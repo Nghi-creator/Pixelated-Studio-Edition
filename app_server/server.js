@@ -3,6 +3,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const { spawn, exec } = require("child_process");
 const net = require("net");
+const fs = require("fs");
 
 const app = express();
 const server = http.createServer(app);
@@ -20,6 +21,12 @@ function startGameEngine() {
   console.log("Starting Virtual Screen...");
   const xvfb = spawn("Xvfb", [":99", "-screen", "0", "640x480x24"]);
 
+  const config = `
+  vrr_runloop_enable = "true"
+  audio_driver = "null"
+  `;
+  fs.writeFileSync("/app/retroarch.cfg", config);
+
   setTimeout(() => {
     console.log("Starting Emulator and Camera...");
 
@@ -29,6 +36,8 @@ function startGameEngine() {
         "-f",
         "-L",
         "/cores/nestopia_libretro.so",
+        "--appendconfig",
+        "/app/retroarch.cfg",
         "/roms/little_sisyphus_v1.nes",
       ],
       { env: { ...process.env, DISPLAY: ":99" } },
