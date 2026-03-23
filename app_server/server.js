@@ -13,6 +13,8 @@ const io = new Server(server, {
 
 function startGameEngine() {
   console.log("Starting Virtual Screen and Audio Engine...");
+
+  // cleanup any existing X server locks or sockets
   if (fs.existsSync("/tmp/.X99-lock"))
     fs.rmSync("/tmp/.X99-lock", { force: true });
   if (fs.existsSync("/tmp/.X11-unix/X99"))
