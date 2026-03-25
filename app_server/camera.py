@@ -16,6 +16,10 @@ def handle_offer(offer):
     global webrtcbin, pipeline
     print("[Python] Received React Offer! Building WebRTC Pipeline...")
 
+    if pipeline is not None:
+        print("[Python] Pipeline already running! Ignoring duplicate React offer.")
+        return
+    
     pipeline_str = """
         webrtcbin name=sendrecv
         
