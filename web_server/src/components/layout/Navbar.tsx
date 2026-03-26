@@ -13,20 +13,6 @@ export default function Navbar() {
             </span>
           </div>
 
-          {/* Search Bar (Hidden on mobile) */}
-          <div className="flex-1 max-w-lg mx-8 hidden md:block">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="text-gray-400 w-4 h-4" />
-              </div>
-              <input
-                type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-700 rounded-lg leading-5 bg-[#111827] text-gray-300 placeholder-gray-500 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe] sm:text-sm transition-colors"
-                placeholder="Search games, genres..."
-              />
-            </div>
-          </div>
-
           {/* Right Nav Controls */}
           <div className="flex items-center space-x-6">
             <button className="text-gray-300 hover:text-[#00f2fe] transition-colors">
