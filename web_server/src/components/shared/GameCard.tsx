@@ -3,10 +3,9 @@ import { Heart } from "lucide-react";
 interface GameCardProps {
   title: string;
   coverUrl: string;
-  genre: string;
 }
 
-export default function GameCard({ title, coverUrl, genre }: GameCardProps) {
+export default function GameCard({ title, coverUrl }: GameCardProps) {
   return (
     <div className="group relative rounded-xl overflow-hidden bg-[#111827] border border-gray-800 hover:border-[#00f2fe]/50 transition-all cursor-pointer">
       {/* Cover Image */}
@@ -24,7 +23,6 @@ export default function GameCard({ title, coverUrl, genre }: GameCardProps) {
       {/* Title & Info Bar at the bottom */}
       <div className="absolute bottom-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19]/90 to-transparent">
         <h3 className="font-bold text-lg truncate text-white">{title}</h3>
-        <p className="text-xs text-[#00f2fe]">{genre}</p>
       </div>
     </div>
   );
