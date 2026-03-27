@@ -35,7 +35,7 @@ SET backdrop_url = 'https://m.gjcdn.net/game-thumbnail/500/622735-crop187_0_1470
 WHERE title = 'Mega Man 2';
 
 UPDATE games 
-SET backdrop_url = 'https://i.etsystatic.com/23724123/r/il/2329e0/2465279803/il_fullxfull.2465279803_nqe2.jpg' 
+SET backdrop_url = 'https://preview.redd.it/are-ninja-gaiden-games-for-nes-pleasantly-difficult-or-just-v0-zf7vx6wzyuae1.jpeg?auto=webp&s=3148addd2f27d14876bb00e6461be6aed850a8b3' 
 WHERE title = 'Ninja Gaiden';
 
 UPDATE games 
@@ -71,7 +71,7 @@ SET backdrop_url = 'https://www.nintendo.com/eu/media/images/10_share_images/gam
 WHERE title = 'Balloon Fight';
 
 UPDATE games 
-SET backdrop_url = 'https://ocremix.org/files/images/games/nes/6/darkwing-duck-nes-title-77917.jpg' 
+SET backdrop_url = 'https://i.ytimg.com/vi/z6Ca6uWNjOM/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLAKVpHbPRPa2BKpggbbKsY0eT-0cA' 
 WHERE title = 'Darkwing Duck';
 
 UPDATE games 
