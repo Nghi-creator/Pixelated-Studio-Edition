@@ -92,6 +92,7 @@ export default function Landing() {
             {filteredGames.map((game) => (
               <GameCard
                 key={game.id}
+                id={game.id}
                 title={game.title}
                 coverUrl={game.cover_url}
               />
