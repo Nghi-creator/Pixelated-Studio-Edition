@@ -19,5 +19,6 @@ VALUES
   ('Ghosts''n Goblins', 'Ghosts''n Goblins (USA).nes', 'https://upload.wikimedia.org/wikipedia/en/a/a1/GhostsnGoblins_flyer.jpg'),
   ('Kirby''s Adventure', 'Kirby''s Adventure (USA) (Rev 1).nes', 'https://upload.wikimedia.org/wikipedia/en/a/ae/Kirby%27s_Adventure_Coverart.png'),
   ('Teenage Mutant Ninja Turtles', 'Teenage Mutant Ninja Turtles (USA).nes', 'https://upload.wikimedia.org/wikipedia/en/5/54/Teenage_Mutant_Ninja_Turtles_%281989_video_game%29.jpg'),
-  ('Tetris', 'Tetris (USA) (Tengen) (Unl).nes', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR_mDEoFFVEHa9g2Gmj1ynjimY7AQR4cDkWEA&s');
+  ('Tetris', 'Tetris (USA) (Tengen) (Unl).nes', 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR_mDEoFFVEHa9g2Gmj1ynjimY7AQR4cDkWEA&s'),
+  ('Little Sisyphus', 'little_sisyphus_v1.nes', 'https://img.itch.zone/aW1nLzE5OTU4MjA0LnBuZw==/original/PQQAi1.png');
 
