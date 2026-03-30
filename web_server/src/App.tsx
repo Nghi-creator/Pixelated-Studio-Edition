@@ -3,6 +3,10 @@ import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import Landing from "./pages/Landing";
 import Player from "./pages/Player";
+import Auth from "./pages/Auth";
+import Favorites from "./pages/Favorites";
+import Profile from "./pages/Profile";
+import ResetPassword from "./pages/ResetPassword";
 
 function App() {
   return (
@@ -13,8 +17,11 @@ function App() {
         <main className="flex-grow pt-16">
           <Routes>
             <Route path="/" element={<Landing />} />
-            {/* Swap the placeholder for the real Player component */}
             <Route path="/play/:id" element={<Player />} />
+            <Route path="/login" element={<Auth />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/favorites" element={<Favorites />} />
+            <Route path="/profile" element={<Profile />} />
           </Routes>
         </main>
 

@@ -1,6 +1,7 @@
-import { Play, Plus } from "lucide-react";
+import { Play, Plus, Check } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../../lib/supabaseClient";
 
 interface Game {
   id: string;
@@ -15,6 +16,7 @@ interface HeroBannerProps {
 
 export default function HeroBanner({ featuredGames }: HeroBannerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isFavorited, setIsFavorited] = useState(false);
   const navigate = useNavigate();
 
   // Automatically rotate the banner every 5 seconds
@@ -26,13 +28,64 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
     return () => clearInterval(interval);
   }, [featuredGames]);
 
+  const currentGame = featuredGames[currentIndex];
+
+  useEffect(() => {
+    const checkFavoriteStatus = async () => {
+      if (!currentGame) return;
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        setIsFavorited(false);
+        return;
+      }
+
+      const { data } = await supabase
+        .from("favorites")
+        .select("game_id")
+        .eq("user_id", session.user.id)
+        .eq("game_id", currentGame.id)
+        .maybeSingle();
+
+      setIsFavorited(!!data);
+    };
+
+    checkFavoriteStatus();
+  }, [currentGame]);
+
+  const toggleFavorite = async () => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      alert("Please sign in to save games to your library!");
+      navigate("/login");
+      return;
+    }
+
+    if (isFavorited) {
+      await supabase
+        .from("favorites")
+        .delete()
+        .eq("user_id", session.user.id)
+        .eq("game_id", currentGame.id);
+      setIsFavorited(false);
+    } else {
+      await supabase
+        .from("favorites")
+        .insert({ user_id: session.user.id, game_id: currentGame.id });
+      setIsFavorited(true);
+    }
+  };
+
   if (!featuredGames || featuredGames.length === 0) {
     return (
       <div className="w-full h-[500px] md:h-[600px] bg-[#0B0F19] animate-pulse"></div>
     );
   }
-
-  const currentGame = featuredGames[currentIndex];
 
   return (
     <div className="relative w-full h-[500px] md:h-[600px] transition-all duration-700 overflow-hidden">
@@ -66,15 +119,31 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
             </p>
 
             <div className="flex flex-wrap gap-4">
-              {/* 3. Add the onClick event to the Play button */}
               <button
                 onClick={() => navigate(`/play/${currentGame.id}`)}
                 className="bg-[#00f2fe] hover:bg-blue-400 text-black font-bold py-3 px-8 rounded-lg shadow-[0_0_15px_rgba(0,242,254,0.4)] transition-all flex items-center gap-2"
               >
                 <Play className="w-5 h-5 fill-black" /> Play Now
               </button>
-              <button className="bg-[#111827] hover:bg-gray-800 border border-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-all flex items-center gap-2">
-                <Plus className="w-5 h-5" /> Add to List
+
+              {/* Dynamic Add/Remove List Button */}
+              <button
+                onClick={toggleFavorite}
+                className={`border font-bold py-3 px-8 rounded-lg transition-all flex items-center gap-2 ${
+                  isFavorited
+                    ? "bg-[#00f2fe]/10 border-[#00f2fe] text-[#00f2fe] hover:bg-[#00f2fe]/20"
+                    : "bg-[#111827] hover:bg-gray-800 border-gray-700 text-white"
+                }`}
+              >
+                {isFavorited ? (
+                  <>
+                    <Check className="w-5 h-5" /> Saved to Library
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5" /> Add to List
+                  </>
+                )}
               </button>
             </div>
 

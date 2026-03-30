@@ -23,10 +23,10 @@ def handle_offer(offer):
     pipeline_str = """
         webrtcbin name=sendrecv
         
-        ximagesrc display-name=:99 use-damage=true ! 
+        ximagesrc display-name=:99 use-damage=false ! 
         video/x-raw,framerate=60/1 ! 
         videoconvert ! video/x-raw,format=I420 ! queue ! 
-        vp8enc deadline=1 cpu-used=8 threads=4 end-usage=cbr target-bitrate=1000000 keyframe-max-dist=30 ! 
+        vp8enc deadline=1 cpu-used=6 threads=4 end-usage=vbr target-bitrate=3000000 max-quantizer=30 min-quantizer=10 keyframe-max-dist=15 ! 
         rtpvp8pay pt=96 ! queue ! 
         application/x-rtp,media=video,encoding-name=VP8,payload=96 ! sendrecv.
         

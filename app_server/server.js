@@ -83,7 +83,6 @@ io.on("connection", (socket) => {
     console.log(
       "[Node.js] Python Camera is armed and ready! Relaying to React...",
     );
-    // Forward the signal back to React so it knows it can send the offer
     socket.broadcast.emit("python-ready");
   });
 

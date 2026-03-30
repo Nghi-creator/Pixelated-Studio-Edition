@@ -45,7 +45,6 @@ export function useWebRTC(gameId: string) {
       pc.addIceCandidate(new RTCIceCandidate(candidate));
     });
 
-    // 1. When we connect, ONLY ask the server to start the game
     socket.on("connect", async () => {
       console.log("[WebRTC] Connected. Fetching ROM data for:", gameId);
 
@@ -62,15 +61,13 @@ export function useWebRTC(gameId: string) {
           `[WebRTC] Requesting Node Server to boot: ${data.rom_filename}`,
         );
         socket.emit("start-game", { romFilename: data.rom_filename });
-
-        // DO NOT SEND THE OFFER YET. We wait for python-ready.
       } catch (err) {
         console.error("Failed to boot game:", err);
         setStatus("error");
       }
     });
 
-    // 2. NEW LISTENER: When Node.js tells us Python is awake, THEN send the offer.
+    // 2. NEW LISTENER
     socket.on("python-ready", async () => {
       console.log("[WebRTC] Python is awake! Generating and sending Offer...");
 
@@ -86,9 +83,8 @@ export function useWebRTC(gameId: string) {
       });
     });
 
-    // Controller Inputs (Keyboard)
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.repeat) return; // Prevent spamming
+      if (e.repeat) return;
       socket.emit("keydown", { key: e.key });
     };
     const handleKeyUp = (e: KeyboardEvent) => {
