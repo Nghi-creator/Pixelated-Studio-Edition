@@ -31,11 +31,11 @@ SET backdrop_url = 'https://i.ebayimg.com/images/g/G0MAAOSwv7pjQbIt/s-l1200.jpg'
 WHERE title = 'Super Mario Bros. 3';
 
 UPDATE games 
-SET backdrop_url = 'https://static.wikia.nocookie.net/megaman/images/c/cb/Rockman_2_package_art.png/revision/latest/scale-to-width-down/1200?cb=20191116023117' 
+SET backdrop_url = 'https://m.gjcdn.net/game-thumbnail/500/622735-crop187_0_1470_722-ll-j8tur8r2-v4.webp' 
 WHERE title = 'Mega Man 2';
 
 UPDATE games 
-SET backdrop_url = 'https://i.etsystatic.com/23724123/r/il/2329e0/2465279803/il_fullxfull.2465279803_nqe2.jpg' 
+SET backdrop_url = 'https://preview.redd.it/are-ninja-gaiden-games-for-nes-pleasantly-difficult-or-just-v0-zf7vx6wzyuae1.jpeg?auto=webp&s=3148addd2f27d14876bb00e6461be6aed850a8b3' 
 WHERE title = 'Ninja Gaiden';
 
 UPDATE games 
@@ -49,3 +49,47 @@ WHERE title = 'Little Sisyphus';
 UPDATE games 
 SET backdrop_url = 'https://cdn.thegamesdb.net/images/medium/fanart/2868-1.jpg' 
 WHERE title = 'Aladdin';
+
+UPDATE games 
+SET backdrop_url = 'https://gh.cdn.sewest.net/assets/ident/news/dragon-quest-facts/en_US/DQ2_NE_08.jpg?quality=65&width=66%25&height=66%25' 
+WHERE title = 'Dragon Warrior';
+
+UPDATE games 
+SET backdrop_url = 'https://www.nintendo.com/eu/media/images/10_share_images/games_15/virtual_console_wii_u_7/SI_WiiUVC_DoubleDragonIIITheSacredStones_image1600w.jpg' 
+WHERE title = 'Double Dragon III - The Sacred Stones';
+
+UPDATE games 
+SET backdrop_url = 'https://hoganreviews.co.uk/wp-content/uploads/2024/08/metal-gear.jpg' 
+WHERE title = 'Metal Gear';
+
+UPDATE games 
+SET backdrop_url = 'https://www.nintendo.com/eu/media/images/10_share_images/games_15/nes_5/H2x1_NES_Metroid_image1600w.jpg' 
+WHERE title = 'Metroid';
+
+UPDATE games 
+SET backdrop_url = 'https://www.nintendo.com/eu/media/images/10_share_images/games_15/nes_5/H2x1_NES_BalloonFight.jpg' 
+WHERE title = 'Balloon Fight';
+
+UPDATE games 
+SET backdrop_url = 'https://i.ytimg.com/vi/z6Ca6uWNjOM/hq720.jpg?sqp=-oaymwEhCK4FEIIDSFryq4qpAxMIARUAAAAAGAElAADIQj0AgKJD&rs=AOn4CLAKVpHbPRPa2BKpggbbKsY0eT-0cA' 
+WHERE title = 'Darkwing Duck';
+
+UPDATE games 
+SET backdrop_url = 'https://www.nintendo.com/eu/media/images/10_share_images/games_15/nes_5/H2x1_NES_DrMario_image1600w.jpg' 
+WHERE title = 'Dr. Mario';
+
+UPDATE games 
+SET backdrop_url = 'https://www.nintendo.com/eu/media/images/10_share_images/games_15/nes_5/H2x1_NES_GhostNGoblins_image1600w.jpg' 
+WHERE title = 'Ghosts''n Goblins';
+
+UPDATE games 
+SET backdrop_url = 'https://www.nintendo.com/eu/media/images/10_share_images/games_15/virtual_console_wii_u_7/H2x1_WiiUVC_KirbysAdventure_image1600w.jpg' 
+WHERE title = 'Kirby''s Adventure';
+
+UPDATE games 
+SET backdrop_url = 'https://www.denofgeek.com/wp-content/uploads/2024/05/TMNT-NES.jpg?fit=759%2C400' 
+WHERE title = 'Teenage Mutant Ninja Turtles';
+
+UPDATE games 
+SET backdrop_url = 'https://i.ytimg.com/vi/RxBoONxU62c/maxresdefault.jpg' 
+WHERE title = 'Tetris';

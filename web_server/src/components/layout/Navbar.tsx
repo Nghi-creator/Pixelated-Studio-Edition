@@ -1,4 +1,4 @@
-import { Search, Gamepad2, Heart, Settings } from "lucide-react";
+import { Gamepad2, Heart, Settings } from "lucide-react";
 
 export default function Navbar() {
   return (

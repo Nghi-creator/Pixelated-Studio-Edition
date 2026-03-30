@@ -1,5 +1,6 @@
 import { Play, Plus } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
 interface Game {
   id: string;
@@ -14,6 +15,7 @@ interface HeroBannerProps {
 
 export default function HeroBanner({ featuredGames }: HeroBannerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const navigate = useNavigate();
 
   // Automatically rotate the banner every 5 seconds
   useEffect(() => {
@@ -64,7 +66,11 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
             </p>
 
             <div className="flex flex-wrap gap-4">
-              <button className="bg-[#00f2fe] hover:bg-blue-400 text-black font-bold py-3 px-8 rounded-lg shadow-[0_0_15px_rgba(0,242,254,0.4)] transition-all flex items-center gap-2">
+              {/* 3. Add the onClick event to the Play button */}
+              <button
+                onClick={() => navigate(`/play/${currentGame.id}`)}
+                className="bg-[#00f2fe] hover:bg-blue-400 text-black font-bold py-3 px-8 rounded-lg shadow-[0_0_15px_rgba(0,242,254,0.4)] transition-all flex items-center gap-2"
+              >
                 <Play className="w-5 h-5 fill-black" /> Play Now
               </button>
               <button className="bg-[#111827] hover:bg-gray-800 border border-gray-700 text-white font-bold py-3 px-8 rounded-lg transition-all flex items-center gap-2">
