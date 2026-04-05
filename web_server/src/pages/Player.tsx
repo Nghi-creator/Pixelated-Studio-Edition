@@ -109,6 +109,7 @@ export default function Player() {
   const fetchComments = useCallback(
     async (pageNum: number, isInitial = false) => {
       if (!id) return;
+
       const { data, error } = await supabase
         .from("comments")
         .select(
@@ -119,13 +120,19 @@ export default function Player() {
         )
         .eq("game_id", id)
         .order("created_at", { ascending: false })
-        .range(pageNum * 10, (pageNum + 1) * 10 - 1);
+        .range(pageNum * 10, (pageNum + 1) * 10);
 
       if (error) return console.error(error);
 
-      if (data.length < 10) setHasMoreComments(false);
+      let displayData = data;
 
-      const typedData = data as unknown as GameComment[];
+      if (data.length > 10) {
+        setHasMoreComments(true);
+        displayData = data.slice(0, 10);
+      } else {
+        setHasMoreComments(false);
+      }
+      const typedData = displayData as unknown as GameComment[];
 
       if (isInitial) {
         setComments(typedData);
@@ -198,7 +205,7 @@ export default function Player() {
   }, [id]);
 
   // Handle Submitting a new comment
-  const handlePostComment = async (e: React.FormEvent) => {
+  const handlePostComment = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!currentUser || !newComment.trim() || !id) return;
 
@@ -214,7 +221,6 @@ export default function Player() {
 
       setNewComment("");
       setPage(0);
-      setHasMoreComments(true);
       await fetchComments(0, true);
     } catch (err) {
       console.error(err);
