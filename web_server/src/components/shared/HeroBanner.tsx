@@ -1,4 +1,4 @@
-import { Play, Plus, Check } from "lucide-react";
+import { Play, Plus, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
@@ -26,7 +26,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
       setCurrentIndex((prev) => (prev + 1) % featuredGames.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, [featuredGames]);
+  }, [featuredGames, currentIndex]);
 
   const currentGame = featuredGames[currentIndex];
 
@@ -81,6 +81,17 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
     }
   };
 
+  // Manual Navigation Handlers
+  const handlePrev = () => {
+    setCurrentIndex((prev) =>
+      prev === 0 ? featuredGames.length - 1 : prev - 1,
+    );
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % featuredGames.length);
+  };
+
   if (!featuredGames || featuredGames.length === 0) {
     return (
       <div className="w-full h-[500px] md:h-[600px] bg-[#0B0F19] animate-pulse"></div>
@@ -88,7 +99,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
   }
 
   return (
-    <div className="relative w-full h-[500px] md:h-[600px] transition-all duration-700 overflow-hidden">
+    <div className="relative w-full h-[500px] md:h-[600px] transition-all duration-700 overflow-hidden group">
       {/* Gradients */}
       <div className="absolute inset-0 bg-gradient-to-r from-[#0B0F19] via-[#0B0F19]/60 to-transparent z-10"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F19] via-transparent to-transparent z-10"></div>
@@ -102,6 +113,24 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
           alt={game.title}
         />
       ))}
+
+      {/* Navigation Arrows */}
+      {featuredGames.length > 1 && (
+        <>
+          <button
+            onClick={handlePrev}
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/40 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+          >
+            <ChevronLeft className="w-8 h-8" />
+          </button>
+          <button
+            onClick={handleNext}
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/40 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+          >
+            <ChevronRight className="w-8 h-8" />
+          </button>
+        </>
+      )}
 
       {/* Content */}
       <div className="absolute top-1/2 left-0 transform -translate-y-1/2 z-20 w-full">
@@ -152,7 +181,8 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
               {featuredGames.map((_, idx) => (
                 <div
                   key={idx}
-                  className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex ? "w-8 bg-[#00f2fe]" : "w-4 bg-gray-600"}`}
+                  onClick={() => setCurrentIndex(idx)}
+                  className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${idx === currentIndex ? "w-8 bg-[#00f2fe]" : "w-4 bg-gray-600 hover:bg-gray-400"}`}
                 />
               ))}
             </div>
