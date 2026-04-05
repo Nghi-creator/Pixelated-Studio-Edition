@@ -49,7 +49,6 @@ export default function Favorites() {
         if (error) throw error;
 
         if (data) {
-          // FIX 1 (Continued): Safely cast the raw data to our new interface
           const formattedGames = (data as unknown as SupabaseJoinRow[])
             .map((row) => row.games)
             .filter((game) => game !== null);
