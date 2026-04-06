@@ -14,7 +14,7 @@ const io = new Server(server, {
 let retroarchProcess = null;
 let cameraProcess = null;
 
-// 1. Boot the "Virtual TV" (Xvfb and Audio) once when the server starts
+// 1. Boot the Xvfb and Audio once when the server starts
 function startVirtualDisplay() {
   console.log("Booting Virtual Display (Xvfb) and PulseAudio...");
 
@@ -48,7 +48,7 @@ function bootGame(romFilename) {
     [
       "-f",
       "-L",
-      "/cores/nestopia_libretro.so",
+      "/cores/mesen_libretro.so",
       "--appendconfig",
       "/app/retroarch.cfg",
       `/roms/${romFilename}`,

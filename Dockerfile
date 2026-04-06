@@ -2,7 +2,7 @@ FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# 1. Download Core Tools (Added pulseaudio and gstreamer1.0-pulseaudio)
+# 1. Download Core Tools
 RUN apt-get update && apt-get install -y \
     software-properties-common \
     wget \
@@ -38,13 +38,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     make \
     ca-certificates
 
-# 3. Forge the Native ARM64 NES Core from Source Code
-RUN git clone --depth 1 https://github.com/libretro/nestopia.git /tmp/nestopia && \
-    cd /tmp/nestopia/libretro && \
+# 3. Forge the Native ARM64 NES Core from Source Code (Mesen)
+RUN git clone --depth 1 https://github.com/libretro/mesen.git /tmp/mesen && \
+    cd /tmp/mesen/Libretro && \
     make -j4 && \
     mkdir -p /cores && \
-    cp nestopia_libretro.so /cores/ && \
-    rm -rf /tmp/nestopia
+    cp mesen_libretro.so /cores/ && \
+    rm -rf /tmp/mesen
 
 # 4. Install Node.js 
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
