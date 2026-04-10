@@ -34,8 +34,17 @@ export default function Landing() {
       if (data) {
         setGames(data);
 
-        const shuffled = [...data].sort(() => 0.5 - Math.random());
-        setFeaturedGames(shuffled.slice(0, 3));
+        const sortedByTrending = [...data].sort((a, b) => {
+          const countB = b.play_count || 0;
+          const countA = a.play_count || 0;
+
+          if (countB === countA) {
+            return Math.random() - 0.5;
+          }
+          return countB - countA;
+        });
+
+        setFeaturedGames(sortedByTrending.slice(0, 3));
       }
     } catch (error) {
       console.error("Error fetching games:", error);
