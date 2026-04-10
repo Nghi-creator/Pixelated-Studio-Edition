@@ -7,6 +7,9 @@ import {
   ThumbsDown,
   Send,
   Trash2,
+  Flag,
+  AlertTriangle,
+  X,
 } from "lucide-react";
 import { useWebRTC } from "../lib/useWebRTC";
 import { supabase } from "../lib/supabaseClient";
@@ -48,6 +51,13 @@ export default function Player() {
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [page, setPage] = useState(0);
   const [hasMoreComments, setHasMoreComments] = useState(true);
+
+  // Reporting State
+  const [reportingCommentId, setReportingCommentId] = useState<string | null>(
+    null,
+  );
+  const [reportReason, setReportReason] = useState("");
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
 
   // 1. Fetch Auth Session
   useEffect(() => {
@@ -253,6 +263,42 @@ export default function Player() {
     }
   };
 
+  // Submit Report
+  const handleSubmitReport = async (e: React.SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!currentUser || !reportingCommentId || !reportReason.trim()) return;
+
+    setIsSubmittingReport(true);
+    try {
+      const { error } = await supabase.from("reported_comments").insert({
+        comment_id: reportingCommentId,
+        reporter_id: currentUser.id,
+        reason: reportReason.trim(),
+      });
+
+      if (error) {
+        if (error.code === "23505") {
+          alert(
+            "You have already reported this comment. Our moderators are reviewing it.",
+          );
+        } else {
+          throw error;
+        }
+      } else {
+        alert(
+          "Report submitted successfully. Thank you for keeping the community safe!",
+        );
+      }
+    } catch (err) {
+      console.error("Failed to submit report:", err);
+      alert("Failed to submit report. Please try again.");
+    } finally {
+      setIsSubmittingReport(false);
+      setReportingCommentId(null);
+      setReportReason("");
+    }
+  };
+
   // React to Comment
   const handleCommentReaction = async (commentId: string, isLike: boolean) => {
     if (!currentUser) {
@@ -310,6 +356,25 @@ export default function Player() {
     }
   };
 
+  // 5. 30-Second Play Tracker
+  useEffect(() => {
+    if (!id) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const { error } = await supabase.rpc("increment_play_count", {
+          game_id: id,
+        });
+
+        if (error) throw error;
+        console.log("Play successfully counted!");
+      } catch (err) {
+        console.error("Failed to count play:", err);
+      }
+    }, 30000);
+    return () => clearTimeout(timer);
+  }, [id]);
+
   return (
     <div className="flex flex-col items-center pt-24 pb-24 px-4 min-h-screen">
       {/* Top Controls Bar */}
@@ -360,8 +425,7 @@ export default function Player() {
       {/* Under-Player Action Bar */}
       <div className="w-full max-w-5xl mt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex flex-wrap items-center gap-4 text-gray-400 text-sm">
-          <p>Click video to focus.</p>
-          <p className="border-l border-gray-700 pl-4">
+          <p>
             Move:{" "}
             <kbd className="bg-gray-800 px-2 py-1 rounded text-gray-200 ml-1 font-mono">
               ARROWS
@@ -496,15 +560,28 @@ export default function Player() {
                         </span>
                       </div>
 
-                      {/* Delete Button (Only shows if they own the comment) */}
-                      {currentUser?.id === comment.user_id && (
-                        <button
-                          onClick={() => handleDeleteComment(comment.id)}
-                          className="text-gray-500 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
+                      {/* Action Icons: Delete or Report */}
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {currentUser?.id === comment.user_id ? (
+                          <button
+                            onClick={() => handleDeleteComment(comment.id)}
+                            className="text-gray-500 hover:text-red-400 transition-colors"
+                            title="Delete Comment"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          currentUser && (
+                            <button
+                              onClick={() => setReportingCommentId(comment.id)}
+                              className="text-gray-500 hover:text-yellow-500 transition-colors"
+                              title="Report Comment"
+                            >
+                              <Flag className="w-4 h-4" />
+                            </button>
+                          )
+                        )}
+                      </div>
                     </div>
 
                     <p className="text-gray-300 text-sm leading-relaxed mb-3">
@@ -568,6 +645,67 @@ export default function Player() {
           </button>
         )}
       </div>
+
+      {/* --- REPORT MODAL --- */}
+      {reportingCommentId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#111827] border border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="flex justify-between items-center p-6 border-b border-gray-800">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <AlertTriangle className="text-yellow-500 w-5 h-5" />
+                Report Comment
+              </h3>
+              <button
+                onClick={() => {
+                  setReportingCommentId(null);
+                  setReportReason("");
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitReport} className="p-6">
+              <p className="text-gray-400 text-sm mb-4">
+                Why are you reporting this comment? This will be sent directly
+                to our moderators for review.
+              </p>
+
+              <textarea
+                value={reportReason}
+                onChange={(e) => setReportReason(e.target.value)}
+                placeholder="E.g., Spam, harassment, toxic behavior..."
+                className="w-full bg-[#0B0F19] border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:border-yellow-500 min-h-[100px] mb-6 resize-none"
+                required
+              />
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setReportingCommentId(null);
+                    setReportReason("");
+                  }}
+                  className="px-4 py-2 text-gray-400 hover:text-white font-medium transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingReport || !reportReason.trim()}
+                  className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+                >
+                  {isSubmittingReport && (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  )}
+                  {isSubmittingReport ? "Submitting..." : "Submit Report"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
