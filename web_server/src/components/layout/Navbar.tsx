@@ -84,31 +84,22 @@ export default function Navbar() {
   useEffect(() => {
     if (!user?.id) return;
 
-    const channel = supabase
-      .channel(`ban-listener-${user.id}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "profiles",
-          filter: `id=eq.${user.id}`,
-        },
-        async (payload) => {
-          console.log("REALTIME PAYLOAD CAUGHT:", payload);
-
-          if (payload.new.is_banned === true) {
-            await supabase.auth.signOut();
-            alert("Your account has been permanently suspended.");
-            window.location.href = "/login";
-          }
-        },
-      )
-      .subscribe((status) => {
-        if (status === "SUBSCRIBED") {
-          console.log("Ban bouncer is online and watching.");
+    const channel = supabase.channel(`ban-listener-${user.id}`).on(
+      "postgres_changes",
+      {
+        event: "UPDATE",
+        schema: "public",
+        table: "profiles",
+        filter: `id=eq.${user.id}`,
+      },
+      async (payload) => {
+        if (payload.new.is_banned === true) {
+          await supabase.auth.signOut();
+          alert("Your account has been permanently suspended.");
+          window.location.href = "/login";
         }
-      });
+      },
+    );
 
     return () => {
       supabase.removeChannel(channel);

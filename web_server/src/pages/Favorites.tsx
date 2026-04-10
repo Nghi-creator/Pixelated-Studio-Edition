@@ -20,7 +20,9 @@ export default function Favorites() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchFavorites = async () => {
+    let channel: ReturnType<typeof supabase.channel>;
+
+    const fetchFavoritesAndListen = async () => {
       try {
         const {
           data: { session },
@@ -31,6 +33,7 @@ export default function Favorites() {
           return;
         }
 
+        // 1. Fetch the initial list of favorites
         const { data, error } = await supabase
           .from("favorites")
           .select(
@@ -55,6 +58,25 @@ export default function Favorites() {
 
           setFavorites(formattedGames);
         }
+
+        // 2. Set up the Realtime Listener
+        channel = supabase
+          .channel("favorites-listener")
+          .on(
+            "postgres_changes",
+            {
+              event: "DELETE",
+              schema: "public",
+              table: "favorites",
+              filter: `user_id=eq.${session.user.id}`,
+            },
+            (payload) => {
+              setFavorites((prev) =>
+                prev.filter((game) => game.id !== payload.old.game_id),
+              );
+            },
+          )
+          .subscribe();
       } catch (error) {
         console.error("Error fetching favorites:", error);
       } finally {
@@ -62,7 +84,11 @@ export default function Favorites() {
       }
     };
 
-    fetchFavorites();
+    fetchFavoritesAndListen();
+
+    return () => {
+      if (channel) supabase.removeChannel(channel);
+    };
   }, [navigate]);
 
   if (loading) {
