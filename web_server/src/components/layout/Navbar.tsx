@@ -1,33 +1,57 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
-import { Gamepad2, Heart, LogOut, User as UserIcon } from "lucide-react";
+import {
+  Gamepad2,
+  Heart,
+  LogOut,
+  User as UserIcon,
+  ShieldAlert,
+} from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [dbUsername, setDbUsername] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
   const navigate = useNavigate();
   const location = useLocation();
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const isKickingOut = useRef(false);
   useEffect(() => {
     const fetchUserAndProfile = async (sessionUser: User | null) => {
       setUser(sessionUser);
       if (sessionUser) {
         const { data } = await supabase
           .from("profiles")
-          .select("username")
+          .select("username, role, is_banned")
           .eq("id", sessionUser.id)
           .single();
 
-        if (data?.username) {
+        // --- BOUNCER ---
+        if (data?.is_banned) {
+          if (isKickingOut.current) return;
+          isKickingOut.current = true;
+
+          await supabase.auth.signOut();
+          setUser(null);
+          alert("Your account has been permanently suspended.");
+          if (window.location.pathname !== "/login") {
+            window.location.href = "/login";
+          }
+          return;
+        }
+
+        if (data) {
           setDbUsername(data.username);
+          setUserRole(data.role);
         }
       } else {
         setDbUsername(null);
+        setUserRole(null);
       }
     };
 
@@ -57,6 +81,40 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const channel = supabase
+      .channel(`ban-listener-${user.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${user.id}`,
+        },
+        async (payload) => {
+          console.log("REALTIME PAYLOAD CAUGHT:", payload);
+
+          if (payload.new.is_banned === true) {
+            await supabase.auth.signOut();
+            alert("Your account has been permanently suspended.");
+            window.location.href = "/login";
+          }
+        },
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("Ban bouncer is online and watching.");
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setIsDropdownOpen(false);
@@ -85,8 +143,8 @@ export default function Navbar() {
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center gap-2 group">
             <Gamepad2 className="w-8 h-8 text-[#00f2fe] group-hover:animate-pulse" />
-            <span className="text-xl font-extrabold tracking-widest text-white">
-              CLOUD<span className="text-[#00f2fe]">101</span>
+            <span className="text-xl font-extrabold tracking-widest text-[#00f2fe]">
+              PIXELATED
             </span>
           </Link>
 
@@ -125,10 +183,22 @@ export default function Navbar() {
                         Signed in as
                       </p>
 
-                      <p className="text-sm font-bold text-white truncate">
+                      <p className="text-sm font-bold text-white truncate flex items-center gap-1.5">
                         {dbUsername || user.email}
                       </p>
                     </div>
+
+                    {/* ADMIN CONDITIONAL RENDER */}
+                    {(userRole === "admin" || userRole === "super_admin") && (
+                      <Link
+                        to="/admin"
+                        onClick={() => setIsDropdownOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm text-[#00f2fe] font-bold hover:bg-gray-800 transition-colors"
+                      >
+                        <ShieldAlert className="w-4 h-4" /> Admin Panel
+                      </Link>
+                    )}
+
                     <Link
                       to="/profile"
                       onClick={() => setIsDropdownOpen(false)}
@@ -136,6 +206,7 @@ export default function Navbar() {
                     >
                       <UserIcon className="w-4 h-4" /> Profile
                     </Link>
+
                     <button
                       onClick={handleSignOut}
                       className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-gray-800 hover:text-red-300 transition-colors text-left"
