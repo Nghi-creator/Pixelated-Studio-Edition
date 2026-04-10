@@ -142,10 +142,6 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
             <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-4 drop-shadow-lg text-white">
               {currentGame.title}
             </h1>
-            <p className="text-lg text-gray-300 mb-8 drop-shadow-md">
-              Jump back into the classic experience. Zero latency. Instant play.
-              Hosted directly on your AWS Edge nodes.
-            </p>
 
             <div className="flex flex-wrap gap-4">
               <button
