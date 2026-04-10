@@ -1,6 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Loader2, ArrowLeft, User, Lock, Save, Camera, X } from "lucide-react";
+import {
+  Loader2,
+  ArrowLeft,
+  User,
+  Lock,
+  Save,
+  Camera,
+  X,
+  AlertOctagon,
+} from "lucide-react";
 import Cropper from "react-easy-crop";
 import { supabase } from "../lib/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
@@ -49,7 +58,6 @@ const getCroppedImg = async (
         reject(new Error("Canvas is empty"));
         return;
       }
-      // Return a proper File object ready for Supabase
       resolve(new File([blob], "avatar.jpg", { type: "image/jpeg" }));
     }, "image/jpeg");
   });
@@ -63,11 +71,12 @@ export default function Profile() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
+  const [userRole, setUserRole] = useState<string>("user");
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
-  // Split messages for better UX
+  // Split messages
   const [profileMessage, setProfileMessage] = useState<{
     type: "success" | "error";
     text: string;
@@ -94,6 +103,14 @@ export default function Profile() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
 
+  // Account Deletion State
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteInput, setDeleteInput] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const hasPassword = user?.app_metadata?.providers?.includes("email");
+
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -107,9 +124,10 @@ export default function Profile() {
         }
         setUser(session.user);
 
+        // Fetch profile and role
         const { data: profile, error: profileError } = await supabase
           .from("profiles")
-          .select("username, avatar_url")
+          .select("username, avatar_url, role")
           .eq("id", session.user.id)
           .single();
 
@@ -118,6 +136,7 @@ export default function Profile() {
         if (profile) {
           setUsername(profile.username || "");
           setAvatarUrl(profile.avatar_url || "");
+          setUserRole(profile.role || "user");
         }
       } catch (error) {
         console.error("Error loading profile", error);
@@ -173,7 +192,6 @@ export default function Profile() {
     try {
       let finalAvatarUrl = avatarUrl;
 
-      // If they cropped a new file, upload it
       if (avatarFile) {
         const fileExt = avatarFile.name.split(".").pop();
         const filePath = `${user.id}/avatar.${fileExt}`;
@@ -260,6 +278,47 @@ export default function Profile() {
     }
   };
 
+  // --- Smart Account Deletion Logic ---
+  const handleDeleteAccount = async (e: React.SubmitEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!user) return;
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    try {
+      if (hasPassword) {
+        // 1A. Email Users: Verify Password
+        const { error: verifyError } = await supabase.auth.signInWithPassword({
+          email: user.email!,
+          password: deleteInput,
+        });
+        if (verifyError) throw new Error("Incorrect password.");
+      } else {
+        // 1B. OAuth Users: Verify Text String
+        if (deleteInput !== "DELETE") {
+          throw new Error("You must type exactly 'DELETE' to confirm.");
+        }
+      }
+
+      // 2. Call the secure RPC function
+      const { error: deleteError } = await supabase.rpc("delete_own_account");
+      if (deleteError) throw deleteError;
+
+      // 3. Sign out and redirect
+      await supabase.auth.signOut();
+      navigate("/");
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        setDeleteError(error.message);
+      } else {
+        setDeleteError(
+          "An unexpected error occurred while deleting your account.",
+        );
+      }
+      setIsDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[80vh]">
@@ -277,7 +336,7 @@ export default function Profile() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* MODAL */}
+      {/* CROPPER MODAL */}
       {showCropper && imageSrc && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4">
           <div className="bg-[#111827] border border-gray-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col">
@@ -336,6 +395,82 @@ export default function Profile() {
         </div>
       )}
 
+      {/* --- NEW: DELETE CONFIRMATION MODAL --- */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-[#111827] border border-red-500/30 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col">
+            <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-red-500/10">
+              <h3 className="text-red-400 font-bold flex items-center gap-2">
+                <AlertOctagon className="w-5 h-5" /> Delete Account
+              </h3>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteError(null);
+                  setDeleteInput("");
+                }}
+                className="text-gray-400 hover:text-white transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6">
+              <p className="text-gray-300 text-sm mb-6 leading-relaxed">
+                This action is{" "}
+                <span className="text-red-400 font-bold">
+                  permanent and irreversible
+                </span>
+                . All your comments, likes, and profile data will be immediately
+                wiped from our servers.
+              </p>
+
+              {deleteError && (
+                <div className="bg-red-500/10 border border-red-500/50 text-red-400 text-sm px-4 py-3 rounded-lg mb-4">
+                  {deleteError}
+                </div>
+              )}
+
+              <form onSubmit={handleDeleteAccount} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    {hasPassword
+                      ? "Enter Password to confirm"
+                      : "Type 'DELETE' to confirm"}
+                  </label>
+                  <input
+                    type={hasPassword ? "password" : "text"}
+                    value={deleteInput}
+                    onChange={(e) => setDeleteInput(e.target.value)}
+                    placeholder={hasPassword ? "Your password" : "DELETE"}
+                    required
+                    className="w-full bg-[#0B0F19] border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                  />
+                </div>
+
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteModal(false)}
+                    className="px-5 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors font-medium"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isDeleting || !deleteInput}
+                    className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg transition-colors font-bold flex items-center gap-2"
+                  >
+                    {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                    Delete Forever
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MAIN PROFILE PAGE */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full mt-8">
         <button
@@ -348,11 +483,9 @@ export default function Profile() {
         <h1 className="text-4xl font-extrabold tracking-tight mb-2 text-white">
           Account Settings
         </h1>
-        <p className="text-gray-400 mb-8">
-          Manage your profile identity and security preferences.
-        </p>
 
         <div className="space-y-8">
+          {/* PROFILE SECTION */}
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 md:p-8">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <User className="w-5 h-5 text-[#00f2fe]" /> Public Profile
@@ -437,6 +570,7 @@ export default function Profile() {
             </form>
           </div>
 
+          {/* SECURITY SECTION */}
           <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 md:p-8">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <Lock className="w-5 h-5 text-red-400" /> Security
@@ -492,6 +626,25 @@ export default function Profile() {
                 Update Password
               </button>
             </form>
+
+            {/* MERGED DANGER ZONE (HIDDEN FROM ADMINS/SUPER_ADMINS) */}
+            {userRole !== "admin" && userRole !== "super_admin" && (
+              <div className="mt-10 pt-8 border-t border-gray-800">
+                <h3 className="text-lg font-bold text-red-500 mb-2 flex items-center gap-2">
+                  <AlertOctagon className="w-5 h-5" /> Danger Zone
+                </h3>
+                <p className="text-gray-400 text-sm mb-6">
+                  Once you delete your account, there is no going back. Please
+                  be certain.
+                </p>
+                <button
+                  onClick={() => setShowDeleteModal(true)}
+                  className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 font-bold py-2.5 px-6 rounded-lg transition-all"
+                >
+                  Delete Account
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>
