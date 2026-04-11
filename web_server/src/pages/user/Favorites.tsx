@@ -94,7 +94,7 @@ export default function Favorites() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[80vh]">
-        <Loader2 className="w-12 h-12 text-[#00f2fe] animate-spin" />
+        <Loader2 className="w-12 h-12 text-synth-primary animate-spin drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
       </div>
     );
   }
@@ -104,7 +104,7 @@ export default function Favorites() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full mt-8">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-gray-400 hover:text-[#00f2fe] transition-colors mb-8 w-fit"
+          className="flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors mb-8 w-fit"
         >
           <ArrowLeft className="w-5 h-5" /> Back to Home
         </button>
@@ -118,8 +118,8 @@ export default function Favorites() {
 
         {/* Empty State vs Grid */}
         {favorites.length === 0 ? (
-          <div className="text-center py-32 bg-[#111827]/50 rounded-2xl border border-gray-800 border-dashed">
-            <HeartCrack className="w-16 h-16 mx-auto mb-6 text-gray-600" />
+          <div className="text-center py-32 bg-synth-surface/40 rounded-2xl border border-synth-border border-dashed shadow-inner">
+            <HeartCrack className="w-16 h-16 mx-auto mb-6 text-synth-border" />
             <h3 className="text-2xl font-bold text-gray-300 mb-2">
               No favorites yet
             </h3>
@@ -129,7 +129,7 @@ export default function Favorites() {
             </p>
             <button
               onClick={() => navigate("/")}
-              className="bg-[#0B0F19] hover:bg-gray-800 border border-[#00f2fe]/50 text-[#00f2fe] font-bold py-3 px-8 rounded-lg transition-all flex items-center gap-2 mx-auto"
+              className="bg-synth-bg hover:bg-synth-elevated border border-synth-primary/55 text-synth-primary font-bold py-3 px-8 rounded-lg transition-all flex items-center gap-2 mx-auto shadow-glow-primary-sm hover:shadow-glow-primary"
             >
               <Gamepad2 className="w-5 h-5" /> Browse Games
             </button>

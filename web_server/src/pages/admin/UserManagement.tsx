@@ -122,26 +122,26 @@ export default function UserManagement() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <Users className="text-[#00f2fe] w-8 h-8" />
+          <Users className="text-synth-primary w-8 h-8 drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
           User Management
         </h1>
-        <span className="bg-gray-800 text-gray-300 px-4 py-2 rounded-full font-semibold">
+        <span className="bg-synth-secondary/15 text-synth-secondary border border-synth-secondary/30 px-4 py-2 rounded-full font-semibold">
           {users.length} Total Users
         </span>
       </div>
 
-      <div className="bg-[#111827] border border-gray-800 rounded-xl overflow-hidden">
+      <div className="bg-synth-surface border border-synth-border rounded-xl overflow-hidden shadow-glow-card">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-[#0B0F19] border-b border-gray-800 text-xs uppercase tracking-wider text-gray-500 font-bold">
+              <tr className="bg-synth-bg border-b border-synth-border text-xs uppercase tracking-wider text-gray-500 font-bold">
                 <th className="p-4">User</th>
                 <th className="p-4">Joined</th>
                 <th className="p-4">Status</th>
                 <th className="p-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-800">
+            <tbody className="divide-y divide-synth-border/80">
               {users.map((user) => {
                 const isSelf = user.id === currentUserId;
                 const isTargetSuperAdmin = user.role === "super_admin";
@@ -149,7 +149,7 @@ export default function UserManagement() {
                 return (
                   <tr
                     key={user.id}
-                    className="hover:bg-gray-800/30 transition-colors"
+                    className="hover:bg-synth-primary/5 transition-colors"
                   >
                     {/* User Info */}
                     <td className="p-4">
@@ -157,16 +157,16 @@ export default function UserManagement() {
                         <img
                           src={
                             user.avatar_url ||
-                            `https://ui-avatars.com/api/?name=${user.username}&background=00f2fe&color=000000`
+                            `https://ui-avatars.com/api/?name=${user.username}&background=FF4D8F&color=000000`
                           }
                           alt="avatar"
-                          className="w-10 h-10 rounded-full border border-gray-700 object-cover"
+                          className="w-10 h-10 rounded-full border border-synth-border object-cover"
                         />
                         <div>
                           <div className="text-white font-bold flex items-center gap-2">
                             @{user.username || "Unknown"}
                             {isSelf && (
-                              <span className="text-xs bg-[#00f2fe]/20 text-[#00f2fe] px-2 py-0.5 rounded-full">
+                              <span className="text-xs bg-synth-primary/20 text-synth-primary px-2 py-0.5 rounded-full border border-synth-primary/30">
                                 You
                               </span>
                             )}
@@ -221,8 +221,8 @@ export default function UserManagement() {
                               }
                               className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
                                 user.role === "admin"
-                                  ? "bg-gray-800 text-gray-300 hover:bg-gray-700"
-                                  : "bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500/20"
+                                  ? "bg-synth-elevated text-gray-300 hover:bg-synth-border"
+                                  : "bg-synth-secondary/15 text-synth-secondary hover:bg-synth-secondary/25 border border-synth-secondary/25"
                               }`}
                             >
                               {user.role === "admin" ? "Demote" : "Make Admin"}
@@ -235,7 +235,7 @@ export default function UserManagement() {
                               }
                               className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
                                 user.is_banned
-                                  ? "bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white"
+                                  ? "bg-synth-elevated text-gray-300 hover:bg-synth-border hover:text-white"
                                   : "bg-red-500/10 text-red-500 hover:bg-red-500/20"
                               }`}
                             >

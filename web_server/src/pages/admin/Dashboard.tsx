@@ -104,13 +104,13 @@ export default function Dashboard() {
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <LayoutDashboard className="text-[#00f2fe] w-8 h-8" />
+          <LayoutDashboard className="text-synth-primary w-8 h-8 drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
           Moderation Queue
         </h1>
 
         <div className="flex items-center gap-3">
           {/* Filter Dropdown */}
-          <div className="relative flex items-center bg-[#111827] border border-gray-800 rounded-lg px-3 py-2">
+          <div className="relative flex items-center bg-synth-surface border border-synth-border rounded-lg px-3 py-2 shadow-inner">
             <Filter className="w-4 h-4 text-gray-400 mr-2" />
             <select
               value={filter}
@@ -123,7 +123,7 @@ export default function Dashboard() {
             </select>
           </div>
 
-          <span className="bg-gray-800 text-gray-300 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap">
+          <span className="bg-synth-primary/15 text-synth-primary border border-synth-primary/30 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap">
             {filteredReports.length} Pending
           </span>
         </div>
@@ -131,7 +131,7 @@ export default function Dashboard() {
 
       {/* Reports Feed */}
       {filteredReports.length === 0 ? (
-        <div className="bg-[#111827] border border-gray-800 rounded-xl p-12 text-center text-gray-400">
+        <div className="bg-synth-surface border border-synth-border rounded-xl p-12 text-center text-gray-400 shadow-glow-card">
           <Check className="w-12 h-12 text-green-500 mx-auto mb-4 opacity-50" />
           <p className="text-xl">Queue is clear.</p>
           <p className="text-sm mt-2">

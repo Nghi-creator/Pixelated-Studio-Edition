@@ -60,7 +60,7 @@ export default function Landing() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[80vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#00f2fe]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-synth-primary shadow-glow-primary-sm"></div>
       </div>
     );
   }
@@ -72,7 +72,7 @@ export default function Landing() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
         {/* Header & Search Bar Row */}
         <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h2 className="text-2xl font-bold border-l-4 border-[#00f2fe] pl-3">
+          <h2 className="text-2xl font-bold border-l-4 border-synth-secondary pl-3 drop-shadow-[0_0_12px_rgba(255,159,67,0.2)]">
             All Games
           </h2>
 
@@ -85,7 +85,7 @@ export default function Landing() {
               placeholder="Search games..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="block w-full pl-10 pr-3 py-2 border border-gray-700 rounded-lg leading-5 bg-[#111827] text-gray-300 placeholder-gray-500 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe] transition-colors"
+              className="block w-full pl-10 pr-3 py-2 border border-synth-border rounded-lg leading-5 bg-synth-surface text-gray-300 placeholder-gray-500 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-colors shadow-inner"
             />
           </div>
         </div>

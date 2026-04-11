@@ -62,7 +62,7 @@ export default function ResetPassword() {
   if (success) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-[#111827]/80 backdrop-blur-xl border border-gray-800 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] p-12 text-center">
+        <div className="w-full max-w-md bg-synth-surface/85 backdrop-blur-xl border border-synth-border rounded-2xl shadow-glow-card p-12 text-center ring-1 ring-synth-primary/10">
           <CheckCircle2 className="w-16 h-16 text-green-400 mx-auto mb-6" />
           <h2 className="text-3xl font-bold text-white mb-2">
             Password Updated
@@ -75,9 +75,9 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#111827]/80 backdrop-blur-xl border border-gray-800 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] p-8">
+      <div className="w-full max-w-md bg-synth-surface/85 backdrop-blur-xl border border-synth-border rounded-2xl shadow-glow-card p-8 ring-1 ring-synth-primary/10">
         <div className="text-center mb-8">
-          <Gamepad2 className="w-12 h-12 text-[#00f2fe] mx-auto mb-4" />
+          <Gamepad2 className="w-12 h-12 text-synth-primary mx-auto mb-4 drop-shadow-[0_0_16px_rgba(255,77,143,0.5)]" />
           <h2 className="text-3xl font-bold text-white mb-2">
             Create New Password
           </h2>
@@ -100,7 +100,7 @@ export default function ResetPassword() {
               placeholder="New Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-[#0B0F19] border border-gray-700 text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe] transition-all"
+              className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
               required
             />
           </div>
@@ -112,7 +112,7 @@ export default function ResetPassword() {
               placeholder="Confirm New Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="w-full bg-[#0B0F19] border border-gray-700 text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe] transition-all"
+              className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
               required
             />
           </div>
@@ -120,7 +120,7 @@ export default function ResetPassword() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-[#00f2fe] hover:bg-blue-400 text-black font-bold py-3 rounded-lg shadow-[0_0_15px_rgba(0,242,254,0.3)] transition-all flex justify-center items-center mt-6"
+            className="w-full bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-3 rounded-lg shadow-glow-primary-sm transition-all flex justify-center items-center mt-6 active:scale-[0.99]"
           >
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin" />

@@ -21,9 +21,13 @@ import Dashboard from "./pages/admin/Dashboard";
 // 1. Define the Standard Layout
 const StandardLayout = () => {
   return (
-    <div className="min-h-screen bg-[#0B0F19] text-white font-sans antialiased flex flex-col selection:bg-[#00f2fe] selection:text-black">
+    <div className="min-h-screen bg-synth-bg text-white font-sans antialiased flex flex-col relative">
+      <div
+        className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(ellipse_100%_55%_at_50%_-20%,rgba(255,77,143,0.12),transparent_55%),radial-gradient(ellipse_85%_45%_at_100%_0%,rgba(255,159,67,0.08),transparent_48%),radial-gradient(ellipse_70%_40%_at_0%_100%,rgba(109,40,217,0.07),transparent_50%)]"
+        aria-hidden
+      />
       <Navbar />
-      <main className="flex-grow pt-16">
+      <main className="relative z-10 flex-grow pt-16">
         <Outlet />
       </main>
       <Footer />

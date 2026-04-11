@@ -79,9 +79,9 @@ export default function Auth() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#111827]/80 backdrop-blur-xl border border-gray-800 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] p-8">
+      <div className="w-full max-w-md bg-synth-surface/85 backdrop-blur-xl border border-synth-border rounded-2xl shadow-glow-card p-8 ring-1 ring-synth-primary/10">
         <div className="text-center mb-8">
-          <Gamepad2 className="w-12 h-12 text-[#00f2fe] mx-auto mb-4" />
+          <Gamepad2 className="w-12 h-12 text-synth-primary mx-auto mb-4 drop-shadow-[0_0_16px_rgba(255,77,143,0.5)]" />
           <h2 className="text-3xl font-bold text-white mb-2">
             {isForgotPassword
               ? "Reset Password"
@@ -120,7 +120,7 @@ export default function Auth() {
                 placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-[#0B0F19] border border-gray-700 text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe] transition-all"
+                className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
                 required
               />
             </div>
@@ -128,7 +128,7 @@ export default function Auth() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#00f2fe] hover:bg-blue-400 text-black font-bold py-3 rounded-lg shadow-[0_0_15px_rgba(0,242,254,0.3)] transition-all flex justify-center items-center"
+              className="w-full bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-3 rounded-lg shadow-glow-primary-sm transition-all flex justify-center items-center active:scale-[0.99]"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -160,7 +160,7 @@ export default function Auth() {
                   placeholder="Email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-[#0B0F19] border border-gray-700 text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe] transition-all"
+                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
                   required
                 />
               </div>
@@ -172,7 +172,7 @@ export default function Auth() {
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-[#0B0F19] border border-gray-700 text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe] transition-all"
+                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
                   required
                 />
               </div>
@@ -187,7 +187,7 @@ export default function Auth() {
                       setError(null);
                       setMessage(null);
                     }}
-                    className="text-[#00f2fe] hover:text-blue-300 text-sm transition-colors"
+                    className="text-synth-primary hover:text-synth-secondary-hover text-sm transition-colors"
                   >
                     Forgot Password?
                   </button>
@@ -197,7 +197,7 @@ export default function Auth() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[#00f2fe] hover:bg-blue-400 text-black font-bold py-3 rounded-lg shadow-[0_0_15px_rgba(0,242,254,0.3)] transition-all flex justify-center items-center"
+                className="w-full bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-3 rounded-lg shadow-glow-primary-sm transition-all flex justify-center items-center active:scale-[0.99]"
               >
                 {loading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -210,17 +210,17 @@ export default function Auth() {
             </form>
 
             <div className="my-6 flex items-center">
-              <div className="flex-grow border-t border-gray-700"></div>
+              <div className="flex-grow border-t border-synth-border"></div>
               <span className="px-3 text-gray-500 text-sm uppercase tracking-wider">
                 Or continue with
               </span>
-              <div className="flex-grow border-t border-gray-700"></div>
+              <div className="flex-grow border-t border-synth-border"></div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 mb-6">
               <button
                 onClick={() => handleOAuth("github")}
-                className="flex items-center justify-center gap-2 bg-[#0B0F19] hover:bg-gray-800 border border-gray-700 text-white py-2.5 rounded-lg transition-all"
+                className="flex items-center justify-center gap-2 bg-synth-bg hover:bg-synth-elevated border border-synth-border hover:border-synth-secondary/40 text-white py-2.5 rounded-lg transition-all"
               >
                 <FaGithub className="w-5 h-5" />
                 GitHub
@@ -228,7 +228,7 @@ export default function Auth() {
 
               <button
                 onClick={() => handleOAuth("google")}
-                className="flex items-center justify-center gap-2 bg-[#0B0F19] hover:bg-gray-800 border border-gray-700 text-white py-2.5 rounded-lg transition-all"
+                className="flex items-center justify-center gap-2 bg-synth-bg hover:bg-synth-elevated border border-synth-border hover:border-synth-secondary/40 text-white py-2.5 rounded-lg transition-all"
               >
                 <FaGoogle className="w-5 h-5" />
                 Google
@@ -254,7 +254,7 @@ export default function Auth() {
                 <button
                   type="button"
                   onClick={() => navigate("/")}
-                  className="text-[#00f2fe] hover:text-blue-300 text-sm font-medium transition-colors"
+                  className="text-synth-primary hover:text-synth-secondary-hover text-sm font-medium transition-colors"
                 >
                   Continue as Guest &rarr;
                 </button>

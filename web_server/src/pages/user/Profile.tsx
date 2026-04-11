@@ -322,7 +322,7 @@ export default function Profile() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-[80vh]">
-        <Loader2 className="w-12 h-12 text-[#00f2fe] animate-spin" />
+        <Loader2 className="w-12 h-12 text-synth-primary animate-spin drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
       </div>
     );
   }
@@ -331,7 +331,7 @@ export default function Profile() {
     previewUrl ||
     avatarUrl ||
     (user?.email
-      ? `https://ui-avatars.com/api/?name=${user.email}&background=00f2fe&color=000000&bold=true`
+      ? `https://ui-avatars.com/api/?name=${user.email}&background=FF4D8F&color=000000&bold=true`
       : "");
 
   return (
@@ -339,8 +339,8 @@ export default function Profile() {
       {/* CROPPER MODAL */}
       {showCropper && imageSrc && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4">
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col">
-            <div className="p-4 border-b border-gray-800 flex justify-between items-center">
+          <div className="bg-synth-surface border border-synth-border rounded-2xl w-full max-w-lg overflow-hidden shadow-glow-card flex flex-col">
+            <div className="p-4 border-b border-synth-border flex justify-between items-center">
               <h3 className="text-white font-bold">Crop your image</h3>
               <button
                 onClick={() => setShowCropper(false)}
@@ -364,7 +364,7 @@ export default function Profile() {
               />
             </div>
 
-            <div className="p-6 bg-[#111827]">
+            <div className="p-6 bg-synth-surface">
               <label className="text-sm text-gray-400 mb-2 block">Zoom</label>
               <input
                 type="range"
@@ -374,18 +374,18 @@ export default function Profile() {
                 step={0.1}
                 aria-labelledby="Zoom"
                 onChange={(e) => setZoom(Number(e.target.value))}
-                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-[#00f2fe] mb-6"
+                className="w-full h-2 bg-synth-elevated rounded-lg appearance-none cursor-pointer accent-synth-primary mb-6"
               />
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setShowCropper(false)}
-                  className="px-5 py-2.5 rounded-lg text-gray-300 hover:bg-gray-800 transition-colors font-medium"
+                  className="px-5 py-2.5 rounded-lg text-gray-300 hover:bg-synth-elevated transition-colors font-medium"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleCropConfirm}
-                  className="px-5 py-2.5 bg-[#00f2fe] hover:bg-blue-400 text-black rounded-lg transition-colors font-bold"
+                  className="px-5 py-2.5 bg-synth-primary hover:bg-synth-primary-hover text-synth-ink rounded-lg transition-colors font-bold shadow-glow-primary-sm"
                 >
                   Confirm Crop
                 </button>
@@ -398,8 +398,8 @@ export default function Profile() {
       {/* --- NEW: DELETE CONFIRMATION MODAL --- */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#111827] border border-red-500/30 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col">
-            <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-red-500/10">
+          <div className="bg-synth-surface border border-red-500/30 rounded-2xl w-full max-w-md overflow-hidden shadow-glow-card flex flex-col">
+            <div className="p-6 border-b border-synth-border flex justify-between items-center bg-red-500/10">
               <h3 className="text-red-400 font-bold flex items-center gap-2">
                 <AlertOctagon className="w-5 h-5" /> Delete Account
               </h3>
@@ -444,7 +444,7 @@ export default function Profile() {
                     onChange={(e) => setDeleteInput(e.target.value)}
                     placeholder={hasPassword ? "Your password" : "DELETE"}
                     required
-                    className="w-full bg-[#0B0F19] border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
                   />
                 </div>
 
@@ -452,7 +452,7 @@ export default function Profile() {
                   <button
                     type="button"
                     onClick={() => setShowDeleteModal(false)}
-                    className="px-5 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors font-medium"
+                    className="px-5 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-synth-elevated transition-colors font-medium"
                   >
                     Cancel
                   </button>
@@ -475,7 +475,7 @@ export default function Profile() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full mt-8">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-gray-400 hover:text-[#00f2fe] transition-colors mb-8 w-fit"
+          className="flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors mb-8 w-fit"
         >
           <ArrowLeft className="w-5 h-5" /> Back to Home
         </button>
@@ -486,9 +486,9 @@ export default function Profile() {
 
         <div className="space-y-8">
           {/* PROFILE SECTION */}
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 md:p-8">
+          <div className="bg-synth-surface border border-synth-border rounded-2xl p-6 md:p-8 shadow-glow-card">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <User className="w-5 h-5 text-[#00f2fe]" /> Public Profile
+              <User className="w-5 h-5 text-synth-primary" /> Public Profile
             </h2>
 
             {/* Profile Message Block */}
@@ -504,7 +504,7 @@ export default function Profile() {
               <div className="flex flex-col items-center gap-6">
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className="relative w-24 h-24 rounded-full overflow-hidden group cursor-pointer border-2 border-transparent hover:border-[#00f2fe] transition-all shadow-lg"
+                  className="relative w-24 h-24 rounded-full overflow-hidden group cursor-pointer border-2 border-transparent hover:border-synth-primary transition-all shadow-lg ring-0 hover:shadow-glow-primary-sm"
                 >
                   <img
                     src={displayAvatar}
@@ -538,7 +538,7 @@ export default function Profile() {
                   type="email"
                   disabled
                   value={user?.email || ""}
-                  className="w-full bg-[#0B0F19]/50 border border-gray-800 text-gray-500 rounded-lg px-4 py-3 cursor-not-allowed"
+                  className="w-full bg-synth-bg/50 border border-synth-border text-gray-500 rounded-lg px-4 py-3 cursor-not-allowed"
                 />
               </div>
 
@@ -551,14 +551,14 @@ export default function Profile() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter a cool username"
-                  className="w-full bg-[#0B0F19] border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe] transition-all"
+                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={savingProfile}
-                className="bg-[#00f2fe] hover:bg-blue-400 text-black font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2"
+                className="bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2 shadow-glow-primary-sm"
               >
                 {savingProfile ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -571,7 +571,7 @@ export default function Profile() {
           </div>
 
           {/* SECURITY SECTION */}
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl p-6 md:p-8">
+          <div className="bg-synth-surface border border-synth-border rounded-2xl p-6 md:p-8 shadow-glow-card">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               <Lock className="w-5 h-5 text-red-400" /> Security
             </h2>
@@ -596,7 +596,7 @@ export default function Profile() {
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="Enter current password"
                   required
-                  className="w-full bg-[#0B0F19] border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-all"
+                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-all"
                 />
               </div>
               <div>
@@ -610,13 +610,13 @@ export default function Profile() {
                   placeholder="Enter new password"
                   required
                   minLength={6}
-                  className="w-full bg-[#0B0F19] border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-all"
+                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-all"
                 />
               </div>
               <button
                 type="submit"
                 disabled={savingPassword}
-                className="bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2"
+                className="bg-synth-elevated hover:bg-synth-border border border-synth-border text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2"
               >
                 {savingPassword ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -629,7 +629,7 @@ export default function Profile() {
 
             {/* MERGED DANGER ZONE (HIDDEN FROM ADMINS/SUPER_ADMINS) */}
             {userRole !== "admin" && userRole !== "super_admin" && (
-              <div className="mt-10 pt-8 border-t border-gray-800">
+              <div className="mt-10 pt-8 border-t border-synth-border">
                 <h3 className="text-lg font-bold text-red-500 mb-2 flex items-center gap-2">
                   <AlertOctagon className="w-5 h-5" /> Danger Zone
                 </h3>

@@ -65,7 +65,7 @@ export default function GameCard({ id, title, coverUrl }: GameCardProps) {
   return (
     <Link
       to={`/play/${id}`}
-      className="group relative block rounded-xl overflow-hidden bg-[#111827] border border-gray-800 hover:border-[#00f2fe]/50 transition-all cursor-pointer"
+      className="group relative block rounded-xl overflow-hidden bg-synth-surface border border-synth-border hover:border-synth-primary/55 hover:shadow-glow-primary-sm transition-all cursor-pointer"
     >
       <img
         src={coverUrl}
@@ -75,14 +75,14 @@ export default function GameCard({ id, title, coverUrl }: GameCardProps) {
 
       <button
         onClick={toggleFavorite}
-        className="absolute top-2 right-2 bg-[#0B0F19]/80 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 focus:outline-none z-10"
+        className="absolute top-2 right-2 bg-synth-bg/85 border border-synth-border/60 p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110 focus:outline-none z-10 backdrop-blur-sm"
       >
         <Heart
-          className={`w-5 h-5 transition-colors ${isFavorited ? "fill-[#00f2fe] text-[#00f2fe]" : "text-white hover:text-[#00f2fe]"}`}
+          className={`w-5 h-5 transition-colors ${isFavorited ? "fill-synth-primary text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.5)]" : "text-white hover:text-synth-primary"}`}
         />
       </button>
 
-      <div className="absolute bottom-0 w-full p-4 bg-gradient-to-t from-[#0B0F19] via-[#0B0F19]/90 to-transparent">
+      <div className="absolute bottom-0 w-full p-4 bg-gradient-to-t from-synth-bg via-synth-bg/92 to-transparent">
         <h3 className="font-bold text-lg truncate text-white">{title}</h3>
       </div>
     </Link>

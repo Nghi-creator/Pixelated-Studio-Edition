@@ -381,7 +381,7 @@ export default function Player() {
       <div className="w-full max-w-5xl flex flex-col mb-6">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-gray-400 hover:text-[#00f2fe] transition-colors w-fit mb-4"
+          className="flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors w-fit mb-4"
         >
           <ArrowLeft className="w-5 h-5" /> Back to Library
         </button>
@@ -391,7 +391,7 @@ export default function Player() {
             {gameTitle || "Loading Game..."}
           </h1>
 
-          <div className="flex items-center gap-2 bg-[#111827] px-4 py-2 rounded-full border border-gray-800">
+          <div className="flex items-center gap-2 bg-synth-surface px-4 py-2 rounded-full border border-synth-border">
             <div
               className={`w-2.5 h-2.5 rounded-full ${status === "playing" ? "bg-green-500 shadow-[0_0_10px_#22c55e]" : "bg-yellow-500 animate-pulse"}`}
             ></div>
@@ -405,10 +405,10 @@ export default function Player() {
       </div>
 
       {/* The Player Container */}
-      <div className="relative w-full max-w-5xl aspect-video bg-black border border-gray-800 rounded-xl overflow-hidden shadow-[0_0_40px_rgba(0,0,0,0.5)] flex items-center justify-center">
+      <div className="relative w-full max-w-5xl aspect-video bg-black border border-synth-border rounded-xl overflow-hidden shadow-glow-card ring-1 ring-synth-primary/10 flex items-center justify-center">
         {status === "connecting" && (
-          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#0B0F19]/90 backdrop-blur-sm">
-            <Loader2 className="w-12 h-12 text-[#00f2fe] animate-spin mb-4" />
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-synth-bg/90 backdrop-blur-sm">
+            <Loader2 className="w-12 h-12 text-synth-primary animate-spin mb-4 drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
             <p className="text-lg text-gray-300 font-medium tracking-wide">
               Establishing WebRTC Handshake...
             </p>
@@ -427,36 +427,36 @@ export default function Player() {
         <div className="flex flex-wrap items-center gap-4 text-gray-400 text-sm">
           <p>
             Move:{" "}
-            <kbd className="bg-gray-800 px-2 py-1 rounded text-gray-200 ml-1 font-mono">
+            <kbd className="bg-synth-elevated border border-synth-border px-2 py-1 rounded text-gray-200 ml-1 font-mono">
               ARROWS
             </kbd>
           </p>
-          <p className="border-l border-gray-700 pl-4">
+          <p className="border-l border-synth-border pl-4">
             Action:{" "}
-            <kbd className="bg-gray-800 px-2 py-1 rounded text-gray-200 ml-1 font-mono">
+            <kbd className="bg-synth-elevated border border-synth-border px-2 py-1 rounded text-gray-200 ml-1 font-mono">
               Z
             </kbd>{" "}
             /{" "}
-            <kbd className="bg-gray-800 px-2 py-1 rounded text-gray-200 ml-1 font-mono">
+            <kbd className="bg-synth-elevated border border-synth-border px-2 py-1 rounded text-gray-200 ml-1 font-mono">
               X
             </kbd>
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-[#111827] rounded-full border border-gray-800 p-1">
+        <div className="flex items-center gap-2 bg-synth-surface rounded-full border border-synth-border p-1">
           <button
             onClick={() => handleReaction(true)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${userReaction === true ? "bg-[#00f2fe]/20 text-[#00f2fe]" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${userReaction === true ? "bg-synth-primary/20 text-synth-primary shadow-glow-primary-sm" : "text-gray-400 hover:bg-synth-elevated hover:text-white"}`}
           >
             <ThumbsUp
               className={`w-4 h-4 ${userReaction === true ? "fill-current" : ""}`}
             />
             <span className="font-bold text-sm">{likes}</span>
           </button>
-          <div className="w-px h-6 bg-gray-700"></div>
+          <div className="w-px h-6 bg-synth-border"></div>
           <button
             onClick={() => handleReaction(false)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${userReaction === false ? "bg-red-500/20 text-red-400" : "text-gray-400 hover:bg-gray-800 hover:text-white"}`}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all ${userReaction === false ? "bg-red-500/20 text-red-400" : "text-gray-400 hover:bg-synth-elevated hover:text-white"}`}
           >
             <span className="font-bold text-sm">{dislikes}</span>
             <ThumbsDown
@@ -467,7 +467,7 @@ export default function Player() {
       </div>
 
       {/* --- COMMENTS SECTION --- */}
-      <div className="w-full max-w-5xl mt-12 border-t border-gray-800 pt-8">
+      <div className="w-full max-w-5xl mt-12 border-t border-synth-border pt-8">
         <h3 className="text-xl font-bold text-white mb-6">
           Comments ({comments.length}
           {hasMoreComments ? "+" : ""})
@@ -482,13 +482,13 @@ export default function Player() {
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 placeholder="Add a comment..."
-                className="w-full bg-[#111827] border border-gray-800 text-white rounded-xl pl-4 pr-12 py-4 focus:outline-none focus:border-[#00f2fe] focus:ring-1 focus:ring-[#00f2fe] transition-all"
+                className="w-full bg-synth-surface border border-synth-border text-white rounded-xl pl-4 pr-12 py-4 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
                 maxLength={500}
               />
               <button
                 type="submit"
                 disabled={!newComment.trim() || isSubmittingComment}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-[#00f2fe] disabled:opacity-50 transition-colors"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-synth-primary disabled:opacity-50 transition-colors"
               >
                 {isSubmittingComment ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -499,12 +499,12 @@ export default function Player() {
             </div>
           </form>
         ) : (
-          <div className="mb-10 p-6 bg-[#111827]/50 border border-gray-800 rounded-xl text-center">
+          <div className="mb-10 p-6 bg-synth-surface/50 border border-synth-border rounded-xl text-center">
             <p className="text-gray-400">
               Please{" "}
               <button
                 onClick={() => navigate("/login")}
-                className="text-[#00f2fe] hover:underline font-medium"
+                className="text-synth-primary hover:text-synth-secondary-hover hover:underline font-medium"
               >
                 sign in
               </button>{" "}
@@ -525,7 +525,7 @@ export default function Player() {
                 comment.profiles?.username || "Anonymous Player";
               const avatar =
                 comment.profiles?.avatar_url ||
-                `https://ui-avatars.com/api/?name=${displayName}&background=00f2fe&color=000000&bold=true`;
+                `https://ui-avatars.com/api/?name=${displayName}&background=FF4D8F&color=000000&bold=true`;
 
               let cLikes = 0;
               let cDislikes = 0;
@@ -544,7 +544,7 @@ export default function Player() {
                   <img
                     src={avatar}
                     alt="Avatar"
-                    className="w-10 h-10 rounded-full object-cover border border-gray-800"
+                    className="w-10 h-10 rounded-full object-cover border border-synth-border"
                   />
                   <div className="flex-grow">
                     <div className="flex justify-between items-start mb-1">
@@ -597,7 +597,7 @@ export default function Player() {
                           currentUser?.id === comment.user_id
                             ? "text-gray-600 opacity-50 cursor-not-allowed"
                             : cUserReaction === true
-                              ? "text-[#00f2fe]"
+                              ? "text-synth-primary"
                               : "text-gray-500 hover:text-white"
                         }`}
                       >
@@ -639,7 +639,7 @@ export default function Player() {
               setPage(nextPage);
               fetchComments(nextPage, false);
             }}
-            className="mt-8 w-full py-3 border border-gray-800 rounded-xl text-gray-400 hover:text-white hover:bg-gray-800 transition-all font-medium"
+            className="mt-8 w-full py-3 border border-synth-border rounded-xl text-gray-400 hover:text-white hover:bg-synth-elevated transition-all font-medium"
           >
             Load More Comments
           </button>
@@ -649,8 +649,8 @@ export default function Player() {
       {/* --- REPORT MODAL --- */}
       {reportingCommentId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#111827] border border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-            <div className="flex justify-between items-center p-6 border-b border-gray-800">
+          <div className="bg-synth-surface border border-synth-border rounded-2xl w-full max-w-md overflow-hidden shadow-glow-card">
+            <div className="flex justify-between items-center p-6 border-b border-synth-border">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
                 <AlertTriangle className="text-yellow-500 w-5 h-5" />
                 Report Comment
@@ -676,7 +676,7 @@ export default function Player() {
                 value={reportReason}
                 onChange={(e) => setReportReason(e.target.value)}
                 placeholder="E.g., Spam, harassment, toxic behavior..."
-                className="w-full bg-[#0B0F19] border border-gray-700 rounded-xl p-3 text-white focus:outline-none focus:border-yellow-500 min-h-[100px] mb-6 resize-none"
+                className="w-full bg-synth-bg border border-synth-border rounded-xl p-3 text-white focus:outline-none focus:border-synth-secondary focus:ring-1 focus:ring-synth-secondary/40 min-h-[100px] mb-6 resize-none"
                 required
               />
 

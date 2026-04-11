@@ -78,10 +78,10 @@ export default function ReportCard({
 
   return (
     <div
-      className={`bg-[#111827] border rounded-xl p-6 flex flex-col md:flex-row gap-6 justify-between items-start transition-all relative ${
+      className={`bg-synth-surface border rounded-xl p-6 flex flex-col md:flex-row gap-6 justify-between items-start transition-all relative shadow-glow-card ${
         showLockBadge || isPendingOtherAdmin
-          ? "border-yellow-500/30"
-          : "border-gray-800 hover:border-gray-700"
+          ? "border-synth-secondary/40"
+          : "border-synth-border hover:border-synth-primary/35"
       }`}
     >
       {/* Left Side: The Content & Details */}
@@ -90,16 +90,16 @@ export default function ReportCard({
           <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider mb-2 flex items-center gap-2">
             Reason
           </h4>
-          <div className="bg-[#0B0F19] p-4 rounded-lg border border-gray-800">
+          <div className="bg-synth-bg p-4 rounded-lg border border-synth-border">
             <p className="text-white">{report.reason}</p>
           </div>
         </div>
 
         <div>
-          <h4 className="text-xs font-bold text-[#00f2fe] uppercase tracking-wider mb-2">
+          <h4 className="text-xs font-bold text-synth-primary uppercase tracking-wider mb-2">
             Content
           </h4>
-          <div className="bg-[#0B0F19] p-4 rounded-lg border border-gray-800">
+          <div className="bg-synth-bg p-4 rounded-lg border border-synth-border">
             <p className="text-white">"{report.comments.content}"</p>
           </div>
         </div>
@@ -116,7 +116,7 @@ export default function ReportCard({
             Reported by:{" "}
             <span
               className={
-                isReporter ? "text-[#00f2fe] font-bold" : "text-gray-300"
+                isReporter ? "text-synth-primary font-bold" : "text-gray-300"
               }
             >
               @{report.profiles?.username || "Unknown"} {isReporter && "(You)"}
@@ -144,7 +144,7 @@ export default function ReportCard({
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 text-white text-sm font-bold rounded-lg transition-colors focus:outline-none"
+            className="flex items-center gap-2 px-4 py-2 bg-synth-elevated hover:bg-synth-border border border-synth-border text-white text-sm font-bold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-synth-primary/30"
           >
             Action{" "}
             <ChevronDown
@@ -153,18 +153,18 @@ export default function ReportCard({
           </button>
 
           {isDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-[#0B0F19] border border-gray-700 rounded-xl shadow-2xl py-2 z-50 overflow-hidden">
+            <div className="absolute right-0 mt-2 w-48 bg-synth-bg border border-synth-border rounded-xl shadow-glow-card py-2 z-50 overflow-hidden backdrop-blur-xl">
               <button
                 onClick={() => {
                   setIsDropdownOpen(false);
                   onIgnore(report.id);
                 }}
-                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-gray-800 hover:text-white transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-synth-elevated hover:text-white transition-colors text-left"
               >
                 <Check className="w-4 h-4" /> Ignore Report
               </button>
 
-              <div className="h-px bg-gray-800 my-1"></div>
+              <div className="h-px bg-synth-border my-1"></div>
 
               <button
                 onClick={() => {

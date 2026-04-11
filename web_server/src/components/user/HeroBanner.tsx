@@ -94,15 +94,15 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
 
   if (!featuredGames || featuredGames.length === 0) {
     return (
-      <div className="w-full h-[500px] md:h-[600px] bg-[#0B0F19] animate-pulse"></div>
+      <div className="w-full h-[500px] md:h-[600px] bg-synth-bg animate-pulse"></div>
     );
   }
 
   return (
     <div className="relative w-full h-[500px] md:h-[600px] transition-all duration-700 overflow-hidden group">
       {/* Gradients */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[#0B0F19] via-[#0B0F19]/60 to-transparent z-10"></div>
-      <div className="absolute inset-0 bg-gradient-to-t from-[#0B0F19] via-transparent to-transparent z-10"></div>
+      <div className="absolute inset-0 bg-gradient-to-r from-synth-bg via-synth-bg/65 to-transparent z-10"></div>
+      <div className="absolute inset-0 bg-gradient-to-t from-synth-bg via-synth-primary/10 to-transparent z-10"></div>
 
       {/* Crossfading Images Loop */}
       {featuredGames.map((game, index) => (
@@ -119,13 +119,13 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
         <>
           <button
             onClick={handlePrev}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/40 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/45 hover:bg-synth-primary/25 border border-white/10 hover:border-synth-primary/50 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 shadow-glow-primary-sm"
           >
             <ChevronLeft className="w-8 h-8" />
           </button>
           <button
             onClick={handleNext}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/40 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/45 hover:bg-synth-primary/25 border border-white/10 hover:border-synth-primary/50 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 shadow-glow-primary-sm"
           >
             <ChevronRight className="w-8 h-8" />
           </button>
@@ -136,19 +136,19 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
       <div className="absolute top-1/2 left-0 transform -translate-y-1/2 z-20 w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
-            <span className="px-3 py-1 rounded-full bg-[#00f2fe]/20 text-[#00f2fe] text-xs font-bold uppercase tracking-wide border border-[#00f2fe]/50 mb-4 inline-block">
+            <span className="px-3 py-1 rounded-full bg-synth-primary/20 text-synth-primary text-xs font-bold uppercase tracking-wide border border-synth-primary/50 mb-4 inline-block shadow-glow-primary-sm">
               Trending Now
             </span>
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-4 drop-shadow-lg text-white">
+            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-4 text-white [text-shadow:0_0_40px_rgba(255,77,143,0.25),0_2px_12px_rgba(0,0,0,0.6)]">
               {currentGame.title}
             </h1>
 
             <div className="flex flex-wrap gap-4">
               <button
                 onClick={() => navigate(`/play/${currentGame.id}`)}
-                className="bg-[#00f2fe] hover:bg-blue-400 text-black font-bold py-3 px-8 rounded-lg shadow-[0_0_15px_rgba(0,242,254,0.4)] transition-all flex items-center gap-2"
+                className="bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-3 px-8 rounded-lg shadow-glow-primary transition-all flex items-center gap-2 active:scale-[0.98]"
               >
-                <Play className="w-5 h-5 fill-black" /> Play Now
+                <Play className="w-5 h-5 fill-synth-ink" /> Play Now
               </button>
 
               {/* Dynamic Add/Remove List Button */}
@@ -156,8 +156,8 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
                 onClick={toggleFavorite}
                 className={`border font-bold py-3 px-8 rounded-lg transition-all flex items-center gap-2 ${
                   isFavorited
-                    ? "bg-[#00f2fe]/10 border-[#00f2fe] text-[#00f2fe] hover:bg-[#00f2fe]/20"
-                    : "bg-[#111827] hover:bg-gray-800 border-gray-700 text-white"
+                    ? "bg-synth-primary/10 border-synth-primary text-synth-primary hover:bg-synth-primary/20 shadow-glow-primary-sm"
+                    : "bg-synth-surface/90 hover:bg-synth-elevated border-synth-border text-white hover:border-synth-secondary/50"
                 }`}
               >
                 {isFavorited ? (
@@ -178,7 +178,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
                 <div
                   key={idx}
                   onClick={() => setCurrentIndex(idx)}
-                  className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${idx === currentIndex ? "w-8 bg-[#00f2fe]" : "w-4 bg-gray-600 hover:bg-gray-400"}`}
+                  className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${idx === currentIndex ? "w-8 bg-synth-primary shadow-glow-primary-sm" : "w-4 bg-synth-border hover:bg-synth-secondary/80"}`}
                 />
               ))}
             </div>
