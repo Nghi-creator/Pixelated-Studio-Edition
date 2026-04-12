@@ -1,5 +1,6 @@
 import socketio
 import gi
+import sys
 gi.require_version('Gst', '1.0')
 gi.require_version('GstWebRTC', '1.0')
 from gi.repository import Gst, GstWebRTC, GLib
@@ -21,22 +22,24 @@ def handle_offer(offer):
         return
     
     pipeline_str = """
-        webrtcbin name=sendrecv
+        webrtcbin name=sendrecv bundle-policy=max-bundle
         
-        ximagesrc display-name=:99 use-damage=false show-pointer=false ! 
-        video/x-raw,framerate=60/1 ! 
+        avfvideosrc capture-screen=true capture-screen-cursor=false ! 
+        video/x-raw,framerate=30/1 ! 
+        videoscale ! video/x-raw,width=640,height=480 !
         videoconvert ! video/x-raw,format=I420 ! 
-        queue max-size-buffers=1 leaky=downstream ! 
-        vp8enc deadline=1 cpu-used=8 threads=4 end-usage=cbr target-bitrate=1000000 max-quantizer=56 min-quantizer=4 keyframe-max-dist=120 error-resilient=1 ! 
+        vp8enc deadline=1 cpu-used=8 threads=4 target-bitrate=1000000 ! 
         rtpvp8pay pt=96 ! 
-        queue max-size-buffers=1 leaky=downstream ! 
-        application/x-rtp,media=video,encoding-name=VP8,payload=96 ! sendrecv.
+        application/x-rtp,media=video,encoding-name=VP8,payload=96 ! 
+        sendrecv.
         
-        pulsesrc device=auto_null.monitor provide-clock=false ! 
-        audioconvert ! audioresample ! queue max-size-buffers=3 leaky=downstream ! 
-        opusenc ! rtpopuspay pt=111 ! queue ! 
-        application/x-rtp,media=audio,encoding-name=OPUS,payload=111 ! sendrecv.
+        audiotestsrc is-live=true wave=silence ! 
+        audioconvert ! audioresample ! 
+        opusenc ! rtpopuspay pt=111 ! 
+        application/x-rtp,media=audio,encoding-name=OPUS,payload=111 ! 
+        sendrecv.
     """
+
     pipeline = Gst.parse_launch(pipeline_str)
     webrtcbin = pipeline.get_by_name('sendrecv')
 
@@ -77,6 +80,16 @@ def on_ice(candidate):
             webrtcbin.emit('add-ice-candidate', candidate['sdpMLineIndex'], candidate['candidate'])
     GLib.idle_add(handle_ice)
 
-sio.connect('http://localhost:8080')
-loop = GLib.MainLoop()
-loop.run()
+# At the bottom of camera.py, replace the connection lines with this:
+try:
+    print("[Python] Waking up! Forcing WebSocket connection...", flush=True)
+    
+    # Force 'websocket' to bypass Mac polling hangs
+    sio.connect('http://127.0.0.1:8080', transports=['websocket'], wait_timeout=10)
+    
+    print("[Python] Successfully connected to Node! Starting video loop...", flush=True)
+    
+    loop = GLib.MainLoop()
+    loop.run()
+except Exception as e:
+    print(f"[Python FATAL ERROR]: {e}", flush=True)

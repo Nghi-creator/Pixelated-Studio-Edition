@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+  <head>
+    <title>PIXELATED Console</title>
+    <style>
+      :root {
+        --bg: #0b0f19;
+        --surface: #111827;
+        --primary: #00f2fe;
+        --secondary: #ff9f43;
+        --text: #d1d5db;
+        --border: #1f2937;
+      }
+      body {
+        font-family: "Inter", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        padding: 40px;
+        margin: 0;
+        display: flex;
+        justify-content: center;
+      }
+      .card {
+        background: var(--surface);
+        padding: 32px;
+        border-radius: 16px;
+        border: 1px solid var(--border);
+        width: 100%;
+        max-width: 500px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.3);
+      }
+      h1 {
+        color: var(--primary);
+        margin-top: 0;
+        font-size: 28px;
+        letter-spacing: -0.025em;
+        text-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
+      }
+      .status-badge {
+        background: rgba(0, 242, 254, 0.1);
+        color: var(--primary);
+        padding: 4px 12px;
+        border-radius: 99px;
+        font-size: 12px;
+        font-weight: bold;
+        display: inline-block;
+        margin-bottom: 24px;
+      }
+      .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 20px;
+      }
+      button {
+        flex: 1;
+        padding: 12px;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: 1px solid transparent;
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: black;
+      }
+      .btn-primary:hover {
+        box-shadow: 0 0 15px rgba(0, 242, 254, 0.5);
+      }
+      .btn-outline {
+        background: transparent;
+        border: 1px solid var(--border);
+        color: var(--text);
+      }
+      .btn-outline:hover {
+        border-color: var(--secondary);
+        color: var(--secondary);
+      }
+      #log {
+        background: #000;
+        color: #10b981;
+        padding: 12px;
+        border-radius: 8px;
+        height: 150px;
+        overflow-y: auto;
+        font-family: "Fira Code", monospace;
+        font-size: 11px;
+        margin-top: 24px;
+        border: 1px solid var(--border);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="status-badge" id="status">SERVER: ONLINE</div>
+      <h1>PIXELATED Console</h1>
+      <p style="font-size: 14px; color: #9ca3af">
+        Your local gateway for personal and cloud gaming.
+      </p>
+
+      <div style="margin-top: 32px">
+        <label
+          style="
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--secondary);
+          "
+          >Library Setup</label
+        >
+        <div class="button-group">
+          <button id="browse-btn" class="btn-primary">
+            Select Local Folder
+          </button>
+          <button id="skip-btn" class="btn-outline">Cloud-Only Mode</button>
+        </div>
+        <p
+          id="folder-path"
+          style="color: #4b5563; font-size: 12px; margin-top: 8px"
+        >
+          No local folder linked.
+        </p>
+      </div>
+
+      <div id="log"></div>
+    </div>
+
+    <script>
+      const { ipcRenderer } = require("electron");
+
+      const browseBtn = document.getElementById("browse-btn");
+      const skipBtn = document.getElementById("skip-btn");
+      const folderPath = document.getElementById("folder-path");
+      const logBox = document.getElementById("log");
+
+      browseBtn.addEventListener("click", async () => {
+        const path = await ipcRenderer.invoke("select-folder");
+        if (path) {
+          folderPath.innerText = "Linked: " + path;
+          folderPath.style.color = "#ff9f43";
+          // Tell the backend to update its path
+          ipcRenderer.send("update-rom-path", path);
+        }
+      });
+
+      skipBtn.addEventListener("click", () => {
+        folderPath.innerText = "Running in Cloud-Only mode.";
+        logBox.innerHTML +=
+          "[App] Bypassing local library setup. Ready for Public games.<br>";
+      });
+
+      ipcRenderer.on("server-log", (event, message) => {
+        logBox.innerHTML += message + "<br>";
+        logBox.scrollTop = logBox.scrollHeight;
+      });
+    </script>
+  </body>
+</html>

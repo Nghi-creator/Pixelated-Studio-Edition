@@ -3,6 +3,7 @@ const http = require("http");
 const { Server } = require("socket.io");
 const { spawn, exec } = require("child_process");
 const fs = require("fs");
+const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
@@ -14,59 +15,104 @@ const io = new Server(server, {
 let retroarchProcess = null;
 let cameraProcess = null;
 
-// 1. Boot the Xvfb and Audio once when the server starts
+// --- DYNAMIC PATH CONFIGURATION ---
+const PATHS = {
+  retroarchConfig: path.join(__dirname, "retroarch.cfg"),
+  corePath:
+    "/Users/nick_kino/Library/Application Support/RetroArch/cores/mesen_libretro.dylib",
+};
+
+let currentRomsFolder = "/Users/nick_kino/Documents/GitHub/Project101/my-games";
+
+// LISTEN FOR MESSAGES FROM MAIN.JS (Electron UI)
+process.on("message", (message) => {
+  if (message.type === "SET_ROM_PATH") {
+    currentRomsFolder = message.path;
+    console.log(`[Engine] Local Library path updated to: ${currentRomsFolder}`);
+  }
+});
+
+// 1. Boot the Virtual Display
 function startVirtualDisplay() {
-  console.log("Booting Virtual Display (Xvfb) and PulseAudio...");
+  console.log("Checking for Virtual Display environment...");
 
-  if (fs.existsSync("/tmp/.X99-lock"))
-    fs.rmSync("/tmp/.X99-lock", { force: true });
-  if (fs.existsSync("/tmp/.X11-unix/X99"))
-    fs.rmSync("/tmp/.X11-unix/X99", { force: true, recursive: true });
+  if (process.platform === "linux") {
+    if (fs.existsSync("/tmp/.X99-lock"))
+      fs.rmSync("/tmp/.X99-lock", { force: true });
 
-  spawn("Xvfb", [":99", "-screen", "0", "640x480x24"]);
-  exec(
-    "pulseaudio -D --system --disallow-exit --disable-shm=yes --load='module-native-protocol-tcp auth-anonymous=1'",
-  );
+    spawn("Xvfb", [":99", "-screen", "0", "640x480x24"]);
+    exec("pulseaudio -D --system --disallow-exit --disable-shm=yes");
+  }
 
-  fs.writeFileSync(
-    "/app/retroarch.cfg",
-    'audio_driver = "pulse"\n' +
-      'audio_sync = "true"\n' +
-      'video_vsync = "false"\n',
-  );
+  const configContent =
+    'audio_driver = "pulse"\naudio_sync = "true"\nvideo_vsync = "false"\n';
+  fs.writeFileSync(PATHS.retroarchConfig, configContent);
 }
 
-// 2. Boot the actual Game and Camera dynamically
-function bootGame(romFilename) {
-  if (retroarchProcess) retroarchProcess.kill();
-  if (cameraProcess) cameraProcess.kill();
+// 2. Boot the actual Game (Handles Native vs. Remote)
+// Inside server.js
+function bootGame(romFilename, isRemote = false) {
+  if (retroarchProcess) {
+    retroarchProcess.kill("SIGKILL");
+    retroarchProcess = null;
+  }
+  if (cameraProcess) {
+    cameraProcess.kill("SIGKILL");
+    cameraProcess = null;
+  }
 
-  console.log(`[Engine] Mounting ROM: ${romFilename}`);
+  const retroarchExe = "/Applications/RetroArch.app/Contents/MacOS/RetroArch";
+  const fullRomPath = path.join(currentRomsFolder, romFilename);
 
-  retroarchProcess = spawn(
-    "retroarch",
-    [
-      "-f",
-      "-L",
-      "/cores/mesen_libretro.so",
-      "--appendconfig",
-      "/app/retroarch.cfg",
-      `/roms/${romFilename}`,
-    ],
-    { env: { ...process.env, DISPLAY: ":99", PULSE_SERVER: "127.0.0.1" } },
+  console.log(
+    `[Engine] Booting ${isRemote ? "REMOTE" : "NATIVE"} session: ${romFilename}`,
   );
 
-  setTimeout(() => {
-    console.log("[Engine] Starting Python WebRTC Camera Bridge...");
-    cameraProcess = spawn("python3", ["-u", __dirname + "/camera.py"], {
-      env: { ...process.env, PULSE_SERVER: "127.0.0.1" },
-    });
+  if (isRemote) {
+    retroarchProcess = spawn(retroarchExe, [
+      "-L",
+      PATHS.corePath,
+      "--appendconfig",
+      PATHS.retroarchConfig,
+      fullRomPath,
+    ]);
 
-    cameraProcess.stdout.on("data", (data) => console.log(`[Camera] ${data}`));
-    cameraProcess.stderr.on("data", (data) =>
-      console.error(`[Camera Error] ${data}`),
-    );
-  }, 1000);
+    setTimeout(() => {
+      console.log("[Engine] Starting Python WebRTC Bridge...");
+
+      cameraProcess = spawn(
+        "python3",
+        ["-u", path.join(__dirname, "camera.py")],
+        {
+          env: {
+            ...process.env,
+            PULSE_SERVER: "127.0.0.1",
+            GST_PLUGIN_PATH: "/opt/homebrew/lib/gstreamer-1.0",
+            GST_PLUGIN_SYSTEM_PATH: "/opt/homebrew/lib/gstreamer-1.0",
+            DYLD_LIBRARY_PATH: "/opt/homebrew/lib",
+            GI_TYPELIB_PATH: "/opt/homebrew/lib/girepository-1.0",
+          },
+        },
+      );
+
+      cameraProcess.stdout.on("data", (data) =>
+        console.log(`[Python]: ${data}`),
+      );
+      cameraProcess.stderr.on("data", (data) =>
+        console.error(`[Python Error]: ${data}`),
+      );
+      cameraProcess.on("close", (code) =>
+        console.log(`[Engine] Python exited: ${code}`),
+      );
+    }, 1000);
+  } else {
+    retroarchProcess = spawn(retroarchExe, [
+      "-f",
+      "-L",
+      PATHS.corePath,
+      fullRomPath,
+    ]);
+  }
 }
 
 // --- THE WEBRTC SWITCHBOARD ---
@@ -74,22 +120,15 @@ io.on("connection", (socket) => {
   console.log(`[Node.js] Client connected! ID: ${socket.id}`);
 
   socket.on("start-game", (payload) => {
-    const romFile = payload.romFilename;
-    console.log(`\n[Node.js] React requested game boot: ${romFile}`);
-    bootGame(romFile);
+    bootGame(payload.romFilename, payload.isRemote || false);
   });
 
   socket.on("python-ready", () => {
-    console.log(
-      "[Node.js] Python Camera is armed and ready! Relaying to React...",
-    );
+    console.log("[Node.js] Python Camera ready! Relaying to React...");
     socket.broadcast.emit("python-ready");
   });
 
   socket.on("webrtc-offer", (offer) => {
-    console.log(
-      `[Node.js] RECEIVED OFFER FROM REACT! Forwarding to Python Camera...`,
-    );
     socket.broadcast.emit("webrtc-offer", offer);
   });
 
@@ -103,20 +142,24 @@ io.on("connection", (socket) => {
     socket.broadcast.emit("webrtc-ice-candidate-backend", candidate),
   );
 
-  // --- CONTROLS ---
+  // --- CONTROLS (Multiplayer-Ready) ---
   socket.on("keydown", (data) => {
-    let linuxKey = translateKey(data.key);
-    if (linuxKey) exec(`DISPLAY=:99 xdotool keydown ${linuxKey}`);
+    let linuxKey = translateKey(data.key, data.playerId || 1);
+    if (linuxKey && process.platform === "linux") {
+      exec(`DISPLAY=:99 xdotool keydown ${linuxKey}`);
+    }
   });
 
   socket.on("keyup", (data) => {
-    let linuxKey = translateKey(data.key);
-    if (linuxKey) exec(`DISPLAY=:99 xdotool keyup ${linuxKey}`);
+    let linuxKey = translateKey(data.key, data.playerId || 1);
+    if (linuxKey && process.platform === "linux") {
+      exec(`DISPLAY=:99 xdotool keyup ${linuxKey}`);
+    }
   });
 });
 
-function translateKey(browserKey) {
-  const keyMap = {
+function translateKey(browserKey, playerId) {
+  const p1Map = {
     ArrowUp: "Up",
     ArrowDown: "Down",
     ArrowLeft: "Left",
@@ -126,10 +169,22 @@ function translateKey(browserKey) {
     Enter: "Return",
     Shift: "Shift_R",
   };
-  return keyMap[browserKey] || "";
+
+  const p2Map = {
+    ArrowUp: "i",
+    ArrowDown: "k",
+    ArrowLeft: "j",
+    ArrowRight: "l",
+    z: "v",
+    x: "b",
+    Enter: "p",
+    Shift: "Shift_L",
+  };
+
+  return playerId === 2 ? p2Map[browserKey] : p1Map[browserKey];
 }
 
 server.listen(8080, "0.0.0.0", () => {
-  console.log("Cloud Console API running on port 8080");
+  console.log("Pixelated Desktop Server running on port 8080");
   startVirtualDisplay();
 });
