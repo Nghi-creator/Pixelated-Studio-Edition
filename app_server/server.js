@@ -1,6 +1,6 @@
 const express = require("express");
 const http = require("http");
-const https = require("https"); // <-- NEW IMPORT
+const https = require("https");
 const { Server } = require("socket.io");
 const { spawn, exec } = require("child_process");
 const fs = require("fs");
@@ -11,10 +11,19 @@ const multer = require("multer");
 const app = express();
 app.use(cors());
 
-// --- LOCAL LIBRARY API ---
+const getUserFolder = (userId) => {
+  const safeId = userId || "anonymous";
+  const folderPath = path.join("/roms", safeId);
+  if (!fs.existsSync(folderPath)) {
+    fs.mkdirSync(folderPath, { recursive: true });
+  }
+  return folderPath;
+};
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "/roms");
+    const userId = req.headers["x-user-id"];
+    cb(null, getUserFolder(userId));
   },
   filename: function (req, file, cb) {
     cb(null, file.originalname);
@@ -24,34 +33,41 @@ const upload = multer({ storage: storage });
 
 app.get("/local-games", (req, res) => {
   try {
+    const userId = req.headers["x-user-id"];
+    const userFolder = getUserFolder(userId);
+
     const files = fs
-      .readdirSync("/roms")
+      .readdirSync(userFolder)
       .filter((file) => file.toLowerCase().endsWith(".nes"))
       .map((file) => ({
         name: file,
-        time: fs.statSync(`/roms/${file}`).mtime.getTime(),
+        time: fs.statSync(path.join(userFolder, file)).mtime.getTime(),
       }))
       .sort((a, b) => b.time - a.time)
       .map((f) => f.name);
 
     res.json(files);
   } catch (err) {
-    console.error("Failed to read /roms directory:", err);
+    console.error("Failed to read user directory:", err);
     res.json([]);
   }
 });
 
 app.post("/upload", upload.single("romFile"), (req, res) => {
   if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  console.log(`[Library] New local game added: ${req.file.originalname}`);
+  console.log(
+    `[Library] New local game added for user: ${req.file.originalname}`,
+  );
   res.json({ success: true, filename: req.file.originalname });
 });
 
 app.delete("/local-games/:filename", (req, res) => {
   try {
+    const userId = req.headers["x-user-id"];
+    const userFolder = getUserFolder(userId);
     const filename = req.params.filename;
     const decodedName = decodeURIComponent(filename);
-    const filePath = `/roms/${decodedName}`;
+    const filePath = path.join(userFolder, decodedName);
 
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
@@ -95,7 +111,6 @@ function startVirtualDisplay() {
   );
 }
 
-// 2. Boot the Game
 function bootGame(absoluteRomPath) {
   if (retroarchProcess) retroarchProcess.kill();
   if (cameraProcess) cameraProcess.kill();
@@ -128,15 +143,14 @@ function bootGame(absoluteRomPath) {
   }, 1000);
 }
 
-// --- THE WEBRTC SWITCHBOARD ---
 io.on("connection", (socket) => {
   console.log(`[Node.js] Client connected! ID: ${socket.id}`);
 
   socket.on("start-game", async (payload) => {
     const romFileOrUrl = payload.romFilename;
+    const userId = payload.userId || "anonymous";
     console.log(`\n[Node.js] React requested game boot: ${romFileOrUrl}`);
 
-    // --- THE CLOUD BOOTLOADER ---
     if (romFileOrUrl.startsWith("http")) {
       const tmpPath = "/tmp/cloud_game.nes";
       console.log(
@@ -167,8 +181,8 @@ io.on("connection", (socket) => {
           );
         });
     } else {
-      // Local Vault File
-      bootGame(`/roms/${romFileOrUrl}`);
+      // Boot Local Vault File from User's Personal Folder
+      bootGame(path.join("/roms", userId, romFileOrUrl));
     }
   });
 
@@ -180,9 +194,6 @@ io.on("connection", (socket) => {
   });
 
   socket.on("webrtc-offer", (offer) => {
-    console.log(
-      `[Node.js] RECEIVED OFFER FROM REACT! Forwarding to Python Camera...`,
-    );
     socket.broadcast.emit("webrtc-offer", offer);
   });
 
@@ -196,7 +207,6 @@ io.on("connection", (socket) => {
     socket.broadcast.emit("webrtc-ice-candidate-backend", candidate),
   );
 
-  // --- CONTROLS ---
   socket.on("keydown", (data) => {
     let linuxKey = translateKey(data.key);
     if (linuxKey) exec(`DISPLAY=:99 xdotool keydown ${linuxKey}`);
