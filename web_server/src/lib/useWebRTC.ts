@@ -6,7 +6,6 @@ const socket = io("http://localhost:8080", { autoConnect: false });
 
 export function useWebRTC(gameId: string) {
   const [stream, setStream] = useState<MediaStream | null>(null);
-
   const [status, setStatus] = useState<
     "idle" | "connecting" | "playing" | "error"
   >(gameId ? "connecting" : "idle");
@@ -46,21 +45,39 @@ export function useWebRTC(gameId: string) {
     });
 
     socket.on("connect", async () => {
-      console.log("[WebRTC] Connected. Fetching ROM data for:", gameId);
+      console.log("[WebRTC] Connected. Booting sequence initiated.");
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const userId = session?.user?.id || "anonymous";
+
+      if (gameId.toLowerCase().endsWith(".nes")) {
+        console.log(
+          `[WebRTC] Local Vault game detected. Booting directly: ${gameId} for user ${userId}`,
+        );
+        socket.emit("start-game", { romFilename: gameId, userId: userId });
+        return;
+      }
 
       try {
         const { data, error } = await supabase
           .from("games")
-          .select("rom_filename")
+          .select("rom_url, rom_filename")
           .eq("id", gameId)
           .single();
 
         if (error || !data) throw new Error("Game not found in DB");
 
+        const targetBootString = data.rom_url || data.rom_filename;
+
         console.log(
-          `[WebRTC] Requesting Node Server to boot: ${data.rom_filename}`,
+          `[WebRTC] Cloud Game found. Sending boot string: ${targetBootString}`,
         );
-        socket.emit("start-game", { romFilename: data.rom_filename });
+        socket.emit("start-game", {
+          romFilename: targetBootString,
+          userId: userId,
+        });
       } catch (err) {
         console.error("Failed to boot game:", err);
         setStatus("error");
@@ -96,11 +113,17 @@ export function useWebRTC(gameId: string) {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
-      pc.close();
+
+      if (pcRef.current) {
+        pcRef.current.close();
+      }
       socket.disconnect();
+
       socket.off("webrtc-answer");
       socket.off("webrtc-ice-candidate-backend");
       socket.off("connect");
+      socket.off("python-ready");
+
       setStream(null);
     };
   }, [gameId]);
