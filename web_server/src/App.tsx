@@ -14,9 +14,11 @@ import Auth from "./pages/user/Auth";
 import Favorites from "./pages/user/Favorites";
 import Profile from "./pages/user/Profile";
 import ResetPassword from "./pages/user/ResetPassword";
+import Publish from "./pages/user/Publish";
 
 import UserManagement from "./pages/admin/UserManagement";
 import Dashboard from "./pages/admin/Dashboard";
+import LocalVault from "./pages/user/LocalVault";
 
 // 1. Define the Standard Layout
 const StandardLayout = () => {
@@ -53,6 +55,8 @@ export default function App() {
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/profile" element={<Profile />} />
+          <Route path="/local" element={<LocalVault />} />
+          <Route path="/publish" element={<Publish />} />
         </Route>
       </Routes>
     </Router>
