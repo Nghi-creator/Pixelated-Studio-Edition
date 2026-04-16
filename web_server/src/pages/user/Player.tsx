@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, Link } from "react-router-dom";
 import {
   ArrowLeft,
   Loader2,
@@ -38,6 +38,7 @@ export default function Player() {
   const { stream, status } = useWebRTC(id || "");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [gameTitle, setGameTitle] = useState<string>("");
+  const [authorName, setAuthorName] = useState<string | null>(null);
 
   // Reaction State (Game)
   const [likes, setLikes] = useState(0);
@@ -209,13 +210,16 @@ export default function Player() {
   useEffect(() => {
     const fetchGameDetails = async () => {
       if (!id) return;
+
       const { data } = await supabase
         .from("games")
-        .select("title")
+        .select("title, author_name, rom_url")
         .eq("id", id)
         .single();
-      if (data?.title) {
-        setGameTitle(data.title);
+
+      if (data) {
+        if (data.title) setGameTitle(data.title);
+        if (data.author_name) setAuthorName(data.author_name);
       } else {
         const formattedTitle = id
           .replace(/-/g, " ")
@@ -375,16 +379,25 @@ export default function Player() {
     return () => clearTimeout(timer);
   }, [id]);
 
+  const isLocalGame = id?.toLowerCase().endsWith(".nes");
+  const backRoute = isLocalGame ? "/local" : "/";
+  const backText = isLocalGame
+    ? "Back to Local Vault"
+    : "Back to Cloud Library";
+
   return (
     <div className="flex flex-col items-center pt-24 pb-24 px-4 min-h-screen">
       {/* Top Controls Bar */}
       <div className="w-full max-w-5xl flex flex-col mb-6">
-        <button
-          onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors w-fit mb-4"
-        >
-          <ArrowLeft className="w-5 h-5" /> Back to Library
-        </button>
+        <div className="p-4">
+          <Link
+            to={backRoute}
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            {backText}
+          </Link>
+        </div>
 
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-extrabold text-white tracking-tight">
@@ -423,26 +436,37 @@ export default function Player() {
       </div>
 
       {/* Under-Player Action Bar */}
-      <div className="w-full max-w-5xl mt-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div className="flex flex-wrap items-center gap-4 text-gray-400 text-sm">
-          <p>
-            Move:{" "}
-            <kbd className="bg-synth-elevated border border-synth-border px-2 py-1 rounded text-gray-200 ml-1 font-mono">
-              ARROWS
-            </kbd>
-          </p>
-          <p className="border-l border-synth-border pl-4">
-            Action:{" "}
-            <kbd className="bg-synth-elevated border border-synth-border px-2 py-1 rounded text-gray-200 ml-1 font-mono">
-              Z
-            </kbd>{" "}
-            /{" "}
-            <kbd className="bg-synth-elevated border border-synth-border px-2 py-1 rounded text-gray-200 ml-1 font-mono">
-              X
-            </kbd>
-          </p>
+      <div className="w-full max-w-5xl mt-6 flex flex-col sm:flex-row justify-between items-start gap-4">
+        {/* Controls & Author Tag Container */}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center gap-4 text-gray-400 text-sm">
+            <p>
+              Move:{" "}
+              <kbd className="bg-synth-elevated border border-synth-border px-2 py-1 rounded text-gray-200 ml-1 font-mono">
+                ARROWS
+              </kbd>
+            </p>
+            <p className="border-l border-synth-border pl-4">
+              Action:{" "}
+              <kbd className="bg-synth-elevated border border-synth-border px-2 py-1 rounded text-gray-200 ml-1 font-mono">
+                Z
+              </kbd>{" "}
+              /{" "}
+              <kbd className="bg-synth-elevated border border-synth-border px-2 py-1 rounded text-gray-200 ml-1 font-mono">
+                X
+              </kbd>
+            </p>
+          </div>
+
+          {/* THE AUTHOR TAG */}
+          {authorName && (
+            <p className="text-synth-primary text-sm font-medium flex items-center gap-1.5">
+              Developed by: {authorName}
+            </p>
+          )}
         </div>
 
+        {/* Reaction Buttons */}
         <div className="flex items-center gap-2 bg-synth-surface rounded-full border border-synth-border p-1">
           <button
             onClick={() => handleReaction(true)}

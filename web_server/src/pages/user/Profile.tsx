@@ -3,7 +3,6 @@ import { useNavigate } from "react-router-dom";
 import {
   Loader2,
   ArrowLeft,
-  User,
   Lock,
   Save,
   Camera,
@@ -15,7 +14,7 @@ import { supabase } from "../../lib/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 
 // ==========================================
-// UTILITY: The Canvas Math to crop the image
+// UTILITY: Crop the image
 // ==========================================
 
 interface Area {
@@ -278,7 +277,6 @@ export default function Profile() {
     }
   };
 
-  // --- Smart Account Deletion Logic ---
   const handleDeleteAccount = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!user) return;
@@ -488,7 +486,7 @@ export default function Profile() {
           {/* PROFILE SECTION */}
           <div className="bg-synth-surface border border-synth-border rounded-2xl p-6 md:p-8 shadow-glow-card">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <User className="w-5 h-5 text-synth-primary" /> Public Profile
+              Public Profile
             </h2>
 
             {/* Profile Message Block */}
@@ -573,7 +571,7 @@ export default function Profile() {
           {/* SECURITY SECTION */}
           <div className="bg-synth-surface border border-synth-border rounded-2xl p-6 md:p-8 shadow-glow-card">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              <Lock className="w-5 h-5 text-red-400" /> Security
+              Security
             </h2>
 
             {/* Password Message Block */}
