@@ -31,8 +31,7 @@ function getSafeEnv() {
 }
 
 // --- PRODUCTION PATH RESOLVER ---
-// When packaged, extraResources puts files in process.resourcesPath
-const appDir = app.isPackaged ? process.resourcesPath : __dirname;
+const appDir = __dirname;
 
 ipcMain.on("start-docker", (event) => {
   event.reply("server-log", "Checking Docker daemon...");
@@ -51,7 +50,7 @@ ipcMain.on("start-docker", (event) => {
 
     event.reply("server-log", "Docker Engine found. Compiling container...");
 
-    // 2. Build the image (targets the Dockerfile in appDir)
+    // 2. Build the image
     const buildCmd = exec("docker build -t pixelated-engine .", {
       cwd: appDir,
       env: safeEnv,
@@ -82,7 +81,6 @@ ipcMain.on("start-docker", (event) => {
         { env: safeEnv },
         (runErr) => {
           if (runErr) {
-            // If it fails to run, it's usually because the container name is already taken from a crash
             exec("docker rm -f pixelated-node", { env: safeEnv }, () => {
               event.reply(
                 "server-log",
@@ -106,7 +104,6 @@ ipcMain.on("stop-docker", (event) => {
   event.reply("server-log", "Initiating shutdown sequence...");
   const safeEnv = getSafeEnv();
 
-  // Force remove the container
   exec("docker rm -f pixelated-node", { env: safeEnv }, (err) => {
     if (err) {
       event.reply(
@@ -122,7 +119,6 @@ ipcMain.on("stop-docker", (event) => {
 
 app.whenReady().then(createWindow);
 
-// Cleanup when the user closes the desktop app
 app.on("window-all-closed", () => {
   const safeEnv = getSafeEnv();
   exec("docker rm -f pixelated-node", { env: safeEnv });
