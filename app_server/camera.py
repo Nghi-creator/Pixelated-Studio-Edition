@@ -16,18 +16,24 @@ def handle_offer(offer):
     global webrtcbin, pipeline
     print("[Python] Received React Offer! Building WebRTC Pipeline...")
 
+    if pipeline is not None:
+        print("[Python] Pipeline already running! Ignoring duplicate React offer.")
+        return
+    
     pipeline_str = """
         webrtcbin name=sendrecv
         
-        ximagesrc display-name=:99 use-damage=true ! 
+        ximagesrc display-name=:99 use-damage=false show-pointer=false ! 
         video/x-raw,framerate=60/1 ! 
-        videoconvert ! video/x-raw,format=I420 ! queue ! 
-        vp8enc deadline=1 cpu-used=8 threads=4 end-usage=cbr target-bitrate=1000000 keyframe-max-dist=30 ! 
-        rtpvp8pay pt=96 ! queue ! 
+        videoconvert ! video/x-raw,format=I420 ! 
+        queue max-size-buffers=1 leaky=downstream ! 
+        vp8enc deadline=1 cpu-used=8 threads=4 end-usage=cbr target-bitrate=1000000 max-quantizer=56 min-quantizer=4 keyframe-max-dist=120 error-resilient=1 ! 
+        rtpvp8pay pt=96 ! 
+        queue max-size-buffers=1 leaky=downstream ! 
         application/x-rtp,media=video,encoding-name=VP8,payload=96 ! sendrecv.
         
-        pulsesrc device=auto_null.monitor ! 
-        audioconvert ! audioresample ! queue ! 
+        pulsesrc device=auto_null.monitor provide-clock=false ! 
+        audioconvert ! audioresample ! queue max-size-buffers=3 leaky=downstream ! 
         opusenc ! rtpopuspay pt=111 ! queue ! 
         application/x-rtp,media=audio,encoding-name=OPUS,payload=111 ! sendrecv.
     """

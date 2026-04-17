@@ -1,0 +1,6 @@
+*.pem
+.env
+.DS_Store
+my-games/.DS_Store
+SKILL.md
+skills-lock.json
