@@ -7,7 +7,7 @@ let mainWindow;
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 600,
-    height: 480,
+    height: 700,
     backgroundColor: "#0B0F19",
     webPreferences: {
       nodeIntegration: false,
@@ -31,77 +31,100 @@ function getSafeEnv() {
 }
 
 // --- PRODUCTION PATH RESOLVER ---
-const enginePath = app.isPackaged
-  ? __dirname.replace("app.asar", "app.asar.unpacked")
-  : __dirname;
+// When packaged, extraResources puts files in process.resourcesPath
+const appDir = app.isPackaged ? process.resourcesPath : __dirname;
 
-ipcMain.on("start-docker", () => {
-  console.log("[Launcher] Booting Cross-Platform Docker Engine...");
-
+ipcMain.on("start-docker", (event) => {
+  event.reply("server-log", "Checking Docker daemon...");
   const safeEnv = getSafeEnv();
 
-  const dockerProcess = exec("docker-compose up --build", {
-    cwd: enginePath,
-    env: safeEnv,
-  });
+  // 1. Check if Docker is running
+  exec("docker info", { env: safeEnv }, (err) => {
+    if (err) {
+      event.reply(
+        "server-log",
+        '<span class="text-red-500">ERROR: Docker Engine not detected or not running.</span>',
+      );
+      event.reply("engine-stopped");
+      return;
+    }
 
-  dockerProcess.stdout.on("data", (data) => {
-    mainWindow.webContents.send("server-log", data.toString());
-  });
+    event.reply("server-log", "Docker Engine found. Compiling container...");
 
-  dockerProcess.stderr.on("data", (data) => {
-    mainWindow.webContents.send("server-log", `[Docker Log] ${data}`);
-  });
+    // 2. Build the image (targets the Dockerfile in appDir)
+    const buildCmd = exec("docker build -t pixelated-engine .", {
+      cwd: appDir,
+      env: safeEnv,
+    });
 
-  dockerProcess.on("error", (error) => {
-    mainWindow.webContents.send(
-      "server-log",
-      `<span class="text-red-500">[FATAL ERROR] ${error.message}</span>`,
+    buildCmd.stdout.on("data", (data) =>
+      event.reply("server-log", data.toString().trim()),
     );
-  });
-
-  dockerProcess.on("exit", (code) => {
-    mainWindow.webContents.send(
-      "server-log",
-      `<span class="text-yellow-500">Docker process exited with code ${code}</span>`,
+    buildCmd.stderr.on("data", (data) =>
+      event.reply("server-log", data.toString().trim()),
     );
+
+    buildCmd.on("close", (code) => {
+      if (code !== 0) {
+        event.reply(
+          "server-log",
+          '<span class="text-red-500">ERROR: Build failed.</span>',
+        );
+        event.reply("engine-stopped");
+        return;
+      }
+
+      event.reply("server-log", "Build complete. Starting WebRTC Node...");
+
+      // 3. Run the container
+      exec(
+        "docker run -d --name pixelated-node -p 8080:8080 pixelated-engine",
+        { env: safeEnv },
+        (runErr) => {
+          if (runErr) {
+            // If it fails to run, it's usually because the container name is already taken from a crash
+            exec("docker rm -f pixelated-node", { env: safeEnv }, () => {
+              event.reply(
+                "server-log",
+                '<span class="text-yellow-500">Cleared old container cache. Click Initialize again.</span>',
+              );
+              event.reply("engine-stopped");
+            });
+            return;
+          }
+          event.reply(
+            "server-log",
+            '<span class="text-green-500">SUCCESS: PIXELATED Engine running on Port 8080.</span>',
+          );
+        },
+      );
+    });
   });
 });
 
-ipcMain.on("stop-docker", () => {
-  console.log("[Launcher] Shutting down Docker Engine...");
-  mainWindow.webContents.send(
-    "server-log",
-    `<span class="text-yellow-500">>> Initiating shutdown sequence...</span>`,
-  );
-
+ipcMain.on("stop-docker", (event) => {
+  event.reply("server-log", "Initiating shutdown sequence...");
   const safeEnv = getSafeEnv();
 
-  const stopProcess = exec("docker-compose down", {
-    cwd: enginePath,
-    env: safeEnv,
-  });
-
-  stopProcess.stdout.on("data", (data) =>
-    mainWindow.webContents.send("server-log", data.toString()),
-  );
-  stopProcess.stderr.on("data", (data) =>
-    mainWindow.webContents.send("server-log", `[Docker] ${data}`),
-  );
-
-  stopProcess.on("exit", () => {
-    mainWindow.webContents.send(
-      "server-log",
-      `<span class="text-red-500">Engine successfully powered down.</span>`,
-    );
-    mainWindow.webContents.send("engine-stopped");
+  // Force remove the container
+  exec("docker rm -f pixelated-node", { env: safeEnv }, (err) => {
+    if (err) {
+      event.reply(
+        "server-log",
+        '<span class="text-red-500">Warning: Could not gracefully stop node.</span>',
+      );
+    } else {
+      event.reply("server-log", "Engine successfully terminated.");
+    }
+    event.reply("engine-stopped");
   });
 });
 
 app.whenReady().then(createWindow);
 
+// Cleanup when the user closes the desktop app
 app.on("window-all-closed", () => {
   const safeEnv = getSafeEnv();
-  exec("docker-compose down", { cwd: enginePath, env: safeEnv });
+  exec("docker rm -f pixelated-node", { env: safeEnv });
   app.quit();
 });

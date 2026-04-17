@@ -1,17 +1,45 @@
 {
-  "name": "pixelated-desktop",
+  "name": "pixelated-studio",
   "version": "1.0.0",
+  "description": "PIXELATED Studio - Developer Edition",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^29.0.0"
+    "electron": "^29.0.0",
+    "electron-builder": "^26.8.1"
   },
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "multer": "^2.1.1",
     "socket.io": "^4.8.3"
+  },
+  "build": {
+    "appId": "com.pixelated.studio",
+    "productName": "Pixelated Studio",
+    "asar": true,
+    "mac": {
+      "target": "dmg"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "extraResources": [
+      {
+        "from": "Dockerfile",
+        "to": "Dockerfile"
+      },
+      {
+        "from": "app_server",
+        "to": "app_server"
+      }
+    ]
   }
 }
