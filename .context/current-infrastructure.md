@@ -58,14 +58,16 @@ Current lifecycle:
 3. Electron builds local image `pixelated-engine` from `app_server/Dockerfile`.
 4. Electron generates a random pairing token for this engine run.
 5. Electron displays the pairing token in the desktop UI.
-6. Electron runs a detached container named `pixelated-node` with `-p 127.0.0.1:8080:8080`, publishing the engine only to host loopback, and passes `PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app"` plus `PIXELATED_ENGINE_TOKEN`.
-7. On stop/window close, Electron removes `pixelated-node`.
+6. Electron removes any stale `pixelated-node` container.
+7. Electron runs a detached container named `pixelated-node` with `-p 127.0.0.1:8080:8080`, publishing the engine only to host loopback, and passes `PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app"` plus `PIXELATED_ENGINE_TOKEN`.
+8. Electron polls `http://127.0.0.1:8080/health` and only marks the engine successful after it returns `ok: true`.
+9. On stop/window close, Electron removes `pixelated-node`.
 
 Notable constraints:
 
 - Container name and port are fixed.
 - Build happens on user machine from the distributed app folder.
-- Old containers are only removed after a failed run attempt, requiring a second initialize click.
+- Health currently verifies the Node engine process, not every media subsystem.
 
 ## Engine Container
 
@@ -99,6 +101,7 @@ Data paths:
 
 Streaming/signaling:
 
+- `GET /health` is exposed for Electron readiness checks.
 - Browser connects to Node Socket.IO at `localhost:8080`.
 - Node forwards WebRTC offers, answers, and ICE candidates between browser and Python sender inside a Socket.IO room named `session:<id>`.
 - Python connects back to Node at `http://localhost:8080`.

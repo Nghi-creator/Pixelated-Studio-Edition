@@ -108,6 +108,29 @@ Remaining follow-up:
 - The prompt-based UX works, but it should eventually become a polished pairing panel in the web app.
 - Tokens rotate every engine start, so users may need to re-enter the token after restarting the desktop engine.
 
+### Engine Health And Startup Readiness
+
+Completed: 2026-05-24
+
+Implemented in:
+
+- `app_server/server.js`
+- `app_server/main.js`
+- `.context/project-flows.md`
+- `.context/current-infrastructure.md`
+
+What changed:
+
+- The engine exposes `GET /health`.
+- The health response reports `ok`, process uptime, active session id, and whether a pairing token is required.
+- Electron removes any stale `pixelated-node` container before starting a new one.
+- Electron waits for `/health` to return `ok: true` before showing the engine as successful.
+- If health never becomes ready, Electron removes the failed container and returns the UI to stopped state.
+
+Remaining follow-up:
+
+- Health is currently a Node-process readiness check. A deeper health check could verify Xvfb, PulseAudio, RetroArch availability, and the Python/GStreamer bridge.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
@@ -171,9 +194,7 @@ Suggested improvements:
 
 - Build and publish the engine image ahead of time, then `docker pull` tagged versions.
 - Keep local build as a development fallback.
-- Remove stale containers before running, instead of requiring a second click.
-- Use a health check endpoint before showing "engine ready".
-- Add structured engine states: checking Docker, pulling/building image, starting container, waiting for health, ready, failed.
+- Add more structured engine states: checking Docker, pulling/building image, starting container, waiting for health, ready, failed.
 - Mount `/roms` as a named volume so local vault survives container replacement.
 
 ### 5. Fix WebRTC Production Readiness
@@ -254,8 +275,6 @@ Do a dedicated RLS pass before public launch:
 ### Phase 0: Stabilize Current Demo
 
 - Add `.context` docs.
-- Add engine health endpoint.
-- Add stale container cleanup before run.
 - Remove generated/binary artifacts from git tracking if currently committed.
 
 ### Phase 1: Backend Control Plane
@@ -289,9 +308,9 @@ Do a dedicated RLS pass before public launch:
 
 If you approve the direction, I would start with this batch:
 
-1. Add `/health` endpoint and improve Electron startup state.
-2. Clean repo ignores for generated files.
-3. Refactor `useWebRTC` into smaller session boot, signaling, peer connection, and input modules.
-4. Add cloud ROM URL allowlisting, max download size, timeout, and temp-file cleanup.
+1. Clean repo ignores for generated files.
+2. Refactor `useWebRTC` into smaller session boot, signaling, peer connection, and input modules.
+3. Add cloud ROM URL allowlisting, max download size, timeout, and temp-file cleanup.
+4. Add a named Docker volume for `/roms` so Local Vault files survive container replacement.
 
 This batch makes the current architecture more coherent without forcing a full backend migration yet.
