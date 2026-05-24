@@ -1,6 +1,6 @@
 # Suggestions
 
-Last reviewed: 2026-05-24
+Last reviewed: 2026-05-25
 
 This file tracks advisory recommendations and implementation status. Completed tasks are moved into the Done section so the active backlog stays clean.
 
@@ -226,6 +226,53 @@ Remaining follow-up:
 
 - Session cleanup is still one-active-session-oriented because the local engine currently supports one RetroArch/camera pair at a time.
 
+### Repository Ignore Hygiene
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `.gitignore`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added ignore rules for local env files while preserving `.env.example`.
+- Added recursive `.DS_Store` ignore coverage.
+- Added `node_modules/` and `dist/` ignore coverage.
+- Added Python bytecode and `__pycache__/` ignore coverage.
+- Added `supabase/.temp/` ignore coverage.
+
+Remaining follow-up:
+
+- If any generated files are already committed in another branch/history, remove them from Git tracking with `git rm --cached` in a dedicated cleanup commit.
+
+### WebRTC Hook Refactor
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `web_server/src/lib/useWebRTC.ts`
+- `web_server/src/lib/webrtcSession.ts`
+- `web_server/src/lib/webrtcPeer.ts`
+- `web_server/src/lib/webrtcInput.ts`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `useWebRTC` now stays focused on React state and lifecycle wiring.
+- Game boot target resolution moved to `webrtcSession.ts`.
+- Session id creation and the shared WebRTC status type moved to `webrtcSession.ts`.
+- Peer connection setup, track handling callback wiring, ICE emission, and offer creation moved to `webrtcPeer.ts`.
+- Keyboard input listeners and key event emission moved to `webrtcInput.ts`.
+
+Remaining follow-up:
+
+- Socket event registration still lives in `useWebRTC`; extracting a signaling helper can wait until telemetry adds more event surface area.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
@@ -325,7 +372,7 @@ Do a dedicated RLS pass before public launch:
 
 ### Frontend
 
-- `useWebRTC` owns socket lifecycle, game lookup, WebRTC setup, and keyboard input. Split this into session boot, signaling, peer connection, and input modules.
+- `useWebRTC` has been split into focused session, peer, and input helpers. Socket event registration remains in the hook for now.
 - Several Supabase queries/actions are embedded directly in page components. Introduce small data modules/hooks for games, comments, favorites, moderation, and profiles.
 - Admin access is checked in UI, but the UI should treat RLS/backend authorization as the source of truth.
 - `fetchComments` uses `.range(pageNum * 10, (pageNum + 1) * 10)`, which requests 11 rows because Supabase ranges are inclusive. If the intent is "fetch 11 to detect hasMore", name that explicitly; otherwise use end `pageNum * 10 + 9`.
@@ -346,7 +393,7 @@ Do a dedicated RLS pass before public launch:
 
 ### Repository Hygiene
 
-- `node_modules`, `dist` installer artifacts, `.DS_Store`, and Supabase `.temp` files appear in the working tree. They should not be committed unless there is a very deliberate reason.
+- Generated dependency/build/cache files are now covered by `.gitignore`.
 - Consider separate READMEs for web app, desktop app, and engine internals.
 - Add `.env.example` files for the web and engine.
 
@@ -388,8 +435,7 @@ Do a dedicated RLS pass before public launch:
 
 If you approve the direction, I would start with this batch:
 
-1. Clean repo ignores for generated files.
-2. Refactor `useWebRTC` into smaller session boot, signaling, peer connection, and input modules.
-3. Add live stream telemetry for FPS, bitrate, ICE state, and encoder failures.
+1. Add live stream telemetry for FPS, bitrate, ICE state, and encoder failures.
+2. Add separate READMEs for web app, desktop app, and engine internals.
 
 This batch makes the current architecture more coherent without forcing a full backend migration yet.

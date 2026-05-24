@@ -1,6 +1,13 @@
 *.pem
 .env
+.env.*
+!.env.example
 .DS_Store
-my-games/.DS_Store
+**/.DS_Store
 SKILL.md
 skills-lock.json
+node_modules/
+dist/
+__pycache__/
+*.py[cod]
+supabase/.temp/

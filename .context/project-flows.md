@@ -51,9 +51,9 @@ Purpose: boot an approved/public game selected from the web library.
 1. User navigates to `/play/:id` in React.
 2. `Player.tsx` calls `useWebRTC(id)`.
 3. `useWebRTC` connects Socket.IO to `http://localhost:8080`.
-4. On socket `connect`, React asks Supabase auth for the current session.
-5. If `id` is not a `.nes` filename, React queries Supabase table `games` for `rom_url` and `rom_filename`.
-6. React picks `rom_url || rom_filename`.
+4. On socket `connect`, `resolveGameBootTarget()` asks Supabase auth for the current session.
+5. If `id` is not a `.nes` filename, `resolveGameBootTarget()` queries Supabase table `games` for `rom_url` and `rom_filename`.
+6. React picks `rom_url || rom_filename` through `resolveGameBootTarget()`.
 7. React emits Socket.IO event `start-game` with `{ romFilename, userId }`.
 8. `server.js` receives `start-game`.
 9. If `romFilename` starts with `http`, Node treats it as a cloud ROM URL.
@@ -87,13 +87,13 @@ Purpose: boot a `.nes` file that the user previously uploaded to the local conta
 4. `server.js` sanitizes the user id and maps it to `/roms/<userId>/`.
 5. Node lists `.nes` files in that folder and returns filenames.
 6. User clicks a local game, navigating to `/play/<filename>.nes`.
-7. `useWebRTC` treats any `.nes` id as a local vault file.
+7. `resolveGameBootTarget()` treats any `.nes` id as a local vault file.
 8. React emits `start-game` with `{ romFilename: filename, userId }`.
 9. Node sanitizes the user id and ROM filename.
 10. Node calls `bootGame("/roms/<userId>/<filename>")`.
 11. Boot continues through the same RetroArch and camera process flow as a cloud game.
 
-Current limitation: user identity is trusted from the `X-User-Id` header or socket payload. There is no pairing token or JWT verification at the local engine boundary.
+Current limitation: the pairing token proves possession of the local engine token, but user identity is still trusted from the `X-User-Id` header or socket payload instead of a verified Supabase JWT.
 
 ## 4. Local Vault Upload/Delete Flow
 
@@ -127,8 +127,8 @@ Storage note: `/roms` is backed by the named Docker volume `pixelated-roms`, so 
 
 Purpose: negotiate a WebRTC connection between browser and GStreamer.
 
-1. React creates an `RTCPeerConnection` with Google STUN.
-2. React creates a per-player `sessionId`.
+1. `createEnginePeerConnection()` creates an `RTCPeerConnection` with Google STUN.
+2. `createWebRTCSessionId()` creates a per-player `sessionId`.
 3. React ensures it has a pairing token in `localStorage`; if not, it prompts the user to enter the token shown in the desktop app.
 4. React connects to Node Socket.IO with `{ auth: { token } }`.
 5. Node rejects the socket if the token does not match `PIXELATED_ENGINE_TOKEN`.
@@ -142,8 +142,8 @@ Purpose: negotiate a WebRTC connection between browser and GStreamer.
 13. Python emits `python-ready` with the same `sessionId`.
 14. Node relays `python-ready` only to sockets in `session:<sessionId>`.
 15. React receives `python-ready`.
-16. React adds recv-only video and audio transceivers.
-17. React creates a WebRTC offer and sets it as the local description.
+16. `createAndSendOffer()` adds recv-only video and audio transceivers.
+17. `createAndSendOffer()` creates a WebRTC offer and sets it as the local description.
 18. React emits `webrtc-offer` with `sessionId`.
 19. Node relays the offer only to `session:<sessionId>`.
 20. Python receives the offer.
@@ -217,9 +217,9 @@ Short version:
 
 Purpose: move keyboard control from browser to the emulator.
 
-1. `useWebRTC` attaches browser `keydown` and `keyup` listeners to `window`.
+1. `attachEngineInput()` attaches browser `keydown` and `keyup` listeners to `window`.
 2. `Player.tsx` separately prevents page scrolling for arrow keys and space when focus is not inside an input or textarea.
-3. On keydown, `useWebRTC` ignores repeated keydown events.
+3. On keydown, `attachEngineInput()` ignores repeated keydown events.
 4. React emits Socket.IO event `keydown` with `{ sessionId, key: e.key }`.
 5. On keyup, React emits Socket.IO event `keyup` with `{ sessionId, key: e.key }`.
 6. Node receives the event in `server.js`.

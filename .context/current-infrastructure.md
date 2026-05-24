@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-05-24
+Last reviewed: 2026-05-25
 
 ## Project Shape
 
@@ -38,8 +38,8 @@ Admin routes:
 
 Current important frontend behaviors:
 
-- `useWebRTC` creates an `RTCPeerConnection`, uses Google public STUN, asks Supabase for a selected game's `rom_url` or `rom_filename`, then asks the local Socket.IO engine to start the game.
-- Local vault uploads/deletes ROMs by calling the local engine over unauthenticated HTTP with an `X-User-Id` header.
+- `useWebRTC` owns React stream/status lifecycle while helper modules resolve game boot targets, create WebRTC peer connections, and forward keyboard input.
+- Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, inserts metadata into `game_submissions`, then pings Formspree.
 - Session tracking inserts browser-load access logs directly from the client.
 
@@ -111,7 +111,7 @@ Streaming/signaling:
 
 Input:
 
-- Browser keydown/keyup events go through Socket.IO.
+- Browser keydown/keyup events are attached by `web_server/src/lib/webrtcInput.ts` and go through Socket.IO.
 - Node maps browser keys to X11 key names.
 - Node executes `xdotool keydown/keyup` against display `:99`.
 - React emits `stop-session` during player cleanup; Node stops the active emulator/camera processes and removes the active temp cloud ROM.

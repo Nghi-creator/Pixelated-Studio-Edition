@@ -1,27 +1,28 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { supabase } from "./supabaseClient";
 import { clearEngineToken, ensureEngineToken } from "./engineAuth";
 import { ENGINE_URL } from "./engineConfig";
+import { attachEngineInput } from "./webrtcInput";
+import {
+  createAndSendOffer,
+  createEnginePeerConnection,
+} from "./webrtcPeer";
+import {
+  createWebRTCSessionId,
+  resolveGameBootTarget,
+  type WebRTCStatus,
+} from "./webrtcSession";
 
 const socket = io(ENGINE_URL, { autoConnect: false });
 
-const createSessionId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-
-  return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-};
-
 export function useWebRTC(gameId: string) {
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [status, setStatus] = useState<
-    "idle" | "connecting" | "playing" | "error"
-  >(gameId ? "connecting" : "idle");
+  const [status, setStatus] = useState<WebRTCStatus>(
+    gameId ? "connecting" : "idle",
+  );
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
-  const sessionIdRef = useRef(createSessionId());
+  const sessionIdRef = useRef(createWebRTCSessionId());
 
   useEffect(() => {
     if (!gameId) return;
@@ -30,36 +31,26 @@ export function useWebRTC(gameId: string) {
     const engineToken = ensureEngineToken();
 
     if (!engineToken) {
-      setStatus("error");
+      queueMicrotask(() => setStatus("error"));
       return;
     }
 
     socket.auth = { token: engineToken };
     socket.connect();
 
-    const pc = new RTCPeerConnection({
-      iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    const pc = createEnginePeerConnection({
+      socket,
+      sessionId,
+      onTrack: (track) => {
+        setStream((prevStream) => {
+          const newStream = prevStream || new MediaStream();
+          newStream.addTrack(track);
+          return newStream;
+        });
+        setStatus("playing");
+      },
     });
     pcRef.current = pc;
-
-    pc.ontrack = (event) => {
-      console.log(`[WebRTC] Track received: ${event.track.kind}`);
-      setStream((prevStream) => {
-        const newStream = prevStream || new MediaStream();
-        newStream.addTrack(event.track);
-        return newStream;
-      });
-      setStatus("playing");
-    };
-
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        socket.emit("webrtc-ice-candidate", {
-          sessionId,
-          candidate: event.candidate,
-        });
-      }
-    };
 
     socket.on("webrtc-answer", (answer) => {
       pc.setRemoteDescription(new RTCSessionDescription(answer));
@@ -86,41 +77,11 @@ export function useWebRTC(gameId: string) {
       console.log("[WebRTC] Connected. Booting sequence initiated.");
       socket.emit("join-session", { sessionId, role: "browser" });
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      const userId = session?.user?.id || "anonymous";
-
-      if (gameId.toLowerCase().endsWith(".nes")) {
-        console.log(
-          `[WebRTC] Local Vault game detected. Booting directly: ${gameId} for user ${userId}`,
-        );
-        socket.emit("start-game", {
-          sessionId,
-          romFilename: gameId,
-          userId: userId,
-        });
-        return;
-      }
-
       try {
-        const { data, error } = await supabase
-          .from("games")
-          .select("rom_url, rom_filename")
-          .eq("id", gameId)
-          .single();
-
-        if (error || !data) throw new Error("Game not found in DB");
-
-        const targetBootString = data.rom_url || data.rom_filename;
-
-        console.log(
-          `[WebRTC] Cloud Game found. Sending boot string: ${targetBootString}`,
-        );
+        const bootTarget = await resolveGameBootTarget(gameId);
         socket.emit("start-game", {
           sessionId,
-          romFilename: targetBootString,
-          userId: userId,
+          ...bootTarget,
         });
       } catch (err) {
         console.error("Failed to boot game:", err);
@@ -130,34 +91,13 @@ export function useWebRTC(gameId: string) {
 
     socket.on("python-ready", async () => {
       console.log("[WebRTC] Python is awake! Generating and sending Offer...");
-
-      pc.addTransceiver("video", { direction: "recvonly" });
-      pc.addTransceiver("audio", { direction: "recvonly" });
-
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-
-      socket.emit("webrtc-offer", {
-        sessionId,
-        type: offer.type,
-        sdp: offer.sdp,
-      });
+      await createAndSendOffer(pc, socket, sessionId);
     });
 
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.repeat) return;
-      socket.emit("keydown", { sessionId, key: e.key });
-    };
-    const handleKeyUp = (e: KeyboardEvent) => {
-      socket.emit("keyup", { sessionId, key: e.key });
-    };
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("keyup", handleKeyUp);
+    const detachEngineInput = attachEngineInput(socket, sessionId);
 
     return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("keyup", handleKeyUp);
+      detachEngineInput();
 
       if (pcRef.current) {
         pcRef.current.close();
