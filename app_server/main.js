@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const { exec } = require("child_process");
 const crypto = require("crypto");
+const http = require("http");
 const path = require("path");
 
 let mainWindow;
@@ -34,6 +35,62 @@ function getSafeEnv() {
 
 // --- PRODUCTION PATH RESOLVER ---
 const appDir = __dirname;
+
+function waitForEngineHealth(attempts = 30, delayMs = 1000) {
+  return new Promise((resolve, reject) => {
+    let attempt = 0;
+
+    const check = () => {
+      attempt += 1;
+      let settled = false;
+
+      const req = http.get("http://127.0.0.1:8080/health", (res) => {
+        let body = "";
+
+        res.on("data", (chunk) => {
+          body += chunk;
+        });
+
+        res.on("end", () => {
+          if (res.statusCode === 200) {
+            try {
+              const payload = JSON.parse(body);
+              if (payload.ok) {
+                settled = true;
+                resolve(payload);
+                return;
+              }
+            } catch (err) {
+              // Fall through to retry with a clearer timeout error later.
+            }
+          }
+
+          if (!settled) retry();
+        });
+      });
+
+      req.on("error", () => {
+        if (!settled) retry();
+      });
+      req.setTimeout(1000, () => {
+        settled = true;
+        req.destroy();
+        retry();
+      });
+    };
+
+    const retry = () => {
+      if (attempt >= attempts) {
+        reject(new Error("Timed out waiting for engine health check."));
+        return;
+      }
+
+      setTimeout(check, delayMs);
+    };
+
+    check();
+  });
+}
 
 ipcMain.on("start-docker", (event) => {
   event.reply("server-log", "Checking Docker daemon...");
@@ -77,29 +134,46 @@ ipcMain.on("start-docker", (event) => {
         return;
       }
 
-      event.reply("server-log", "Build complete. Starting WebRTC Node...");
+      event.reply("server-log", "Build complete. Preparing WebRTC Node...");
 
-      // 3. Run the container
-      exec(
-        `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ENGINE_TOKEN="${engineToken}" pixelated-engine`,
-        { env: safeEnv },
-        (runErr) => {
-          if (runErr) {
-            exec("docker rm -f pixelated-node", { env: safeEnv }, () => {
+      // 3. Remove any stale container before running
+      exec("docker rm -f pixelated-node", { env: safeEnv }, () => {
+        event.reply("server-log", "Starting WebRTC Node...");
+
+        // 4. Run the container
+        exec(
+          `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ENGINE_TOKEN="${engineToken}" pixelated-engine`,
+          { env: safeEnv },
+          (runErr) => {
+            if (runErr) {
               event.reply(
                 "server-log",
-                '<span class="text-yellow-500">Cleared old container cache. Click Initialize again.</span>',
+                '<span class="text-red-500">ERROR: Could not start engine container.</span>',
               );
               event.reply("engine-stopped");
-            });
-            return;
-          }
-          event.reply(
-            "server-log",
-            '<span class="text-green-500">SUCCESS: PIXELATED Engine running on Port 8080.</span>',
-          );
-        },
-      );
+              return;
+            }
+
+            event.reply("server-log", "Waiting for engine health check...");
+            waitForEngineHealth()
+              .then(() => {
+                event.reply(
+                  "server-log",
+                  '<span class="text-green-500">SUCCESS: PIXELATED Engine healthy on Port 8080.</span>',
+                );
+              })
+              .catch((healthErr) => {
+                event.reply(
+                  "server-log",
+                  `<span class="text-red-500">ERROR: ${healthErr.message}</span>`,
+                );
+                exec("docker rm -f pixelated-node", { env: safeEnv }, () => {
+                  event.reply("engine-stopped");
+                });
+              });
+          },
+        );
+      });
     });
   });
 });

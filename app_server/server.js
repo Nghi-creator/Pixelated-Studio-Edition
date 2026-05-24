@@ -39,6 +39,15 @@ const ENGINE_TOKEN = process.env.PIXELATED_ENGINE_TOKEN || "";
 const app = express();
 app.use(cors(corsOptions));
 
+app.get("/health", (req, res) => {
+  res.json({
+    ok: true,
+    uptime: process.uptime(),
+    activeSessionId,
+    engineTokenRequired: Boolean(ENGINE_TOKEN),
+  });
+});
+
 function isValidEngineToken(token) {
   if (!ENGINE_TOKEN) return true;
   if (typeof token !== "string" || !token) return false;

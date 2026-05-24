@@ -28,14 +28,18 @@ Purpose: start the local Dockerized game streaming node.
 5. `main.js` builds the image with `docker build -t pixelated-engine .` from `app_server/`.
 6. Electron generates a random pairing token for this engine run.
 7. Electron sends the token to the desktop renderer, which displays it with a copy button.
-8. `main.js` starts a detached container with `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ENGINE_TOKEN="<token>" pixelated-engine`.
-9. The container starts `node server.js`.
-10. `server.js` listens on `0.0.0.0:8080`.
-11. On server start, `server.js` calls `startVirtualDisplay()`.
-12. `startVirtualDisplay()` removes stale X11 lock files, starts `Xvfb :99`, starts PulseAudio, and writes `/app/retroarch.cfg`.
-13. Electron displays log messages from the Docker lifecycle back in the desktop UI.
+8. `main.js` removes any stale `pixelated-node` container.
+9. `main.js` starts a detached container with `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ENGINE_TOKEN="<token>" pixelated-engine`.
+10. The container starts `node server.js`.
+11. `server.js` listens on `0.0.0.0:8080`.
+12. On server start, `server.js` calls `startVirtualDisplay()`.
+13. `startVirtualDisplay()` removes stale X11 lock files, starts `Xvfb :99`, starts PulseAudio, and writes `/app/retroarch.cfg`.
+14. Electron polls `http://127.0.0.1:8080/health`.
+15. If health returns `ok: true`, Electron marks the engine as successful.
+16. If health times out, Electron removes `pixelated-node` and returns the UI to stopped state.
+17. Electron displays log messages from the Docker lifecycle back in the desktop UI.
 
-Current limitation: Electron marks the engine as successful after `docker run` succeeds, not after an actual container health check.
+Current limitation: health currently confirms the Node engine is serving. It does not yet verify Xvfb, PulseAudio, RetroArch, or the Python/GStreamer bridge.
 
 Security note: the Node server still listens on `0.0.0.0` inside the container, but Docker publishes it only to `127.0.0.1` on the host.
 
