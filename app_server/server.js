@@ -45,17 +45,23 @@ const allowedRomHosts = (process.env.PIXELATED_ALLOWED_ROM_HOSTS || "")
   .split(",")
   .map((host) => host.trim().toLowerCase())
   .filter(Boolean);
+const HEALTH_PATHS = {
+  cameraBridge: path.join(__dirname, "camera.py"),
+  mesenCore: "/cores/mesen_libretro.so",
+  retroarchConfig: "/app/retroarch.cfg",
+  retroarchBinary: "/usr/bin/retroarch",
+  roms: "/roms",
+  xvfbSocket: "/tmp/.X11-unix/X99",
+  pythonBinary: "/usr/bin/python3",
+  gstreamerBinary: "/usr/bin/gst-launch-1.0",
+};
 
 const app = express();
 app.use(cors(corsOptions));
 
 app.get("/health", (req, res) => {
-  res.json({
-    ok: true,
-    uptime: process.uptime(),
-    activeSessionId,
-    engineTokenRequired: Boolean(ENGINE_TOKEN),
-  });
+  const snapshot = getHealthSnapshot();
+  res.status(snapshot.ok ? 200 : 503).json(snapshot);
 });
 
 function isValidEngineToken(token) {
@@ -202,8 +208,86 @@ io.use((socket, next) => {
 
 let retroarchProcess = null;
 let cameraProcess = null;
+let pulseAudioProcess = null;
+let virtualDisplayProcess = null;
 let activeSessionId = null;
 let activeCloudRomPath = null;
+
+function pathExists(filePath) {
+  return fs.existsSync(filePath);
+}
+
+function canWriteDirectory(dirPath) {
+  try {
+    fs.accessSync(dirPath, fs.constants.W_OK);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
+function processStarted(processRef) {
+  return (
+    Boolean(processRef) &&
+    (processRef.exitCode === null || processRef.exitCode === 0)
+  );
+}
+
+function getHealthSnapshot() {
+  const checks = {
+    node: true,
+    virtualDisplay: {
+      processStarted: processStarted(virtualDisplayProcess),
+      socketReady: pathExists(HEALTH_PATHS.xvfbSocket),
+    },
+    audio: {
+      processStarted: processStarted(pulseAudioProcess),
+    },
+    retroarch: {
+      binaryExists: pathExists(HEALTH_PATHS.retroarchBinary),
+      mesenCoreExists: pathExists(HEALTH_PATHS.mesenCore),
+      configExists: pathExists(HEALTH_PATHS.retroarchConfig),
+    },
+    cameraBridge: {
+      fileExists: pathExists(HEALTH_PATHS.cameraBridge),
+      pythonExists: pathExists(HEALTH_PATHS.pythonBinary),
+      gstreamerExists: pathExists(HEALTH_PATHS.gstreamerBinary),
+    },
+    storage: {
+      romsDirectoryExists: pathExists(HEALTH_PATHS.roms),
+      romsDirectoryWritable: canWriteDirectory(HEALTH_PATHS.roms),
+    },
+    runtime: {
+      activeSessionId,
+      retroarchRunning: Boolean(
+        retroarchProcess && retroarchProcess.exitCode === null,
+      ),
+      cameraRunning: Boolean(cameraProcess && cameraProcess.exitCode === null),
+      activeCloudRomPath,
+    },
+  };
+
+  const ok =
+    checks.node &&
+    checks.virtualDisplay.processStarted &&
+    checks.virtualDisplay.socketReady &&
+    checks.audio.processStarted &&
+    checks.retroarch.binaryExists &&
+    checks.retroarch.mesenCoreExists &&
+    checks.retroarch.configExists &&
+    checks.cameraBridge.fileExists &&
+    checks.cameraBridge.pythonExists &&
+    checks.cameraBridge.gstreamerExists &&
+    checks.storage.romsDirectoryExists &&
+    checks.storage.romsDirectoryWritable;
+
+  return {
+    ok,
+    uptime: process.uptime(),
+    engineTokenRequired: Boolean(ENGINE_TOKEN),
+    checks,
+  };
+}
 
 function normalizeSessionId(sessionId) {
   return typeof sessionId === "string" && /^[a-zA-Z0-9_-]+$/.test(sessionId)
@@ -252,8 +336,8 @@ function startVirtualDisplay() {
   if (fs.existsSync("/tmp/.X11-unix/X99"))
     fs.rmSync("/tmp/.X11-unix/X99", { force: true, recursive: true });
 
-  spawn("Xvfb", [":99", "-screen", "0", "640x480x24"]);
-  exec(
+  virtualDisplayProcess = spawn("Xvfb", [":99", "-screen", "0", "640x480x24"]);
+  pulseAudioProcess = exec(
     "pulseaudio -D --system --disallow-exit --disable-shm=yes --load='module-native-protocol-tcp auth-anonymous=1'",
   );
 

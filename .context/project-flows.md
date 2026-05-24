@@ -35,11 +35,12 @@ Purpose: start the local Dockerized game streaming node.
 12. On server start, `server.js` calls `startVirtualDisplay()`.
 13. `startVirtualDisplay()` removes stale X11 lock files, starts `Xvfb :99`, starts PulseAudio, and writes `/app/retroarch.cfg`.
 14. Electron polls `http://127.0.0.1:8080/health`.
-15. If health returns `ok: true`, Electron marks the engine as successful.
-16. If health times out, Electron removes `pixelated-node` and returns the UI to stopped state.
-17. Electron displays log messages from the Docker lifecycle back in the desktop UI.
+15. `/health` checks Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
+16. If health returns `ok: true`, Electron marks the engine as successful.
+17. If health times out, Electron removes `pixelated-node` and returns the UI to stopped state.
+18. Electron displays log messages from the Docker lifecycle back in the desktop UI.
 
-Current limitation: health currently confirms the Node engine is serving. It does not yet verify Xvfb, PulseAudio, RetroArch, or the Python/GStreamer bridge.
+Current limitation: health is still readiness-focused. It does not yet expose live stream telemetry such as FPS, bitrate, ICE state, or encoder errors.
 
 Security note: the Node server still listens on `0.0.0.0` inside the container, but Docker publishes it only to `127.0.0.1` on the host.
 

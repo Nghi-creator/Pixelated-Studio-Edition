@@ -67,7 +67,7 @@ Notable constraints:
 
 - Container name and port are fixed.
 - Build happens on user machine from the distributed app folder.
-- Health currently verifies the Node engine process, not every media subsystem.
+- Health verifies core local engine dependencies: Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
 
 ## Engine Container
 
@@ -101,7 +101,7 @@ Data paths:
 
 Streaming/signaling:
 
-- `GET /health` is exposed for Electron readiness checks.
+- `GET /health` is exposed for Electron readiness checks and returns structured subsystem state.
 - Browser connects to Node Socket.IO at `localhost:8080`.
 - Node forwards WebRTC offers, answers, and ICE candidates between browser and Python sender inside a Socket.IO room named `session:<id>`.
 - Python connects back to Node at `http://localhost:8080`.

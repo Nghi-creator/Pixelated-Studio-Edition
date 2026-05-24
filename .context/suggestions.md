@@ -129,7 +129,32 @@ What changed:
 
 Remaining follow-up:
 
-- Health is currently a Node-process readiness check. A deeper health check could verify Xvfb, PulseAudio, RetroArch availability, and the Python/GStreamer bridge.
+- Startup health now includes the main local engine dependencies. Future health work can add live stream metrics such as FPS, bitrate, ICE state, and encoder errors.
+
+### Deep Engine Health Checks
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `app_server/server.js`
+- `.context/project-flows.md`
+- `.context/current-infrastructure.md`
+
+What changed:
+
+- `/health` now reports structured subsystem checks.
+- Health checks Xvfb process state and display socket readiness.
+- Health checks PulseAudio startup process state.
+- Health checks RetroArch binary, Mesen core, and RetroArch config presence.
+- Health checks Python, GStreamer, and `camera.py` presence.
+- Health checks that `/roms` exists and is writable.
+- Health reports active runtime state: active session id, RetroArch running, camera running, and active cloud ROM path.
+- Electron startup now waits for those required checks to be ready because `/health` returns `503` until `ok` is true.
+
+Remaining follow-up:
+
+- Add live stream telemetry later: FPS, bitrate, ICE connection state, encoder failures, and per-session crash reasons.
 
 ### Persistent Local Vault Storage
 
@@ -365,6 +390,6 @@ If you approve the direction, I would start with this batch:
 
 1. Clean repo ignores for generated files.
 2. Refactor `useWebRTC` into smaller session boot, signaling, peer connection, and input modules.
-3. Add a deeper health check for Xvfb, PulseAudio, RetroArch, and the Python/GStreamer bridge.
+3. Add live stream telemetry for FPS, bitrate, ICE state, and encoder failures.
 
 This batch makes the current architecture more coherent without forcing a full backend migration yet.
