@@ -64,7 +64,7 @@ Purpose: boot an approved/public game selected from the web library.
 15. Node enforces `PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS`, defaulting to 15 seconds.
 16. If validation or download fails, Node removes the temp file and emits `engine-error` to React.
 17. After download finishes, Node calls `bootGame(tmpPath)`.
-18. `bootGame()` kills any previous RetroArch and camera processes.
+18. `bootGame()` kills any previous RetroArch and camera processes and removes any previous active temp cloud ROM.
 19. `bootGame()` spawns RetroArch with:
     - full-screen mode,
     - Mesen libretro core at `/cores/mesen_libretro.so`,
@@ -340,7 +340,19 @@ Purpose: stop the local engine.
 4. Docker stops/removes the running engine container.
 5. RetroArch, Python/GStreamer, Xvfb, PulseAudio, and Node all terminate with the container.
 
-Current limitation: cloud temp ROM cleanup relies on container lifecycle unless explicit cleanup is added.
+## 16. Player Session Cleanup Flow
+
+Purpose: stop the current local game session when the React player unmounts.
+
+1. `useWebRTC` cleanup closes the current `RTCPeerConnection`.
+2. React emits `stop-session` with the current `sessionId`.
+3. Node verifies that the session id matches the active engine session.
+4. Node kills the active RetroArch process.
+5. Node kills the active Python/GStreamer camera process.
+6. If the active game used a temp cloud ROM, Node deletes that temp file.
+7. Node clears `activeSessionId` and the active temp ROM pointer.
+
+Current limitation: cleanup is designed for the current one-active-session local engine model.
 
 ## Missing Or Implicit Flows Worth Adding Later
 
@@ -350,4 +362,4 @@ Current limitation: cloud temp ROM cleanup relies on container lifecycle unless 
 - TURN credential flow: backend should mint short-lived credentials for production WebRTC.
 - Engine/node capacity flow: hosted nodes should report whether they can accept sessions.
 - Observability flow: collect session start/stop, ICE failures, encoder health, FPS/bitrate, and crash logs.
-- Cleanup flow: temp ROMs, stale processes, stale containers, and old local vault files need explicit lifecycle rules.
+- Cleanup flow: old local vault files need explicit lifecycle rules if storage quotas become important.

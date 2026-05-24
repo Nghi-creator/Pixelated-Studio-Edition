@@ -162,6 +162,7 @@ export function useWebRTC(gameId: string) {
       if (pcRef.current) {
         pcRef.current.close();
       }
+      socket.emit("stop-session", { sessionId });
       socket.disconnect();
 
       socket.off("webrtc-answer");

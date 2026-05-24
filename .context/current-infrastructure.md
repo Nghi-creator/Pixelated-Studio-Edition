@@ -97,7 +97,7 @@ Runtime processes:
 Data paths:
 
 - Local uploaded ROMs are stored under `/roms/<userId>/`, backed by the named Docker volume `pixelated-roms`.
-- Cloud ROM URLs are downloaded into `/tmp/cloud_game_<uuid>.nes` after HTTPS, host allowlist, size, and timeout validation.
+- Cloud ROM URLs are downloaded into `/tmp/cloud_game_<uuid>.nes` after HTTPS, host allowlist, size, and timeout validation. The active temp cloud ROM is deleted on session cleanup or when a new game replaces it.
 
 Streaming/signaling:
 
@@ -114,6 +114,7 @@ Input:
 - Browser keydown/keyup events go through Socket.IO.
 - Node maps browser keys to X11 key names.
 - Node executes `xdotool keydown/keyup` against display `:99`.
+- React emits `stop-session` during player cleanup; Node stops the active emulator/camera processes and removes the active temp cloud ROM.
 
 ## Supabase
 

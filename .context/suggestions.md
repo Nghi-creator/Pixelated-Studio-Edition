@@ -177,7 +177,29 @@ What changed:
 Remaining follow-up:
 
 - This is still local-engine validation. A future backend should resolve game ids to approved signed ROM manifests instead of accepting URLs from the browser.
-- Temp ROM cleanup after normal play/session end is still pending.
+
+### Session Teardown And Temp ROM Cleanup
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `app_server/server.js`
+- `web_server/src/lib/useWebRTC.ts`
+- `.context/project-flows.md`
+- `.context/current-infrastructure.md`
+
+What changed:
+
+- React emits `stop-session` before disconnecting from the local engine.
+- Node stops the active RetroArch process for that session.
+- Node stops the active Python/GStreamer camera bridge for that session.
+- Node tracks the active temp cloud ROM path and deletes it during session cleanup.
+- Starting a new game also clears any previous active temp cloud ROM.
+
+Remaining follow-up:
+
+- Session cleanup is still one-active-session-oriented because the local engine currently supports one RetroArch/camera pair at a time.
 
 ## Highest Priority Issues
 
@@ -289,7 +311,6 @@ Do a dedicated RLS pass before public launch:
 - `exec` is used for `xdotool` key events. Current key mapping is allowlisted, which helps, but `spawn` with args would be cleaner.
 - `bootGame` kills global processes, so one engine supports one active game at a time. That is fine for a local node, but it should be explicit.
 - `startVirtualDisplay` starts Xvfb/PulseAudio without retaining process handles or checking failures.
-- Cloud temp ROMs are created but not cleaned up after normal session end.
 
 ### Docker
 
@@ -344,7 +365,6 @@ If you approve the direction, I would start with this batch:
 
 1. Clean repo ignores for generated files.
 2. Refactor `useWebRTC` into smaller session boot, signaling, peer connection, and input modules.
-3. Add normal-session temp ROM cleanup.
-4. Add a deeper health check for Xvfb, PulseAudio, RetroArch, and the Python/GStreamer bridge.
+3. Add a deeper health check for Xvfb, PulseAudio, RetroArch, and the Python/GStreamer bridge.
 
 This batch makes the current architecture more coherent without forcing a full backend migration yet.

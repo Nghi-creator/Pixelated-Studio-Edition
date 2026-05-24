@@ -203,6 +203,7 @@ io.use((socket, next) => {
 let retroarchProcess = null;
 let cameraProcess = null;
 let activeSessionId = null;
+let activeCloudRomPath = null;
 
 function normalizeSessionId(sessionId) {
   return typeof sessionId === "string" && /^[a-zA-Z0-9_-]+$/.test(sessionId)
@@ -264,10 +265,34 @@ function startVirtualDisplay() {
   );
 }
 
-function bootGame(absoluteRomPath, sessionId) {
+function cleanupActiveSession(sessionId) {
+  if (sessionId && activeSessionId && sessionId !== activeSessionId) return;
+
+  if (retroarchProcess) {
+    retroarchProcess.kill();
+    retroarchProcess = null;
+  }
+
+  if (cameraProcess) {
+    cameraProcess.kill();
+    cameraProcess = null;
+  }
+
+  if (activeCloudRomPath) {
+    removeFileIfExists(activeCloudRomPath);
+    activeCloudRomPath = null;
+  }
+
+  activeSessionId = null;
+}
+
+function bootGame(absoluteRomPath, sessionId, options = {}) {
   if (retroarchProcess) retroarchProcess.kill();
   if (cameraProcess) cameraProcess.kill();
+  if (activeCloudRomPath) removeFileIfExists(activeCloudRomPath);
+
   activeSessionId = sessionId;
+  activeCloudRomPath = options.isCloudRom ? absoluteRomPath : null;
 
   console.log(
     `[Engine] Mounting ROM for session ${sessionId}: ${absoluteRomPath}`,
@@ -436,7 +461,7 @@ io.on("connection", (socket) => {
       try {
         await downloadCloudRom(romFileOrUrl, tmpPath);
         console.log("[Engine] Download complete. Booting Cloud Game.");
-        bootGame(tmpPath, sessionId);
+        bootGame(tmpPath, sessionId, { isCloudRom: true });
       } catch (err) {
         console.error("[Engine] Failed to download cloud ROM:", err);
         socket.emit("engine-error", {
@@ -496,6 +521,12 @@ io.on("connection", (socket) => {
     if (data.sessionId && data.sessionId !== activeSessionId) return;
     let linuxKey = translateKey(data.key);
     if (linuxKey) exec(`DISPLAY=:99 xdotool keyup ${linuxKey}`);
+  });
+
+  socket.on("stop-session", (payload = {}) => {
+    const sessionId =
+      normalizeSessionId(payload.sessionId) || socket.data.sessionId;
+    cleanupActiveSession(sessionId);
   });
 });
 
