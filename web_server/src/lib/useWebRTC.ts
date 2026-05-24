@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { supabase } from "./supabaseClient";
+import { ENGINE_URL } from "./engineConfig";
 
-const socket = io("http://localhost:8080", { autoConnect: false });
+const socket = io(ENGINE_URL, { autoConnect: false });
 
 const createSessionId = () => {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {

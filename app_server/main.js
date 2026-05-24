@@ -77,7 +77,7 @@ ipcMain.on("start-docker", (event) => {
 
       // 3. Run the container
       exec(
-        "docker run -d --name pixelated-node -p 8080:8080 pixelated-engine",
+        "docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 pixelated-engine",
         { env: safeEnv },
         (runErr) => {
           if (runErr) {

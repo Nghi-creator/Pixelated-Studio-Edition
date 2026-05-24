@@ -9,8 +9,34 @@ const cors = require("cors");
 const multer = require("multer");
 const crypto = require("crypto");
 
+const DEFAULT_ALLOWED_ORIGINS = [
+  "http://localhost:5173",
+  "http://127.0.0.1:5173",
+  "https://pixelated-studio-edition.vercel.app",
+];
+const allowedOrigins = (
+  process.env.PIXELATED_ALLOWED_ORIGINS || DEFAULT_ALLOWED_ORIGINS.join(",")
+)
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`Origin not allowed by CORS: ${origin}`));
+  },
+  methods: ["GET", "POST", "DELETE"],
+};
+const MAX_ROM_SIZE_BYTES = Number(
+  process.env.PIXELATED_MAX_ROM_SIZE_BYTES || 8 * 1024 * 1024,
+);
+
 const app = express();
-app.use(cors());
+app.use(cors(corsOptions));
 
 const getUserFolder = (userId) => {
   const safeId =
@@ -29,10 +55,25 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const safeFilename = path.basename(file.originalname || "unknown.nes");
-    cb(null, safeFilename);
+    cb(null, `${Date.now()}-${crypto.randomUUID()}-${safeFilename}`);
   },
 });
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: MAX_ROM_SIZE_BYTES,
+    files: 1,
+  },
+  fileFilter: function (req, file, cb) {
+    const safeFilename = path.basename(file.originalname || "");
+    if (!safeFilename.toLowerCase().endsWith(".nes")) {
+      cb(new Error("Only .nes ROM files are supported"));
+      return;
+    }
+
+    cb(null, true);
+  },
+});
 
 app.get("/local-games", (req, res) => {
   try {
@@ -56,12 +97,27 @@ app.get("/local-games", (req, res) => {
   }
 });
 
-app.post("/upload", upload.single("romFile"), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No file uploaded" });
-  console.log(
-    `[Library] New local game added for user: ${req.file.originalname}`,
-  );
-  res.json({ success: true, filename: req.file.originalname });
+app.post("/upload", (req, res) => {
+  upload.single("romFile")(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      const message =
+        err.code === "LIMIT_FILE_SIZE"
+          ? `ROM file is too large. Max size is ${MAX_ROM_SIZE_BYTES} bytes.`
+          : err.message;
+      return res.status(400).json({ error: message });
+    }
+
+    if (err) {
+      return res.status(400).json({ error: err.message });
+    }
+
+    if (!req.file) return res.status(400).json({ error: "No file uploaded" });
+
+    console.log(
+      `[Library] New local game added for user: ${req.file.originalname}`,
+    );
+    res.json({ success: true, filename: req.file.filename });
+  });
 });
 
 app.delete("/local-games/:filename", (req, res) => {
@@ -88,7 +144,7 @@ app.delete("/local-games/:filename", (req, res) => {
 
 const server = http.createServer(app);
 const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
+  cors: corsOptions,
 });
 
 let retroarchProcess = null;
