@@ -7,6 +7,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { engineEndpoint } from "../../lib/engineConfig";
 import { supabase } from "../../lib/supabaseClient";
 
 export default function LocalVault() {
@@ -29,7 +30,7 @@ export default function LocalVault() {
 
   const fetchLocalGames = async (uid: string) => {
     try {
-      const res = await fetch("http://localhost:8080/local-games", {
+      const res = await fetch(engineEndpoint("/local-games"), {
         headers: { "X-User-Id": uid },
       });
       if (!res.ok) throw new Error("Local engine offline");
@@ -73,7 +74,7 @@ export default function LocalVault() {
     formData.append("romFile", file);
 
     try {
-      const res = await fetch("http://localhost:8080/upload", {
+      const res = await fetch(engineEndpoint("/upload"), {
         method: "POST",
         headers: { "X-User-Id": userId },
         body: formData,
@@ -99,7 +100,7 @@ export default function LocalVault() {
 
     try {
       const res = await fetch(
-        `http://localhost:8080/local-games/${encodeURIComponent(filename)}`,
+        engineEndpoint(`/local-games/${encodeURIComponent(filename)}`),
         {
           method: "DELETE",
           headers: { "X-User-Id": userId },
