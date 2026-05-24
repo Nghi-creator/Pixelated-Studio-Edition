@@ -7,6 +7,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { clearEngineToken, engineAuthHeaders } from "../../lib/engineAuth";
 import { engineEndpoint } from "../../lib/engineConfig";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -31,8 +32,12 @@ export default function LocalVault() {
   const fetchLocalGames = async (uid: string) => {
     try {
       const res = await fetch(engineEndpoint("/local-games"), {
-        headers: { "X-User-Id": uid },
+        headers: { "X-User-Id": uid, ...engineAuthHeaders() },
       });
+      if (res.status === 401) {
+        clearEngineToken();
+        throw new Error("Invalid engine pairing token");
+      }
       if (!res.ok) throw new Error("Local engine offline");
       const data = await res.json();
       setLocalGames(data);
@@ -76,12 +81,15 @@ export default function LocalVault() {
     try {
       const res = await fetch(engineEndpoint("/upload"), {
         method: "POST",
-        headers: { "X-User-Id": userId },
+        headers: { "X-User-Id": userId, ...engineAuthHeaders() },
         body: formData,
       });
 
       if (res.ok) {
         await fetchLocalGames(userId);
+      } else if (res.status === 401) {
+        clearEngineToken();
+        alert("Invalid pairing token. Please enter the desktop app token again.");
       } else {
         alert("Upload failed.");
       }
@@ -103,12 +111,15 @@ export default function LocalVault() {
         engineEndpoint(`/local-games/${encodeURIComponent(filename)}`),
         {
           method: "DELETE",
-          headers: { "X-User-Id": userId },
+          headers: { "X-User-Id": userId, ...engineAuthHeaders() },
         },
       );
 
       if (res.ok) {
         await fetchLocalGames(userId);
+      } else if (res.status === 401) {
+        clearEngineToken();
+        alert("Invalid pairing token. Please enter the desktop app token again.");
       } else {
         alert("Failed to delete game.");
       }

@@ -117,6 +117,28 @@
           </svg>
           <span id="power-text">Initialize Engine</span>
         </button>
+
+        <div
+          id="token-panel"
+          class="hidden rounded-lg border border-synth-border bg-[#050810] p-4"
+        >
+          <div class="flex items-center justify-between gap-3 mb-2">
+            <p class="text-[10px] uppercase tracking-widest text-gray-400">
+              Web Pairing Token
+            </p>
+            <button
+              id="copy-token"
+              class="text-xs font-bold text-synth-primary hover:text-synth-secondary transition-colors"
+              type="button"
+            >
+              Copy
+            </button>
+          </div>
+          <code
+            id="engine-token"
+            class="block break-all text-xs text-synth-secondary font-mono"
+          ></code>
+        </div>
       </div>
 
       <div
@@ -272,6 +294,9 @@
       const powerText = document.getElementById("power-text");
       const logBox = document.getElementById("log");
       const statusBadge = document.querySelector(".status-badge");
+      const tokenPanel = document.getElementById("token-panel");
+      const tokenValue = document.getElementById("engine-token");
+      const copyTokenBtn = document.getElementById("copy-token");
 
       // Modal Logic
       const docsModal = document.getElementById("docs-modal");
@@ -325,6 +350,8 @@
           );
           powerBtn.classList.add("shadow-glow-primary");
           powerText.innerText = "Initialize Engine";
+          tokenPanel.classList.add("hidden");
+          tokenValue.innerText = "";
           isRunning = false;
         }
       }
@@ -347,6 +374,27 @@
           powerText.innerText = "Shutting down...";
           window.electronAPI.stopDocker();
         }
+      });
+
+      copyTokenBtn.addEventListener("click", async () => {
+        if (!tokenValue.innerText) return;
+
+        try {
+          await navigator.clipboard.writeText(tokenValue.innerText);
+          copyTokenBtn.innerText = "Copied";
+          setTimeout(() => {
+            copyTokenBtn.innerText = "Copy";
+          }, 1200);
+        } catch (err) {
+          appendLog(
+            '<span class="text-red-400">Failed to copy token. Select it manually.</span>',
+          );
+        }
+      });
+
+      window.electronAPI.onEngineToken((event, token) => {
+        tokenValue.innerText = token;
+        tokenPanel.classList.remove("hidden");
       });
 
       window.electronAPI.onServerLog((event, message) => {

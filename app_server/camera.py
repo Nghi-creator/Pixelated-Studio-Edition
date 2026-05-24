@@ -11,6 +11,7 @@ sio = socketio.Client()
 Gst.init(None)
 
 SESSION_ID = os.environ.get('PIXELATED_SESSION_ID', 'default-session')
+ENGINE_TOKEN = os.environ.get('PIXELATED_ENGINE_TOKEN', '')
 webrtcbin = None
 pipeline = None
 
@@ -87,6 +88,6 @@ def on_ice(candidate):
             webrtcbin.emit('add-ice-candidate', candidate['sdpMLineIndex'], candidate['candidate'])
     GLib.idle_add(handle_ice)
 
-sio.connect('http://localhost:8080')
+sio.connect('http://localhost:8080', auth={'token': ENGINE_TOKEN})
 loop = GLib.MainLoop()
 loop.run()

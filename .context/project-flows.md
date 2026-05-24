@@ -26,12 +26,14 @@ Purpose: start the local Dockerized game streaming node.
 3. `preload.js` forwards the request to Electron main over IPC event `start-docker`.
 4. `main.js` runs `docker info` to check whether Docker is available.
 5. `main.js` builds the image with `docker build -t pixelated-engine .` from `app_server/`.
-6. `main.js` starts a detached container with `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 pixelated-engine`.
-7. The container starts `node server.js`.
-8. `server.js` listens on `0.0.0.0:8080`.
-9. On server start, `server.js` calls `startVirtualDisplay()`.
-10. `startVirtualDisplay()` removes stale X11 lock files, starts `Xvfb :99`, starts PulseAudio, and writes `/app/retroarch.cfg`.
-11. Electron displays log messages from the Docker lifecycle back in the desktop UI.
+6. Electron generates a random pairing token for this engine run.
+7. Electron sends the token to the desktop renderer, which displays it with a copy button.
+8. `main.js` starts a detached container with `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ENGINE_TOKEN="<token>" pixelated-engine`.
+9. The container starts `node server.js`.
+10. `server.js` listens on `0.0.0.0:8080`.
+11. On server start, `server.js` calls `startVirtualDisplay()`.
+12. `startVirtualDisplay()` removes stale X11 lock files, starts `Xvfb :99`, starts PulseAudio, and writes `/app/retroarch.cfg`.
+13. Electron displays log messages from the Docker lifecycle back in the desktop UI.
 
 Current limitation: Electron marks the engine as successful after `docker run` succeeds, not after an actual container health check.
 
@@ -90,20 +92,23 @@ Upload:
 
 1. User drags or selects a `.nes` file in `/local`.
 2. React checks that the filename ends with `.nes`.
-3. React sends `POST http://localhost:8080/upload` with multipart field `romFile` and `X-User-Id`.
-4. Multer rejects files that do not have a `.nes` filename.
-5. Multer rejects files larger than `PIXELATED_MAX_ROM_SIZE_BYTES`, defaulting to 8 MiB.
-6. Multer stores the file under `/roms/<safeUserId>/<timestamp>-<uuid>-<basename(originalname)>`.
-7. Node returns `{ success: true, filename }`.
-8. React refetches the local game list.
+3. React ensures it has a pairing token in `localStorage`; if not, it prompts the user to enter the token shown in the desktop app.
+4. React sends `POST http://localhost:8080/upload` with multipart field `romFile`, `X-User-Id`, and `X-Engine-Token`.
+5. Node rejects the request if the pairing token does not match `PIXELATED_ENGINE_TOKEN`.
+6. Multer rejects files that do not have a `.nes` filename.
+7. Multer rejects files larger than `PIXELATED_MAX_ROM_SIZE_BYTES`, defaulting to 8 MiB.
+8. Multer stores the file under `/roms/<safeUserId>/<timestamp>-<uuid>-<basename(originalname)>`.
+9. Node returns `{ success: true, filename }`.
+10. React refetches the local game list.
 
 Delete:
 
 1. User clicks delete on a local game.
-2. React sends `DELETE http://localhost:8080/local-games/:filename` with `X-User-Id`.
-3. Node decodes and sanitizes the filename with `path.basename`.
-4. Node deletes `/roms/<safeUserId>/<safeName>` if it exists.
-5. React refetches the local game list.
+2. React sends `DELETE http://localhost:8080/local-games/:filename` with `X-User-Id` and `X-Engine-Token`.
+3. Node rejects the request if the pairing token does not match `PIXELATED_ENGINE_TOKEN`.
+4. Node decodes and sanitizes the filename with `path.basename`.
+5. Node deletes `/roms/<safeUserId>/<safeName>` if it exists.
+6. React refetches the local game list.
 
 Current limitation: the `/roms` directory is inside the container unless Docker volume mounting is added.
 
@@ -113,34 +118,36 @@ Purpose: negotiate a WebRTC connection between browser and GStreamer.
 
 1. React creates an `RTCPeerConnection` with Google STUN.
 2. React creates a per-player `sessionId`.
-3. React connects to Node Socket.IO.
-4. React emits `join-session` with `{ sessionId, role: "browser" }`.
-5. Node joins that browser socket to room `session:<sessionId>`.
-6. React emits `start-game` with the same `sessionId`.
-7. Node boots RetroArch and then starts `camera.py` with `PIXELATED_SESSION_ID=<sessionId>`.
-8. `camera.py` connects back to `http://localhost:8080` as a Socket.IO client.
-9. Python emits `join-session` with `{ sessionId, role: "camera" }`.
-10. Node joins that camera socket to room `session:<sessionId>`.
-11. Python emits `python-ready` with the same `sessionId`.
-12. Node relays `python-ready` only to sockets in `session:<sessionId>`.
-13. React receives `python-ready`.
-14. React adds recv-only video and audio transceivers.
-15. React creates a WebRTC offer and sets it as the local description.
-16. React emits `webrtc-offer` with `sessionId`.
-17. Node relays the offer only to `session:<sessionId>`.
-18. Python receives the offer.
-19. Python builds the GStreamer pipeline and gets the `webrtcbin` element.
-20. Python sets the React offer as the remote description.
-21. Python creates a WebRTC answer.
-22. Python sets the answer as its local description.
-23. Python emits `webrtc-answer` with `sessionId`.
-24. Node relays the answer only to `session:<sessionId>`.
-25. React sets the answer as its remote description.
-26. React and Python exchange ICE candidates through `webrtc-ice-candidate` and `webrtc-ice-candidate-backend` events relayed only inside the same session room.
-27. Once media tracks arrive, React adds them to a `MediaStream` and marks status as `playing`.
-28. `Player.tsx` assigns that `MediaStream` to the `<video>` element through `videoRef.current.srcObject`.
+3. React ensures it has a pairing token in `localStorage`; if not, it prompts the user to enter the token shown in the desktop app.
+4. React connects to Node Socket.IO with `{ auth: { token } }`.
+5. Node rejects the socket if the token does not match `PIXELATED_ENGINE_TOKEN`.
+6. React emits `join-session` with `{ sessionId, role: "browser" }`.
+7. Node joins that browser socket to room `session:<sessionId>`.
+8. React emits `start-game` with the same `sessionId`.
+9. Node boots RetroArch and then starts `camera.py` with `PIXELATED_SESSION_ID=<sessionId>` and `PIXELATED_ENGINE_TOKEN=<token>`.
+10. `camera.py` connects back to `http://localhost:8080` as a Socket.IO client with the token.
+11. Python emits `join-session` with `{ sessionId, role: "camera" }`.
+12. Node joins that camera socket to room `session:<sessionId>`.
+13. Python emits `python-ready` with the same `sessionId`.
+14. Node relays `python-ready` only to sockets in `session:<sessionId>`.
+15. React receives `python-ready`.
+16. React adds recv-only video and audio transceivers.
+17. React creates a WebRTC offer and sets it as the local description.
+18. React emits `webrtc-offer` with `sessionId`.
+19. Node relays the offer only to `session:<sessionId>`.
+20. Python receives the offer.
+21. Python builds the GStreamer pipeline and gets the `webrtcbin` element.
+22. Python sets the React offer as the remote description.
+23. Python creates a WebRTC answer.
+24. Python sets the answer as its local description.
+25. Python emits `webrtc-answer` with `sessionId`.
+26. Node relays the answer only to `session:<sessionId>`.
+27. React sets the answer as its remote description.
+28. React and Python exchange ICE candidates through `webrtc-ice-candidate` and `webrtc-ice-candidate-backend` events relayed only inside the same session room.
+29. Once media tracks arrive, React adds them to a `MediaStream` and marks status as `playing`.
+30. `Player.tsx` assigns that `MediaStream` to the `<video>` element through `videoRef.current.srcObject`.
 
-Current limitation: signaling is now room-scoped, but the local engine still has no pairing token or backend-issued session authorization.
+Current limitation: signaling is now room-scoped and token-gated, but it is still local pairing rather than backend-issued session authorization.
 
 ## 6. Video Buffer Flow
 
