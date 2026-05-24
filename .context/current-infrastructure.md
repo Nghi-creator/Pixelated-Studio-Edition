@@ -59,7 +59,7 @@ Current lifecycle:
 4. Electron generates a random pairing token for this engine run.
 5. Electron displays the pairing token in the desktop UI.
 6. Electron removes any stale `pixelated-node` container.
-7. Electron runs a detached container named `pixelated-node` with `-p 127.0.0.1:8080:8080`, publishing the engine only to host loopback, and passes `PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app"` plus `PIXELATED_ENGINE_TOKEN`.
+7. Electron runs a detached container named `pixelated-node` with `-p 127.0.0.1:8080:8080` and `-v pixelated-roms:/roms`, publishing the engine only to host loopback, and passes `PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app"`, `PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co"`, plus `PIXELATED_ENGINE_TOKEN`.
 8. Electron polls `http://127.0.0.1:8080/health` and only marks the engine successful after it returns `ok: true`.
 9. On stop/window close, Electron removes `pixelated-node`.
 
@@ -96,8 +96,8 @@ Runtime processes:
 
 Data paths:
 
-- Local uploaded ROMs are stored under `/roms/<userId>/`.
-- Cloud ROM URLs are downloaded into `/tmp/cloud_game_<uuid>.nes`.
+- Local uploaded ROMs are stored under `/roms/<userId>/`, backed by the named Docker volume `pixelated-roms`.
+- Cloud ROM URLs are downloaded into `/tmp/cloud_game_<uuid>.nes` after HTTPS, host allowlist, size, and timeout validation.
 
 Streaming/signaling:
 
@@ -107,6 +107,7 @@ Streaming/signaling:
 - Python connects back to Node at `http://localhost:8080`.
 - Browser receives VP8 video and Opus audio.
 - React generates the current session id, Node passes it into `camera.py` through `PIXELATED_SESSION_ID`, and both browser/camera sockets join the same room before WebRTC negotiation.
+- Engine-side download failures emit `engine-error` to the browser session.
 
 Input:
 

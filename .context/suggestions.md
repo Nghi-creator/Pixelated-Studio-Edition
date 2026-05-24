@@ -131,6 +131,54 @@ Remaining follow-up:
 
 - Health is currently a Node-process readiness check. A deeper health check could verify Xvfb, PulseAudio, RetroArch availability, and the Python/GStreamer bridge.
 
+### Persistent Local Vault Storage
+
+Completed: 2026-05-24
+
+Implemented in:
+
+- `app_server/main.js`
+- `.context/project-flows.md`
+- `.context/current-infrastructure.md`
+
+What changed:
+
+- Electron starts the engine container with `-v pixelated-roms:/roms`.
+- Local Vault ROMs now live in a named Docker volume instead of only inside the disposable container filesystem.
+- Removing/recreating `pixelated-node` no longer wipes local uploaded ROMs.
+
+Remaining follow-up:
+
+- Add a desktop UI action later if users need to explicitly clear the local ROM volume.
+
+### Cloud ROM Download Hardening
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `app_server/main.js`
+- `app_server/server.js`
+- `web_server/src/lib/useWebRTC.ts`
+- `.context/project-flows.md`
+- `.context/current-infrastructure.md`
+
+What changed:
+
+- Electron starts the engine with `PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co"`.
+- The engine validates cloud ROM URLs before downloading.
+- Cloud ROM URLs must use HTTPS.
+- Cloud ROM hostnames must be in `PIXELATED_ALLOWED_ROM_HOSTS` when that env var is set.
+- Cloud ROM downloads are capped by `PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES`, defaulting to 8 MiB.
+- Cloud ROM downloads time out via `PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS`, defaulting to 15 seconds.
+- Failed or oversized downloads clean up the temp file.
+- React listens for `engine-error` and moves the player to error state when the engine rejects a ROM download.
+
+Remaining follow-up:
+
+- This is still local-engine validation. A future backend should resolve game ids to approved signed ROM manifests instead of accepting URLs from the browser.
+- Temp ROM cleanup after normal play/session end is still pending.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
@@ -173,20 +221,7 @@ Remaining suggested improvements:
 
 - If LAN streaming is intentional, make it an explicit setting with a warning.
 
-### 3. Harden ROM Downloading
-
-The engine downloads arbitrary `http` URLs received from the browser and boots them. Even if the UI normally sends Supabase URLs, the socket event itself can be spoofed.
-
-Suggested improvements:
-
-- Backend should resolve game id to an approved ROM URL.
-- Engine should receive a signed session manifest, not arbitrary URLs from the browser.
-- Allow only HTTPS.
-- Allow only approved storage hostnames.
-- Enforce max download size and timeout.
-- Delete temp ROMs after the session ends.
-
-### 4. Improve Docker Build/Run Lifecycle
+### 3. Improve Docker Build/Run Lifecycle
 
 The Electron app builds the image on demand and uses a fixed container name/port. This is workable for a demo, but fragile for users.
 
@@ -195,9 +230,8 @@ Suggested improvements:
 - Build and publish the engine image ahead of time, then `docker pull` tagged versions.
 - Keep local build as a development fallback.
 - Add more structured engine states: checking Docker, pulling/building image, starting container, waiting for health, ready, failed.
-- Mount `/roms` as a named volume so local vault survives container replacement.
 
-### 5. Fix WebRTC Production Readiness
+### 4. Fix WebRTC Production Readiness
 
 Google STUN alone is not enough for real users and varied networks.
 
@@ -310,7 +344,7 @@ If you approve the direction, I would start with this batch:
 
 1. Clean repo ignores for generated files.
 2. Refactor `useWebRTC` into smaller session boot, signaling, peer connection, and input modules.
-3. Add cloud ROM URL allowlisting, max download size, timeout, and temp-file cleanup.
-4. Add a named Docker volume for `/roms` so Local Vault files survive container replacement.
+3. Add normal-session temp ROM cleanup.
+4. Add a deeper health check for Xvfb, PulseAudio, RetroArch, and the Python/GStreamer bridge.
 
 This batch makes the current architecture more coherent without forcing a full backend migration yet.
