@@ -142,7 +142,7 @@ ipcMain.on("start-docker", (event) => {
 
         // 4. Run the container
         exec(
-          `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ENGINE_TOKEN="${engineToken}" pixelated-engine`,
+          `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_ENGINE_TOKEN="${engineToken}" pixelated-engine`,
           { env: safeEnv },
           (runErr) => {
             if (runErr) {
