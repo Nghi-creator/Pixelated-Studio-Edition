@@ -29,7 +29,7 @@ Purpose: start the local Dockerized game streaming node.
 6. Electron generates a random pairing token for this engine run.
 7. Electron sends the token to the desktop renderer, which displays it with a copy button.
 8. `main.js` removes any stale `pixelated-node` container.
-9. `main.js` starts a detached container with `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ENGINE_TOKEN="<token>" pixelated-engine`.
+9. `main.js` starts a detached container with `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_ENGINE_TOKEN="<token>" pixelated-engine`.
 10. The container starts `node server.js`.
 11. `server.js` listens on `0.0.0.0:8080`.
 12. On server start, `server.js` calls `startVirtualDisplay()`.
@@ -56,19 +56,25 @@ Purpose: boot an approved/public game selected from the web library.
 7. React emits Socket.IO event `start-game` with `{ romFilename, userId }`.
 8. `server.js` receives `start-game`.
 9. If `romFilename` starts with `http`, Node treats it as a cloud ROM URL.
-10. Node downloads the ROM with `https.get()` into `/tmp/cloud_game_<uuid>.nes`.
-11. After download finishes, Node calls `bootGame(tmpPath)`.
-12. `bootGame()` kills any previous RetroArch and camera processes.
-13. `bootGame()` spawns RetroArch with:
+10. Node validates that the URL is parseable.
+11. Node requires the URL to use HTTPS.
+12. Node checks the hostname against `PIXELATED_ALLOWED_ROM_HOSTS` when configured.
+13. Node downloads the ROM with `https.get()` into `/tmp/cloud_game_<uuid>.nes`.
+14. Node enforces `PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES`, defaulting to 8 MiB.
+15. Node enforces `PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS`, defaulting to 15 seconds.
+16. If validation or download fails, Node removes the temp file and emits `engine-error` to React.
+17. After download finishes, Node calls `bootGame(tmpPath)`.
+18. `bootGame()` kills any previous RetroArch and camera processes.
+19. `bootGame()` spawns RetroArch with:
     - full-screen mode,
     - Mesen libretro core at `/cores/mesen_libretro.so`,
     - config `/app/retroarch.cfg`,
     - downloaded ROM path,
     - `DISPLAY=:99`,
     - `PULSE_SERVER=127.0.0.1`.
-14. After a 1 second delay, Node starts `python3 -u camera.py`.
+20. After a 1 second delay, Node starts `python3 -u camera.py`.
 
-Current limitation: the browser can send an arbitrary URL to the local engine if it can reach the socket. The engine does not verify that the URL came from an approved Supabase game row.
+Current limitation: the local engine now validates HTTPS, hostname, size, and timeout, but it still receives a URL from the browser. A future backend should resolve game ids to approved signed ROM manifests.
 
 ## 3. Local Vault Game Boot Flow
 
@@ -114,7 +120,7 @@ Delete:
 5. Node deletes `/roms/<safeUserId>/<safeName>` if it exists.
 6. React refetches the local game list.
 
-Current limitation: the `/roms` directory is inside the container unless Docker volume mounting is added.
+Storage note: `/roms` is backed by the named Docker volume `pixelated-roms`, so uploaded Local Vault ROMs survive container replacement.
 
 ## 5. WebRTC Signaling Flow
 

@@ -77,6 +77,11 @@ export function useWebRTC(gameId: string) {
       setStatus("error");
     });
 
+    socket.on("engine-error", (payload: { message?: string }) => {
+      console.error("[WebRTC] Engine error:", payload?.message);
+      setStatus("error");
+    });
+
     socket.on("connect", async () => {
       console.log("[WebRTC] Connected. Booting sequence initiated.");
       socket.emit("join-session", { sessionId, role: "browser" });
@@ -163,6 +168,7 @@ export function useWebRTC(gameId: string) {
       socket.off("webrtc-ice-candidate-backend");
       socket.off("connect");
       socket.off("connect_error");
+      socket.off("engine-error");
       socket.off("python-ready");
 
       setStream(null);

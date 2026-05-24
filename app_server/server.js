@@ -34,7 +34,17 @@ const corsOptions = {
 const MAX_ROM_SIZE_BYTES = Number(
   process.env.PIXELATED_MAX_ROM_SIZE_BYTES || 8 * 1024 * 1024,
 );
+const MAX_CLOUD_ROM_SIZE_BYTES = Number(
+  process.env.PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES || 8 * 1024 * 1024,
+);
+const CLOUD_ROM_DOWNLOAD_TIMEOUT_MS = Number(
+  process.env.PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS || 15000,
+);
 const ENGINE_TOKEN = process.env.PIXELATED_ENGINE_TOKEN || "";
+const allowedRomHosts = (process.env.PIXELATED_ALLOWED_ROM_HOSTS || "")
+  .split(",")
+  .map((host) => host.trim().toLowerCase())
+  .filter(Boolean);
 
 const app = express();
 app.use(cors(corsOptions));
@@ -294,6 +304,100 @@ function bootGame(absoluteRomPath, sessionId) {
   }, 1000);
 }
 
+function validateCloudRomUrl(romUrl) {
+  let parsedUrl;
+
+  try {
+    parsedUrl = new URL(romUrl);
+  } catch (err) {
+    throw new Error("Invalid cloud ROM URL");
+  }
+
+  if (parsedUrl.protocol !== "https:") {
+    throw new Error("Cloud ROM URLs must use HTTPS");
+  }
+
+  if (
+    allowedRomHosts.length > 0 &&
+    !allowedRomHosts.includes(parsedUrl.hostname.toLowerCase())
+  ) {
+    throw new Error(`Cloud ROM host is not allowed: ${parsedUrl.hostname}`);
+  }
+
+  return parsedUrl;
+}
+
+function removeFileIfExists(filePath) {
+  fs.unlink(filePath, () => {});
+}
+
+function downloadCloudRom(romUrl, destinationPath) {
+  const parsedUrl = validateCloudRomUrl(romUrl);
+
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destinationPath);
+    let downloadedBytes = 0;
+    let settled = false;
+
+    const fail = (err) => {
+      if (settled) return;
+      settled = true;
+      file.destroy();
+      removeFileIfExists(destinationPath);
+      reject(err);
+    };
+
+    const request = https.get(parsedUrl, (response) => {
+      if (response.statusCode !== 200) {
+        response.resume();
+        fail(
+          new Error(
+            `Failed to download cloud ROM: status ${response.statusCode}`,
+          ),
+        );
+        return;
+      }
+
+      const contentLength = Number(response.headers["content-length"] || 0);
+      if (contentLength > MAX_CLOUD_ROM_SIZE_BYTES) {
+        response.resume();
+        fail(
+          new Error(
+            `Cloud ROM is too large. Max size is ${MAX_CLOUD_ROM_SIZE_BYTES} bytes.`,
+          ),
+        );
+        return;
+      }
+
+      response.on("data", (chunk) => {
+        downloadedBytes += chunk.length;
+        if (downloadedBytes > MAX_CLOUD_ROM_SIZE_BYTES) {
+          response.destroy(
+            new Error(
+              `Cloud ROM exceeded max size of ${MAX_CLOUD_ROM_SIZE_BYTES} bytes.`,
+            ),
+          );
+        }
+      });
+
+      response.on("error", fail);
+      file.on("error", fail);
+      file.on("finish", () => {
+        if (settled) return;
+        settled = true;
+        file.close(resolve);
+      });
+
+      response.pipe(file);
+    });
+
+    request.setTimeout(CLOUD_ROM_DOWNLOAD_TIMEOUT_MS, () => {
+      request.destroy(new Error("Cloud ROM download timed out"));
+    });
+    request.on("error", fail);
+  });
+}
+
 io.on("connection", (socket) => {
   console.log(`[Node.js] Client connected! ID: ${socket.id}`);
 
@@ -329,29 +433,16 @@ io.on("connection", (socket) => {
         "[Engine] Cloud URL detected. Downloading ROM to temporary storage...",
       );
 
-      const file = fs.createWriteStream(tmpPath);
-      https
-        .get(romFileOrUrl, (response) => {
-          if (response.statusCode !== 200) {
-            console.error(
-              `[Engine] Failed to download: Status Code ${response.statusCode}`,
-            );
-            return;
-          }
-          response.pipe(file);
-          file.on("finish", () => {
-            file.close();
-            console.log("[Engine] Download complete. Booting Cloud Game.");
-            bootGame(tmpPath, sessionId);
-          });
-        })
-        .on("error", (err) => {
-          fs.unlink(tmpPath, () => {});
-          console.error(
-            "[Engine] CRITICAL: Failed to download cloud ROM:",
-            err,
-          );
+      try {
+        await downloadCloudRom(romFileOrUrl, tmpPath);
+        console.log("[Engine] Download complete. Booting Cloud Game.");
+        bootGame(tmpPath, sessionId);
+      } catch (err) {
+        console.error("[Engine] Failed to download cloud ROM:", err);
+        socket.emit("engine-error", {
+          message: err instanceof Error ? err.message : "Cloud ROM failed",
         });
+      }
     } else {
       // Boot Local Vault File from User's Personal Folder
       const safeRomFile = path.basename(romFileOrUrl);
