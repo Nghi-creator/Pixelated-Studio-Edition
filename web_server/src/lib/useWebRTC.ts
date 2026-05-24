@@ -4,6 +4,14 @@ import { supabase } from "./supabaseClient";
 
 const socket = io("http://localhost:8080", { autoConnect: false });
 
+const createSessionId = () => {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+
+  return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
 export function useWebRTC(gameId: string) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [status, setStatus] = useState<
@@ -11,9 +19,12 @@ export function useWebRTC(gameId: string) {
   >(gameId ? "connecting" : "idle");
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const sessionIdRef = useRef(createSessionId());
 
   useEffect(() => {
     if (!gameId) return;
+
+    const sessionId = sessionIdRef.current;
 
     socket.connect();
 
@@ -33,7 +44,12 @@ export function useWebRTC(gameId: string) {
     };
 
     pc.onicecandidate = (event) => {
-      if (event.candidate) socket.emit("webrtc-ice-candidate", event.candidate);
+      if (event.candidate) {
+        socket.emit("webrtc-ice-candidate", {
+          sessionId,
+          candidate: event.candidate,
+        });
+      }
     };
 
     socket.on("webrtc-answer", (answer) => {
@@ -46,6 +62,7 @@ export function useWebRTC(gameId: string) {
 
     socket.on("connect", async () => {
       console.log("[WebRTC] Connected. Booting sequence initiated.");
+      socket.emit("join-session", { sessionId, role: "browser" });
 
       const {
         data: { session },
@@ -56,7 +73,11 @@ export function useWebRTC(gameId: string) {
         console.log(
           `[WebRTC] Local Vault game detected. Booting directly: ${gameId} for user ${userId}`,
         );
-        socket.emit("start-game", { romFilename: gameId, userId: userId });
+        socket.emit("start-game", {
+          sessionId,
+          romFilename: gameId,
+          userId: userId,
+        });
         return;
       }
 
@@ -75,6 +96,7 @@ export function useWebRTC(gameId: string) {
           `[WebRTC] Cloud Game found. Sending boot string: ${targetBootString}`,
         );
         socket.emit("start-game", {
+          sessionId,
           romFilename: targetBootString,
           userId: userId,
         });
@@ -94,6 +116,7 @@ export function useWebRTC(gameId: string) {
       await pc.setLocalDescription(offer);
 
       socket.emit("webrtc-offer", {
+        sessionId,
         type: offer.type,
         sdp: offer.sdp,
       });
@@ -101,10 +124,10 @@ export function useWebRTC(gameId: string) {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.repeat) return;
-      socket.emit("keydown", { key: e.key });
+      socket.emit("keydown", { sessionId, key: e.key });
     };
     const handleKeyUp = (e: KeyboardEvent) => {
-      socket.emit("keyup", { key: e.key });
+      socket.emit("keyup", { sessionId, key: e.key });
     };
 
     window.addEventListener("keydown", handleKeyDown);

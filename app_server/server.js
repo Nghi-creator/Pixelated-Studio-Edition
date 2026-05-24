@@ -93,6 +93,46 @@ const io = new Server(server, {
 
 let retroarchProcess = null;
 let cameraProcess = null;
+let activeSessionId = null;
+
+function normalizeSessionId(sessionId) {
+  return typeof sessionId === "string" && /^[a-zA-Z0-9_-]+$/.test(sessionId)
+    ? sessionId
+    : null;
+}
+
+function getSessionRoom(sessionId) {
+  return `session:${sessionId}`;
+}
+
+function joinSession(socket, sessionId, role = "unknown") {
+  const safeSessionId = normalizeSessionId(sessionId);
+
+  if (!safeSessionId) {
+    console.warn(`[Node.js] Refusing invalid session id from ${socket.id}`);
+    return null;
+  }
+
+  socket.data.sessionId = safeSessionId;
+  socket.join(getSessionRoom(safeSessionId));
+  console.log(
+    `[Node.js] ${role} socket ${socket.id} joined session ${safeSessionId}`,
+  );
+
+  return safeSessionId;
+}
+
+function relayToSession(socket, eventName, payload) {
+  const sessionId =
+    normalizeSessionId(payload?.sessionId) || socket.data.sessionId;
+
+  if (!sessionId) {
+    console.warn(`[Node.js] Dropping ${eventName}: missing session id`);
+    return;
+  }
+
+  socket.to(getSessionRoom(sessionId)).emit(eventName, payload);
+}
 
 function startVirtualDisplay() {
   console.log("Booting Virtual Display (Xvfb) and PulseAudio...");
@@ -115,11 +155,14 @@ function startVirtualDisplay() {
   );
 }
 
-function bootGame(absoluteRomPath) {
+function bootGame(absoluteRomPath, sessionId) {
   if (retroarchProcess) retroarchProcess.kill();
   if (cameraProcess) cameraProcess.kill();
+  activeSessionId = sessionId;
 
-  console.log(`[Engine] Mounting ROM: ${absoluteRomPath}`);
+  console.log(
+    `[Engine] Mounting ROM for session ${sessionId}: ${absoluteRomPath}`,
+  );
 
   retroarchProcess = spawn(
     "retroarch",
@@ -137,7 +180,11 @@ function bootGame(absoluteRomPath) {
   setTimeout(() => {
     console.log("[Engine] Starting Python WebRTC Camera Bridge...");
     cameraProcess = spawn("python3", ["-u", __dirname + "/camera.py"], {
-      env: { ...process.env, PULSE_SERVER: "127.0.0.1" },
+      env: {
+        ...process.env,
+        PULSE_SERVER: "127.0.0.1",
+        PIXELATED_SESSION_ID: sessionId,
+      },
     });
 
     cameraProcess.stdout.on("data", (data) => console.log(`[Camera] ${data}`));
@@ -150,13 +197,31 @@ function bootGame(absoluteRomPath) {
 io.on("connection", (socket) => {
   console.log(`[Node.js] Client connected! ID: ${socket.id}`);
 
-  socket.on("start-game", async (payload) => {
+  socket.on("join-session", (payload = {}) => {
+    joinSession(socket, payload.sessionId, payload.role);
+  });
+
+  socket.on("start-game", async (payload = {}) => {
+    const sessionId =
+      normalizeSessionId(payload.sessionId) ||
+      socket.data.sessionId ||
+      joinSession(socket, crypto.randomUUID(), "browser");
     const romFileOrUrl = payload.romFilename;
     const rawUserId = payload.userId || "anonymous";
     const safeUserId = /^[a-zA-Z0-9_-]+$/.test(rawUserId)
       ? rawUserId
       : "anonymous";
-    console.log(`\n[Node.js] React requested game boot: ${romFileOrUrl}`);
+    socket.data.sessionId = sessionId;
+    socket.join(getSessionRoom(sessionId));
+
+    console.log(
+      `\n[Node.js] React requested game boot for session ${sessionId}: ${romFileOrUrl}`,
+    );
+
+    if (!romFileOrUrl) {
+      console.warn("[Node.js] Ignoring start-game without a ROM target");
+      return;
+    }
 
     if (romFileOrUrl.startsWith("http")) {
       const tmpPath = `/tmp/cloud_game_${crypto.randomUUID()}.nes`;
@@ -177,7 +242,7 @@ io.on("connection", (socket) => {
           file.on("finish", () => {
             file.close();
             console.log("[Engine] Download complete. Booting Cloud Game.");
-            bootGame(tmpPath);
+            bootGame(tmpPath, sessionId);
           });
         })
         .on("error", (err) => {
@@ -190,37 +255,54 @@ io.on("connection", (socket) => {
     } else {
       // Boot Local Vault File from User's Personal Folder
       const safeRomFile = path.basename(romFileOrUrl);
-      bootGame(path.join("/roms", safeUserId, safeRomFile));
+      bootGame(path.join("/roms", safeUserId, safeRomFile), sessionId);
     }
   });
 
-  socket.on("python-ready", () => {
+  socket.on("python-ready", (payload = {}) => {
+    const sessionId =
+      normalizeSessionId(payload.sessionId) || socket.data.sessionId;
+
+    if (!sessionId) {
+      console.warn("[Node.js] Dropping python-ready: missing session id");
+      return;
+    }
+
+    joinSession(socket, sessionId, "camera");
     console.log(
-      "[Node.js] Python Camera is armed and ready! Relaying to React...",
+      `[Node.js] Python Camera is armed for session ${sessionId}! Relaying to React...`,
     );
-    socket.broadcast.emit("python-ready");
+    socket.to(getSessionRoom(sessionId)).emit("python-ready", { sessionId });
   });
 
-  socket.on("webrtc-offer", (offer) => {
-    socket.broadcast.emit("webrtc-offer", offer);
+  socket.on("webrtc-offer", (offer = {}) => {
+    const { sessionId: _sessionId, ...offerPayload } = offer;
+    relayToSession(socket, "webrtc-offer", offerPayload);
   });
 
-  socket.on("webrtc-answer", (answer) =>
-    socket.broadcast.emit("webrtc-answer", answer),
-  );
-  socket.on("webrtc-ice-candidate", (candidate) =>
-    socket.broadcast.emit("webrtc-ice-candidate", candidate),
-  );
-  socket.on("webrtc-ice-candidate-backend", (candidate) =>
-    socket.broadcast.emit("webrtc-ice-candidate-backend", candidate),
-  );
+  socket.on("webrtc-answer", (answer = {}) => {
+    const { sessionId: _sessionId, ...answerPayload } = answer;
+    relayToSession(socket, "webrtc-answer", answerPayload);
+  });
 
-  socket.on("keydown", (data) => {
+  socket.on("webrtc-ice-candidate", (payload) => {
+    const candidate = payload?.candidate || payload;
+    relayToSession(socket, "webrtc-ice-candidate", candidate);
+  });
+
+  socket.on("webrtc-ice-candidate-backend", (payload) => {
+    const candidate = payload?.candidate || payload;
+    relayToSession(socket, "webrtc-ice-candidate-backend", candidate);
+  });
+
+  socket.on("keydown", (data = {}) => {
+    if (data.sessionId && data.sessionId !== activeSessionId) return;
     let linuxKey = translateKey(data.key);
     if (linuxKey) exec(`DISPLAY=:99 xdotool keydown ${linuxKey}`);
   });
 
-  socket.on("keyup", (data) => {
+  socket.on("keyup", (data = {}) => {
+    if (data.sessionId && data.sessionId !== activeSessionId) return;
     let linuxKey = translateKey(data.key);
     if (linuxKey) exec(`DISPLAY=:99 xdotool keyup ${linuxKey}`);
   });

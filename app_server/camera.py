@@ -1,4 +1,5 @@
 import socketio
+import os
 import gi
 gi.require_version('Gst', '1.0')
 gi.require_version('GstWebRTC', '1.0')
@@ -9,6 +10,7 @@ from gi.repository import Gst, GstWebRTC, GstSdp, GLib
 sio = socketio.Client()
 Gst.init(None)
 
+SESSION_ID = os.environ.get('PIXELATED_SESSION_ID', 'default-session')
 webrtcbin = None
 pipeline = None
 
@@ -43,14 +45,21 @@ def handle_offer(offer):
     pipeline.set_state(Gst.State.PLAYING)
 
     def on_ice_candidate(webrtc, mlineindex, candidate):
-        sio.emit('webrtc-ice-candidate-backend', {'sdpMLineIndex': mlineindex, 'candidate': candidate})
+        sio.emit('webrtc-ice-candidate-backend', {
+            'sessionId': SESSION_ID,
+            'candidate': {'sdpMLineIndex': mlineindex, 'candidate': candidate}
+        })
     webrtcbin.connect('on-ice-candidate', on_ice_candidate)
 
     def on_answer_created(promise, _, __):
         reply = promise.get_reply()
         answer = reply.get_value('answer')
         webrtcbin.emit('set-local-description', answer, None)
-        sio.emit('webrtc-answer', {'type': answer.type.value_nick, 'sdp': answer.sdp.as_text()})
+        sio.emit('webrtc-answer', {
+            'sessionId': SESSION_ID,
+            'type': answer.type.value_nick,
+            'sdp': answer.sdp.as_text()
+        })
     
     def on_offer_set(promise, _, __):
         promise = Gst.Promise.new_with_change_func(on_answer_created, None, None)
@@ -64,7 +73,8 @@ def handle_offer(offer):
 @sio.event
 def connect():
     print("[Python] Connected to Node.js Switchboard!")
-    sio.emit('python-ready')
+    sio.emit('join-session', {'sessionId': SESSION_ID, 'role': 'camera'})
+    sio.emit('python-ready', {'sessionId': SESSION_ID})
 
 @sio.on('webrtc-offer')
 def on_offer(offer):
