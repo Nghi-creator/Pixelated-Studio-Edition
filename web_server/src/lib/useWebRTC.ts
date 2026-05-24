@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { supabase } from "./supabaseClient";
+import { clearEngineToken, ensureEngineToken } from "./engineAuth";
 import { ENGINE_URL } from "./engineConfig";
 
 const socket = io(ENGINE_URL, { autoConnect: false });
@@ -26,7 +27,14 @@ export function useWebRTC(gameId: string) {
     if (!gameId) return;
 
     const sessionId = sessionIdRef.current;
+    const engineToken = ensureEngineToken();
 
+    if (!engineToken) {
+      setStatus("error");
+      return;
+    }
+
+    socket.auth = { token: engineToken };
     socket.connect();
 
     const pc = new RTCPeerConnection({
@@ -59,6 +67,14 @@ export function useWebRTC(gameId: string) {
 
     socket.on("webrtc-ice-candidate-backend", (candidate) => {
       pc.addIceCandidate(new RTCIceCandidate(candidate));
+    });
+
+    socket.on("connect_error", (err) => {
+      console.error("[WebRTC] Engine connection failed:", err.message);
+      if (err.message === "Invalid engine pairing token") {
+        clearEngineToken();
+      }
+      setStatus("error");
     });
 
     socket.on("connect", async () => {
@@ -146,6 +162,7 @@ export function useWebRTC(gameId: string) {
       socket.off("webrtc-answer");
       socket.off("webrtc-ice-candidate-backend");
       socket.off("connect");
+      socket.off("connect_error");
       socket.off("python-ready");
 
       setStream(null);

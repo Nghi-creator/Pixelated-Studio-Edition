@@ -1,8 +1,10 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const { exec } = require("child_process");
+const crypto = require("crypto");
 const path = require("path");
 
 let mainWindow;
+let engineToken = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -36,6 +38,8 @@ const appDir = __dirname;
 ipcMain.on("start-docker", (event) => {
   event.reply("server-log", "Checking Docker daemon...");
   const safeEnv = getSafeEnv();
+  engineToken = crypto.randomBytes(24).toString("base64url");
+  event.reply("engine-token", engineToken);
 
   // 1. Check if Docker is running
   exec("docker info", { env: safeEnv }, (err) => {
@@ -77,7 +81,7 @@ ipcMain.on("start-docker", (event) => {
 
       // 3. Run the container
       exec(
-        "docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 pixelated-engine",
+        `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ENGINE_TOKEN="${engineToken}" pixelated-engine`,
         { env: safeEnv },
         (runErr) => {
           if (runErr) {

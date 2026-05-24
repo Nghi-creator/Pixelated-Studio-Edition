@@ -34,9 +34,31 @@ const corsOptions = {
 const MAX_ROM_SIZE_BYTES = Number(
   process.env.PIXELATED_MAX_ROM_SIZE_BYTES || 8 * 1024 * 1024,
 );
+const ENGINE_TOKEN = process.env.PIXELATED_ENGINE_TOKEN || "";
 
 const app = express();
 app.use(cors(corsOptions));
+
+function isValidEngineToken(token) {
+  if (!ENGINE_TOKEN) return true;
+  if (typeof token !== "string" || !token) return false;
+
+  const expected = Buffer.from(ENGINE_TOKEN);
+  const actual = Buffer.from(token);
+
+  return (
+    expected.length === actual.length && crypto.timingSafeEqual(expected, actual)
+  );
+}
+
+function requireEngineToken(req, res, next) {
+  if (isValidEngineToken(req.get("x-engine-token"))) {
+    next();
+    return;
+  }
+
+  res.status(401).json({ error: "Invalid engine pairing token" });
+}
 
 const getUserFolder = (userId) => {
   const safeId =
@@ -75,7 +97,7 @@ const upload = multer({
   },
 });
 
-app.get("/local-games", (req, res) => {
+app.get("/local-games", requireEngineToken, (req, res) => {
   try {
     const userId = req.headers["x-user-id"];
     const userFolder = getUserFolder(userId);
@@ -97,7 +119,7 @@ app.get("/local-games", (req, res) => {
   }
 });
 
-app.post("/upload", (req, res) => {
+app.post("/upload", requireEngineToken, (req, res) => {
   upload.single("romFile")(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       const message =
@@ -120,7 +142,7 @@ app.post("/upload", (req, res) => {
   });
 });
 
-app.delete("/local-games/:filename", (req, res) => {
+app.delete("/local-games/:filename", requireEngineToken, (req, res) => {
   try {
     const userId = req.headers["x-user-id"];
     const userFolder = getUserFolder(userId);
@@ -145,6 +167,18 @@ app.delete("/local-games/:filename", (req, res) => {
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: corsOptions,
+});
+
+io.use((socket, next) => {
+  const token =
+    socket.handshake.auth?.token || socket.handshake.headers["x-engine-token"];
+
+  if (isValidEngineToken(token)) {
+    next();
+    return;
+  }
+
+  next(new Error("Invalid engine pairing token"));
 });
 
 let retroarchProcess = null;
@@ -240,6 +274,7 @@ function bootGame(absoluteRomPath, sessionId) {
         ...process.env,
         PULSE_SERVER: "127.0.0.1",
         PIXELATED_SESSION_ID: sessionId,
+        PIXELATED_ENGINE_TOKEN: ENGINE_TOKEN,
       },
     });
 
