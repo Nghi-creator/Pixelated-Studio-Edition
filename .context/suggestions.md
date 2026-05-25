@@ -387,6 +387,44 @@ Remaining follow-up:
 - The comments hook preserves the current inclusive Supabase range behavior. Decide later whether to rename it as intentional "fetch 11 rows to detect hasMore" or change the range to fetch exactly 10.
 - Continue Phase 3 by creating the localhost backend skeleton at `services/api`.
 
+### Localhost Backend Skeleton
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `services/api/package.json`
+- `services/api/package-lock.json`
+- `services/api/tsconfig.json`
+- `services/api/eslint.config.js`
+- `services/api/.env.example`
+- `services/api/README.md`
+- `services/api/src/server.ts`
+- `services/api/src/config/env.ts`
+- `services/api/src/plugins/cors.ts`
+- `services/api/src/plugins/logger.ts`
+- `services/api/src/routes/health.ts`
+- `services/api/src/routes/me.ts`
+- `services/api/src/modules/auth/supabaseAuth.ts`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added a localhost-first backend skeleton at `services/api`.
+- Added Fastify + TypeScript + Zod + pino + Supabase client dependencies.
+- Added `GET /health`.
+- Added placeholder `GET /me` that returns `501` until Phase 4 auth is implemented.
+- Added env parsing with default `HOST=127.0.0.1` and `PORT=4000`.
+- Added CORS for local Vite, `127.0.0.1`, and hosted Vercel origins.
+- Added lint, typecheck, build, dev, and start scripts.
+- Added backend README and `.env.example`.
+
+Remaining follow-up:
+
+- Continue Phase 4 by adding Supabase JWT verification, authenticated `GET /me`, `GET /me/permissions`, and a web API client.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
@@ -555,5 +593,5 @@ The implementation batch is paused while the architecture is reconsidered. See:
 
 Recommended next work after review:
 
-1. Create `services/api` with health/config/auth scaffolding.
+1. Add backend auth and web API client.
 2. Add backend, web, desktop, and engine READMEs.

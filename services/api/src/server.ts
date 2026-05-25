@@ -1,0 +1,28 @@
+import Fastify from "fastify";
+import { env } from "./config/env.js";
+import { createLoggerOptions } from "./plugins/logger.js";
+import { registerCors } from "./plugins/cors.js";
+import { registerHealthRoutes } from "./routes/health.js";
+import { registerMeRoutes } from "./routes/me.js";
+
+export async function buildServer() {
+  const app = Fastify({
+    logger: createLoggerOptions(),
+  });
+
+  await registerCors(app);
+  await registerHealthRoutes(app);
+  await registerMeRoutes(app);
+
+  return app;
+}
+
+const app = await buildServer();
+
+try {
+  await app.listen({ host: env.HOST, port: env.PORT });
+  app.log.info(`Pixelated API listening on http://${env.HOST}:${env.PORT}`);
+} catch (err) {
+  app.log.error(err, "Failed to start Pixelated API");
+  process.exit(1);
+}

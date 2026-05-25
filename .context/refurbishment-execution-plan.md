@@ -131,6 +131,8 @@ Exit criteria:
 
 ## Phase 3: Create Localhost Backend Skeleton
 
+Status: completed 2026-05-25.
+
 Goal: add the backend service without changing production flows yet.
 
 Target structure:
@@ -159,33 +161,34 @@ services/
 Recommended localhost defaults:
 
 ```text
-API URL: http://localhost:4000
-Health:  GET http://localhost:4000/health
+API URL: http://127.0.0.1:4000
+Health:  GET http://127.0.0.1:4000/health
 ```
 
 Steps:
 
-1. Create `services/api` with Node.js, TypeScript, Fastify, Zod, pino, and Supabase client dependencies.
-2. Add `GET /health` returning service name, version, uptime, and environment.
-3. Add `.env.example` with:
+1. Done: created `services/api` with Node.js, TypeScript, Fastify, Zod, pino, and Supabase client dependencies.
+2. Done: added `GET /health` returning service name, uptime, and environment.
+3. Done: added `.env.example` with:
    - `PORT=4000`
+   - `HOST=127.0.0.1`
    - `SUPABASE_URL=`
    - `SUPABASE_ANON_KEY=`
    - `SUPABASE_SERVICE_ROLE_KEY=`
    - `WEB_ORIGIN=http://localhost:5173`
-4. Add CORS for local Vite and the hosted Vercel origin.
-5. Add dev scripts:
+4. Done: added CORS for local Vite and the hosted Vercel origin.
+5. Done: added dev scripts:
    - `npm run dev`
    - `npm run build`
    - `npm run lint`
    - `npm run typecheck`
-6. Add backend README with local startup instructions.
+6. Done: added backend README with local startup instructions.
 
 Exit criteria:
 
-- `cd services/api && npm run dev` starts on `localhost:4000`.
-- `GET /health` works.
-- No web app behavior depends on it yet.
+- Done: `cd services/api && npm start` starts on `127.0.0.1:4000` after `npm run build`.
+- Done: `GET /health` works.
+- Done: no web app behavior depends on it yet.
 
 ## Phase 4: Add Backend Auth And Client API Layer
 
