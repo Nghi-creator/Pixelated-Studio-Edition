@@ -39,6 +39,7 @@ Admin routes:
 Current important frontend behaviors:
 
 - `useWebRTC` owns React stream/status lifecycle while helper modules resolve game boot targets, create WebRTC peer connections, and forward keyboard input.
+- `/play/:id` is composed from `web_server/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, inserts metadata into `game_submissions`, then pings Formspree.
 - Session tracking inserts browser-load access logs directly from the client.

@@ -346,6 +346,47 @@ Remaining follow-up:
 - Run a manual runtime smoke test with the Electron/Docker engine because static syntax checks do not prove Xvfb, RetroArch, Socket.IO, and GStreamer work together.
 - Continue Phase 2 by splitting `Player.tsx` in place.
 
+### Player Page Feature Split
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `web_server/src/pages/user/Player.tsx`
+- `web_server/src/features/player/PlayerHeader.tsx`
+- `web_server/src/features/player/StreamStage.tsx`
+- `web_server/src/features/player/StreamTelemetryPanel.tsx`
+- `web_server/src/features/player/PlayerControls.tsx`
+- `web_server/src/features/player/ReactionButtons.tsx`
+- `web_server/src/features/player/useAuthUser.ts`
+- `web_server/src/features/player/useGameMetadata.ts`
+- `web_server/src/features/player/useGameReactions.ts`
+- `web_server/src/features/player/usePlayCount.ts`
+- `web_server/src/features/player/types.ts`
+- `web_server/src/features/player/comments/CommentsPanel.tsx`
+- `web_server/src/features/player/comments/CommentForm.tsx`
+- `web_server/src/features/player/comments/CommentItem.tsx`
+- `web_server/src/features/player/comments/ReportModal.tsx`
+- `web_server/src/features/player/comments/useComments.ts`
+- `web_server/src/features/player/comments/useCommentReporting.ts`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `Player.tsx` is now a route-level composition component instead of owning stream UI, metadata queries, comments, reactions, reporting, and play-count logic directly.
+- Stream display and error overlays moved into `StreamStage.tsx`.
+- Developer telemetry display moved into `StreamTelemetryPanel.tsx`.
+- Header/status/back navigation moved into `PlayerHeader.tsx`.
+- Controls and reaction buttons moved into dedicated components.
+- Auth user, game metadata, game reactions, play count, comments, and comment reporting moved into feature hooks.
+
+Remaining follow-up:
+
+- The comments hook preserves the current inclusive Supabase range behavior. Decide later whether to rename it as intentional "fetch 11 rows to detect hasMore" or change the range to fetch exactly 10.
+- Continue Phase 3 by creating the localhost backend skeleton at `services/api`.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
@@ -514,6 +555,5 @@ The implementation batch is paused while the architecture is reconsidered. See:
 
 Recommended next work after review:
 
-1. Split `Player.tsx` into smaller player feature modules.
-2. Create `services/api` with health/config/auth scaffolding.
-3. Add backend, web, desktop, and engine READMEs.
+1. Create `services/api` with health/config/auth scaffolding.
+2. Add backend, web, desktop, and engine READMEs.
