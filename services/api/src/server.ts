@@ -2,8 +2,10 @@ import Fastify from "fastify";
 import { env } from "./config/env.js";
 import { createLoggerOptions } from "./plugins/logger.js";
 import { registerCors } from "./plugins/cors.js";
+import { registerGameRoutes } from "./routes/games.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerMeRoutes } from "./routes/me.js";
+import { registerModerationRoutes } from "./routes/moderation.js";
 
 export async function buildServer() {
   const app = Fastify({
@@ -13,6 +15,8 @@ export async function buildServer() {
   await registerCors(app);
   await registerHealthRoutes(app);
   await registerMeRoutes(app);
+  await registerGameRoutes(app);
+  await registerModerationRoutes(app);
 
   return app;
 }

@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { api } from "../../lib/apiClient";
 
 export function usePlayCount(gameId: string | undefined) {
   useEffect(() => {
@@ -7,11 +7,7 @@ export function usePlayCount(gameId: string | undefined) {
 
     const timer = setTimeout(async () => {
       try {
-        const { error } = await supabase.rpc("increment_play_count", {
-          game_id: gameId,
-        });
-
-        if (error) throw error;
+        await api.countPlay(gameId);
         console.log("Play successfully counted!");
       } catch (err) {
         console.error("Failed to count play:", err);

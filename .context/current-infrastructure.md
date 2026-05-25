@@ -23,10 +23,12 @@ Current status:
 - `GET /health` returns service name, environment, uptime, and `ok: true`.
 - `GET /me` verifies a Supabase bearer token and returns the authenticated user id/email.
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
+- `POST /games/:gameId/play-count` increments play count through the API instead of direct browser RPC.
+- `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
 - CORS allows local Vite origins and the hosted Vercel origin.
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
-- `web_server/src/lib/apiClient.ts` can call the API with the current Supabase access token.
-- No user-facing web app behavior depends on this API yet.
+- `web_server/src/lib/apiClient.ts` calls the API with the current Supabase access token.
+- Player play-count tracking and comment reporting now depend on the API.
 
 ## Web App
 

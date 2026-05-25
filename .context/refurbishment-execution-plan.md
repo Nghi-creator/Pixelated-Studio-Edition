@@ -217,24 +217,27 @@ Exit criteria:
 
 ## Phase 5: Move Low-Risk Mutations Through Backend
 
+Status: implemented 2026-05-25. Needs final signed-in smoke test after `services/api/.env` is populated with Supabase credentials.
+
 Goal: route server-worthy but low-blast-radius workflows through the API first.
 
 Suggested order:
 
-1. Move play-count increments:
+1. Done: move play-count increments:
    - Backend: `POST /games/:gameId/play-count`
    - Frontend: `usePlayCount` calls API instead of direct RPC.
-2. Move comment report submission:
+2. Done: move comment report submission:
    - Backend: `POST /moderation/comments/:commentId/report`
    - Frontend: reporting hook calls API.
-3. Move admin report action later, after permissions are proven:
+3. Deferred: move admin report action later, after permissions are proven:
    - Backend: `POST /admin/reports/:reportId/action`
 
 Exit criteria:
 
-- Backend verifies user identity.
-- Backend writes to Supabase with service role only where needed.
-- Frontend no longer performs those mutations directly.
+- Done in code: backend verifies user identity through Supabase bearer-token middleware.
+- Done in code: backend writes play-count/report mutations with the Supabase service client.
+- Done: frontend no longer performs play-count and comment-report mutations directly.
+- Needs Supabase env smoke test: signed-in play-count and comment-report flows work against the real database.
 
 ## Phase 6: Add Backend Session Creation For Cloud Games
 

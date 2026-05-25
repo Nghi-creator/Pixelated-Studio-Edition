@@ -83,6 +83,10 @@ export type ApiPermissionsResponse = {
 };
 
 export const api = {
+  countPlay: (gameId: string) =>
+    apiRequest<{ success: true }>(`/games/${gameId}/play-count`, {
+      method: "POST",
+    }),
   health: () =>
     apiRequest<{
       environment: string;
@@ -92,4 +96,9 @@ export const api = {
     }>("/health", { authenticated: false }),
   me: () => apiRequest<ApiMeResponse>("/me"),
   permissions: () => apiRequest<ApiPermissionsResponse>("/me/permissions"),
+  reportComment: (commentId: string, reason: string) =>
+    apiRequest<{ success: true }>(`/moderation/comments/${commentId}/report`, {
+      body: JSON.stringify({ reason }),
+      method: "POST",
+    }),
 };

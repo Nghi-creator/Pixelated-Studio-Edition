@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { supabase } from "../../../lib/supabaseClient";
+import { ApiError, api } from "../../../lib/apiClient";
 
 export function useCommentReporting(currentUser: User | null) {
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(
@@ -20,26 +20,18 @@ export function useCommentReporting(currentUser: User | null) {
 
     setIsSubmittingReport(true);
     try {
-      const { error } = await supabase.from("reported_comments").insert({
-        comment_id: reportingCommentId,
-        reporter_id: currentUser.id,
-        reason: reportReason.trim(),
-      });
-
-      if (error) {
-        if (error.code === "23505") {
-          alert(
-            "You have already reported this comment. Our moderators are reviewing it.",
-          );
-        } else {
-          throw error;
-        }
-      } else {
-        alert(
-          "Report submitted successfully. Thank you for keeping the community safe!",
-        );
-      }
+      await api.reportComment(reportingCommentId, reportReason.trim());
+      alert(
+        "Report submitted successfully. Thank you for keeping the community safe!",
+      );
     } catch (err) {
+      if (err instanceof ApiError && err.status === 409) {
+        alert(
+          "You have already reported this comment. Our moderators are reviewing it.",
+        );
+        return;
+      }
+
       console.error("Failed to submit report:", err);
       alert("Failed to submit report. Please try again.");
     } finally {

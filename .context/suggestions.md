@@ -455,6 +455,37 @@ Remaining follow-up:
 - Populate `services/api/.env` with Supabase URL/keys and run a signed-in browser smoke test.
 - Continue Phase 5 by moving low-risk mutations through the backend.
 
+### Low-Risk Mutations Through Backend
+
+Implemented: 2026-05-25
+
+Implemented in:
+
+- `services/api/src/routes/games.ts`
+- `services/api/src/routes/moderation.ts`
+- `services/api/src/server.ts`
+- `web_server/src/lib/apiClient.ts`
+- `web_server/src/features/player/usePlayCount.ts`
+- `web_server/src/features/player/comments/useCommentReporting.ts`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated `POST /games/:gameId/play-count`.
+- Added authenticated `POST /moderation/comments/:commentId/report`.
+- The backend now uses the authenticated Supabase user id for report `reporter_id`.
+- Duplicate comment reports return `409` so the UI can preserve the existing "already reported" message.
+- `usePlayCount` now calls the API instead of direct Supabase RPC.
+- `useCommentReporting` now calls the API instead of directly inserting into `reported_comments`.
+
+Remaining follow-up:
+
+- Populate `services/api/.env` and run a signed-in end-to-end smoke test for play-count and comment-report mutations.
+- Admin report actions still happen directly in the browser and should move later.
+- Continue Phase 6 by adding backend session creation for cloud games.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
@@ -623,5 +654,5 @@ The implementation batch is paused while the architecture is reconsidered. See:
 
 Recommended next work after review:
 
-1. Move low-risk mutations through the backend.
+1. Add backend session creation for cloud games.
 2. Add backend, web, desktop, and engine READMEs.
