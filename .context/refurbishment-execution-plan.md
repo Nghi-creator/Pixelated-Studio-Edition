@@ -87,17 +87,20 @@ Exit criteria:
 
 ## Phase 2: Split The Player Page In Place
 
+Status: completed 2026-05-25.
+
 Goal: reduce `Player.tsx` before routing flows through the API.
 
 Target temporary structure:
 
 ```text
 web_server/src/features/player/
-  PlayerView.tsx
   StreamStage.tsx
   StreamTelemetryPanel.tsx
   PlayerHeader.tsx
   PlayerControls.tsx
+  ReactionButtons.tsx
+  useAuthUser.ts
   useGameMetadata.ts
   useGameReactions.ts
   usePlayCount.ts
@@ -111,20 +114,20 @@ web_server/src/features/player/
 
 Steps:
 
-1. Move video/stream display UI into `StreamStage.tsx`.
-2. Move telemetry toggle/panel into `StreamTelemetryPanel.tsx`.
-3. Move top title/status/back UI into `PlayerHeader.tsx`.
-4. Move game metadata query into `useGameMetadata.ts`.
-5. Move likes/dislikes into `useGameReactions.ts`.
-6. Move play-count timer into `usePlayCount.ts`.
-7. Move comments/reporting into `comments/`.
-8. Keep `web_server/src/pages/user/Player.tsx` as a thin route component.
+1. Done: moved video/stream display UI into `StreamStage.tsx`.
+2. Done: moved telemetry panel into `StreamTelemetryPanel.tsx`.
+3. Done: moved top title/status/back UI and telemetry toggle into `PlayerHeader.tsx`.
+4. Done: moved game metadata query into `useGameMetadata.ts`.
+5. Done: moved likes/dislikes into `useGameReactions.ts` and `ReactionButtons.tsx`.
+6. Done: moved play-count timer into `usePlayCount.ts`.
+7. Done: moved comments/reporting into `comments/`.
+8. Done: kept `web_server/src/pages/user/Player.tsx` as a thin route component.
 
 Exit criteria:
 
-- `Player.tsx` is mostly composition.
-- UI behavior remains unchanged.
-- `cd web_server && npm run lint && npm run build` passes.
+- Done: `Player.tsx` is mostly composition.
+- Done: UI behavior is intended to remain unchanged.
+- Done: `cd web_server && npm run lint && npm run build` passes.
 
 ## Phase 3: Create Localhost Backend Skeleton
 
