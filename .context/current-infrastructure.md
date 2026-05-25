@@ -21,13 +21,17 @@ Current status:
 - Phase 3 localhost skeleton exists in `services/api/`.
 - Default local URL is `http://127.0.0.1:4000`.
 - `GET /health` returns service name, environment, uptime, and `ok: true`.
+- `GET /ready` returns `503` until the required Supabase backend env vars are configured.
 - `GET /me` verifies a Supabase bearer token and returns the authenticated user id/email.
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - `POST /games/:gameId/play-count` increments play count through the API instead of direct browser RPC.
 - `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
 - `POST /sessions` creates a short-lived backend session for cloud games, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
 - CORS allows local Vite origins and the hosted Vercel origin.
+- API CORS origin matching normalizes trailing slashes to avoid deploy config mistakes.
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
+- `services/api/.env` exists locally with blank Supabase keys for the project owner to fill.
+- On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `web_server/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - Cloud/library game boot, player play-count tracking, and comment reporting now depend on the API.
 

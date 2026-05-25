@@ -361,15 +361,19 @@ Exit criteria:
 
 ## Phase 10: Hosting Prep
 
+Status: staging-host ready as of 2026-05-26. Local env file, CORS origin normalization, readiness checks, and hosting checklist are in place. Supabase env presence was verified through `/ready`; signed-in browser smoke tests should run immediately after staging deploy.
+
 Goal: prepare deployment after localhost backend works.
 
 Render backend prep:
 
-1. Add Dockerfile or Render build/start commands for `services/api`.
-2. Add `GET /health` as the Render health check.
-3. Configure env vars in Render.
-4. Configure CORS for Vercel and local dev.
-5. Add Redis only when sessions/rate limits need shared state.
+1. Pending: add Dockerfile or Render build/start commands for `services/api`.
+2. Done: `GET /health` exists as the liveness check.
+3. Done: `GET /ready` reports whether required backend env vars are configured.
+4. Done locally: created `services/api/.env`; still needs Supabase keys filled by project owner.
+5. Done: CORS allows Vercel and local dev, with trailing slash normalization.
+6. Pending: configure env vars in the chosen host.
+7. Later: add Redis only when sessions/rate limits need shared state.
 
 Future engine fleet prep:
 

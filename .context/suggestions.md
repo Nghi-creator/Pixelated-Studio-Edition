@@ -518,6 +518,39 @@ Remaining follow-up:
 - Replace in-memory sessions with durable/TTL-backed storage when Redis or a sessions table is introduced.
 - Continue Phase 7 by making local engine pairing a first-class backend/web concept.
 
+### Backend Hosting Prep
+
+Implemented: 2026-05-25
+
+Implemented in:
+
+- `services/api/.env`
+- `services/api/.env.example`
+- `services/api/README.md`
+- `services/api/src/config/env.ts`
+- `services/api/src/plugins/cors.ts`
+- `services/api/src/routes/health.ts`
+- `.context/backend-hosting-checklist.md`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Created a local ignored backend `.env` file with blank Supabase values for the project owner to fill.
+- Updated `.env.example` to include both local Vite and hosted Vercel web origins.
+- Blank Supabase env values now parse as missing values instead of crashing the API on startup.
+- API CORS origin matching now normalizes trailing slashes.
+- Added `GET /ready` to report whether Supabase backend env vars are configured.
+- Added a backend hosting checklist with local, staging, Vercel, health check, and remaining production-gap notes.
+- Updated the API README to match the current backend scope.
+
+Remaining follow-up:
+
+- Run signed-in browser smoke tests against the staging backend after deploy.
+- Add provider-specific build/start config once Render, Fly.io, Railway, or another host is selected.
+- Do not call the backend production-ready until the local engine validates backend session intent or the architecture explicitly keeps local pairing as the authority.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
