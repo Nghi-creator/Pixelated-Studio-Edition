@@ -12,6 +12,11 @@ import {
   resolveGameBootTarget,
   type WebRTCStatus,
 } from "./webrtcSession";
+import {
+  INITIAL_WEBRTC_TELEMETRY,
+  startWebRTCTelemetry,
+  type WebRTCTelemetry,
+} from "./webrtcTelemetry";
 
 const socket = io(ENGINE_URL, { autoConnect: false });
 
@@ -19,6 +24,9 @@ export function useWebRTC(gameId: string) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [status, setStatus] = useState<WebRTCStatus>(
     gameId ? "connecting" : "idle",
+  );
+  const [telemetry, setTelemetry] = useState<WebRTCTelemetry>(
+    INITIAL_WEBRTC_TELEMETRY,
   );
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -51,6 +59,12 @@ export function useWebRTC(gameId: string) {
       },
     });
     pcRef.current = pc;
+    const stopTelemetry = startWebRTCTelemetry(pc, (nextTelemetry) => {
+      setTelemetry((currentTelemetry) => ({
+        ...currentTelemetry,
+        ...nextTelemetry,
+      }));
+    });
 
     socket.on("webrtc-answer", (answer) => {
       pc.setRemoteDescription(new RTCSessionDescription(answer));
@@ -70,6 +84,11 @@ export function useWebRTC(gameId: string) {
 
     socket.on("engine-error", (payload: { message?: string }) => {
       console.error("[WebRTC] Engine error:", payload?.message);
+      setTelemetry((currentTelemetry) => ({
+        ...currentTelemetry,
+        lastEngineError: payload?.message || "Engine error",
+        lastUpdatedAt: Date.now(),
+      }));
       setStatus("error");
     });
 
@@ -97,6 +116,7 @@ export function useWebRTC(gameId: string) {
     const detachEngineInput = attachEngineInput(socket, sessionId);
 
     return () => {
+      stopTelemetry();
       detachEngineInput();
 
       if (pcRef.current) {
@@ -113,8 +133,9 @@ export function useWebRTC(gameId: string) {
       socket.off("python-ready");
 
       setStream(null);
+      setTelemetry(INITIAL_WEBRTC_TELEMETRY);
     };
   }, [gameId]);
 
-  return { stream, status };
+  return { stream, status, telemetry };
 }
