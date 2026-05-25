@@ -44,10 +44,28 @@ Implemented now:
 - Environment parsing.
 - CORS for localhost web and hosted Vercel origin.
 - `GET /health`.
-- Placeholder `GET /me` returning `501` until Phase 4 auth is implemented.
+- Supabase JWT verification middleware.
+- Authenticated `GET /me`.
+- Authenticated `GET /me/permissions`.
+- Supabase anon/service clients.
 
 Next phase:
 
-- Verify Supabase JWTs.
-- Add an authenticated `GET /me`.
-- Add a web API client using `VITE_API_URL=http://localhost:4000`.
+- Move low-risk mutations through the backend.
+
+## Auth Routes
+
+Auth routes expect:
+
+```text
+Authorization: Bearer <supabase-access-token>
+```
+
+Routes:
+
+```text
+GET /me
+GET /me/permissions
+```
+
+If Supabase env vars are missing, authenticated routes return `503`.

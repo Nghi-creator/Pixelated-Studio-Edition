@@ -425,6 +425,36 @@ Remaining follow-up:
 
 - Continue Phase 4 by adding Supabase JWT verification, authenticated `GET /me`, `GET /me/permissions`, and a web API client.
 
+### Backend Auth And Web API Client
+
+Implemented: 2026-05-25
+
+Implemented in:
+
+- `services/api/src/modules/auth/supabaseAuth.ts`
+- `services/api/src/types/fastify.d.ts`
+- `services/api/src/routes/me.ts`
+- `services/api/README.md`
+- `web_server/src/lib/apiClient.ts`
+- `web_server/.env.example`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added Supabase bearer-token verification middleware for the API.
+- Added authenticated `GET /me`.
+- Added authenticated `GET /me/permissions`.
+- `GET /me/permissions` returns profile role, ban/developer flags, and abilities for admin access, report management, user management, publishing, and ban state.
+- Added a web API client that reads `VITE_API_URL` and attaches the current Supabase access token.
+- Added `VITE_API_URL=http://127.0.0.1:4000` to the web env example.
+
+Remaining follow-up:
+
+- Populate `services/api/.env` with Supabase URL/keys and run a signed-in browser smoke test.
+- Continue Phase 5 by moving low-risk mutations through the backend.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
@@ -593,5 +623,5 @@ The implementation batch is paused while the architecture is reconsidered. See:
 
 Recommended next work after review:
 
-1. Add backend auth and web API client.
+1. Move low-risk mutations through the backend.
 2. Add backend, web, desktop, and engine READMEs.

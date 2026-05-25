@@ -21,10 +21,12 @@ Current status:
 - Phase 3 localhost skeleton exists in `services/api/`.
 - Default local URL is `http://127.0.0.1:4000`.
 - `GET /health` returns service name, environment, uptime, and `ok: true`.
-- `GET /me` exists as a placeholder and returns `501` until Phase 4 auth is wired.
+- `GET /me` verifies a Supabase bearer token and returns the authenticated user id/email.
+- `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - CORS allows local Vite origins and the hosted Vercel origin.
-- Supabase anon/service clients are scaffolded but not yet used by routes.
-- No web app behavior depends on this API yet.
+- Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
+- `web_server/src/lib/apiClient.ts` can call the API with the current Supabase access token.
+- No user-facing web app behavior depends on this API yet.
 
 ## Web App
 

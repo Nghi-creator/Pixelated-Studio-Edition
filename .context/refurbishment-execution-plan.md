@@ -192,26 +192,28 @@ Exit criteria:
 
 ## Phase 4: Add Backend Auth And Client API Layer
 
+Status: implemented 2026-05-25. Needs a final signed-in smoke test after `services/api/.env` is populated with Supabase credentials.
+
 Goal: prove the web app can call localhost API using Supabase auth.
 
 Backend steps:
 
-1. Add Supabase JWT verification middleware.
-2. Add `GET /me` that returns the authenticated user id/email.
-3. Add `GET /me/permissions` that reads `profiles.role` and returns abilities.
+1. Done: add Supabase JWT verification middleware.
+2. Done: add `GET /me` that returns the authenticated user id/email.
+3. Done: add `GET /me/permissions` that reads `profiles` and returns profile role plus abilities.
 
 Frontend steps:
 
-1. Add `web_server/src/lib/apiClient.ts`.
-2. Add `VITE_API_URL=http://localhost:4000` to `web_server/.env.example`.
-3. Attach the current Supabase access token as `Authorization: Bearer <token>`.
-4. Add a small internal test call from an existing authenticated page or temporary dev-only utility.
+1. Done: add `web_server/src/lib/apiClient.ts`.
+2. Done: add `VITE_API_URL=http://127.0.0.1:4000` to `web_server/.env.example`.
+3. Done: attach the current Supabase access token as `Authorization: Bearer <token>`.
+4. Deferred: add a visible/internal test call only if needed during manual auth smoke testing. The API client is available but no user-facing web behavior depends on it yet.
 
 Exit criteria:
 
-- Signed-in web user can call `GET /me`.
-- Signed-out user receives 401.
-- Current Supabase direct flows still work.
+- Needs Supabase env smoke test: signed-in web user can call `GET /me`.
+- Needs Supabase env smoke test: signed-out user receives 401 when Supabase auth is configured.
+- Done: current Supabase direct flows still work because no user-facing behavior has been routed through the API yet.
 
 ## Phase 5: Move Low-Risk Mutations Through Backend
 
