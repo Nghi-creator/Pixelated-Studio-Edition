@@ -241,6 +241,8 @@ Exit criteria:
 
 ## Phase 6: Add Backend Session Creation For Cloud Games
 
+Status: implemented 2026-05-25. Needs final signed-in smoke test after `services/api/.env` is populated with Supabase credentials.
+
 Goal: stop the browser from resolving cloud ROM URLs directly for normal cloud play.
 
 Backend endpoint:
@@ -270,18 +272,18 @@ Localhost-first behavior:
 
 Steps:
 
-1. Add `sessions` module in `services/api`.
-2. Add session id/token generation.
-3. Add optional `sessions` table migration or keep in-memory for the very first localhost proof.
-4. Move `resolveGameBootTarget()` logic from React into backend.
-5. Update `useWebRTC` to request a session before `start-game`.
-6. Keep Local Vault `.nes` mode compatible with the existing local path.
+1. Done: add `sessions` module in `services/api`.
+2. Done: add session id/token generation.
+3. Done: keep sessions in memory for the first localhost proof.
+4. Done: move cloud `resolveGameBootTarget()` ROM lookup from React into backend.
+5. Done: update `useWebRTC` to request a session before cloud `start-game`.
+6. Done: keep Local Vault `.nes` mode compatible with the existing local path.
 
 Exit criteria:
 
-- Cloud game boot no longer queries `games.rom_url` directly from React.
-- React receives backend-issued `sessionId`.
-- Existing local engine still streams.
+- Done in code: cloud game boot no longer queries `games.rom_url` directly from React.
+- Done in code: React receives a backend session response and keeps using the current browser session id during the transition.
+- Needs runtime smoke test: existing local engine still streams after the session route change.
 
 ## Phase 7: Add Local Pairing To Backend Model
 

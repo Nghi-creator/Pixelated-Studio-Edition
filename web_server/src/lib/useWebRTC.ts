@@ -97,7 +97,7 @@ export function useWebRTC(gameId: string) {
       socket.emit("join-session", { sessionId, role: "browser" });
 
       try {
-        const bootTarget = await resolveGameBootTarget(gameId);
+        const bootTarget = await resolveGameBootTarget(gameId, sessionId);
         socket.emit("start-game", {
           sessionId,
           ...bootTarget,

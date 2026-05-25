@@ -486,6 +486,38 @@ Remaining follow-up:
 - Admin report actions still happen directly in the browser and should move later.
 - Continue Phase 6 by adding backend session creation for cloud games.
 
+### Backend Cloud Session Creation
+
+Implemented: 2026-05-25
+
+Implemented in:
+
+- `services/api/src/routes/sessions.ts`
+- `services/api/src/server.ts`
+- `web_server/src/lib/apiClient.ts`
+- `web_server/src/lib/webrtcSession.ts`
+- `web_server/src/lib/useWebRTC.ts`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated `POST /sessions`.
+- Added `GET /sessions/:sessionId` and `DELETE /sessions/:sessionId` for the localhost proof.
+- Backend resolves cloud game ROM targets from Supabase instead of React querying `games.rom_url` directly.
+- Backend returns `sessionId`, short-lived `sessionToken`, `engineUrl`, `expiresAt`, authenticated user id, and boot target.
+- Sessions are stored in memory for the first localhost proof.
+- React cloud game boot now calls `api.createSession()` before emitting `start-game`.
+- Local Vault `.nes` boot still uses the existing local path and does not require backend session creation.
+
+Remaining follow-up:
+
+- Populate `services/api/.env` and run a signed-in end-to-end smoke test for cloud game boot.
+- The local engine currently receives `sessionToken` but does not validate it yet.
+- Replace in-memory sessions with durable/TTL-backed storage when Redis or a sessions table is introduced.
+- Continue Phase 7 by making local engine pairing a first-class backend/web concept.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
@@ -654,5 +686,5 @@ The implementation batch is paused while the architecture is reconsidered. See:
 
 Recommended next work after review:
 
-1. Add backend session creation for cloud games.
+1. Add local pairing to the backend/web model.
 2. Add backend, web, desktop, and engine READMEs.

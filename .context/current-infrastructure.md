@@ -25,10 +25,11 @@ Current status:
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - `POST /games/:gameId/play-count` increments play count through the API instead of direct browser RPC.
 - `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
+- `POST /sessions` creates a short-lived backend session for cloud games, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
 - CORS allows local Vite origins and the hosted Vercel origin.
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
 - `web_server/src/lib/apiClient.ts` calls the API with the current Supabase access token.
-- Player play-count tracking and comment reporting now depend on the API.
+- Cloud/library game boot, player play-count tracking, and comment reporting now depend on the API.
 
 ## Web App
 
@@ -56,6 +57,7 @@ Admin routes:
 Current important frontend behaviors:
 
 - `useWebRTC` owns React stream/status lifecycle while helper modules resolve game boot targets, create WebRTC peer connections, and forward keyboard input.
+- For cloud/library games, `useWebRTC` asks the backend API to create a session and resolve the ROM target before emitting `start-game` to the local engine.
 - `/play/:id` is composed from `web_server/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, inserts metadata into `game_submissions`, then pings Formspree.

@@ -82,9 +82,32 @@ export type ApiPermissionsResponse = {
   };
 };
 
+export type ApiSessionResponse = {
+  boot: {
+    romFilename: string | null;
+    romUrl: string | null;
+  };
+  engineUrl: string;
+  expiresAt: string;
+  sessionId: string;
+  sessionToken: string;
+  user: {
+    id: string;
+  };
+};
+
 export const api = {
   countPlay: (gameId: string) =>
     apiRequest<{ success: true }>(`/games/${gameId}/play-count`, {
+      method: "POST",
+    }),
+  createSession: (gameId: string, clientSessionId: string) =>
+    apiRequest<ApiSessionResponse>("/sessions", {
+      body: JSON.stringify({
+        clientSessionId,
+        gameId,
+        mode: "cloud",
+      }),
       method: "POST",
     }),
   health: () =>
