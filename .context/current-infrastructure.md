@@ -107,7 +107,8 @@ Streaming/signaling:
 - Python connects back to Node at `http://localhost:8080`.
 - Browser receives VP8 video and Opus audio.
 - React generates the current session id, Node passes it into `camera.py` through `PIXELATED_SESSION_ID`, and both browser/camera sockets join the same room before WebRTC negotiation.
-- Engine-side download failures emit `engine-error` to the browser session.
+- React polls browser WebRTC stats once per second for FPS, bitrate, ICE state, packet loss, and jitter. The player hides those metrics by default and exposes them through a persisted developer telemetry toggle.
+- Engine-side download failures and camera/GStreamer failures emit `engine-error` to the browser session.
 
 Input:
 

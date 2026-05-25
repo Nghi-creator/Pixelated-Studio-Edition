@@ -273,6 +273,36 @@ Remaining follow-up:
 
 - Socket event registration still lives in `useWebRTC`; extracting a signaling helper can wait until telemetry adds more event surface area.
 
+### Live Stream Telemetry
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `web_server/src/lib/useWebRTC.ts`
+- `web_server/src/lib/webrtcTelemetry.ts`
+- `web_server/src/pages/user/Player.tsx`
+- `app_server/server.js`
+- `app_server/camera.py`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- React polls `RTCPeerConnection.getStats()` once per second while a player session is active.
+- The player UI can show received FPS, received bitrate, ICE state, packet loss, and jitter through an opt-in developer telemetry toggle.
+- The telemetry toggle is hidden by default for normal players and persists in `localStorage`.
+- React tracks ICE connection state and peer connection state as part of the stream telemetry object.
+- Camera/GStreamer errors emit `engine-error` from Python to Node.
+- Node relays `engine-error` to the matching session room.
+- React stores the latest engine error in telemetry and shows technical error detail only when developer telemetry is enabled.
+
+Remaining follow-up:
+
+- Telemetry is still session-local UI state. A future backend should persist metrics for trend analysis, alerting, and node scheduling.
+- Browser stats expose received FPS/bitrate, not encoder-internal FPS. Deeper encoder metrics would require explicit GStreamer probes or structured camera-side telemetry.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
@@ -333,7 +363,7 @@ Suggested improvements:
 
 - Add TURN support.
 - Generate short-lived TURN credentials from the backend.
-- Track ICE state and reconnect/fail clearly in the UI.
+- Add reconnect/fail recovery flows beyond the current ICE/error display.
 - Add bitrate/framerate profiles.
 - Add a fallback message when the local engine is offline.
 
@@ -373,6 +403,7 @@ Do a dedicated RLS pass before public launch:
 ### Frontend
 
 - `useWebRTC` has been split into focused session, peer, and input helpers. Socket event registration remains in the hook for now.
+- Player sessions now expose opt-in browser-side stream telemetry: FPS, bitrate, ICE state, packet loss, jitter, and last engine error.
 - Several Supabase queries/actions are embedded directly in page components. Introduce small data modules/hooks for games, comments, favorites, moderation, and profiles.
 - Admin access is checked in UI, but the UI should treat RLS/backend authorization as the source of truth.
 - `fetchComments` uses `.range(pageNum * 10, (pageNum + 1) * 10)`, which requests 11 rows because Supabase ranges are inclusive. If the intent is "fetch 11 to detect hasMore", name that explicitly; otherwise use end `pageNum * 10 + 9`.
@@ -435,7 +466,6 @@ Do a dedicated RLS pass before public launch:
 
 If you approve the direction, I would start with this batch:
 
-1. Add live stream telemetry for FPS, bitrate, ICE state, and encoder failures.
-2. Add separate READMEs for web app, desktop app, and engine internals.
+1. Add separate READMEs for web app, desktop app, and engine internals.
 
 This batch makes the current architecture more coherent without forcing a full backend migration yet.

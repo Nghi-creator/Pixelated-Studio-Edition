@@ -9,6 +9,7 @@ import {
   Trash2,
   Flag,
   AlertTriangle,
+  Activity,
   X,
 } from "lucide-react";
 import { useWebRTC } from "../../lib/useWebRTC";
@@ -30,15 +31,21 @@ interface GameComment {
   }[];
 }
 
+const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
+
 export default function Player() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const { stream, status } = useWebRTC(id || "");
+  const { stream, status, telemetry } = useWebRTC(id || "");
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [gameTitle, setGameTitle] = useState<string>("");
   const [authorName, setAuthorName] = useState<string | null>(null);
+  const [showStreamTelemetry, setShowStreamTelemetry] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(STREAM_TELEMETRY_VISIBILITY_KEY) === "1";
+  });
 
   // Reaction State (Game)
   const [likes, setLikes] = useState(0);
@@ -66,6 +73,13 @@ export default function Player() {
       setCurrentUser(session?.user ?? null);
     });
   }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(
+      STREAM_TELEMETRY_VISIBILITY_KEY,
+      showStreamTelemetry ? "1" : "0",
+    );
+  }, [showStreamTelemetry]);
 
   // 2. Stream Setup & Scroll Lock
   useEffect(() => {
@@ -384,6 +398,22 @@ export default function Player() {
   const backText = isLocalGame
     ? "Back to Local Vault"
     : "Back to Cloud Library";
+  const statusLabel =
+    status === "connecting"
+      ? "Connecting to Edge Node..."
+      : status === "playing"
+        ? "Live Stream Active"
+        : status === "error"
+          ? "Stream Error"
+          : "Idle";
+  const statusDotClass =
+    status === "playing"
+      ? "bg-green-500 shadow-[0_0_10px_#22c55e]"
+      : status === "error"
+        ? "bg-red-500 shadow-[0_0_10px_#ef4444]"
+        : "bg-yellow-500 animate-pulse";
+  const formatNumber = (value: number | null, digits = 0) =>
+    value === null ? "--" : value.toFixed(digits);
 
   return (
     <div className="flex flex-col items-center pt-24 pb-24 px-4 min-h-screen">
@@ -399,20 +429,33 @@ export default function Player() {
           </Link>
         </div>
 
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
           <h1 className="text-3xl font-extrabold text-white tracking-tight">
             {gameTitle || "Loading Game..."}
           </h1>
 
-          <div className="flex items-center gap-2 bg-synth-surface px-4 py-2 rounded-full border border-synth-border">
-            <div
-              className={`w-2.5 h-2.5 rounded-full ${status === "playing" ? "bg-green-500 shadow-[0_0_10px_#22c55e]" : "bg-yellow-500 animate-pulse"}`}
-            ></div>
-            <span className="text-sm font-medium text-gray-300 uppercase tracking-wider">
-              {status === "connecting"
-                ? "Connecting to Edge Node..."
-                : "Live Stream Active"}
-            </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowStreamTelemetry((value) => !value)}
+              aria-pressed={showStreamTelemetry}
+              aria-label="Toggle stream telemetry"
+              title="Toggle stream telemetry"
+              className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
+                showStreamTelemetry
+                  ? "border-synth-primary bg-synth-primary/15 text-synth-primary"
+                  : "border-synth-border bg-synth-surface text-gray-400 hover:text-white"
+              }`}
+            >
+              <Activity className="h-4 w-4" />
+            </button>
+
+            <div className="flex items-center gap-2 bg-synth-surface px-4 py-2 rounded-full border border-synth-border">
+              <div className={`w-2.5 h-2.5 rounded-full ${statusDotClass}`} />
+              <span className="text-sm font-medium text-gray-300 uppercase tracking-wider">
+                {statusLabel}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -427,6 +470,19 @@ export default function Player() {
             </p>
           </div>
         )}
+        {status === "error" && (
+          <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-synth-bg/90 backdrop-blur-sm px-6 text-center">
+            <AlertTriangle className="w-12 h-12 text-red-400 mb-4 drop-shadow-[0_0_12px_rgba(248,113,113,0.45)]" />
+            <p className="text-lg text-gray-200 font-semibold">
+              Stream could not start
+            </p>
+            {showStreamTelemetry && telemetry.lastEngineError && (
+              <p className="mt-2 max-w-xl text-sm text-gray-400">
+                {telemetry.lastEngineError}
+              </p>
+            )}
+          </div>
+        )}
         <video
           ref={videoRef}
           autoPlay
@@ -434,6 +490,42 @@ export default function Player() {
           className="w-full h-full object-contain"
         />
       </div>
+
+      {showStreamTelemetry && (
+        <div className="w-full max-w-5xl mt-3 grid grid-cols-2 md:grid-cols-4 gap-2">
+          <div className="min-h-16 rounded-lg border border-synth-border bg-synth-surface/80 px-3 py-2">
+            <div className="flex items-center gap-2 text-xs uppercase text-gray-500">
+              <Activity className="w-3.5 h-3.5" />
+              FPS
+            </div>
+            <div className="mt-1 text-lg font-bold text-white tabular-nums">
+              {formatNumber(telemetry.fps)}
+            </div>
+          </div>
+          <div className="min-h-16 rounded-lg border border-synth-border bg-synth-surface/80 px-3 py-2">
+            <div className="text-xs uppercase text-gray-500">Bitrate</div>
+            <div className="mt-1 text-lg font-bold text-white tabular-nums">
+              {formatNumber(telemetry.bitrateKbps)}{" "}
+              <span className="text-xs font-medium text-gray-500">kbps</span>
+            </div>
+          </div>
+          <div className="min-h-16 rounded-lg border border-synth-border bg-synth-surface/80 px-3 py-2">
+            <div className="text-xs uppercase text-gray-500">ICE</div>
+            <div className="mt-1 text-lg font-bold text-white capitalize">
+              {telemetry.iceConnectionState}
+            </div>
+          </div>
+          <div className="min-h-16 rounded-lg border border-synth-border bg-synth-surface/80 px-3 py-2">
+            <div className="text-xs uppercase text-gray-500">Loss / Jitter</div>
+            <div className="mt-1 text-lg font-bold text-white tabular-nums">
+              {telemetry.packetsLost}{" "}
+              <span className="text-xs font-medium text-gray-500">
+                / {formatNumber(telemetry.jitterMs, 1)} ms
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Under-Player Action Bar */}
       <div className="w-full max-w-5xl mt-6 flex flex-col sm:flex-row justify-between items-start gap-4">

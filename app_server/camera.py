@@ -15,6 +15,17 @@ ENGINE_TOKEN = os.environ.get('PIXELATED_ENGINE_TOKEN', '')
 webrtcbin = None
 pipeline = None
 
+def emit_engine_error(message):
+    print(f"[Python] Engine error: {message}")
+    try:
+        sio.emit('engine-error', {
+            'sessionId': SESSION_ID,
+            'message': message,
+            'source': 'camera'
+        })
+    except Exception as exc:
+        print(f"[Python] Failed to emit engine-error: {exc}")
+
 def handle_offer(offer):
     global webrtcbin, pipeline
     print("[Python] Received React Offer! Building WebRTC Pipeline...")
@@ -42,6 +53,23 @@ def handle_offer(offer):
     """
     pipeline = Gst.parse_launch(pipeline_str)
     webrtcbin = pipeline.get_by_name('sendrecv')
+
+    bus = pipeline.get_bus()
+    bus.add_signal_watch()
+
+    def on_bus_message(_, message):
+        if message.type == Gst.MessageType.ERROR:
+            err, debug = message.parse_error()
+            emit_engine_error(f"GStreamer error: {err.message}")
+            if debug:
+                print(f"[Python] GStreamer debug: {debug}")
+        elif message.type == Gst.MessageType.WARNING:
+            warn, debug = message.parse_warning()
+            print(f"[Python] GStreamer warning: {warn.message}")
+            if debug:
+                print(f"[Python] GStreamer warning debug: {debug}")
+
+    bus.connect('message', on_bus_message)
 
     pipeline.set_state(Gst.State.PLAYING)
 

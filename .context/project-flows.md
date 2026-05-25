@@ -156,9 +156,36 @@ Purpose: negotiate a WebRTC connection between browser and GStreamer.
 27. React sets the answer as its remote description.
 28. React and Python exchange ICE candidates through `webrtc-ice-candidate` and `webrtc-ice-candidate-backend` events relayed only inside the same session room.
 29. Once media tracks arrive, React adds them to a `MediaStream` and marks status as `playing`.
-30. `Player.tsx` assigns that `MediaStream` to the `<video>` element through `videoRef.current.srcObject`.
+30. `startWebRTCTelemetry()` polls `RTCPeerConnection.getStats()` once per second.
+31. `useWebRTC` returns stream telemetry alongside `stream` and `status`.
+32. `Player.tsx` assigns that `MediaStream` to the `<video>` element through `videoRef.current.srcObject`.
+33. `Player.tsx` hides received FPS, bitrate, ICE state, packet loss, and jitter by default.
+34. If the user enables the telemetry toggle, `Player.tsx` renders those metrics below the video and persists that preference in `localStorage`.
 
 Current limitation: signaling is now room-scoped and token-gated, but it is still local pairing rather than backend-issued session authorization.
+
+## 5A. Live Stream Telemetry And Error Flow
+
+Purpose: surface stream quality and engine failures while a player session is active.
+
+1. `useWebRTC` creates an `RTCPeerConnection`.
+2. `startWebRTCTelemetry()` registers ICE and peer connection state listeners.
+3. `startWebRTCTelemetry()` calls `getStats()` every second.
+4. React reads inbound RTP reports.
+5. React calculates received bitrate from inbound byte deltas.
+6. React reads inbound video `framesPerSecond` when the browser exposes it.
+7. React sums packet loss and converts jitter to milliseconds.
+8. `useWebRTC` stores the latest telemetry snapshot in React state.
+9. `Player.tsx` keeps FPS, bitrate, ICE state, packet loss, and jitter hidden by default.
+10. The player telemetry toggle persists in `localStorage`.
+11. When the toggle is enabled, `Player.tsx` displays the live telemetry strip below the video.
+12. `camera.py` watches the GStreamer bus for error messages.
+13. On a GStreamer error, Python emits `engine-error` with `sessionId`, message, and source.
+14. `server.js` relays that error to the matching `session:<sessionId>` room.
+15. React receives `engine-error`, stores it as `lastEngineError`, and moves the player to error state.
+16. The normal player error overlay stays simple; technical engine detail appears only when the telemetry toggle is enabled.
+
+Current limitation: telemetry is local to the active React session and is not persisted. It should eventually flow to a backend metrics store for fleet scheduling, debugging, and alerts.
 
 ## 6. Video Buffer Flow
 
@@ -362,5 +389,5 @@ Current limitation: cleanup is designed for the current one-active-session local
 - Session ownership flow: all socket events should carry or derive a session id.
 - TURN credential flow: backend should mint short-lived credentials for production WebRTC.
 - Engine/node capacity flow: hosted nodes should report whether they can accept sessions.
-- Observability flow: collect session start/stop, ICE failures, encoder health, FPS/bitrate, and crash logs.
+- Observability persistence flow: send session start/stop, ICE failures, encoder health, FPS/bitrate, and crash logs to a backend metrics store.
 - Cleanup flow: old local vault files need explicit lifecycle rules if storage quotas become important.
