@@ -303,6 +303,49 @@ Remaining follow-up:
 - Telemetry is still session-local UI state. A future backend should persist metrics for trend analysis, alerting, and node scheduling.
 - Browser stats expose received FPS/bitrate, not encoder-internal FPS. Deeper encoder metrics would require explicit GStreamer probes or structured camera-side telemetry.
 
+### Local Engine Server Module Split
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `app_server/server.js`
+- `app_server/src/config.js`
+- `app_server/src/http/healthRoutes.js`
+- `app_server/src/http/localVaultRoutes.js`
+- `app_server/src/http/errorHandlers.js`
+- `app_server/src/signaling/socketAuth.js`
+- `app_server/src/signaling/sessionRooms.js`
+- `app_server/src/signaling/signalingRelay.js`
+- `app_server/src/signaling/startGameHandlers.js`
+- `app_server/src/signaling/inputHandlers.js`
+- `app_server/src/signaling/engineErrorHandlers.js`
+- `app_server/src/runtime/processManager.js`
+- `app_server/src/roms/cloudRomDownloader.js`
+- `app_server/src/roms/localRomStore.js`
+- `app_server/src/input/translateKey.js`
+- `app_server/src/input/injectKey.js`
+- `app_server/src/telemetry/healthSnapshot.js`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `app_server/server.js` is now a composition root for Express, Socket.IO, routes, auth, runtime, and health wiring.
+- Local Vault HTTP routes moved out of `server.js`.
+- Engine token HTTP and Socket.IO auth moved out of `server.js`.
+- Session room helpers and signaling relay handlers moved out of `server.js`.
+- Start-game, input, and engine-error socket handlers moved out of `server.js`.
+- Cloud ROM validation/download and local ROM folder helpers moved out of `server.js`.
+- Runtime process state, virtual display startup, game booting, and cleanup moved into `processManager.js`.
+- Deep health snapshot generation moved into `telemetry/healthSnapshot.js`.
+
+Remaining follow-up:
+
+- Run a manual runtime smoke test with the Electron/Docker engine because static syntax checks do not prove Xvfb, RetroArch, Socket.IO, and GStreamer work together.
+- Continue Phase 2 by splitting `Player.tsx` in place.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
@@ -464,8 +507,13 @@ Do a dedicated RLS pass before public launch:
 
 ## Recommended First Implementation Batch
 
-If you approve the direction, I would start with this batch:
+The implementation batch is paused while the architecture is reconsidered. See:
 
-1. Add separate READMEs for web app, desktop app, and engine internals.
+- `.context/target-architecture-refurbishment.md`
+- `.context/refurbishment-execution-plan.md`
 
-This batch makes the current architecture more coherent without forcing a full backend migration yet.
+Recommended next work after review:
+
+1. Split `Player.tsx` into smaller player feature modules.
+2. Create `services/api` with health/config/auth scaffolding.
+3. Add backend, web, desktop, and engine READMEs.
