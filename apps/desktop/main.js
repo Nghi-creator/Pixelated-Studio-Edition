@@ -33,8 +33,10 @@ function getSafeEnv() {
   }
 }
 
-// --- PRODUCTION PATH RESOLVER ---
-const appDir = __dirname;
+// --- ENGINE RUNTIME PATH RESOLVER ---
+const engineRuntimeDir =
+  process.env.PIXELATED_ENGINE_RUNTIME_DIR ||
+  path.resolve(__dirname, "../../engine/runtime");
 
 function waitForEngineHealth(attempts = 30, delayMs = 1000) {
   return new Promise((resolve, reject) => {
@@ -113,7 +115,7 @@ ipcMain.on("start-docker", (event) => {
 
     // 2. Build the image
     const buildCmd = exec("docker build -t pixelated-engine .", {
-      cwd: appDir,
+      cwd: engineRuntimeDir,
       env: safeEnv,
     });
 

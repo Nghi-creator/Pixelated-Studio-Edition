@@ -4,6 +4,10 @@ import { env } from "../config/env.js";
 const startedAt = Date.now();
 
 export async function registerHealthRoutes(app: FastifyInstance) {
+  app.get("/", async (_request, reply) =>
+    reply.type("text/plain").send("API is awake!"),
+  );
+
   app.get("/health", async () => ({
     ok: true,
     service: "pixelated-api",

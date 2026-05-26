@@ -2,20 +2,20 @@
 
 Last reviewed: 2026-05-24
 
-This file describes the runtime flows in PIXELATED Studio, using `assets/Pixelated.png` plus the current code in `web_server/` and `app_server/` as the source of truth.
+This file describes the runtime flows in PIXELATED Studio, using `assets/Pixelated.png` plus the current code in `apps/web/` and `apps/desktop/` as the source of truth.
 
 ## Main Actors
 
-- React web app: Vite/React UI in `web_server/src`.
+- React web app: Vite/React UI in `apps/web/src`.
 - Supabase: auth, Postgres, storage, realtime, RPCs.
-- Electron desktop app: local launcher in `app_server/main.js`.
-- Docker engine container: Ubuntu 22.04 image built from `app_server/Dockerfile`.
-- Node.js orchestrator: Express + Socket.IO server in `app_server/server.js`.
+- Electron desktop app: local launcher in `apps/desktop/main.js`.
+- Docker engine container: Ubuntu 22.04 image built from `engine/runtime/Dockerfile`.
+- Node.js orchestrator: Express + Socket.IO server in `engine/runtime/server.js`.
 - RetroArch/Mesen: native emulator process inside the container.
 - Xvfb: virtual X11 display inside the container.
 - PulseAudio: virtual audio output inside the container.
-- GStreamer/Python bridge: WebRTC media sender in `app_server/camera.py`.
-- Browser `RTCPeerConnection`: WebRTC receiver created by `web_server/src/lib/useWebRTC.ts`.
+- GStreamer/Python bridge: WebRTC media sender in `engine/runtime/camera.py`.
+- Browser `RTCPeerConnection`: WebRTC receiver created by `apps/web/src/lib/useWebRTC.ts`.
 
 ## 1. Engine Boot Flow
 
@@ -25,7 +25,7 @@ Purpose: start the local Dockerized game streaming node.
 2. Electron renderer calls `window.electronAPI.startDocker()`.
 3. `preload.js` forwards the request to Electron main over IPC event `start-docker`.
 4. `main.js` runs `docker info` to check whether Docker is available.
-5. `main.js` builds the image with `docker build -t pixelated-engine .` from `app_server/`.
+5. `main.js` builds the image with `docker build -t pixelated-engine .` from `engine/runtime/`.
 6. Electron generates a random pairing token for this engine run.
 7. Electron sends the token to the desktop renderer, which displays it with a copy button.
 8. `main.js` removes any stale `pixelated-node` container.
@@ -103,7 +103,7 @@ Upload:
 
 1. User drags or selects a `.nes` file in `/local`.
 2. React checks that the filename ends with `.nes`.
-3. React ensures it has a pairing token in `localStorage`; if not, it prompts the user to enter the token shown in the desktop app.
+3. React requires the local engine pairing panel to have saved a desktop pairing token in browser `localStorage`.
 4. React sends `POST http://localhost:8080/upload` with multipart field `romFile`, `X-User-Id`, and `X-Engine-Token`.
 5. Node rejects the request if the pairing token does not match `PIXELATED_ENGINE_TOKEN`.
 6. Multer rejects files that do not have a `.nes` filename.
@@ -129,7 +129,7 @@ Purpose: negotiate a WebRTC connection between browser and GStreamer.
 
 1. `createEnginePeerConnection()` creates an `RTCPeerConnection` with Google STUN.
 2. `createWebRTCSessionId()` creates a per-player `sessionId`.
-3. React ensures it has a pairing token in `localStorage`; if not, it prompts the user to enter the token shown in the desktop app.
+3. React reads the desktop pairing token from browser `localStorage`; if it is missing, the player shows the local engine pairing panel.
 4. React connects to Node Socket.IO with `{ auth: { token } }`.
 5. Node rejects the socket if the token does not match `PIXELATED_ENGINE_TOKEN`.
 6. React emits `join-session` with `{ sessionId, role: "browser" }`.
@@ -164,6 +164,22 @@ Purpose: negotiate a WebRTC connection between browser and GStreamer.
 
 Current limitation: signaling is now room-scoped and token-gated, but it is still local pairing rather than backend-issued session authorization.
 
+## 5B. Local Engine Pairing Flow
+
+Purpose: make local-engine intent explicit without sending the desktop pairing token to the hosted backend.
+
+1. Electron starts the local engine and displays a per-run pairing token.
+2. React renders `EnginePairingPanel` in Local Vault and when the player needs a token.
+3. User enters the local engine URL and desktop pairing token.
+4. React stores the engine URL and pairing token in browser `localStorage`.
+5. React calls `GET <engineUrl>/health` without the token to verify the local engine is reachable.
+6. If the user is signed in, React calls `POST /local-pairings` on the backend with only `{ engineUrl }`.
+7. Backend records pairing intent metadata for the authenticated user.
+8. Backend does not receive or store the desktop pairing token.
+9. Local Vault uses the stored token for `X-Engine-Token` on upload/list/delete requests.
+10. WebRTC uses the stored token for Socket.IO auth.
+11. If the engine rejects the token, React clears it and shows the pairing panel again.
+
 ## 5A. Live Stream Telemetry And Error Flow
 
 Purpose: surface stream quality and engine failures while a player session is active.
@@ -178,14 +194,17 @@ Purpose: surface stream quality and engine failures while a player session is ac
 8. `useWebRTC` stores the latest telemetry snapshot in React state.
 9. `Player.tsx` keeps FPS, bitrate, ICE state, packet loss, and jitter hidden by default.
 10. The player telemetry toggle persists in `localStorage`.
-11. When the toggle is enabled, `Player.tsx` displays the live telemetry strip below the video.
-12. `camera.py` watches the GStreamer bus for error messages.
-13. On a GStreamer error, Python emits `engine-error` with `sessionId`, message, and source.
-14. `server.js` relays that error to the matching `session:<sessionId>` room.
-15. React receives `engine-error`, stores it as `lastEngineError`, and moves the player to error state.
-16. The normal player error overlay stays simple; technical engine detail appears only when the telemetry toggle is enabled.
+11. `useWebRTC` sends a sampled telemetry snapshot to `POST /metrics/stream` at most every five seconds.
+12. Backend validates the metric and rate-limits accepted samples per authenticated user/session.
+13. Backend stores recent metrics in memory for the current API process.
+14. When the toggle is enabled, `Player.tsx` displays the live telemetry strip below the video.
+15. `camera.py` watches the GStreamer bus for error messages.
+16. On a GStreamer error, Python emits `engine-error` with `sessionId`, message, and source.
+17. `server.js` relays that error to the matching `session:<sessionId>` room.
+18. React receives `engine-error`, stores it as `lastEngineError`, and moves the player to error state.
+19. The normal player error overlay stays simple; technical engine detail appears only when the telemetry toggle is enabled.
 
-Current limitation: telemetry is local to the active React session and is not persisted. It should eventually flow to a backend metrics store for fleet scheduling, debugging, and alerts.
+Current limitation: backend telemetry is in-memory and process-local. It should move to durable storage or an observability pipeline before multi-replica hosting or fleet scheduling.
 
 ## 6. Video Buffer Flow
 

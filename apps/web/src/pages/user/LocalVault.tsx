@@ -7,7 +7,13 @@ import {
   Trash2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { clearEngineToken, engineAuthHeaders } from "../../lib/engineAuth";
+import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
+import {
+  clearEngineToken,
+  engineAuthHeaders,
+  ENGINE_PAIRING_EVENT,
+  hasEngineToken,
+} from "../../lib/engineAuth";
 import { engineEndpoint } from "../../lib/engineConfig";
 import { supabase } from "../../lib/supabaseClient";
 
@@ -16,6 +22,7 @@ export default function LocalVault() {
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [userId, setUserId] = useState<string>("anonymous");
+  const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
 
   useEffect(() => {
     const initVault = async () => {
@@ -24,12 +31,35 @@ export default function LocalVault() {
       } = await supabase.auth.getSession();
       const currentUserId = session?.user?.id || "anonymous";
       setUserId(currentUserId);
-      fetchLocalGames(currentUserId);
+      if (hasEngineToken()) {
+        fetchLocalGames(currentUserId);
+      }
     };
     initVault();
   }, []);
 
+  useEffect(() => {
+    const refreshEnginePairing = () => {
+      const paired = hasEngineToken();
+      setIsEnginePaired(paired);
+      if (paired) {
+        fetchLocalGames(userId);
+      } else {
+        setLocalGames([]);
+      }
+    };
+
+    window.addEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
+    return () =>
+      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
+  }, [userId]);
+
   const fetchLocalGames = async (uid: string) => {
+    if (!hasEngineToken()) {
+      setLocalGames([]);
+      return;
+    }
+
     try {
       const res = await fetch(engineEndpoint("/local-games"), {
         headers: { "X-User-Id": uid, ...engineAuthHeaders() },
@@ -59,6 +89,7 @@ export default function LocalVault() {
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    if (!isEnginePaired) return;
     const file = e.dataTransfer.files[0];
     if (file) await uploadFile(file);
   };
@@ -69,6 +100,11 @@ export default function LocalVault() {
   };
 
   const uploadFile = async (file: File) => {
+    if (!hasEngineToken()) {
+      alert("Pair the local engine before uploading ROMs.");
+      return;
+    }
+
     if (!file.name.toLowerCase().endsWith(".nes")) {
       alert("Only .nes files are supported!");
       return;
@@ -152,12 +188,18 @@ export default function LocalVault() {
         </p>
       </div>
 
+      <div className="mb-8">
+        <EnginePairingPanel onPaired={() => fetchLocalGames(userId)} />
+      </div>
+
       {/* THE DROPZONE */}
       <div
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`relative mb-12 w-full h-64 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all cursor-pointer overflow-hidden ${
+        className={`relative mb-12 w-full h-64 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all overflow-hidden ${
+          isEnginePaired ? "cursor-pointer" : "cursor-not-allowed opacity-60"
+        } ${
           isDragging
             ? "border-synth-primary bg-synth-primary/10 shadow-glow-primary"
             : "border-synth-border bg-synth-surface hover:border-synth-secondary/50"
@@ -166,6 +208,7 @@ export default function LocalVault() {
         <input
           type="file"
           accept=".nes"
+          disabled={!isEnginePaired}
           onChange={handleFileInput}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
         />
@@ -182,7 +225,9 @@ export default function LocalVault() {
           {isUploading ? "Transmitting to Engine..." : "Drag & Drop ROMs here"}
         </h3>
         <p className="text-sm text-gray-400">
-          or click to browse your files (.nes only)
+          {isEnginePaired
+            ? "or click to browse your files (.nes only)"
+            : "pair the local engine before uploading"}
         </p>
       </div>
 

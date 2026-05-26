@@ -36,6 +36,12 @@ Health check:
 GET http://localhost:4000/health
 ```
 
+Root probe:
+
+```text
+GET http://localhost:4000/
+```
+
 Readiness check:
 
 ```text
@@ -52,6 +58,7 @@ Implemented now:
 - Environment parsing.
 - CORS for localhost web and hosted Vercel origin.
 - `GET /health`.
+- `GET /`.
 - `GET /ready`.
 - Supabase JWT verification middleware.
 - Authenticated `GET /me`.
