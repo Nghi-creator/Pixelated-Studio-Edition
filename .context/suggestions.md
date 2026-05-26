@@ -636,6 +636,37 @@ Remaining follow-up:
 
 - Add integration smoke tests with a real staged Supabase access token when practical.
 
+### Admin Report Actions Through Backend
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/src/routes/moderation.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/admin/Dashboard.tsx`
+- `apps/web/src/components/admin/ReportCard.tsx`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated `POST /admin/reports/:reportId/action`.
+- Supported actions are `ignore`, `delete_comment`, and `ban_user`.
+- Backend verifies the acting user is an admin or super admin before resolving a report.
+- Backend preserves the existing peer-review rule: non-super-admins cannot resolve reports they submitted.
+- Backend preserves the existing admin-target rule: only super admins can resolve reports against admins/super admins.
+- Backend prevents self-ban.
+- Ignoring a report deletes only the report row.
+- Deleting a comment removes the reported comment, allowing report cleanup through cascade behavior.
+- Banning a user sets `profiles.is_banned = true` and deletes the reported comment.
+- Admin dashboard actions now call the API instead of writing directly to Supabase from the browser.
+
+Remaining follow-up:
+
+- Move admin report list fetching through the API so the whole moderation queue is backend-shaped.
+- Add dedicated admin action tests with fake Supabase coverage.
+
 ### Backend Hosting Prep
 
 Implemented: 2026-05-25
@@ -781,13 +812,13 @@ Smoke checklist:
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
 
-### 2. Move Remaining Sensitive Mutations Through Backend
+### 2. Move Remaining Sensitive Reads/Mutations Through Backend
 
 Several workflows still write directly from the browser to Supabase. That is acceptable while RLS is tight, but backend routing gives better audit, validation, and rate limiting.
 
 Suggested order:
 
-- Admin report actions.
+- Admin report list fetching.
 - Publish/submission uploads and metadata creation.
 - Access logging/session tracking.
 - Profile role-sensitive updates.

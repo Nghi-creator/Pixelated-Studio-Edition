@@ -65,6 +65,7 @@ Implemented now:
 - Authenticated `GET /me/permissions`.
 - Authenticated `POST /games/:gameId/play-count`.
 - Authenticated `POST /moderation/comments/:commentId/report`.
+- Authenticated `POST /admin/reports/:reportId/action`.
 - Authenticated `POST /sessions`.
 - `POST /sessions/:sessionId/verify` for local engine cloud session verification.
 - Authenticated local pairing routes.
@@ -90,6 +91,7 @@ GET /me
 GET /me/permissions
 POST /games/:gameId/play-count
 POST /moderation/comments/:commentId/report
+POST /admin/reports/:reportId/action
 POST /sessions
 GET /sessions/:sessionId
 DELETE /sessions/:sessionId
