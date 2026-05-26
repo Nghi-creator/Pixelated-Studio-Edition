@@ -73,7 +73,7 @@ Implemented now:
 
 Next phase:
 
-- Add automated API tests for the persisted control-plane records.
+- Add integration smoke tests with a real staged Supabase access token when practical.
 
 ## Auth Routes
 
@@ -121,3 +121,13 @@ SUPABASE_URL=<your Supabase URL>
 SUPABASE_ANON_KEY=<your Supabase anon key>
 SUPABASE_SERVICE_ROLE_KEY=<your Supabase service role key>
 ```
+
+## Tests
+
+Run the focused API test suite from this folder:
+
+```bash
+npm run test
+```
+
+The current tests use Fastify injection and a fake Supabase service, so they do not require local database access.

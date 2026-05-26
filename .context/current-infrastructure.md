@@ -42,6 +42,7 @@ Current status:
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
 - `services/api/.env` exists locally and is ignored; production keys live on the backend host.
 - API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
+- `services/api` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - Cloud/library game boot, player play-count tracking, and comment reporting now depend on the API.

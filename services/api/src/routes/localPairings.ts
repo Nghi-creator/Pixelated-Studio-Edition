@@ -13,6 +13,13 @@ type LocalPairingRow = {
   updated_at: string;
 };
 
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
+
+type LocalPairingRouteOptions = {
+  requireUser?: typeof requireSupabaseUser;
+  supabase?: SupabaseServiceLike | null;
+};
+
 const pairingBodySchema = z.object({
   engineUrl: z.string().url(),
 });
@@ -27,23 +34,29 @@ function mapPairing(row: LocalPairingRow) {
   };
 }
 
-export async function registerLocalPairingRoutes(app: FastifyInstance) {
+export async function registerLocalPairingRoutes(
+  app: FastifyInstance,
+  options: LocalPairingRouteOptions = {},
+) {
+  const requireUser = options.requireUser || requireSupabaseUser;
+  const service = options.supabase === undefined ? supabaseService : options.supabase;
+
   app.get(
     "/local-pairings/current",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
 
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
 
-      const { data, error } = await supabaseService
+      const { data, error } = await service
         .from("local_engine_pairings")
         .select("id,engine_url,token_stored_by,created_at,updated_at")
         .eq("user_id", user.id)
@@ -65,7 +78,7 @@ export async function registerLocalPairingRoutes(app: FastifyInstance) {
 
   app.post(
     "/local-pairings",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
@@ -77,7 +90,7 @@ export async function registerLocalPairingRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid local pairing" });
       }
 
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -86,7 +99,7 @@ export async function registerLocalPairingRoutes(app: FastifyInstance) {
       const now = new Date().toISOString();
       const engineUrl = parsedBody.data.engineUrl.replace(/\/$/, "");
 
-      const { data, error } = await supabaseService
+      const { data, error } = await service
         .from("local_engine_pairings")
         .upsert(
           {
@@ -114,20 +127,20 @@ export async function registerLocalPairingRoutes(app: FastifyInstance) {
 
   app.delete(
     "/local-pairings/current",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
 
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
 
-      await supabaseService
+      await service
         .from("local_engine_pairings")
         .delete()
         .eq("user_id", user.id);

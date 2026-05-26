@@ -29,6 +29,13 @@ type BackendSessionRow = {
   user_id: string;
 };
 
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
+
+type SessionRouteOptions = {
+  requireUser?: typeof requireSupabaseUser;
+  supabase?: SupabaseServiceLike | null;
+};
+
 function createSessionToken() {
   return crypto.randomBytes(32).toString("base64url");
 }
@@ -58,10 +65,13 @@ function mapBoot(row: BackendSessionRow) {
   };
 }
 
-async function getLiveSession(sessionId: string) {
-  if (!supabaseService) return null;
+async function getLiveSession(
+  service: SupabaseServiceLike | null,
+  sessionId: string,
+) {
+  if (!service) return null;
 
-  const { data, error } = await supabaseService
+  const { data, error } = await service
     .from("backend_sessions")
     .select(
       "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,expires_at,deleted_at",
@@ -76,17 +86,23 @@ async function getLiveSession(sessionId: string) {
   return data;
 }
 
-export async function registerSessionRoutes(app: FastifyInstance) {
+export async function registerSessionRoutes(
+  app: FastifyInstance,
+  options: SessionRouteOptions = {},
+) {
+  const requireUser = options.requireUser || requireSupabaseUser;
+  const service = options.supabase === undefined ? supabaseService : options.supabase;
+
   app.post(
     "/sessions",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
 
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -97,7 +113,7 @@ export async function registerSessionRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid session request" });
       }
 
-      const { data, error } = await supabaseService
+      const { data, error } = await service
         .from("games")
         .select("rom_url, rom_filename")
         .eq("id", parsedBody.data.gameId)
@@ -120,7 +136,7 @@ export async function registerSessionRoutes(app: FastifyInstance) {
         romUrl: data.rom_url || null,
       };
 
-      const { error: sessionError } = await supabaseService
+      const { error: sessionError } = await service
         .from("backend_sessions")
         .upsert({
           boot_rom_filename: boot.romFilename,
@@ -154,7 +170,7 @@ export async function registerSessionRoutes(app: FastifyInstance) {
 
   app.get(
     "/sessions/:sessionId",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const params = z
         .object({ sessionId: z.string().regex(/^[a-zA-Z0-9_-]+$/) })
@@ -164,7 +180,7 @@ export async function registerSessionRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid session id" });
       }
 
-      const session = await getLiveSession(params.data.sessionId);
+      const session = await getLiveSession(service, params.data.sessionId);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
@@ -183,7 +199,7 @@ export async function registerSessionRoutes(app: FastifyInstance) {
 
   app.delete(
     "/sessions/:sessionId",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const params = z
         .object({ sessionId: z.string().regex(/^[a-zA-Z0-9_-]+$/) })
@@ -193,15 +209,15 @@ export async function registerSessionRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid session id" });
       }
 
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
 
-      const session = await getLiveSession(params.data.sessionId);
+      const session = await getLiveSession(service, params.data.sessionId);
       if (session && session.user_id === request.user?.id) {
-        await supabaseService
+        await service
           .from("backend_sessions")
           .update({ deleted_at: new Date().toISOString() })
           .eq("id", params.data.sessionId)
@@ -228,8 +244,11 @@ export async function registerSessionRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: "Invalid session token" });
     }
 
-    const session = await getLiveSession(params.data.sessionId);
-    if (!session || !sessionTokenMatches(session.session_token_hash, body.data.sessionToken)) {
+    const session = await getLiveSession(service, params.data.sessionId);
+    if (
+      !session ||
+      !sessionTokenMatches(session.session_token_hash, body.data.sessionToken)
+    ) {
       return reply.status(401).send({ error: "Invalid or expired session" });
     }
 

@@ -605,6 +605,37 @@ Remaining follow-up:
 
 - Add automated API tests for session persistence, token verification, pairing upsert/delete, metric rate limiting, and cleanup behavior.
 
+### Backend Control-Plane API Tests
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/package.json`
+- `services/api/src/controlPlane.test.ts`
+- `services/api/src/routes/sessions.ts`
+- `services/api/src/routes/localPairings.ts`
+- `services/api/src/routes/metrics.ts`
+- `services/api/src/modules/maintenance/controlPlaneCleanup.ts`
+- `.context/suggestions.md`
+- `.context/current-infrastructure.md`
+
+What changed:
+
+- Added `npm run test` for the API service.
+- Added Fastify injection tests that run without a live Supabase database.
+- Route modules now accept injectable auth and Supabase dependencies for tests.
+- Tests cover persisted session creation and hashed token storage.
+- Tests cover backend session token verification and bad-token rejection.
+- Tests cover session ownership protection.
+- Tests cover local pairing upsert/read/delete behavior.
+- Tests cover stream metric persistence and per-user/session rate limiting.
+- Tests cover cleanup for expired sessions, stopped sessions, and old stream metrics.
+
+Remaining follow-up:
+
+- Add integration smoke tests with a real staged Supabase access token when practical.
+
 ### Backend Hosting Prep
 
 Implemented: 2026-05-25
@@ -750,16 +781,7 @@ Smoke checklist:
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
 
-### 2. Add Backend API Tests
-
-The main control-plane records are now durable and have retention cleanup, but they still need automated coverage.
-
-Recommended next implementation:
-
-- Add API tests for session create/verify/expiry/ownership, pairing upsert/delete, and metric rate limiting.
-- Add cleanup tests for expired sessions and old metrics.
-
-### 3. Move Remaining Sensitive Mutations Through Backend
+### 2. Move Remaining Sensitive Mutations Through Backend
 
 Several workflows still write directly from the browser to Supabase. That is acceptable while RLS is tight, but backend routing gives better audit, validation, and rate limiting.
 
@@ -770,7 +792,7 @@ Suggested order:
 - Access logging/session tracking.
 - Profile role-sensitive updates.
 
-### 4. Improve Docker Build/Run Lifecycle
+### 3. Improve Docker Build/Run Lifecycle
 
 The Electron app builds the image on demand and uses a fixed container name/port. This is workable for a demo, but fragile for users.
 
@@ -780,7 +802,7 @@ Suggested improvements:
 - Keep local build as a development fallback.
 - Add more structured engine states: checking Docker, pulling/building image, starting container, waiting for health, ready, failed.
 
-### 5. Fix WebRTC Production Readiness
+### 4. Fix WebRTC Production Readiness
 
 Google STUN alone is not enough for real users and varied networks.
 
@@ -792,7 +814,7 @@ Suggested improvements:
 - Add bitrate/framerate profiles.
 - Add a fallback message when the local engine is offline.
 
-### 6. Decide Explicit LAN Support
+### 5. Decide Explicit LAN Support
 
 The local engine is currently bound to host loopback. That is the right secure default. If LAN streaming becomes a product goal, add it as an explicit desktop setting with warning copy, origin controls, and token rotation.
 

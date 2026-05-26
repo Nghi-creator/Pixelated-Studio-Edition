@@ -4,18 +4,33 @@ import { supabaseService } from "../auth/supabaseAuth.js";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
-export async function cleanupControlPlaneState(app: FastifyInstance) {
-  if (!supabaseService) {
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
+
+type CleanupOptions = {
+  metricRetentionDays?: number;
+  now?: Date;
+  supabase?: SupabaseServiceLike | null;
+};
+
+export async function cleanupControlPlaneState(
+  app: FastifyInstance,
+  options: CleanupOptions = {},
+) {
+  const service = options.supabase === undefined ? supabaseService : options.supabase;
+
+  if (!service) {
     app.log.warn("Skipping control-plane cleanup: Supabase service unavailable");
     return;
   }
 
-  const now = new Date();
+  const now = options.now || new Date();
+  const retentionDays =
+    options.metricRetentionDays || env.STREAM_METRIC_RETENTION_DAYS;
   const metricCutoff = new Date(
-    now.getTime() - env.STREAM_METRIC_RETENTION_DAYS * MS_PER_DAY,
+    now.getTime() - retentionDays * MS_PER_DAY,
   ).toISOString();
 
-  const { error: expiredSessionError } = await supabaseService
+  const { error: expiredSessionError } = await service
     .from("backend_sessions")
     .delete()
     .lt("expires_at", now.toISOString());
@@ -27,7 +42,7 @@ export async function cleanupControlPlaneState(app: FastifyInstance) {
     );
   }
 
-  const { error: deletedSessionError } = await supabaseService
+  const { error: deletedSessionError } = await service
     .from("backend_sessions")
     .delete()
     .not("deleted_at", "is", null);
@@ -39,7 +54,7 @@ export async function cleanupControlPlaneState(app: FastifyInstance) {
     );
   }
 
-  const { error: metricError } = await supabaseService
+  const { error: metricError } = await service
     .from("stream_metrics")
     .delete()
     .lt("received_at", metricCutoff);

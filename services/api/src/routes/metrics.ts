@@ -45,6 +45,13 @@ type StreamMetricRow = {
   session_id: string;
 };
 
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
+
+type MetricRouteOptions = {
+  requireUser?: typeof requireSupabaseUser;
+  supabase?: SupabaseServiceLike | null;
+};
+
 function mapMetric(row: StreamMetricRow) {
   return {
     bitrateKbps: row.bitrate_kbps,
@@ -59,10 +66,16 @@ function mapMetric(row: StreamMetricRow) {
   };
 }
 
-export async function registerMetricRoutes(app: FastifyInstance) {
+export async function registerMetricRoutes(
+  app: FastifyInstance,
+  options: MetricRouteOptions = {},
+) {
+  const requireUser = options.requireUser || requireSupabaseUser;
+  const service = options.supabase === undefined ? supabaseService : options.supabase;
+
   app.post(
     "/metrics/stream",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
@@ -74,7 +87,7 @@ export async function registerMetricRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid stream metric" });
       }
 
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -82,7 +95,7 @@ export async function registerMetricRoutes(app: FastifyInstance) {
 
       const now = Date.now();
       const { data: latestMetric, error: latestMetricError } =
-        await supabaseService
+        await service
           .from("stream_metrics")
           .select("received_at")
           .eq("user_id", user.id)
@@ -109,7 +122,7 @@ export async function registerMetricRoutes(app: FastifyInstance) {
         });
       }
 
-      const { error } = await supabaseService.from("stream_metrics").insert({
+      const { error } = await service.from("stream_metrics").insert({
         bitrate_kbps: parsedMetric.data.bitrateKbps,
         connection_state: parsedMetric.data.connectionState,
         fps: parsedMetric.data.fps,
@@ -133,20 +146,20 @@ export async function registerMetricRoutes(app: FastifyInstance) {
 
   app.get(
     "/metrics/stream/recent",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
 
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
 
-      const { data, error } = await supabaseService
+      const { data, error } = await service
         .from("stream_metrics")
         .select(
           "session_id,fps,bitrate_kbps,packets_lost,jitter_ms,ice_connection_state,connection_state,metric_timestamp,received_at",
