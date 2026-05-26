@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-05-25
+Last reviewed: 2026-05-26
 
 ## Project Shape
 
@@ -8,8 +8,9 @@ PIXELATED Studio is currently a React + Supabase web app paired with a local Ele
 
 Top-level areas:
 
-- `web_server/`: Vite, React 19, TypeScript, Tailwind frontend.
-- `app_server/`: Electron desktop app, local Express/Socket.IO bridge, Docker image, GStreamer/Python WebRTC sender.
+- `apps/web/`: Vite, React 19, TypeScript, Tailwind frontend.
+- `apps/desktop/`: Electron desktop launcher and Docker orchestration UI.
+- `engine/runtime/`: local Express/Socket.IO bridge, Docker image, RetroArch/GStreamer runtime, and Python WebRTC sender.
 - `services/api/`: localhost-first Fastify + TypeScript backend control-plane skeleton.
 - `supabase/`: database, storage, RLS, RPC, and realtime migrations.
 - `assets/`: README/banner architecture imagery.
@@ -29,12 +30,16 @@ Current status:
 - `POST /games/:gameId/play-count` increments play count through the API instead of direct browser RPC.
 - `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
 - `POST /sessions` creates a short-lived backend session for cloud games, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
+- `POST /local-pairings` records authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
+- `GET /local-pairings/current` and `DELETE /local-pairings/current` expose/clear the current user's local pairing metadata.
+- `POST /metrics/stream` accepts authenticated, sampled WebRTC telemetry snapshots.
+- `GET /metrics/stream/recent` returns recent in-memory telemetry snapshots for the authenticated user.
 - CORS allows local Vite origins and the hosted Vercel origin.
 - API CORS origin matching normalizes trailing slashes to avoid deploy config mistakes.
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
 - `services/api/.env` exists locally with blank Supabase keys for the project owner to fill.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
-- `web_server/src/lib/apiClient.ts` calls the API with the current Supabase access token.
+- `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - Cloud/library game boot, player play-count tracking, and comment reporting now depend on the API.
 
 ## Web App
@@ -44,8 +49,8 @@ Runtime stack:
 - Vite + React + TypeScript.
 - `@supabase/supabase-js` for auth, database, storage, realtime, and RPC calls.
 - `socket.io-client` connects directly to the local engine at `http://localhost:8080`.
-- The web app centralizes the engine base URL in `web_server/src/lib/engineConfig.ts`; override with `VITE_ENGINE_URL`.
-- Routes are declared in `web_server/src/App.tsx`.
+- The web app centralizes the engine base URL in `apps/web/src/lib/engineConfig.ts`; override with `VITE_ENGINE_URL`.
+- Routes are declared in `apps/web/src/App.tsx`.
 
 Main user-facing routes:
 
@@ -64,7 +69,11 @@ Current important frontend behaviors:
 
 - `useWebRTC` owns React stream/status lifecycle while helper modules resolve game boot targets, create WebRTC peer connections, and forward keyboard input.
 - For cloud/library games, `useWebRTC` asks the backend API to create a session and resolve the ROM target before emitting `start-game` to the local engine.
-- `/play/:id` is composed from `web_server/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
+- The prompt-only engine token flow has been replaced by a local engine pairing panel in the player and Local Vault UI.
+- The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
+- `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
+- `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.
+- `/play/:id` is composed from `apps/web/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, inserts metadata into `game_submissions`, then pings Formspree.
 - Session tracking inserts browser-load access logs directly from the client.
@@ -73,15 +82,15 @@ Current important frontend behaviors:
 
 Runtime stack:
 
-- Electron app in `app_server/main.js`.
-- Renderer files: `app_server/index.html` and `app_server/preload.js`.
+- Electron app in `apps/desktop/main.js`.
+- Renderer files: `apps/desktop/index.html` and `apps/desktop/preload.js`.
 - Uses local Docker CLI through `child_process.exec`.
 
 Current lifecycle:
 
 1. User clicks initialize in the Electron UI.
 2. Electron checks `docker info`.
-3. Electron builds local image `pixelated-engine` from `app_server/Dockerfile`.
+3. Electron builds local image `pixelated-engine` from `engine/runtime/Dockerfile`.
 4. Electron generates a random pairing token for this engine run.
 5. Electron displays the pairing token in the desktop UI.
 6. Electron removes any stale `pixelated-node` container.
@@ -115,7 +124,7 @@ Installed runtime pieces:
 Runtime processes:
 
 - `server.js`: Express + Socket.IO composition root.
-- `app_server/src/`: local engine modules for config, health/local vault HTTP routes, Socket.IO signaling, ROM download/storage, runtime process control, input injection, and health telemetry.
+- `engine/runtime/src/`: local engine modules for config, health/local vault HTTP routes, Socket.IO signaling, ROM download/storage, runtime process control, input injection, and health telemetry.
 - `Xvfb :99`: virtual screen.
 - PulseAudio system daemon.
 - RetroArch process per game.
@@ -139,7 +148,7 @@ Streaming/signaling:
 
 Input:
 
-- Browser keydown/keyup events are attached by `web_server/src/lib/webrtcInput.ts` and go through Socket.IO.
+- Browser keydown/keyup events are attached by `apps/web/src/lib/webrtcInput.ts` and go through Socket.IO.
 - Node maps browser keys to X11 key names.
 - Node executes `xdotool keydown/keyup` against display `:99`.
 - React emits `stop-session` during player cleanup; Node stops the active emulator/camera processes and removes the active temp cloud ROM.

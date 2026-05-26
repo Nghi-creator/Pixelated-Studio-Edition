@@ -25,9 +25,9 @@ Completed: 2026-05-24
 
 Implemented in:
 
-- `web_server/src/lib/useWebRTC.ts`
-- `app_server/server.js`
-- `app_server/camera.py`
+- `apps/web/src/lib/useWebRTC.ts`
+- `engine/runtime/server.js`
+- `engine/runtime/camera.py`
 - `.context/project-flows.md`
 - `.context/current-infrastructure.md`
 
@@ -50,12 +50,12 @@ Completed: 2026-05-24
 
 Implemented in:
 
-- `app_server/main.js`
-- `app_server/server.js`
-- `web_server/src/lib/engineConfig.ts`
-- `web_server/src/lib/useWebRTC.ts`
-- `web_server/src/pages/user/LocalVault.tsx`
-- `web_server/.env.example`
+- `apps/desktop/main.js`
+- `engine/runtime/server.js`
+- `apps/web/src/lib/engineConfig.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/pages/user/LocalVault.tsx`
+- `apps/web/.env.example`
 - `.context/project-flows.md`
 - `.context/current-infrastructure.md`
 
@@ -67,8 +67,8 @@ What changed:
 - Local ROM uploads are capped by `PIXELATED_MAX_ROM_SIZE_BYTES`, defaulting to 8 MiB.
 - Local ROM uploads must use a `.nes` filename.
 - Uploaded local ROMs are stored with a generated unique prefix to avoid silent overwrites.
-- React engine URL usage is centralized in `web_server/src/lib/engineConfig.ts`.
-- `web_server/.env.example` documents `VITE_ENGINE_URL`.
+- React engine URL usage is centralized in `apps/web/src/lib/engineConfig.ts`.
+- `apps/web/.env.example` documents `VITE_ENGINE_URL`.
 
 Remaining follow-up:
 
@@ -80,14 +80,14 @@ Completed: 2026-05-24
 
 Implemented in:
 
-- `app_server/main.js`
-- `app_server/preload.js`
-- `app_server/index.html`
-- `app_server/server.js`
-- `app_server/camera.py`
-- `web_server/src/lib/engineAuth.ts`
-- `web_server/src/lib/useWebRTC.ts`
-- `web_server/src/pages/user/LocalVault.tsx`
+- `apps/desktop/main.js`
+- `apps/desktop/preload.js`
+- `apps/desktop/index.html`
+- `engine/runtime/server.js`
+- `engine/runtime/camera.py`
+- `apps/web/src/lib/engineAuth.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/pages/user/LocalVault.tsx`
 - `.context/project-flows.md`
 - `.context/current-infrastructure.md`
 
@@ -114,8 +114,8 @@ Completed: 2026-05-24
 
 Implemented in:
 
-- `app_server/server.js`
-- `app_server/main.js`
+- `engine/runtime/server.js`
+- `apps/desktop/main.js`
 - `.context/project-flows.md`
 - `.context/current-infrastructure.md`
 
@@ -137,7 +137,7 @@ Completed: 2026-05-25
 
 Implemented in:
 
-- `app_server/server.js`
+- `engine/runtime/server.js`
 - `.context/project-flows.md`
 - `.context/current-infrastructure.md`
 
@@ -162,7 +162,7 @@ Completed: 2026-05-24
 
 Implemented in:
 
-- `app_server/main.js`
+- `apps/desktop/main.js`
 - `.context/project-flows.md`
 - `.context/current-infrastructure.md`
 
@@ -182,9 +182,9 @@ Completed: 2026-05-25
 
 Implemented in:
 
-- `app_server/main.js`
-- `app_server/server.js`
-- `web_server/src/lib/useWebRTC.ts`
+- `apps/desktop/main.js`
+- `engine/runtime/server.js`
+- `apps/web/src/lib/useWebRTC.ts`
 - `.context/project-flows.md`
 - `.context/current-infrastructure.md`
 
@@ -209,8 +209,8 @@ Completed: 2026-05-25
 
 Implemented in:
 
-- `app_server/server.js`
-- `web_server/src/lib/useWebRTC.ts`
+- `engine/runtime/server.js`
+- `apps/web/src/lib/useWebRTC.ts`
 - `.context/project-flows.md`
 - `.context/current-infrastructure.md`
 
@@ -253,10 +253,10 @@ Completed: 2026-05-25
 
 Implemented in:
 
-- `web_server/src/lib/useWebRTC.ts`
-- `web_server/src/lib/webrtcSession.ts`
-- `web_server/src/lib/webrtcPeer.ts`
-- `web_server/src/lib/webrtcInput.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/lib/webrtcSession.ts`
+- `apps/web/src/lib/webrtcPeer.ts`
+- `apps/web/src/lib/webrtcInput.ts`
 - `.context/current-infrastructure.md`
 - `.context/project-flows.md`
 - `.context/suggestions.md`
@@ -279,11 +279,11 @@ Completed: 2026-05-25
 
 Implemented in:
 
-- `web_server/src/lib/useWebRTC.ts`
-- `web_server/src/lib/webrtcTelemetry.ts`
-- `web_server/src/pages/user/Player.tsx`
-- `app_server/server.js`
-- `app_server/camera.py`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/lib/webrtcTelemetry.ts`
+- `apps/web/src/pages/user/Player.tsx`
+- `engine/runtime/server.js`
+- `engine/runtime/camera.py`
 - `.context/current-infrastructure.md`
 - `.context/project-flows.md`
 - `.context/suggestions.md`
@@ -309,30 +309,30 @@ Completed: 2026-05-25
 
 Implemented in:
 
-- `app_server/server.js`
-- `app_server/src/config.js`
-- `app_server/src/http/healthRoutes.js`
-- `app_server/src/http/localVaultRoutes.js`
-- `app_server/src/http/errorHandlers.js`
-- `app_server/src/signaling/socketAuth.js`
-- `app_server/src/signaling/sessionRooms.js`
-- `app_server/src/signaling/signalingRelay.js`
-- `app_server/src/signaling/startGameHandlers.js`
-- `app_server/src/signaling/inputHandlers.js`
-- `app_server/src/signaling/engineErrorHandlers.js`
-- `app_server/src/runtime/processManager.js`
-- `app_server/src/roms/cloudRomDownloader.js`
-- `app_server/src/roms/localRomStore.js`
-- `app_server/src/input/translateKey.js`
-- `app_server/src/input/injectKey.js`
-- `app_server/src/telemetry/healthSnapshot.js`
+- `engine/runtime/server.js`
+- `engine/runtime/src/config.js`
+- `engine/runtime/src/http/healthRoutes.js`
+- `engine/runtime/src/http/localVaultRoutes.js`
+- `engine/runtime/src/http/errorHandlers.js`
+- `engine/runtime/src/signaling/socketAuth.js`
+- `engine/runtime/src/signaling/sessionRooms.js`
+- `engine/runtime/src/signaling/signalingRelay.js`
+- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/signaling/inputHandlers.js`
+- `engine/runtime/src/signaling/engineErrorHandlers.js`
+- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/roms/cloudRomDownloader.js`
+- `engine/runtime/src/roms/localRomStore.js`
+- `engine/runtime/src/input/translateKey.js`
+- `engine/runtime/src/input/injectKey.js`
+- `engine/runtime/src/telemetry/healthSnapshot.js`
 - `.context/current-infrastructure.md`
 - `.context/refurbishment-execution-plan.md`
 - `.context/suggestions.md`
 
 What changed:
 
-- `app_server/server.js` is now a composition root for Express, Socket.IO, routes, auth, runtime, and health wiring.
+- `engine/runtime/server.js` is now a composition root for Express, Socket.IO, routes, auth, runtime, and health wiring.
 - Local Vault HTTP routes moved out of `server.js`.
 - Engine token HTTP and Socket.IO auth moved out of `server.js`.
 - Session room helpers and signaling relay handlers moved out of `server.js`.
@@ -352,23 +352,23 @@ Completed: 2026-05-25
 
 Implemented in:
 
-- `web_server/src/pages/user/Player.tsx`
-- `web_server/src/features/player/PlayerHeader.tsx`
-- `web_server/src/features/player/StreamStage.tsx`
-- `web_server/src/features/player/StreamTelemetryPanel.tsx`
-- `web_server/src/features/player/PlayerControls.tsx`
-- `web_server/src/features/player/ReactionButtons.tsx`
-- `web_server/src/features/player/useAuthUser.ts`
-- `web_server/src/features/player/useGameMetadata.ts`
-- `web_server/src/features/player/useGameReactions.ts`
-- `web_server/src/features/player/usePlayCount.ts`
-- `web_server/src/features/player/types.ts`
-- `web_server/src/features/player/comments/CommentsPanel.tsx`
-- `web_server/src/features/player/comments/CommentForm.tsx`
-- `web_server/src/features/player/comments/CommentItem.tsx`
-- `web_server/src/features/player/comments/ReportModal.tsx`
-- `web_server/src/features/player/comments/useComments.ts`
-- `web_server/src/features/player/comments/useCommentReporting.ts`
+- `apps/web/src/pages/user/Player.tsx`
+- `apps/web/src/features/player/PlayerHeader.tsx`
+- `apps/web/src/features/player/StreamStage.tsx`
+- `apps/web/src/features/player/StreamTelemetryPanel.tsx`
+- `apps/web/src/features/player/PlayerControls.tsx`
+- `apps/web/src/features/player/ReactionButtons.tsx`
+- `apps/web/src/features/player/useAuthUser.ts`
+- `apps/web/src/features/player/useGameMetadata.ts`
+- `apps/web/src/features/player/useGameReactions.ts`
+- `apps/web/src/features/player/usePlayCount.ts`
+- `apps/web/src/features/player/types.ts`
+- `apps/web/src/features/player/comments/CommentsPanel.tsx`
+- `apps/web/src/features/player/comments/CommentForm.tsx`
+- `apps/web/src/features/player/comments/CommentItem.tsx`
+- `apps/web/src/features/player/comments/ReportModal.tsx`
+- `apps/web/src/features/player/comments/useComments.ts`
+- `apps/web/src/features/player/comments/useCommentReporting.ts`
 - `.context/current-infrastructure.md`
 - `.context/refurbishment-execution-plan.md`
 - `.context/suggestions.md`
@@ -435,8 +435,8 @@ Implemented in:
 - `services/api/src/types/fastify.d.ts`
 - `services/api/src/routes/me.ts`
 - `services/api/README.md`
-- `web_server/src/lib/apiClient.ts`
-- `web_server/.env.example`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/.env.example`
 - `.context/current-infrastructure.md`
 - `.context/refurbishment-execution-plan.md`
 - `.context/suggestions.md`
@@ -464,9 +464,9 @@ Implemented in:
 - `services/api/src/routes/games.ts`
 - `services/api/src/routes/moderation.ts`
 - `services/api/src/server.ts`
-- `web_server/src/lib/apiClient.ts`
-- `web_server/src/features/player/usePlayCount.ts`
-- `web_server/src/features/player/comments/useCommentReporting.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/features/player/usePlayCount.ts`
+- `apps/web/src/features/player/comments/useCommentReporting.ts`
 - `.context/current-infrastructure.md`
 - `.context/refurbishment-execution-plan.md`
 - `.context/suggestions.md`
@@ -494,9 +494,9 @@ Implemented in:
 
 - `services/api/src/routes/sessions.ts`
 - `services/api/src/server.ts`
-- `web_server/src/lib/apiClient.ts`
-- `web_server/src/lib/webrtcSession.ts`
-- `web_server/src/lib/useWebRTC.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/lib/webrtcSession.ts`
+- `apps/web/src/lib/useWebRTC.ts`
 - `.context/current-infrastructure.md`
 - `.context/refurbishment-execution-plan.md`
 - `.context/suggestions.md`
@@ -552,6 +552,105 @@ Remaining follow-up:
 - Run signed-in browser smoke tests against the staging backend after deploy.
 - Add provider-specific build/start config once Render, Fly.io, Railway, or another host is selected.
 - Do not call the backend production-ready until the local engine validates backend session intent or the architecture explicitly keeps local pairing as the authority.
+
+### Local Pairing Backend Model
+
+Implemented: 2026-05-26
+
+Implemented in:
+
+- `services/api/src/routes/localPairings.ts`
+- `services/api/src/server.ts`
+- `apps/web/src/features/local-engine/EnginePairingPanel.tsx`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/lib/engineAuth.ts`
+- `apps/web/src/lib/engineConfig.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/pages/user/LocalVault.tsx`
+- `apps/web/src/pages/user/Player.tsx`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated backend local pairing endpoints.
+- Backend local pairing records store engine URL and pairing metadata only.
+- Desktop pairing tokens remain in browser `localStorage`; the backend does not receive them.
+- Replaced prompt-only token entry with an explicit local engine pairing panel.
+- Local Vault now shows the pairing panel before uploads/lists and disables uploads until paired.
+- Player now shows the pairing panel when no local engine token exists.
+- WebRTC retries connection when pairing state changes.
+- Engine URL can be overridden per browser through local storage, while `VITE_ENGINE_URL` remains the default.
+
+Remaining follow-up:
+
+- Redeploy the Render API so `/local-pairings` exists in staging.
+- Redeploy the Vercel frontend with `VITE_API_URL=https://pixelated-api-services.onrender.com`.
+- Browser-smoke the hosted frontend with the desktop engine running.
+- Decide later whether local pairing metadata should move from in-memory API state to a persistent table.
+
+### Stream Metrics Ingestion
+
+Implemented: 2026-05-26
+
+Implemented in:
+
+- `services/api/src/routes/metrics.ts`
+- `services/api/src/server.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated `POST /metrics/stream`.
+- Added authenticated `GET /metrics/stream/recent` for recent user-scoped in-memory snapshots.
+- Backend validates FPS, bitrate, packet loss, jitter, ICE state, peer connection state, session id, and timestamp.
+- Backend rate-limits metrics per user/session to one accepted sample every five seconds.
+- React keeps polling `getStats()` every second for the local developer telemetry UI.
+- React sends backend stream metrics at most once every five seconds.
+- React disables metric sending quietly for unsigned sessions or unavailable API auth config.
+
+Remaining follow-up:
+
+- Redeploy Render API and Vercel frontend.
+- Browser-smoke a signed-in stream and confirm the live API receives accepted metrics.
+- Replace in-memory metrics with a database table, time-series store, or log pipeline when you need persistence across deploys/replicas.
+
+### Target Tree Move
+
+Implemented: 2026-05-26
+
+Implemented in:
+
+- `apps/web/`
+- `apps/desktop/`
+- `engine/runtime/`
+- `services/api/`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Moved the React app from `web_server/` to `apps/web/`.
+- Moved the Electron desktop launcher from `app_server/` to `apps/desktop/`.
+- Moved the Docker engine runtime from `app_server/` to `engine/runtime/`.
+- Added `engine/runtime/package.json` so the Docker runtime has its own Node dependency manifest.
+- Updated the desktop launcher to build the Docker image from `engine/runtime`.
+- Added focused README files for web, desktop, and engine runtime.
+- Refreshed package metadata after the move.
+
+Remaining follow-up:
+
+- Runtime-smoke the desktop app and Docker engine after the move.
+- Move shared contracts to `packages/shared` after API/web payloads settle.
+- Remove any leftover ignored generated artifacts under the old folder names when convenient.
 
 ## Highest Priority Issues
 

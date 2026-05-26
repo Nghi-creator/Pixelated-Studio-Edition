@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { clearEngineToken, ensureEngineToken } from "./engineAuth";
-import { ENGINE_URL } from "./engineConfig";
+import { api, ApiError } from "./apiClient";
+import {
+  clearEngineToken,
+  ENGINE_PAIRING_EVENT,
+  ensureEngineToken,
+} from "./engineAuth";
+import { getEngineUrl } from "./engineConfig";
 import { attachEngineInput } from "./webrtcInput";
 import {
   createAndSendOffer,
@@ -18,7 +23,7 @@ import {
   type WebRTCTelemetry,
 } from "./webrtcTelemetry";
 
-const socket = io(ENGINE_URL, { autoConnect: false });
+const STREAM_METRIC_SEND_INTERVAL_MS = 5_000;
 
 export function useWebRTC(gameId: string) {
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -28,9 +33,21 @@ export function useWebRTC(gameId: string) {
   const [telemetry, setTelemetry] = useState<WebRTCTelemetry>(
     INITIAL_WEBRTC_TELEMETRY,
   );
+  const [pairingVersion, setPairingVersion] = useState(0);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const sessionIdRef = useRef(createWebRTCSessionId());
+  const lastMetricSentAtRef = useRef(0);
+  const metricsDisabledRef = useRef(false);
+
+  useEffect(() => {
+    const handlePairingChange = () =>
+      setPairingVersion((currentVersion) => currentVersion + 1);
+
+    window.addEventListener(ENGINE_PAIRING_EVENT, handlePairingChange);
+    return () =>
+      window.removeEventListener(ENGINE_PAIRING_EVENT, handlePairingChange);
+  }, []);
 
   useEffect(() => {
     if (!gameId) return;
@@ -39,10 +56,19 @@ export function useWebRTC(gameId: string) {
     const engineToken = ensureEngineToken();
 
     if (!engineToken) {
-      queueMicrotask(() => setStatus("error"));
+      queueMicrotask(() => {
+        setTelemetry((currentTelemetry) => ({
+          ...currentTelemetry,
+          lastEngineError:
+            "Pair the local engine before starting a game stream.",
+          lastUpdatedAt: Date.now(),
+        }));
+        setStatus("error");
+      });
       return;
     }
 
+    const socket = io(getEngineUrl(), { autoConnect: false });
     socket.auth = { token: engineToken };
     socket.connect();
 
@@ -60,10 +86,47 @@ export function useWebRTC(gameId: string) {
     });
     pcRef.current = pc;
     const stopTelemetry = startWebRTCTelemetry(pc, (nextTelemetry) => {
+      const metricSnapshot = {
+        ...INITIAL_WEBRTC_TELEMETRY,
+        ...nextTelemetry,
+      };
+
       setTelemetry((currentTelemetry) => ({
         ...currentTelemetry,
         ...nextTelemetry,
       }));
+
+      const now = Date.now();
+      const metricTimestamp = nextTelemetry.lastUpdatedAt;
+
+      if (
+        metricsDisabledRef.current ||
+        !metricTimestamp ||
+        now - lastMetricSentAtRef.current < STREAM_METRIC_SEND_INTERVAL_MS
+      ) {
+        return;
+      }
+
+      lastMetricSentAtRef.current = now;
+      api
+        .streamMetric({
+          bitrateKbps: metricSnapshot.bitrateKbps,
+          connectionState: metricSnapshot.connectionState,
+          fps: metricSnapshot.fps,
+          iceConnectionState: metricSnapshot.iceConnectionState,
+          jitterMs: metricSnapshot.jitterMs,
+          packetsLost: metricSnapshot.packetsLost,
+          sessionId,
+          timestamp: new Date(metricTimestamp).toISOString(),
+        })
+        .catch((err) => {
+          if (err instanceof ApiError && [401, 503].includes(err.status)) {
+            metricsDisabledRef.current = true;
+            return;
+          }
+
+          console.warn("[WebRTC] Failed to send stream metric:", err);
+        });
     });
 
     socket.on("webrtc-answer", (answer) => {
@@ -135,7 +198,7 @@ export function useWebRTC(gameId: string) {
       setStream(null);
       setTelemetry(INITIAL_WEBRTC_TELEMETRY);
     };
-  }, [gameId]);
+  }, [gameId, pairingVersion]);
 
   return { stream, status, telemetry };
 }

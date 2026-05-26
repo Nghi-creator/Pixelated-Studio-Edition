@@ -13,6 +13,8 @@ import { useAuthUser } from "../../features/player/useAuthUser";
 import { useGameMetadata } from "../../features/player/useGameMetadata";
 import { useGameReactions } from "../../features/player/useGameReactions";
 import { usePlayCount } from "../../features/player/usePlayCount";
+import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
+import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engineAuth";
 import { useWebRTC } from "../../lib/useWebRTC";
 
 const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
@@ -23,6 +25,7 @@ export default function Player() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const { stream, status, telemetry } = useWebRTC(id || "");
+  const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
   const currentUser = useAuthUser();
   const { authorName, gameTitle } = useGameMetadata(id);
   const [showStreamTelemetry, setShowStreamTelemetry] = useState(() => {
@@ -55,6 +58,14 @@ export default function Player() {
   } = useCommentReporting(currentUser);
 
   usePlayCount(id);
+
+  useEffect(() => {
+    const refreshEnginePairing = () => setIsEnginePaired(hasEngineToken());
+    window.addEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
+
+    return () =>
+      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(
@@ -110,6 +121,15 @@ export default function Player() {
         showStreamTelemetry={showStreamTelemetry}
         status={status}
       />
+
+      {!isEnginePaired && (
+        <div className="mb-5 w-full max-w-5xl">
+          <EnginePairingPanel
+            compact
+            onPaired={() => setIsEnginePaired(true)}
+          />
+        </div>
+      )}
 
       <StreamStage
         showStreamTelemetry={showStreamTelemetry}

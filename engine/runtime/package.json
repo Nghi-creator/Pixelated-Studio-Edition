@@ -1,0 +1,16 @@
+{
+  "name": "@pixelated/engine-runtime",
+  "version": "1.0.0",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "check": "node --check server.js && find src -name '*.js' -exec node --check {} \\;",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "multer": "^2.1.1",
+    "socket.io": "^4.8.3"
+  }
+}
