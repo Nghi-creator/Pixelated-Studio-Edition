@@ -19,11 +19,11 @@ Goal: make sure the current tree is understandable before bigger movement.
 1. Review pending git changes and decide whether to commit or checkpoint them.
 2. Keep `.context/current-infrastructure.md`, `.context/project-flows.md`, `.context/suggestions.md`, and `.context/target-architecture-refurbishment.md` as the current reference set.
 3. Confirm web checks still pass:
-   - `cd web_server && npm run lint`
-   - `cd web_server && npm run build`
+   - `cd apps/web && npm run lint`
+   - `cd apps/web && npm run build`
 4. Confirm engine syntax checks still pass:
-   - `node --check app_server/server.js`
-   - `python3 -c "import ast, pathlib; ast.parse(pathlib.Path('app_server/camera.py').read_text())"`
+   - `node --check engine/runtime/server.js`
+   - `python3 -c "import ast, pathlib; ast.parse(pathlib.Path('engine/runtime/camera.py').read_text())"`
 
 Exit criteria:
 
@@ -34,12 +34,12 @@ Exit criteria:
 
 Status: completed 2026-05-25.
 
-Goal: reduce `app_server/server.js` before adding backend complexity.
+Goal: reduce `engine/runtime/server.js` before adding backend complexity.
 
 Target temporary structure:
 
 ```text
-app_server/
+apps/desktop/
   server.js
   src/
     config.js
@@ -67,7 +67,7 @@ app_server/
 
 Steps:
 
-1. Done: extracted config constants from `server.js` into `app_server/src/config.js`.
+1. Done: extracted config constants from `server.js` into `engine/runtime/src/config.js`.
 2. Done: extracted token validation and Socket.IO auth into `signaling/socketAuth.js`.
 3. Done: extracted session room helpers into `signaling/sessionRooms.js`.
 4. Done: extracted health snapshot logic into `telemetry/healthSnapshot.js`.
@@ -80,7 +80,7 @@ Steps:
 
 Exit criteria:
 
-- Done: `app_server/server.js` is mostly wiring.
+- Done: `engine/runtime/server.js` is mostly wiring.
 - Needs manual runtime smoke test: Local Vault still works.
 - Needs manual runtime smoke test: WebRTC local session still works.
 - Done: same syntax checks from Phase 0 pass.
@@ -94,7 +94,7 @@ Goal: reduce `Player.tsx` before routing flows through the API.
 Target temporary structure:
 
 ```text
-web_server/src/features/player/
+apps/web/src/features/player/
   StreamStage.tsx
   StreamTelemetryPanel.tsx
   PlayerHeader.tsx
@@ -121,13 +121,13 @@ Steps:
 5. Done: moved likes/dislikes into `useGameReactions.ts` and `ReactionButtons.tsx`.
 6. Done: moved play-count timer into `usePlayCount.ts`.
 7. Done: moved comments/reporting into `comments/`.
-8. Done: kept `web_server/src/pages/user/Player.tsx` as a thin route component.
+8. Done: kept `apps/web/src/pages/user/Player.tsx` as a thin route component.
 
 Exit criteria:
 
 - Done: `Player.tsx` is mostly composition.
 - Done: UI behavior is intended to remain unchanged.
-- Done: `cd web_server && npm run lint && npm run build` passes.
+- Done: `cd apps/web && npm run lint && npm run build` passes.
 
 ## Phase 3: Create Localhost Backend Skeleton
 
@@ -204,8 +204,8 @@ Backend steps:
 
 Frontend steps:
 
-1. Done: add `web_server/src/lib/apiClient.ts`.
-2. Done: add `VITE_API_URL=http://127.0.0.1:4000` to `web_server/.env.example`.
+1. Done: add `apps/web/src/lib/apiClient.ts`.
+2. Done: add `VITE_API_URL=http://127.0.0.1:4000` to `apps/web/.env.example`.
 3. Done: attach the current Supabase access token as `Authorization: Bearer <token>`.
 4. Deferred: add a visible/internal test call only if needed during manual auth smoke testing. The API client is available but no user-facing web behavior depends on it yet.
 
@@ -358,20 +358,23 @@ Exit criteria:
 
 ## Phase 9: Move To Target Tree
 
+Status: implemented 2026-05-26. Shared package extraction is intentionally deferred until contracts stabilize further.
+
 Goal: rename folders only after boundaries are proven.
 
 Steps:
 
-1. Move `web_server` to `apps/web`.
-2. Move Electron orchestration from `app_server` to `apps/desktop`.
-3. Move engine runtime from `app_server` to `engine/runtime`.
-4. Move shared API/session/telemetry contracts to `packages/shared`.
-5. Update import paths, package scripts, README docs, and deployment notes.
+1. Done: move `web_server` to `apps/web`.
+2. Done: move Electron orchestration from `app_server` to `apps/desktop`.
+3. Done: move engine runtime from `app_server` to `engine/runtime`.
+4. Deferred: move shared API/session/telemetry contracts to `packages/shared`.
+5. Done: update package scripts, README docs, and deployment notes for the moved units.
 
 Exit criteria:
 
-- Root repo shape matches `.context/target-architecture-refurbishment.md`.
-- Each app/service can run from its own package.
+- Done in code: root repo shape now matches the major target folders.
+- Done in code: web, desktop, engine runtime, and API each have their own package.
+- Needs runtime smoke test: desktop app can build the engine image from `engine/runtime` and stream after the move.
 
 ## Phase 10: Hosting Prep
 
@@ -405,6 +408,6 @@ Exit criteria:
 
 Start with Phase 1, step 1:
 
-Extract `app_server/server.js` config constants into `app_server/src/config.js`, then continue splitting one responsibility at a time.
+Extract `engine/runtime/server.js` config constants into `engine/runtime/src/config.js`, then continue splitting one responsibility at a time.
 
 Reason: it lowers risk before introducing the backend, and it attacks the biggest file that will otherwise make every later backend/session change harder.

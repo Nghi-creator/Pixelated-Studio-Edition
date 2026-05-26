@@ -2,20 +2,20 @@
 
 Last reviewed: 2026-05-24
 
-This file describes the runtime flows in PIXELATED Studio, using `assets/Pixelated.png` plus the current code in `web_server/` and `app_server/` as the source of truth.
+This file describes the runtime flows in PIXELATED Studio, using `assets/Pixelated.png` plus the current code in `apps/web/` and `apps/desktop/` as the source of truth.
 
 ## Main Actors
 
-- React web app: Vite/React UI in `web_server/src`.
+- React web app: Vite/React UI in `apps/web/src`.
 - Supabase: auth, Postgres, storage, realtime, RPCs.
-- Electron desktop app: local launcher in `app_server/main.js`.
-- Docker engine container: Ubuntu 22.04 image built from `app_server/Dockerfile`.
-- Node.js orchestrator: Express + Socket.IO server in `app_server/server.js`.
+- Electron desktop app: local launcher in `apps/desktop/main.js`.
+- Docker engine container: Ubuntu 22.04 image built from `engine/runtime/Dockerfile`.
+- Node.js orchestrator: Express + Socket.IO server in `engine/runtime/server.js`.
 - RetroArch/Mesen: native emulator process inside the container.
 - Xvfb: virtual X11 display inside the container.
 - PulseAudio: virtual audio output inside the container.
-- GStreamer/Python bridge: WebRTC media sender in `app_server/camera.py`.
-- Browser `RTCPeerConnection`: WebRTC receiver created by `web_server/src/lib/useWebRTC.ts`.
+- GStreamer/Python bridge: WebRTC media sender in `engine/runtime/camera.py`.
+- Browser `RTCPeerConnection`: WebRTC receiver created by `apps/web/src/lib/useWebRTC.ts`.
 
 ## 1. Engine Boot Flow
 
@@ -25,7 +25,7 @@ Purpose: start the local Dockerized game streaming node.
 2. Electron renderer calls `window.electronAPI.startDocker()`.
 3. `preload.js` forwards the request to Electron main over IPC event `start-docker`.
 4. `main.js` runs `docker info` to check whether Docker is available.
-5. `main.js` builds the image with `docker build -t pixelated-engine .` from `app_server/`.
+5. `main.js` builds the image with `docker build -t pixelated-engine .` from `engine/runtime/`.
 6. Electron generates a random pairing token for this engine run.
 7. Electron sends the token to the desktop renderer, which displays it with a copy button.
 8. `main.js` removes any stale `pixelated-node` container.

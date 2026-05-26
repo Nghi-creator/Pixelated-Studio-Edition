@@ -53,7 +53,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
 # 5. Set up server
 WORKDIR /app
 
-RUN npm install express socket.io cors
 RUN mkdir -p /roms
 
 COPY package*.json ./
