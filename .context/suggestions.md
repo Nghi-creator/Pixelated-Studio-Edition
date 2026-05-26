@@ -590,6 +590,37 @@ Remaining follow-up:
 - Browser-smoke the hosted frontend with the desktop engine running.
 - Decide later whether local pairing metadata should move from in-memory API state to a persistent table.
 
+### Stream Metrics Ingestion
+
+Implemented: 2026-05-26
+
+Implemented in:
+
+- `services/api/src/routes/metrics.ts`
+- `services/api/src/server.ts`
+- `web_server/src/lib/apiClient.ts`
+- `web_server/src/lib/useWebRTC.ts`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated `POST /metrics/stream`.
+- Added authenticated `GET /metrics/stream/recent` for recent user-scoped in-memory snapshots.
+- Backend validates FPS, bitrate, packet loss, jitter, ICE state, peer connection state, session id, and timestamp.
+- Backend rate-limits metrics per user/session to one accepted sample every five seconds.
+- React keeps polling `getStats()` every second for the local developer telemetry UI.
+- React sends backend stream metrics at most once every five seconds.
+- React disables metric sending quietly for unsigned sessions or unavailable API auth config.
+
+Remaining follow-up:
+
+- Redeploy Render API and Vercel frontend.
+- Browser-smoke a signed-in stream and confirm the live API receives accepted metrics.
+- Replace in-memory metrics with a database table, time-series store, or log pipeline when you need persistence across deploys/replicas.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane

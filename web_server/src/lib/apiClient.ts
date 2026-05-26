@@ -107,6 +107,17 @@ export type ApiLocalPairingResponse = {
   status?: "paired";
 };
 
+export type ApiStreamMetricPayload = {
+  bitrateKbps: number | null;
+  connectionState: RTCPeerConnectionState;
+  fps: number | null;
+  iceConnectionState: RTCIceConnectionState;
+  jitterMs: number | null;
+  packetsLost: number;
+  sessionId: string;
+  timestamp: string;
+};
+
 export const api = {
   clearLocalPairing: () =>
     apiRequest<void>("/local-pairings/current", {
@@ -144,6 +155,11 @@ export const api = {
   reportComment: (commentId: string, reason: string) =>
     apiRequest<{ success: true }>(`/moderation/comments/${commentId}/report`, {
       body: JSON.stringify({ reason }),
+      method: "POST",
+    }),
+  streamMetric: (metric: ApiStreamMetricPayload) =>
+    apiRequest<{ accepted: boolean; reason?: string }>("/metrics/stream", {
+      body: JSON.stringify(metric),
       method: "POST",
     }),
 };

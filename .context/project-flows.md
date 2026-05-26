@@ -194,14 +194,17 @@ Purpose: surface stream quality and engine failures while a player session is ac
 8. `useWebRTC` stores the latest telemetry snapshot in React state.
 9. `Player.tsx` keeps FPS, bitrate, ICE state, packet loss, and jitter hidden by default.
 10. The player telemetry toggle persists in `localStorage`.
-11. When the toggle is enabled, `Player.tsx` displays the live telemetry strip below the video.
-12. `camera.py` watches the GStreamer bus for error messages.
-13. On a GStreamer error, Python emits `engine-error` with `sessionId`, message, and source.
-14. `server.js` relays that error to the matching `session:<sessionId>` room.
-15. React receives `engine-error`, stores it as `lastEngineError`, and moves the player to error state.
-16. The normal player error overlay stays simple; technical engine detail appears only when the telemetry toggle is enabled.
+11. `useWebRTC` sends a sampled telemetry snapshot to `POST /metrics/stream` at most every five seconds.
+12. Backend validates the metric and rate-limits accepted samples per authenticated user/session.
+13. Backend stores recent metrics in memory for the current API process.
+14. When the toggle is enabled, `Player.tsx` displays the live telemetry strip below the video.
+15. `camera.py` watches the GStreamer bus for error messages.
+16. On a GStreamer error, Python emits `engine-error` with `sessionId`, message, and source.
+17. `server.js` relays that error to the matching `session:<sessionId>` room.
+18. React receives `engine-error`, stores it as `lastEngineError`, and moves the player to error state.
+19. The normal player error overlay stays simple; technical engine detail appears only when the telemetry toggle is enabled.
 
-Current limitation: telemetry is local to the active React session and is not persisted. It should eventually flow to a backend metrics store for fleet scheduling, debugging, and alerts.
+Current limitation: backend telemetry is in-memory and process-local. It should move to durable storage or an observability pipeline before multi-replica hosting or fleet scheduling.
 
 ## 6. Video Buffer Flow
 

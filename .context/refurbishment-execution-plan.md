@@ -322,6 +322,8 @@ Exit criteria:
 
 ## Phase 8: Metrics Ingestion
 
+Status: implemented 2026-05-26. Needs hosted API/frontend redeploy and signed-in stream smoke test.
+
 Goal: turn browser-only telemetry into backend-visible telemetry.
 
 Backend endpoint:
@@ -342,15 +344,17 @@ Body: {
 
 Steps:
 
-1. Add `metrics` module to backend.
-2. Accept telemetry snapshots at a low rate, for example every 5 or 10 seconds.
-3. Store only useful sampled records, not every browser poll.
-4. Add basic validation and rate limiting.
+1. Done: add `metrics` module to backend.
+2. Done: accept telemetry snapshots at a low rate, currently every five seconds from React.
+3. Done: store useful sampled records in memory for the first proof.
+4. Done: add schema validation and per-user/session rate limiting.
+5. Done: disable metric sending quietly for unsigned sessions or unavailable API responses.
 
 Exit criteria:
 
-- Telemetry remains visible in the dev toggle.
-- Backend can collect enough data for debugging without flooding Supabase.
+- Done in code: telemetry remains visible in the dev toggle.
+- Done in code: backend can collect enough data for debugging without flooding Supabase.
+- Needs runtime smoke test: signed-in hosted frontend posts metrics during an active stream.
 
 ## Phase 9: Move To Target Tree
 

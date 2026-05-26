@@ -6,6 +6,7 @@ import { registerGameRoutes } from "./routes/games.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerLocalPairingRoutes } from "./routes/localPairings.js";
 import { registerMeRoutes } from "./routes/me.js";
+import { registerMetricRoutes } from "./routes/metrics.js";
 import { registerModerationRoutes } from "./routes/moderation.js";
 import { registerSessionRoutes } from "./routes/sessions.js";
 
@@ -21,6 +22,7 @@ export async function buildServer() {
   await registerGameRoutes(app);
   await registerModerationRoutes(app);
   await registerSessionRoutes(app);
+  await registerMetricRoutes(app);
 
   return app;
 }

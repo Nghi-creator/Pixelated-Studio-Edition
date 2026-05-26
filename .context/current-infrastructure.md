@@ -31,6 +31,8 @@ Current status:
 - `POST /sessions` creates a short-lived backend session for cloud games, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
 - `POST /local-pairings` records authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
 - `GET /local-pairings/current` and `DELETE /local-pairings/current` expose/clear the current user's local pairing metadata.
+- `POST /metrics/stream` accepts authenticated, sampled WebRTC telemetry snapshots.
+- `GET /metrics/stream/recent` returns recent in-memory telemetry snapshots for the authenticated user.
 - CORS allows local Vite origins and the hosted Vercel origin.
 - API CORS origin matching normalizes trailing slashes to avoid deploy config mistakes.
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
@@ -69,6 +71,7 @@ Current important frontend behaviors:
 - The prompt-only engine token flow has been replaced by a local engine pairing panel in the player and Local Vault UI.
 - The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
 - `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
+- `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.
 - `/play/:id` is composed from `web_server/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, inserts metadata into `game_submissions`, then pings Formspree.
