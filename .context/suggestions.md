@@ -303,6 +303,254 @@ Remaining follow-up:
 - Telemetry is still session-local UI state. A future backend should persist metrics for trend analysis, alerting, and node scheduling.
 - Browser stats expose received FPS/bitrate, not encoder-internal FPS. Deeper encoder metrics would require explicit GStreamer probes or structured camera-side telemetry.
 
+### Local Engine Server Module Split
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `app_server/server.js`
+- `app_server/src/config.js`
+- `app_server/src/http/healthRoutes.js`
+- `app_server/src/http/localVaultRoutes.js`
+- `app_server/src/http/errorHandlers.js`
+- `app_server/src/signaling/socketAuth.js`
+- `app_server/src/signaling/sessionRooms.js`
+- `app_server/src/signaling/signalingRelay.js`
+- `app_server/src/signaling/startGameHandlers.js`
+- `app_server/src/signaling/inputHandlers.js`
+- `app_server/src/signaling/engineErrorHandlers.js`
+- `app_server/src/runtime/processManager.js`
+- `app_server/src/roms/cloudRomDownloader.js`
+- `app_server/src/roms/localRomStore.js`
+- `app_server/src/input/translateKey.js`
+- `app_server/src/input/injectKey.js`
+- `app_server/src/telemetry/healthSnapshot.js`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `app_server/server.js` is now a composition root for Express, Socket.IO, routes, auth, runtime, and health wiring.
+- Local Vault HTTP routes moved out of `server.js`.
+- Engine token HTTP and Socket.IO auth moved out of `server.js`.
+- Session room helpers and signaling relay handlers moved out of `server.js`.
+- Start-game, input, and engine-error socket handlers moved out of `server.js`.
+- Cloud ROM validation/download and local ROM folder helpers moved out of `server.js`.
+- Runtime process state, virtual display startup, game booting, and cleanup moved into `processManager.js`.
+- Deep health snapshot generation moved into `telemetry/healthSnapshot.js`.
+
+Remaining follow-up:
+
+- Run a manual runtime smoke test with the Electron/Docker engine because static syntax checks do not prove Xvfb, RetroArch, Socket.IO, and GStreamer work together.
+- Continue Phase 2 by splitting `Player.tsx` in place.
+
+### Player Page Feature Split
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `web_server/src/pages/user/Player.tsx`
+- `web_server/src/features/player/PlayerHeader.tsx`
+- `web_server/src/features/player/StreamStage.tsx`
+- `web_server/src/features/player/StreamTelemetryPanel.tsx`
+- `web_server/src/features/player/PlayerControls.tsx`
+- `web_server/src/features/player/ReactionButtons.tsx`
+- `web_server/src/features/player/useAuthUser.ts`
+- `web_server/src/features/player/useGameMetadata.ts`
+- `web_server/src/features/player/useGameReactions.ts`
+- `web_server/src/features/player/usePlayCount.ts`
+- `web_server/src/features/player/types.ts`
+- `web_server/src/features/player/comments/CommentsPanel.tsx`
+- `web_server/src/features/player/comments/CommentForm.tsx`
+- `web_server/src/features/player/comments/CommentItem.tsx`
+- `web_server/src/features/player/comments/ReportModal.tsx`
+- `web_server/src/features/player/comments/useComments.ts`
+- `web_server/src/features/player/comments/useCommentReporting.ts`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `Player.tsx` is now a route-level composition component instead of owning stream UI, metadata queries, comments, reactions, reporting, and play-count logic directly.
+- Stream display and error overlays moved into `StreamStage.tsx`.
+- Developer telemetry display moved into `StreamTelemetryPanel.tsx`.
+- Header/status/back navigation moved into `PlayerHeader.tsx`.
+- Controls and reaction buttons moved into dedicated components.
+- Auth user, game metadata, game reactions, play count, comments, and comment reporting moved into feature hooks.
+
+Remaining follow-up:
+
+- The comments hook preserves the current inclusive Supabase range behavior. Decide later whether to rename it as intentional "fetch 11 rows to detect hasMore" or change the range to fetch exactly 10.
+- Continue Phase 3 by creating the localhost backend skeleton at `services/api`.
+
+### Localhost Backend Skeleton
+
+Completed: 2026-05-25
+
+Implemented in:
+
+- `services/api/package.json`
+- `services/api/package-lock.json`
+- `services/api/tsconfig.json`
+- `services/api/eslint.config.js`
+- `services/api/.env.example`
+- `services/api/README.md`
+- `services/api/src/server.ts`
+- `services/api/src/config/env.ts`
+- `services/api/src/plugins/cors.ts`
+- `services/api/src/plugins/logger.ts`
+- `services/api/src/routes/health.ts`
+- `services/api/src/routes/me.ts`
+- `services/api/src/modules/auth/supabaseAuth.ts`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added a localhost-first backend skeleton at `services/api`.
+- Added Fastify + TypeScript + Zod + pino + Supabase client dependencies.
+- Added `GET /health`.
+- Added placeholder `GET /me` that returns `501` until Phase 4 auth is implemented.
+- Added env parsing with default `HOST=127.0.0.1` and `PORT=4000`.
+- Added CORS for local Vite, `127.0.0.1`, and hosted Vercel origins.
+- Added lint, typecheck, build, dev, and start scripts.
+- Added backend README and `.env.example`.
+
+Remaining follow-up:
+
+- Continue Phase 4 by adding Supabase JWT verification, authenticated `GET /me`, `GET /me/permissions`, and a web API client.
+
+### Backend Auth And Web API Client
+
+Implemented: 2026-05-25
+
+Implemented in:
+
+- `services/api/src/modules/auth/supabaseAuth.ts`
+- `services/api/src/types/fastify.d.ts`
+- `services/api/src/routes/me.ts`
+- `services/api/README.md`
+- `web_server/src/lib/apiClient.ts`
+- `web_server/.env.example`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added Supabase bearer-token verification middleware for the API.
+- Added authenticated `GET /me`.
+- Added authenticated `GET /me/permissions`.
+- `GET /me/permissions` returns profile role, ban/developer flags, and abilities for admin access, report management, user management, publishing, and ban state.
+- Added a web API client that reads `VITE_API_URL` and attaches the current Supabase access token.
+- Added `VITE_API_URL=http://127.0.0.1:4000` to the web env example.
+
+Remaining follow-up:
+
+- Populate `services/api/.env` with Supabase URL/keys and run a signed-in browser smoke test.
+- Continue Phase 5 by moving low-risk mutations through the backend.
+
+### Low-Risk Mutations Through Backend
+
+Implemented: 2026-05-25
+
+Implemented in:
+
+- `services/api/src/routes/games.ts`
+- `services/api/src/routes/moderation.ts`
+- `services/api/src/server.ts`
+- `web_server/src/lib/apiClient.ts`
+- `web_server/src/features/player/usePlayCount.ts`
+- `web_server/src/features/player/comments/useCommentReporting.ts`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated `POST /games/:gameId/play-count`.
+- Added authenticated `POST /moderation/comments/:commentId/report`.
+- The backend now uses the authenticated Supabase user id for report `reporter_id`.
+- Duplicate comment reports return `409` so the UI can preserve the existing "already reported" message.
+- `usePlayCount` now calls the API instead of direct Supabase RPC.
+- `useCommentReporting` now calls the API instead of directly inserting into `reported_comments`.
+
+Remaining follow-up:
+
+- Populate `services/api/.env` and run a signed-in end-to-end smoke test for play-count and comment-report mutations.
+- Admin report actions still happen directly in the browser and should move later.
+- Continue Phase 6 by adding backend session creation for cloud games.
+
+### Backend Cloud Session Creation
+
+Implemented: 2026-05-25
+
+Implemented in:
+
+- `services/api/src/routes/sessions.ts`
+- `services/api/src/server.ts`
+- `web_server/src/lib/apiClient.ts`
+- `web_server/src/lib/webrtcSession.ts`
+- `web_server/src/lib/useWebRTC.ts`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated `POST /sessions`.
+- Added `GET /sessions/:sessionId` and `DELETE /sessions/:sessionId` for the localhost proof.
+- Backend resolves cloud game ROM targets from Supabase instead of React querying `games.rom_url` directly.
+- Backend returns `sessionId`, short-lived `sessionToken`, `engineUrl`, `expiresAt`, authenticated user id, and boot target.
+- Sessions are stored in memory for the first localhost proof.
+- React cloud game boot now calls `api.createSession()` before emitting `start-game`.
+- Local Vault `.nes` boot still uses the existing local path and does not require backend session creation.
+
+Remaining follow-up:
+
+- Populate `services/api/.env` and run a signed-in end-to-end smoke test for cloud game boot.
+- The local engine currently receives `sessionToken` but does not validate it yet.
+- Replace in-memory sessions with durable/TTL-backed storage when Redis or a sessions table is introduced.
+- Continue Phase 7 by making local engine pairing a first-class backend/web concept.
+
+### Backend Hosting Prep
+
+Implemented: 2026-05-25
+
+Implemented in:
+
+- `services/api/.env`
+- `services/api/.env.example`
+- `services/api/README.md`
+- `services/api/src/config/env.ts`
+- `services/api/src/plugins/cors.ts`
+- `services/api/src/routes/health.ts`
+- `.context/backend-hosting-checklist.md`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Created a local ignored backend `.env` file with blank Supabase values for the project owner to fill.
+- Updated `.env.example` to include both local Vite and hosted Vercel web origins.
+- Blank Supabase env values now parse as missing values instead of crashing the API on startup.
+- API CORS origin matching now normalizes trailing slashes.
+- Added `GET /ready` to report whether Supabase backend env vars are configured.
+- Added a backend hosting checklist with local, staging, Vercel, health check, and remaining production-gap notes.
+- Updated the API README to match the current backend scope.
+
+Remaining follow-up:
+
+- Run signed-in browser smoke tests against the staging backend after deploy.
+- Add provider-specific build/start config once Render, Fly.io, Railway, or another host is selected.
+- Do not call the backend production-ready until the local engine validates backend session intent or the architecture explicitly keeps local pairing as the authority.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane
@@ -464,8 +712,12 @@ Do a dedicated RLS pass before public launch:
 
 ## Recommended First Implementation Batch
 
-If you approve the direction, I would start with this batch:
+The implementation batch is paused while the architecture is reconsidered. See:
 
-1. Add separate READMEs for web app, desktop app, and engine internals.
+- `.context/target-architecture-refurbishment.md`
+- `.context/refurbishment-execution-plan.md`
 
-This batch makes the current architecture more coherent without forcing a full backend migration yet.
+Recommended next work after review:
+
+1. Add local pairing to the backend/web model.
+2. Add backend, web, desktop, and engine READMEs.
