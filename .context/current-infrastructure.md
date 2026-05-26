@@ -35,10 +35,13 @@ Current status:
 - `GET /local-pairings/current` and `DELETE /local-pairings/current` expose/clear the current user's local pairing metadata.
 - `POST /metrics/stream` persists authenticated, sampled WebRTC telemetry snapshots.
 - `GET /metrics/stream/recent` returns recent persisted telemetry snapshots for the authenticated user.
+- The API schedules control-plane retention cleanup on startup.
+- Cleanup deletes expired/stopped backend sessions and stream metrics older than `STREAM_METRIC_RETENTION_DAYS`.
 - CORS allows local Vite origins and the hosted Vercel origin.
 - API CORS origin matching normalizes trailing slashes to avoid deploy config mistakes.
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
 - `services/api/.env` exists locally and is ignored; production keys live on the backend host.
+- API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - Cloud/library game boot, player play-count tracking, and comment reporting now depend on the API.

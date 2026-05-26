@@ -391,7 +391,8 @@ Render backend prep:
 4. Done locally: created `services/api/.env`; still needs Supabase keys filled by project owner.
 5. Done: CORS allows Vercel and local dev, with trailing slash normalization.
 6. Done externally: configure env vars in the chosen host.
-7. Done: sessions, local pairing metadata, and stream metrics now use Supabase tables for shared state. Redis can wait until queueing, locks, or high-rate metrics need it.
+7. Done: sessions, local pairing metadata, and stream metrics now use Supabase tables for shared state.
+8. Done: API schedules retention cleanup for expired/stopped sessions and old stream metrics. Redis can wait until queueing, locks, or high-rate metrics need it.
 
 Future engine fleet prep:
 

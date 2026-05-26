@@ -1,5 +1,6 @@
 import Fastify from "fastify";
 import { env } from "./config/env.js";
+import { scheduleControlPlaneCleanup } from "./modules/maintenance/controlPlaneCleanup.js";
 import { createLoggerOptions } from "./plugins/logger.js";
 import { registerCors } from "./plugins/cors.js";
 import { registerGameRoutes } from "./routes/games.js";
@@ -23,6 +24,7 @@ export async function buildServer() {
   await registerModerationRoutes(app);
   await registerSessionRoutes(app);
   await registerMetricRoutes(app);
+  scheduleControlPlaneCleanup(app);
 
   return app;
 }

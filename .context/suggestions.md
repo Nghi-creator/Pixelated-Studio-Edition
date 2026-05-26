@@ -575,8 +575,35 @@ What changed:
 Remaining follow-up:
 
 - Redeploy the API now that the migration has been pushed to Supabase.
-- Add cleanup for expired `backend_sessions` and old `stream_metrics`.
 - Add automated API tests for session persistence, token verification, pairing upsert/delete, and metric rate limiting.
+
+### Backend Control-Plane Retention Cleanup
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/src/config/env.ts`
+- `services/api/src/modules/maintenance/controlPlaneCleanup.ts`
+- `services/api/src/server.ts`
+- `services/api/.env.example`
+- `.context/suggestions.md`
+- `.context/current-infrastructure.md`
+- `.context/backend-hosting-checklist.md`
+
+What changed:
+
+- Added a scheduled API cleanup job for persisted control-plane records.
+- Expired `backend_sessions` rows are deleted.
+- Soft-deleted/stopped `backend_sessions` rows are deleted.
+- `stream_metrics` rows older than the configured retention period are deleted.
+- Added `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
+- Added `STREAM_METRIC_RETENTION_DAYS`, defaulting to seven days.
+- Cleanup skips safely when the Supabase service-role client is not configured.
+
+Remaining follow-up:
+
+- Add automated API tests for session persistence, token verification, pairing upsert/delete, metric rate limiting, and cleanup behavior.
 
 ### Backend Hosting Prep
 
@@ -723,15 +750,14 @@ Smoke checklist:
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
 
-### 2. Add Backend State Retention And Tests
+### 2. Add Backend API Tests
 
-The main control-plane records are now durable, but they still need operational cleanup and automated coverage.
+The main control-plane records are now durable and have retention cleanup, but they still need automated coverage.
 
 Recommended next implementation:
 
-- Add a cleanup path for expired `backend_sessions`.
-- Add retention cleanup for old `stream_metrics`.
 - Add API tests for session create/verify/expiry/ownership, pairing upsert/delete, and metric rate limiting.
+- Add cleanup tests for expired sessions and old metrics.
 
 ### 3. Move Remaining Sensitive Mutations Through Backend
 

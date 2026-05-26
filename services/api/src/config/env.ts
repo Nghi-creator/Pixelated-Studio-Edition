@@ -12,6 +12,12 @@ const envSchema = z.object({
     .default("development"),
   HOST: z.preprocess(blankToUndefined, z.string().optional()),
   PORT: z.coerce.number().int().positive().default(4000),
+  CONTROL_PLANE_CLEANUP_INTERVAL_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(60 * 60 * 1000),
+  STREAM_METRIC_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
   SUPABASE_ANON_KEY: z.preprocess(blankToUndefined, z.string().optional()),
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(blankToUndefined, z.string().optional()),
   SUPABASE_URL: z.preprocess(blankToUndefined, z.string().url().optional()),

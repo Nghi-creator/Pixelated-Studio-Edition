@@ -73,7 +73,7 @@ Implemented now:
 
 Next phase:
 
-- Add retention cleanup and automated API tests for the persisted control-plane records.
+- Add automated API tests for the persisted control-plane records.
 
 ## Auth Routes
 
@@ -115,6 +115,8 @@ NODE_ENV=production
 HOST=0.0.0.0
 PORT=<provider port>
 WEB_ORIGIN=https://pixelated-studio-edition.vercel.app
+CONTROL_PLANE_CLEANUP_INTERVAL_MS=3600000
+STREAM_METRIC_RETENTION_DAYS=7
 SUPABASE_URL=<your Supabase URL>
 SUPABASE_ANON_KEY=<your Supabase anon key>
 SUPABASE_SERVICE_ROLE_KEY=<your Supabase service role key>

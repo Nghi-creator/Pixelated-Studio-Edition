@@ -48,6 +48,8 @@ NODE_ENV=production
 HOST=0.0.0.0
 PORT=<provider-assigned-port-or-4000>
 WEB_ORIGIN=https://pixelated-studio-edition.vercel.app
+CONTROL_PLANE_CLEANUP_INTERVAL_MS=3600000
+STREAM_METRIC_RETENTION_DAYS=7
 SUPABASE_URL=<your-supabase-url>
 SUPABASE_ANON_KEY=<your-supabase-anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
@@ -127,6 +129,6 @@ VITE_API_URL=https://pixelated-api-services.onrender.com
 
 ## Remaining Production Gaps
 
-- Expired backend sessions and old stream metrics need retention cleanup.
+- Add automated API tests for session, pairing, metric, and cleanup behavior.
 - No API rate limiting yet.
 - No hosted engine fleet assignment yet.
