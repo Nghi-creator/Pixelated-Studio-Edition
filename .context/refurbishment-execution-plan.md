@@ -131,6 +131,8 @@ Exit criteria:
 
 ## Phase 3: Create Localhost Backend Skeleton
 
+Status: completed 2026-05-25.
+
 Goal: add the backend service without changing production flows yet.
 
 Target structure:
@@ -159,79 +161,87 @@ services/
 Recommended localhost defaults:
 
 ```text
-API URL: http://localhost:4000
-Health:  GET http://localhost:4000/health
+API URL: http://127.0.0.1:4000
+Health:  GET http://127.0.0.1:4000/health
 ```
 
 Steps:
 
-1. Create `services/api` with Node.js, TypeScript, Fastify, Zod, pino, and Supabase client dependencies.
-2. Add `GET /health` returning service name, version, uptime, and environment.
-3. Add `.env.example` with:
+1. Done: created `services/api` with Node.js, TypeScript, Fastify, Zod, pino, and Supabase client dependencies.
+2. Done: added `GET /health` returning service name, uptime, and environment.
+3. Done: added `.env.example` with:
    - `PORT=4000`
+   - `HOST=127.0.0.1`
    - `SUPABASE_URL=`
    - `SUPABASE_ANON_KEY=`
    - `SUPABASE_SERVICE_ROLE_KEY=`
    - `WEB_ORIGIN=http://localhost:5173`
-4. Add CORS for local Vite and the hosted Vercel origin.
-5. Add dev scripts:
+4. Done: added CORS for local Vite and the hosted Vercel origin.
+5. Done: added dev scripts:
    - `npm run dev`
    - `npm run build`
    - `npm run lint`
    - `npm run typecheck`
-6. Add backend README with local startup instructions.
+6. Done: added backend README with local startup instructions.
 
 Exit criteria:
 
-- `cd services/api && npm run dev` starts on `localhost:4000`.
-- `GET /health` works.
-- No web app behavior depends on it yet.
+- Done: `cd services/api && npm start` starts on `127.0.0.1:4000` after `npm run build`.
+- Done: `GET /health` works.
+- Done: no web app behavior depends on it yet.
 
 ## Phase 4: Add Backend Auth And Client API Layer
+
+Status: implemented 2026-05-25. Needs a final signed-in smoke test after `services/api/.env` is populated with Supabase credentials.
 
 Goal: prove the web app can call localhost API using Supabase auth.
 
 Backend steps:
 
-1. Add Supabase JWT verification middleware.
-2. Add `GET /me` that returns the authenticated user id/email.
-3. Add `GET /me/permissions` that reads `profiles.role` and returns abilities.
+1. Done: add Supabase JWT verification middleware.
+2. Done: add `GET /me` that returns the authenticated user id/email.
+3. Done: add `GET /me/permissions` that reads `profiles` and returns profile role plus abilities.
 
 Frontend steps:
 
-1. Add `web_server/src/lib/apiClient.ts`.
-2. Add `VITE_API_URL=http://localhost:4000` to `web_server/.env.example`.
-3. Attach the current Supabase access token as `Authorization: Bearer <token>`.
-4. Add a small internal test call from an existing authenticated page or temporary dev-only utility.
+1. Done: add `web_server/src/lib/apiClient.ts`.
+2. Done: add `VITE_API_URL=http://127.0.0.1:4000` to `web_server/.env.example`.
+3. Done: attach the current Supabase access token as `Authorization: Bearer <token>`.
+4. Deferred: add a visible/internal test call only if needed during manual auth smoke testing. The API client is available but no user-facing web behavior depends on it yet.
 
 Exit criteria:
 
-- Signed-in web user can call `GET /me`.
-- Signed-out user receives 401.
-- Current Supabase direct flows still work.
+- Needs Supabase env smoke test: signed-in web user can call `GET /me`.
+- Needs Supabase env smoke test: signed-out user receives 401 when Supabase auth is configured.
+- Done: current Supabase direct flows still work because no user-facing behavior has been routed through the API yet.
 
 ## Phase 5: Move Low-Risk Mutations Through Backend
+
+Status: implemented 2026-05-25. Needs final signed-in smoke test after `services/api/.env` is populated with Supabase credentials.
 
 Goal: route server-worthy but low-blast-radius workflows through the API first.
 
 Suggested order:
 
-1. Move play-count increments:
+1. Done: move play-count increments:
    - Backend: `POST /games/:gameId/play-count`
    - Frontend: `usePlayCount` calls API instead of direct RPC.
-2. Move comment report submission:
+2. Done: move comment report submission:
    - Backend: `POST /moderation/comments/:commentId/report`
    - Frontend: reporting hook calls API.
-3. Move admin report action later, after permissions are proven:
+3. Deferred: move admin report action later, after permissions are proven:
    - Backend: `POST /admin/reports/:reportId/action`
 
 Exit criteria:
 
-- Backend verifies user identity.
-- Backend writes to Supabase with service role only where needed.
-- Frontend no longer performs those mutations directly.
+- Done in code: backend verifies user identity through Supabase bearer-token middleware.
+- Done in code: backend writes play-count/report mutations with the Supabase service client.
+- Done: frontend no longer performs play-count and comment-report mutations directly.
+- Needs Supabase env smoke test: signed-in play-count and comment-report flows work against the real database.
 
 ## Phase 6: Add Backend Session Creation For Cloud Games
+
+Status: implemented 2026-05-25. Needs final signed-in smoke test after `services/api/.env` is populated with Supabase credentials.
 
 Goal: stop the browser from resolving cloud ROM URLs directly for normal cloud play.
 
@@ -262,18 +272,18 @@ Localhost-first behavior:
 
 Steps:
 
-1. Add `sessions` module in `services/api`.
-2. Add session id/token generation.
-3. Add optional `sessions` table migration or keep in-memory for the very first localhost proof.
-4. Move `resolveGameBootTarget()` logic from React into backend.
-5. Update `useWebRTC` to request a session before `start-game`.
-6. Keep Local Vault `.nes` mode compatible with the existing local path.
+1. Done: add `sessions` module in `services/api`.
+2. Done: add session id/token generation.
+3. Done: keep sessions in memory for the first localhost proof.
+4. Done: move cloud `resolveGameBootTarget()` ROM lookup from React into backend.
+5. Done: update `useWebRTC` to request a session before cloud `start-game`.
+6. Done: keep Local Vault `.nes` mode compatible with the existing local path.
 
 Exit criteria:
 
-- Cloud game boot no longer queries `games.rom_url` directly from React.
-- React receives backend-issued `sessionId`.
-- Existing local engine still streams.
+- Done in code: cloud game boot no longer queries `games.rom_url` directly from React.
+- Done in code: React receives a backend session response and keeps using the current browser session id during the transition.
+- Needs runtime smoke test: existing local engine still streams after the session route change.
 
 ## Phase 7: Add Local Pairing To Backend Model
 
@@ -351,15 +361,19 @@ Exit criteria:
 
 ## Phase 10: Hosting Prep
 
+Status: staging-host ready as of 2026-05-26. Local env file, CORS origin normalization, readiness checks, and hosting checklist are in place. Supabase env presence was verified through `/ready`; signed-in browser smoke tests should run immediately after staging deploy.
+
 Goal: prepare deployment after localhost backend works.
 
 Render backend prep:
 
-1. Add Dockerfile or Render build/start commands for `services/api`.
-2. Add `GET /health` as the Render health check.
-3. Configure env vars in Render.
-4. Configure CORS for Vercel and local dev.
-5. Add Redis only when sessions/rate limits need shared state.
+1. Pending: add Dockerfile or Render build/start commands for `services/api`.
+2. Done: `GET /health` exists as the liveness check.
+3. Done: `GET /ready` reports whether required backend env vars are configured.
+4. Done locally: created `services/api/.env`; still needs Supabase keys filled by project owner.
+5. Done: CORS allows Vercel and local dev, with trailing slash normalization.
+6. Pending: configure env vars in the chosen host.
+7. Later: add Redis only when sessions/rate limits need shared state.
 
 Future engine fleet prep:
 

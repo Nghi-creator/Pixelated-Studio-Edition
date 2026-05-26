@@ -1,3 +1,4 @@
+import { api } from "./apiClient";
 import { supabase } from "./supabaseClient";
 
 export type WebRTCStatus = "idle" | "connecting" | "playing" | "error";
@@ -10,7 +11,10 @@ export const createWebRTCSessionId = () => {
   return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 };
 
-export const resolveGameBootTarget = async (gameId: string) => {
+export const resolveGameBootTarget = async (
+  gameId: string,
+  clientSessionId: string,
+) => {
   const {
     data: { session },
   } = await supabase.auth.getSession();
@@ -23,18 +27,17 @@ export const resolveGameBootTarget = async (gameId: string) => {
     return { romFilename: gameId, userId };
   }
 
-  const { data, error } = await supabase
-    .from("games")
-    .select("rom_url, rom_filename")
-    .eq("id", gameId)
-    .single();
-
-  if (error || !data) throw new Error("Game not found in DB");
-
-  const romFilename = data.rom_url || data.rom_filename;
+  const backendSession = await api.createSession(gameId, clientSessionId);
+  const romFilename =
+    backendSession.boot.romUrl || backendSession.boot.romFilename;
   if (!romFilename) throw new Error("Game has no ROM target");
 
   console.log(`[WebRTC] Cloud Game found. Sending boot string: ${romFilename}`);
 
-  return { romFilename, userId };
+  return {
+    romFilename,
+    sessionId: backendSession.sessionId,
+    sessionToken: backendSession.sessionToken,
+    userId: backendSession.user.id,
+  };
 };
