@@ -287,28 +287,38 @@ Exit criteria:
 
 ## Phase 7: Add Local Pairing To Backend Model
 
+Status: implemented 2026-05-26. Needs hosted API redeploy and browser smoke test against the live web app.
+
 Goal: make local engine pairing a first-class concept rather than prompt-only browser state.
 
 Possible localhost model:
 
 ```text
 POST /local-pairings
-Body: { engineToken, engineUrl }
+Body: { engineUrl }
 Returns: { pairingId, status }
 ```
 
+Secret-handling decision:
+
+- The browser stores the desktop pairing token in local `localStorage`.
+- The backend stores only pairing intent/metadata: authenticated user, engine URL, pairing id, and timestamps.
+- The API does not receive or persist the desktop pairing token.
+
 Steps:
 
-1. Add backend module `local-pairing`.
-2. Let authenticated users store a local engine endpoint and token locally or server-side.
-3. Replace prompt-only token entry with a cleaner pairing panel in the web app.
-4. Keep token storage cautious: local-only storage is safest for the desktop token unless there is a strong reason to sync it.
+1. Done: add backend module `local-pairing`.
+2. Done: let authenticated users store local engine endpoint metadata server-side.
+3. Done: keep the desktop pairing token in browser-local storage only.
+4. Done: replace prompt-only token entry with a pairing panel in the player and Local Vault UI.
+5. Done: make WebRTC retry startup when pairing state changes.
 
 Exit criteria:
 
-- Pairing UX is explicit.
-- Backend knows whether a user intends local engine mode.
-- Secret handling decision is documented.
+- Done in code: pairing UX is explicit.
+- Done in code: backend knows whether a user intends local engine mode.
+- Done: secret handling decision is documented.
+- Needs runtime smoke test: hosted frontend pairs with the local desktop engine and streams after redeploying the backend route.
 
 ## Phase 8: Metrics Ingestion
 

@@ -103,7 +103,7 @@ Upload:
 
 1. User drags or selects a `.nes` file in `/local`.
 2. React checks that the filename ends with `.nes`.
-3. React ensures it has a pairing token in `localStorage`; if not, it prompts the user to enter the token shown in the desktop app.
+3. React requires the local engine pairing panel to have saved a desktop pairing token in browser `localStorage`.
 4. React sends `POST http://localhost:8080/upload` with multipart field `romFile`, `X-User-Id`, and `X-Engine-Token`.
 5. Node rejects the request if the pairing token does not match `PIXELATED_ENGINE_TOKEN`.
 6. Multer rejects files that do not have a `.nes` filename.
@@ -129,7 +129,7 @@ Purpose: negotiate a WebRTC connection between browser and GStreamer.
 
 1. `createEnginePeerConnection()` creates an `RTCPeerConnection` with Google STUN.
 2. `createWebRTCSessionId()` creates a per-player `sessionId`.
-3. React ensures it has a pairing token in `localStorage`; if not, it prompts the user to enter the token shown in the desktop app.
+3. React reads the desktop pairing token from browser `localStorage`; if it is missing, the player shows the local engine pairing panel.
 4. React connects to Node Socket.IO with `{ auth: { token } }`.
 5. Node rejects the socket if the token does not match `PIXELATED_ENGINE_TOKEN`.
 6. React emits `join-session` with `{ sessionId, role: "browser" }`.
@@ -163,6 +163,22 @@ Purpose: negotiate a WebRTC connection between browser and GStreamer.
 34. If the user enables the telemetry toggle, `Player.tsx` renders those metrics below the video and persists that preference in `localStorage`.
 
 Current limitation: signaling is now room-scoped and token-gated, but it is still local pairing rather than backend-issued session authorization.
+
+## 5B. Local Engine Pairing Flow
+
+Purpose: make local-engine intent explicit without sending the desktop pairing token to the hosted backend.
+
+1. Electron starts the local engine and displays a per-run pairing token.
+2. React renders `EnginePairingPanel` in Local Vault and when the player needs a token.
+3. User enters the local engine URL and desktop pairing token.
+4. React stores the engine URL and pairing token in browser `localStorage`.
+5. React calls `GET <engineUrl>/health` without the token to verify the local engine is reachable.
+6. If the user is signed in, React calls `POST /local-pairings` on the backend with only `{ engineUrl }`.
+7. Backend records pairing intent metadata for the authenticated user.
+8. Backend does not receive or store the desktop pairing token.
+9. Local Vault uses the stored token for `X-Engine-Token` on upload/list/delete requests.
+10. WebRTC uses the stored token for Socket.IO auth.
+11. If the engine rejects the token, React clears it and shows the pairing panel again.
 
 ## 5A. Live Stream Telemetry And Error Flow
 

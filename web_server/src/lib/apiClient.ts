@@ -96,7 +96,22 @@ export type ApiSessionResponse = {
   };
 };
 
+export type ApiLocalPairingResponse = {
+  pairing: {
+    createdAt: string;
+    engineUrl: string;
+    pairingId: string;
+    tokenStoredBy: "browser-local-storage";
+    updatedAt: string;
+  };
+  status?: "paired";
+};
+
 export const api = {
+  clearLocalPairing: () =>
+    apiRequest<void>("/local-pairings/current", {
+      method: "DELETE",
+    }),
   countPlay: (gameId: string) =>
     apiRequest<{ success: true }>(`/games/${gameId}/play-count`, {
       method: "POST",
@@ -110,6 +125,8 @@ export const api = {
       }),
       method: "POST",
     }),
+  localPairing: () =>
+    apiRequest<ApiLocalPairingResponse>("/local-pairings/current"),
   health: () =>
     apiRequest<{
       environment: string;
@@ -118,6 +135,11 @@ export const api = {
       uptimeSeconds: number;
     }>("/health", { authenticated: false }),
   me: () => apiRequest<ApiMeResponse>("/me"),
+  pairLocalEngine: (engineUrl: string) =>
+    apiRequest<ApiLocalPairingResponse>("/local-pairings", {
+      body: JSON.stringify({ engineUrl }),
+      method: "POST",
+    }),
   permissions: () => apiRequest<ApiPermissionsResponse>("/me/permissions"),
   reportComment: (commentId: string, reason: string) =>
     apiRequest<{ success: true }>(`/moderation/comments/${commentId}/report`, {

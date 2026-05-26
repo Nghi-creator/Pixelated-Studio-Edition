@@ -553,6 +553,43 @@ Remaining follow-up:
 - Add provider-specific build/start config once Render, Fly.io, Railway, or another host is selected.
 - Do not call the backend production-ready until the local engine validates backend session intent or the architecture explicitly keeps local pairing as the authority.
 
+### Local Pairing Backend Model
+
+Implemented: 2026-05-26
+
+Implemented in:
+
+- `services/api/src/routes/localPairings.ts`
+- `services/api/src/server.ts`
+- `web_server/src/features/local-engine/EnginePairingPanel.tsx`
+- `web_server/src/lib/apiClient.ts`
+- `web_server/src/lib/engineAuth.ts`
+- `web_server/src/lib/engineConfig.ts`
+- `web_server/src/lib/useWebRTC.ts`
+- `web_server/src/pages/user/LocalVault.tsx`
+- `web_server/src/pages/user/Player.tsx`
+- `.context/current-infrastructure.md`
+- `.context/refurbishment-execution-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated backend local pairing endpoints.
+- Backend local pairing records store engine URL and pairing metadata only.
+- Desktop pairing tokens remain in browser `localStorage`; the backend does not receive them.
+- Replaced prompt-only token entry with an explicit local engine pairing panel.
+- Local Vault now shows the pairing panel before uploads/lists and disables uploads until paired.
+- Player now shows the pairing panel when no local engine token exists.
+- WebRTC retries connection when pairing state changes.
+- Engine URL can be overridden per browser through local storage, while `VITE_ENGINE_URL` remains the default.
+
+Remaining follow-up:
+
+- Redeploy the Render API so `/local-pairings` exists in staging.
+- Redeploy the Vercel frontend with `VITE_API_URL=https://pixelated-api-services.onrender.com`.
+- Browser-smoke the hosted frontend with the desktop engine running.
+- Decide later whether local pairing metadata should move from in-memory API state to a persistent table.
+
 ## Highest Priority Issues
 
 ### 1. Add a Real Backend Control Plane

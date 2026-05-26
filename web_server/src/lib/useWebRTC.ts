@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { clearEngineToken, ensureEngineToken } from "./engineAuth";
-import { ENGINE_URL } from "./engineConfig";
+import {
+  clearEngineToken,
+  ENGINE_PAIRING_EVENT,
+  ensureEngineToken,
+} from "./engineAuth";
+import { getEngineUrl } from "./engineConfig";
 import { attachEngineInput } from "./webrtcInput";
 import {
   createAndSendOffer,
@@ -18,8 +22,6 @@ import {
   type WebRTCTelemetry,
 } from "./webrtcTelemetry";
 
-const socket = io(ENGINE_URL, { autoConnect: false });
-
 export function useWebRTC(gameId: string) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [status, setStatus] = useState<WebRTCStatus>(
@@ -28,9 +30,19 @@ export function useWebRTC(gameId: string) {
   const [telemetry, setTelemetry] = useState<WebRTCTelemetry>(
     INITIAL_WEBRTC_TELEMETRY,
   );
+  const [pairingVersion, setPairingVersion] = useState(0);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const sessionIdRef = useRef(createWebRTCSessionId());
+
+  useEffect(() => {
+    const handlePairingChange = () =>
+      setPairingVersion((currentVersion) => currentVersion + 1);
+
+    window.addEventListener(ENGINE_PAIRING_EVENT, handlePairingChange);
+    return () =>
+      window.removeEventListener(ENGINE_PAIRING_EVENT, handlePairingChange);
+  }, []);
 
   useEffect(() => {
     if (!gameId) return;
@@ -39,10 +51,19 @@ export function useWebRTC(gameId: string) {
     const engineToken = ensureEngineToken();
 
     if (!engineToken) {
-      queueMicrotask(() => setStatus("error"));
+      queueMicrotask(() => {
+        setTelemetry((currentTelemetry) => ({
+          ...currentTelemetry,
+          lastEngineError:
+            "Pair the local engine before starting a game stream.",
+          lastUpdatedAt: Date.now(),
+        }));
+        setStatus("error");
+      });
       return;
     }
 
+    const socket = io(getEngineUrl(), { autoConnect: false });
     socket.auth = { token: engineToken };
     socket.connect();
 
@@ -135,7 +156,7 @@ export function useWebRTC(gameId: string) {
       setStream(null);
       setTelemetry(INITIAL_WEBRTC_TELEMETRY);
     };
-  }, [gameId]);
+  }, [gameId, pairingVersion]);
 
   return { stream, status, telemetry };
 }
