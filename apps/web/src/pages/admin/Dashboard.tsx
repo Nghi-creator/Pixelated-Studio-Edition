@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Check, LayoutDashboard, Filter } from "lucide-react";
 import ReportCard, { type Report } from "../../components/admin/ReportCard";
+import { api, ApiError, type ApiAdminReportAction } from "../../lib/apiClient";
 
 type FilterType = "all" | "users" | "admins";
 
@@ -63,26 +64,40 @@ export default function Dashboard() {
     fetchReports();
   }, []);
 
+  const resolveReport = async (
+    reportId: string,
+    action: ApiAdminReportAction,
+  ) => {
+    try {
+      const result = await api.adminReportAction(reportId, action);
+      setReports((prev) =>
+        action === "ignore"
+          ? prev.filter((report) => report.id !== result.reportId)
+          : prev.filter((report) => report.comments?.id !== result.commentId),
+      );
+    } catch (err) {
+      console.error("Failed to resolve report:", err);
+      const message =
+        err instanceof ApiError && typeof err.payload === "object"
+          ? (err.payload as { error?: string })?.error
+          : null;
+      alert(message || "Failed to resolve report. Please try again.");
+    }
+  };
+
   const handleIgnore = async (reportId: string) => {
-    await supabase.from("reported_comments").delete().eq("id", reportId);
-    setReports((prev) => prev.filter((r) => r.id !== reportId));
+    await resolveReport(reportId, "ignore");
   };
 
-  const handleDeleteComment = async (commentId: string) => {
-    await supabase.from("comments").delete().eq("id", commentId);
-    setReports((prev) => prev.filter((r) => r.comments?.id !== commentId));
+  const handleDeleteComment = async (reportId: string) => {
+    await resolveReport(reportId, "delete_comment");
   };
 
-  const handleBanUser = async (userId: string, commentId: string) => {
+  const handleBanUser = async (reportId: string) => {
     if (!window.confirm("Are you sure you want to ban this user permanently?"))
       return;
 
-    await supabase
-      .from("profiles")
-      .update({ is_banned: true })
-      .eq("id", userId);
-    await supabase.from("comments").delete().eq("id", commentId);
-    setReports((prev) => prev.filter((r) => r.comments?.id !== commentId));
+    await resolveReport(reportId, "ban_user");
   };
 
   // Apply the active filter

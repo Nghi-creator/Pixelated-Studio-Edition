@@ -1,10 +1,10 @@
 # Backend Hosting Checklist
 
-Updated: 2026-05-26
+Updated: 2026-05-27
 
 ## Current Recommendation
 
-The backend is ready for a staging deploy.
+The backend is deployed for staging and ready for signed-in browser smoke testing.
 
 Pre-hosting checks passed on 2026-05-26:
 
@@ -19,7 +19,7 @@ Pre-hosting checks passed on 2026-05-26:
 - Production-mode startup with blank `HOST` bound to `0.0.0.0`, which is required for Render port detection.
 - `GET /` and `HEAD /` returned `200` for provider root probes.
 
-Do not treat the deploy as final production until the local engine validates backend-created session intent. The API now creates `sessionToken` values, but the current local engine still relies on the local pairing token for its boundary.
+`supabase/migrations/20260527093000_backend_control_plane_state.sql` was pushed to the hosted Supabase project on 2026-05-27. The latest API changes can be deployed after normal build checks pass.
 
 ## Local `.env`
 
@@ -48,6 +48,8 @@ NODE_ENV=production
 HOST=0.0.0.0
 PORT=<provider-assigned-port-or-4000>
 WEB_ORIGIN=https://pixelated-studio-edition.vercel.app
+CONTROL_PLANE_CLEANUP_INTERVAL_MS=3600000
+STREAM_METRIC_RETENTION_DAYS=7
 SUPABASE_URL=<your-supabase-url>
 SUPABASE_ANON_KEY=<your-supabase-anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
@@ -122,13 +124,11 @@ VITE_API_URL=http://127.0.0.1:4000
 After staging backend deploy:
 
 ```txt
-VITE_API_URL=https://<your-backend-host>
+VITE_API_URL=https://pixelated-api-services.onrender.com
 ```
 
 ## Remaining Production Gaps
 
-- Local engine does not yet validate backend session tokens.
-- API sessions are in memory, so multiple backend replicas will not share session state.
+- Add automated API tests for session, pairing, metric, and cleanup behavior.
 - No API rate limiting yet.
-- No centralized stream metrics ingestion yet.
 - No hosted engine fleet assignment yet.

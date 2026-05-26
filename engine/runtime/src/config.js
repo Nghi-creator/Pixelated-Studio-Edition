@@ -38,6 +38,10 @@ const CLOUD_ROM_DOWNLOAD_TIMEOUT_MS = Number(
 );
 
 const ENGINE_TOKEN = process.env.PIXELATED_ENGINE_TOKEN || "";
+const PIXELATED_API_URL = (process.env.PIXELATED_API_URL || "").replace(
+  /\/+$/,
+  "",
+);
 
 const allowedRomHosts = (process.env.PIXELATED_ALLOWED_ROM_HOSTS || "")
   .split(",")
@@ -64,4 +68,5 @@ module.exports = {
   HEALTH_PATHS,
   MAX_CLOUD_ROM_SIZE_BYTES,
   MAX_ROM_SIZE_BYTES,
+  PIXELATED_API_URL,
 };

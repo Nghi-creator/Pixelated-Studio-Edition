@@ -118,7 +118,25 @@ export type ApiStreamMetricPayload = {
   timestamp: string;
 };
 
+export type ApiAdminReportAction = "ban_user" | "delete_comment" | "ignore";
+
+export type ApiAdminReportActionResponse = {
+  action: ApiAdminReportAction;
+  commentId: string;
+  reportId: string;
+  success: true;
+  targetUserId?: string;
+};
+
 export const api = {
+  adminReportAction: (reportId: string, action: ApiAdminReportAction) =>
+    apiRequest<ApiAdminReportActionResponse>(
+      `/admin/reports/${reportId}/action`,
+      {
+        body: JSON.stringify({ action }),
+        method: "POST",
+      },
+    ),
   clearLocalPairing: () =>
     apiRequest<void>("/local-pairings/current", {
       method: "DELETE",

@@ -37,6 +37,16 @@ function getSafeEnv() {
 const engineRuntimeDir =
   process.env.PIXELATED_ENGINE_RUNTIME_DIR ||
   path.resolve(__dirname, "../../engine/runtime");
+const backendApiUrl =
+  process.env.PIXELATED_API_URL || "https://pixelated-api-services.onrender.com";
+
+function quoteDockerEnvValue(value) {
+  return String(value)
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\$/g, "\\$")
+    .replace(/`/g, "\\`");
+}
 
 function waitForEngineHealth(attempts = 30, delayMs = 1000) {
   return new Promise((resolve, reject) => {
@@ -144,7 +154,7 @@ ipcMain.on("start-docker", (event) => {
 
         // 4. Run the container
         exec(
-          `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_ENGINE_TOKEN="${engineToken}" pixelated-engine`,
+          `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="${quoteDockerEnvValue(backendApiUrl)}" -e PIXELATED_ENGINE_TOKEN="${quoteDockerEnvValue(engineToken)}" pixelated-engine`,
           { env: safeEnv },
           (runErr) => {
             if (runErr) {

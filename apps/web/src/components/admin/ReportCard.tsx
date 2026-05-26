@@ -33,7 +33,7 @@ interface ReportCardProps {
   currentUserRole: string;
   onIgnore: (id: string) => void;
   onDelete: (id: string) => void;
-  onBan: (userId: string, commentId: string) => void;
+  onBan: (id: string) => void;
 }
 
 export default function ReportCard({
@@ -169,7 +169,7 @@ export default function ReportCard({
               <button
                 onClick={() => {
                   setIsDropdownOpen(false);
-                  onDelete(report.comments.id);
+                  onDelete(report.id);
                 }}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left"
               >
@@ -179,7 +179,7 @@ export default function ReportCard({
               <button
                 onClick={() => {
                   setIsDropdownOpen(false);
-                  onBan(report.comments.profiles.id, report.comments.id);
+                  onBan(report.id);
                 }}
                 disabled={!canBan}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-left transition-colors ${

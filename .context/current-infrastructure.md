@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-05-26
+Last reviewed: 2026-05-27
 
 ## Project Shape
 
@@ -29,18 +29,25 @@ Current status:
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - `POST /games/:gameId/play-count` increments play count through the API instead of direct browser RPC.
 - `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
-- `POST /sessions` creates a short-lived backend session for cloud games, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
-- `POST /local-pairings` records authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
+- `POST /admin/reports/:reportId/action` resolves moderation queue actions through the API for ignore, delete-comment, and ban-user actions.
+- `POST /sessions` creates a short-lived backend session for cloud games, persists a hashed session token in Supabase, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
+- `POST /sessions/:sessionId/verify` verifies a short-lived session token and returns the backend-approved boot target to the local engine.
+- `POST /local-pairings` persists authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
 - `GET /local-pairings/current` and `DELETE /local-pairings/current` expose/clear the current user's local pairing metadata.
-- `POST /metrics/stream` accepts authenticated, sampled WebRTC telemetry snapshots.
-- `GET /metrics/stream/recent` returns recent in-memory telemetry snapshots for the authenticated user.
+- `POST /metrics/stream` persists authenticated, sampled WebRTC telemetry snapshots.
+- `GET /metrics/stream/recent` returns recent persisted telemetry snapshots for the authenticated user.
+- The API schedules control-plane retention cleanup on startup.
+- Cleanup deletes expired/stopped backend sessions and stream metrics older than `STREAM_METRIC_RETENTION_DAYS`.
 - CORS allows local Vite origins and the hosted Vercel origin.
 - API CORS origin matching normalizes trailing slashes to avoid deploy config mistakes.
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
-- `services/api/.env` exists locally with blank Supabase keys for the project owner to fill.
+- `services/api/.env` exists locally and is ignored; production keys live on the backend host.
+- API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
+- `services/api` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - Cloud/library game boot, player play-count tracking, and comment reporting now depend on the API.
+- Admin report resolution actions now depend on the API instead of direct browser writes.
 
 ## Web App
 
@@ -68,7 +75,7 @@ Admin routes:
 Current important frontend behaviors:
 
 - `useWebRTC` owns React stream/status lifecycle while helper modules resolve game boot targets, create WebRTC peer connections, and forward keyboard input.
-- For cloud/library games, `useWebRTC` asks the backend API to create a session and resolve the ROM target before emitting `start-game` to the local engine.
+- For cloud/library games, `useWebRTC` asks the backend API to create a session before emitting `start-game` to the local engine.
 - The prompt-only engine token flow has been replaced by a local engine pairing panel in the player and Local Vault UI.
 - The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
 - `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
@@ -94,7 +101,7 @@ Current lifecycle:
 4. Electron generates a random pairing token for this engine run.
 5. Electron displays the pairing token in the desktop UI.
 6. Electron removes any stale `pixelated-node` container.
-7. Electron runs a detached container named `pixelated-node` with `-p 127.0.0.1:8080:8080` and `-v pixelated-roms:/roms`, publishing the engine only to host loopback, and passes `PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app"`, `PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co"`, plus `PIXELATED_ENGINE_TOKEN`.
+7. Electron runs a detached container named `pixelated-node` with `-p 127.0.0.1:8080:8080` and `-v pixelated-roms:/roms`, publishing the engine only to host loopback, and passes `PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app"`, `PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co"`, `PIXELATED_API_URL`, plus `PIXELATED_ENGINE_TOKEN`.
 8. Electron polls `http://127.0.0.1:8080/health` and only marks the engine successful after it returns `ok: true`.
 9. On stop/window close, Electron removes `pixelated-node`.
 
@@ -134,6 +141,7 @@ Data paths:
 
 - Local uploaded ROMs are stored under `/roms/<userId>/`, backed by the named Docker volume `pixelated-roms`.
 - Cloud ROM URLs are downloaded into `/tmp/cloud_game_<uuid>.nes` after HTTPS, host allowlist, size, and timeout validation. The active temp cloud ROM is deleted on session cleanup or when a new game replaces it.
+- Cloud game starts must include the backend `sessionToken`; the engine verifies it through `PIXELATED_API_URL` before using the backend-approved boot target.
 
 Streaming/signaling:
 
@@ -173,6 +181,9 @@ Core tables inferred from migrations:
 - `reported_comments`: moderation queue.
 - `access_logs`: page/session logging.
 - `game_submissions`: developer upload applications.
+- `backend_sessions`: backend-owned playable session records with hashed session tokens and approved boot targets.
+- `local_engine_pairings`: backend-owned local engine pairing intent metadata without desktop pairing secrets.
+- `stream_metrics`: sampled WebRTC telemetry for authenticated user sessions.
 
 Storage buckets inferred from migrations:
 
@@ -186,6 +197,7 @@ Security model today:
 - Most app data access happens directly from the browser with the Supabase anon client and RLS.
 - Admin pages rely on client-side role checks for routing, while database policies appear to provide the real enforcement.
 - Local engine HTTP routes and Socket.IO handshakes require the per-run pairing token generated by Electron.
+- Cloud game boot also requires a backend-created session token that the engine verifies with the API before downloading the approved ROM target.
 - The hosted React app stores the pairing token in browser `localStorage` and sends it through `X-Engine-Token` for REST calls and Socket.IO auth for streaming.
 - The Python camera bridge receives `PIXELATED_ENGINE_TOKEN` through env and uses it when connecting to Node Socket.IO.
 - The Docker port is published only to host loopback and the engine CORS origin is set to the hosted Vercel app by Electron.

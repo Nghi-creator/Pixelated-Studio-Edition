@@ -1,9 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { requireSupabaseUser } from "../modules/auth/supabaseAuth.js";
+import {
+  requireSupabaseUser,
+  supabaseService,
+} from "../modules/auth/supabaseAuth.js";
 
 const METRIC_MIN_INTERVAL_MS = 5_000;
-const MAX_RECENT_METRICS = 500;
 
 const streamMetricSchema = z.object({
   bitrateKbps: z.number().min(0).max(1_000_000).nullable(),
@@ -31,18 +33,49 @@ const streamMetricSchema = z.object({
   timestamp: z.string().datetime(),
 });
 
-type StreamMetric = z.infer<typeof streamMetricSchema> & {
-  receivedAt: string;
-  userId: string;
+type StreamMetricRow = {
+  bitrate_kbps: number | null;
+  connection_state: string;
+  fps: number | null;
+  ice_connection_state: string;
+  jitter_ms: number | null;
+  metric_timestamp: string;
+  packets_lost: number;
+  received_at: string;
+  session_id: string;
 };
 
-const recentMetrics: StreamMetric[] = [];
-const lastMetricByUserSession = new Map<string, number>();
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
-export async function registerMetricRoutes(app: FastifyInstance) {
+type MetricRouteOptions = {
+  requireUser?: typeof requireSupabaseUser;
+  supabase?: SupabaseServiceLike | null;
+};
+
+function mapMetric(row: StreamMetricRow) {
+  return {
+    bitrateKbps: row.bitrate_kbps,
+    connectionState: row.connection_state,
+    fps: row.fps,
+    iceConnectionState: row.ice_connection_state,
+    jitterMs: row.jitter_ms,
+    packetsLost: row.packets_lost,
+    receivedAt: row.received_at,
+    sessionId: row.session_id,
+    timestamp: row.metric_timestamp,
+  };
+}
+
+export async function registerMetricRoutes(
+  app: FastifyInstance,
+  options: MetricRouteOptions = {},
+) {
+  const requireUser = options.requireUser || requireSupabaseUser;
+  const service = options.supabase === undefined ? supabaseService : options.supabase;
+
   app.post(
     "/metrics/stream",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
@@ -54,10 +87,34 @@ export async function registerMetricRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid stream metric" });
       }
 
-      const key = `${user.id}:${parsedMetric.data.sessionId}`;
-      const now = Date.now();
-      const lastMetricAt = lastMetricByUserSession.get(key) || 0;
+      if (!service) {
+        return reply.status(503).send({
+          error: "Supabase service client is not configured for the API.",
+        });
+      }
 
+      const now = Date.now();
+      const { data: latestMetric, error: latestMetricError } =
+        await service
+          .from("stream_metrics")
+          .select("received_at")
+          .eq("user_id", user.id)
+          .eq("session_id", parsedMetric.data.sessionId)
+          .order("received_at", { ascending: false })
+          .limit(1)
+          .maybeSingle<{ received_at: string }>();
+
+      if (latestMetricError) {
+        request.log.error(
+          { err: latestMetricError },
+          "Failed to read latest stream metric",
+        );
+        return reply.status(500).send({ error: "Failed to save stream metric" });
+      }
+
+      const lastMetricAt = latestMetric
+        ? Date.parse(latestMetric.received_at)
+        : 0;
       if (now - lastMetricAt < METRIC_MIN_INTERVAL_MS) {
         return reply.status(202).send({
           accepted: false,
@@ -65,15 +122,22 @@ export async function registerMetricRoutes(app: FastifyInstance) {
         });
       }
 
-      lastMetricByUserSession.set(key, now);
-      recentMetrics.push({
-        ...parsedMetric.data,
-        receivedAt: new Date(now).toISOString(),
-        userId: user.id,
+      const { error } = await service.from("stream_metrics").insert({
+        bitrate_kbps: parsedMetric.data.bitrateKbps,
+        connection_state: parsedMetric.data.connectionState,
+        fps: parsedMetric.data.fps,
+        ice_connection_state: parsedMetric.data.iceConnectionState,
+        jitter_ms: parsedMetric.data.jitterMs,
+        metric_timestamp: parsedMetric.data.timestamp,
+        packets_lost: parsedMetric.data.packetsLost,
+        received_at: new Date(now).toISOString(),
+        session_id: parsedMetric.data.sessionId,
+        user_id: user.id,
       });
 
-      if (recentMetrics.length > MAX_RECENT_METRICS) {
-        recentMetrics.splice(0, recentMetrics.length - MAX_RECENT_METRICS);
+      if (error) {
+        request.log.error({ err: error }, "Failed to save stream metric");
+        return reply.status(500).send({ error: "Failed to save stream metric" });
       }
 
       return reply.status(202).send({ accepted: true });
@@ -82,17 +146,36 @@ export async function registerMetricRoutes(app: FastifyInstance) {
 
   app.get(
     "/metrics/stream/recent",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
 
+      if (!service) {
+        return reply.status(503).send({
+          error: "Supabase service client is not configured for the API.",
+        });
+      }
+
+      const { data, error } = await service
+        .from("stream_metrics")
+        .select(
+          "session_id,fps,bitrate_kbps,packets_lost,jitter_ms,ice_connection_state,connection_state,metric_timestamp,received_at",
+        )
+        .eq("user_id", user.id)
+        .order("received_at", { ascending: false })
+        .limit(50)
+        .returns<StreamMetricRow[]>();
+
+      if (error) {
+        request.log.error({ err: error }, "Failed to load stream metrics");
+        return reply.status(500).send({ error: "Failed to load stream metrics" });
+      }
+
       return {
-        metrics: recentMetrics
-          .filter((metric) => metric.userId === user.id)
-          .slice(-50),
+        metrics: (data || []).reverse().map(mapMetric),
       };
     },
   );

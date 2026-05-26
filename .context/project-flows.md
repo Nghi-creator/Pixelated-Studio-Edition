@@ -1,6 +1,6 @@
 # Project Flows
 
-Last reviewed: 2026-05-24
+Last reviewed: 2026-05-27
 
 This file describes the runtime flows in PIXELATED Studio, using `assets/Pixelated.png` plus the current code in `apps/web/` and `apps/desktop/` as the source of truth.
 
@@ -29,7 +29,7 @@ Purpose: start the local Dockerized game streaming node.
 6. Electron generates a random pairing token for this engine run.
 7. Electron sends the token to the desktop renderer, which displays it with a copy button.
 8. `main.js` removes any stale `pixelated-node` container.
-9. `main.js` starts a detached container with `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_ENGINE_TOKEN="<token>" pixelated-engine`.
+9. `main.js` starts a detached container with `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="<api-url>" -e PIXELATED_ENGINE_TOKEN="<token>" pixelated-engine`.
 10. The container starts `node server.js`.
 11. `server.js` listens on `0.0.0.0:8080`.
 12. On server start, `server.js` calls `startVirtualDisplay()`.
@@ -52,30 +52,34 @@ Purpose: boot an approved/public game selected from the web library.
 2. `Player.tsx` calls `useWebRTC(id)`.
 3. `useWebRTC` connects Socket.IO to `http://localhost:8080`.
 4. On socket `connect`, `resolveGameBootTarget()` asks Supabase auth for the current session.
-5. If `id` is not a `.nes` filename, `resolveGameBootTarget()` queries Supabase table `games` for `rom_url` and `rom_filename`.
-6. React picks `rom_url || rom_filename` through `resolveGameBootTarget()`.
-7. React emits Socket.IO event `start-game` with `{ romFilename, userId }`.
+5. If `id` is not a `.nes` filename, `resolveGameBootTarget()` calls backend `POST /sessions`.
+6. Backend verifies the Supabase bearer token, resolves `games.rom_url || games.rom_filename`, stores the session with a hashed `sessionToken`, and returns the approved boot target.
+7. React emits Socket.IO event `start-game` with `{ sessionId, sessionToken, romFilename, userId }`.
 8. `server.js` receives `start-game`.
-9. If `romFilename` starts with `http`, Node treats it as a cloud ROM URL.
-10. Node validates that the URL is parseable.
-11. Node requires the URL to use HTTPS.
-12. Node checks the hostname against `PIXELATED_ALLOWED_ROM_HOSTS` when configured.
-13. Node downloads the ROM with `https.get()` into `/tmp/cloud_game_<uuid>.nes`.
-14. Node enforces `PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES`, defaulting to 8 MiB.
-15. Node enforces `PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS`, defaulting to 15 seconds.
-16. If validation or download fails, Node removes the temp file and emits `engine-error` to React.
-17. After download finishes, Node calls `bootGame(tmpPath)`.
-18. `bootGame()` kills any previous RetroArch and camera processes and removes any previous active temp cloud ROM.
-19. `bootGame()` spawns RetroArch with:
+9. If `sessionToken` exists, Node calls backend `POST /sessions/:sessionId/verify` through `PIXELATED_API_URL`.
+10. Backend verifies the token and returns the approved boot target.
+11. Node replaces the browser-supplied ROM target with the verified backend target.
+12. If a cloud URL arrives without a valid backend session token, Node emits `engine-error` and refuses to boot it.
+13. If the verified boot target starts with `http`, Node treats it as a cloud ROM URL.
+14. Node validates that the URL is parseable.
+15. Node requires the URL to use HTTPS.
+16. Node checks the hostname against `PIXELATED_ALLOWED_ROM_HOSTS` when configured.
+17. Node downloads the ROM with `https.get()` into `/tmp/cloud_game_<uuid>.nes`.
+18. Node enforces `PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES`, defaulting to 8 MiB.
+19. Node enforces `PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS`, defaulting to 15 seconds.
+20. If validation or download fails, Node removes the temp file and emits `engine-error` to React.
+21. After download finishes, Node calls `bootGame(tmpPath)`.
+22. `bootGame()` kills any previous RetroArch and camera processes and removes any previous active temp cloud ROM.
+23. `bootGame()` spawns RetroArch with:
     - full-screen mode,
     - Mesen libretro core at `/cores/mesen_libretro.so`,
     - config `/app/retroarch.cfg`,
     - downloaded ROM path,
     - `DISPLAY=:99`,
     - `PULSE_SERVER=127.0.0.1`.
-20. After a 1 second delay, Node starts `python3 -u camera.py`.
+24. After a 1 second delay, Node starts `python3 -u camera.py`.
 
-Current limitation: the local engine now validates HTTPS, hostname, size, and timeout, but it still receives a URL from the browser. A future backend should resolve game ids to approved signed ROM manifests.
+Current limitation: backend sessions are now persisted, but there is not yet an automated cleanup job for expired rows.
 
 ## 3. Local Vault Game Boot Flow
 
@@ -162,7 +166,7 @@ Purpose: negotiate a WebRTC connection between browser and GStreamer.
 33. `Player.tsx` hides received FPS, bitrate, ICE state, packet loss, and jitter by default.
 34. If the user enables the telemetry toggle, `Player.tsx` renders those metrics below the video and persists that preference in `localStorage`.
 
-Current limitation: signaling is now room-scoped and token-gated, but it is still local pairing rather than backend-issued session authorization.
+Current limitation: signaling is room-scoped and token-gated. Cloud boot authorization now comes from the backend session token, while Local Vault still uses local pairing as its authority.
 
 ## 5B. Local Engine Pairing Flow
 
@@ -174,7 +178,7 @@ Purpose: make local-engine intent explicit without sending the desktop pairing t
 4. React stores the engine URL and pairing token in browser `localStorage`.
 5. React calls `GET <engineUrl>/health` without the token to verify the local engine is reachable.
 6. If the user is signed in, React calls `POST /local-pairings` on the backend with only `{ engineUrl }`.
-7. Backend records pairing intent metadata for the authenticated user.
+7. Backend persists pairing intent metadata for the authenticated user in `local_engine_pairings`.
 8. Backend does not receive or store the desktop pairing token.
 9. Local Vault uses the stored token for `X-Engine-Token` on upload/list/delete requests.
 10. WebRTC uses the stored token for Socket.IO auth.
@@ -195,8 +199,8 @@ Purpose: surface stream quality and engine failures while a player session is ac
 9. `Player.tsx` keeps FPS, bitrate, ICE state, packet loss, and jitter hidden by default.
 10. The player telemetry toggle persists in `localStorage`.
 11. `useWebRTC` sends a sampled telemetry snapshot to `POST /metrics/stream` at most every five seconds.
-12. Backend validates the metric and rate-limits accepted samples per authenticated user/session.
-13. Backend stores recent metrics in memory for the current API process.
+12. Backend validates the metric and rate-limits accepted samples per authenticated user/session using the latest persisted sample.
+13. Backend stores accepted samples in `stream_metrics`.
 14. When the toggle is enabled, `Player.tsx` displays the live telemetry strip below the video.
 15. `camera.py` watches the GStreamer bus for error messages.
 16. On a GStreamer error, Python emits `engine-error` with `sessionId`, message, and source.
@@ -204,7 +208,7 @@ Purpose: surface stream quality and engine failures while a player session is ac
 18. React receives `engine-error`, stores it as `lastEngineError`, and moves the player to error state.
 19. The normal player error overlay stays simple; technical engine detail appears only when the telemetry toggle is enabled.
 
-Current limitation: backend telemetry is in-memory and process-local. It should move to durable storage or an observability pipeline before multi-replica hosting or fleet scheduling.
+Current limitation: backend telemetry is persisted in Supabase, but it still needs retention cleanup and richer dashboards before fleet scheduling.
 
 ## 6. Video Buffer Flow
 
