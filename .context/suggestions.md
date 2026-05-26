@@ -200,7 +200,7 @@ What changed:
 
 Remaining follow-up:
 
-- The engine now verifies backend-created session tokens before cloud boot, but backend session state is still process-local.
+- Backend-created session tokens are now verified by the engine and persisted in Supabase.
 
 ### Session Teardown And Temp ROM Cleanup
 
@@ -299,7 +299,7 @@ What changed:
 
 Remaining follow-up:
 
-- Backend telemetry is still process-local. Persist it for trend analysis, alerting, and node scheduling.
+- Backend telemetry is now persisted. Add retention cleanup and dashboards before using it for alerting or node scheduling.
 - Browser stats expose received FPS/bitrate, not encoder-internal FPS. Deeper encoder metrics would require explicit GStreamer probes or structured camera-side telemetry.
 
 ### Local Engine Server Module Split
@@ -420,7 +420,7 @@ What changed:
 
 Remaining follow-up:
 
-- Keep this service updated as the control-plane contracts move from in-memory proofs to durable storage.
+- Keep this service updated as the control-plane contracts move toward tests, retention, and hosted engine scheduling.
 
 ### Backend Auth And Web API Client
 
@@ -502,14 +502,14 @@ What changed:
 - Added `GET /sessions/:sessionId` and `DELETE /sessions/:sessionId` for the localhost proof.
 - Backend resolves cloud game ROM targets from Supabase instead of React querying `games.rom_url` directly.
 - Backend returns `sessionId`, short-lived `sessionToken`, `engineUrl`, `expiresAt`, authenticated user id, and boot target.
-- Sessions are stored in memory for the first localhost proof.
+- Sessions are persisted in `backend_sessions` after the first localhost proof.
 - React cloud game boot now calls `api.createSession()` before emitting `start-game`.
 - Local Vault `.nes` boot still uses the existing local path and does not require backend session creation.
 
 Remaining follow-up:
 
 - Run a signed-in end-to-end smoke test for cloud game boot against the hosted Vercel + Render stack.
-- Replace in-memory sessions with durable/TTL-backed storage when Redis or a sessions table is introduced.
+- Add cleanup for expired persisted sessions.
 
 ### Backend Session Verification By Engine
 
@@ -533,7 +533,7 @@ What changed:
 
 - Added backend `POST /sessions/:sessionId/verify`.
 - Backend session records now retain the approved boot target for verification.
-- Expired in-memory sessions are pruned on read/verify.
+- Expired persisted sessions are ignored on read/verify.
 - Authenticated `GET /sessions/:sessionId` and `DELETE /sessions/:sessionId` now only expose/delete sessions owned by the authenticated user.
 - The engine now rejects cloud URL boot requests that do not include a backend session token.
 - The engine verifies `sessionToken` with the API before booting a cloud game.
@@ -543,8 +543,40 @@ What changed:
 Remaining follow-up:
 
 - Runtime-smoke a signed-in cloud game through hosted Vercel, hosted Render, and the desktop engine after redeploying these changes.
-- Move sessions out of API memory before running multiple API replicas or expecting sessions to survive backend restarts.
 - Add automated API tests for create/verify/expiry/ownership behavior.
+
+### Persistent Backend Control-Plane State
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `supabase/migrations/20260527093000_backend_control_plane_state.sql`
+- `services/api/src/routes/sessions.ts`
+- `services/api/src/routes/localPairings.ts`
+- `services/api/src/routes/metrics.ts`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added `backend_sessions` for durable cloud session records.
+- Session tokens are stored as SHA-256 hashes instead of raw tokens.
+- Session verification now reads the persisted session row and approved boot target.
+- Authenticated session lookup/delete now read/update persisted rows.
+- Added `local_engine_pairings` for durable local engine pairing intent metadata.
+- Local pairing secrets still stay browser-local; only engine URL and metadata are persisted.
+- Added `stream_metrics` for sampled WebRTC telemetry.
+- Stream metric rate limiting now checks the latest persisted sample for the user/session.
+- Recent stream metrics are read from Supabase instead of API process memory.
+- RLS is enabled on all new tables; browser-readable policies exist only for own local pairing and own stream metrics, while backend writes use the service-role client.
+
+Remaining follow-up:
+
+- Redeploy the API now that the migration has been pushed to Supabase.
+- Add cleanup for expired `backend_sessions` and old `stream_metrics`.
+- Add automated API tests for session persistence, token verification, pairing upsert/delete, and metric rate limiting.
 
 ### Backend Hosting Prep
 
@@ -614,7 +646,7 @@ What changed:
 Remaining follow-up:
 
 - Browser-smoke the hosted frontend with the desktop engine running.
-- Decide later whether local pairing metadata should move from in-memory API state to a persistent table.
+- Add cleanup/audit behavior later if pairing history becomes useful.
 
 ### Stream Metrics Ingestion
 
@@ -634,7 +666,7 @@ Implemented in:
 What changed:
 
 - Added authenticated `POST /metrics/stream`.
-- Added authenticated `GET /metrics/stream/recent` for recent user-scoped in-memory snapshots.
+- Added authenticated `GET /metrics/stream/recent` for recent user-scoped persisted snapshots.
 - Backend validates FPS, bitrate, packet loss, jitter, ICE state, peer connection state, session id, and timestamp.
 - Backend rate-limits metrics per user/session to one accepted sample every five seconds.
 - React keeps polling `getStats()` every second for the local developer telemetry UI.
@@ -644,7 +676,7 @@ What changed:
 Remaining follow-up:
 
 - Browser-smoke a signed-in stream and confirm the live API receives accepted metrics.
-- Replace in-memory metrics with a database table, time-series store, or log pipeline when you need persistence across deploys/replicas.
+- Add retention cleanup or move high-volume metrics to a time-series/log pipeline when traffic grows.
 
 ### Target Tree Move
 
@@ -679,19 +711,7 @@ Remaining follow-up:
 
 ## Highest Priority Issues
 
-### 1. Persist Backend Session And Telemetry State
-
-The hosted API currently stores sessions, local pairings, and sampled stream metrics in process memory. That is fine for a single-instance proof, but it is the biggest production risk now because Render restarts, deploys, or future multi-replica hosting will erase active session state.
-
-Recommended next implementation:
-
-- Add Supabase tables for backend sessions, local pairings, and stream metric samples.
-- Store hashed session tokens rather than raw tokens.
-- Add TTL cleanup for expired sessions and old metrics.
-- Keep the in-memory maps only as optional process-local caches, not the source of truth.
-- Add focused API tests for create/verify/expiry/ownership/rate-limit behavior.
-
-### 2. Complete Signed-In Hosted Smoke Coverage
+### 1. Complete Signed-In Hosted Smoke Coverage
 
 The live API health, readiness, protected-route, CORS, deployed bundle, and Docker engine smoke checks passed after the latest deploys. The remaining missing test is the signed-in browser path that requires a real user session.
 
@@ -702,6 +722,16 @@ Smoke checklist:
 - Local pairing metadata saves through `/local-pairings`.
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
+
+### 2. Add Backend State Retention And Tests
+
+The main control-plane records are now durable, but they still need operational cleanup and automated coverage.
+
+Recommended next implementation:
+
+- Add a cleanup path for expired `backend_sessions`.
+- Add retention cleanup for old `stream_metrics`.
+- Add API tests for session create/verify/expiry/ownership, pairing upsert/delete, and metric rate limiting.
 
 ### 3. Move Remaining Sensitive Mutations Through Backend
 
@@ -844,6 +874,7 @@ The refurbishment batch is no longer paused; the current tree and plan are track
 
 Recommended next work after review:
 
-1. Persist backend sessions, local pairings, and stream metrics.
+1. Redeploy the API with the persisted control-plane state changes.
 2. Add API tests around session create/verify/expiry/ownership and metric rate limiting.
-3. Then move admin report actions through the backend.
+3. Add retention cleanup for expired sessions and old metrics.
+4. Then move admin report actions through the backend.

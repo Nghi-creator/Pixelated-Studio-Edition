@@ -274,7 +274,7 @@ Steps:
 
 1. Done: add `sessions` module in `services/api`.
 2. Done: add session id/token generation.
-3. Done: keep sessions in memory for the first localhost proof.
+3. Done initially: kept sessions in memory for the first localhost proof. Superseded 2026-05-27 by persisted `backend_sessions`.
 4. Done: move cloud `resolveGameBootTarget()` ROM lookup from React into backend.
 5. Done: update `useWebRTC` to request a session before cloud `start-game`.
 6. Done: keep Local Vault `.nes` mode compatible with the existing local path.
@@ -347,7 +347,7 @@ Steps:
 
 1. Done: add `metrics` module to backend.
 2. Done: accept telemetry snapshots at a low rate, currently every five seconds from React.
-3. Done: store useful sampled records in memory for the first proof.
+3. Done initially: stored useful sampled records in memory for the first proof. Superseded 2026-05-27 by persisted `stream_metrics`.
 4. Done: add schema validation and per-user/session rate limiting.
 5. Done: disable metric sending quietly for unsigned sessions or unavailable API responses.
 
@@ -379,7 +379,7 @@ Exit criteria:
 
 ## Phase 10: Hosting Prep
 
-Status: staging-host ready as of 2026-05-27. Local env file, CORS origin normalization, readiness checks, Render-compatible `0.0.0.0` production binding, root probe response, hosting checklist, Vercel API env, and engine cloud session verification are in place. Signed-in browser smoke tests remain.
+Status: staging-host ready as of 2026-05-27. Local env file, CORS origin normalization, readiness checks, Render-compatible `0.0.0.0` production binding, root probe response, hosting checklist, Vercel API env, engine cloud session verification, and durable backend control-plane tables are in place. The Supabase migration was pushed on 2026-05-27. Signed-in browser smoke tests remain after API redeploy.
 
 Goal: prepare deployment after localhost backend works.
 
@@ -391,7 +391,7 @@ Render backend prep:
 4. Done locally: created `services/api/.env`; still needs Supabase keys filled by project owner.
 5. Done: CORS allows Vercel and local dev, with trailing slash normalization.
 6. Done externally: configure env vars in the chosen host.
-7. Later: add Redis only when sessions/rate limits need shared state.
+7. Done: sessions, local pairing metadata, and stream metrics now use Supabase tables for shared state. Redis can wait until queueing, locks, or high-rate metrics need it.
 
 Future engine fleet prep:
 
@@ -407,6 +407,6 @@ Exit criteria:
 
 ## Immediate Next Task Recommendation
 
-Persist backend session and telemetry state.
+Redeploy the API/desktop engine changes, then run signed-in hosted smoke coverage.
 
-Reason: the API is now live and the engine verifies backend session tokens, but sessions, local pairings, and metrics are still stored in process memory. That becomes the next real production risk because deploys, restarts, or multiple API replicas erase the control-plane state.
+Reason: `backend_sessions`, `local_engine_pairings`, and `stream_metrics` now exist in Supabase. The next real proof is a signed-in cloud play path through Vercel, Render, and the local engine.

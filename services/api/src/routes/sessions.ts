@@ -17,20 +17,17 @@ const createSessionBodySchema = z.object({
   mode: z.enum(["cloud", "local"]).default("cloud"),
 });
 
-const sessions = new Map<
-  string,
-  {
-    boot: {
-      romFilename: string | null;
-      romUrl: string | null;
-    };
-    expiresAt: string;
-    gameId: string;
-    mode: "cloud" | "local";
-    sessionToken: string;
-    userId: string;
-  }
->();
+type BackendSessionRow = {
+  boot_rom_filename: string | null;
+  boot_rom_url: string | null;
+  deleted_at: string | null;
+  expires_at: string;
+  game_id: string;
+  id: string;
+  mode: "cloud" | "local";
+  session_token_hash: string;
+  user_id: string;
+};
 
 function createSessionToken() {
   return crypto.randomBytes(32).toString("base64url");
@@ -40,20 +37,43 @@ function createSessionId(clientSessionId?: string) {
   return clientSessionId || crypto.randomUUID();
 }
 
-function isExpired(expiresAt: string) {
-  return Date.parse(expiresAt) <= Date.now();
+function hashSessionToken(sessionToken: string) {
+  return crypto.createHash("sha256").update(sessionToken).digest("hex");
 }
 
-function getLiveSession(sessionId: string) {
-  const session = sessions.get(sessionId);
-  if (!session) return null;
+function sessionTokenMatches(storedHash: string, sessionToken: string) {
+  const candidateHash = hashSessionToken(sessionToken);
+  const stored = Buffer.from(storedHash, "hex");
+  const candidate = Buffer.from(candidateHash, "hex");
 
-  if (isExpired(session.expiresAt)) {
-    sessions.delete(sessionId);
-    return null;
-  }
+  return (
+    stored.length === candidate.length && crypto.timingSafeEqual(stored, candidate)
+  );
+}
 
-  return session;
+function mapBoot(row: BackendSessionRow) {
+  return {
+    romFilename: row.boot_rom_filename,
+    romUrl: row.boot_rom_url,
+  };
+}
+
+async function getLiveSession(sessionId: string) {
+  if (!supabaseService) return null;
+
+  const { data, error } = await supabaseService
+    .from("backend_sessions")
+    .select(
+      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,expires_at,deleted_at",
+    )
+    .eq("id", sessionId)
+    .is("deleted_at", null)
+    .gt("expires_at", new Date().toISOString())
+    .maybeSingle<BackendSessionRow>();
+
+  if (error || !data) return null;
+
+  return data;
 }
 
 export async function registerSessionRoutes(app: FastifyInstance) {
@@ -100,14 +120,24 @@ export async function registerSessionRoutes(app: FastifyInstance) {
         romUrl: data.rom_url || null,
       };
 
-      sessions.set(sessionId, {
-        boot,
-        expiresAt,
-        gameId: parsedBody.data.gameId,
-        mode: parsedBody.data.mode,
-        sessionToken,
-        userId: user.id,
-      });
+      const { error: sessionError } = await supabaseService
+        .from("backend_sessions")
+        .upsert({
+          boot_rom_filename: boot.romFilename,
+          boot_rom_url: boot.romUrl,
+          deleted_at: null,
+          expires_at: expiresAt,
+          game_id: parsedBody.data.gameId,
+          id: sessionId,
+          mode: parsedBody.data.mode,
+          session_token_hash: hashSessionToken(sessionToken),
+          user_id: user.id,
+        });
+
+      if (sessionError) {
+        request.log.error({ err: sessionError }, "Failed to create session");
+        return reply.status(500).send({ error: "Failed to create session" });
+      }
 
       return {
         boot,
@@ -134,19 +164,19 @@ export async function registerSessionRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid session id" });
       }
 
-      const session = getLiveSession(params.data.sessionId);
+      const session = await getLiveSession(params.data.sessionId);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
       }
-      if (session.userId !== request.user?.id) {
+      if (session.user_id !== request.user?.id) {
         return reply.status(404).send({ error: "Session not found" });
       }
 
       return {
-        expiresAt: session.expiresAt,
-        gameId: session.gameId,
+        expiresAt: session.expires_at,
+        gameId: session.game_id,
         mode: session.mode,
-        sessionId: params.data.sessionId,
+        sessionId: session.id,
       };
     },
   );
@@ -163,9 +193,19 @@ export async function registerSessionRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid session id" });
       }
 
-      const session = getLiveSession(params.data.sessionId);
-      if (session && session.userId === request.user?.id) {
-        sessions.delete(params.data.sessionId);
+      if (!supabaseService) {
+        return reply.status(503).send({
+          error: "Supabase service client is not configured for the API.",
+        });
+      }
+
+      const session = await getLiveSession(params.data.sessionId);
+      if (session && session.user_id === request.user?.id) {
+        await supabaseService
+          .from("backend_sessions")
+          .update({ deleted_at: new Date().toISOString() })
+          .eq("id", params.data.sessionId)
+          .eq("user_id", request.user.id);
       }
       return reply.status(204).send();
     },
@@ -188,19 +228,19 @@ export async function registerSessionRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: "Invalid session token" });
     }
 
-    const session = getLiveSession(params.data.sessionId);
-    if (!session || session.sessionToken !== body.data.sessionToken) {
+    const session = await getLiveSession(params.data.sessionId);
+    if (!session || !sessionTokenMatches(session.session_token_hash, body.data.sessionToken)) {
       return reply.status(401).send({ error: "Invalid or expired session" });
     }
 
     return {
-      boot: session.boot,
-      expiresAt: session.expiresAt,
-      gameId: session.gameId,
+      boot: mapBoot(session),
+      expiresAt: session.expires_at,
+      gameId: session.game_id,
       mode: session.mode,
-      sessionId: params.data.sessionId,
+      sessionId: session.id,
       user: {
-        id: session.userId,
+        id: session.user_id,
       },
     };
   });

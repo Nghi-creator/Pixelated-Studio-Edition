@@ -19,7 +19,7 @@ Pre-hosting checks passed on 2026-05-26:
 - Production-mode startup with blank `HOST` bound to `0.0.0.0`, which is required for Render port detection.
 - `GET /` and `HEAD /` returned `200` for provider root probes.
 
-Do not treat the deploy as final production until sessions, local pairings, and metrics are durable instead of API-process memory.
+`supabase/migrations/20260527093000_backend_control_plane_state.sql` was pushed to the hosted Supabase project on 2026-05-27. The latest API changes can be deployed after normal build checks pass.
 
 ## Local `.env`
 
@@ -127,7 +127,6 @@ VITE_API_URL=https://pixelated-api-services.onrender.com
 
 ## Remaining Production Gaps
 
-- API sessions are in memory, so multiple backend replicas will not share session state.
-- Local pairings and stream metrics are in memory, so deploys/restarts clear them.
+- Expired backend sessions and old stream metrics need retention cleanup.
 - No API rate limiting yet.
 - No hosted engine fleet assignment yet.

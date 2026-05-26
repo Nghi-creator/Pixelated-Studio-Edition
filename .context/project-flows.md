@@ -53,7 +53,7 @@ Purpose: boot an approved/public game selected from the web library.
 3. `useWebRTC` connects Socket.IO to `http://localhost:8080`.
 4. On socket `connect`, `resolveGameBootTarget()` asks Supabase auth for the current session.
 5. If `id` is not a `.nes` filename, `resolveGameBootTarget()` calls backend `POST /sessions`.
-6. Backend verifies the Supabase bearer token, resolves `games.rom_url || games.rom_filename`, creates a short-lived `sessionToken`, and returns the approved boot target.
+6. Backend verifies the Supabase bearer token, resolves `games.rom_url || games.rom_filename`, stores the session with a hashed `sessionToken`, and returns the approved boot target.
 7. React emits Socket.IO event `start-game` with `{ sessionId, sessionToken, romFilename, userId }`.
 8. `server.js` receives `start-game`.
 9. If `sessionToken` exists, Node calls backend `POST /sessions/:sessionId/verify` through `PIXELATED_API_URL`.
@@ -79,7 +79,7 @@ Purpose: boot an approved/public game selected from the web library.
     - `PULSE_SERVER=127.0.0.1`.
 24. After a 1 second delay, Node starts `python3 -u camera.py`.
 
-Current limitation: backend sessions are still stored in API memory, so a backend restart invalidates active cloud session tokens.
+Current limitation: backend sessions are now persisted, but there is not yet an automated cleanup job for expired rows.
 
 ## 3. Local Vault Game Boot Flow
 
@@ -178,7 +178,7 @@ Purpose: make local-engine intent explicit without sending the desktop pairing t
 4. React stores the engine URL and pairing token in browser `localStorage`.
 5. React calls `GET <engineUrl>/health` without the token to verify the local engine is reachable.
 6. If the user is signed in, React calls `POST /local-pairings` on the backend with only `{ engineUrl }`.
-7. Backend records pairing intent metadata for the authenticated user.
+7. Backend persists pairing intent metadata for the authenticated user in `local_engine_pairings`.
 8. Backend does not receive or store the desktop pairing token.
 9. Local Vault uses the stored token for `X-Engine-Token` on upload/list/delete requests.
 10. WebRTC uses the stored token for Socket.IO auth.
@@ -199,8 +199,8 @@ Purpose: surface stream quality and engine failures while a player session is ac
 9. `Player.tsx` keeps FPS, bitrate, ICE state, packet loss, and jitter hidden by default.
 10. The player telemetry toggle persists in `localStorage`.
 11. `useWebRTC` sends a sampled telemetry snapshot to `POST /metrics/stream` at most every five seconds.
-12. Backend validates the metric and rate-limits accepted samples per authenticated user/session.
-13. Backend stores recent metrics in memory for the current API process.
+12. Backend validates the metric and rate-limits accepted samples per authenticated user/session using the latest persisted sample.
+13. Backend stores accepted samples in `stream_metrics`.
 14. When the toggle is enabled, `Player.tsx` displays the live telemetry strip below the video.
 15. `camera.py` watches the GStreamer bus for error messages.
 16. On a GStreamer error, Python emits `engine-error` with `sessionId`, message, and source.
@@ -208,7 +208,7 @@ Purpose: surface stream quality and engine failures while a player session is ac
 18. React receives `engine-error`, stores it as `lastEngineError`, and moves the player to error state.
 19. The normal player error overlay stays simple; technical engine detail appears only when the telemetry toggle is enabled.
 
-Current limitation: backend telemetry is in-memory and process-local. It should move to durable storage or an observability pipeline before multi-replica hosting or fleet scheduling.
+Current limitation: backend telemetry is persisted in Supabase, but it still needs retention cleanup and richer dashboards before fleet scheduling.
 
 ## 6. Video Buffer Flow
 

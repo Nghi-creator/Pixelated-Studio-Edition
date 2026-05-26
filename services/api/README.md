@@ -50,7 +50,7 @@ GET http://localhost:4000/ready
 
 ## Current Scope
 
-The API now handles authenticated identity/permissions, low-risk player mutations, comment reports, local pairing metadata, stream metric ingestion, and cloud game session creation/verification. The local engine still runs separately on `localhost:8080`.
+The API now handles authenticated identity/permissions, low-risk player mutations, comment reports, persisted local pairing metadata, persisted stream metric ingestion, and cloud game session creation/verification. The local engine still runs separately on `localhost:8080`.
 
 Implemented now:
 
@@ -73,7 +73,7 @@ Implemented now:
 
 Next phase:
 
-- Persist sessions, local pairings, and metrics outside API process memory.
+- Add retention cleanup and automated API tests for the persisted control-plane records.
 
 ## Auth Routes
 

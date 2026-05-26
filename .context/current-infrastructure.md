@@ -29,16 +29,16 @@ Current status:
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - `POST /games/:gameId/play-count` increments play count through the API instead of direct browser RPC.
 - `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
-- `POST /sessions` creates a short-lived backend session for cloud games, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
+- `POST /sessions` creates a short-lived backend session for cloud games, persists a hashed session token in Supabase, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
 - `POST /sessions/:sessionId/verify` verifies a short-lived session token and returns the backend-approved boot target to the local engine.
-- `POST /local-pairings` records authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
+- `POST /local-pairings` persists authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
 - `GET /local-pairings/current` and `DELETE /local-pairings/current` expose/clear the current user's local pairing metadata.
-- `POST /metrics/stream` accepts authenticated, sampled WebRTC telemetry snapshots.
-- `GET /metrics/stream/recent` returns recent in-memory telemetry snapshots for the authenticated user.
+- `POST /metrics/stream` persists authenticated, sampled WebRTC telemetry snapshots.
+- `GET /metrics/stream/recent` returns recent persisted telemetry snapshots for the authenticated user.
 - CORS allows local Vite origins and the hosted Vercel origin.
 - API CORS origin matching normalizes trailing slashes to avoid deploy config mistakes.
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
-- `services/api/.env` exists locally with blank Supabase keys for the project owner to fill.
+- `services/api/.env` exists locally and is ignored; production keys live on the backend host.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - Cloud/library game boot, player play-count tracking, and comment reporting now depend on the API.
@@ -175,6 +175,9 @@ Core tables inferred from migrations:
 - `reported_comments`: moderation queue.
 - `access_logs`: page/session logging.
 - `game_submissions`: developer upload applications.
+- `backend_sessions`: backend-owned playable session records with hashed session tokens and approved boot targets.
+- `local_engine_pairings`: backend-owned local engine pairing intent metadata without desktop pairing secrets.
+- `stream_metrics`: sampled WebRTC telemetry for authenticated user sessions.
 
 Storage buckets inferred from migrations:
 
