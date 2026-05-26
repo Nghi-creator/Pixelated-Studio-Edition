@@ -20,6 +20,8 @@ Current status:
 
 - Phase 3 localhost skeleton exists in `services/api/`.
 - Default local URL is `http://127.0.0.1:4000`.
+- Production API startup defaults to `0.0.0.0` when `NODE_ENV=production` so hosts like Render can detect the open port.
+- `GET /` returns a small liveness response for provider root probes.
 - `GET /health` returns service name, environment, uptime, and `ok: true`.
 - `GET /ready` returns `503` until the required Supabase backend env vars are configured.
 - `GET /me` verifies a Supabase bearer token and returns the authenticated user id/email.

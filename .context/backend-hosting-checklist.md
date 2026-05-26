@@ -16,6 +16,8 @@ Pre-hosting checks passed on 2026-05-26:
 - Unsigned `GET /me` returned `401`.
 - Unsigned `POST /sessions` returned `401`.
 - Vercel-origin CORS was accepted for `https://pixelated-studio-edition.vercel.app/`.
+- Production-mode startup with blank `HOST` bound to `0.0.0.0`, which is required for Render port detection.
+- `GET /` and `HEAD /` returned `200` for provider root probes.
 
 Do not treat the deploy as final production until the local engine validates backend-created session intent. The API now creates `sessionToken` values, but the current local engine still relies on the local pairing token for its boundary.
 
@@ -53,7 +55,9 @@ SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
 
 Provider notes:
 
+- The API now defaults to `HOST=0.0.0.0` when `NODE_ENV=production`, which fixes Render port scanning even if `HOST` is not explicitly set.
 - Render may inject `PORT`; if it does, use the provider value.
+- If Render still reports no open ports, confirm `NODE_ENV=production` or set `HOST=0.0.0.0` explicitly in Render env vars.
 - Fly.io usually wants the app to listen on `0.0.0.0`.
 - CORS origin matching now normalizes trailing slashes, but the clean value is still `https://pixelated-studio-edition.vercel.app`.
 
@@ -63,6 +67,13 @@ Liveness:
 
 ```txt
 GET /health
+```
+
+Render's default root probe also succeeds:
+
+```txt
+GET /
+HEAD /
 ```
 
 Readiness:

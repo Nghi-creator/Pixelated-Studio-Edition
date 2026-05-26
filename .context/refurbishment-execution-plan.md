@@ -361,7 +361,7 @@ Exit criteria:
 
 ## Phase 10: Hosting Prep
 
-Status: staging-host ready as of 2026-05-26. Local env file, CORS origin normalization, readiness checks, and hosting checklist are in place. Supabase env presence was verified through `/ready`; signed-in browser smoke tests should run immediately after staging deploy.
+Status: staging-host ready as of 2026-05-26. Local env file, CORS origin normalization, readiness checks, Render-compatible `0.0.0.0` production binding, root probe response, and hosting checklist are in place. Supabase env presence was verified through `/ready`; signed-in browser smoke tests should run immediately after staging deploy.
 
 Goal: prepare deployment after localhost backend works.
 

@@ -4,6 +4,11 @@ import { env } from "../config/env.js";
 const startedAt = Date.now();
 
 export async function registerHealthRoutes(app: FastifyInstance) {
+  app.get("/", async () => ({
+    ok: true,
+    service: "pixelated-api",
+  }));
+
   app.get("/health", async () => ({
     ok: true,
     service: "pixelated-api",

@@ -10,7 +10,7 @@ const envSchema = z.object({
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
-  HOST: z.string().default("127.0.0.1"),
+  HOST: z.preprocess(blankToUndefined, z.string().optional()),
   PORT: z.coerce.number().int().positive().default(4000),
   SUPABASE_ANON_KEY: z.preprocess(blankToUndefined, z.string().optional()),
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(blankToUndefined, z.string().optional()),
@@ -44,6 +44,9 @@ const defaultAllowedOrigins = [
 
 export const env = {
   ...parsedEnv.data,
+  HOST:
+    parsedEnv.data.HOST ||
+    (parsedEnv.data.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1"),
   allowedOrigins: Array.from(
     new Set([
       ...defaultAllowedOrigins.map(normalizeOrigin),

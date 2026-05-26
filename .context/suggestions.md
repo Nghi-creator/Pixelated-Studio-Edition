@@ -540,7 +540,9 @@ What changed:
 - Created a local ignored backend `.env` file with blank Supabase values for the project owner to fill.
 - Updated `.env.example` to include both local Vite and hosted Vercel web origins.
 - Blank Supabase env values now parse as missing values instead of crashing the API on startup.
+- Production startup now defaults to `HOST=0.0.0.0`, fixing Render port detection when `HOST` is not explicitly set.
 - API CORS origin matching now normalizes trailing slashes.
+- Added `GET /` so Render/default provider root probes return `200`.
 - Added `GET /ready` to report whether Supabase backend env vars are configured.
 - Added a backend hosting checklist with local, staging, Vercel, health check, and remaining production-gap notes.
 - Updated the API README to match the current backend scope.
