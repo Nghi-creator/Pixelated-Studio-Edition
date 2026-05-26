@@ -50,7 +50,7 @@ GET http://localhost:4000/ready
 
 ## Current Scope
 
-The API now handles authenticated identity/permissions, low-risk player mutations, comment reports, and cloud game session creation. The local engine still runs separately on `localhost:8080`.
+The API now handles authenticated identity/permissions, low-risk player mutations, comment reports, local pairing metadata, stream metric ingestion, and cloud game session creation/verification. The local engine still runs separately on `localhost:8080`.
 
 Implemented now:
 
@@ -66,11 +66,14 @@ Implemented now:
 - Authenticated `POST /games/:gameId/play-count`.
 - Authenticated `POST /moderation/comments/:commentId/report`.
 - Authenticated `POST /sessions`.
+- `POST /sessions/:sessionId/verify` for local engine cloud session verification.
+- Authenticated local pairing routes.
+- Authenticated stream metric routes.
 - Supabase anon/service clients.
 
 Next phase:
 
-- Add local pairing to the backend/web model, then finish staging deploy prep.
+- Persist sessions, local pairings, and metrics outside API process memory.
 
 ## Auth Routes
 
@@ -88,7 +91,16 @@ GET /me/permissions
 POST /games/:gameId/play-count
 POST /moderation/comments/:commentId/report
 POST /sessions
+GET /sessions/:sessionId
+DELETE /sessions/:sessionId
+POST /local-pairings
+GET /local-pairings/current
+DELETE /local-pairings/current
+POST /metrics/stream
+GET /metrics/stream/recent
 ```
+
+The local engine calls `POST /sessions/:sessionId/verify` with a `sessionToken` created by `POST /sessions`. That route is token-protected rather than Supabase-bearer protected because it is used server-to-engine during cloud game boot.
 
 If Supabase env vars are missing, authenticated routes return `503`.
 

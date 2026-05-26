@@ -20,6 +20,10 @@ const createSessionBodySchema = z.object({
 const sessions = new Map<
   string,
   {
+    boot: {
+      romFilename: string | null;
+      romUrl: string | null;
+    };
     expiresAt: string;
     gameId: string;
     mode: "cloud" | "local";
@@ -34,6 +38,22 @@ function createSessionToken() {
 
 function createSessionId(clientSessionId?: string) {
   return clientSessionId || crypto.randomUUID();
+}
+
+function isExpired(expiresAt: string) {
+  return Date.parse(expiresAt) <= Date.now();
+}
+
+function getLiveSession(sessionId: string) {
+  const session = sessions.get(sessionId);
+  if (!session) return null;
+
+  if (isExpired(session.expiresAt)) {
+    sessions.delete(sessionId);
+    return null;
+  }
+
+  return session;
 }
 
 export async function registerSessionRoutes(app: FastifyInstance) {
@@ -75,8 +95,13 @@ export async function registerSessionRoutes(app: FastifyInstance) {
       const sessionId = createSessionId(parsedBody.data.clientSessionId);
       const sessionToken = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
+      const boot = {
+        romFilename: data.rom_filename || null,
+        romUrl: data.rom_url || null,
+      };
 
       sessions.set(sessionId, {
+        boot,
         expiresAt,
         gameId: parsedBody.data.gameId,
         mode: parsedBody.data.mode,
@@ -85,10 +110,7 @@ export async function registerSessionRoutes(app: FastifyInstance) {
       });
 
       return {
-        boot: {
-          romFilename: data.rom_filename || null,
-          romUrl: data.rom_url || null,
-        },
+        boot,
         engineUrl: "http://localhost:8080",
         expiresAt,
         sessionId,
@@ -112,8 +134,11 @@ export async function registerSessionRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid session id" });
       }
 
-      const session = sessions.get(params.data.sessionId);
+      const session = getLiveSession(params.data.sessionId);
       if (!session) {
+        return reply.status(404).send({ error: "Session not found" });
+      }
+      if (session.userId !== request.user?.id) {
         return reply.status(404).send({ error: "Session not found" });
       }
 
@@ -138,8 +163,45 @@ export async function registerSessionRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid session id" });
       }
 
-      sessions.delete(params.data.sessionId);
+      const session = getLiveSession(params.data.sessionId);
+      if (session && session.userId === request.user?.id) {
+        sessions.delete(params.data.sessionId);
+      }
       return reply.status(204).send();
     },
   );
+
+  app.post("/sessions/:sessionId/verify", async (request, reply) => {
+    const params = z
+      .object({ sessionId: z.string().regex(/^[a-zA-Z0-9_-]+$/) })
+      .safeParse(request.params);
+
+    if (!params.success) {
+      return reply.status(400).send({ error: "Invalid session id" });
+    }
+
+    const body = z
+      .object({ sessionToken: z.string().min(16) })
+      .safeParse(request.body);
+
+    if (!body.success) {
+      return reply.status(400).send({ error: "Invalid session token" });
+    }
+
+    const session = getLiveSession(params.data.sessionId);
+    if (!session || session.sessionToken !== body.data.sessionToken) {
+      return reply.status(401).send({ error: "Invalid or expired session" });
+    }
+
+    return {
+      boot: session.boot,
+      expiresAt: session.expiresAt,
+      gameId: session.gameId,
+      mode: session.mode,
+      sessionId: params.data.sessionId,
+      user: {
+        id: session.userId,
+      },
+    };
+  });
 }

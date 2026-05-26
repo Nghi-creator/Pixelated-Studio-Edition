@@ -1,6 +1,6 @@
 # Refurbishment Execution Plan
 
-Last reviewed: 2026-05-25
+Last reviewed: 2026-05-27
 
 Purpose: convert the target architecture into a step-by-step implementation path. The first backend target is a localhost API server for testing, not hosted deployment.
 
@@ -217,7 +217,7 @@ Exit criteria:
 
 ## Phase 5: Move Low-Risk Mutations Through Backend
 
-Status: implemented 2026-05-25. Needs final signed-in smoke test after `services/api/.env` is populated with Supabase credentials.
+Status: implemented 2026-05-25. Hosted API is live; still needs final signed-in browser smoke coverage.
 
 Goal: route server-worthy but low-blast-radius workflows through the API first.
 
@@ -268,7 +268,7 @@ Localhost-first behavior:
 - The backend resolves `gameId` to `rom_url || rom_filename`.
 - The backend creates a short-lived signed session token.
 - The browser sends the session token to the local engine.
-- The local engine can initially trust the backend-created payload, then later validate tokens against the backend.
+- The local engine validates backend-created session tokens before booting cloud ROM targets.
 
 Steps:
 
@@ -283,6 +283,7 @@ Exit criteria:
 
 - Done in code: cloud game boot no longer queries `games.rom_url` directly from React.
 - Done in code: React receives a backend session response and keeps using the current browser session id during the transition.
+- Done in code: the engine verifies backend session tokens before using a cloud ROM target.
 - Needs runtime smoke test: existing local engine still streams after the session route change.
 
 ## Phase 7: Add Local Pairing To Backend Model
@@ -378,18 +379,18 @@ Exit criteria:
 
 ## Phase 10: Hosting Prep
 
-Status: staging-host ready as of 2026-05-26. Local env file, CORS origin normalization, readiness checks, Render-compatible `0.0.0.0` production binding, root probe response, and hosting checklist are in place. Supabase env presence was verified through `/ready`; signed-in browser smoke tests should run immediately after staging deploy.
+Status: staging-host ready as of 2026-05-27. Local env file, CORS origin normalization, readiness checks, Render-compatible `0.0.0.0` production binding, root probe response, hosting checklist, Vercel API env, and engine cloud session verification are in place. Signed-in browser smoke tests remain.
 
 Goal: prepare deployment after localhost backend works.
 
 Render backend prep:
 
-1. Pending: add Dockerfile or Render build/start commands for `services/api`.
+1. Done externally: Render build/start commands are configured well enough for the live API service.
 2. Done: `GET /health` exists as the liveness check.
 3. Done: `GET /ready` reports whether required backend env vars are configured.
 4. Done locally: created `services/api/.env`; still needs Supabase keys filled by project owner.
 5. Done: CORS allows Vercel and local dev, with trailing slash normalization.
-6. Pending: configure env vars in the chosen host.
+6. Done externally: configure env vars in the chosen host.
 7. Later: add Redis only when sessions/rate limits need shared state.
 
 Future engine fleet prep:
@@ -406,8 +407,6 @@ Exit criteria:
 
 ## Immediate Next Task Recommendation
 
-Start with Phase 1, step 1:
+Persist backend session and telemetry state.
 
-Extract `engine/runtime/server.js` config constants into `engine/runtime/src/config.js`, then continue splitting one responsibility at a time.
-
-Reason: it lowers risk before introducing the backend, and it attacks the biggest file that will otherwise make every later backend/session change harder.
+Reason: the API is now live and the engine verifies backend session tokens, but sessions, local pairings, and metrics are still stored in process memory. That becomes the next real production risk because deploys, restarts, or multiple API replicas erase the control-plane state.

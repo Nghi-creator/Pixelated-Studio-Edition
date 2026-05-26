@@ -1,6 +1,6 @@
 # Suggestions
 
-Last reviewed: 2026-05-25
+Last reviewed: 2026-05-27
 
 This file tracks advisory recommendations and implementation status. Completed tasks are moved into the Done section so the active backlog stays clean.
 
@@ -8,14 +8,14 @@ This file tracks advisory recommendations and implementation status. Completed t
 
 The current idea is promising: React/Supabase is fine for the community layer, while the Electron + Docker engine proves the hard part of cloud gaming: isolated execution, capture, encode, signaling, and remote input.
 
-The biggest architectural gap is that the "cloud" runtime is still a trusted local node with a public web UI talking to `localhost:8080`. That is good for a developer sandbox, but it will not scale into a multi-user public cloud-gaming platform until there is a real backend/control plane between users, game sessions, storage, and compute nodes.
+The backend control plane now exists and is live enough for staged testing. The biggest remaining gap has shifted from "add a backend" to "make backend-issued session intent authoritative across web, API, and engine, then add persistence/tests around those contracts."
 
 Recommended direction:
 
 1. Keep Supabase for auth, profiles, library metadata, simple social features, and admin dashboards.
-2. Add a backend control plane before adding caches or heavy infra.
+2. Keep moving sensitive mutations and session decisions behind `services/api`.
 3. Treat each game stream as an isolated session with ownership, lifecycle, observability, and resource limits.
-4. Move sensitive operations away from direct browser writes when abuse, billing, moderation, or compute allocation matters.
+4. Add durable session/metric storage before multi-replica API hosting or hosted engine scheduling.
 
 ## Done
 
@@ -42,7 +42,7 @@ What changed:
 
 Remaining follow-up:
 
-- This scopes signaling, but it does not authorize session membership. Pairing-token enforcement or backend-issued session authorization is still needed.
+- Signaling is now scoped and token-gated. Hosted cloud boot also has backend session verification; Local Vault still intentionally uses local pairing as its authority.
 
 ### Local Engine Boundary Hardening
 
@@ -105,7 +105,6 @@ What changed:
 
 Remaining follow-up:
 
-- The prompt-based UX works, but it should eventually become a polished pairing panel in the web app.
 - Tokens rotate every engine start, so users may need to re-enter the token after restarting the desktop engine.
 
 ### Engine Health And Startup Readiness
@@ -201,7 +200,7 @@ What changed:
 
 Remaining follow-up:
 
-- This is still local-engine validation. A future backend should resolve game ids to approved signed ROM manifests instead of accepting URLs from the browser.
+- The engine now verifies backend-created session tokens before cloud boot, but backend session state is still process-local.
 
 ### Session Teardown And Temp ROM Cleanup
 
@@ -300,7 +299,7 @@ What changed:
 
 Remaining follow-up:
 
-- Telemetry is still session-local UI state. A future backend should persist metrics for trend analysis, alerting, and node scheduling.
+- Backend telemetry is still process-local. Persist it for trend analysis, alerting, and node scheduling.
 - Browser stats expose received FPS/bitrate, not encoder-internal FPS. Deeper encoder metrics would require explicit GStreamer probes or structured camera-side telemetry.
 
 ### Local Engine Server Module Split
@@ -344,7 +343,6 @@ What changed:
 Remaining follow-up:
 
 - Run a manual runtime smoke test with the Electron/Docker engine because static syntax checks do not prove Xvfb, RetroArch, Socket.IO, and GStreamer work together.
-- Continue Phase 2 by splitting `Player.tsx` in place.
 
 ### Player Page Feature Split
 
@@ -385,7 +383,6 @@ What changed:
 Remaining follow-up:
 
 - The comments hook preserves the current inclusive Supabase range behavior. Decide later whether to rename it as intentional "fetch 11 rows to detect hasMore" or change the range to fetch exactly 10.
-- Continue Phase 3 by creating the localhost backend skeleton at `services/api`.
 
 ### Localhost Backend Skeleton
 
@@ -423,7 +420,7 @@ What changed:
 
 Remaining follow-up:
 
-- Continue Phase 4 by adding Supabase JWT verification, authenticated `GET /me`, `GET /me/permissions`, and a web API client.
+- Keep this service updated as the control-plane contracts move from in-memory proofs to durable storage.
 
 ### Backend Auth And Web API Client
 
@@ -452,8 +449,7 @@ What changed:
 
 Remaining follow-up:
 
-- Populate `services/api/.env` with Supabase URL/keys and run a signed-in browser smoke test.
-- Continue Phase 5 by moving low-risk mutations through the backend.
+- Run a signed-in browser smoke test against the hosted API.
 
 ### Low-Risk Mutations Through Backend
 
@@ -482,9 +478,8 @@ What changed:
 
 Remaining follow-up:
 
-- Populate `services/api/.env` and run a signed-in end-to-end smoke test for play-count and comment-report mutations.
+- Run a signed-in end-to-end smoke test for play-count and comment-report mutations against the hosted API.
 - Admin report actions still happen directly in the browser and should move later.
-- Continue Phase 6 by adding backend session creation for cloud games.
 
 ### Backend Cloud Session Creation
 
@@ -513,10 +508,43 @@ What changed:
 
 Remaining follow-up:
 
-- Populate `services/api/.env` and run a signed-in end-to-end smoke test for cloud game boot.
-- The local engine currently receives `sessionToken` but does not validate it yet.
+- Run a signed-in end-to-end smoke test for cloud game boot against the hosted Vercel + Render stack.
 - Replace in-memory sessions with durable/TTL-backed storage when Redis or a sessions table is introduced.
-- Continue Phase 7 by making local engine pairing a first-class backend/web concept.
+
+### Backend Session Verification By Engine
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/src/routes/sessions.ts`
+- `engine/runtime/server.js`
+- `engine/runtime/src/config.js`
+- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/sessions/verifyBackendSession.js`
+- `apps/desktop/main.js`
+- `apps/desktop/README.md`
+- `engine/runtime/README.md`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added backend `POST /sessions/:sessionId/verify`.
+- Backend session records now retain the approved boot target for verification.
+- Expired in-memory sessions are pruned on read/verify.
+- Authenticated `GET /sessions/:sessionId` and `DELETE /sessions/:sessionId` now only expose/delete sessions owned by the authenticated user.
+- The engine now rejects cloud URL boot requests that do not include a backend session token.
+- The engine verifies `sessionToken` with the API before booting a cloud game.
+- After verification, the engine uses the backend-approved boot target instead of trusting the browser-supplied URL.
+- Electron passes `PIXELATED_API_URL` into the engine container, defaulting to the hosted Render API while allowing localhost override for development.
+
+Remaining follow-up:
+
+- Runtime-smoke a signed-in cloud game through hosted Vercel, hosted Render, and the desktop engine after redeploying these changes.
+- Move sessions out of API memory before running multiple API replicas or expecting sessions to survive backend restarts.
+- Add automated API tests for create/verify/expiry/ownership behavior.
 
 ### Backend Hosting Prep
 
@@ -585,8 +613,6 @@ What changed:
 
 Remaining follow-up:
 
-- Redeploy the Render API so `/local-pairings` exists in staging.
-- Redeploy the Vercel frontend with `VITE_API_URL=https://pixelated-api-services.onrender.com`.
 - Browser-smoke the hosted frontend with the desktop engine running.
 - Decide later whether local pairing metadata should move from in-memory API state to a persistent table.
 
@@ -617,7 +643,6 @@ What changed:
 
 Remaining follow-up:
 
-- Redeploy Render API and Vercel frontend.
 - Browser-smoke a signed-in stream and confirm the live API receives accepted metrics.
 - Replace in-memory metrics with a database table, time-series store, or log pipeline when you need persistence across deploys/replicas.
 
@@ -654,47 +679,42 @@ Remaining follow-up:
 
 ## Highest Priority Issues
 
-### 1. Add a Real Backend Control Plane
+### 1. Persist Backend Session And Telemetry State
 
-Today the frontend talks directly to Supabase and directly to the local engine. For small scale, that is fast. For larger scale, the missing backend becomes the place where all hard decisions pile up.
+The hosted API currently stores sessions, local pairings, and sampled stream metrics in process memory. That is fine for a single-instance proof, but it is the biggest production risk now because Render restarts, deploys, or future multi-replica hosting will erase active session state.
 
-Add a backend service when you want:
+Recommended next implementation:
 
-- Session creation and authorization.
-- Game node allocation.
-- Signed ROM/media URLs.
-- Rate limits and upload validation.
-- Moderation workflow.
-- Admin actions with audit logs.
-- TURN credential generation.
-- Session cleanup.
-- Metrics and billing hooks later.
+- Add Supabase tables for backend sessions, local pairings, and stream metric samples.
+- Store hashed session tokens rather than raw tokens.
+- Add TTL cleanup for expired sessions and old metrics.
+- Keep the in-memory maps only as optional process-local caches, not the source of truth.
+- Add focused API tests for create/verify/expiry/ownership/rate-limit behavior.
 
-Good first version:
+### 2. Complete Signed-In Hosted Smoke Coverage
 
-- Node.js with Fastify/NestJS or Express if you want minimal migration.
-- Supabase JWT verification for auth.
-- Postgres via Supabase for persistent state.
-- Redis for ephemeral session state, queues, locks, and rate limits.
-- REST endpoints for normal app workflows and Socket.IO/WebSocket only for realtime session control.
+The live API health, readiness, protected-route, CORS, deployed bundle, and Docker engine smoke checks passed after the latest deploys. The remaining missing test is the signed-in browser path that requires a real user session.
 
-Suggested first backend endpoints:
+Smoke checklist:
 
-- `POST /sessions`: create a playable game session and return signaling/session info.
-- `DELETE /sessions/:id`: stop a session.
-- `POST /uploads/submissions`: validate and sign upload paths.
-- `POST /moderation/reports/:id/actions`: approve/delete/ban/ignore.
-- `GET /me/permissions`: centralize role/ability checks.
+- Hosted Vercel app can call `GET /me` on Render after login.
+- Cloud play creates a backend session and the engine verifies it.
+- Local pairing metadata saves through `/local-pairings`.
+- Stream metrics post to `/metrics/stream` during active play.
+- Comment reporting and play-count increments work through the API.
 
-### 2. Secure The Local Engine Boundary
+### 3. Move Remaining Sensitive Mutations Through Backend
 
-The local engine is now protected by host-loopback binding, restricted CORS, and a pairing token. The remaining work is mostly UX and explicit LAN support.
+Several workflows still write directly from the browser to Supabase. That is acceptable while RLS is tight, but backend routing gives better audit, validation, and rate limiting.
 
-Remaining suggested improvements:
+Suggested order:
 
-- If LAN streaming is intentional, make it an explicit setting with a warning.
+- Admin report actions.
+- Publish/submission uploads and metadata creation.
+- Access logging/session tracking.
+- Profile role-sensitive updates.
 
-### 3. Improve Docker Build/Run Lifecycle
+### 4. Improve Docker Build/Run Lifecycle
 
 The Electron app builds the image on demand and uses a fixed container name/port. This is workable for a demo, but fragile for users.
 
@@ -704,7 +724,7 @@ Suggested improvements:
 - Keep local build as a development fallback.
 - Add more structured engine states: checking Docker, pulling/building image, starting container, waiting for health, ready, failed.
 
-### 4. Fix WebRTC Production Readiness
+### 5. Fix WebRTC Production Readiness
 
 Google STUN alone is not enough for real users and varied networks.
 
@@ -715,6 +735,10 @@ Suggested improvements:
 - Add reconnect/fail recovery flows beyond the current ICE/error display.
 - Add bitrate/framerate profiles.
 - Add a fallback message when the local engine is offline.
+
+### 6. Decide Explicit LAN Support
+
+The local engine is currently bound to host loopback. That is the right secure default. If LAN streaming becomes a product goal, add it as an explicit desktop setting with warning copy, origin controls, and token rotation.
 
 ## Database And Supabase Suggestions
 
@@ -813,12 +837,13 @@ Do a dedicated RLS pass before public launch:
 
 ## Recommended First Implementation Batch
 
-The implementation batch is paused while the architecture is reconsidered. See:
+The refurbishment batch is no longer paused; the current tree and plan are tracked in:
 
 - `.context/target-architecture-refurbishment.md`
 - `.context/refurbishment-execution-plan.md`
 
 Recommended next work after review:
 
-1. Add local pairing to the backend/web model.
-2. Add backend, web, desktop, and engine READMEs.
+1. Persist backend sessions, local pairings, and stream metrics.
+2. Add API tests around session create/verify/expiry/ownership and metric rate limiting.
+3. Then move admin report actions through the backend.

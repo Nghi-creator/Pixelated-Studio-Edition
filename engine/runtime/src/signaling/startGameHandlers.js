@@ -8,15 +8,16 @@ const {
 const { sanitizeUserId } = require("../roms/localRomStore");
 
 function registerStartGameHandler(socket, options) {
-  const { downloadCloudRom, runtime } = options;
+  const { apiUrl, downloadCloudRom, runtime, verifyBackendSession } = options;
 
   socket.on("start-game", async (payload = {}) => {
     const sessionId =
       normalizeSessionId(payload.sessionId) ||
       socket.data.sessionId ||
       joinSession(socket, crypto.randomUUID(), "browser");
-    const romFileOrUrl = payload.romFilename;
-    const safeUserId = sanitizeUserId(payload.userId || "anonymous");
+    let romFileOrUrl =
+      typeof payload.romFilename === "string" ? payload.romFilename : "";
+    let safeUserId = sanitizeUserId(payload.userId || "anonymous");
     socket.data.sessionId = sessionId;
     socket.join(getSessionRoom(sessionId));
 
@@ -26,6 +27,33 @@ function registerStartGameHandler(socket, options) {
 
     if (!romFileOrUrl) {
       console.warn("[Node.js] Ignoring start-game without a ROM target");
+      return;
+    }
+
+    if (payload.sessionToken) {
+      try {
+        const verifiedSession = await verifyBackendSession({
+          apiUrl,
+          sessionId,
+          sessionToken: payload.sessionToken,
+        });
+
+        romFileOrUrl = verifiedSession.romTarget;
+        safeUserId = sanitizeUserId(verifiedSession.userId || safeUserId);
+      } catch (err) {
+        console.error("[Engine] Cloud session verification failed:", err);
+        socket.emit("engine-error", {
+          message:
+            err instanceof Error
+              ? err.message
+              : "Cloud session verification failed",
+        });
+        return;
+      }
+    } else if (romFileOrUrl.startsWith("http")) {
+      socket.emit("engine-error", {
+        message: "Cloud games require a backend session token.",
+      });
       return;
     }
 

@@ -10,6 +10,7 @@ const {
   HEALTH_PATHS,
   MAX_CLOUD_ROM_SIZE_BYTES,
   MAX_ROM_SIZE_BYTES,
+  PIXELATED_API_URL,
 } = require("./src/config");
 const { registerErrorHandlers } = require("./src/http/errorHandlers");
 const { registerHealthRoutes } = require("./src/http/healthRoutes");
@@ -22,6 +23,7 @@ const { joinSession, normalizeSessionId } = require("./src/signaling/sessionRoom
 const { registerSignalingRelayHandlers } = require("./src/signaling/signalingRelay");
 const { createEngineTokenAuth } = require("./src/signaling/socketAuth");
 const { registerStartGameHandler } = require("./src/signaling/startGameHandlers");
+const { verifyBackendSession } = require("./src/sessions/verifyBackendSession");
 const { createHealthSnapshot } = require("./src/telemetry/healthSnapshot");
 
 const app = express();
@@ -65,8 +67,10 @@ io.on("connection", (socket) => {
   });
 
   registerStartGameHandler(socket, {
+    apiUrl: PIXELATED_API_URL,
     downloadCloudRom: cloudRoms.downloadCloudRom,
     runtime,
+    verifyBackendSession,
   });
   registerSignalingRelayHandlers(socket);
   registerEngineErrorHandlers(socket);

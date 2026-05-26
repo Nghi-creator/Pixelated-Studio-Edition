@@ -19,3 +19,9 @@ Override that path for packaged or custom layouts with:
 ```txt
 PIXELATED_ENGINE_RUNTIME_DIR=/absolute/path/to/engine/runtime
 ```
+
+The desktop app passes `PIXELATED_API_URL` into the engine so cloud sessions can be verified with the backend before boot. It defaults to the hosted Render API; override it for localhost API testing:
+
+```txt
+PIXELATED_API_URL=http://127.0.0.1:4000
+```
