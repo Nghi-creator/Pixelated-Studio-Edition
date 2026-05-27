@@ -1011,6 +1011,45 @@ Remaining follow-up:
 - Publish a real versioned engine image to a registry and set production desktop packaging env vars to pull it.
 - Runtime-smoke the desktop app with both default local build mode and prebuilt image pull mode.
 
+### Backend-Issued WebRTC ICE Config
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/src/routes/webrtc.ts`
+- `services/api/src/server.ts`
+- `services/api/src/config/env.ts`
+- `services/api/src/webrtc.test.ts`
+- `services/api/.env.example`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/lib/webrtcPeer.ts`
+- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/camera.py`
+- `engine/runtime/README.md`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/backend-hosting-checklist.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated `GET /webrtc/ice-servers`.
+- API returns configured STUN URLs and can issue coturn REST-style short-lived TURN credentials when `TURN_URLS` and `TURN_SHARED_SECRET` are configured.
+- API also supports static TURN credentials through `TURN_STATIC_USERNAME` and `TURN_STATIC_CREDENTIAL`.
+- React loads ICE config before creating `RTCPeerConnection`, with a Google STUN fallback when the API is unavailable or the user is unsigned.
+- React forwards the same ICE config in `start-game`.
+- Node validates ICE server payloads and forwards only URL, username, and credential fields into `camera.py`.
+- Python configures GStreamer `webrtcbin` with the matching STUN/TURN servers before answering the WebRTC offer.
+- Added tests for default ICE config and coturn REST credential generation.
+
+Remaining follow-up:
+
+- Configure a real TURN provider on Render with `TURN_URLS` and `TURN_SHARED_SECRET`, or static TURN credentials if the provider does not support REST credentials.
+- Runtime-smoke a stream from a network where direct/STUN connectivity fails, then confirm relay candidates appear in WebRTC stats.
+
 ## Highest Priority Issues
 
 ### 1. Complete Signed-In Hosted Smoke Coverage
@@ -1025,17 +1064,15 @@ Smoke checklist:
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
 
-### 2. Fix WebRTC Production Readiness
+### 2. Improve WebRTC Reconnect And Profiles
 
-Google STUN alone is not enough for real users and varied networks.
+TURN support is now wired through the API, browser, Node engine, and Python/GStreamer sender. The remaining production-readiness work is stream behavior rather than basic ICE configuration.
 
 Suggested improvements:
 
-- Add TURN support.
-- Generate short-lived TURN credentials from the backend.
 - Add reconnect/fail recovery flows beyond the current ICE/error display.
 - Add bitrate/framerate profiles.
-- Add a fallback message when the local engine is offline.
+- Add a clearer fallback message when the local engine is offline.
 
 ### 3. Decide Explicit LAN Support
 

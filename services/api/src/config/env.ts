@@ -18,6 +18,12 @@ const envSchema = z.object({
     .positive()
     .default(60 * 60 * 1000),
   STREAM_METRIC_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
+  STUN_URLS: z.string().default("stun:stun.l.google.com:19302"),
+  TURN_CREDENTIAL_TTL_SECONDS: z.coerce.number().int().positive().default(3600),
+  TURN_SHARED_SECRET: z.preprocess(blankToUndefined, z.string().optional()),
+  TURN_STATIC_CREDENTIAL: z.preprocess(blankToUndefined, z.string().optional()),
+  TURN_STATIC_USERNAME: z.preprocess(blankToUndefined, z.string().optional()),
+  TURN_URLS: z.preprocess(blankToUndefined, z.string().optional()),
   FORMSPREE_SUBMISSION_URL: z.preprocess(
     blankToUndefined,
     z.string().url().optional(),

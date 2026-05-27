@@ -1,5 +1,7 @@
 import socketio
 import os
+import json
+from urllib.parse import quote, urlparse, urlunparse
 import gi
 gi.require_version('Gst', '1.0')
 gi.require_version('GstWebRTC', '1.0')
@@ -12,8 +14,43 @@ Gst.init(None)
 
 SESSION_ID = os.environ.get('PIXELATED_SESSION_ID', 'default-session')
 ENGINE_TOKEN = os.environ.get('PIXELATED_ENGINE_TOKEN', '')
+ICE_SERVERS = os.environ.get('PIXELATED_ICE_SERVERS', '[]')
 webrtcbin = None
 pipeline = None
+
+def parse_ice_servers():
+    try:
+        parsed = json.loads(ICE_SERVERS)
+        return parsed if isinstance(parsed, list) else []
+    except Exception as exc:
+        print(f"[Python] Failed to parse PIXELATED_ICE_SERVERS: {exc}")
+        return []
+
+def iter_ice_urls(server):
+    urls = server.get('urls') if isinstance(server, dict) else None
+    if isinstance(urls, str):
+        return [urls]
+    if isinstance(urls, list):
+        return [url for url in urls if isinstance(url, str)]
+    return []
+
+def configure_ice_servers(webrtc):
+    for server in parse_ice_servers():
+        username = server.get('username') if isinstance(server, dict) else None
+        credential = server.get('credential') if isinstance(server, dict) else None
+
+        for url in iter_ice_urls(server):
+            parsed = urlparse(url)
+            if parsed.scheme == 'stun':
+                webrtc.set_property('stun-server', url)
+                print(f"[Python] Configured STUN server: {url}")
+            elif parsed.scheme in ['turn', 'turns'] and username and credential:
+                safe_username = quote(username, safe='')
+                safe_credential = quote(credential, safe='')
+                netloc = f"{safe_username}:{safe_credential}@{parsed.netloc}"
+                turn_url = urlunparse((parsed.scheme, netloc, parsed.path, '', parsed.query, ''))
+                webrtc.set_property('turn-server', turn_url)
+                print(f"[Python] Configured TURN server: {parsed.scheme}://{parsed.netloc}")
 
 def emit_engine_error(message):
     print(f"[Python] Engine error: {message}")
@@ -53,6 +90,7 @@ def handle_offer(offer):
     """
     pipeline = Gst.parse_launch(pipeline_str)
     webrtcbin = pipeline.get_by_name('sendrecv')
+    configure_ice_servers(webrtcbin)
 
     bus = pipeline.get_bus()
     bus.add_signal_watch()

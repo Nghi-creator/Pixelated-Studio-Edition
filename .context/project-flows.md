@@ -132,42 +132,44 @@ Storage note: `/roms` is backed by the named Docker volume `pixelated-roms`, so 
 
 Purpose: negotiate a WebRTC connection between browser and GStreamer.
 
-1. `createEnginePeerConnection()` creates an `RTCPeerConnection` with Google STUN.
-2. `createWebRTCSessionId()` creates a per-player `sessionId`.
-3. React reads the desktop pairing token from browser `localStorage`; if it is missing, the player shows the local engine pairing panel.
-4. React connects to Node Socket.IO with `{ auth: { token } }`.
-5. Node rejects the socket if the token does not match `PIXELATED_ENGINE_TOKEN`.
-6. React emits `join-session` with `{ sessionId, role: "browser" }`.
-7. Node joins that browser socket to room `session:<sessionId>`.
-8. React emits `start-game` with the same `sessionId`; cloud starts include `mode: "cloud"` and `sessionToken`, while Local Vault starts include `mode: "local"` and no backend token.
-9. Node boots RetroArch and then starts `camera.py` with `PIXELATED_SESSION_ID=<sessionId>` and `PIXELATED_ENGINE_TOKEN=<token>`.
-10. `camera.py` connects back to `http://localhost:8080` as a Socket.IO client with the token.
-11. Python emits `join-session` with `{ sessionId, role: "camera" }`.
-12. Node joins that camera socket to room `session:<sessionId>`.
-13. Python emits `python-ready` with the same `sessionId`.
-14. Node relays `python-ready` only to sockets in `session:<sessionId>`.
-15. React receives `python-ready`.
-16. `createAndSendOffer()` adds recv-only video and audio transceivers.
-17. `createAndSendOffer()` creates a WebRTC offer and sets it as the local description.
-18. React emits `webrtc-offer` with `sessionId`.
-19. Node relays the offer only to `session:<sessionId>`.
-20. Python receives the offer.
-21. Python builds the GStreamer pipeline and gets the `webrtcbin` element.
-22. Python sets the React offer as the remote description.
-23. Python creates a WebRTC answer.
-24. Python sets the answer as its local description.
-25. Python emits `webrtc-answer` with `sessionId`.
-26. Node relays the answer only to `session:<sessionId>`.
-27. React sets the answer as its remote description.
-28. React and Python exchange ICE candidates through `webrtc-ice-candidate` and `webrtc-ice-candidate-backend` events relayed only inside the same session room.
-29. Once media tracks arrive, React adds them to a `MediaStream` and marks status as `playing`.
-30. `startWebRTCTelemetry()` polls `RTCPeerConnection.getStats()` once per second.
-31. `useWebRTC` returns stream telemetry alongside `stream` and `status`.
-32. `Player.tsx` assigns that `MediaStream` to the `<video>` element through `videoRef.current.srcObject`.
-33. `Player.tsx` hides received FPS, bitrate, ICE state, packet loss, and jitter by default.
-34. If the user enables the telemetry toggle, `Player.tsx` renders those metrics below the video and persists that preference in `localStorage`.
+1. `createWebRTCSessionId()` creates a per-player `sessionId`.
+2. `useWebRTC` calls `GET /webrtc/ice-servers` on the API to load STUN/TURN config. If the API is unavailable or the user is unsigned, React falls back to Google STUN.
+3. `createEnginePeerConnection()` creates an `RTCPeerConnection` with that ICE config.
+4. React reads the desktop pairing token from browser `localStorage`; if it is missing, the player shows the local engine pairing panel.
+5. React connects to Node Socket.IO with `{ auth: { token } }`.
+6. Node rejects the socket if the token does not match `PIXELATED_ENGINE_TOKEN`.
+7. React emits `join-session` with `{ sessionId, role: "browser" }`.
+8. Node joins that browser socket to room `session:<sessionId>`.
+9. React emits `start-game` with the same `sessionId` and ICE config; cloud starts include `mode: "cloud"` and `sessionToken`, while Local Vault starts include `mode: "local"` and no backend token.
+10. Node validates the ICE config and keeps only STUN/TURN URL, username, and credential fields.
+11. Node boots RetroArch and then starts `camera.py` with `PIXELATED_SESSION_ID=<sessionId>`, `PIXELATED_ENGINE_TOKEN=<token>`, and `PIXELATED_ICE_SERVERS=<json>`.
+12. `camera.py` connects back to `http://localhost:8080` as a Socket.IO client with the token.
+13. Python emits `join-session` with `{ sessionId, role: "camera" }`.
+14. Node joins that camera socket to room `session:<sessionId>`.
+15. Python emits `python-ready` with the same `sessionId`.
+16. Node relays `python-ready` only to sockets in `session:<sessionId>`.
+17. React receives `python-ready`.
+18. `createAndSendOffer()` adds recv-only video and audio transceivers.
+19. `createAndSendOffer()` creates a WebRTC offer and sets it as the local description.
+20. React emits `webrtc-offer` with `sessionId`.
+21. Node relays the offer only to `session:<sessionId>`.
+22. Python receives the offer.
+23. Python builds the GStreamer pipeline, gets the `webrtcbin` element, and configures the same STUN/TURN servers.
+24. Python sets the React offer as the remote description.
+25. Python creates a WebRTC answer.
+26. Python sets the answer as its local description.
+27. Python emits `webrtc-answer` with `sessionId`.
+28. Node relays the answer only to `session:<sessionId>`.
+29. React sets the answer as its remote description.
+30. React and Python exchange ICE candidates through `webrtc-ice-candidate` and `webrtc-ice-candidate-backend` events relayed only inside the same session room.
+31. Once media tracks arrive, React adds them to a `MediaStream` and marks status as `playing`.
+32. `startWebRTCTelemetry()` polls `RTCPeerConnection.getStats()` once per second.
+33. `useWebRTC` returns stream telemetry alongside `stream` and `status`.
+34. `Player.tsx` assigns that `MediaStream` to the `<video>` element through `videoRef.current.srcObject`.
+35. `Player.tsx` hides received FPS, bitrate, ICE state, packet loss, and jitter by default.
+36. If the user enables the telemetry toggle, `Player.tsx` renders those metrics below the video and persists that preference in `localStorage`.
 
-Current limitation: signaling is room-scoped and token-gated. Cloud boot authorization now comes from the backend session token, while Local Vault still uses local pairing as its authority.
+Current limitation: signaling is room-scoped and token-gated, and ICE config can now come from the backend. Production still needs a real TURN provider configured in API env vars.
 
 ## 5B. Local Engine Pairing Flow
 

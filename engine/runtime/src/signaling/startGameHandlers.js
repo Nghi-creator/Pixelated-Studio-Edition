@@ -17,6 +17,31 @@ function hasCloudSessionIntent(payload) {
   );
 }
 
+function normalizeIceServers(value) {
+  return Array.isArray(value)
+    ? value
+        .map((server) => {
+          if (!server || typeof server !== "object") return null;
+          const urls = Array.isArray(server.urls)
+            ? server.urls.filter((url) => typeof url === "string")
+            : typeof server.urls === "string"
+              ? server.urls
+              : null;
+          if (!urls || (Array.isArray(urls) && urls.length === 0)) return null;
+          return {
+            credential:
+              typeof server.credential === "string"
+                ? server.credential
+                : undefined,
+            urls,
+            username:
+              typeof server.username === "string" ? server.username : undefined,
+          };
+        })
+        .filter(Boolean)
+    : [];
+}
+
 function registerStartGameHandler(socket, options) {
   const { apiUrl, downloadCloudRom, runtime, verifyBackendSession } = options;
 
@@ -30,6 +55,7 @@ function registerStartGameHandler(socket, options) {
     let safeUserId = sanitizeUserId(payload.userId || "anonymous");
     socket.data.sessionId = sessionId;
     socket.join(getSessionRoom(sessionId));
+    const iceServers = normalizeIceServers(payload.iceServers);
 
     console.log(
       `\n[Node.js] React requested game boot for session ${sessionId}: ${romFileOrUrl}`,
@@ -87,7 +113,10 @@ function registerStartGameHandler(socket, options) {
       try {
         await downloadCloudRom(romFileOrUrl, tmpPath);
         console.log("[Engine] Download complete. Booting Cloud Game.");
-        runtime.bootGame(tmpPath, sessionId, { isCloudRom: true });
+        runtime.bootGame(tmpPath, sessionId, {
+          ...(iceServers.length > 0 ? { iceServers } : {}),
+          isCloudRom: true,
+        });
       } catch (err) {
         console.error("[Engine] Failed to download cloud ROM:", err);
         socket.emit("engine-error", {
@@ -96,12 +125,17 @@ function registerStartGameHandler(socket, options) {
       }
     } else {
       const safeRomFile = path.basename(romFileOrUrl);
-      runtime.bootGame(path.join("/roms", safeUserId, safeRomFile), sessionId);
+      runtime.bootGame(
+        path.join("/roms", safeUserId, safeRomFile),
+        sessionId,
+        iceServers.length > 0 ? { iceServers } : {},
+      );
     }
   });
 }
 
 module.exports = {
   hasCloudSessionIntent,
+  normalizeIceServers,
   registerStartGameHandler,
 };

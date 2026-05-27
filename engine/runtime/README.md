@@ -26,3 +26,8 @@ Cloud game starts verify their backend-created session token before booting a RO
 ```sh
 docker run -e PIXELATED_API_URL=http://127.0.0.1:4000 ...
 ```
+
+The browser asks the API for WebRTC ICE servers before negotiation and forwards
+that config to the engine in `start-game`. The Node runtime passes it to
+`camera.py` as `PIXELATED_ICE_SERVERS`, and the GStreamer `webrtcbin` sender
+uses the configured STUN/TURN servers when creating its answer.

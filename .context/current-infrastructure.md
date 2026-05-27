@@ -47,6 +47,7 @@ Current status:
 - `GET /local-pairings/current` and `DELETE /local-pairings/current` expose/clear the current user's local pairing metadata.
 - `POST /metrics/stream` persists authenticated, sampled WebRTC telemetry snapshots.
 - `GET /metrics/stream/recent` returns recent persisted telemetry snapshots for the authenticated user.
+- `GET /webrtc/ice-servers` returns authenticated WebRTC ICE configuration. It always supports configured STUN URLs and can issue short-lived coturn REST credentials when `TURN_URLS` and `TURN_SHARED_SECRET` are configured.
 - The API schedules control-plane retention cleanup on startup.
 - Cleanup deletes expired/stopped backend sessions and stream metrics older than `STREAM_METRIC_RETENTION_DAYS`.
 - CORS allows local Vite origins and the hosted Vercel origin.
@@ -94,6 +95,7 @@ Current important frontend behaviors:
 - The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
 - `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
 - `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.
+- `useWebRTC` asks the API for ICE servers before creating the browser peer connection. If the API is unavailable or the user is unsigned, it falls back to Google STUN.
 - `/play/:id` is composed from `apps/web/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
@@ -173,6 +175,7 @@ Streaming/signaling:
 - Node forwards WebRTC offers, answers, and ICE candidates between browser and Python sender inside a Socket.IO room named `session:<id>`.
 - Python connects back to Node at `http://localhost:8080`.
 - Browser receives VP8 video and Opus audio.
+- React forwards API-issued ICE server config in `start-game`; Node passes it to `camera.py` through `PIXELATED_ICE_SERVERS`; Python configures GStreamer `webrtcbin` with the matching STUN/TURN servers.
 - React generates the current session id, Node passes it into `camera.py` through `PIXELATED_SESSION_ID`, and both browser/camera sockets join the same room before WebRTC negotiation.
 - React polls browser WebRTC stats once per second for FPS, bitrate, ICE state, packet loss, and jitter. The player hides those metrics by default and exposes them through a persisted developer telemetry toggle.
 - Engine-side download failures and camera/GStreamer failures emit `engine-error` to the browser session.
