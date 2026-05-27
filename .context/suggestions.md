@@ -19,6 +19,40 @@ Recommended direction:
 
 ## Done
 
+### Explicit Desktop LAN Mode Toggle
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/desktop/main.js`
+- `apps/desktop/preload.js`
+- `apps/desktop/index.html`
+- `engine/runtime/src/config.js`
+- `engine/runtime/src/telemetry/healthSnapshot.js`
+- `engine/runtime/server.js`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added an explicit LAN mode toggle to the desktop launcher, default off.
+- Local mode keeps Docker publishing on `127.0.0.1:8080:8080`.
+- LAN mode publishes Docker on `0.0.0.0:8080:8080`.
+- Desktop discovers host LAN IPv4 URLs and displays them when LAN mode is active.
+- Desktop still generates a fresh pairing token for each engine start.
+- Desktop locks exposure mode while the engine is running, so changing mode requires stopping and starting the engine again.
+- The engine receives `PIXELATED_ENGINE_EXPOSURE_MODE` and `PIXELATED_ADVERTISED_URLS`.
+- `/health` now reports `exposureMode` and `advertisedUrls`.
+- The multiplayer plan now includes the TypeScript migration track for engine and desktop code.
+
+Remaining follow-up:
+
+- Two-device LAN smoke test: confirm another LAN device can reach `/health` only after LAN mode is enabled.
+- Add one-click restart-on-toggle later if changing exposure mode while running should feel smoother.
+
 ### Backend Session Intent Validation
 
 Completed: 2026-05-27
@@ -1165,15 +1199,12 @@ Smoke checklist:
 
 ### 1. Decide Explicit LAN Support
 
-The local engine is currently bound to host loopback. That is the right secure default. LAN streaming is now tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
+The local engine now defaults to host loopback and has an explicit desktop LAN mode for testing. LAN streaming is tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
 
 Recommended next implementation slice:
 
-- Add an explicit desktop LAN mode toggle, default off.
-- Rotate the pairing token whenever LAN mode changes.
-- Keep loopback-only Docker publishing in local mode.
-- Publish the engine to LAN only after the user enables LAN mode.
-- Display discovered LAN URL(s), warning copy, and the active pairing token in the desktop app.
+- Runtime-smoke Phase 1 with two devices on the same LAN.
+- Then proceed to Phase 2: LAN pairing UX in the hosted React app.
 
 ## Database And Supabase Suggestions
 

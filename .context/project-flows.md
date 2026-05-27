@@ -29,7 +29,7 @@ Purpose: start the local Dockerized game streaming node.
 6. Electron generates a random pairing token for this engine run.
 7. Electron sends the token to the desktop renderer, which displays it with a copy button.
 8. `main.js` removes any stale `pixelated-node` container.
-9. `main.js` starts a detached container with `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="<api-url>" -e PIXELATED_ENGINE_TOKEN="<token>" pixelated-engine`.
+9. `main.js` starts a detached container. In local mode it uses `-p 127.0.0.1:8080:8080`; in explicit LAN mode it uses `-p 0.0.0.0:8080:8080`. The command also mounts `-v pixelated-roms:/roms` and passes `PIXELATED_ALLOWED_ORIGINS`, `PIXELATED_ALLOWED_ROM_HOSTS`, `PIXELATED_API_URL`, `PIXELATED_ENGINE_TOKEN`, `PIXELATED_ENGINE_EXPOSURE_MODE`, and `PIXELATED_ADVERTISED_URLS`.
 10. The container starts `node server.js`.
 11. `server.js` listens on `0.0.0.0:8080`.
 12. On server start, `server.js` calls `startVirtualDisplay()`.
@@ -42,7 +42,7 @@ Purpose: start the local Dockerized game streaming node.
 
 Current limitation: health is still readiness-focused. It does not yet expose live stream telemetry such as FPS, bitrate, ICE state, or encoder errors.
 
-Security note: the Node server still listens on `0.0.0.0` inside the container, but Docker publishes it only to `127.0.0.1` on the host.
+Security note: the Node server still listens on `0.0.0.0` inside the container. Docker publishes it only to `127.0.0.1` by default. Publishing to LAN requires the explicit desktop LAN mode toggle.
 
 ## 2. Cloud Library Game Boot Flow
 

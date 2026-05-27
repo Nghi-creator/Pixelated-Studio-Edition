@@ -95,6 +95,46 @@
       </p>
 
       <div class="flex flex-col gap-4">
+        <div
+          class="rounded-lg border border-synth-border bg-[#050810] p-4"
+        >
+          <div class="flex items-start justify-between gap-4">
+            <div>
+              <p class="text-[10px] uppercase tracking-widest text-gray-400">
+                Engine Exposure
+              </p>
+              <p id="exposure-label" class="mt-1 text-sm font-bold text-white">
+                Local only
+              </p>
+            </div>
+            <label
+              for="lan-toggle"
+              class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full bg-synth-border transition-colors has-[:checked]:bg-synth-primary"
+            >
+              <input id="lan-toggle" type="checkbox" class="peer sr-only" />
+              <span
+                class="inline-block h-5 w-5 translate-x-1 rounded-full bg-white transition-transform peer-checked:translate-x-6"
+              ></span>
+            </label>
+          </div>
+          <p id="exposure-copy" class="mt-3 text-xs leading-5 text-gray-400">
+            Engine binds to this computer only.
+          </p>
+          <div id="lan-warning" class="hidden mt-3 text-xs leading-5 text-amber-300">
+            LAN mode exposes the engine to devices on your network. Share the URL
+            and token only with people you trust.
+          </div>
+          <div id="lan-url-panel" class="hidden mt-3">
+            <p class="text-[10px] uppercase tracking-widest text-gray-400">
+              LAN URL
+            </p>
+            <div
+              id="lan-urls"
+              class="mt-1 space-y-1 font-mono text-xs text-synth-secondary"
+            ></div>
+          </div>
+        </div>
+
         <button
           id="power-btn"
           class="w-full bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-3 px-8 rounded-lg shadow-glow-primary transition-all flex items-center justify-center gap-2 active:scale-[0.98]"
@@ -297,6 +337,12 @@
       const tokenPanel = document.getElementById("token-panel");
       const tokenValue = document.getElementById("engine-token");
       const copyTokenBtn = document.getElementById("copy-token");
+      const lanToggle = document.getElementById("lan-toggle");
+      const exposureLabel = document.getElementById("exposure-label");
+      const exposureCopy = document.getElementById("exposure-copy");
+      const lanWarning = document.getElementById("lan-warning");
+      const lanUrlPanel = document.getElementById("lan-url-panel");
+      const lanUrls = document.getElementById("lan-urls");
 
       // Modal Logic
       const docsModal = document.getElementById("docs-modal");
@@ -319,6 +365,49 @@
       });
 
       let isRunning = false;
+
+      function getExposureMode() {
+        return lanToggle.checked ? "lan" : "local";
+      }
+
+      function setExposureUi() {
+        const exposureMode = getExposureMode();
+        const isLan = exposureMode === "lan";
+
+        exposureLabel.innerText = isLan ? "LAN multiplayer" : "Local only";
+        exposureCopy.innerText = isLan
+          ? "Engine will bind to your LAN when initialized."
+          : "Engine binds to this computer only.";
+        lanWarning.classList.toggle("hidden", !isLan);
+        lanUrlPanel.classList.toggle("hidden", !isLan || !lanUrls.innerText);
+      }
+
+      function setExposureControlsEnabled(enabled) {
+        lanToggle.disabled = !enabled;
+        lanToggle.parentElement.classList.toggle("opacity-50", !enabled);
+        lanToggle.parentElement.classList.toggle("cursor-not-allowed", !enabled);
+      }
+
+      function renderLanUrls(urls = []) {
+        lanUrls.innerHTML = "";
+        urls.forEach((url) => {
+          const item = document.createElement("code");
+          item.className = "block break-all";
+          item.innerText = url;
+          lanUrls.appendChild(item);
+        });
+        lanUrlPanel.classList.toggle(
+          "hidden",
+          getExposureMode() !== "lan" || urls.length === 0,
+        );
+      }
+
+      lanToggle.addEventListener("change", () => {
+        renderLanUrls([]);
+        setExposureUi();
+      });
+
+      setExposureUi();
 
       function setStatus(active) {
         if (active) {
@@ -352,6 +441,8 @@
           powerText.innerText = "Initialize Engine";
           tokenPanel.classList.add("hidden");
           tokenValue.innerText = "";
+          renderLanUrls([]);
+          setExposureControlsEnabled(true);
           isRunning = false;
         }
       }
@@ -380,6 +471,7 @@
         if (state.status === "ready") {
           setStatus(true);
           powerBtn.disabled = false;
+          setExposureControlsEnabled(false);
           return;
         }
 
@@ -393,24 +485,29 @@
           powerText.innerText = "Initialize Engine";
           tokenPanel.classList.add("hidden");
           tokenValue.innerText = "";
+          renderLanUrls([]);
           isRunning = false;
           powerBtn.disabled = false;
+          setExposureControlsEnabled(true);
           return;
         }
 
         if (state.status === "stopped") {
           setStatus(false);
           powerBtn.disabled = false;
+          setExposureControlsEnabled(true);
           return;
         }
 
         if (state.status === "starting") {
           powerBtn.disabled = true;
+          setExposureControlsEnabled(false);
           powerText.innerText = state.label;
         }
 
         if (state.status === "stopping") {
           powerBtn.disabled = true;
+          setExposureControlsEnabled(false);
           powerText.innerText = "Shutting down...";
         }
       }
@@ -427,7 +524,7 @@
           );
           powerBtn.disabled = true; // Prevent spam clicking while booting
           powerText.innerText = "Booting...";
-          window.electronAPI.startDocker();
+          window.electronAPI.startDocker({ exposureMode: getExposureMode() });
         } else {
           powerBtn.disabled = true;
           powerText.innerText = "Shutting down...";
@@ -454,6 +551,10 @@
       window.electronAPI.onEngineToken((event, token) => {
         tokenValue.innerText = token;
         tokenPanel.classList.remove("hidden");
+      });
+
+      window.electronAPI.onEngineExposure((event, payload) => {
+        renderLanUrls(payload.advertisedUrls || []);
       });
 
       window.electronAPI.onEngineState((event, state) => {

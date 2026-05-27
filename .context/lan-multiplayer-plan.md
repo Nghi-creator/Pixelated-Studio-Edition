@@ -1,6 +1,6 @@
 # LAN And Multiplayer Feature Plan
 
-Last reviewed: 2026-05-27
+Last reviewed: 2026-05-28
 
 This plan tracks explicit LAN support and the multiplayer feature path. The project currently has a secure local-default engine: Docker publishes the engine only on host loopback, React pairs with a local engine URL, and the desktop pairing token gates engine HTTP and Socket.IO access.
 
@@ -137,9 +137,30 @@ Open technical question: GStreamer `webrtcbin` may need one peer connection per 
 
 ## Implementation Phases
 
+### Phase 0: TypeScript Migration Track
+
+Status: planned alongside multiplayer work.
+
+The engine runtime and desktop launcher are still JavaScript while the web app and API are TypeScript. Multiplayer will add socket payload contracts, role/slot state, invite data, and desktop IPC state, so TypeScript should be introduced as part of the feature path rather than as a separate cosmetic rename.
+
+Recommended migration order:
+
+- Add TypeScript config/build support to `engine/runtime/` first.
+- Convert engine config, signaling payload validators, session room helpers, and input routing modules before implementing player slots.
+- Add TypeScript config/build support to `apps/desktop/` after LAN mode stabilizes.
+- Convert desktop IPC contracts, Docker command construction, LAN interface discovery, and lifecycle state handling.
+- Keep `camera.py` as Python and type the JSON contracts it receives through env/socket payloads on the Node side.
+
+Acceptance criteria:
+
+- Runtime Docker image still starts from built JavaScript output or a compatible Node entrypoint.
+- Engine tests and checks run through the new TypeScript build path.
+- Desktop preload/main IPC payloads are typed before lobby/player-slot UI is added.
+- No broad rename-only migration blocks LAN feature delivery.
+
 ### Phase 1: Explicit LAN Mode Toggle
 
-Status: planned.
+Status: implemented in code on 2026-05-28; pending two-device LAN smoke.
 
 Deliverables:
 
@@ -158,6 +179,8 @@ Acceptance criteria:
 - `http://localhost:8080/health` works in local mode.
 - `http://<lan-ip>:8080/health` works from another LAN device only after LAN mode is enabled.
 - Disabling LAN mode stops/restarts the container back on loopback and rotates the token.
+
+Implementation note: the current desktop UI locks exposure mode while the engine is running. Changing exposure mode requires stopping and restarting the engine, which rotates the token during the new start. A later UX pass can add one-click restart-on-toggle if that feels better.
 
 ### Phase 2: LAN Pairing UX
 
@@ -182,6 +205,7 @@ Status: planned.
 
 Deliverables:
 
+- Convert the relevant engine signaling/session modules to TypeScript before adding role state.
 - Add local engine session/lobby state.
 - Add `host`, `player`, and `spectator` roles.
 - Add join/leave events.
@@ -200,6 +224,7 @@ Status: planned.
 
 Deliverables:
 
+- Convert input event contracts and routing helpers to TypeScript before expanding player slots.
 - Extend React input events with `playerIndex`.
 - Add engine-side participant/slot validation.
 - Add player 2+ key/gamepad mapping strategy.
@@ -233,6 +258,7 @@ Status: planned, after local LAN proof.
 
 Deliverables:
 
+- Move shared lobby/session payload types into a shared TypeScript package if web, API, engine, and desktop all need the same contracts.
 - Add backend lobby records for signed-in users if needed.
 - Add optional invite metadata without storing engine tokens.
 - Add audit/metrics for multiplayer sessions.
