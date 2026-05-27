@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "check": "node --check server.js && find src -name '*.js' -exec node --check {} \\;",
+    "test": "node --test src/**/*.test.js",
     "start": "node server.js"
   },
   "dependencies": {

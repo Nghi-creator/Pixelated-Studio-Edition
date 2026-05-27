@@ -24,7 +24,7 @@ export const resolveGameBootTarget = async (
     console.log(
       `[WebRTC] Local Vault game detected. Booting directly: ${gameId} for user ${userId}`,
     );
-    return { romFilename: gameId, userId };
+    return { mode: "local", romFilename: gameId, userId };
   }
 
   const backendSession = await api.createSession(gameId, clientSessionId);
@@ -35,6 +35,7 @@ export const resolveGameBootTarget = async (
   console.log(`[WebRTC] Cloud Game found. Sending boot string: ${romFilename}`);
 
   return {
+    mode: "cloud",
     romFilename,
     sessionId: backendSession.sessionId,
     sessionToken: backendSession.sessionToken,

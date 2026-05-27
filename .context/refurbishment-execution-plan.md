@@ -267,8 +267,8 @@ Localhost-first behavior:
 - For now, `engineUrl` can still be `http://localhost:8080`.
 - The backend resolves `gameId` to `rom_url || rom_filename`.
 - The backend creates a short-lived signed session token.
-- The browser sends the session token to the local engine.
-- The local engine validates backend-created session tokens before booting cloud ROM targets.
+- The browser sends `mode: "cloud"` and the session token to the local engine.
+- The local engine validates backend-created session tokens and requires the verified backend session mode to be `cloud` before booting cloud ROM targets.
 
 Steps:
 
@@ -283,7 +283,7 @@ Exit criteria:
 
 - Done in code: cloud game boot no longer queries `games.rom_url` directly from React.
 - Done in code: React receives a backend session response and keeps using the current browser session id during the transition.
-- Done in code: the engine verifies backend session tokens before using a cloud ROM target.
+- Done in code: the engine verifies backend session tokens and backend `cloud` session intent before using a cloud ROM target.
 - Needs runtime smoke test: existing local engine still streams after the session route change.
 
 ## Phase 7: Add Local Pairing To Backend Model

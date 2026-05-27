@@ -8,7 +8,7 @@ This file tracks advisory recommendations and implementation status. Completed t
 
 The current idea is promising: React/Supabase is fine for the community layer, while the Electron + Docker engine proves the hard part of cloud gaming: isolated execution, capture, encode, signaling, and remote input.
 
-The backend control plane now exists and is live enough for staged testing. The biggest remaining gap has shifted from "add a backend" to "make backend-issued session intent authoritative across web, API, and engine, then add persistence/tests around those contracts."
+The backend control plane now exists and is live enough for staged testing. Backend-issued cloud session intent is now authoritative across web, API, and engine; the next meaningful gap is signed-in hosted smoke coverage and later hosted engine scheduling.
 
 Recommended direction:
 
@@ -18,6 +18,32 @@ Recommended direction:
 4. Add durable session/metric storage before multi-replica API hosting or hosted engine scheduling.
 
 ## Done
+
+### Backend Session Intent Validation
+
+Completed: 2026-05-27
+
+Implemented in:
+
+- `apps/web/src/lib/webrtcSession.ts`
+- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/sessions/verifyBackendSession.js`
+- `engine/runtime/src/signaling/startGameHandlers.test.js`
+- `.context/project-flows.md`
+- `.context/current-infrastructure.md`
+
+What changed:
+
+- Cloud player starts now send explicit `mode: "cloud"` with the backend `sessionToken`.
+- Local Vault starts now send explicit `mode: "local"` and continue without a backend session token.
+- The local engine treats `mode: "cloud"` or any provided `sessionToken` as backend session intent.
+- Cloud intent without a session token is rejected before any ROM can boot.
+- After `POST /sessions/:sessionId/verify`, the engine requires the verified backend session mode to be `cloud`.
+- The engine still uses the local pairing token for Socket.IO and Local Vault boundaries; the desktop pairing secret is not sent to the hosted backend.
+
+Remaining follow-up:
+
+- Runtime-smoke a signed-in cloud game through hosted Vercel, hosted Render, and the desktop engine after redeploying these changes.
 
 ### Session-Scoped Signaling
 
