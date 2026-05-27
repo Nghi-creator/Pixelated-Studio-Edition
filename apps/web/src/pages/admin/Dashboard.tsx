@@ -35,28 +35,11 @@ export default function Dashboard() {
     });
 
     const fetchReports = async () => {
-      const { data, error } = await supabase
-        .from("reported_comments")
-        .select(
-          `
-          id,
-          reason,
-          created_at,
-          comments (
-            id,
-            content,
-            profiles ( id, username, role ) 
-          ),
-          profiles ( id, username )
-        `,
-        )
-        .order("created_at", { ascending: false });
-
-      if (error) {
+      try {
+        const data = await api.adminReports<Report>();
+        setReports(data.reports);
+      } catch (error) {
         console.error("Error fetching reports:", error);
-      } else {
-        // @ts-expect-error - Supabase's type inference struggles with nested selects, so we assert the type here
-        setReports(data || []);
       }
       setLoading(false);
     };

@@ -129,6 +129,8 @@ export type ApiAdminReportActionResponse = {
 };
 
 export const api = {
+  adminReports: <TReport>() =>
+    apiRequest<{ reports: TReport[] }>("/admin/reports"),
   adminReportAction: (reportId: string, action: ApiAdminReportAction) =>
     apiRequest<ApiAdminReportActionResponse>(
       `/admin/reports/${reportId}/action`,

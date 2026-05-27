@@ -30,6 +30,7 @@ Current status:
 - `POST /games/:gameId/play-count` increments play count through the API instead of direct browser RPC.
 - `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
 - `POST /admin/reports/:reportId/action` resolves moderation queue actions through the API for ignore, delete-comment, and ban-user actions.
+- `GET /admin/reports` loads the moderation queue through the API for authenticated admins/super admins.
 - `POST /sessions` creates a short-lived backend session for cloud games, persists a hashed session token in Supabase, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
 - `POST /sessions/:sessionId/verify` verifies a short-lived session token and returns the backend-approved boot target to the local engine.
 - `POST /local-pairings` persists authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
@@ -47,7 +48,7 @@ Current status:
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - Cloud/library game boot, player play-count tracking, and comment reporting now depend on the API.
-- Admin report resolution actions now depend on the API instead of direct browser writes.
+- Admin report queue reads and resolution actions now depend on the API instead of direct browser Supabase access.
 
 ## Web App
 

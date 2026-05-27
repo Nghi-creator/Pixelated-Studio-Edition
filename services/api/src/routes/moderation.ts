@@ -93,6 +93,62 @@ export async function registerModerationRoutes(app: FastifyInstance) {
     },
   );
 
+  app.get(
+    "/admin/reports",
+    { preHandler: requireSupabaseUser },
+    async (request, reply) => {
+      const user = request.user;
+      if (!user) {
+        return reply.status(401).send({ error: "Missing authenticated user" });
+      }
+
+      if (!supabaseService) {
+        return reply.status(503).send({
+          error: "Supabase service client is not configured for the API.",
+        });
+      }
+
+      const { data: actorProfile, error: actorError } = await supabaseService
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle<ProfileRole>();
+
+      if (actorError) {
+        request.log.error(actorError, "Failed to load moderator profile");
+        return reply.status(500).send({ error: "Failed to authorize reports" });
+      }
+
+      if (!isAdminRole(actorProfile?.role)) {
+        return reply.status(403).send({ error: "Admin access required" });
+      }
+
+      const { data, error } = await supabaseService
+        .from("reported_comments")
+        .select(
+          `
+          id,
+          reason,
+          created_at,
+          comments (
+            id,
+            content,
+            profiles ( id, username, role )
+          ),
+          profiles ( id, username )
+        `,
+        )
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        request.log.error(error, "Failed to load moderation reports");
+        return reply.status(500).send({ error: "Failed to load reports" });
+      }
+
+      return { reports: data || [] };
+    },
+  );
+
   app.post(
     "/admin/reports/:reportId/action",
     { preHandler: requireSupabaseUser },

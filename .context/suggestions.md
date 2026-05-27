@@ -690,8 +690,30 @@ What changed:
 
 Remaining follow-up:
 
-- Move admin report list fetching through the API so the whole moderation queue is backend-shaped.
 - Add dedicated admin action tests with fake Supabase coverage.
+
+### Admin Report Queue Through Backend
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/src/routes/moderation.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/admin/Dashboard.tsx`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated `GET /admin/reports`.
+- Backend verifies the acting user is an admin or super admin before returning reports.
+- Admin dashboard now loads the moderation queue through the API instead of directly querying `reported_comments` from the browser.
+- The moderation queue is now backend-shaped for both reads and destructive actions.
+
+Remaining follow-up:
+
+- Add dedicated admin moderation tests with fake Supabase coverage.
 
 ### Backend Hosting Prep
 
@@ -844,7 +866,6 @@ Several workflows still write directly from the browser to Supabase. That is acc
 
 Suggested order:
 
-- Admin report list fetching.
 - Publish/submission uploads and metadata creation.
 - Access logging/session tracking.
 - Profile role-sensitive updates.
