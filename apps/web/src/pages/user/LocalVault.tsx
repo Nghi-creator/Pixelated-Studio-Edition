@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from "react";
 import {
+  AlertCircle,
   UploadCloud,
   Gamepad2,
   Loader2,
   ArrowLeft,
   Trash2,
+  CheckCircle2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
@@ -23,6 +25,10 @@ export default function LocalVault() {
   const [isUploading, setIsUploading] = useState(false);
   const [userId, setUserId] = useState<string>("anonymous");
   const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
+  const [vaultMessage, setVaultMessage] = useState<{
+    tone: "error" | "success";
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     const initVault = async () => {
@@ -43,6 +49,7 @@ export default function LocalVault() {
       const paired = hasEngineToken();
       setIsEnginePaired(paired);
       if (paired) {
+        setVaultMessage(null);
         fetchLocalGames(userId);
       } else {
         setLocalGames([]);
@@ -66,6 +73,10 @@ export default function LocalVault() {
       });
       if (res.status === 401) {
         clearEngineToken();
+        setVaultMessage({
+          tone: "error",
+          text: "The saved pairing token was rejected. Enter the current desktop token to reconnect.",
+        });
         throw new Error("Invalid engine pairing token");
       }
       if (!res.ok) throw new Error("Local engine offline");
@@ -73,6 +84,12 @@ export default function LocalVault() {
       setLocalGames(data);
     } catch (err) {
       console.error("Could not connect to local Docker engine:", err);
+      setVaultMessage((currentMessage) =>
+        currentMessage || {
+          tone: "error",
+          text: "Local engine is unreachable. Check the desktop app and engine URL.",
+        },
+      );
     }
   };
 
@@ -101,15 +118,22 @@ export default function LocalVault() {
 
   const uploadFile = async (file: File) => {
     if (!hasEngineToken()) {
-      alert("Pair the local engine before uploading ROMs.");
+      setVaultMessage({
+        tone: "error",
+        text: "Pair the local engine before uploading ROMs.",
+      });
       return;
     }
 
     if (!file.name.toLowerCase().endsWith(".nes")) {
-      alert("Only .nes files are supported!");
+      setVaultMessage({
+        tone: "error",
+        text: "Only .nes files are supported.",
+      });
       return;
     }
 
+    setVaultMessage(null);
     setIsUploading(true);
     const formData = new FormData();
     formData.append("romFile", file);
@@ -123,15 +147,31 @@ export default function LocalVault() {
 
       if (res.ok) {
         await fetchLocalGames(userId);
+        setVaultMessage({
+          tone: "success",
+          text: "ROM uploaded to your Local Vault.",
+        });
       } else if (res.status === 401) {
         clearEngineToken();
-        alert("Invalid pairing token. Please enter the desktop app token again.");
+        setVaultMessage({
+          tone: "error",
+          text: "The saved pairing token was rejected. Enter the current desktop token to reconnect.",
+        });
       } else {
-        alert("Upload failed.");
+        const payload = await res.json().catch(() => null);
+        setVaultMessage({
+          tone: "error",
+          text:
+            payload?.error ||
+            "Upload failed. Check the ROM file and try again.",
+        });
       }
     } catch (err) {
       console.error("Upload error:", err);
-      alert("Make sure your Docker engine is running!");
+      setVaultMessage({
+        tone: "error",
+        text: "Local engine is unreachable. Check the desktop app and engine URL.",
+      });
     } finally {
       setIsUploading(false);
     }
@@ -153,15 +193,28 @@ export default function LocalVault() {
 
       if (res.ok) {
         await fetchLocalGames(userId);
+        setVaultMessage({
+          tone: "success",
+          text: "Local Vault game deleted.",
+        });
       } else if (res.status === 401) {
         clearEngineToken();
-        alert("Invalid pairing token. Please enter the desktop app token again.");
+        setVaultMessage({
+          tone: "error",
+          text: "The saved pairing token was rejected. Enter the current desktop token to reconnect.",
+        });
       } else {
-        alert("Failed to delete game.");
+        setVaultMessage({
+          tone: "error",
+          text: "Failed to delete that game.",
+        });
       }
     } catch (err) {
       console.error("Delete error:", err);
-      alert("Make sure your Docker engine is running!");
+      setVaultMessage({
+        tone: "error",
+        text: "Local engine is unreachable. Check the desktop app and engine URL.",
+      });
     }
   };
 
@@ -191,6 +244,23 @@ export default function LocalVault() {
       <div className="mb-8">
         <EnginePairingPanel onPaired={() => fetchLocalGames(userId)} />
       </div>
+
+      {vaultMessage && (
+        <div
+          className={`mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${
+            vaultMessage.tone === "error"
+              ? "border-red-400/30 bg-red-500/10 text-red-200"
+              : "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+          }`}
+        >
+          {vaultMessage.tone === "error" ? (
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          ) : (
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+          )}
+          <p>{vaultMessage.text}</p>
+        </div>
+      )}
 
       {/* THE DROPZONE */}
       <div
