@@ -118,6 +118,18 @@ export type ApiStreamMetricPayload = {
   timestamp: string;
 };
 
+export type ApiIceServer = {
+  credential?: string;
+  urls: string | string[];
+  username?: string;
+};
+
+export type ApiIceServersResponse = {
+  expiresAt: string | null;
+  iceServers: ApiIceServer[];
+  ttlSeconds: number;
+};
+
 export type ApiAdminReportAction = "ban_user" | "delete_comment" | "ignore";
 
 export type ApiAdminReportActionResponse = {
@@ -210,6 +222,7 @@ export const api = {
       `/games/${gameId}/reactions`,
       { authenticated: false },
     ),
+  iceServers: () => apiRequest<ApiIceServersResponse>("/webrtc/ice-servers"),
   listFavorites: <TFavorite>() => apiRequest<{ favorites: TFavorite[] }>("/favorites"),
   localPairing: () =>
     apiRequest<ApiLocalPairingResponse>("/local-pairings/current"),

@@ -1,7 +1,10 @@
 const assert = require("node:assert/strict");
 const { EventEmitter } = require("node:events");
 const test = require("node:test");
-const { registerStartGameHandler } = require("./startGameHandlers");
+const {
+  normalizeStreamProfile,
+  registerStartGameHandler,
+} = require("./startGameHandlers");
 
 class FakeSocket extends EventEmitter {
   constructor() {
@@ -98,7 +101,10 @@ test("verified cloud sessions replace browser supplied boot targets", async () =
   assert.equal(calls.verify, 1);
   assert.equal(downloads[0].romUrl, "https://cdn.example.test/game.nes");
   assert.equal(booted[0].sessionId, "session-2");
-  assert.deepEqual(booted[0].options, { isCloudRom: true });
+  assert.deepEqual(booted[0].options, {
+    isCloudRom: true,
+    streamProfile: { bitrateKbps: 1000, fps: 60, id: "balanced" },
+  });
 });
 
 test("non-cloud backend sessions cannot boot through cloud intent", async () => {
@@ -140,4 +146,27 @@ test("local vault starts still use local rom paths without backend verification"
   assert.equal(calls.verify, 0);
   assert.equal(booted[0].romPath, "/roms/local-user/game.nes");
   assert.equal(booted[0].sessionId, "session-4");
+  assert.deepEqual(booted[0].options, {
+    streamProfile: { bitrateKbps: 1000, fps: 60, id: "balanced" },
+  });
+});
+
+test("stream profiles are clamped before reaching the runtime", () => {
+  assert.deepEqual(
+    normalizeStreamProfile({
+      bitrateKbps: 1600,
+      fps: 30,
+      id: "performance",
+    }),
+    { bitrateKbps: 1600, fps: 30, id: "performance" },
+  );
+
+  assert.deepEqual(
+    normalizeStreamProfile({
+      bitrateKbps: 99999,
+      fps: 999,
+      id: "not allowed!",
+    }),
+    { bitrateKbps: 1000, fps: 60, id: "balanced" },
+  );
 });

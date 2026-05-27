@@ -91,6 +91,10 @@ function createProcessManager(options) {
           PULSE_SERVER: "127.0.0.1",
           PIXELATED_SESSION_ID: sessionId,
           PIXELATED_ENGINE_TOKEN: engineToken,
+          PIXELATED_ICE_SERVERS: JSON.stringify(bootOptions.iceServers || []),
+          PIXELATED_STREAM_PROFILE: JSON.stringify(
+            bootOptions.streamProfile || {},
+          ),
         },
       });
 

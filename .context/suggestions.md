@@ -8,7 +8,7 @@ This file tracks advisory recommendations and implementation status. Completed t
 
 The current idea is promising: React/Supabase is fine for the community layer, while the Electron + Docker engine proves the hard part of cloud gaming: isolated execution, capture, encode, signaling, and remote input.
 
-The backend control plane now owns the web app data boundary. Backend-issued cloud session intent is authoritative across web, API, and engine, and the frontend no longer calls Supabase tables, RPCs, or realtime channels directly. The next meaningful gap is deploy sequencing for the new boundary hardening migration, signed-in hosted smoke coverage, and later hosted engine scheduling.
+The backend control plane now owns the web app data boundary. Backend-issued cloud session intent is authoritative across web, API, and engine, and the frontend no longer calls Supabase tables, RPCs, or realtime channels directly. The next implementation gap is explicit LAN-mode product support, then later hosted engine scheduling.
 
 Recommended direction:
 
@@ -760,6 +760,7 @@ Implemented in:
 - `services/api/src/server.ts`
 - `apps/web/src/lib/apiClient.ts`
 - `apps/web/src/lib/useSessionTracker.ts`
+- `supabase/migrations/20260527104500_backend_access_logs.sql`
 - `.context/current-infrastructure.md`
 - `.context/suggestions.md`
 
@@ -817,11 +818,39 @@ What changed:
 - Removed the remaining frontend Supabase table/RPC/realtime usage under `apps/web/src`.
 - Browser Supabase usage is now limited to auth/session handling and intentional Storage uploads for avatars and submissions.
 - Added a staged hardening migration that removes now-obsolete direct browser policies for favorites, likes, comments, comment likes, reported comments, profile updates, and admin access-log reads.
+- The hardening migration was pushed to hosted Supabase on 2026-05-27.
 
 Remaining follow-up:
 
-- Deploy the new API and web builds, then push `supabase/migrations/20260527111500_api_owned_social_writes.sql` with or immediately after the deploy so production is not caught between old frontend code and hardened RLS policies.
-- Add dedicated API tests for catalog/social/profile/admin-user/access-log routes.
+- Browser-smoke signed-in library, favorites, comments/reactions, profile update, admin users, and admin access logs against the hosted stack.
+
+### Backend-Owned Data Route Tests
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/src/dataBoundary.test.ts`
+- `services/api/src/routes/accessLogs.ts`
+- `services/api/src/routes/adminUsers.ts`
+- `services/api/src/routes/catalog.ts`
+- `services/api/src/routes/profiles.ts`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added Fastify injection tests for the API-owned data boundary without requiring a live Supabase database.
+- Route modules for catalog/social/profile/admin-user/access-log flows now support injectable auth and Supabase dependencies, matching the existing control-plane test pattern.
+- Tests cover game catalog and favorite reads/deletes.
+- Tests cover comment deletion scoping: regular users can only delete their own comments, while admins can delete any comment.
+- Tests cover comment reaction replacement and self-reaction rejection.
+- Tests cover profile update scoping and account deletion via Supabase auth admin.
+- Tests cover admin-user and admin-access-log authorization for regular users, admins, and super admins.
+
+Remaining follow-up:
+
+- Add tests for the submission notification path and admin report action edge cases when those areas get their next pass.
 
 ### Backend Hosting Prep
 
@@ -954,11 +983,162 @@ Remaining follow-up:
 - Move shared contracts to `packages/shared` after API/web payloads settle.
 - Remove any leftover ignored generated artifacts under the old folder names when convenient.
 
-## Highest Priority Issues
+### Desktop Docker Lifecycle States
 
-### 1. Complete Signed-In Hosted Smoke Coverage
+Implemented: 2026-05-27
 
-The live API health, readiness, protected-route, CORS, deployed bundle, and Docker engine smoke checks passed after the latest deploys. The remaining missing test is the signed-in browser path that requires a real user session.
+Implemented in:
+
+- `apps/desktop/main.js`
+- `apps/desktop/preload.js`
+- `apps/desktop/index.html`
+- `apps/desktop/README.md`
+- `engine/runtime/README.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added structured desktop engine lifecycle events for checking Docker, pulling image, building image, removing stale containers, starting container, waiting for health, ready, stopping, stopped, and failed.
+- Updated the desktop UI to show those lifecycle states instead of one generic booting state.
+- Added optional prebuilt image support through `PIXELATED_ENGINE_IMAGE` and `PIXELATED_ENGINE_PULL=1`.
+- Kept local image building as the default developer path.
+- Added pull-to-build fallback behavior, with `PIXELATED_ENGINE_BUILD_FALLBACK=0` available for packaged releases that should fail instead of building locally.
+- Added Docker image reference validation before shelling out to Docker.
+
+Remaining follow-up:
+
+- Publish a real versioned engine image to a registry and set production desktop packaging env vars to pull it.
+- Runtime-smoke the desktop app with both default local build mode and prebuilt image pull mode.
+
+### Backend-Issued WebRTC ICE Config
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/src/routes/webrtc.ts`
+- `services/api/src/server.ts`
+- `services/api/src/config/env.ts`
+- `services/api/src/webrtc.test.ts`
+- `services/api/.env.example`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/lib/webrtcPeer.ts`
+- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/camera.py`
+- `engine/runtime/README.md`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/backend-hosting-checklist.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated `GET /webrtc/ice-servers`.
+- API returns configured STUN URLs and can issue coturn REST-style short-lived TURN credentials when `TURN_URLS` and `TURN_SHARED_SECRET` are configured.
+- API also supports static TURN credentials through `TURN_STATIC_USERNAME` and `TURN_STATIC_CREDENTIAL`.
+- React loads ICE config before creating `RTCPeerConnection`, with a Google STUN fallback when the API is unavailable or the user is unsigned.
+- React forwards the same ICE config in `start-game`.
+- Node validates ICE server payloads and forwards only URL, username, and credential fields into `camera.py`.
+- Python configures GStreamer `webrtcbin` with the matching STUN/TURN servers before answering the WebRTC offer.
+- Added tests for default ICE config and coturn REST credential generation.
+
+Remaining follow-up:
+
+- Configure a real TURN provider on Render with `TURN_URLS` and `TURN_SHARED_SECRET`, or static TURN credentials if the provider does not support REST credentials, before relying on relay behavior in production.
+
+### API Test Folder Consolidation
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/tests/controlPlane.test.ts`
+- `services/api/tests/dataBoundary.test.ts`
+- `services/api/tests/webrtc.test.ts`
+- `services/api/package.json`
+- `services/api/README.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Moved API `.test.ts` files out of `services/api/src/` and into `services/api/tests/`.
+- Updated the API test script to run `tsx --test "tests/**/*.test.ts"`.
+- Updated relative test imports to reference `../src/...`.
+
+Remaining follow-up:
+
+- Keep new API tests in `services/api/tests/` so route/source folders stay easier to scan.
+
+### WebRTC Retry And Failure Recovery
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/features/player/StreamStage.tsx`
+- `apps/web/src/pages/user/Player.tsx`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added a player retry action for stream errors.
+- Retrying creates a fresh WebRTC session id, clears stale telemetry/metrics timers, and restarts local engine negotiation without leaving the player page.
+- WebRTC connection `failed` state now moves the player into an actionable error state.
+- WebRTC `disconnected` state gets a short grace period before surfacing an error, reducing flicker during brief network changes.
+- Local engine connection failures and rejected pairing tokens now set clearer player-facing error messages.
+
+Remaining follow-up:
+
+- Runtime smoke is tracked in the manual validation section because it requires Docker Desktop and an interactive player session.
+
+### WebRTC Stream Profiles
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `apps/web/src/lib/streamProfiles.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/features/player/PlayerControls.tsx`
+- `apps/web/src/pages/user/Player.tsx`
+- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/signaling/startGameHandlers.test.js`
+- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/camera.py`
+- `engine/runtime/README.md`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added stream profile presets: Performance, Balanced, and Quality.
+- The player UI exposes profile selection and persists it in `localStorage`.
+- React forwards selected profile bitrate and framerate in `start-game`.
+- The local engine validates profile id, fps, and bitrate before using them.
+- Node passes the sanitized profile to `camera.py` as `PIXELATED_STREAM_PROFILE`.
+- Python applies the profile to GStreamer capture framerate and VP8 target bitrate.
+- Engine tests cover stream profile validation/clamping.
+
+Remaining follow-up:
+
+- Automated validation is complete. Runtime smoke is tracked in the manual validation section because it requires Docker Desktop and an interactive player session.
+
+## Manual Validation Items
+
+These are not active code implementation tasks. They require an interactive browser session, a signed-in user, Docker Desktop running, or a real TURN provider.
+
+### Signed-In Hosted Smoke Coverage
+
+Status: external/manual validation.
+
+The live API health, readiness, protected-route, CORS, deployed bundle, and Docker engine smoke checks passed after the latest deploys. The remaining hosted smoke path requires a real signed-in browser session.
 
 Smoke checklist:
 
@@ -968,42 +1148,32 @@ Smoke checklist:
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
 
-### 2. Deploy Backend-Owned Data Boundary Hardening
+### WebRTC Runtime Smoke
 
-The code boundary is in place, but the RLS hardening migration is intentionally staged until the matching backend and frontend deploys are live.
+Status: ready for interactive smoke. Docker Desktop is reachable from the CLI as of 2026-05-27; the remaining checks require launching the desktop app and using the browser player.
 
-Deploy order:
+Smoke checklist:
 
-- Deploy the Render API build that includes catalog, social, profile, admin user, and admin access-log routes.
-- Deploy the Vercel web build that calls those API routes.
-- Push `supabase/migrations/20260527111500_api_owned_social_writes.sql`.
-- Smoke-test library, favorites, player comments/reactions, profile update, admin users, admin reports, admin access logs, cloud play, local pairing, and stream metrics with a signed-in user.
+- Start Docker Desktop.
+- Launch the desktop app.
+- Start a player session.
+- Stop/restart the desktop engine during playback and verify the retry button recovers.
+- Switch Performance, Balanced, and Quality profiles and compare received FPS/bitrate in developer telemetry.
+- If a TURN provider is configured, smoke from a network where direct/STUN connectivity fails and confirm relay candidates appear in WebRTC stats.
 
-### 3. Improve Docker Build/Run Lifecycle
+## Highest Priority Issues
 
-The Electron app builds the image on demand and uses a fixed container name/port. This is workable for a demo, but fragile for users.
+### 1. Decide Explicit LAN Support
 
-Suggested improvements:
+The local engine is currently bound to host loopback. That is the right secure default. LAN streaming is now tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
 
-- Build and publish the engine image ahead of time, then `docker pull` tagged versions.
-- Keep local build as a development fallback.
-- Add more structured engine states: checking Docker, pulling/building image, starting container, waiting for health, ready, failed.
+Recommended next implementation slice:
 
-### 4. Fix WebRTC Production Readiness
-
-Google STUN alone is not enough for real users and varied networks.
-
-Suggested improvements:
-
-- Add TURN support.
-- Generate short-lived TURN credentials from the backend.
-- Add reconnect/fail recovery flows beyond the current ICE/error display.
-- Add bitrate/framerate profiles.
-- Add a fallback message when the local engine is offline.
-
-### 5. Decide Explicit LAN Support
-
-The local engine is currently bound to host loopback. That is the right secure default. If LAN streaming becomes a product goal, add it as an explicit desktop setting with warning copy, origin controls, and token rotation.
+- Add an explicit desktop LAN mode toggle, default off.
+- Rotate the pairing token whenever LAN mode changes.
+- Keep loopback-only Docker publishing in local mode.
+- Publish the engine to LAN only after the user enables LAN mode.
+- Display discovered LAN URL(s), warning copy, and the active pairing token in the desktop app.
 
 ## Database And Supabase Suggestions
 

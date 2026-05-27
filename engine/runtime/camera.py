@@ -1,5 +1,7 @@
 import socketio
 import os
+import json
+from urllib.parse import quote, urlparse, urlunparse
 import gi
 gi.require_version('Gst', '1.0')
 gi.require_version('GstWebRTC', '1.0')
@@ -12,8 +14,72 @@ Gst.init(None)
 
 SESSION_ID = os.environ.get('PIXELATED_SESSION_ID', 'default-session')
 ENGINE_TOKEN = os.environ.get('PIXELATED_ENGINE_TOKEN', '')
+ICE_SERVERS = os.environ.get('PIXELATED_ICE_SERVERS', '[]')
+STREAM_PROFILE = os.environ.get('PIXELATED_STREAM_PROFILE', '{}')
 webrtcbin = None
 pipeline = None
+
+def parse_ice_servers():
+    try:
+        parsed = json.loads(ICE_SERVERS)
+        return parsed if isinstance(parsed, list) else []
+    except Exception as exc:
+        print(f"[Python] Failed to parse PIXELATED_ICE_SERVERS: {exc}")
+        return []
+
+def iter_ice_urls(server):
+    urls = server.get('urls') if isinstance(server, dict) else None
+    if isinstance(urls, str):
+        return [urls]
+    if isinstance(urls, list):
+        return [url for url in urls if isinstance(url, str)]
+    return []
+
+def configure_ice_servers(webrtc):
+    for server in parse_ice_servers():
+        username = server.get('username') if isinstance(server, dict) else None
+        credential = server.get('credential') if isinstance(server, dict) else None
+
+        for url in iter_ice_urls(server):
+            parsed = urlparse(url)
+            if parsed.scheme == 'stun':
+                webrtc.set_property('stun-server', url)
+                print(f"[Python] Configured STUN server: {url}")
+            elif parsed.scheme in ['turn', 'turns'] and username and credential:
+                safe_username = quote(username, safe='')
+                safe_credential = quote(credential, safe='')
+                netloc = f"{safe_username}:{safe_credential}@{parsed.netloc}"
+                turn_url = urlunparse((parsed.scheme, netloc, parsed.path, '', parsed.query, ''))
+                webrtc.set_property('turn-server', turn_url)
+                print(f"[Python] Configured TURN server: {parsed.scheme}://{parsed.netloc}")
+
+def parse_stream_profile():
+    try:
+        parsed = json.loads(STREAM_PROFILE)
+        profile = parsed if isinstance(parsed, dict) else {}
+    except Exception as exc:
+        print(f"[Python] Failed to parse PIXELATED_STREAM_PROFILE: {exc}")
+        profile = {}
+
+    try:
+        fps = int(profile.get('fps', 60))
+    except Exception:
+        fps = 60
+
+    try:
+        bitrate_kbps = int(profile.get('bitrateKbps', 1000))
+    except Exception:
+        bitrate_kbps = 1000
+
+    fps = min(max(fps, 24), 60)
+    bitrate_kbps = min(max(bitrate_kbps, 500), 2500)
+
+    return {
+        'bitrate': bitrate_kbps * 1000,
+        'bitrate_kbps': bitrate_kbps,
+        'fps': fps,
+        'id': profile.get('id', 'balanced') if isinstance(profile.get('id', 'balanced'), str) else 'balanced'
+    }
 
 def emit_engine_error(message):
     print(f"[Python] Engine error: {message}")
@@ -33,15 +99,18 @@ def handle_offer(offer):
     if pipeline is not None:
         print("[Python] Pipeline already running! Ignoring duplicate React offer.")
         return
+
+    stream_profile = parse_stream_profile()
+    print(f"[Python] Stream profile: {stream_profile['id']} ({stream_profile['fps']}fps, {stream_profile['bitrate_kbps']}kbps)")
     
-    pipeline_str = """
+    pipeline_str = f"""
         webrtcbin name=sendrecv
         
         ximagesrc display-name=:99 use-damage=false show-pointer=false ! 
-        video/x-raw,framerate=60/1 ! 
+        video/x-raw,framerate={stream_profile['fps']}/1 ! 
         videoconvert ! video/x-raw,format=I420 ! 
         queue max-size-buffers=1 leaky=downstream ! 
-        vp8enc deadline=1 cpu-used=8 threads=4 end-usage=cbr target-bitrate=1000000 max-quantizer=56 min-quantizer=4 keyframe-max-dist=120 error-resilient=1 ! 
+        vp8enc deadline=1 cpu-used=8 threads=4 end-usage=cbr target-bitrate={stream_profile['bitrate']} max-quantizer=56 min-quantizer=4 keyframe-max-dist=120 error-resilient=1 ! 
         rtpvp8pay pt=96 ! 
         queue max-size-buffers=1 leaky=downstream ! 
         application/x-rtp,media=video,encoding-name=VP8,payload=96 ! sendrecv.
@@ -53,6 +122,7 @@ def handle_offer(offer):
     """
     pipeline = Gst.parse_launch(pipeline_str)
     webrtcbin = pipeline.get_by_name('sendrecv')
+    configure_ice_servers(webrtcbin)
 
     bus = pipeline.get_bus()
     bus.add_signal_watch()

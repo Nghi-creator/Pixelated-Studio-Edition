@@ -15,6 +15,7 @@ import { registerModerationRoutes } from "./routes/moderation.js";
 import { registerProfileRoutes } from "./routes/profiles.js";
 import { registerSessionRoutes } from "./routes/sessions.js";
 import { registerSubmissionRoutes } from "./routes/submissions.js";
+import { registerWebRTCRoutes } from "./routes/webrtc.js";
 
 export async function buildServer() {
   const app = Fastify({
@@ -34,6 +35,7 @@ export async function buildServer() {
   await registerSubmissionRoutes(app);
   await registerSessionRoutes(app);
   await registerMetricRoutes(app);
+  await registerWebRTCRoutes(app);
   scheduleControlPlaneCleanup(app);
 
   return app;

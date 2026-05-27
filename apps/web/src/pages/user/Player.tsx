@@ -15,6 +15,12 @@ import { useGameReactions } from "../../features/player/useGameReactions";
 import { usePlayCount } from "../../features/player/usePlayCount";
 import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
 import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engineAuth";
+import {
+  getStreamProfile,
+  STREAM_PROFILES,
+  STREAM_PROFILE_STORAGE_KEY,
+  type StreamProfileId,
+} from "../../lib/streamProfiles";
 import { useWebRTC } from "../../lib/useWebRTC";
 
 const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
@@ -24,7 +30,17 @@ export default function Player() {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const { stream, status, telemetry } = useWebRTC(id || "");
+  const [streamProfileId, setStreamProfileId] = useState<StreamProfileId>(() => {
+    if (typeof window === "undefined") return "balanced";
+    return getStreamProfile(
+      window.localStorage.getItem(STREAM_PROFILE_STORAGE_KEY),
+    ).id;
+  });
+  const streamProfile = getStreamProfile(streamProfileId);
+  const { retry, stream, status, telemetry } = useWebRTC(
+    id || "",
+    streamProfile,
+  );
   const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
   const currentUser = useAuthUser();
   const { authorName, gameTitle } = useGameMetadata(id);
@@ -73,6 +89,10 @@ export default function Player() {
       showStreamTelemetry ? "1" : "0",
     );
   }, [showStreamTelemetry]);
+
+  useEffect(() => {
+    window.localStorage.setItem(STREAM_PROFILE_STORAGE_KEY, streamProfileId);
+  }, [streamProfileId]);
 
   useEffect(() => {
     if (videoRef.current && stream) {
@@ -132,6 +152,7 @@ export default function Player() {
       )}
 
       <StreamStage
+        onRetry={retry}
         showStreamTelemetry={showStreamTelemetry}
         status={status}
         telemetry={telemetry}
@@ -142,6 +163,7 @@ export default function Player() {
 
       <PlayerControls
         authorName={authorName}
+        onStreamProfileChange={setStreamProfileId}
         reactionButtons={
           <ReactionButtons
             dislikes={dislikes}
@@ -150,6 +172,8 @@ export default function Player() {
             userReaction={userReaction}
           />
         }
+        selectedStreamProfileId={streamProfileId}
+        streamProfiles={STREAM_PROFILES}
       />
 
       <CommentsPanel

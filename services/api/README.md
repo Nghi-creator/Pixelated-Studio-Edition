@@ -50,7 +50,7 @@ GET http://localhost:4000/ready
 
 ## Current Scope
 
-The API now handles authenticated identity/permissions, game catalog reads, favorites, reactions, comments, profile updates/deletion, admin reports, admin users, access logs, game submission metadata and notifications, persisted local pairing metadata, persisted stream metric ingestion, and cloud game session creation/verification. The local engine still runs separately on `localhost:8080`.
+The API now handles authenticated identity/permissions, game catalog reads, favorites, reactions, comments, profile updates/deletion, admin reports, admin users, access logs, game submission metadata and notifications, WebRTC ICE server config, persisted local pairing metadata, persisted stream metric ingestion, and cloud game session creation/verification. The local engine still runs separately on `localhost:8080`.
 
 Implemented now:
 
@@ -79,6 +79,7 @@ Implemented now:
 - Authenticated `GET /admin/access-logs`.
 - Authenticated `POST /submissions/games`.
 - Optional server-side Formspree notifications for game submissions.
+- Authenticated `GET /webrtc/ice-servers`.
 - Authenticated `POST /sessions`.
 - `POST /sessions/:sessionId/verify` for local engine cloud session verification.
 - Authenticated local pairing routes.
@@ -126,6 +127,7 @@ GET /admin/users
 PATCH /admin/users/:userId
 GET /admin/access-logs
 POST /submissions/games
+GET /webrtc/ice-servers
 POST /sessions
 GET /sessions/:sessionId
 DELETE /sessions/:sessionId
@@ -159,6 +161,12 @@ PORT=<provider port>
 WEB_ORIGIN=https://pixelated-studio-edition.vercel.app
 CONTROL_PLANE_CLEANUP_INTERVAL_MS=3600000
 STREAM_METRIC_RETENTION_DAYS=7
+STUN_URLS=stun:stun.l.google.com:19302
+TURN_URLS=<optional comma-separated turn: or turns: URLs>
+TURN_SHARED_SECRET=<optional coturn REST shared secret>
+TURN_STATIC_USERNAME=<optional static TURN username>
+TURN_STATIC_CREDENTIAL=<optional static TURN credential>
+TURN_CREDENTIAL_TTL_SECONDS=3600
 FORMSPREE_SUBMISSION_URL=<optional Formspree endpoint for submission notifications>
 SUPABASE_URL=<your Supabase URL>
 SUPABASE_ANON_KEY=<your Supabase anon key>
@@ -173,4 +181,4 @@ Run the focused API test suite from this folder:
 npm run test
 ```
 
-The current tests use Fastify injection and a fake Supabase service, so they do not require local database access.
+Tests live under `services/api/tests/`. The current tests use Fastify injection and a fake Supabase service, so they do not require local database access.

@@ -2,10 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
 import type { FastifyRequest } from "fastify";
-import { cleanupControlPlaneState } from "./modules/maintenance/controlPlaneCleanup.js";
-import { registerLocalPairingRoutes } from "./routes/localPairings.js";
-import { registerMetricRoutes } from "./routes/metrics.js";
-import { registerSessionRoutes } from "./routes/sessions.js";
+import { cleanupControlPlaneState } from "../src/modules/maintenance/controlPlaneCleanup.js";
+import { registerLocalPairingRoutes } from "../src/routes/localPairings.js";
+import { registerMetricRoutes } from "../src/routes/metrics.js";
+import { registerSessionRoutes } from "../src/routes/sessions.js";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const OTHER_USER_ID = "22222222-2222-4222-8222-222222222222";

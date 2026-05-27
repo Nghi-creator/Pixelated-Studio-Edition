@@ -1,18 +1,22 @@
 import type { Socket } from "socket.io-client";
 
 type PeerConnectionOptions = {
+  iceServers?: RTCIceServer[];
   socket: Socket;
   sessionId: string;
   onTrack: (track: MediaStreamTrack) => void;
 };
 
 export const createEnginePeerConnection = ({
+  iceServers,
   socket,
   sessionId,
   onTrack,
 }: PeerConnectionOptions) => {
   const peerConnection = new RTCPeerConnection({
-    iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
+    iceServers: iceServers?.length
+      ? iceServers
+      : [{ urls: "stun:stun.l.google.com:19302" }],
   });
 
   peerConnection.ontrack = (event) => {

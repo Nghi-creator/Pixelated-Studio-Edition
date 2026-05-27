@@ -17,14 +17,24 @@ type ProfileRole = {
   role: string | null;
 };
 
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
+
+type AdminUserRouteOptions = {
+  requireUser?: typeof requireSupabaseUser;
+  supabase?: SupabaseServiceLike | null;
+};
+
 function isSuperAdminRole(role: string | null | undefined) {
   return role === "super_admin";
 }
 
-async function requireSuperAdmin(userId: string) {
-  if (!supabaseService) return false;
+async function requireSuperAdmin(
+  service: SupabaseServiceLike | null,
+  userId: string,
+) {
+  if (!service) return false;
 
-  const { data, error } = await supabaseService
+  const { data, error } = await service
     .from("profiles")
     .select("role")
     .eq("id", userId)
@@ -34,26 +44,32 @@ async function requireSuperAdmin(userId: string) {
   return isSuperAdminRole(data?.role);
 }
 
-export async function registerAdminUserRoutes(app: FastifyInstance) {
+export async function registerAdminUserRoutes(
+  app: FastifyInstance,
+  options: AdminUserRouteOptions = {},
+) {
+  const requireUser = options.requireUser || requireSupabaseUser;
+  const service = options.supabase === undefined ? supabaseService : options.supabase;
+
   app.get(
     "/admin/users",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
 
-      if (!(await requireSuperAdmin(user.id))) {
+      if (!(await requireSuperAdmin(service, user.id))) {
         return reply.status(403).send({ error: "Super admin access required" });
       }
 
-      const { data, error } = await supabaseService
+      const { data, error } = await service
         .from("profiles")
         .select("*")
         .order("created_at", { ascending: false });
@@ -69,19 +85,19 @@ export async function registerAdminUserRoutes(app: FastifyInstance) {
 
   app.patch(
     "/admin/users/:userId",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
 
-      if (!(await requireSuperAdmin(user.id))) {
+      if (!(await requireSuperAdmin(service, user.id))) {
         return reply.status(403).send({ error: "Super admin access required" });
       }
 
@@ -95,7 +111,7 @@ export async function registerAdminUserRoutes(app: FastifyInstance) {
         return reply.status(403).send({ error: "Cannot modify yourself" });
       }
 
-      const { data: target } = await supabaseService
+      const { data: target } = await service
         .from("profiles")
         .select("role")
         .eq("id", params.data.userId)
@@ -104,7 +120,7 @@ export async function registerAdminUserRoutes(app: FastifyInstance) {
         return reply.status(403).send({ error: "Cannot modify super admins" });
       }
 
-      const { data, error } = await supabaseService
+      const { data, error } = await service
         .from("profiles")
         .update(body.data)
         .eq("id", params.data.userId)

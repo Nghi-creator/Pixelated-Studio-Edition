@@ -21,14 +21,21 @@ type ProfileRole = {
   role: string | null;
 };
 
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
+
+type CatalogRouteOptions = {
+  requireUser?: typeof requireSupabaseUser;
+  supabase?: SupabaseServiceLike | null;
+};
+
 function isAdminRole(role: string | null | undefined) {
   return role === "admin" || role === "super_admin";
 }
 
-async function getUserRole(userId: string) {
-  if (!supabaseService) return null;
+async function getUserRole(service: SupabaseServiceLike | null, userId: string) {
+  if (!service) return null;
 
-  const { data, error } = await supabaseService
+  const { data, error } = await service
     .from("profiles")
     .select("role")
     .eq("id", userId)
@@ -38,15 +45,21 @@ async function getUserRole(userId: string) {
   return data?.role || null;
 }
 
-export async function registerCatalogRoutes(app: FastifyInstance) {
+export async function registerCatalogRoutes(
+  app: FastifyInstance,
+  options: CatalogRouteOptions = {},
+) {
+  const requireUser = options.requireUser || requireSupabaseUser;
+  const service = options.supabase === undefined ? supabaseService : options.supabase;
+
   app.get("/games", async (request, reply) => {
-    if (!supabaseService) {
+    if (!service) {
       return reply.status(503).send({
         error: "Supabase service client is not configured for the API.",
       });
     }
 
-    const { data, error } = await supabaseService
+    const { data, error } = await service
       .from("games")
       .select("*")
       .order("title");
@@ -60,7 +73,7 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
   });
 
   app.get("/games/:gameId", async (request, reply) => {
-    if (!supabaseService) {
+    if (!service) {
       return reply.status(503).send({
         error: "Supabase service client is not configured for the API.",
       });
@@ -71,7 +84,7 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: "Invalid game id" });
     }
 
-    const { data, error } = await supabaseService
+    const { data, error } = await service
       .from("games")
       .select("id,title,author_name,rom_url,rom_filename,cover_url,backdrop_url,play_count")
       .eq("id", params.data.gameId)
@@ -91,19 +104,19 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
 
   app.get(
     "/favorites",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
 
-      const { data, error } = await supabaseService
+      const { data, error } = await service
         .from("favorites")
         .select("game_id,games(id,title,cover_url)")
         .eq("user_id", user.id)
@@ -124,13 +137,13 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
 
   app.get(
     "/favorites/:gameId",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -141,7 +154,7 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid game id" });
       }
 
-      const { data, error } = await supabaseService
+      const { data, error } = await service
         .from("favorites")
         .select("game_id")
         .eq("user_id", user.id)
@@ -159,13 +172,13 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
 
   app.put(
     "/favorites/:gameId",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -176,7 +189,7 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid game id" });
       }
 
-      const { error } = await supabaseService
+      const { error } = await service
         .from("favorites")
         .upsert({ game_id: params.data.gameId, user_id: user.id });
 
@@ -191,13 +204,13 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
 
   app.delete(
     "/favorites/:gameId",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -208,7 +221,7 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid game id" });
       }
 
-      await supabaseService
+      await service
         .from("favorites")
         .delete()
         .eq("user_id", user.id)
@@ -219,7 +232,7 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
   );
 
   app.get("/games/:gameId/reactions", async (request, reply) => {
-    if (!supabaseService) {
+    if (!service) {
       return reply.status(503).send({
         error: "Supabase service client is not configured for the API.",
       });
@@ -230,7 +243,7 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
       return reply.status(400).send({ error: "Invalid game id" });
     }
 
-    const { data, error } = await supabaseService
+    const { data, error } = await service
       .from("likes")
       .select("user_id,is_like")
       .eq("game_id", params.data.gameId);
@@ -245,13 +258,13 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
 
   app.put(
     "/games/:gameId/reaction",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -263,14 +276,14 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid reaction" });
       }
 
-      await supabaseService
+      await service
         .from("likes")
         .delete()
         .eq("user_id", user.id)
         .eq("game_id", params.data.gameId);
 
       if (body.data.isLike !== null) {
-        const { error } = await supabaseService.from("likes").insert({
+        const { error } = await service.from("likes").insert({
           game_id: params.data.gameId,
           is_like: body.data.isLike,
           user_id: user.id,
@@ -286,7 +299,7 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
   );
 
   app.get("/games/:gameId/comments", async (request, reply) => {
-    if (!supabaseService) {
+    if (!service) {
       return reply.status(503).send({
         error: "Supabase service client is not configured for the API.",
       });
@@ -300,7 +313,7 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
 
     const start = query.data.page * 10;
     const end = start + 10;
-    const { data, error } = await supabaseService
+    const { data, error } = await service
       .from("comments")
       .select(
         "id,content,created_at,user_id,profiles(username,avatar_url),comment_likes(user_id,is_like)",
@@ -322,13 +335,13 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
 
   app.post(
     "/games/:gameId/comments",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -340,7 +353,7 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid comment" });
       }
 
-      const { error } = await supabaseService.from("comments").insert({
+      const { error } = await service.from("comments").insert({
         content: body.data.content,
         game_id: params.data.gameId,
         user_id: user.id,
@@ -357,13 +370,13 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
 
   app.delete(
     "/comments/:commentId",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -374,8 +387,8 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid comment id" });
       }
 
-      const role = await getUserRole(user.id);
-      let query = supabaseService
+      const role = await getUserRole(service, user.id);
+      let query = service
         .from("comments")
         .delete()
         .eq("id", params.data.commentId);
@@ -390,13 +403,13 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
 
   app.put(
     "/comments/:commentId/reaction",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -408,7 +421,7 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid comment reaction" });
       }
 
-      const { data: comment } = await supabaseService
+      const { data: comment } = await service
         .from("comments")
         .select("user_id")
         .eq("id", params.data.commentId)
@@ -417,20 +430,20 @@ export async function registerCatalogRoutes(app: FastifyInstance) {
         return reply.status(403).send({ error: "Cannot react to this comment" });
       }
 
-      await supabaseService
+      await service
         .from("comment_likes")
         .delete()
         .eq("user_id", user.id)
         .eq("comment_id", params.data.commentId);
       if (body.data.isLike !== null) {
-        await supabaseService.from("comment_likes").insert({
+        await service.from("comment_likes").insert({
           comment_id: params.data.commentId,
           is_like: body.data.isLike,
           user_id: user.id,
         });
       }
 
-      const { data } = await supabaseService
+      const { data } = await service
         .from("comment_likes")
         .select("user_id,is_like")
         .eq("comment_id", params.data.commentId);

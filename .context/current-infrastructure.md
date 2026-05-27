@@ -47,6 +47,7 @@ Current status:
 - `GET /local-pairings/current` and `DELETE /local-pairings/current` expose/clear the current user's local pairing metadata.
 - `POST /metrics/stream` persists authenticated, sampled WebRTC telemetry snapshots.
 - `GET /metrics/stream/recent` returns recent persisted telemetry snapshots for the authenticated user.
+- `GET /webrtc/ice-servers` returns authenticated WebRTC ICE configuration. It always supports configured STUN URLs and can issue short-lived coturn REST credentials when `TURN_URLS` and `TURN_SHARED_SECRET` are configured.
 - The API schedules control-plane retention cleanup on startup.
 - Cleanup deletes expired/stopped backend sessions and stream metrics older than `STREAM_METRIC_RETENTION_DAYS`.
 - CORS allows local Vite origins and the hosted Vercel origin.
@@ -54,12 +55,13 @@ Current status:
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
 - `services/api/.env` exists locally and is ignored; production keys live on the backend host.
 - API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
-- `services/api` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
+- `services/api/tests/` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
+- API tests also cover the backend-owned data boundary for catalog/favorites, comment ownership/reactions, profile update/account deletion, admin user authorization, and admin access-log authorization.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - Cloud/library game boot, game catalog reads, favorites, reactions, comments, profiles, player play-count tracking, game submission metadata/notification, access logging, admin user management, admin access-log reads, admin reports, and comment reporting now depend on the API.
 - The web app has no direct Supabase table/RPC/realtime calls under `apps/web/src`; Supabase remains in the browser for auth/session management and Storage uploads.
-- `supabase/migrations/20260527111500_api_owned_social_writes.sql` is staged but intentionally not pushed yet. Push it with or immediately after deploying the matching API and web builds because it removes direct browser data policies for workflows now owned by the API.
+- `supabase/migrations/20260527111500_api_owned_social_writes.sql` was pushed to hosted Supabase on 2026-05-27, removing direct browser data policies for workflows now owned by the API.
 
 ## Web App
 
@@ -93,6 +95,8 @@ Current important frontend behaviors:
 - The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
 - `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
 - `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.
+- `useWebRTC` asks the API for ICE servers before creating the browser peer connection. If the API is unavailable or the user is unsigned, it falls back to Google STUN.
+- Failed or long-disconnected WebRTC sessions now show a retry action that creates a fresh session id and restarts negotiation without leaving the player page.
 - `/play/:id` is composed from `apps/web/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
@@ -119,11 +123,20 @@ Current lifecycle:
 8. Electron polls `http://127.0.0.1:8080/health` and only marks the engine successful after it returns `ok: true`.
 9. On stop/window close, Electron removes `pixelated-node`.
 
+The desktop UI now receives structured engine lifecycle states: checking Docker,
+pulling image, building image, removing stale container, starting container,
+waiting for health, ready, stopping, stopped, and failed. The launcher still
+builds locally by default, but packaged releases can set
+`PIXELATED_ENGINE_IMAGE` and `PIXELATED_ENGINE_PULL=1` to pull a prebuilt image
+first. Pull failures fall back to a local build unless
+`PIXELATED_ENGINE_BUILD_FALLBACK=0` is set.
+
 Notable constraints:
 
 - Container name and port are fixed.
 - Build happens on user machine from the distributed app folder.
 - Health verifies core local engine dependencies: Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
+- LAN/multiplayer support is planned in `.context/lan-multiplayer-plan.md`. Current engine exposure remains loopback-only until an explicit desktop LAN mode is implemented.
 
 ## Engine Container
 
@@ -164,6 +177,8 @@ Streaming/signaling:
 - Node forwards WebRTC offers, answers, and ICE candidates between browser and Python sender inside a Socket.IO room named `session:<id>`.
 - Python connects back to Node at `http://localhost:8080`.
 - Browser receives VP8 video and Opus audio.
+- React forwards API-issued ICE server config in `start-game`; Node passes it to `camera.py` through `PIXELATED_ICE_SERVERS`; Python configures GStreamer `webrtcbin` with the matching STUN/TURN servers.
+- React forwards the selected stream profile in `start-game`; Node validates bitrate/framerate bounds and passes it to `camera.py` through `PIXELATED_STREAM_PROFILE`; Python applies the profile to GStreamer capture framerate and VP8 target bitrate.
 - React generates the current session id, Node passes it into `camera.py` through `PIXELATED_SESSION_ID`, and both browser/camera sockets join the same room before WebRTC negotiation.
 - React polls browser WebRTC stats once per second for FPS, bitrate, ICE state, packet loss, and jitter. The player hides those metrics by default and exposes them through a persisted developer telemetry toggle.
 - Engine-side download failures and camera/GStreamer failures emit `engine-error` to the browser session.
@@ -219,7 +234,7 @@ Security model today:
 - Local vault uploads are limited to `.nes` filenames and capped by `PIXELATED_MAX_ROM_SIZE_BYTES`, defaulting to 8 MiB.
 - Developer submission storage uploads now require an authenticated Supabase user, and `game_submissions.submitter_id` records who submitted the game.
 - Direct public inserts into `access_logs` are disabled; access logs are created by the backend service-role client.
-- A staged hardening migration removes direct browser policies for favorites, likes, comments, comment likes, reported comments, profile updates, and admin access-log reads after the new API/web deploy is live.
+- The pushed hardening migration removes direct browser policies for favorites, likes, comments, comment likes, reported comments, profile updates, and admin access-log reads now that the API/web data boundary is live.
 
 ## Deployment Model
 
