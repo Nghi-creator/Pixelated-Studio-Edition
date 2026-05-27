@@ -136,6 +136,7 @@ Notable constraints:
 - Container name and port are fixed.
 - Build happens on user machine from the distributed app folder.
 - Health verifies core local engine dependencies: Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
+- LAN/multiplayer support is planned in `.context/lan-multiplayer-plan.md`. Current engine exposure remains loopback-only until an explicit desktop LAN mode is implemented.
 
 ## Engine Container
 

@@ -8,7 +8,7 @@ This file tracks advisory recommendations and implementation status. Completed t
 
 The current idea is promising: React/Supabase is fine for the community layer, while the Electron + Docker engine proves the hard part of cloud gaming: isolated execution, capture, encode, signaling, and remote input.
 
-The backend control plane now owns the web app data boundary. Backend-issued cloud session intent is authoritative across web, API, and engine, and the frontend no longer calls Supabase tables, RPCs, or realtime channels directly. The next meaningful gap is deploy sequencing for the new boundary hardening migration, signed-in hosted smoke coverage, and later hosted engine scheduling.
+The backend control plane now owns the web app data boundary. Backend-issued cloud session intent is authoritative across web, API, and engine, and the frontend no longer calls Supabase tables, RPCs, or realtime channels directly. The next implementation gap is explicit LAN-mode product support, then later hosted engine scheduling.
 
 Recommended direction:
 
@@ -1047,8 +1047,7 @@ What changed:
 
 Remaining follow-up:
 
-- Configure a real TURN provider on Render with `TURN_URLS` and `TURN_SHARED_SECRET`, or static TURN credentials if the provider does not support REST credentials.
-- Runtime-smoke a stream from a network where direct/STUN connectivity fails, then confirm relay candidates appear in WebRTC stats.
+- Configure a real TURN provider on Render with `TURN_URLS` and `TURN_SHARED_SECRET`, or static TURN credentials if the provider does not support REST credentials, before relying on relay behavior in production.
 
 ### API Test Folder Consolidation
 
@@ -1096,7 +1095,7 @@ What changed:
 
 Remaining follow-up:
 
-- Runtime-smoke retry behavior by stopping/restarting the desktop engine during a player session.
+- Runtime smoke is tracked in the manual validation section because it requires Docker Desktop and an interactive player session.
 
 ### WebRTC Stream Profiles
 
@@ -1129,13 +1128,17 @@ What changed:
 
 Remaining follow-up:
 
-- Runtime-smoke each profile in the player and compare received FPS/bitrate in the developer telemetry panel.
+- Automated validation is complete. Runtime smoke is tracked in the manual validation section because it requires Docker Desktop and an interactive player session.
 
-## Highest Priority Issues
+## Manual Validation Items
 
-### 1. Complete Signed-In Hosted Smoke Coverage
+These are not active code implementation tasks. They require an interactive browser session, a signed-in user, Docker Desktop running, or a real TURN provider.
 
-The live API health, readiness, protected-route, CORS, deployed bundle, and Docker engine smoke checks passed after the latest deploys. The remaining missing test is the signed-in browser path that requires a real user session.
+### Signed-In Hosted Smoke Coverage
+
+Status: external/manual validation.
+
+The live API health, readiness, protected-route, CORS, deployed bundle, and Docker engine smoke checks passed after the latest deploys. The remaining hosted smoke path requires a real signed-in browser session.
 
 Smoke checklist:
 
@@ -1145,9 +1148,32 @@ Smoke checklist:
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
 
-### 2. Decide Explicit LAN Support
+### WebRTC Runtime Smoke
 
-The local engine is currently bound to host loopback. That is the right secure default. If LAN streaming becomes a product goal, add it as an explicit desktop setting with warning copy, origin controls, and token rotation.
+Status: ready for interactive smoke. Docker Desktop is reachable from the CLI as of 2026-05-27; the remaining checks require launching the desktop app and using the browser player.
+
+Smoke checklist:
+
+- Start Docker Desktop.
+- Launch the desktop app.
+- Start a player session.
+- Stop/restart the desktop engine during playback and verify the retry button recovers.
+- Switch Performance, Balanced, and Quality profiles and compare received FPS/bitrate in developer telemetry.
+- If a TURN provider is configured, smoke from a network where direct/STUN connectivity fails and confirm relay candidates appear in WebRTC stats.
+
+## Highest Priority Issues
+
+### 1. Decide Explicit LAN Support
+
+The local engine is currently bound to host loopback. That is the right secure default. LAN streaming is now tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
+
+Recommended next implementation slice:
+
+- Add an explicit desktop LAN mode toggle, default off.
+- Rotate the pairing token whenever LAN mode changes.
+- Keep loopback-only Docker publishing in local mode.
+- Publish the engine to LAN only after the user enables LAN mode.
+- Display discovered LAN URL(s), warning copy, and the active pairing token in the desktop app.
 
 ## Database And Supabase Suggestions
 
