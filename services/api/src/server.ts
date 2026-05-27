@@ -10,6 +10,7 @@ import { registerMeRoutes } from "./routes/me.js";
 import { registerMetricRoutes } from "./routes/metrics.js";
 import { registerModerationRoutes } from "./routes/moderation.js";
 import { registerSessionRoutes } from "./routes/sessions.js";
+import { registerSubmissionRoutes } from "./routes/submissions.js";
 
 export async function buildServer() {
   const app = Fastify({
@@ -22,6 +23,7 @@ export async function buildServer() {
   await registerLocalPairingRoutes(app);
   await registerGameRoutes(app);
   await registerModerationRoutes(app);
+  await registerSubmissionRoutes(app);
   await registerSessionRoutes(app);
   await registerMetricRoutes(app);
   scheduleControlPlaneCleanup(app);

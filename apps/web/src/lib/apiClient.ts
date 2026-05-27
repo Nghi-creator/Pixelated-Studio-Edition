@@ -128,6 +128,16 @@ export type ApiAdminReportActionResponse = {
   targetUserId?: string;
 };
 
+export type ApiGameSubmissionPayload = {
+  authorName: string;
+  bannerUrl: string | null;
+  coverUrl: string | null;
+  description: string | null;
+  email: string;
+  gameTitle: string;
+  romUrl: string;
+};
+
 export const api = {
   adminReports: <TReport>() =>
     apiRequest<{ reports: TReport[] }>("/admin/reports"),
@@ -177,6 +187,14 @@ export const api = {
       body: JSON.stringify({ reason }),
       method: "POST",
     }),
+  submitGame: (payload: ApiGameSubmissionPayload) =>
+    apiRequest<{ submission: { id: string; status: "pending" } }>(
+      "/submissions/games",
+      {
+        body: JSON.stringify(payload),
+        method: "POST",
+      },
+    ),
   streamMetric: (metric: ApiStreamMetricPayload) =>
     apiRequest<{ accepted: boolean; reason?: string }>("/metrics/stream", {
       body: JSON.stringify(metric),

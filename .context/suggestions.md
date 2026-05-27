@@ -715,6 +715,38 @@ Remaining follow-up:
 
 - Add dedicated admin moderation tests with fake Supabase coverage.
 
+### Game Submission Metadata Through Backend
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `supabase/migrations/20260527103000_secure_game_submissions.sql`
+- `services/api/src/routes/submissions.ts`
+- `services/api/src/server.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/user/Publish.tsx`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added `game_submissions.submitter_id`.
+- Enabled RLS on `game_submissions`.
+- Added user/admin read policies for game submissions.
+- Replaced public uploads to the `submissions` bucket with authenticated uploads.
+- Added authenticated `POST /submissions/games`.
+- Backend validates submission metadata and requires file URLs to come from the Supabase `submissions` bucket.
+- Backend records the authenticated submitter id when creating `game_submissions`.
+- Publish page now requires sign-in before uploading.
+- Publish page now creates submission metadata through the API instead of inserting directly into Supabase.
+- The migration was pushed to hosted Supabase on 2026-05-27.
+
+Remaining follow-up:
+
+- Add API tests for `POST /submissions/games`.
+- Move the Formspree notification server-side if you want the form endpoint hidden from the browser.
+
 ### Backend Hosting Prep
 
 Implemented: 2026-05-25
@@ -866,7 +898,7 @@ Several workflows still write directly from the browser to Supabase. That is acc
 
 Suggested order:
 
-- Publish/submission uploads and metadata creation.
+- Submission review/approval workflow.
 - Access logging/session tracking.
 - Profile role-sensitive updates.
 
