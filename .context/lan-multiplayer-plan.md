@@ -184,7 +184,7 @@ Implementation note: the current desktop UI locks exposure mode while the engine
 
 ### Phase 2: LAN Pairing UX
 
-Status: planned.
+Status: implemented in code on 2026-05-28; pending hosted-browser LAN smoke.
 
 Deliverables:
 
@@ -198,6 +198,10 @@ Acceptance criteria:
 - A guest browser can pair with a LAN engine URL and token.
 - Wrong token is rejected by HTTP and Socket.IO.
 - Pairing metadata saved to the backend contains only non-secret URL data.
+
+Implementation note: the pairing panel now classifies local, LAN, and custom engine URLs; checks `/health.exposureMode`; rejects LAN-looking URLs when the engine reports local-only mode; and gives clearer wrong-token, unreachable-LAN, and hosted-HTTPS-to-HTTP-LAN failure messages.
+
+Remaining risk: the hosted Vercel app is HTTPS while LAN engine URLs are currently HTTP. Some browsers may block HTTP private-network requests from an HTTPS origin. If this blocks real guest pairing, the next architecture decision is local HTTPS for the engine, a local companion page, or another browser-approved private-network access strategy.
 
 ### Phase 3: Lobby And Roles
 

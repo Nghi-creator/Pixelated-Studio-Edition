@@ -92,6 +92,8 @@ Current important frontend behaviors:
 - `useWebRTC` owns React stream/status lifecycle while helper modules resolve game boot targets, create WebRTC peer connections, and forward keyboard input.
 - For cloud/library games, `useWebRTC` asks the backend API to create a session before emitting `start-game` with `mode: "cloud"` and the backend `sessionToken` to the local engine.
 - The prompt-only engine token flow has been replaced by a local engine pairing panel in the player and Local Vault UI.
+- The pairing panel classifies local, LAN, and custom engine URLs; LAN-looking URLs must match an engine reporting `exposureMode: "lan"` from `/health`.
+- Pairing errors now distinguish rejected tokens, local-only engines reached through LAN URLs, unreachable LAN hosts, and likely HTTPS-hosted-app to HTTP-LAN browser blocking.
 - The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
 - `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
 - `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.

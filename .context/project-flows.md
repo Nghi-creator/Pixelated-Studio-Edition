@@ -178,14 +178,18 @@ Purpose: make local-engine intent explicit without sending the desktop pairing t
 1. Electron starts the local engine and displays a per-run pairing token.
 2. React renders `EnginePairingPanel` in Local Vault and when the player needs a token.
 3. User enters the local engine URL and desktop pairing token.
-4. React stores the engine URL and pairing token in browser `localStorage`.
-5. React calls `GET <engineUrl>/health` without the token to verify the local engine is reachable.
-6. If the user is signed in, React calls `POST /local-pairings` on the backend with only `{ engineUrl }`.
-7. Backend persists pairing intent metadata for the authenticated user in `local_engine_pairings`.
-8. Backend does not receive or store the desktop pairing token.
-9. Local Vault uses the stored token for `X-Engine-Token` on upload/list/delete requests.
-10. WebRTC uses the stored token for Socket.IO auth.
-11. If the engine rejects the token, React clears it and shows the pairing panel again.
+4. React classifies the URL as local, LAN, or custom based on hostname.
+5. React calls `GET <engineUrl>/health` without the token to verify the engine is reachable.
+6. If the URL looks like LAN but `/health` reports `exposureMode: "local"`, React rejects pairing and tells the user to enable LAN mode in the desktop app.
+7. React calls `GET <engineUrl>/local-games` with `X-Engine-Token` and a pairing-check user id to verify the token.
+8. React stores the engine URL and pairing token in browser `localStorage`.
+9. If the user is signed in, React calls `POST /local-pairings` on the backend with only `{ engineUrl }`.
+10. Backend persists pairing intent metadata for the authenticated user in `local_engine_pairings`.
+11. Backend does not receive or store the desktop pairing token.
+12. Local Vault uses the stored token for `X-Engine-Token` on upload/list/delete requests.
+13. WebRTC uses the stored token for Socket.IO auth.
+14. If the engine rejects the token, React clears it and shows the pairing panel again.
+15. If a hosted HTTPS browser cannot reach an HTTP LAN engine URL, React shows a private-network/mixed-content oriented error instead of a generic unreachable message.
 
 ## 5A. Live Stream Telemetry And Error Flow
 

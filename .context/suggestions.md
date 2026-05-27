@@ -53,6 +53,34 @@ Remaining follow-up:
 - Two-device LAN smoke test: confirm another LAN device can reach `/health` only after LAN mode is enabled.
 - Add one-click restart-on-toggle later if changing exposure mode while running should feel smoother.
 
+### LAN Pairing UX
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/web/src/features/local-engine/EnginePairingPanel.tsx`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- The pairing panel now classifies engine URLs as local, LAN, or custom.
+- LAN URLs get explicit warning/context copy instead of being treated like `localhost`.
+- Engine URL validation now requires `http://` or `https://`.
+- Pairing reads `/health` and checks `exposureMode`.
+- LAN-looking URLs are rejected if the engine reports local-only mode.
+- Wrong token errors now tell the user to copy the current desktop token.
+- Unreachable LAN errors now point users toward LAN mode, same-network checks, and possible hosted-HTTPS to HTTP-LAN browser blocking.
+- Backend pairing metadata still stores only non-secret engine URL data; the desktop token remains browser-local.
+
+Remaining follow-up:
+
+- Hosted-browser LAN smoke with two devices on the same network.
+- Decide whether HTTP LAN access from hosted HTTPS is good enough in target browsers or whether the engine needs local HTTPS/private-network-access hardening.
+
 ### Backend Session Intent Validation
 
 Completed: 2026-05-27
@@ -1199,12 +1227,13 @@ Smoke checklist:
 
 ### 1. Decide Explicit LAN Support
 
-The local engine now defaults to host loopback and has an explicit desktop LAN mode for testing. LAN streaming is tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
+The local engine now defaults to host loopback, has an explicit desktop LAN mode for testing, and the React pairing panel understands LAN URLs. LAN streaming is tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
 
 Recommended next implementation slice:
 
 - Runtime-smoke Phase 1 with two devices on the same LAN.
-- Then proceed to Phase 2: LAN pairing UX in the hosted React app.
+- Decide the HTTPS-hosted-app to HTTP-LAN-engine strategy if browser private-network restrictions block guest pairing.
+- Then proceed to Phase 0A before Phase 3: TypeScript migration for engine signaling/session modules.
 
 ## Database And Supabase Suggestions
 
