@@ -419,13 +419,14 @@ sequenceDiagram
   participant Redis as Redis
   participant Engine as Local/Hosted Engine
 
-  Web->>API: POST /sessions { gameId }
+  Web->>API: POST /sessions { gameId, mode: "cloud" }
   API->>SB: Verify JWT + fetch game metadata
   API->>API: Authorize play request
   API->>Redis: Store session TTL + token
   API-->>Web: sessionId, sessionToken, engine endpoint
-  Web->>Engine: connect with sessionToken
-  Engine->>API: optional validate sessionToken
+  Web->>Engine: start-game { mode: "cloud", sessionToken }
+  Engine->>API: POST /sessions/:id/verify
+  API-->>Engine: approved boot target + mode: "cloud"
   Web->>Engine: WebRTC offer + input
   Engine-->>Web: WebRTC answer + media
   Web->>API: stream metrics snapshots

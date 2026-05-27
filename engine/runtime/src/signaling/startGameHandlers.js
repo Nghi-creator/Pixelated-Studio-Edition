@@ -7,6 +7,16 @@ const {
 } = require("./sessionRooms");
 const { sanitizeUserId } = require("../roms/localRomStore");
 
+function normalizeStartMode(mode) {
+  return typeof mode === "string" ? mode.trim().toLowerCase() : "";
+}
+
+function hasCloudSessionIntent(payload) {
+  return (
+    normalizeStartMode(payload.mode) === "cloud" || Boolean(payload.sessionToken)
+  );
+}
+
 function registerStartGameHandler(socket, options) {
   const { apiUrl, downloadCloudRom, runtime, verifyBackendSession } = options;
 
@@ -30,13 +40,24 @@ function registerStartGameHandler(socket, options) {
       return;
     }
 
-    if (payload.sessionToken) {
+    if (hasCloudSessionIntent(payload)) {
+      if (!payload.sessionToken) {
+        socket.emit("engine-error", {
+          message: "Cloud games require a backend session token.",
+        });
+        return;
+      }
+
       try {
         const verifiedSession = await verifyBackendSession({
           apiUrl,
           sessionId,
           sessionToken: payload.sessionToken,
         });
+
+        if (verifiedSession.mode !== "cloud") {
+          throw new Error("Backend session is not approved for cloud boot.");
+        }
 
         romFileOrUrl = verifiedSession.romTarget;
         safeUserId = sanitizeUserId(verifiedSession.userId || safeUserId);
@@ -80,4 +101,7 @@ function registerStartGameHandler(socket, options) {
   });
 }
 
-module.exports = { registerStartGameHandler };
+module.exports = {
+  hasCloudSessionIntent,
+  registerStartGameHandler,
+};

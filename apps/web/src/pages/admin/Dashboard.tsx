@@ -22,41 +22,17 @@ export default function Dashboard() {
       if (session?.user) {
         setCurrentUserId(session.user.id);
 
-        const { data } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
-
-        if (data) {
-          setCurrentUserRole(data.role);
-        }
+        const data = await api.permissions();
+        setCurrentUserRole(data.profile.role);
       }
     });
 
     const fetchReports = async () => {
-      const { data, error } = await supabase
-        .from("reported_comments")
-        .select(
-          `
-          id,
-          reason,
-          created_at,
-          comments (
-            id,
-            content,
-            profiles ( id, username, role ) 
-          ),
-          profiles ( id, username )
-        `,
-        )
-        .order("created_at", { ascending: false });
-
-      if (error) {
+      try {
+        const data = await api.adminReports<Report>();
+        setReports(data.reports);
+      } catch (error) {
         console.error("Error fetching reports:", error);
-      } else {
-        // @ts-expect-error - Supabase's type inference struggles with nested selects, so we assert the type here
-        setReports(data || []);
       }
       setLoading(false);
     };

@@ -9,12 +9,11 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
+import { api } from "../../lib/apiClient";
 
 export default function Publish() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-
-  const FORMSPREE_URL = "https://formspree.io/f/mlgaeqgj";
 
   // Form State
   const [authorName, setAuthorName] = useState("");
@@ -79,6 +78,15 @@ export default function Publish() {
     setIsSubmitting(true);
 
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        alert("Please sign in before submitting a game.");
+        return;
+      }
+
       // 1. Upload ROM
       const romUrl = await uploadToSupabase(romFile, "roms");
 
@@ -88,38 +96,15 @@ export default function Publish() {
       if (coverFile) coverUrl = await uploadToSupabase(coverFile, "covers");
       if (bannerFile) bannerUrl = await uploadToSupabase(bannerFile, "banners");
 
-      // 3. Save to Supabase Database
-      const { error: dbError } = await supabase
-        .from("game_submissions")
-        .insert({
-          author_name: authorName,
-          email: email,
-          game_title: gameTitle,
-          description: description || null,
-          rom_url: romUrl,
-          cover_url: coverUrl,
-          banner_url: bannerUrl,
-        });
-
-      if (dbError) throw dbError;
-
-      // 4. Stealth Ping to Formspree for Email Alert
-      await fetch(FORMSPREE_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          subject: `New Game Submission: ${gameTitle}`,
-          developer: authorName,
-          contact_email: email,
-          game: gameTitle,
-          description: description || "No description provided.",
-          rom_download: romUrl,
-          cover_art: coverUrl || "None provided",
-          banner_art: bannerUrl || "None provided",
-        }),
+      // 3. Save submission metadata through the backend
+      await api.submitGame({
+        authorName,
+        bannerUrl,
+        coverUrl,
+        description: description || null,
+        email,
+        gameTitle,
+        romUrl,
       });
 
       setIsSuccess(true);

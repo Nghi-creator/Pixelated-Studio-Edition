@@ -19,7 +19,9 @@ Pre-hosting checks passed on 2026-05-26:
 - Production-mode startup with blank `HOST` bound to `0.0.0.0`, which is required for Render port detection.
 - `GET /` and `HEAD /` returned `200` for provider root probes.
 
-`supabase/migrations/20260527093000_backend_control_plane_state.sql` was pushed to the hosted Supabase project on 2026-05-27. The latest API changes can be deployed after normal build checks pass.
+`supabase/migrations/20260527093000_backend_control_plane_state.sql`, `20260527103000_secure_game_submissions.sql`, and `20260527104500_backend_access_logs.sql` were pushed to the hosted Supabase project on 2026-05-27.
+
+`supabase/migrations/20260527111500_api_owned_social_writes.sql` is staged but should not be pushed until the matching API and web builds are deployed. It removes direct browser policies for workflows now owned by the API, so pushing it early can break the currently deployed frontend.
 
 ## Local `.env`
 
@@ -50,6 +52,7 @@ PORT=<provider-assigned-port-or-4000>
 WEB_ORIGIN=https://pixelated-studio-edition.vercel.app
 CONTROL_PLANE_CLEANUP_INTERVAL_MS=3600000
 STREAM_METRIC_RETENTION_DAYS=7
+FORMSPREE_SUBMISSION_URL=<optional-formspree-endpoint>
 SUPABASE_URL=<your-supabase-url>
 SUPABASE_ANON_KEY=<your-supabase-anon-key>
 SUPABASE_SERVICE_ROLE_KEY=<your-supabase-service-role-key>
@@ -127,8 +130,17 @@ After staging backend deploy:
 VITE_API_URL=https://pixelated-api-services.onrender.com
 ```
 
+## Data-Boundary Deploy Order
+
+For the API-owned social/profile/admin boundary:
+
+1. Deploy the Render API build with catalog, favorites, reactions, comments, profiles, admin users, and admin access-log routes.
+2. Deploy the Vercel web build that calls those routes through `apps/web/src/lib/apiClient.ts`.
+3. Push `supabase/migrations/20260527111500_api_owned_social_writes.sql`.
+4. Smoke-test signed-in library, favorites, player comments/reactions, profile update, admin user management, admin access logs, cloud play, local pairing, and stream metrics.
+
 ## Remaining Production Gaps
 
-- Add automated API tests for session, pairing, metric, and cleanup behavior.
+- Add automated API tests for catalog/social/profile/admin user/admin access-log behavior.
 - No API rate limiting yet.
 - No hosted engine fleet assignment yet.

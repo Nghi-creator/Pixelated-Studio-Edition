@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { supabase } from "../../lib/supabaseClient";
+import { api } from "../../lib/apiClient";
 
 export function useGameReactions(gameId: string | undefined, currentUser: User | null) {
   const [likes, setLikes] = useState(0);
@@ -11,17 +11,13 @@ export function useGameReactions(gameId: string | undefined, currentUser: User |
   const fetchReactions = useCallback(async () => {
     if (!gameId) return;
 
-    const { data, error } = await supabase
-      .from("likes")
-      .select("user_id, is_like")
-      .eq("game_id", gameId);
-    if (error) return console.error(error);
+    const { reactions } = await api.gameReactions(gameId);
 
     let likeCount = 0;
     let dislikeCount = 0;
     let currentUserReaction: boolean | null = null;
 
-    data.forEach((row) => {
+    reactions.forEach((row) => {
       if (row.is_like) likeCount++;
       else dislikeCount++;
 
@@ -44,25 +40,15 @@ export function useGameReactions(gameId: string | undefined, currentUser: User |
       alert("Please sign in to react to this game!");
       return;
     }
+    if (!gameId) return;
     if (isReactionLoading) return;
     setIsReactionLoading(true);
 
     try {
       if (userReaction === isLike) {
-        await supabase
-          .from("likes")
-          .delete()
-          .match({ user_id: currentUser.id, game_id: gameId });
+        await api.setGameReaction(gameId, null);
       } else {
-        if (userReaction !== null) {
-          await supabase
-            .from("likes")
-            .delete()
-            .match({ user_id: currentUser.id, game_id: gameId });
-        }
-        await supabase
-          .from("likes")
-          .insert({ user_id: currentUser.id, game_id: gameId, is_like: isLike });
+        await api.setGameReaction(gameId, isLike);
       }
       await fetchReactions();
     } catch (err) {

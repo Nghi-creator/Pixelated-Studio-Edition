@@ -54,32 +54,33 @@ Purpose: boot an approved/public game selected from the web library.
 4. On socket `connect`, `resolveGameBootTarget()` asks Supabase auth for the current session.
 5. If `id` is not a `.nes` filename, `resolveGameBootTarget()` calls backend `POST /sessions`.
 6. Backend verifies the Supabase bearer token, resolves `games.rom_url || games.rom_filename`, stores the session with a hashed `sessionToken`, and returns the approved boot target.
-7. React emits Socket.IO event `start-game` with `{ sessionId, sessionToken, romFilename, userId }`.
+7. React emits Socket.IO event `start-game` with `{ mode: "cloud", sessionId, sessionToken, romFilename, userId }`.
 8. `server.js` receives `start-game`.
-9. If `sessionToken` exists, Node calls backend `POST /sessions/:sessionId/verify` through `PIXELATED_API_URL`.
-10. Backend verifies the token and returns the approved boot target.
-11. Node replaces the browser-supplied ROM target with the verified backend target.
-12. If a cloud URL arrives without a valid backend session token, Node emits `engine-error` and refuses to boot it.
-13. If the verified boot target starts with `http`, Node treats it as a cloud ROM URL.
-14. Node validates that the URL is parseable.
-15. Node requires the URL to use HTTPS.
-16. Node checks the hostname against `PIXELATED_ALLOWED_ROM_HOSTS` when configured.
-17. Node downloads the ROM with `https.get()` into `/tmp/cloud_game_<uuid>.nes`.
-18. Node enforces `PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES`, defaulting to 8 MiB.
-19. Node enforces `PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS`, defaulting to 15 seconds.
-20. If validation or download fails, Node removes the temp file and emits `engine-error` to React.
-21. After download finishes, Node calls `bootGame(tmpPath)`.
-22. `bootGame()` kills any previous RetroArch and camera processes and removes any previous active temp cloud ROM.
-23. `bootGame()` spawns RetroArch with:
+9. If `mode: "cloud"` or `sessionToken` exists, Node treats the event as backend session intent and calls `POST /sessions/:sessionId/verify` through `PIXELATED_API_URL`.
+10. Backend verifies the token and returns the approved boot target plus session mode.
+11. Node requires the verified backend session mode to be `cloud`.
+12. Node replaces the browser-supplied ROM target with the verified backend target.
+13. If a cloud intent or cloud URL arrives without a valid backend session token, Node emits `engine-error` and refuses to boot it.
+14. If the verified boot target starts with `http`, Node treats it as a cloud ROM URL.
+15. Node validates that the URL is parseable.
+16. Node requires the URL to use HTTPS.
+17. Node checks the hostname against `PIXELATED_ALLOWED_ROM_HOSTS` when configured.
+18. Node downloads the ROM with `https.get()` into `/tmp/cloud_game_<uuid>.nes`.
+19. Node enforces `PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES`, defaulting to 8 MiB.
+20. Node enforces `PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS`, defaulting to 15 seconds.
+21. If validation or download fails, Node removes the temp file and emits `engine-error` to React.
+22. After download finishes, Node calls `bootGame(tmpPath)`.
+23. `bootGame()` kills any previous RetroArch and camera processes and removes any previous active temp cloud ROM.
+24. `bootGame()` spawns RetroArch with:
     - full-screen mode,
     - Mesen libretro core at `/cores/mesen_libretro.so`,
     - config `/app/retroarch.cfg`,
     - downloaded ROM path,
     - `DISPLAY=:99`,
     - `PULSE_SERVER=127.0.0.1`.
-24. After a 1 second delay, Node starts `python3 -u camera.py`.
+25. After a 1 second delay, Node starts `python3 -u camera.py`.
 
-Current limitation: backend sessions are now persisted, but there is not yet an automated cleanup job for expired rows.
+Current limitation: a signed-in hosted browser smoke test is still needed after redeploying the API and engine changes.
 
 ## 3. Local Vault Game Boot Flow
 
@@ -92,7 +93,7 @@ Purpose: boot a `.nes` file that the user previously uploaded to the local conta
 5. Node lists `.nes` files in that folder and returns filenames.
 6. User clicks a local game, navigating to `/play/<filename>.nes`.
 7. `resolveGameBootTarget()` treats any `.nes` id as a local vault file.
-8. React emits `start-game` with `{ romFilename: filename, userId }`.
+8. React emits `start-game` with `{ mode: "local", romFilename: filename, userId }`.
 9. Node sanitizes the user id and ROM filename.
 10. Node calls `bootGame("/roms/<userId>/<filename>")`.
 11. Boot continues through the same RetroArch and camera process flow as a cloud game.
@@ -138,7 +139,7 @@ Purpose: negotiate a WebRTC connection between browser and GStreamer.
 5. Node rejects the socket if the token does not match `PIXELATED_ENGINE_TOKEN`.
 6. React emits `join-session` with `{ sessionId, role: "browser" }`.
 7. Node joins that browser socket to room `session:<sessionId>`.
-8. React emits `start-game` with the same `sessionId`.
+8. React emits `start-game` with the same `sessionId`; cloud starts include `mode: "cloud"` and `sessionToken`, while Local Vault starts include `mode: "local"` and no backend token.
 9. Node boots RetroArch and then starts `camera.py` with `PIXELATED_SESSION_ID=<sessionId>` and `PIXELATED_ENGINE_TOKEN=<token>`.
 10. `camera.py` connects back to `http://localhost:8080` as a Socket.IO client with the token.
 11. Python emits `join-session` with `{ sessionId, role: "camera" }`.

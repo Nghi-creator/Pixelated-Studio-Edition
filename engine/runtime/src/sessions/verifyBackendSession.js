@@ -36,6 +36,7 @@ async function verifyBackendSession(options) {
     }
 
     return {
+      mode: verifiedSession?.mode,
       romTarget,
       userId: verifiedSession?.user?.id,
     };

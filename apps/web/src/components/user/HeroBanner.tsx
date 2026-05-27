@@ -2,12 +2,13 @@ import { Play, Plus, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
+import { api } from "../../lib/apiClient";
 
 interface Game {
   id: string;
   title: string;
   cover_url: string;
-  backdrop_url?: string;
+  backdrop_url?: string | null;
 }
 
 interface HeroBannerProps {
@@ -42,14 +43,8 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
         return;
       }
 
-      const { data } = await supabase
-        .from("favorites")
-        .select("game_id")
-        .eq("user_id", session.user.id)
-        .eq("game_id", currentGame.id)
-        .maybeSingle();
-
-      setIsFavorited(!!data);
+      const data = await api.favoriteStatus(currentGame.id);
+      setIsFavorited(data.favorited);
     };
 
     checkFavoriteStatus();
@@ -67,16 +62,10 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
     }
 
     if (isFavorited) {
-      await supabase
-        .from("favorites")
-        .delete()
-        .eq("user_id", session.user.id)
-        .eq("game_id", currentGame.id);
+      await api.removeFavorite(currentGame.id);
       setIsFavorited(false);
     } else {
-      await supabase
-        .from("favorites")
-        .insert({ user_id: session.user.id, game_id: currentGame.id });
+      await api.saveFavorite(currentGame.id);
       setIsFavorited(true);
     }
   };

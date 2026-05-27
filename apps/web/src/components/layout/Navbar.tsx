@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
+import { api } from "../../lib/apiClient";
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
@@ -29,13 +30,9 @@ export default function Navbar() {
     const fetchUserAndProfile = async (sessionUser: User | null) => {
       setUser(sessionUser);
       if (sessionUser) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("username, role, is_banned, is_developer")
-          .eq("id", sessionUser.id)
-          .single();
+        const data = await api.permissions();
 
-        if (data?.is_banned) {
+        if (data.profile.is_banned) {
           if (isKickingOut.current) return;
           isKickingOut.current = true;
 
@@ -48,11 +45,9 @@ export default function Navbar() {
           return;
         }
 
-        if (data) {
-          setDbUsername(data.username);
-          setUserRole(data.role);
-          setIsDeveloper(data.is_developer || false);
-        }
+        setDbUsername(data.profile.username);
+        setUserRole(data.profile.role);
+        setIsDeveloper(data.profile.is_developer || false);
       } else {
         setDbUsername(null);
         setUserRole(null);
@@ -85,31 +80,6 @@ export default function Navbar() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const channel = supabase.channel(`ban-listener-${user.id}`).on(
-      "postgres_changes",
-      {
-        event: "UPDATE",
-        schema: "public",
-        table: "profiles",
-        filter: `id=eq.${user.id}`,
-      },
-      async (payload) => {
-        if (payload.new.is_banned === true) {
-          await supabase.auth.signOut();
-          alert("Your account has been permanently suspended.");
-          window.location.href = "/login";
-        }
-      },
-    );
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user?.id]);
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();

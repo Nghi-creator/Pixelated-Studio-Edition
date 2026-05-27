@@ -2,6 +2,7 @@ import { Heart } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { supabase } from "../../lib/supabaseClient";
+import { api } from "../../lib/apiClient";
 
 interface GameCardProps {
   id: string;
@@ -20,14 +21,8 @@ export default function GameCard({ id, title, coverUrl }: GameCardProps) {
       } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { data } = await supabase
-        .from("favorites")
-        .select("game_id")
-        .eq("user_id", session.user.id)
-        .eq("game_id", id)
-        .maybeSingle();
-
-      if (data) setIsFavorited(true);
+      const data = await api.favoriteStatus(id);
+      setIsFavorited(data.favorited);
     };
 
     checkFavorite();
@@ -48,16 +43,10 @@ export default function GameCard({ id, title, coverUrl }: GameCardProps) {
     }
 
     if (isFavorited) {
-      await supabase
-        .from("favorites")
-        .delete()
-        .eq("user_id", session.user.id)
-        .eq("game_id", id);
+      await api.removeFavorite(id);
       setIsFavorited(false);
     } else {
-      await supabase
-        .from("favorites")
-        .insert({ user_id: session.user.id, game_id: id });
+      await api.saveFavorite(id);
       setIsFavorited(true);
     }
   };

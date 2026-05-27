@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { supabase } from "../../../lib/supabaseClient";
+import { api } from "../../../lib/apiClient";
 import type { GameComment } from "../types";
 
 export function useComments(gameId: string | undefined, currentUser: User | null) {
@@ -14,36 +14,13 @@ export function useComments(gameId: string | undefined, currentUser: User | null
     async (pageNum: number, isInitial = false) => {
       if (!gameId) return;
 
-      const { data, error } = await supabase
-        .from("comments")
-        .select(
-          `
-          id, content, created_at, user_id,
-          profiles ( username, avatar_url ),
-          comment_likes ( user_id, is_like )
-        `,
-        )
-        .eq("game_id", gameId)
-        .order("created_at", { ascending: false })
-        .range(pageNum * 10, (pageNum + 1) * 10);
-
-      if (error) return console.error(error);
-
-      let displayData = data;
-
-      if (data.length > 10) {
-        setHasMoreComments(true);
-        displayData = data.slice(0, 10);
-      } else {
-        setHasMoreComments(false);
-      }
-
-      const typedData = displayData as unknown as GameComment[];
+      const data = await api.gameComments<GameComment>(gameId, pageNum);
+      setHasMoreComments(data.hasMore);
 
       if (isInitial) {
-        setComments(typedData);
+        setComments(data.comments);
       } else {
-        setComments((prev) => [...prev, ...typedData]);
+        setComments((prev) => [...prev, ...data.comments]);
       }
     },
     [gameId],
@@ -59,12 +36,7 @@ export function useComments(gameId: string | undefined, currentUser: User | null
 
     setIsSubmittingComment(true);
     try {
-      const { error } = await supabase.from("comments").insert({
-        user_id: currentUser.id,
-        game_id: gameId,
-        content: newComment.trim(),
-      });
-      if (error) throw error;
+      await api.postComment(gameId, newComment.trim());
       setNewComment("");
       setPage(0);
       await fetchComments(0, true);
@@ -82,7 +54,7 @@ export function useComments(gameId: string | undefined, currentUser: User | null
     }
 
     try {
-      await supabase.from("comments").delete().eq("id", commentId);
+      await api.deleteComment(commentId);
       setComments((prev) => prev.filter((comment) => comment.id !== commentId));
     } catch (err) {
       console.error(err);
@@ -109,34 +81,20 @@ export function useComments(gameId: string | undefined, currentUser: User | null
       );
 
       if (existingReaction?.is_like === isLike) {
-        await supabase
-          .from("comment_likes")
-          .delete()
-          .match({ user_id: currentUser.id, comment_id: commentId });
-      } else {
-        if (existingReaction) {
-          await supabase
-            .from("comment_likes")
-            .delete()
-            .match({ user_id: currentUser.id, comment_id: commentId });
-        }
-        await supabase.from("comment_likes").insert({
-          user_id: currentUser.id,
-          comment_id: commentId,
-          is_like: isLike,
-        });
-      }
-
-      const { data } = await supabase
-        .from("comment_likes")
-        .select("user_id, is_like")
-        .eq("comment_id", commentId);
-
-      if (data) {
+        const data = await api.setCommentReaction(commentId, null);
         setComments((prev) =>
           prev.map((comment) =>
             comment.id === commentId
-              ? { ...comment, comment_likes: data }
+              ? { ...comment, comment_likes: data.reactions }
+              : comment,
+          ),
+        );
+      } else {
+        const data = await api.setCommentReaction(commentId, isLike);
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment.id === commentId
+              ? { ...comment, comment_likes: data.reactions }
               : comment,
           ),
         );

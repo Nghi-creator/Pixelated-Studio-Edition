@@ -8,16 +8,42 @@ This file tracks advisory recommendations and implementation status. Completed t
 
 The current idea is promising: React/Supabase is fine for the community layer, while the Electron + Docker engine proves the hard part of cloud gaming: isolated execution, capture, encode, signaling, and remote input.
 
-The backend control plane now exists and is live enough for staged testing. The biggest remaining gap has shifted from "add a backend" to "make backend-issued session intent authoritative across web, API, and engine, then add persistence/tests around those contracts."
+The backend control plane now owns the web app data boundary. Backend-issued cloud session intent is authoritative across web, API, and engine, and the frontend no longer calls Supabase tables, RPCs, or realtime channels directly. The next meaningful gap is deploy sequencing for the new boundary hardening migration, signed-in hosted smoke coverage, and later hosted engine scheduling.
 
 Recommended direction:
 
 1. Keep Supabase for auth, profiles, library metadata, simple social features, and admin dashboards.
-2. Keep moving sensitive mutations and session decisions behind `services/api`.
+2. Keep app data reads/writes behind `services/api`; keep browser Supabase usage limited to auth/session and intentional Storage uploads.
 3. Treat each game stream as an isolated session with ownership, lifecycle, observability, and resource limits.
 4. Add durable session/metric storage before multi-replica API hosting or hosted engine scheduling.
 
 ## Done
+
+### Backend Session Intent Validation
+
+Completed: 2026-05-27
+
+Implemented in:
+
+- `apps/web/src/lib/webrtcSession.ts`
+- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/sessions/verifyBackendSession.js`
+- `engine/runtime/src/signaling/startGameHandlers.test.js`
+- `.context/project-flows.md`
+- `.context/current-infrastructure.md`
+
+What changed:
+
+- Cloud player starts now send explicit `mode: "cloud"` with the backend `sessionToken`.
+- Local Vault starts now send explicit `mode: "local"` and continue without a backend session token.
+- The local engine treats `mode: "cloud"` or any provided `sessionToken` as backend session intent.
+- Cloud intent without a session token is rejected before any ROM can boot.
+- After `POST /sessions/:sessionId/verify`, the engine requires the verified backend session mode to be `cloud`.
+- The engine still uses the local pairing token for Socket.IO and Local Vault boundaries; the desktop pairing secret is not sent to the hosted backend.
+
+Remaining follow-up:
+
+- Runtime-smoke a signed-in cloud game through hosted Vercel, hosted Render, and the desktop engine after redeploying these changes.
 
 ### Session-Scoped Signaling
 
@@ -479,7 +505,7 @@ What changed:
 Remaining follow-up:
 
 - Run a signed-in end-to-end smoke test for play-count and comment-report mutations against the hosted API.
-- Admin report actions still happen directly in the browser and should move later.
+- Admin report actions now happen through the API; add dedicated admin action tests when that area gets its next pass.
 
 ### Backend Cloud Session Creation
 
@@ -574,7 +600,7 @@ What changed:
 
 Remaining follow-up:
 
-- Redeploy the API now that the migration has been pushed to Supabase.
+- Keep hosted API deploys aligned with migrations that change persisted control-plane tables.
 - Add automated API tests for session persistence, token verification, pairing upsert/delete, and metric rate limiting.
 
 ### Backend Control-Plane Retention Cleanup
@@ -664,8 +690,138 @@ What changed:
 
 Remaining follow-up:
 
-- Move admin report list fetching through the API so the whole moderation queue is backend-shaped.
 - Add dedicated admin action tests with fake Supabase coverage.
+
+### Admin Report Queue Through Backend
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/src/routes/moderation.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/admin/Dashboard.tsx`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added authenticated `GET /admin/reports`.
+- Backend verifies the acting user is an admin or super admin before returning reports.
+- Admin dashboard now loads the moderation queue through the API instead of directly querying `reported_comments` from the browser.
+- The moderation queue is now backend-shaped for both reads and destructive actions.
+
+Remaining follow-up:
+
+- Add dedicated admin moderation tests with fake Supabase coverage.
+
+### Game Submission Metadata Through Backend
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `supabase/migrations/20260527103000_secure_game_submissions.sql`
+- `services/api/src/routes/submissions.ts`
+- `services/api/src/server.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/user/Publish.tsx`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added `game_submissions.submitter_id`.
+- Enabled RLS on `game_submissions`.
+- Added user/admin read policies for game submissions.
+- Replaced public uploads to the `submissions` bucket with authenticated uploads.
+- Added authenticated `POST /submissions/games`.
+- Backend validates submission metadata and requires file URLs to come from the Supabase `submissions` bucket.
+- Backend records the authenticated submitter id when creating `game_submissions`.
+- Backend optionally sends the submission notification when `FORMSPREE_SUBMISSION_URL` is configured.
+- Publish page now requires sign-in before uploading.
+- Publish page now creates submission metadata through the API instead of inserting directly into Supabase.
+- Publish page no longer calls Formspree directly from the browser.
+- The migration was pushed to hosted Supabase on 2026-05-27.
+
+Remaining follow-up:
+
+- Add API tests for `POST /submissions/games`.
+- Configure `FORMSPREE_SUBMISSION_URL` on the backend host if email notifications should be sent in production.
+
+### Access Logging Through Backend
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `supabase/migrations/20260527104500_backend_access_logs.sql`
+- `services/api/src/routes/accessLogs.ts`
+- `services/api/src/server.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/lib/useSessionTracker.ts`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added `POST /access-logs`.
+- Backend supports guest logs and authenticated logs on the same endpoint.
+- Backend derives `user_id` from the optional Supabase bearer token instead of trusting browser payloads.
+- Session tracker now calls the API instead of inserting directly into Supabase.
+- Access log entries now include the current browser path.
+- Removed the public insert RLS policy on `access_logs`.
+- The migration was pushed to hosted Supabase on 2026-05-27.
+
+Remaining follow-up:
+
+- Admin access-log list fetching now happens through the API as part of the frontend data-boundary pass.
+- Add API tests for `POST /access-logs` and `GET /admin/access-logs`.
+
+### Frontend Data Boundary Through Backend
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/src/routes/catalog.ts`
+- `services/api/src/routes/profiles.ts`
+- `services/api/src/routes/adminUsers.ts`
+- `services/api/src/routes/accessLogs.ts`
+- `services/api/src/server.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/user/Landing.tsx`
+- `apps/web/src/pages/user/Favorites.tsx`
+- `apps/web/src/pages/user/Profile.tsx`
+- `apps/web/src/components/user/GameCard.tsx`
+- `apps/web/src/components/user/HeroBanner.tsx`
+- `apps/web/src/features/player/useGameMetadata.ts`
+- `apps/web/src/features/player/useGameReactions.ts`
+- `apps/web/src/features/player/comments/useComments.ts`
+- `apps/web/src/components/layout/AdminLayout.tsx`
+- `apps/web/src/components/layout/Navbar.tsx`
+- `apps/web/src/pages/admin/Dashboard.tsx`
+- `apps/web/src/pages/admin/UserManagement.tsx`
+- `apps/web/src/pages/admin/AccessLogs.tsx`
+- `supabase/migrations/20260527111500_api_owned_social_writes.sql`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+- `services/api/README.md`
+
+What changed:
+
+- Added API routes for game catalog reads, favorites, game reactions, comments, comment reactions, profile reads/updates/deletion, admin user management, and admin access-log reads.
+- Updated the React API client to cover those routes.
+- Moved library loading, favorites, game metadata, reactions, comments, profile updates, account deletion, admin user management, admin access logs, admin permission checks, and navbar/admin layout permission checks through the API.
+- Moved the game submission notification side effect through the API.
+- Removed the remaining frontend Supabase table/RPC/realtime usage under `apps/web/src`.
+- Browser Supabase usage is now limited to auth/session handling and intentional Storage uploads for avatars and submissions.
+- Added a staged hardening migration that removes now-obsolete direct browser policies for favorites, likes, comments, comment likes, reported comments, profile updates, and admin access-log reads.
+
+Remaining follow-up:
+
+- Deploy the new API and web builds, then push `supabase/migrations/20260527111500_api_owned_social_writes.sql` with or immediately after the deploy so production is not caught between old frontend code and hardened RLS policies.
+- Add dedicated API tests for catalog/social/profile/admin-user/access-log routes.
 
 ### Backend Hosting Prep
 
@@ -812,16 +968,16 @@ Smoke checklist:
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
 
-### 2. Move Remaining Sensitive Reads/Mutations Through Backend
+### 2. Deploy Backend-Owned Data Boundary Hardening
 
-Several workflows still write directly from the browser to Supabase. That is acceptable while RLS is tight, but backend routing gives better audit, validation, and rate limiting.
+The code boundary is in place, but the RLS hardening migration is intentionally staged until the matching backend and frontend deploys are live.
 
-Suggested order:
+Deploy order:
 
-- Admin report list fetching.
-- Publish/submission uploads and metadata creation.
-- Access logging/session tracking.
-- Profile role-sensitive updates.
+- Deploy the Render API build that includes catalog, social, profile, admin user, and admin access-log routes.
+- Deploy the Vercel web build that calls those API routes.
+- Push `supabase/migrations/20260527111500_api_owned_social_writes.sql`.
+- Smoke-test library, favorites, player comments/reactions, profile update, admin users, admin reports, admin access logs, cloud play, local pairing, and stream metrics with a signed-in user.
 
 ### 3. Improve Docker Build/Run Lifecycle
 
@@ -854,10 +1010,10 @@ The local engine is currently bound to host loopback. That is the right secure d
 ### Keep Supabase For These
 
 - Auth.
-- Profiles and social graph.
-- Game metadata.
-- Comments/reactions/favorites.
-- Admin dashboards at early scale.
+- Persistence for profiles and social graph behind the API.
+- Persistence for game metadata behind the API.
+- Persistence for comments/reactions/favorites behind the API.
+- Admin dashboard persistence behind the API.
 - Storage buckets for public covers/banners and approved ROMs.
 
 ### Move Or Gate These Through Backend Over Time
@@ -867,6 +1023,7 @@ The local engine is currently bound to host loopback. That is the right secure d
 - Access logging.
 - Play-count increments.
 - ROM URL resolution.
+- Favorites, reactions, comments, profile updates, admin users, and admin access-log reads are now routed through the API; keep them there.
 - Upload signing and validation.
 - Anything that needs rate limiting, abuse prevention, or audit trails.
 
@@ -886,7 +1043,7 @@ Do a dedicated RLS pass before public launch:
 
 - `useWebRTC` has been split into focused session, peer, and input helpers. Socket event registration remains in the hook for now.
 - Player sessions now expose opt-in browser-side stream telemetry: FPS, bitrate, ICE state, packet loss, jitter, and last engine error.
-- Several Supabase queries/actions are embedded directly in page components. Introduce small data modules/hooks for games, comments, favorites, moderation, and profiles.
+- Direct Supabase table/RPC/realtime calls have been removed from `apps/web/src`; keep future app data access behind `apps/web/src/lib/apiClient.ts` or small hooks/modules built on top of it.
 - Admin access is checked in UI, but the UI should treat RLS/backend authorization as the source of truth.
 - `fetchComments` uses `.range(pageNum * 10, (pageNum + 1) * 10)`, which requests 11 rows because Supabase ranges are inclusive. If the intent is "fetch 11 to detect hasMore", name that explicitly; otherwise use end `pageNum * 10 + 9`.
 

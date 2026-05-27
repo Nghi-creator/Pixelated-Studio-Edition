@@ -18,6 +18,10 @@ const envSchema = z.object({
     .positive()
     .default(60 * 60 * 1000),
   STREAM_METRIC_RETENTION_DAYS: z.coerce.number().int().positive().default(7),
+  FORMSPREE_SUBMISSION_URL: z.preprocess(
+    blankToUndefined,
+    z.string().url().optional(),
+  ),
   SUPABASE_ANON_KEY: z.preprocess(blankToUndefined, z.string().optional()),
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(blankToUndefined, z.string().optional()),
   SUPABASE_URL: z.preprocess(blankToUndefined, z.string().url().optional()),

@@ -27,9 +27,20 @@ Current status:
 - `GET /ready` returns `503` until the required Supabase backend env vars are configured.
 - `GET /me` verifies a Supabase bearer token and returns the authenticated user id/email.
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
+- `GET /games` and `GET /games/:gameId` read approved game catalog metadata through the API.
+- `GET /favorites`, `GET /favorites/:gameId`, `PUT /favorites/:gameId`, and `DELETE /favorites/:gameId` manage favorites through the API.
+- `GET /games/:gameId/reactions` and `PUT /games/:gameId/reaction` manage game reactions through the API.
+- `GET /games/:gameId/comments`, `POST /games/:gameId/comments`, `DELETE /comments/:commentId`, and `PUT /comments/:commentId/reaction` manage player comments and comment reactions through the API.
+- `GET /profile`, `PATCH /profile`, and `DELETE /me/account` manage user profile data and account deletion through the API.
 - `POST /games/:gameId/play-count` increments play count through the API instead of direct browser RPC.
 - `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
 - `POST /admin/reports/:reportId/action` resolves moderation queue actions through the API for ignore, delete-comment, and ban-user actions.
+- `GET /admin/reports` loads the moderation queue through the API for authenticated admins/super admins.
+- `GET /admin/users` and `PATCH /admin/users/:userId` move admin user management through the API.
+- `GET /admin/access-logs` loads access logs through the API for authenticated admins/super admins.
+- `POST /submissions/games` creates developer game submission records through the API for authenticated users.
+- `POST /submissions/games` can optionally send the submission notification server-side when `FORMSPREE_SUBMISSION_URL` is configured.
+- `POST /access-logs` records guest or authenticated session/access logs through the API.
 - `POST /sessions` creates a short-lived backend session for cloud games, persists a hashed session token in Supabase, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
 - `POST /sessions/:sessionId/verify` verifies a short-lived session token and returns the backend-approved boot target to the local engine.
 - `POST /local-pairings` persists authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
@@ -46,15 +57,17 @@ Current status:
 - `services/api` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
-- Cloud/library game boot, player play-count tracking, and comment reporting now depend on the API.
-- Admin report resolution actions now depend on the API instead of direct browser writes.
+- Cloud/library game boot, game catalog reads, favorites, reactions, comments, profiles, player play-count tracking, game submission metadata/notification, access logging, admin user management, admin access-log reads, admin reports, and comment reporting now depend on the API.
+- The web app has no direct Supabase table/RPC/realtime calls under `apps/web/src`; Supabase remains in the browser for auth/session management and Storage uploads.
+- `supabase/migrations/20260527111500_api_owned_social_writes.sql` is staged but intentionally not pushed yet. Push it with or immediately after deploying the matching API and web builds because it removes direct browser data policies for workflows now owned by the API.
 
 ## Web App
 
 Runtime stack:
 
 - Vite + React + TypeScript.
-- `@supabase/supabase-js` for auth, database, storage, realtime, and RPC calls.
+- `@supabase/supabase-js` for auth/session management and direct Storage uploads.
+- `apps/web/src/lib/apiClient.ts` for app data reads/writes through `services/api`.
 - `socket.io-client` connects directly to the local engine at `http://localhost:8080`.
 - The web app centralizes the engine base URL in `apps/web/src/lib/engineConfig.ts`; override with `VITE_ENGINE_URL`.
 - Routes are declared in `apps/web/src/App.tsx`.
@@ -75,15 +88,16 @@ Admin routes:
 Current important frontend behaviors:
 
 - `useWebRTC` owns React stream/status lifecycle while helper modules resolve game boot targets, create WebRTC peer connections, and forward keyboard input.
-- For cloud/library games, `useWebRTC` asks the backend API to create a session before emitting `start-game` to the local engine.
+- For cloud/library games, `useWebRTC` asks the backend API to create a session before emitting `start-game` with `mode: "cloud"` and the backend `sessionToken` to the local engine.
 - The prompt-only engine token flow has been replaced by a local engine pairing panel in the player and Local Vault UI.
 - The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
 - `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
 - `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.
 - `/play/:id` is composed from `apps/web/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
-- Publishing uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, inserts metadata into `game_submissions`, then pings Formspree.
-- Session tracking inserts browser-load access logs directly from the client.
+- Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
+- Game catalog, favorites, comments, reactions, profile updates/deletion, admin users, admin reports, and admin access logs are loaded or mutated through the API instead of direct browser Supabase table/RPC/realtime calls.
+- Session tracking calls the API to insert browser-load access logs; the backend derives user id from the optional Supabase bearer token.
 
 ## Desktop Orchestrator
 
@@ -141,7 +155,7 @@ Data paths:
 
 - Local uploaded ROMs are stored under `/roms/<userId>/`, backed by the named Docker volume `pixelated-roms`.
 - Cloud ROM URLs are downloaded into `/tmp/cloud_game_<uuid>.nes` after HTTPS, host allowlist, size, and timeout validation. The active temp cloud ROM is deleted on session cleanup or when a new game replaces it.
-- Cloud game starts must include the backend `sessionToken`; the engine verifies it through `PIXELATED_API_URL` before using the backend-approved boot target.
+- Cloud game starts must include `mode: "cloud"` and the backend `sessionToken`; the engine verifies the token through `PIXELATED_API_URL`, requires the verified backend session mode to be `cloud`, and only then uses the backend-approved boot target.
 
 Streaming/signaling:
 
@@ -163,7 +177,7 @@ Input:
 
 ## Supabase
 
-Used as the only hosted backend today:
+Used as the persistence/auth/storage provider behind the API:
 
 - Auth.
 - Postgres tables.
@@ -194,14 +208,18 @@ Storage buckets inferred from migrations:
 
 Security model today:
 
-- Most app data access happens directly from the browser with the Supabase anon client and RLS.
-- Admin pages rely on client-side role checks for routing, while database policies appear to provide the real enforcement.
+- App data reads/writes now route through `services/api`; the browser no longer calls Supabase tables, RPCs, or realtime channels directly under `apps/web/src`.
+- Supabase RLS remains enabled as defense in depth and for storage/auth-adjacent access, while the backend service-role client performs validated control-plane operations.
+- Admin pages still do client-side role checks for routing/UX, but the API performs the real admin/super-admin authorization for admin reads and mutations.
 - Local engine HTTP routes and Socket.IO handshakes require the per-run pairing token generated by Electron.
-- Cloud game boot also requires a backend-created session token that the engine verifies with the API before downloading the approved ROM target.
+- Cloud game boot also requires backend-created session intent: `mode: "cloud"` plus a session token that the engine verifies with the API before downloading or booting the approved ROM target.
 - The hosted React app stores the pairing token in browser `localStorage` and sends it through `X-Engine-Token` for REST calls and Socket.IO auth for streaming.
 - The Python camera bridge receives `PIXELATED_ENGINE_TOKEN` through env and uses it when connecting to Node Socket.IO.
 - The Docker port is published only to host loopback and the engine CORS origin is set to the hosted Vercel app by Electron.
 - Local vault uploads are limited to `.nes` filenames and capped by `PIXELATED_MAX_ROM_SIZE_BYTES`, defaulting to 8 MiB.
+- Developer submission storage uploads now require an authenticated Supabase user, and `game_submissions.submitter_id` records who submitted the game.
+- Direct public inserts into `access_logs` are disabled; access logs are created by the backend service-role client.
+- A staged hardening migration removes direct browser policies for favorites, likes, comments, comment likes, reported comments, profile updates, and admin access-log reads after the new API/web deploy is live.
 
 ## Deployment Model
 

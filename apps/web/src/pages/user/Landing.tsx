@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
 import { Search } from "lucide-react";
-import { supabase } from "../../lib/supabaseClient";
 import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
+import { api } from "../../lib/apiClient";
 
 interface Game {
   id: string;
   title: string;
   cover_url: string;
-  rom_filename: string;
-  backdrop_url?: string;
+  rom_filename?: string | null;
+  backdrop_url?: string | null;
+  play_count?: number | null;
 }
 
 export default function Landing() {
@@ -24,17 +25,11 @@ export default function Landing() {
 
   const fetchGames = async () => {
     try {
-      const { data, error } = await supabase
-        .from("games")
-        .select("*")
-        .order("title");
+      const data = await api.games();
+      if (data.games) {
+        setGames(data.games);
 
-      if (error) throw error;
-
-      if (data) {
-        setGames(data);
-
-        const sortedByTrending = [...data].sort((a, b) => {
+        const sortedByTrending = [...data.games].sort((a, b) => {
           const countB = b.play_count || 0;
           const countA = a.play_count || 0;
 

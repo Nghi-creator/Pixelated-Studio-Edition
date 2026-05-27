@@ -12,6 +12,7 @@ import {
 import Cropper from "react-easy-crop";
 import { supabase } from "../../lib/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
+import { api } from "../../lib/apiClient";
 
 // ==========================================
 // UTILITY: Crop the image
@@ -123,14 +124,7 @@ export default function Profile() {
         }
         setUser(session.user);
 
-        // Fetch profile and role
-        const { data: profile, error: profileError } = await supabase
-          .from("profiles")
-          .select("username, avatar_url, role")
-          .eq("id", session.user.id)
-          .single();
-
-        if (profileError) throw profileError;
+        const { profile } = await api.profile();
 
         if (profile) {
           setUsername(profile.username || "");
@@ -208,12 +202,7 @@ export default function Profile() {
         finalAvatarUrl = `${publicUrl}?t=${new Date().getTime()}`;
       }
 
-      const { error } = await supabase
-        .from("profiles")
-        .update({ username, avatar_url: finalAvatarUrl })
-        .eq("id", user.id);
-
-      if (error) throw error;
+      await api.updateProfile({ avatarUrl: finalAvatarUrl, username });
 
       const { error: authError } = await supabase.auth.updateUser({
         data: { avatar_url: finalAvatarUrl, username: username },
@@ -298,9 +287,7 @@ export default function Profile() {
         }
       }
 
-      // 2. Call the secure RPC function
-      const { error: deleteError } = await supabase.rpc("delete_own_account");
-      if (deleteError) throw deleteError;
+      await api.deleteAccount();
 
       // 3. Sign out and redirect
       await supabase.auth.signOut();
