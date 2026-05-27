@@ -3,15 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { HeartCrack, Loader2, Gamepad2, ArrowLeft } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import GameCard from "../../components/user/GameCard";
+import { api } from "../../lib/apiClient";
 
 interface SavedGame {
   id: string;
   title: string;
   cover_url: string;
-}
-
-interface SupabaseJoinRow {
-  games: SavedGame;
 }
 
 export default function Favorites() {
@@ -20,8 +17,6 @@ export default function Favorites() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    let channel: ReturnType<typeof supabase.channel>;
-
     const fetchFavoritesAndListen = async () => {
       try {
         const {
@@ -33,50 +28,9 @@ export default function Favorites() {
           return;
         }
 
-        // 1. Fetch the initial list of favorites
-        const { data, error } = await supabase
-          .from("favorites")
-          .select(
-            `
-            game_id,
-            games (
-              id,
-              title,
-              cover_url
-            )
-          `,
-          )
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false });
+        const data = await api.listFavorites<SavedGame>();
+        setFavorites(data.favorites);
 
-        if (error) throw error;
-
-        if (data) {
-          const formattedGames = (data as unknown as SupabaseJoinRow[])
-            .map((row) => row.games)
-            .filter((game) => game !== null);
-
-          setFavorites(formattedGames);
-        }
-
-        // 2. Set up the Realtime Listener
-        channel = supabase
-          .channel("favorites-listener")
-          .on(
-            "postgres_changes",
-            {
-              event: "DELETE",
-              schema: "public",
-              table: "favorites",
-              filter: `user_id=eq.${session.user.id}`,
-            },
-            (payload) => {
-              setFavorites((prev) =>
-                prev.filter((game) => game.id !== payload.old.game_id),
-              );
-            },
-          )
-          .subscribe();
       } catch (error) {
         console.error("Error fetching favorites:", error);
       } finally {
@@ -85,10 +39,6 @@ export default function Favorites() {
     };
 
     fetchFavoritesAndListen();
-
-    return () => {
-      if (channel) supabase.removeChannel(channel);
-    };
   }, [navigate]);
 
   if (loading) {

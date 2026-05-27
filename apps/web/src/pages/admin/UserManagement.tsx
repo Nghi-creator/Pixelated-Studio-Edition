@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Users } from "lucide-react";
+import { api } from "../../lib/apiClient";
 
 interface Profile {
   id: string;
-  username: string;
-  avatar_url: string;
+  username: string | null;
+  avatar_url: string | null;
   role: string;
   is_banned: boolean;
   created_at: string;
@@ -21,26 +22,14 @@ export default function UserManagement() {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setCurrentUserId(session.user.id);
-        const { data } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
-        if (data) setCurrentUserRole(data.role);
+        const data = await api.permissions();
+        setCurrentUserRole(data.profile.role);
       }
     });
 
     const fetchUsers = async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("Error fetching users:", error);
-      } else {
-        setUsers(data || []);
-      }
+      const data = await api.users();
+      setUsers(data.users);
       setLoading(false);
     };
 
@@ -57,20 +46,14 @@ export default function UserManagement() {
 
     if (!window.confirm(confirmMessage)) return;
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .update({ role: newRole })
-      .eq("id", userId)
-      .select()
-      .single();
-
-    if (error || !data) {
-      alert("Database update failed! Please run the SQL policy script.");
-      console.error(error);
-    } else {
+    try {
+      await api.updateAdminUser(userId, { role: newRole });
       setUsers((prev) =>
         prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)),
       );
+    } catch (error) {
+      alert("User update failed.");
+      console.error(error);
     }
   };
 
@@ -83,22 +66,16 @@ export default function UserManagement() {
 
     if (!window.confirm(confirmMessage)) return;
 
-    const { data, error } = await supabase
-      .from("profiles")
-      .update({ is_banned: newBanStatus })
-      .eq("id", userId)
-      .select()
-      .single();
-
-    if (error || !data) {
-      alert("Database update failed! Please run the SQL policy script.");
-      console.error(error);
-    } else {
+    try {
+      await api.updateAdminUser(userId, { is_banned: newBanStatus });
       setUsers((prev) =>
         prev.map((u) =>
           u.id === userId ? { ...u, is_banned: newBanStatus } : u,
         ),
       );
+    } catch (error) {
+      alert("User update failed.");
+      console.error(error);
     }
   };
 

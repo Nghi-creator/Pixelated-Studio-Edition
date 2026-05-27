@@ -15,8 +15,6 @@ export default function Publish() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const FORMSPREE_URL = "https://formspree.io/f/mlgaeqgj";
-
   // Form State
   const [authorName, setAuthorName] = useState("");
   const [email, setEmail] = useState("");
@@ -107,25 +105,6 @@ export default function Publish() {
         email,
         gameTitle,
         romUrl,
-      });
-
-      // 4. Stealth Ping to Formspree for Email Alert
-      await fetch(FORMSPREE_URL, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        body: JSON.stringify({
-          subject: `New Game Submission: ${gameTitle}`,
-          developer: authorName,
-          contact_email: email,
-          game: gameTitle,
-          description: description || "No description provided.",
-          rom_download: romUrl,
-          cover_art: coverUrl || "None provided",
-          banner_art: bannerUrl || "None provided",
-        }),
       });
 
       setIsSuccess(true);

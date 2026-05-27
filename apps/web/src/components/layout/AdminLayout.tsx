@@ -9,6 +9,7 @@ import {
   Activity,
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
+import { api } from "../../lib/apiClient";
 
 export default function AdminLayout() {
   const location = useLocation();
@@ -24,13 +25,11 @@ export default function AdminLayout() {
         return;
       }
 
-      const { data } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", session.user.id)
-        .single();
-
-      if (!data || (data.role !== "admin" && data.role !== "super_admin")) {
+      const data = await api.permissions();
+      if (
+        data.profile.role !== "admin" &&
+        data.profile.role !== "super_admin"
+      ) {
         navigate("/");
         return;
       }

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
 import { Activity } from "lucide-react";
+import { api } from "../../lib/apiClient";
 
 interface AccessLog {
   id: string;
   created_at: string;
   user_id: string | null;
+  path?: string;
   profiles: {
     username: string;
   } | null;
@@ -17,43 +18,12 @@ export default function AccessLogs() {
 
   useEffect(() => {
     const fetchLogs = async () => {
-      const { data, error } = await supabase
-        .from("access_logs")
-        .select(`
-          id,
-          created_at,
-          user_id,
-          profiles ( username )
-        `)
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (error) {
-        console.error("Error fetching access logs:", error);
-      } else {
-        // @ts-expect-error Supabase types typically return arrays even on join
-        setLogs(data || []);
-      }
+      const data = await api.accessLogs<AccessLog>();
+      setLogs(data.logs);
       setLoading(false);
     };
 
     fetchLogs();
-
-    const channel = supabase
-      .channel("access_logs_changes")
-      .on(
-        "postgres_changes",
-        { event: "INSERT", schema: "public", table: "access_logs" },
-        () => {
-          // Re-fetch to seamlessly grab the new rows and their profile joins natively
-          fetchLogs();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, []);
 
   if (loading) {
@@ -78,6 +48,7 @@ export default function AccessLogs() {
             <thead>
               <tr className="bg-synth-bg border-b border-synth-border text-xs uppercase tracking-wider text-gray-500 font-bold">
                 <th className="p-4">User</th>
+                <th className="p-4">Path</th>
                 <th className="p-4">Session Logged At</th>
               </tr>
             </thead>
@@ -90,6 +61,9 @@ export default function AccessLogs() {
                     ) : (
                       <span className="text-gray-400 italic">Guest</span>
                     )}
+                  </td>
+                  <td className="p-4 text-gray-400 text-sm">
+                    {log.path || "/"}
                   </td>
                   <td className="p-4 text-gray-400 text-sm">
                     {new Date(log.created_at).toLocaleString()}

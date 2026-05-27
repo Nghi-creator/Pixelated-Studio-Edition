@@ -22,15 +22,8 @@ export default function Dashboard() {
       if (session?.user) {
         setCurrentUserId(session.user.id);
 
-        const { data } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
-
-        if (data) {
-          setCurrentUserRole(data.role);
-        }
+        const data = await api.permissions();
+        setCurrentUserRole(data.profile.role);
       }
     });
 

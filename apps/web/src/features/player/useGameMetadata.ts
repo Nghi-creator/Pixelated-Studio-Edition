@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
+import { api } from "../../lib/apiClient";
 
 const formatFallbackTitle = (gameId: string) =>
   gameId.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
@@ -12,16 +12,11 @@ export function useGameMetadata(gameId: string | undefined) {
     const fetchGameDetails = async () => {
       if (!gameId) return;
 
-      const { data } = await supabase
-        .from("games")
-        .select("title, author_name, rom_url")
-        .eq("id", gameId)
-        .single();
-
-      if (data) {
-        if (data.title) setGameTitle(data.title);
-        if (data.author_name) setAuthorName(data.author_name);
-      } else {
+      try {
+        const data = await api.game(gameId);
+        if (data.game.title) setGameTitle(data.game.title);
+        if (data.game.author_name) setAuthorName(data.game.author_name);
+      } catch {
         setGameTitle(formatFallbackTitle(gameId));
       }
     };

@@ -29,6 +29,32 @@ function isSubmissionStorageUrl(url: string) {
   );
 }
 
+async function notifySubmission(submission: z.infer<typeof submissionBodySchema>) {
+  if (!env.FORMSPREE_SUBMISSION_URL) return;
+
+  const response = await fetch(env.FORMSPREE_SUBMISSION_URL, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      subject: `New Game Submission: ${submission.gameTitle}`,
+      developer: submission.authorName,
+      contact_email: submission.email,
+      game: submission.gameTitle,
+      description: submission.description || "No description provided.",
+      rom_download: submission.romUrl,
+      cover_art: submission.coverUrl || "None provided",
+      banner_art: submission.bannerUrl || "None provided",
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Formspree notification failed with ${response.status}`);
+  }
+}
+
 export async function registerSubmissionRoutes(app: FastifyInstance) {
   app.post(
     "/submissions/games",
@@ -85,6 +111,12 @@ export async function registerSubmissionRoutes(app: FastifyInstance) {
       if (error || !data) {
         request.log.error({ err: error }, "Failed to create game submission");
         return reply.status(500).send({ error: "Failed to create submission" });
+      }
+
+      try {
+        await notifySubmission(submission);
+      } catch (err) {
+        request.log.warn({ err }, "Failed to send submission notification");
       }
 
       return reply.status(201).send({
