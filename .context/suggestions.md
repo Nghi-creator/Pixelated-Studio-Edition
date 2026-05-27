@@ -19,6 +19,68 @@ Recommended direction:
 
 ## Done
 
+### Explicit Desktop LAN Mode Toggle
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/desktop/main.js`
+- `apps/desktop/preload.js`
+- `apps/desktop/index.html`
+- `engine/runtime/src/config.js`
+- `engine/runtime/src/telemetry/healthSnapshot.js`
+- `engine/runtime/server.js`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added an explicit LAN mode toggle to the desktop launcher, default off.
+- Local mode keeps Docker publishing on `127.0.0.1:8080:8080`.
+- LAN mode publishes Docker on `0.0.0.0:8080:8080`.
+- Desktop discovers host LAN IPv4 URLs and displays them when LAN mode is active.
+- Desktop still generates a fresh pairing token for each engine start.
+- Desktop locks exposure mode while the engine is running, so changing mode requires stopping and starting the engine again.
+- The engine receives `PIXELATED_ENGINE_EXPOSURE_MODE` and `PIXELATED_ADVERTISED_URLS`.
+- `/health` now reports `exposureMode` and `advertisedUrls`.
+- The multiplayer plan now includes the TypeScript migration track for engine and desktop code.
+
+Remaining follow-up:
+
+- Two-device LAN smoke test: confirm another LAN device can reach `/health` only after LAN mode is enabled.
+- Add one-click restart-on-toggle later if changing exposure mode while running should feel smoother.
+
+### LAN Pairing UX
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/web/src/features/local-engine/EnginePairingPanel.tsx`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- The pairing panel now classifies engine URLs as local, LAN, or custom.
+- LAN URLs get explicit warning/context copy instead of being treated like `localhost`.
+- Engine URL validation now requires `http://` or `https://`.
+- Pairing reads `/health` and checks `exposureMode`.
+- LAN-looking URLs are rejected if the engine reports local-only mode.
+- Wrong token errors now tell the user to copy the current desktop token.
+- Unreachable LAN errors now point users toward LAN mode, same-network checks, and possible hosted-HTTPS to HTTP-LAN browser blocking.
+- Backend pairing metadata still stores only non-secret engine URL data; the desktop token remains browser-local.
+
+Remaining follow-up:
+
+- Hosted-browser LAN smoke with two devices on the same network.
+- Decide whether HTTP LAN access from hosted HTTPS is good enough in target browsers or whether the engine needs local HTTPS/private-network-access hardening.
+
 ### Backend Session Intent Validation
 
 Completed: 2026-05-27
@@ -1165,15 +1227,13 @@ Smoke checklist:
 
 ### 1. Decide Explicit LAN Support
 
-The local engine is currently bound to host loopback. That is the right secure default. LAN streaming is now tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
+The local engine now defaults to host loopback, has an explicit desktop LAN mode for testing, and the React pairing panel understands LAN URLs. LAN streaming is tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
 
 Recommended next implementation slice:
 
-- Add an explicit desktop LAN mode toggle, default off.
-- Rotate the pairing token whenever LAN mode changes.
-- Keep loopback-only Docker publishing in local mode.
-- Publish the engine to LAN only after the user enables LAN mode.
-- Display discovered LAN URL(s), warning copy, and the active pairing token in the desktop app.
+- Runtime-smoke Phase 1 with two devices on the same LAN.
+- Decide the HTTPS-hosted-app to HTTP-LAN-engine strategy if browser private-network restrictions block guest pairing.
+- Then proceed to Phase 0A before Phase 3: TypeScript migration for engine signaling/session modules.
 
 ## Database And Supabase Suggestions
 

@@ -4,8 +4,10 @@ const cors = require("cors");
 const { Server } = require("socket.io");
 const {
   allowedRomHosts,
+  ADVERTISED_URLS,
   CLOUD_ROM_DOWNLOAD_TIMEOUT_MS,
   corsOptions,
+  ENGINE_EXPOSURE_MODE,
   ENGINE_TOKEN,
   HEALTH_PATHS,
   MAX_CLOUD_ROM_SIZE_BYTES,
@@ -40,6 +42,8 @@ const cloudRoms = createCloudRomDownloader({
   timeoutMs: CLOUD_ROM_DOWNLOAD_TIMEOUT_MS,
 });
 const getHealthSnapshot = createHealthSnapshot({
+  advertisedUrls: ADVERTISED_URLS,
+  exposureMode: ENGINE_EXPOSURE_MODE,
   engineToken: ENGINE_TOKEN,
   getRuntimeState: runtime.getRuntimeState,
   healthPaths: HEALTH_PATHS,

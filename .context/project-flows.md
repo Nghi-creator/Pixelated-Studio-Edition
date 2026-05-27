@@ -29,7 +29,7 @@ Purpose: start the local Dockerized game streaming node.
 6. Electron generates a random pairing token for this engine run.
 7. Electron sends the token to the desktop renderer, which displays it with a copy button.
 8. `main.js` removes any stale `pixelated-node` container.
-9. `main.js` starts a detached container with `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="<api-url>" -e PIXELATED_ENGINE_TOKEN="<token>" pixelated-engine`.
+9. `main.js` starts a detached container. In local mode it uses `-p 127.0.0.1:8080:8080`; in explicit LAN mode it uses `-p 0.0.0.0:8080:8080`. The command also mounts `-v pixelated-roms:/roms` and passes `PIXELATED_ALLOWED_ORIGINS`, `PIXELATED_ALLOWED_ROM_HOSTS`, `PIXELATED_API_URL`, `PIXELATED_ENGINE_TOKEN`, `PIXELATED_ENGINE_EXPOSURE_MODE`, and `PIXELATED_ADVERTISED_URLS`.
 10. The container starts `node server.js`.
 11. `server.js` listens on `0.0.0.0:8080`.
 12. On server start, `server.js` calls `startVirtualDisplay()`.
@@ -42,7 +42,7 @@ Purpose: start the local Dockerized game streaming node.
 
 Current limitation: health is still readiness-focused. It does not yet expose live stream telemetry such as FPS, bitrate, ICE state, or encoder errors.
 
-Security note: the Node server still listens on `0.0.0.0` inside the container, but Docker publishes it only to `127.0.0.1` on the host.
+Security note: the Node server still listens on `0.0.0.0` inside the container. Docker publishes it only to `127.0.0.1` by default. Publishing to LAN requires the explicit desktop LAN mode toggle.
 
 ## 2. Cloud Library Game Boot Flow
 
@@ -178,14 +178,18 @@ Purpose: make local-engine intent explicit without sending the desktop pairing t
 1. Electron starts the local engine and displays a per-run pairing token.
 2. React renders `EnginePairingPanel` in Local Vault and when the player needs a token.
 3. User enters the local engine URL and desktop pairing token.
-4. React stores the engine URL and pairing token in browser `localStorage`.
-5. React calls `GET <engineUrl>/health` without the token to verify the local engine is reachable.
-6. If the user is signed in, React calls `POST /local-pairings` on the backend with only `{ engineUrl }`.
-7. Backend persists pairing intent metadata for the authenticated user in `local_engine_pairings`.
-8. Backend does not receive or store the desktop pairing token.
-9. Local Vault uses the stored token for `X-Engine-Token` on upload/list/delete requests.
-10. WebRTC uses the stored token for Socket.IO auth.
-11. If the engine rejects the token, React clears it and shows the pairing panel again.
+4. React classifies the URL as local, LAN, or custom based on hostname.
+5. React calls `GET <engineUrl>/health` without the token to verify the engine is reachable.
+6. If the URL looks like LAN but `/health` reports `exposureMode: "local"`, React rejects pairing and tells the user to enable LAN mode in the desktop app.
+7. React calls `GET <engineUrl>/local-games` with `X-Engine-Token` and a pairing-check user id to verify the token.
+8. React stores the engine URL and pairing token in browser `localStorage`.
+9. If the user is signed in, React calls `POST /local-pairings` on the backend with only `{ engineUrl }`.
+10. Backend persists pairing intent metadata for the authenticated user in `local_engine_pairings`.
+11. Backend does not receive or store the desktop pairing token.
+12. Local Vault uses the stored token for `X-Engine-Token` on upload/list/delete requests.
+13. WebRTC uses the stored token for Socket.IO auth.
+14. If the engine rejects the token, React clears it and shows the pairing panel again.
+15. If a hosted HTTPS browser cannot reach an HTTP LAN engine URL, React shows a private-network/mixed-content oriented error instead of a generic unreachable message.
 
 ## 5A. Live Stream Telemetry And Error Flow
 

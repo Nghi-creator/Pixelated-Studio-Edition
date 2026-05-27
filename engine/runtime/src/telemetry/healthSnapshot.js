@@ -21,7 +21,13 @@ function processStarted(processRef) {
 }
 
 function createHealthSnapshot(options) {
-  const { engineToken, healthPaths, getRuntimeState } = options;
+  const {
+    advertisedUrls = [],
+    engineToken,
+    exposureMode = "local",
+    healthPaths,
+    getRuntimeState,
+  } = options;
 
   return function getHealthSnapshot() {
     const runtimeState = getRuntimeState();
@@ -78,6 +84,8 @@ function createHealthSnapshot(options) {
 
     return {
       ok,
+      advertisedUrls,
+      exposureMode,
       uptime: process.uptime(),
       engineTokenRequired: Boolean(engineToken),
       checks,

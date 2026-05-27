@@ -92,6 +92,8 @@ Current important frontend behaviors:
 - `useWebRTC` owns React stream/status lifecycle while helper modules resolve game boot targets, create WebRTC peer connections, and forward keyboard input.
 - For cloud/library games, `useWebRTC` asks the backend API to create a session before emitting `start-game` with `mode: "cloud"` and the backend `sessionToken` to the local engine.
 - The prompt-only engine token flow has been replaced by a local engine pairing panel in the player and Local Vault UI.
+- The pairing panel classifies local, LAN, and custom engine URLs; LAN-looking URLs must match an engine reporting `exposureMode: "lan"` from `/health`.
+- Pairing errors now distinguish rejected tokens, local-only engines reached through LAN URLs, unreachable LAN hosts, and likely HTTPS-hosted-app to HTTP-LAN browser blocking.
 - The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
 - `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
 - `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.
@@ -119,7 +121,7 @@ Current lifecycle:
 4. Electron generates a random pairing token for this engine run.
 5. Electron displays the pairing token in the desktop UI.
 6. Electron removes any stale `pixelated-node` container.
-7. Electron runs a detached container named `pixelated-node` with `-p 127.0.0.1:8080:8080` and `-v pixelated-roms:/roms`, publishing the engine only to host loopback, and passes `PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app"`, `PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co"`, `PIXELATED_API_URL`, plus `PIXELATED_ENGINE_TOKEN`.
+7. Electron runs a detached container named `pixelated-node` with `-v pixelated-roms:/roms`. In local mode it publishes `-p 127.0.0.1:8080:8080`; in explicit LAN mode it publishes `-p 0.0.0.0:8080:8080`. It passes `PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app"`, `PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co"`, `PIXELATED_API_URL`, `PIXELATED_ENGINE_TOKEN`, `PIXELATED_ENGINE_EXPOSURE_MODE`, and `PIXELATED_ADVERTISED_URLS`.
 8. Electron polls `http://127.0.0.1:8080/health` and only marks the engine successful after it returns `ok: true`.
 9. On stop/window close, Electron removes `pixelated-node`.
 
@@ -136,7 +138,7 @@ Notable constraints:
 - Container name and port are fixed.
 - Build happens on user machine from the distributed app folder.
 - Health verifies core local engine dependencies: Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
-- LAN/multiplayer support is planned in `.context/lan-multiplayer-plan.md`. Current engine exposure remains loopback-only until an explicit desktop LAN mode is implemented.
+- LAN/multiplayer support is planned in `.context/lan-multiplayer-plan.md`. Current engine exposure defaults to loopback-only, with explicit desktop LAN mode available for LAN testing.
 
 ## Engine Container
 
@@ -173,6 +175,7 @@ Data paths:
 Streaming/signaling:
 
 - `GET /health` is exposed for Electron readiness checks and returns structured subsystem state.
+- `/health` also reports `exposureMode` and `advertisedUrls` so the desktop/web surfaces can distinguish local-only and LAN engine exposure.
 - Browser connects to Node Socket.IO at `localhost:8080`.
 - Node forwards WebRTC offers, answers, and ICE candidates between browser and Python sender inside a Socket.IO room named `session:<id>`.
 - Python connects back to Node at `http://localhost:8080`.

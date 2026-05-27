@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain } = require("electron");
 const { exec } = require("child_process");
 const crypto = require("crypto");
 const http = require("http");
+const os = require("os");
 const path = require("path");
 
 let mainWindow;
@@ -99,6 +100,38 @@ function quoteDockerEnvValue(value) {
     .replace(/"/g, '\\"')
     .replace(/\$/g, "\\$")
     .replace(/`/g, "\\`");
+}
+
+function normalizeExposureMode(value) {
+  return value === "lan" ? "lan" : "local";
+}
+
+function getDockerPublishHost(exposureMode) {
+  return exposureMode === "lan" ? "0.0.0.0" : "127.0.0.1";
+}
+
+function getAdvertisedEngineUrls(exposureMode) {
+  if (exposureMode !== "lan") {
+    return ["http://localhost:8080"];
+  }
+
+  const urls = [];
+  const interfaces = os.networkInterfaces();
+
+  Object.values(interfaces).forEach((entries = []) => {
+    entries.forEach((entry) => {
+      if (
+        entry &&
+        entry.family === "IPv4" &&
+        !entry.internal &&
+        entry.address
+      ) {
+        urls.push(`http://${entry.address}:8080`);
+      }
+    });
+  });
+
+  return urls.length > 0 ? urls : ["http://<your-lan-ip>:8080"];
 }
 
 function isSafeDockerImageRef(value) {
@@ -222,7 +255,7 @@ async function prepareEngineImage(event, safeEnv) {
   });
 }
 
-ipcMain.on("start-docker", (event) => {
+ipcMain.on("start-docker", (event, options = {}) => {
   if (!isSafeDockerImageRef(engineImage)) {
     emitEngineState(event, "FAILED", "Invalid image reference");
     event.reply(
@@ -236,8 +269,16 @@ ipcMain.on("start-docker", (event) => {
   emitEngineState(event, "CHECKING_DOCKER");
   event.reply("server-log", "Checking Docker daemon...");
   const safeEnv = getSafeEnv();
+  const exposureMode = normalizeExposureMode(options.exposureMode);
+  const publishHost = getDockerPublishHost(exposureMode);
+  const advertisedUrls = getAdvertisedEngineUrls(exposureMode);
+
   engineToken = crypto.randomBytes(24).toString("base64url");
   event.reply("engine-token", engineToken);
+  event.reply("engine-exposure", {
+    advertisedUrls,
+    exposureMode,
+  });
 
   // 1. Check if Docker is running
   exec("docker info", { env: safeEnv }, (err) => {
@@ -265,10 +306,13 @@ ipcMain.on("start-docker", (event) => {
       })
       .then(() => {
         emitEngineState(event, "STARTING_CONTAINER");
-        event.reply("server-log", "Starting WebRTC Node...");
+        event.reply(
+          "server-log",
+          `Starting WebRTC Node in ${exposureMode.toUpperCase()} mode...`,
+        );
 
         return execCommand(
-          `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="${quoteDockerEnvValue(backendApiUrl)}" -e PIXELATED_ENGINE_TOKEN="${quoteDockerEnvValue(engineToken)}" ${engineImage}`,
+          `docker run -d --name pixelated-node -p ${publishHost}:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="${quoteDockerEnvValue(backendApiUrl)}" -e PIXELATED_ENGINE_TOKEN="${quoteDockerEnvValue(engineToken)}" -e PIXELATED_ENGINE_EXPOSURE_MODE="${exposureMode}" -e PIXELATED_ADVERTISED_URLS="${quoteDockerEnvValue(advertisedUrls.join(","))}" ${engineImage}`,
           { env: safeEnv },
         );
       })

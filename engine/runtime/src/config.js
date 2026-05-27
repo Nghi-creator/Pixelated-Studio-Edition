@@ -42,6 +42,12 @@ const PIXELATED_API_URL = (process.env.PIXELATED_API_URL || "").replace(
   /\/+$/,
   "",
 );
+const ENGINE_EXPOSURE_MODE =
+  process.env.PIXELATED_ENGINE_EXPOSURE_MODE === "lan" ? "lan" : "local";
+const ADVERTISED_URLS = (process.env.PIXELATED_ADVERTISED_URLS || "")
+  .split(",")
+  .map((url) => url.trim())
+  .filter(Boolean);
 
 const allowedRomHosts = (process.env.PIXELATED_ALLOWED_ROM_HOSTS || "")
   .split(",")
@@ -64,7 +70,9 @@ module.exports = {
   allowedRomHosts,
   CLOUD_ROM_DOWNLOAD_TIMEOUT_MS,
   corsOptions,
+  ADVERTISED_URLS,
   ENGINE_TOKEN,
+  ENGINE_EXPOSURE_MODE,
   HEALTH_PATHS,
   MAX_CLOUD_ROM_SIZE_BYTES,
   MAX_ROM_SIZE_BYTES,
