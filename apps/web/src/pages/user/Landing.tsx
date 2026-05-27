@@ -18,6 +18,7 @@ export default function Landing() {
   const [searchQuery, setSearchQuery] = useState("");
   const [featuredGames, setFeaturedGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     fetchGames();
@@ -25,6 +26,7 @@ export default function Landing() {
 
   const fetchGames = async () => {
     try {
+      setLoadError("");
       const data = await api.games();
       if (data.games) {
         setGames(data.games);
@@ -43,6 +45,7 @@ export default function Landing() {
       }
     } catch (error) {
       console.error("Error fetching games:", error);
+      setLoadError("Could not load the game library. Check the API connection.");
     } finally {
       setLoading(false);
     }
@@ -86,7 +89,11 @@ export default function Landing() {
         </div>
 
         {/* The Game Grid */}
-        {filteredGames.length === 0 ? (
+        {loadError ? (
+          <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-8 text-center text-red-200">
+            {loadError}
+          </div>
+        ) : filteredGames.length === 0 ? (
           <div className="text-center py-20 text-gray-500">
             <Search className="w-12 h-12 mx-auto mb-4 opacity-20" />
             <p className="text-xl">No games found matching "{searchQuery}"</p>

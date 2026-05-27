@@ -1,7 +1,23 @@
 import { supabase } from "./supabaseClient";
 
+const LOCAL_API_URL = "http://127.0.0.1:4000";
+const PRODUCTION_API_URL = "https://pixelated-api-services.onrender.com";
+
+const isLocalBrowserHost = () => {
+  if (typeof window === "undefined") return true;
+  return ["localhost", "127.0.0.1", "::1"].includes(window.location.hostname);
+};
+
+const getDefaultApiUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+
+  return isLocalBrowserHost() ? LOCAL_API_URL : PRODUCTION_API_URL;
+};
+
 export const API_URL =
-  import.meta.env.VITE_API_URL?.replace(/\/$/, "") || "http://127.0.0.1:4000";
+  getDefaultApiUrl().replace(/\/$/, "");
 
 type ApiRequestOptions = RequestInit & {
   authenticated?: boolean;

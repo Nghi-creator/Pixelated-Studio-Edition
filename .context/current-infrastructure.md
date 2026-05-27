@@ -59,6 +59,7 @@ Current status:
 - API tests also cover the backend-owned data boundary for catalog/favorites, comment ownership/reactions, profile update/account deletion, admin user authorization, and admin access-log authorization.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
+- The web API client uses `VITE_API_URL` when configured. If it is missing, localhost browsers fall back to `http://127.0.0.1:4000`, while non-local browser hosts fall back to `https://pixelated-api-services.onrender.com` to avoid production builds accidentally calling viewer-local localhost.
 - Cloud/library game boot, game catalog reads, favorites, reactions, comments, profiles, player play-count tracking, game submission metadata/notification, access logging, admin user management, admin access-log reads, admin reports, and comment reporting now depend on the API.
 - The web app has no direct Supabase table/RPC/realtime calls under `apps/web/src`; Supabase remains in the browser for auth/session management and Storage uploads.
 - `supabase/migrations/20260527111500_api_owned_social_writes.sql` was pushed to hosted Supabase on 2026-05-27, removing direct browser data policies for workflows now owned by the API.
