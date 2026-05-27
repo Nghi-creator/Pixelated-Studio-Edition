@@ -983,6 +983,34 @@ Remaining follow-up:
 - Move shared contracts to `packages/shared` after API/web payloads settle.
 - Remove any leftover ignored generated artifacts under the old folder names when convenient.
 
+### Desktop Docker Lifecycle States
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `apps/desktop/main.js`
+- `apps/desktop/preload.js`
+- `apps/desktop/index.html`
+- `apps/desktop/README.md`
+- `engine/runtime/README.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added structured desktop engine lifecycle events for checking Docker, pulling image, building image, removing stale containers, starting container, waiting for health, ready, stopping, stopped, and failed.
+- Updated the desktop UI to show those lifecycle states instead of one generic booting state.
+- Added optional prebuilt image support through `PIXELATED_ENGINE_IMAGE` and `PIXELATED_ENGINE_PULL=1`.
+- Kept local image building as the default developer path.
+- Added pull-to-build fallback behavior, with `PIXELATED_ENGINE_BUILD_FALLBACK=0` available for packaged releases that should fail instead of building locally.
+- Added Docker image reference validation before shelling out to Docker.
+
+Remaining follow-up:
+
+- Publish a real versioned engine image to a registry and set production desktop packaging env vars to pull it.
+- Runtime-smoke the desktop app with both default local build mode and prebuilt image pull mode.
+
 ## Highest Priority Issues
 
 ### 1. Complete Signed-In Hosted Smoke Coverage
@@ -997,17 +1025,7 @@ Smoke checklist:
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
 
-### 2. Improve Docker Build/Run Lifecycle
-
-The Electron app builds the image on demand and uses a fixed container name/port. This is workable for a demo, but fragile for users.
-
-Suggested improvements:
-
-- Build and publish the engine image ahead of time, then `docker pull` tagged versions.
-- Keep local build as a development fallback.
-- Add more structured engine states: checking Docker, pulling/building image, starting container, waiting for health, ready, failed.
-
-### 3. Fix WebRTC Production Readiness
+### 2. Fix WebRTC Production Readiness
 
 Google STUN alone is not enough for real users and varied networks.
 
@@ -1019,9 +1037,7 @@ Suggested improvements:
 - Add bitrate/framerate profiles.
 - Add a fallback message when the local engine is offline.
 
-### 4. Decide Explicit LAN Support
-
-The local engine is currently bound to host loopback. That is the right secure default. If LAN streaming becomes a product goal, add it as an explicit desktop setting with warning copy, origin controls, and token rotation.
+### 3. Decide Explicit LAN Support
 
 The local engine is currently bound to host loopback. That is the right secure default. If LAN streaming becomes a product goal, add it as an explicit desktop setting with warning copy, origin controls, and token rotation.
 

@@ -39,6 +39,59 @@ const engineRuntimeDir =
   path.resolve(__dirname, "../../engine/runtime");
 const backendApiUrl =
   process.env.PIXELATED_API_URL || "https://pixelated-api-services.onrender.com";
+const engineImage = process.env.PIXELATED_ENGINE_IMAGE || "pixelated-engine";
+const pullEngineImage =
+  process.env.PIXELATED_ENGINE_PULL === "1" ||
+  (engineImage !== "pixelated-engine" && process.env.PIXELATED_ENGINE_PULL !== "0");
+const buildFallback = process.env.PIXELATED_ENGINE_BUILD_FALLBACK !== "0";
+
+const engineStates = {
+  CHECKING_DOCKER: {
+    label: "Checking Docker",
+    status: "starting",
+  },
+  PULLING_IMAGE: {
+    label: "Pulling Image",
+    status: "starting",
+  },
+  BUILDING_IMAGE: {
+    label: "Building Image",
+    status: "starting",
+  },
+  REMOVING_STALE: {
+    label: "Removing Stale Container",
+    status: "starting",
+  },
+  STARTING_CONTAINER: {
+    label: "Starting Container",
+    status: "starting",
+  },
+  WAITING_HEALTH: {
+    label: "Waiting For Health",
+    status: "starting",
+  },
+  READY: {
+    label: "Engine Ready",
+    status: "ready",
+  },
+  STOPPING: {
+    label: "Stopping Engine",
+    status: "stopping",
+  },
+  STOPPED: {
+    label: "Engine Offline",
+    status: "stopped",
+  },
+  FAILED: {
+    label: "Engine Failed",
+    status: "failed",
+  },
+};
+
+function emitEngineState(event, key, detail = "") {
+  const state = engineStates[key] || engineStates.FAILED;
+  event.reply("engine-state", { ...state, detail, key });
+}
 
 function quoteDockerEnvValue(value) {
   return String(value)
@@ -46,6 +99,10 @@ function quoteDockerEnvValue(value) {
     .replace(/"/g, '\\"')
     .replace(/\$/g, "\\$")
     .replace(/`/g, "\\`");
+}
+
+function isSafeDockerImageRef(value) {
+  return /^[a-zA-Z0-9][a-zA-Z0-9._/-]*(?::[a-zA-Z0-9._-]+)?$/.test(value);
 }
 
 function waitForEngineHealth(attempts = 30, delayMs = 1000) {
@@ -104,7 +161,79 @@ function waitForEngineHealth(attempts = 30, delayMs = 1000) {
   });
 }
 
+function streamCommand(event, command, options) {
+  return new Promise((resolve, reject) => {
+    const child = exec(command, options);
+
+    child.stdout.on("data", (data) =>
+      event.reply("server-log", data.toString().trim()),
+    );
+    child.stderr.on("data", (data) =>
+      event.reply("server-log", data.toString().trim()),
+    );
+    child.on("error", reject);
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      reject(new Error(`Command failed with exit code ${code}`));
+    });
+  });
+}
+
+function execCommand(command, options) {
+  return new Promise((resolve, reject) => {
+    exec(command, options, (err, stdout, stderr) => {
+      if (err) {
+        reject(err);
+        return;
+      }
+      resolve({ stderr, stdout });
+    });
+  });
+}
+
+async function prepareEngineImage(event, safeEnv) {
+  if (!isSafeDockerImageRef(engineImage)) {
+    throw new Error("Invalid PIXELATED_ENGINE_IMAGE value.");
+  }
+
+  if (pullEngineImage) {
+    emitEngineState(event, "PULLING_IMAGE", engineImage);
+    event.reply("server-log", `Pulling engine image: ${engineImage}`);
+    try {
+      await streamCommand(event, `docker pull ${engineImage}`, { env: safeEnv });
+      return;
+    } catch (err) {
+      if (!buildFallback) throw err;
+      event.reply(
+        "server-log",
+        "Pull failed. Falling back to local engine image build.",
+      );
+    }
+  }
+
+  emitEngineState(event, "BUILDING_IMAGE", engineRuntimeDir);
+  event.reply("server-log", "Building local engine image...");
+  await streamCommand(event, `docker build -t ${engineImage} .`, {
+    cwd: engineRuntimeDir,
+    env: safeEnv,
+  });
+}
+
 ipcMain.on("start-docker", (event) => {
+  if (!isSafeDockerImageRef(engineImage)) {
+    emitEngineState(event, "FAILED", "Invalid image reference");
+    event.reply(
+      "server-log",
+      '<span class="text-red-500">ERROR: Invalid PIXELATED_ENGINE_IMAGE value.</span>',
+    );
+    event.reply("engine-stopped");
+    return;
+  }
+
+  emitEngineState(event, "CHECKING_DOCKER");
   event.reply("server-log", "Checking Docker daemon...");
   const safeEnv = getSafeEnv();
   engineToken = crypto.randomBytes(24).toString("base64url");
@@ -113,6 +242,7 @@ ipcMain.on("start-docker", (event) => {
   // 1. Check if Docker is running
   exec("docker info", { env: safeEnv }, (err) => {
     if (err) {
+      emitEngineState(event, "FAILED", "Docker is not running");
       event.reply(
         "server-log",
         '<span class="text-red-500">ERROR: Docker Engine not detected or not running.</span>',
@@ -121,76 +251,54 @@ ipcMain.on("start-docker", (event) => {
       return;
     }
 
-    event.reply("server-log", "Docker Engine found. Compiling container...");
+    event.reply("server-log", "Docker Engine found.");
 
-    // 2. Build the image
-    const buildCmd = exec("docker build -t pixelated-engine .", {
-      cwd: engineRuntimeDir,
-      env: safeEnv,
-    });
+    prepareEngineImage(event, safeEnv)
+      .then(() => {
+        event.reply("server-log", "Image ready. Preparing WebRTC Node...");
+        emitEngineState(event, "REMOVING_STALE");
 
-    buildCmd.stdout.on("data", (data) =>
-      event.reply("server-log", data.toString().trim()),
-    );
-    buildCmd.stderr.on("data", (data) =>
-      event.reply("server-log", data.toString().trim()),
-    );
-
-    buildCmd.on("close", (code) => {
-      if (code !== 0) {
-        event.reply(
-          "server-log",
-          '<span class="text-red-500">ERROR: Build failed.</span>',
+        // Remove any stale container before running
+        return execCommand("docker rm -f pixelated-node", { env: safeEnv }).catch(
+          () => undefined,
         );
-        event.reply("engine-stopped");
-        return;
-      }
-
-      event.reply("server-log", "Build complete. Preparing WebRTC Node...");
-
-      // 3. Remove any stale container before running
-      exec("docker rm -f pixelated-node", { env: safeEnv }, () => {
+      })
+      .then(() => {
+        emitEngineState(event, "STARTING_CONTAINER");
         event.reply("server-log", "Starting WebRTC Node...");
 
-        // 4. Run the container
-        exec(
-          `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="${quoteDockerEnvValue(backendApiUrl)}" -e PIXELATED_ENGINE_TOKEN="${quoteDockerEnvValue(engineToken)}" pixelated-engine`,
+        return execCommand(
+          `docker run -d --name pixelated-node -p 127.0.0.1:8080:8080 -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="${quoteDockerEnvValue(backendApiUrl)}" -e PIXELATED_ENGINE_TOKEN="${quoteDockerEnvValue(engineToken)}" ${engineImage}`,
           { env: safeEnv },
-          (runErr) => {
-            if (runErr) {
-              event.reply(
-                "server-log",
-                '<span class="text-red-500">ERROR: Could not start engine container.</span>',
-              );
-              event.reply("engine-stopped");
-              return;
-            }
-
-            event.reply("server-log", "Waiting for engine health check...");
-            waitForEngineHealth()
-              .then(() => {
-                event.reply(
-                  "server-log",
-                  '<span class="text-green-500">SUCCESS: PIXELATED Engine healthy on Port 8080.</span>',
-                );
-              })
-              .catch((healthErr) => {
-                event.reply(
-                  "server-log",
-                  `<span class="text-red-500">ERROR: ${healthErr.message}</span>`,
-                );
-                exec("docker rm -f pixelated-node", { env: safeEnv }, () => {
-                  event.reply("engine-stopped");
-                });
-              });
-          },
         );
+      })
+      .then(() => {
+        emitEngineState(event, "WAITING_HEALTH");
+        event.reply("server-log", "Waiting for engine health check...");
+        return waitForEngineHealth();
+      })
+      .then(() => {
+        emitEngineState(event, "READY", "Port 8080");
+        event.reply(
+          "server-log",
+          '<span class="text-green-500">SUCCESS: PIXELATED Engine healthy on Port 8080.</span>',
+        );
+      })
+      .catch((startErr) => {
+        emitEngineState(event, "FAILED", startErr.message);
+        event.reply(
+          "server-log",
+          `<span class="text-red-500">ERROR: ${startErr.message}</span>`,
+        );
+        exec("docker rm -f pixelated-node", { env: safeEnv }, () => {
+          event.reply("engine-stopped");
+        });
       });
-    });
   });
 });
 
 ipcMain.on("stop-docker", (event) => {
+  emitEngineState(event, "STOPPING");
   event.reply("server-log", "Initiating shutdown sequence...");
   const safeEnv = getSafeEnv();
 
@@ -203,6 +311,7 @@ ipcMain.on("stop-docker", (event) => {
     } else {
       event.reply("server-log", "Engine successfully terminated.");
     }
+    emitEngineState(event, "STOPPED");
     event.reply("engine-stopped");
   });
 });

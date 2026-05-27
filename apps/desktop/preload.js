@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   startDocker: () => ipcRenderer.send("start-docker"),
   stopDocker: () => ipcRenderer.send("stop-docker"),
   onServerLog: (callback) => ipcRenderer.on("server-log", callback),
+  onEngineState: (callback) => ipcRenderer.on("engine-state", callback),
   onEngineStopped: (callback) => ipcRenderer.on("engine-stopped", callback),
   onEngineToken: (callback) => ipcRenderer.on("engine-token", callback),
 });

@@ -120,6 +120,14 @@ Current lifecycle:
 8. Electron polls `http://127.0.0.1:8080/health` and only marks the engine successful after it returns `ok: true`.
 9. On stop/window close, Electron removes `pixelated-node`.
 
+The desktop UI now receives structured engine lifecycle states: checking Docker,
+pulling image, building image, removing stale container, starting container,
+waiting for health, ready, stopping, stopped, and failed. The launcher still
+builds locally by default, but packaged releases can set
+`PIXELATED_ENGINE_IMAGE` and `PIXELATED_ENGINE_PULL=1` to pull a prebuilt image
+first. Pull failures fall back to a local build unless
+`PIXELATED_ENGINE_BUILD_FALLBACK=0` is set.
+
 Notable constraints:
 
 - Container name and port are fixed.
