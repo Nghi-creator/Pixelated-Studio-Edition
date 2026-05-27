@@ -222,7 +222,7 @@ Purpose: move rendered game frames from RetroArch to the browser.
 3. Xvfb provides the virtual framebuffer for display `:99`.
 4. `camera.py` starts a GStreamer pipeline after receiving the WebRTC offer.
 5. GStreamer `ximagesrc display-name=:99 use-damage=false show-pointer=false` captures raw frames from Xvfb.
-6. GStreamer constrains video to `video/x-raw,framerate=60/1`.
+6. GStreamer constrains video to the selected stream profile framerate, currently 30 or 60 fps.
 7. `videoconvert` converts frames.
 8. Caps force `video/x-raw,format=I420`.
 9. A leaky queue keeps latency low by dropping stale frames under pressure.
@@ -230,7 +230,7 @@ Purpose: move rendered game frames from RetroArch to the browser.
     - `deadline=1`,
     - `cpu-used=8`,
     - `threads=4`,
-    - constant bitrate target `1000000`,
+    - constant bitrate target from the selected stream profile, currently 700, 1000, or 1600 kbps,
     - keyframe distance `120`,
     - error resilience enabled.
 11. `rtpvp8pay pt=96` packetizes VP8 into RTP.

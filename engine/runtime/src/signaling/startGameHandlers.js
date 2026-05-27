@@ -42,6 +42,22 @@ function normalizeIceServers(value) {
     : [];
 }
 
+function normalizeStreamProfile(value) {
+  const profile = value && typeof value === "object" ? value : {};
+  const fps = Number(profile.fps);
+  const bitrateKbps = Number(profile.bitrateKbps);
+  const id = typeof profile.id === "string" ? profile.id : "balanced";
+
+  return {
+    bitrateKbps:
+      Number.isFinite(bitrateKbps) && bitrateKbps >= 500 && bitrateKbps <= 2500
+        ? Math.round(bitrateKbps)
+        : 1000,
+    fps: Number.isFinite(fps) && fps >= 24 && fps <= 60 ? Math.round(fps) : 60,
+    id: /^[a-z0-9_-]{1,40}$/i.test(id) ? id : "balanced",
+  };
+}
+
 function registerStartGameHandler(socket, options) {
   const { apiUrl, downloadCloudRom, runtime, verifyBackendSession } = options;
 
@@ -56,6 +72,7 @@ function registerStartGameHandler(socket, options) {
     socket.data.sessionId = sessionId;
     socket.join(getSessionRoom(sessionId));
     const iceServers = normalizeIceServers(payload.iceServers);
+    const streamProfile = normalizeStreamProfile(payload.streamProfile);
 
     console.log(
       `\n[Node.js] React requested game boot for session ${sessionId}: ${romFileOrUrl}`,
@@ -116,6 +133,7 @@ function registerStartGameHandler(socket, options) {
         runtime.bootGame(tmpPath, sessionId, {
           ...(iceServers.length > 0 ? { iceServers } : {}),
           isCloudRom: true,
+          streamProfile,
         });
       } catch (err) {
         console.error("[Engine] Failed to download cloud ROM:", err);
@@ -128,7 +146,10 @@ function registerStartGameHandler(socket, options) {
       runtime.bootGame(
         path.join("/roms", safeUserId, safeRomFile),
         sessionId,
-        iceServers.length > 0 ? { iceServers } : {},
+        {
+          ...(iceServers.length > 0 ? { iceServers } : {}),
+          streamProfile,
+        },
       );
     }
   });
@@ -137,5 +158,6 @@ function registerStartGameHandler(socket, options) {
 module.exports = {
   hasCloudSessionIntent,
   normalizeIceServers,
+  normalizeStreamProfile,
   registerStartGameHandler,
 };

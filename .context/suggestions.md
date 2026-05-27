@@ -1097,7 +1097,39 @@ What changed:
 Remaining follow-up:
 
 - Runtime-smoke retry behavior by stopping/restarting the desktop engine during a player session.
-- Add bitrate/framerate profiles.
+
+### WebRTC Stream Profiles
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `apps/web/src/lib/streamProfiles.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/features/player/PlayerControls.tsx`
+- `apps/web/src/pages/user/Player.tsx`
+- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/signaling/startGameHandlers.test.js`
+- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/camera.py`
+- `engine/runtime/README.md`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added stream profile presets: Performance, Balanced, and Quality.
+- The player UI exposes profile selection and persists it in `localStorage`.
+- React forwards selected profile bitrate and framerate in `start-game`.
+- The local engine validates profile id, fps, and bitrate before using them.
+- Node passes the sanitized profile to `camera.py` as `PIXELATED_STREAM_PROFILE`.
+- Python applies the profile to GStreamer capture framerate and VP8 target bitrate.
+- Engine tests cover stream profile validation/clamping.
+
+Remaining follow-up:
+
+- Runtime-smoke each profile in the player and compare received FPS/bitrate in the developer telemetry panel.
 
 ## Highest Priority Issues
 
@@ -1113,15 +1145,7 @@ Smoke checklist:
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
 
-### 2. Add WebRTC Bitrate And Framerate Profiles
-
-TURN support and basic retry behavior are now wired through the API, browser, Node engine, and Python/GStreamer sender. The remaining production-readiness work is stream profile control.
-
-Suggested improvements:
-
-- Add bitrate/framerate profiles.
-
-### 3. Decide Explicit LAN Support
+### 2. Decide Explicit LAN Support
 
 The local engine is currently bound to host loopback. That is the right secure default. If LAN streaming becomes a product goal, add it as an explicit desktop setting with warning copy, origin controls, and token rotation.
 

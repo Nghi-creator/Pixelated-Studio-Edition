@@ -31,3 +31,7 @@ The browser asks the API for WebRTC ICE servers before negotiation and forwards
 that config to the engine in `start-game`. The Node runtime passes it to
 `camera.py` as `PIXELATED_ICE_SERVERS`, and the GStreamer `webrtcbin` sender
 uses the configured STUN/TURN servers when creating its answer.
+
+The browser also forwards a stream profile in `start-game`. Node validates the
+profile and passes it to `camera.py` as `PIXELATED_STREAM_PROFILE`; the camera
+bridge applies it to GStreamer framerate caps and VP8 target bitrate.

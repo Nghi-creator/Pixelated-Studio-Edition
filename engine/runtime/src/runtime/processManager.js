@@ -92,6 +92,9 @@ function createProcessManager(options) {
           PIXELATED_SESSION_ID: sessionId,
           PIXELATED_ENGINE_TOKEN: engineToken,
           PIXELATED_ICE_SERVERS: JSON.stringify(bootOptions.iceServers || []),
+          PIXELATED_STREAM_PROFILE: JSON.stringify(
+            bootOptions.streamProfile || {},
+          ),
         },
       });
 

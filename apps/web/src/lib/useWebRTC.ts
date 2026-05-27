@@ -22,6 +22,7 @@ import {
   startWebRTCTelemetry,
   type WebRTCTelemetry,
 } from "./webrtcTelemetry";
+import type { StreamProfile } from "./streamProfiles";
 
 const STREAM_METRIC_SEND_INTERVAL_MS = 5_000;
 const DISCONNECTED_GRACE_MS = 5_000;
@@ -39,7 +40,7 @@ async function loadIceServers() {
   }
 }
 
-export function useWebRTC(gameId: string) {
+export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [status, setStatus] = useState<WebRTCStatus>(
     gameId ? "connecting" : "idle",
@@ -248,6 +249,11 @@ export function useWebRTC(gameId: string) {
         socket.emit("start-game", {
           sessionId,
           iceServers: iceServersForSession,
+          streamProfile: {
+            bitrateKbps: streamProfile.bitrateKbps,
+            fps: streamProfile.fps,
+            id: streamProfile.id,
+          },
           ...bootTarget,
         });
       } catch (err) {
@@ -289,7 +295,7 @@ export function useWebRTC(gameId: string) {
       setStream(null);
       setTelemetry(INITIAL_WEBRTC_TELEMETRY);
     };
-  }, [gameId, pairingVersion, retryVersion]);
+  }, [gameId, pairingVersion, retryVersion, streamProfile]);
 
   const retry = () => {
     sessionIdRef.current = createWebRTCSessionId();
