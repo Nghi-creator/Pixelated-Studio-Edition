@@ -760,6 +760,7 @@ Implemented in:
 - `services/api/src/server.ts`
 - `apps/web/src/lib/apiClient.ts`
 - `apps/web/src/lib/useSessionTracker.ts`
+- `supabase/migrations/20260527104500_backend_access_logs.sql`
 - `.context/current-infrastructure.md`
 - `.context/suggestions.md`
 
@@ -817,11 +818,39 @@ What changed:
 - Removed the remaining frontend Supabase table/RPC/realtime usage under `apps/web/src`.
 - Browser Supabase usage is now limited to auth/session handling and intentional Storage uploads for avatars and submissions.
 - Added a staged hardening migration that removes now-obsolete direct browser policies for favorites, likes, comments, comment likes, reported comments, profile updates, and admin access-log reads.
+- The hardening migration was pushed to hosted Supabase on 2026-05-27.
 
 Remaining follow-up:
 
-- Deploy the new API and web builds, then push `supabase/migrations/20260527111500_api_owned_social_writes.sql` with or immediately after the deploy so production is not caught between old frontend code and hardened RLS policies.
-- Add dedicated API tests for catalog/social/profile/admin-user/access-log routes.
+- Browser-smoke signed-in library, favorites, comments/reactions, profile update, admin users, and admin access logs against the hosted stack.
+
+### Backend-Owned Data Route Tests
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/src/dataBoundary.test.ts`
+- `services/api/src/routes/accessLogs.ts`
+- `services/api/src/routes/adminUsers.ts`
+- `services/api/src/routes/catalog.ts`
+- `services/api/src/routes/profiles.ts`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added Fastify injection tests for the API-owned data boundary without requiring a live Supabase database.
+- Route modules for catalog/social/profile/admin-user/access-log flows now support injectable auth and Supabase dependencies, matching the existing control-plane test pattern.
+- Tests cover game catalog and favorite reads/deletes.
+- Tests cover comment deletion scoping: regular users can only delete their own comments, while admins can delete any comment.
+- Tests cover comment reaction replacement and self-reaction rejection.
+- Tests cover profile update scoping and account deletion via Supabase auth admin.
+- Tests cover admin-user and admin-access-log authorization for regular users, admins, and super admins.
+
+Remaining follow-up:
+
+- Add tests for the submission notification path and admin report action edge cases when those areas get their next pass.
 
 ### Backend Hosting Prep
 
@@ -968,18 +997,7 @@ Smoke checklist:
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
 
-### 2. Deploy Backend-Owned Data Boundary Hardening
-
-The code boundary is in place, but the RLS hardening migration is intentionally staged until the matching backend and frontend deploys are live.
-
-Deploy order:
-
-- Deploy the Render API build that includes catalog, social, profile, admin user, and admin access-log routes.
-- Deploy the Vercel web build that calls those API routes.
-- Push `supabase/migrations/20260527111500_api_owned_social_writes.sql`.
-- Smoke-test library, favorites, player comments/reactions, profile update, admin users, admin reports, admin access logs, cloud play, local pairing, and stream metrics with a signed-in user.
-
-### 3. Improve Docker Build/Run Lifecycle
+### 2. Improve Docker Build/Run Lifecycle
 
 The Electron app builds the image on demand and uses a fixed container name/port. This is workable for a demo, but fragile for users.
 
@@ -989,7 +1007,7 @@ Suggested improvements:
 - Keep local build as a development fallback.
 - Add more structured engine states: checking Docker, pulling/building image, starting container, waiting for health, ready, failed.
 
-### 4. Fix WebRTC Production Readiness
+### 3. Fix WebRTC Production Readiness
 
 Google STUN alone is not enough for real users and varied networks.
 
@@ -1001,7 +1019,9 @@ Suggested improvements:
 - Add bitrate/framerate profiles.
 - Add a fallback message when the local engine is offline.
 
-### 5. Decide Explicit LAN Support
+### 4. Decide Explicit LAN Support
+
+The local engine is currently bound to host loopback. That is the right secure default. If LAN streaming becomes a product goal, add it as an explicit desktop setting with warning copy, origin controls, and token rotation.
 
 The local engine is currently bound to host loopback. That is the right secure default. If LAN streaming becomes a product goal, add it as an explicit desktop setting with warning copy, origin controls, and token rotation.
 

@@ -19,9 +19,7 @@ Pre-hosting checks passed on 2026-05-26:
 - Production-mode startup with blank `HOST` bound to `0.0.0.0`, which is required for Render port detection.
 - `GET /` and `HEAD /` returned `200` for provider root probes.
 
-`supabase/migrations/20260527093000_backend_control_plane_state.sql`, `20260527103000_secure_game_submissions.sql`, and `20260527104500_backend_access_logs.sql` were pushed to the hosted Supabase project on 2026-05-27.
-
-`supabase/migrations/20260527111500_api_owned_social_writes.sql` is staged but should not be pushed until the matching API and web builds are deployed. It removes direct browser policies for workflows now owned by the API, so pushing it early can break the currently deployed frontend.
+`supabase/migrations/20260527093000_backend_control_plane_state.sql`, `20260527103000_secure_game_submissions.sql`, `20260527104500_backend_access_logs.sql`, and `20260527111500_api_owned_social_writes.sql` were pushed to the hosted Supabase project on 2026-05-27.
 
 ## Local `.env`
 
@@ -132,11 +130,11 @@ VITE_API_URL=https://pixelated-api-services.onrender.com
 
 ## Data-Boundary Deploy Order
 
-For the API-owned social/profile/admin boundary:
+For future API-owned social/profile/admin boundary changes:
 
 1. Deploy the Render API build with catalog, favorites, reactions, comments, profiles, admin users, and admin access-log routes.
 2. Deploy the Vercel web build that calls those routes through `apps/web/src/lib/apiClient.ts`.
-3. Push `supabase/migrations/20260527111500_api_owned_social_writes.sql`.
+3. Push any migration that removes old direct-browser policies.
 4. Smoke-test signed-in library, favorites, player comments/reactions, profile update, admin user management, admin access logs, cloud play, local pairing, and stream metrics.
 
 ## Remaining Production Gaps

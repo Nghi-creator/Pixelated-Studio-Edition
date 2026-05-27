@@ -55,11 +55,12 @@ Current status:
 - `services/api/.env` exists locally and is ignored; production keys live on the backend host.
 - API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
 - `services/api` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
+- API tests also cover the backend-owned data boundary for catalog/favorites, comment ownership/reactions, profile update/account deletion, admin user authorization, and admin access-log authorization.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - Cloud/library game boot, game catalog reads, favorites, reactions, comments, profiles, player play-count tracking, game submission metadata/notification, access logging, admin user management, admin access-log reads, admin reports, and comment reporting now depend on the API.
 - The web app has no direct Supabase table/RPC/realtime calls under `apps/web/src`; Supabase remains in the browser for auth/session management and Storage uploads.
-- `supabase/migrations/20260527111500_api_owned_social_writes.sql` is staged but intentionally not pushed yet. Push it with or immediately after deploying the matching API and web builds because it removes direct browser data policies for workflows now owned by the API.
+- `supabase/migrations/20260527111500_api_owned_social_writes.sql` was pushed to hosted Supabase on 2026-05-27, removing direct browser data policies for workflows now owned by the API.
 
 ## Web App
 
@@ -219,7 +220,7 @@ Security model today:
 - Local vault uploads are limited to `.nes` filenames and capped by `PIXELATED_MAX_ROM_SIZE_BYTES`, defaulting to 8 MiB.
 - Developer submission storage uploads now require an authenticated Supabase user, and `game_submissions.submitter_id` records who submitted the game.
 - Direct public inserts into `access_logs` are disabled; access logs are created by the backend service-role client.
-- A staged hardening migration removes direct browser policies for favorites, likes, comments, comment likes, reported comments, profile updates, and admin access-log reads after the new API/web deploy is live.
+- The pushed hardening migration removes direct browser policies for favorites, likes, comments, comment likes, reported comments, profile updates, and admin access-log reads now that the API/web data boundary is live.
 
 ## Deployment Model
 
