@@ -747,6 +747,35 @@ Remaining follow-up:
 - Add API tests for `POST /submissions/games`.
 - Move the Formspree notification server-side if you want the form endpoint hidden from the browser.
 
+### Access Logging Through Backend
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `supabase/migrations/20260527104500_backend_access_logs.sql`
+- `services/api/src/routes/accessLogs.ts`
+- `services/api/src/server.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/lib/useSessionTracker.ts`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added `POST /access-logs`.
+- Backend supports guest logs and authenticated logs on the same endpoint.
+- Backend derives `user_id` from the optional Supabase bearer token instead of trusting browser payloads.
+- Session tracker now calls the API instead of inserting directly into Supabase.
+- Access log entries now include the current browser path.
+- Removed the public insert RLS policy on `access_logs`.
+- The migration was pushed to hosted Supabase on 2026-05-27.
+
+Remaining follow-up:
+
+- Move admin access-log list fetching through the API.
+- Add API tests for `POST /access-logs`.
+
 ### Backend Hosting Prep
 
 Implemented: 2026-05-25
@@ -899,7 +928,7 @@ Several workflows still write directly from the browser to Supabase. That is acc
 Suggested order:
 
 - Submission review/approval workflow.
-- Access logging/session tracking.
+- Admin access-log list fetching.
 - Profile role-sensitive updates.
 
 ### 3. Improve Docker Build/Run Lifecycle

@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { supabase } from "./supabaseClient";
+import { api } from "./apiClient";
 
 export function useSessionTracker() {
   useEffect(() => {
@@ -18,15 +19,7 @@ export function useSessionTracker() {
       sessionStorage.setItem(sessionKey, "true");
       
       try {
-        const { error } = await supabase.from("access_logs").insert({
-          user_id: user_id,
-        });
-
-        if (error) {
-          console.error("Supabase failed to insert session:", error);
-          sessionStorage.removeItem(sessionKey); // Unlock if it actually failed
-          return;
-        }
+        await api.logAccess(window.location.pathname);
       } catch (err) {
         console.error("Exception in logSession", err);
         sessionStorage.removeItem(sessionKey);

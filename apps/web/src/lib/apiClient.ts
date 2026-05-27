@@ -175,6 +175,11 @@ export const api = {
       service: string;
       uptimeSeconds: number;
     }>("/health", { authenticated: false }),
+  logAccess: (path: string) =>
+    apiRequest<{ success: true }>("/access-logs", {
+      body: JSON.stringify({ path }),
+      method: "POST",
+    }),
   me: () => apiRequest<ApiMeResponse>("/me"),
   pairLocalEngine: (engineUrl: string) =>
     apiRequest<ApiLocalPairingResponse>("/local-pairings", {

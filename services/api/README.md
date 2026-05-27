@@ -60,6 +60,7 @@ Implemented now:
 - `GET /health`.
 - `GET /`.
 - `GET /ready`.
+- `POST /access-logs`.
 - Supabase JWT verification middleware.
 - Authenticated `GET /me`.
 - Authenticated `GET /me/permissions`.
@@ -89,6 +90,7 @@ Authorization: Bearer <supabase-access-token>
 Routes:
 
 ```text
+POST /access-logs
 GET /me
 GET /me/permissions
 POST /games/:gameId/play-count

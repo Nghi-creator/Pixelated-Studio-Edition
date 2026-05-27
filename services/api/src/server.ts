@@ -3,6 +3,7 @@ import { env } from "./config/env.js";
 import { scheduleControlPlaneCleanup } from "./modules/maintenance/controlPlaneCleanup.js";
 import { createLoggerOptions } from "./plugins/logger.js";
 import { registerCors } from "./plugins/cors.js";
+import { registerAccessLogRoutes } from "./routes/accessLogs.js";
 import { registerGameRoutes } from "./routes/games.js";
 import { registerHealthRoutes } from "./routes/health.js";
 import { registerLocalPairingRoutes } from "./routes/localPairings.js";
@@ -19,6 +20,7 @@ export async function buildServer() {
 
   await registerCors(app);
   await registerHealthRoutes(app);
+  await registerAccessLogRoutes(app);
   await registerMeRoutes(app);
   await registerLocalPairingRoutes(app);
   await registerGameRoutes(app);

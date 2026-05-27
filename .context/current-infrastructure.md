@@ -32,6 +32,7 @@ Current status:
 - `POST /admin/reports/:reportId/action` resolves moderation queue actions through the API for ignore, delete-comment, and ban-user actions.
 - `GET /admin/reports` loads the moderation queue through the API for authenticated admins/super admins.
 - `POST /submissions/games` creates developer game submission records through the API for authenticated users.
+- `POST /access-logs` records guest or authenticated session/access logs through the API.
 - `POST /sessions` creates a short-lived backend session for cloud games, persists a hashed session token in Supabase, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
 - `POST /sessions/:sessionId/verify` verifies a short-lived session token and returns the backend-approved boot target to the local engine.
 - `POST /local-pairings` persists authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
@@ -85,7 +86,7 @@ Current important frontend behaviors:
 - `/play/:id` is composed from `apps/web/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, creates submission metadata through the API, then pings Formspree.
-- Session tracking inserts browser-load access logs directly from the client.
+- Session tracking calls the API to insert browser-load access logs; the backend derives user id from the optional Supabase bearer token.
 
 ## Desktop Orchestrator
 
@@ -205,6 +206,7 @@ Security model today:
 - The Docker port is published only to host loopback and the engine CORS origin is set to the hosted Vercel app by Electron.
 - Local vault uploads are limited to `.nes` filenames and capped by `PIXELATED_MAX_ROM_SIZE_BYTES`, defaulting to 8 MiB.
 - Developer submission storage uploads now require an authenticated Supabase user, and `game_submissions.submitter_id` records who submitted the game.
+- Direct public inserts into `access_logs` are disabled; access logs are created by the backend service-role client.
 
 ## Deployment Model
 
