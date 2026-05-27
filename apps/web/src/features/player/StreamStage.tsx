@@ -1,9 +1,10 @@
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
 import type { RefObject } from "react";
 import type { WebRTCStatus } from "../../lib/webrtcSession";
 import type { WebRTCTelemetry } from "../../lib/webrtcTelemetry";
 
 type StreamStageProps = {
+  onRetry?: () => void;
   showStreamTelemetry: boolean;
   status: WebRTCStatus;
   telemetry: WebRTCTelemetry;
@@ -11,6 +12,7 @@ type StreamStageProps = {
 };
 
 export function StreamStage({
+  onRetry,
   showStreamTelemetry,
   status,
   telemetry,
@@ -36,6 +38,16 @@ export function StreamStage({
             <p className="mt-2 max-w-xl text-sm text-gray-400">
               {telemetry.lastEngineError}
             </p>
+          )}
+          {onRetry && (
+            <button
+              className="mt-5 inline-flex h-11 items-center gap-2 rounded-lg border border-synth-primary/60 bg-synth-primary/15 px-4 text-sm font-semibold text-white transition-colors hover:bg-synth-primary/25"
+              onClick={onRetry}
+              type="button"
+            >
+              <RotateCcw className="h-4 w-4" />
+              Retry Stream
+            </button>
           )}
         </div>
       )}

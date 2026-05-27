@@ -1050,6 +1050,55 @@ Remaining follow-up:
 - Configure a real TURN provider on Render with `TURN_URLS` and `TURN_SHARED_SECRET`, or static TURN credentials if the provider does not support REST credentials.
 - Runtime-smoke a stream from a network where direct/STUN connectivity fails, then confirm relay candidates appear in WebRTC stats.
 
+### API Test Folder Consolidation
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `services/api/tests/controlPlane.test.ts`
+- `services/api/tests/dataBoundary.test.ts`
+- `services/api/tests/webrtc.test.ts`
+- `services/api/package.json`
+- `services/api/README.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Moved API `.test.ts` files out of `services/api/src/` and into `services/api/tests/`.
+- Updated the API test script to run `tsx --test "tests/**/*.test.ts"`.
+- Updated relative test imports to reference `../src/...`.
+
+Remaining follow-up:
+
+- Keep new API tests in `services/api/tests/` so route/source folders stay easier to scan.
+
+### WebRTC Retry And Failure Recovery
+
+Implemented: 2026-05-27
+
+Implemented in:
+
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/features/player/StreamStage.tsx`
+- `apps/web/src/pages/user/Player.tsx`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added a player retry action for stream errors.
+- Retrying creates a fresh WebRTC session id, clears stale telemetry/metrics timers, and restarts local engine negotiation without leaving the player page.
+- WebRTC connection `failed` state now moves the player into an actionable error state.
+- WebRTC `disconnected` state gets a short grace period before surfacing an error, reducing flicker during brief network changes.
+- Local engine connection failures and rejected pairing tokens now set clearer player-facing error messages.
+
+Remaining follow-up:
+
+- Runtime-smoke retry behavior by stopping/restarting the desktop engine during a player session.
+- Add bitrate/framerate profiles.
+
 ## Highest Priority Issues
 
 ### 1. Complete Signed-In Hosted Smoke Coverage
@@ -1064,15 +1113,13 @@ Smoke checklist:
 - Stream metrics post to `/metrics/stream` during active play.
 - Comment reporting and play-count increments work through the API.
 
-### 2. Improve WebRTC Reconnect And Profiles
+### 2. Add WebRTC Bitrate And Framerate Profiles
 
-TURN support is now wired through the API, browser, Node engine, and Python/GStreamer sender. The remaining production-readiness work is stream behavior rather than basic ICE configuration.
+TURN support and basic retry behavior are now wired through the API, browser, Node engine, and Python/GStreamer sender. The remaining production-readiness work is stream profile control.
 
 Suggested improvements:
 
-- Add reconnect/fail recovery flows beyond the current ICE/error display.
 - Add bitrate/framerate profiles.
-- Add a clearer fallback message when the local engine is offline.
 
 ### 3. Decide Explicit LAN Support
 

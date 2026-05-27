@@ -55,7 +55,7 @@ Current status:
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
 - `services/api/.env` exists locally and is ignored; production keys live on the backend host.
 - API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
-- `services/api` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
+- `services/api/tests/` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
 - API tests also cover the backend-owned data boundary for catalog/favorites, comment ownership/reactions, profile update/account deletion, admin user authorization, and admin access-log authorization.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
@@ -96,6 +96,7 @@ Current important frontend behaviors:
 - `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
 - `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.
 - `useWebRTC` asks the API for ICE servers before creating the browser peer connection. If the API is unavailable or the user is unsigned, it falls back to Google STUN.
+- Failed or long-disconnected WebRTC sessions now show a retry action that creates a fresh session id and restarts negotiation without leaving the player page.
 - `/play/:id` is composed from `apps/web/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.

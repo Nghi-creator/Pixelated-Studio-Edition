@@ -24,7 +24,7 @@ export default function Player() {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
 
-  const { stream, status, telemetry } = useWebRTC(id || "");
+  const { retry, stream, status, telemetry } = useWebRTC(id || "");
   const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
   const currentUser = useAuthUser();
   const { authorName, gameTitle } = useGameMetadata(id);
@@ -132,6 +132,7 @@ export default function Player() {
       )}
 
       <StreamStage
+        onRetry={retry}
         showStreamTelemetry={showStreamTelemetry}
         status={status}
         telemetry={telemetry}

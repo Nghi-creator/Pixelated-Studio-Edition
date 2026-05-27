@@ -24,6 +24,7 @@ import {
 } from "./webrtcTelemetry";
 
 const STREAM_METRIC_SEND_INTERVAL_MS = 5_000;
+const DISCONNECTED_GRACE_MS = 5_000;
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
 ];
@@ -47,6 +48,7 @@ export function useWebRTC(gameId: string) {
     INITIAL_WEBRTC_TELEMETRY,
   );
   const [pairingVersion, setPairingVersion] = useState(0);
+  const [retryVersion, setRetryVersion] = useState(0);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const sessionIdRef = useRef(createWebRTCSessionId());
@@ -86,10 +88,26 @@ export function useWebRTC(gameId: string) {
     let pc: RTCPeerConnection | null = null;
     let stopTelemetry: () => void = () => undefined;
     let detachEngineInput: () => void = () => undefined;
+    let disconnectedTimeoutId: number | null = null;
     let disposed = false;
     let iceServersForSession: RTCIceServer[] = FALLBACK_ICE_SERVERS;
 
+    const failStream = (message: string) => {
+      if (disposed) return;
+      setTelemetry((currentTelemetry) => ({
+        ...currentTelemetry,
+        lastEngineError: message,
+        lastUpdatedAt: Date.now(),
+      }));
+      setStatus("error");
+    };
+
     const initialize = async () => {
+      setStatus("connecting");
+      setStream(null);
+      setTelemetry(INITIAL_WEBRTC_TELEMETRY);
+      lastMetricSentAtRef.current = 0;
+
       iceServersForSession = await loadIceServers();
       if (disposed) return;
 
@@ -107,6 +125,44 @@ export function useWebRTC(gameId: string) {
         },
       });
       pcRef.current = pc;
+
+      const handlePeerStateChange = () => {
+        if (!pc) return;
+        const { connectionState, iceConnectionState } = pc;
+
+        if (connectionState === "failed" || iceConnectionState === "failed") {
+          if (disconnectedTimeoutId !== null) {
+            window.clearTimeout(disconnectedTimeoutId);
+            disconnectedTimeoutId = null;
+          }
+          failStream(
+            "WebRTC connection failed. Check that the desktop engine is running, then retry the stream.",
+          );
+          return;
+        }
+
+        if (
+          connectionState === "disconnected" ||
+          iceConnectionState === "disconnected"
+        ) {
+          if (disconnectedTimeoutId !== null) return;
+          disconnectedTimeoutId = window.setTimeout(() => {
+            disconnectedTimeoutId = null;
+            failStream(
+              "WebRTC disconnected for too long. Retry once the local engine is reachable.",
+            );
+          }, DISCONNECTED_GRACE_MS);
+          return;
+        }
+
+        if (disconnectedTimeoutId !== null) {
+          window.clearTimeout(disconnectedTimeoutId);
+          disconnectedTimeoutId = null;
+        }
+      };
+
+      pc.addEventListener("connectionstatechange", handlePeerStateChange);
+      pc.addEventListener("iceconnectionstatechange", handlePeerStateChange);
 
       stopTelemetry = startWebRTCTelemetry(pc, (nextTelemetry) => {
         const metricSnapshot = {
@@ -168,18 +224,19 @@ export function useWebRTC(gameId: string) {
       console.error("[WebRTC] Engine connection failed:", err.message);
       if (err.message === "Invalid engine pairing token") {
         clearEngineToken();
+        failStream(
+          "The saved desktop pairing token was rejected. Pair the local engine again, then retry.",
+        );
+        return;
       }
-      setStatus("error");
+      failStream(
+        "Could not reach the local engine. Make sure the desktop app is running, then retry.",
+      );
     });
 
     socket.on("engine-error", (payload: { message?: string }) => {
       console.error("[WebRTC] Engine error:", payload?.message);
-      setTelemetry((currentTelemetry) => ({
-        ...currentTelemetry,
-        lastEngineError: payload?.message || "Engine error",
-        lastUpdatedAt: Date.now(),
-      }));
-      setStatus("error");
+      failStream(payload?.message || "Engine error");
     });
 
     socket.on("connect", async () => {
@@ -212,6 +269,9 @@ export function useWebRTC(gameId: string) {
       disposed = true;
       stopTelemetry();
       detachEngineInput();
+      if (disconnectedTimeoutId !== null) {
+        window.clearTimeout(disconnectedTimeoutId);
+      }
 
       if (pcRef.current) {
         pcRef.current.close();
@@ -229,7 +289,14 @@ export function useWebRTC(gameId: string) {
       setStream(null);
       setTelemetry(INITIAL_WEBRTC_TELEMETRY);
     };
-  }, [gameId, pairingVersion]);
+  }, [gameId, pairingVersion, retryVersion]);
 
-  return { stream, status, telemetry };
+  const retry = () => {
+    sessionIdRef.current = createWebRTCSessionId();
+    metricsDisabledRef.current = false;
+    lastMetricSentAtRef.current = 0;
+    setRetryVersion((currentVersion) => currentVersion + 1);
+  };
+
+  return { retry, stream, status, telemetry };
 }

@@ -181,4 +181,4 @@ Run the focused API test suite from this folder:
 npm run test
 ```
 
-The current tests use Fastify injection and a fake Supabase service, so they do not require local database access.
+Tests live under `services/api/tests/`. The current tests use Fastify injection and a fake Supabase service, so they do not require local database access.
