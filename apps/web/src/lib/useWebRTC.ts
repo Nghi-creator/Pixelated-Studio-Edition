@@ -52,6 +52,7 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
   const [retryVersion, setRetryVersion] = useState(0);
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const peerIdRef = useRef(createWebRTCSessionId());
   const sessionIdRef = useRef(createWebRTCSessionId());
   const lastMetricSentAtRef = useRef(0);
   const metricsDisabledRef = useRef(false);
@@ -69,6 +70,7 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
     if (!gameId) return;
 
     const sessionId = sessionIdRef.current;
+    const peerId = peerIdRef.current;
     const engineToken = ensureEngineToken();
 
     if (!engineToken) {
@@ -114,6 +116,7 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
 
       pc = createEnginePeerConnection({
         iceServers: iceServersForSession,
+        peerId,
         socket,
         sessionId,
         onTrack: (track) => {
@@ -213,13 +216,21 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
       socket.connect();
     };
 
-    socket.on("webrtc-answer", (answer) => {
-      pc?.setRemoteDescription(new RTCSessionDescription(answer));
-    });
+    socket.on(
+      "webrtc-answer",
+      (answer: RTCSessionDescriptionInit & { peerId?: string }) => {
+        if (answer.peerId && answer.peerId !== peerId) return;
+        pc?.setRemoteDescription(new RTCSessionDescription(answer));
+      },
+    );
 
-    socket.on("webrtc-ice-candidate-backend", (candidate) => {
-      pc?.addIceCandidate(new RTCIceCandidate(candidate));
-    });
+    socket.on(
+      "webrtc-ice-candidate-backend",
+      (candidate: RTCIceCandidateInit & { peerId?: string }) => {
+        if (candidate.peerId && candidate.peerId !== peerId) return;
+        pc?.addIceCandidate(new RTCIceCandidate(candidate));
+      },
+    );
 
     socket.on("connect_error", (err) => {
       console.error("[WebRTC] Engine connection failed:", err.message);
@@ -265,7 +276,7 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
     socket.on("python-ready", async () => {
       console.log("[WebRTC] Python is awake! Generating and sending Offer...");
       if (pc) {
-        await createAndSendOffer(pc, socket, sessionId);
+        await createAndSendOffer(pc, socket, sessionId, peerId);
       }
     });
 
@@ -282,6 +293,7 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
       if (pcRef.current) {
         pcRef.current.close();
       }
+      socket.emit("webrtc-peer-disconnect", { peerId, sessionId });
       socket.emit("stop-session", { sessionId });
       socket.disconnect();
 
@@ -298,6 +310,7 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
   }, [gameId, pairingVersion, retryVersion, streamProfile]);
 
   const retry = () => {
+    peerIdRef.current = createWebRTCSessionId();
     sessionIdRef.current = createWebRTCSessionId();
     metricsDisabledRef.current = false;
     lastMetricSentAtRef.current = 0;

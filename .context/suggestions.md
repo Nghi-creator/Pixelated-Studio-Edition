@@ -19,6 +19,37 @@ Recommended direction:
 
 ## Done
 
+### Multi-Viewer WebRTC Fanout Foundation
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/web/src/lib/webrtcPeer.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `engine/runtime/camera.py`
+- `engine/runtime/src/signaling/signalingRelay.ts`
+- `engine/runtime/src/signaling/signalingRelay.test.ts`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added a browser-generated `peerId` to WebRTC offers and ICE candidates.
+- Node now joins browser sockets to peer-specific rooms and routes camera answers/candidates only to the matching peer.
+- `camera.py` now keeps a `peers` dictionary and creates a separate GStreamer `webrtcbin` pipeline per browser peer.
+- Duplicate offers for the same peer are ignored without blocking other peers.
+- Viewer cleanup now emits `webrtc-peer-disconnect`, allowing the camera to tear down only that peer pipeline.
+- Host-only stop behavior remains enforced by lobby state, so a guest viewer leaving should not stop the host session.
+- Added signaling tests for peer-room offer routing, peer-targeted answers, peer-targeted ICE, and peer cleanup relay.
+
+Remaining follow-up:
+
+- Run a real two-browser Docker/RetroArch smoke to confirm the per-peer camera pipelines can both receive audio/video.
+- Watch CPU usage during multi-viewer sessions; each peer currently creates its own capture/encode pipeline.
+- Add React lobby/guest join UI so users can intentionally join the same host session.
+
 ### Multiplayer Input Routing
 
 Completed: 2026-05-28
@@ -1335,8 +1366,8 @@ The local engine now defaults to host loopback, has an explicit desktop LAN mode
 
 Recommended next implementation slice:
 
-- Validate Phase 5 multi-viewer WebRTC behavior with two browser clients against one engine session.
-- Add React lobby UI and guest join/invite UX once the media fanout behavior is understood.
+- Add React lobby UI and guest join/invite UX so participants can intentionally share one session and request player slots.
+- Validate the multi-viewer WebRTC path with two browser clients against one Docker engine session.
 - Decide the local HTTPS/private-network strategy because Chrome blocked hosted Vercel to HTTP LAN engine fetches with `LocalNetworkAccessPermissionDenied`.
 - Runtime-smoke true two-device LAN once the browser transport decision is made.
 

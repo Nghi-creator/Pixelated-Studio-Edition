@@ -7,11 +7,14 @@ import {
 } from "./sessionRooms";
 
 type SessionPayload = {
+  peerId?: unknown;
   sessionId?: unknown;
 };
 
 type CandidateEnvelope = {
   candidate?: SessionPayload;
+  peerId?: unknown;
+  sessionId?: unknown;
 };
 
 function stripSessionId(payload: unknown) {
@@ -21,9 +24,59 @@ function stripSessionId(payload: unknown) {
 }
 
 function unwrapCandidate(payload: CandidateEnvelope | SessionPayload) {
-  return "candidate" in payload && payload.candidate
-    ? payload.candidate
-    : payload;
+  if (!("candidate" in payload) || !payload.candidate) return payload;
+
+  return {
+    ...payload.candidate,
+    peerId: payload.peerId,
+    sessionId: payload.sessionId,
+  };
+}
+
+function getPeerId(payload: unknown) {
+  if (!payload || typeof payload !== "object") return null;
+  const peerId = (payload as { peerId?: unknown }).peerId;
+  return typeof peerId === "string" && /^[a-zA-Z0-9_-]+$/.test(peerId)
+    ? peerId
+    : null;
+}
+
+function getPeerRoom(peerId: string) {
+  return `peer:${peerId}`;
+}
+
+function rememberPeer(socket: Socket, peerId: string) {
+  const peerIds = Array.isArray(socket.data.webrtcPeerIds)
+    ? socket.data.webrtcPeerIds
+    : [];
+
+  if (!peerIds.includes(peerId)) {
+    socket.data.webrtcPeerIds = [...peerIds, peerId];
+  }
+}
+
+function emitPeerDisconnect(socket: Socket, peerId: string) {
+  const sessionId = normalizeSessionId(socket.data.sessionId);
+  if (!sessionId) return;
+
+  socket.to(getSessionRoom(sessionId)).emit("webrtc-peer-disconnect", {
+    peerId,
+    sessionId,
+  });
+}
+
+function relayToPeerOrSession(
+  socket: Socket,
+  eventName: string,
+  payload?: unknown,
+) {
+  const peerId = getPeerId(payload);
+  if (peerId) {
+    socket.to(getPeerRoom(peerId)).emit(eventName, stripSessionId(payload));
+    return;
+  }
+
+  relayToSession(socket, eventName, stripSessionId(payload));
 }
 
 export function registerSignalingRelayHandlers(socket: Socket) {
@@ -44,11 +97,21 @@ export function registerSignalingRelayHandlers(socket: Socket) {
   });
 
   socket.on("webrtc-offer", (offer: SessionPayload = {}) => {
+    const peerId = getPeerId(offer);
+    if (peerId) {
+      socket.join(getPeerRoom(peerId));
+      rememberPeer(socket, peerId);
+    }
     relayToSession(socket, "webrtc-offer", stripSessionId(offer));
   });
 
+  socket.on("webrtc-peer-disconnect", (payload: SessionPayload = {}) => {
+    const peerId = getPeerId(payload);
+    if (peerId) emitPeerDisconnect(socket, peerId);
+  });
+
   socket.on("webrtc-answer", (answer: SessionPayload = {}) => {
-    relayToSession(socket, "webrtc-answer", stripSessionId(answer));
+    relayToPeerOrSession(socket, "webrtc-answer", answer);
   });
 
   socket.on("webrtc-ice-candidate", (payload: CandidateEnvelope = {}) => {
@@ -58,11 +121,21 @@ export function registerSignalingRelayHandlers(socket: Socket) {
   socket.on(
     "webrtc-ice-candidate-backend",
     (payload: CandidateEnvelope = {}) => {
-      relayToSession(
+      relayToPeerOrSession(
         socket,
         "webrtc-ice-candidate-backend",
         unwrapCandidate(payload),
       );
     },
   );
+
+  socket.on("disconnect", () => {
+    const peerIds = Array.isArray(socket.data.webrtcPeerIds)
+      ? socket.data.webrtcPeerIds
+      : [];
+
+    for (const peerId of peerIds) {
+      if (typeof peerId === "string") emitPeerDisconnect(socket, peerId);
+    }
+  });
 }

@@ -267,19 +267,21 @@ Implementation note: browser key events now include `playerIndex`. The engine re
 
 ### Phase 5: Multi-Viewer WebRTC Validation
 
-Status: planned.
+Status: peer-targeted multi-viewer foundation implemented on 2026-05-28; real two-browser Docker/RetroArch smoke pending.
 
 Deliverables:
 
-- Test whether one `camera.py` sender can negotiate multiple browser peers.
-- If not, design per-viewer sender processes or a local media fanout strategy.
-- Add session cleanup so viewer disconnects do not stop the host game unless the host leaves.
+- Test whether one `camera.py` sender can negotiate multiple browser peers. Code now supports one camera process with one GStreamer/WebRTC pipeline per peer; manual smoke still needed.
+- If not, design per-viewer sender processes or a local media fanout strategy. Current implementation uses per-peer pipelines inside the existing camera process.
+- Add session cleanup so viewer disconnects do not stop the host game unless the host leaves. Implemented with `webrtc-peer-disconnect`; host-only stop remains enforced by lobby state.
 
 Acceptance criteria:
 
-- Two LAN browsers can receive audio/video from the same game session.
-- Disconnecting one guest does not kill the host session.
-- Stopping the host session cleans up all viewer signaling/media state.
+- Two LAN browsers can receive audio/video from the same game session. Pending manual smoke.
+- Disconnecting one guest does not kill the host session. Implemented in signaling/control flow; manual smoke pending.
+- Stopping the host session cleans up all viewer signaling/media state. Existing host-only session cleanup stops the camera process and all peer pipelines with it.
+
+Implementation note: WebRTC signaling now carries a browser-generated `peerId`. Node joins the browser socket to a peer-specific room, relays offers/candidates to the session room for the camera, and routes camera answers/candidates back only to the matching peer. `camera.py` now maintains a `peers` dictionary and builds a separate GStreamer `webrtcbin` pipeline for each peer instead of ignoring duplicate offers.
 
 ### Phase 6: Backend Multiplayer Support
 
@@ -327,6 +329,6 @@ Manual:
 
 ## Recommended Next Implementation Task
 
-Continue with Phase 5: multi-viewer WebRTC validation.
+Continue with the React lobby and guest join UI before Phase 6 backend multiplayer metadata.
 
-The local engine now has lobby roles and slot-aware input authorization for player 1 and player 2. The next risky unknown is whether the current `camera.py`/GStreamer `webrtcbin` path can serve multiple browser viewers from one running game, or whether the engine needs a per-viewer sender/fanout design. In parallel, decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing because Chrome already blocked direct HTTPS-to-HTTP LAN fetches during smoke testing.
+The engine can now represent roles/slots, enforce slot-aware input, and route multiple WebRTC peers independently. The next useful product slice is showing connected participants and letting a guest join an existing host session intentionally. In parallel, run a real two-browser Docker/RetroArch smoke and decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing.

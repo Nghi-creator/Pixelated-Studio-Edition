@@ -183,6 +183,9 @@ Streaming/signaling:
 - Node forwards WebRTC offers, answers, and ICE candidates between browser and Python sender inside a Socket.IO room named `session:<id>`.
 - Python connects back to Node at `http://localhost:8080`.
 - Browser receives VP8 video and Opus audio.
+- WebRTC signaling now includes a browser-generated `peerId`. Node places each browser in a peer-specific room so camera answers and ICE candidates route only to the matching browser instead of broadcasting to every viewer in the session.
+- `camera.py` now tracks one GStreamer `webrtcbin` pipeline per peer inside the camera process, allowing multiple viewers to negotiate against the same running game session in principle. A real two-browser Docker/RetroArch smoke is still pending.
+- Viewer cleanup emits `webrtc-peer-disconnect`, letting the camera tear down that peer pipeline without stopping the host game session.
 - The local engine now keeps in-memory lobby state per session. The first browser participant becomes `host` with player slot 1; later participants can join as `player` or `spectator`, request/release player slots, and receive `lobby-state` updates.
 - Lobby host permissions gate start, stop, and kick actions engine-side. The React lobby UI and guest invite surface are still pending.
 - React forwards API-issued ICE server config in `start-game`; Node passes it to `camera.py` through `PIXELATED_ICE_SERVERS`; Python configures GStreamer `webrtcbin` with the matching STUN/TURN servers.

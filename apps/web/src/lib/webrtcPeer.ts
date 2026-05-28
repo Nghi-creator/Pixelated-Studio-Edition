@@ -2,6 +2,7 @@ import type { Socket } from "socket.io-client";
 
 type PeerConnectionOptions = {
   iceServers?: RTCIceServer[];
+  peerId: string;
   socket: Socket;
   sessionId: string;
   onTrack: (track: MediaStreamTrack) => void;
@@ -9,6 +10,7 @@ type PeerConnectionOptions = {
 
 export const createEnginePeerConnection = ({
   iceServers,
+  peerId,
   socket,
   sessionId,
   onTrack,
@@ -28,6 +30,7 @@ export const createEnginePeerConnection = ({
     if (event.candidate) {
       socket.emit("webrtc-ice-candidate", {
         sessionId,
+        peerId,
         candidate: event.candidate,
       });
     }
@@ -40,6 +43,7 @@ export const createAndSendOffer = async (
   peerConnection: RTCPeerConnection,
   socket: Socket,
   sessionId: string,
+  peerId: string,
 ) => {
   peerConnection.addTransceiver("video", { direction: "recvonly" });
   peerConnection.addTransceiver("audio", { direction: "recvonly" });
@@ -49,6 +53,7 @@ export const createAndSendOffer = async (
 
   socket.emit("webrtc-offer", {
     sessionId,
+    peerId,
     type: offer.type,
     sdp: offer.sdp,
   });
