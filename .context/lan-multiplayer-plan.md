@@ -184,7 +184,7 @@ Implementation note: the current desktop UI locks exposure mode while the engine
 
 ### Phase 2: LAN Pairing UX
 
-Status: implemented in code on 2026-05-28; pending hosted-browser LAN smoke.
+Status: implemented in code on 2026-05-28; hosted-browser LAN smoke confirms HTTP LAN access is blocked by Chrome private-network checks.
 
 Deliverables:
 
@@ -201,7 +201,9 @@ Acceptance criteria:
 
 Implementation note: the pairing panel now classifies local, LAN, and custom engine URLs; checks `/health.exposureMode`; rejects LAN-looking URLs when the engine reports local-only mode; and gives clearer wrong-token, unreachable-LAN, and hosted-HTTPS-to-HTTP-LAN failure messages.
 
-Remaining risk: the hosted Vercel app is HTTPS while LAN engine URLs are currently HTTP. Some browsers may block HTTP private-network requests from an HTTPS origin. If this blocks real guest pairing, the next architecture decision is local HTTPS for the engine, a local companion page, or another browser-approved private-network access strategy.
+Confirmed risk: the hosted Vercel app is HTTPS while LAN engine URLs are currently HTTP. A Chrome smoke test from `https://pixelated-studio-edition.vercel.app` to a reachable mock engine at `http://192.168.1.11:8080` failed with `LocalNetworkAccessPermissionDenied`, even when the mock engine returned permissive CORS and `Access-Control-Allow-Private-Network: true`.
+
+Next architecture decision: local HTTPS for the engine, a local companion web origin, or another browser-approved private-network access strategy.
 
 ### Phase 3: Lobby And Roles
 
@@ -302,6 +304,6 @@ Manual:
 
 ## Recommended Next Implementation Task
 
-Start with Phase 1: explicit LAN mode toggle in the desktop app.
+Proceed with Phase 0A before Phase 3: TypeScript migration for engine signaling/session modules.
 
-That is the smallest valuable slice because it preserves the secure default while giving the project a real LAN surface to test before adding lobbies, player slots, and multi-viewer media behavior.
+LAN browser access from hosted Vercel also needs a design pass. The leading product direction is local HTTPS for the engine, but multiplayer contracts should be typed before lobby/role/input work expands.

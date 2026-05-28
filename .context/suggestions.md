@@ -78,8 +78,8 @@ What changed:
 
 Remaining follow-up:
 
-- Hosted-browser LAN smoke with two devices on the same network.
-- Decide whether HTTP LAN access from hosted HTTPS is good enough in target browsers or whether the engine needs local HTTPS/private-network-access hardening.
+- Hosted-browser LAN smoke confirmed Chrome blocks HTTP LAN engine fetches from the HTTPS Vercel origin with `LocalNetworkAccessPermissionDenied`.
+- Decide between local engine HTTPS, a local companion web origin, or another browser-approved private-network access strategy before calling LAN pairing shippable.
 
 ### Backend Session Intent Validation
 
@@ -1231,8 +1231,7 @@ The local engine now defaults to host loopback, has an explicit desktop LAN mode
 
 Recommended next implementation slice:
 
-- Runtime-smoke Phase 1 with two devices on the same LAN.
-- Decide the HTTPS-hosted-app to HTTP-LAN-engine strategy if browser private-network restrictions block guest pairing.
+- Decide the HTTPS-hosted-app to HTTP-LAN-engine strategy because browser private-network restrictions block guest pairing.
 - Then proceed to Phase 0A before Phase 3: TypeScript migration for engine signaling/session modules.
 
 ## Database And Supabase Suggestions
