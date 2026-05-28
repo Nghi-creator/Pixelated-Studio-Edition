@@ -30,6 +30,32 @@ const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
 ];
 
+export type LobbyRole = "host" | "player" | "spectator";
+
+export type LobbyParticipant = {
+  connectedAt: string;
+  displayName: string;
+  playerIndex: number | null;
+  role: LobbyRole;
+  socketId: string;
+};
+
+export type LobbyState = {
+  hostSocketId: string | null;
+  maxPlayers: number;
+  participants: LobbyParticipant[];
+  sessionId: string;
+};
+
+export type WebRTCMode = "host" | "guest";
+
+type UseWebRTCOptions = {
+  displayName?: string;
+  mode?: WebRTCMode;
+  requestedRole?: LobbyRole;
+  sessionId?: string | null;
+};
+
 async function loadIceServers() {
   try {
     const { iceServers } = await api.iceServers();
@@ -40,22 +66,38 @@ async function loadIceServers() {
   }
 }
 
-export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
+export function useWebRTC(
+  gameId: string,
+  streamProfile: StreamProfile,
+  options: UseWebRTCOptions = {},
+) {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [status, setStatus] = useState<WebRTCStatus>(
     gameId ? "connecting" : "idle",
   );
+  const [lobbyState, setLobbyState] = useState<LobbyState | null>(null);
+  const [localParticipant, setLocalParticipant] =
+    useState<LobbyParticipant | null>(null);
   const [telemetry, setTelemetry] = useState<WebRTCTelemetry>(
     INITIAL_WEBRTC_TELEMETRY,
   );
   const [pairingVersion, setPairingVersion] = useState(0);
   const [retryVersion, setRetryVersion] = useState(0);
+  const [sessionId, setSessionId] = useState(
+    () => options.sessionId || createWebRTCSessionId(),
+  );
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const peerIdRef = useRef(createWebRTCSessionId());
-  const sessionIdRef = useRef(createWebRTCSessionId());
+  const sessionIdRef = useRef(sessionId);
+  const socketRef = useRef<ReturnType<typeof io> | null>(null);
+  const localParticipantRef = useRef<LobbyParticipant | null>(null);
   const lastMetricSentAtRef = useRef(0);
   const metricsDisabledRef = useRef(false);
+
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   useEffect(() => {
     const handlePairingChange = () =>
@@ -69,8 +111,12 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
   useEffect(() => {
     if (!gameId) return;
 
-    const sessionId = sessionIdRef.current;
     const peerId = peerIdRef.current;
+    const mode = options.mode || "host";
+    const requestedRole =
+      options.requestedRole || (mode === "host" ? "host" : "spectator");
+    const displayName =
+      options.displayName || (mode === "host" ? "Host" : "Guest");
     const engineToken = ensureEngineToken();
 
     if (!engineToken) {
@@ -87,6 +133,7 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
     }
 
     const socket = io(getEngineUrl(), { autoConnect: false });
+    socketRef.current = socket;
     socket.auth = { token: engineToken };
     let pc: RTCPeerConnection | null = null;
     let stopTelemetry: () => void = () => undefined;
@@ -108,6 +155,9 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
     const initialize = async () => {
       setStatus("connecting");
       setStream(null);
+      setLobbyState(null);
+      setLocalParticipant(null);
+      localParticipantRef.current = null;
       setTelemetry(INITIAL_WEBRTC_TELEMETRY);
       lastMetricSentAtRef.current = 0;
 
@@ -212,7 +262,6 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
           });
       });
 
-      detachEngineInput = attachEngineInput(socket, sessionId);
       socket.connect();
     };
 
@@ -253,7 +302,15 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
 
     socket.on("connect", async () => {
       console.log("[WebRTC] Connected. Booting sequence initiated.");
-      socket.emit("join-session", { sessionId, role: "browser" });
+      socket.emit("join-session", {
+        sessionId,
+        displayName,
+        role: requestedRole,
+      });
+
+      if (mode !== "host") {
+        return;
+      }
 
       try {
         const bootTarget = await resolveGameBootTarget(gameId, sessionId);
@@ -271,6 +328,29 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
         console.error("Failed to boot game:", err);
         setStatus("error");
       }
+    });
+
+    socket.on("lobby-state", (nextLobbyState: LobbyState) => {
+      const participant =
+        nextLobbyState.participants.find(
+          (entry) => entry.socketId === socket.id,
+        ) || null;
+      setLobbyState(nextLobbyState);
+      setLocalParticipant(participant);
+      localParticipantRef.current = participant;
+
+      detachEngineInput();
+      if (participant?.playerIndex) {
+        detachEngineInput = attachEngineInput(
+          socket,
+          sessionId,
+          participant.playerIndex,
+        );
+      }
+    });
+
+    socket.on("lobby-kicked", () => {
+      failStream("The host removed you from the lobby.");
     });
 
     socket.on("python-ready", async () => {
@@ -294,28 +374,68 @@ export function useWebRTC(gameId: string, streamProfile: StreamProfile) {
         pcRef.current.close();
       }
       socket.emit("webrtc-peer-disconnect", { peerId, sessionId });
-      socket.emit("stop-session", { sessionId });
+      if (localParticipantRef.current?.role === "host") {
+        socket.emit("stop-session", { sessionId });
+      }
       socket.disconnect();
+      socketRef.current = null;
 
       socket.off("webrtc-answer");
       socket.off("webrtc-ice-candidate-backend");
       socket.off("connect");
       socket.off("connect_error");
       socket.off("engine-error");
+      socket.off("lobby-kicked");
+      socket.off("lobby-state");
       socket.off("python-ready");
 
       setStream(null);
       setTelemetry(INITIAL_WEBRTC_TELEMETRY);
     };
-  }, [gameId, pairingVersion, retryVersion, streamProfile]);
+  }, [
+    gameId,
+    options.displayName,
+    options.mode,
+    options.requestedRole,
+    options.sessionId,
+    pairingVersion,
+    retryVersion,
+    sessionId,
+    streamProfile,
+  ]);
 
   const retry = () => {
     peerIdRef.current = createWebRTCSessionId();
-    sessionIdRef.current = createWebRTCSessionId();
+    if (!options.sessionId) {
+      setSessionId(createWebRTCSessionId());
+    }
     metricsDisabledRef.current = false;
     lastMetricSentAtRef.current = 0;
     setRetryVersion((currentVersion) => currentVersion + 1);
   };
 
-  return { retry, stream, status, telemetry };
+  const requestPlayerSlot = (playerIndex: number) => {
+    socketRef.current?.emit("request-player-slot", {
+      playerIndex,
+      sessionId: sessionIdRef.current,
+    });
+  };
+
+  const releasePlayerSlot = () => {
+    socketRef.current?.emit("release-player-slot", {
+      sessionId: sessionIdRef.current,
+    });
+  };
+
+  return {
+    lobbyState,
+    localParticipant,
+    releasePlayerSlot,
+    requestPlayerSlot,
+    retry,
+    sessionId,
+    stream,
+    status,
+    telemetry,
+  };
 }

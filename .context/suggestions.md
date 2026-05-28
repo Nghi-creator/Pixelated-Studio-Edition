@@ -19,6 +19,37 @@ Recommended direction:
 
 ## Done
 
+### React Lobby And Guest Join UI
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/web/src/features/player/LobbyPanel.tsx`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/pages/user/Player.tsx`
+- `engine/runtime/server.js`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added a player-page lobby panel that shows participants, roles, and player slots.
+- Added a copyable session invite URL using `?session=<id>&role=spectator`.
+- `useWebRTC` now supports host and guest modes.
+- Guests opened from a session URL join the existing local-engine session without emitting `start-game`.
+- The engine replays `python-ready` to late-joining browsers when the requested session is already active.
+- The hook now exposes lobby state, local participant state, current session id, and request/release slot actions.
+- Input attachment now follows the local participant's assigned slot.
+- Guest cleanup no longer emits `stop-session`; host-only stop remains enforced by the engine.
+
+Remaining follow-up:
+
+- Manual two-browser smoke against the Docker engine.
+- Add a host kick button in the React lobby once the UX needs moderation controls.
+- Decide whether invite links should default to spectator or player requests once the LAN flow is tested with real users.
+
 ### Multi-Viewer WebRTC Fanout Foundation
 
 Completed: 2026-05-28
@@ -1366,7 +1397,6 @@ The local engine now defaults to host loopback, has an explicit desktop LAN mode
 
 Recommended next implementation slice:
 
-- Add React lobby UI and guest join/invite UX so participants can intentionally share one session and request player slots.
 - Validate the multi-viewer WebRTC path with two browser clients against one Docker engine session.
 - Decide the local HTTPS/private-network strategy because Chrome blocked hosted Vercel to HTTP LAN engine fetches with `LocalNetworkAccessPermissionDenied`.
 - Runtime-smoke true two-device LAN once the browser transport decision is made.

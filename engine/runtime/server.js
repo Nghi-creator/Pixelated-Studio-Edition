@@ -76,6 +76,9 @@ io.on("connection", (socket) => {
         requestedRole: payload.role === "browser" ? "host" : payload.role,
         sessionId,
       });
+      if (runtime.getActiveSessionId() === sessionId) {
+        socket.emit("python-ready", { sessionId });
+      }
     }
   });
 

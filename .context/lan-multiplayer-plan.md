@@ -283,7 +283,30 @@ Acceptance criteria:
 
 Implementation note: WebRTC signaling now carries a browser-generated `peerId`. Node joins the browser socket to a peer-specific room, relays offers/candidates to the session room for the camera, and routes camera answers/candidates back only to the matching peer. `camera.py` now maintains a `peers` dictionary and builds a separate GStreamer `webrtcbin` pipeline for each peer instead of ignoring duplicate offers.
 
-### Phase 6: Backend Multiplayer Support
+### Phase 6: React Lobby And Guest Join UI
+
+Status: first local-engine UI slice implemented on 2026-05-28; real two-browser smoke pending.
+
+Deliverables:
+
+- Show local lobby participants, roles, and player slots on the player page.
+- Show a copyable session invite URL for the current host session.
+- Let guests join an existing local-engine session from a `?session=<id>` URL.
+- Let guests request/release player slots from the player page.
+- Ensure guests do not boot or stop the host game.
+- Wake late-joining guests when a camera process is already active for that session.
+
+Acceptance criteria:
+
+- Host can copy a session link from the player page.
+- Guest opening the link joins as a spectator by default.
+- Guest can request an open player slot and input uses that slot.
+- Guest disconnect does not stop the host game.
+- Host disconnect still stops the active session.
+
+Implementation note: `useWebRTC` now exposes lobby state, the local participant, session id, and slot actions. Player links use `?session=<id>&role=spectator`; guest clients join the existing session and wait for/receive `python-ready` without emitting `start-game`. The engine re-emits `python-ready` to a newly joined browser when the requested session is already active.
+
+### Phase 7: Backend Multiplayer Support
 
 Status: planned, after local LAN proof.
 
@@ -329,6 +352,6 @@ Manual:
 
 ## Recommended Next Implementation Task
 
-Continue with the React lobby and guest join UI before Phase 6 backend multiplayer metadata.
+Continue with manual multiplayer smoke before backend multiplayer metadata.
 
-The engine can now represent roles/slots, enforce slot-aware input, and route multiple WebRTC peers independently. The next useful product slice is showing connected participants and letting a guest join an existing host session intentionally. In parallel, run a real two-browser Docker/RetroArch smoke and decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing.
+The engine can now represent roles/slots, enforce slot-aware input, route multiple WebRTC peers independently, and React can show/share/join a local lobby. The next useful slice is a real Docker/RetroArch smoke with two browser clients. In parallel, decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing.

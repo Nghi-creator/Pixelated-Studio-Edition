@@ -102,6 +102,9 @@ Current important frontend behaviors:
 - `useWebRTC` asks the API for ICE servers before creating the browser peer connection. If the API is unavailable or the user is unsigned, it falls back to Google STUN.
 - Failed or long-disconnected WebRTC sessions now show a retry action that creates a fresh session id and restarts negotiation without leaving the player page.
 - `/play/:id` is composed from `apps/web/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
+- The player page now includes a local lobby panel. It displays participants, host/player/spectator roles, assigned player slots, and a copyable `?session=<id>&role=spectator` invite URL.
+- Guest player pages opened with a session URL join the existing local-engine session without emitting `start-game`; the engine replays `python-ready` for late joiners when the requested game session is already active.
+- Guests can request/release player slots through the lobby panel. Input is attached only when the local participant owns a player slot.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
 - Game catalog, favorites, comments, reactions, profile updates/deletion, admin users, admin reports, and admin access logs are loaded or mutated through the API instead of direct browser Supabase table/RPC/realtime calls.
@@ -187,7 +190,7 @@ Streaming/signaling:
 - `camera.py` now tracks one GStreamer `webrtcbin` pipeline per peer inside the camera process, allowing multiple viewers to negotiate against the same running game session in principle. A real two-browser Docker/RetroArch smoke is still pending.
 - Viewer cleanup emits `webrtc-peer-disconnect`, letting the camera tear down that peer pipeline without stopping the host game session.
 - The local engine now keeps in-memory lobby state per session. The first browser participant becomes `host` with player slot 1; later participants can join as `player` or `spectator`, request/release player slots, and receive `lobby-state` updates.
-- Lobby host permissions gate start, stop, and kick actions engine-side. The React lobby UI and guest invite surface are still pending.
+- Lobby host permissions gate start, stop, and kick actions engine-side. Host disconnect stops the session; guest disconnect only cleans up that peer/viewer path.
 - React forwards API-issued ICE server config in `start-game`; Node passes it to `camera.py` through `PIXELATED_ICE_SERVERS`; Python configures GStreamer `webrtcbin` with the matching STUN/TURN servers.
 - React forwards the selected stream profile in `start-game`; Node validates bitrate/framerate bounds and passes it to `camera.py` through `PIXELATED_STREAM_PROFILE`; Python applies the profile to GStreamer capture framerate and VP8 target bitrate.
 - React generates the current session id, Node passes it into `camera.py` through `PIXELATED_SESSION_ID`, and both browser/camera sockets join the same room before WebRTC negotiation.
