@@ -9,12 +9,25 @@ const gameParamsSchema = z.object({
   gameId: z.string().uuid(),
 });
 
-export async function registerGameRoutes(app: FastifyInstance) {
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
+
+type GameRouteOptions = {
+  requireUser?: typeof requireSupabaseUser;
+  supabase?: SupabaseServiceLike | null;
+};
+
+export async function registerGameRoutes(
+  app: FastifyInstance,
+  options: GameRouteOptions = {},
+) {
+  const requireUser = options.requireUser || requireSupabaseUser;
+  const service = options.supabase === undefined ? supabaseService : options.supabase;
+
   app.post(
     "/games/:gameId/play-count",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -25,7 +38,7 @@ export async function registerGameRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid game id" });
       }
 
-      const { error } = await supabaseService.rpc("increment_play_count", {
+      const { error } = await service.rpc("increment_play_count", {
         game_id: parsedParams.data.gameId,
       });
 

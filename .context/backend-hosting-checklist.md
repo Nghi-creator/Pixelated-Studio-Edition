@@ -145,6 +145,5 @@ For future API-owned social/profile/admin boundary changes:
 
 ## Remaining Production Gaps
 
-- Add automated API tests for catalog/social/profile/admin user/admin access-log behavior.
 - No API rate limiting yet.
 - No hosted engine fleet assignment yet.
