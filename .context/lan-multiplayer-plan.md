@@ -247,21 +247,23 @@ Implementation note: the first browser socket joining a session becomes `host` a
 
 ### Phase 4: Multiplayer Input Routing
 
-Status: planned.
+Status: implemented for keyboard player slots 1 and 2 on 2026-05-28; manual RetroArch smoke pending.
 
 Deliverables:
 
-- Convert input event contracts and routing helpers to TypeScript before expanding player slots.
-- Extend React input events with `playerIndex`.
-- Add engine-side participant/slot validation.
-- Add player 2+ key/gamepad mapping strategy.
-- Add tests for rejected unauthorized input.
+- Convert input event contracts and routing helpers to TypeScript before expanding player slots. Completed in Phase 0A.
+- Extend React input events with `playerIndex`. Completed with player 1 as the current UI default.
+- Add engine-side participant/slot validation. Completed through lobby `canSendInput`.
+- Add player 2+ key/gamepad mapping strategy. Completed for keyboard slot 2; slots 3 and 4 still need a virtual gamepad or RetroArch-specific mapping decision.
+- Add tests for rejected unauthorized input. Completed.
 
 Acceptance criteria:
 
-- Player 1 and Player 2 input routes to distinct emulator controls in a test ROM or RetroArch input diagnostic.
-- A spectator cannot control the emulator.
-- A guest assigned to slot 2 cannot emit slot 1 input.
+- Player 1 and Player 2 input routes to distinct emulator controls in a test ROM or RetroArch input diagnostic. Automated mapping exists; manual emulator smoke pending.
+- A spectator cannot control the emulator. Covered by automated tests.
+- A guest assigned to slot 2 cannot emit slot 1 input. Covered by automated tests.
+
+Implementation note: browser key events now include `playerIndex`. The engine rejects spectator or wrong-slot input before calling `xdotool`. Player 1 keeps the existing arrow/Z/X/Enter/Shift mapping; player 2 maps the same browser controls onto W/A/S/D/F/G/R/T and writes matching RetroArch player 2 binds into `/app/retroarch.cfg`.
 
 ### Phase 5: Multi-Viewer WebRTC Validation
 
@@ -325,6 +327,6 @@ Manual:
 
 ## Recommended Next Implementation Task
 
-Continue with Phase 4: multiplayer input routing.
+Continue with Phase 5: multi-viewer WebRTC validation.
 
-Phase 3 now has engine-side lobby roles and slots, so the next valuable slice is enforcing those slots at the input boundary before the UI lets guests control anything. In parallel, decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing because Chrome already blocked direct HTTPS-to-HTTP LAN fetches during smoke testing.
+The local engine now has lobby roles and slot-aware input authorization for player 1 and player 2. The next risky unknown is whether the current `camera.py`/GStreamer `webrtcbin` path can serve multiple browser viewers from one running game, or whether the engine needs a per-viewer sender/fanout design. In parallel, decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing because Chrome already blocked direct HTTPS-to-HTTP LAN fetches during smoke testing.

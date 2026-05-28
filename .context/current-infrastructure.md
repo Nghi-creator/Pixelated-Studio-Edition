@@ -194,9 +194,11 @@ Streaming/signaling:
 Input:
 
 - Browser keydown/keyup events are attached by `apps/web/src/lib/webrtcInput.ts` and go through Socket.IO.
-- Node maps browser keys to X11 key names.
+- Browser keydown/keyup events include `playerIndex`, defaulting to player 1 until the lobby UI exposes assigned slots.
+- Node authorizes input against local lobby slot state before injecting any key.
+- Node maps browser keys to X11 key names. Player 1 keeps arrow/Z/X/Enter/Shift; player 2 maps the same browser controls onto W/A/S/D/F/G/R/T.
 - Node executes `xdotool keydown/keyup` against display `:99`.
-- Multiplayer slot-aware input routing is not implemented yet; Phase 4 in `.context/lan-multiplayer-plan.md` will add `playerIndex` payloads and reject spectator or wrong-slot input.
+- RetroArch config generation now writes explicit player 1 and player 2 keyboard binds. Slots 3 and 4 still need a virtual gamepad or RetroArch mapping decision before real input is enabled.
 - React emits `stop-session` during player cleanup; Node stops the active emulator/camera processes and removes the active temp cloud ROM.
 
 ## Supabase

@@ -19,6 +19,40 @@ Recommended direction:
 
 ## Done
 
+### Multiplayer Input Routing
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/web/src/lib/webrtcInput.ts`
+- `engine/runtime/server.js`
+- `engine/runtime/src/input/translateKey.js`
+- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/signaling/inputHandlers.ts`
+- `engine/runtime/src/signaling/inputHandlers.test.ts`
+- `engine/runtime/src/signaling/lobby.ts`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- React input events now include `playerIndex`, defaulting to player 1 for the current single-player UI.
+- The engine validates keyboard input against lobby slot ownership before injecting keys.
+- Spectators cannot control the emulator.
+- A guest assigned to player slot 2 cannot emit player slot 1 input.
+- Player 1 keeps the existing arrow/Z/X/Enter/Shift keyboard path.
+- Player 2 maps the same browser controls onto W/A/S/D/F/G/R/T before `xdotool` injection.
+- RetroArch config generation now writes explicit player 1 and player 2 keyboard binds.
+- Added automated tests for host input, player 2 mapping, spectator rejection, and wrong-slot rejection.
+
+Remaining follow-up:
+
+- Manual smoke with a two-player test ROM or RetroArch input diagnostic.
+- Add React lobby UI so guests can see and request their assigned slots.
+- Decide the slots 3 and 4 input strategy, likely virtual gamepads or deeper RetroArch input config instead of more shared keyboard mapping.
+
 ### Engine Lobby Role Foundation
 
 Completed: 2026-05-28
@@ -1301,8 +1335,8 @@ The local engine now defaults to host loopback, has an explicit desktop LAN mode
 
 Recommended next implementation slice:
 
-- Implement Phase 4 slot-aware input routing so only the assigned player socket can control its own slot.
-- Add React lobby UI and guest join/invite UX after the input boundary is safe.
+- Validate Phase 5 multi-viewer WebRTC behavior with two browser clients against one engine session.
+- Add React lobby UI and guest join/invite UX once the media fanout behavior is understood.
 - Decide the local HTTPS/private-network strategy because Chrome blocked hosted Vercel to HTTP LAN engine fetches with `LocalNetworkAccessPermissionDenied`.
 - Runtime-smoke true two-device LAN once the browser transport decision is made.
 

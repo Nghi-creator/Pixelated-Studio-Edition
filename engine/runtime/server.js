@@ -89,7 +89,9 @@ io.on("connection", (socket) => {
   });
   registerSignalingRelayHandlers(socket);
   registerEngineErrorHandlers(socket);
-  registerInputHandlers(socket, runtime);
+  registerInputHandlers(socket, runtime, {
+    canSendInput: lobby.canSendInput,
+  });
 
   socket.on("stop-session", (payload = {}) => {
     const sessionId =

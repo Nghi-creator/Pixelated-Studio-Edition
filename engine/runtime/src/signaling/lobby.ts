@@ -251,6 +251,22 @@ export function createLobbyManager(maxPlayers = 4) {
     return participants.get(socket.id)?.role === "host";
   }
 
+  function canSendInput(
+    socket: LobbySocket,
+    sessionId: string | null,
+    playerIndex: number,
+  ) {
+    if (!sessionId || !Number.isInteger(playerIndex)) return false;
+    const participants = sessions.get(sessionId);
+    if (!participants || participants.size === 0) return true;
+
+    const participant = participants.get(socket.id);
+    return (
+      (participant?.role === "host" || participant?.role === "player") &&
+      participant.playerIndex === playerIndex
+    );
+  }
+
   function kickParticipant(socket: LobbySocket, payload: KickPayload = {}) {
     const sessionId =
       normalizeSessionId(payload.sessionId) || socket.data.sessionId;
@@ -332,6 +348,7 @@ export function createLobbyManager(maxPlayers = 4) {
 
   return {
     canControlSession,
+    canSendInput,
     getLobbyState,
     joinLobby,
     kickParticipant,
