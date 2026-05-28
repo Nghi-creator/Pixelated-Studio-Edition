@@ -8,6 +8,15 @@ Build from this folder:
 docker build -t pixelated-engine .
 ```
 
+The runtime now compiles mixed TypeScript/JavaScript source into `dist/` before
+starting:
+
+```sh
+npm run build
+npm run check
+npm test
+```
+
 Run through the desktop app for normal local use so it can generate and pass the per-run pairing token.
 
 The desktop launcher builds this image locally by default. Packaged releases can

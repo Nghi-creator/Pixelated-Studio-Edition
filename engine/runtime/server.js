@@ -22,6 +22,7 @@ const { createProcessManager } = require("./src/runtime/processManager");
 const { registerEngineErrorHandlers } = require("./src/signaling/engineErrorHandlers");
 const { registerInputHandlers } = require("./src/signaling/inputHandlers");
 const { joinSession, normalizeSessionId } = require("./src/signaling/sessionRooms");
+const { createLobbyManager } = require("./src/signaling/lobby");
 const { registerSignalingRelayHandlers } = require("./src/signaling/signalingRelay");
 const { createEngineTokenAuth } = require("./src/signaling/socketAuth");
 const { registerStartGameHandler } = require("./src/signaling/startGameHandlers");
@@ -48,6 +49,7 @@ const getHealthSnapshot = createHealthSnapshot({
   getRuntimeState: runtime.getRuntimeState,
   healthPaths: HEALTH_PATHS,
 });
+const lobby = createLobbyManager();
 
 registerHealthRoutes(app, getHealthSnapshot);
 registerLocalVaultRoutes(app, {
@@ -67,22 +69,39 @@ io.on("connection", (socket) => {
   console.log(`[Node.js] Client connected! ID: ${socket.id}`);
 
   socket.on("join-session", (payload = {}) => {
-    joinSession(socket, payload.sessionId, payload.role);
+    const sessionId = joinSession(socket, payload.sessionId, payload.role);
+    if (sessionId && payload.role !== "camera") {
+      lobby.joinLobby(socket, {
+        displayName: payload.displayName,
+        requestedRole: payload.role === "browser" ? "host" : payload.role,
+        sessionId,
+      });
+    }
   });
 
+  lobby.registerLobbyHandlers(socket);
   registerStartGameHandler(socket, {
     apiUrl: PIXELATED_API_URL,
+    canStartGame: lobby.canControlSession,
     downloadCloudRom: cloudRoms.downloadCloudRom,
     runtime,
     verifyBackendSession,
   });
   registerSignalingRelayHandlers(socket);
   registerEngineErrorHandlers(socket);
-  registerInputHandlers(socket, runtime);
+  registerInputHandlers(socket, runtime, {
+    canSendInput: lobby.canSendInput,
+  });
 
   socket.on("stop-session", (payload = {}) => {
     const sessionId =
       normalizeSessionId(payload.sessionId) || socket.data.sessionId;
+    if (!lobby.canControlSession(socket, sessionId)) {
+      socket.emit("engine-error", {
+        message: "Only the lobby host can stop a game.",
+      });
+      return;
+    }
     runtime.cleanupActiveSession(sessionId);
   });
 });

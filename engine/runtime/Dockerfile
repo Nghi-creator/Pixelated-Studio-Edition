@@ -58,5 +58,6 @@ RUN mkdir -p /roms
 COPY package*.json ./
 RUN npm install
 COPY . .
+RUN npm run build
 
-CMD ["node", "server.js"]
+CMD ["npm", "start"]

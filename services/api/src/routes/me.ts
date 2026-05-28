@@ -22,6 +22,13 @@ const DEFAULT_PROFILE: ProfilePermissions = {
   username: null,
 };
 
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
+
+type MeRouteOptions = {
+  requireUser?: typeof requireSupabaseUser;
+  supabase?: SupabaseServiceLike | null;
+};
+
 function buildAbilities(profile: ProfilePermissions) {
   const isAdmin = profile.role === "admin" || profile.role === "super_admin";
   const isSuperAdmin = profile.role === "super_admin";
@@ -35,10 +42,10 @@ function buildAbilities(profile: ProfilePermissions) {
   };
 }
 
-async function getProfile(userId: string) {
-  if (!supabaseService) return DEFAULT_PROFILE;
+async function getProfile(service: SupabaseServiceLike | null, userId: string) {
+  if (!service) return DEFAULT_PROFILE;
 
-  const { data, error } = await supabaseService
+  const { data, error } = await service
     .from("profiles")
     .select("username, email, avatar_url, role, is_banned, is_developer")
     .eq("id", userId)
@@ -54,8 +61,14 @@ async function getProfile(userId: string) {
   };
 }
 
-export async function registerMeRoutes(app: FastifyInstance) {
-  app.get("/me", { preHandler: requireSupabaseUser }, async (request) => {
+export async function registerMeRoutes(
+  app: FastifyInstance,
+  options: MeRouteOptions = {},
+) {
+  const requireUser = options.requireUser || requireSupabaseUser;
+  const service = options.supabase === undefined ? supabaseService : options.supabase;
+
+  app.get("/me", { preHandler: requireUser }, async (request) => {
     const user = request.user;
 
     return {
@@ -68,7 +81,7 @@ export async function registerMeRoutes(app: FastifyInstance) {
 
   app.get(
     "/me/permissions",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
@@ -76,7 +89,7 @@ export async function registerMeRoutes(app: FastifyInstance) {
       }
 
       try {
-        const profile = await getProfile(user.id);
+        const profile = await getProfile(service, user.id);
 
         return {
           abilities: buildAbilities(profile),

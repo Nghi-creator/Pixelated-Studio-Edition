@@ -139,17 +139,36 @@ Open technical question: GStreamer `webrtcbin` may need one peer connection per 
 
 ### Phase 0: TypeScript Migration Track
 
-Status: planned alongside multiplayer work.
+Status: Phase 0A implemented for engine signaling on 2026-05-28; desktop TypeScript migration remains planned.
 
 The engine runtime and desktop launcher are still JavaScript while the web app and API are TypeScript. Multiplayer will add socket payload contracts, role/slot state, invite data, and desktop IPC state, so TypeScript should be introduced as part of the feature path rather than as a separate cosmetic rename.
 
 Recommended migration order:
 
-- Add TypeScript config/build support to `engine/runtime/` first.
-- Convert engine config, signaling payload validators, session room helpers, and input routing modules before implementing player slots.
+- Add TypeScript config/build support to `engine/runtime/` first. Completed in Phase 0A.
+- Convert engine config, signaling payload validators, session room helpers, and input routing modules before implementing player slots. Completed in Phase 0A for config, session rooms, socket auth, signaling relay, engine errors, start-game handling, and input handlers.
 - Add TypeScript config/build support to `apps/desktop/` after LAN mode stabilizes.
 - Convert desktop IPC contracts, Docker command construction, LAN interface discovery, and lifecycle state handling.
 - Keep `camera.py` as Python and type the JSON contracts it receives through env/socket payloads on the Node side.
+
+Phase 0A implementation notes:
+
+- `engine/runtime` now has `tsconfig.json`.
+- `npm run build` compiles mixed `.ts` and `.js` source into `dist/`.
+- `npm run check`, `npm test`, and `npm start` run against compiled output.
+- The Docker image runs `npm run build` during image creation and starts with `npm start`.
+- Converted files:
+  - `engine/runtime/src/config.ts`
+  - `engine/runtime/src/signaling/sessionRooms.ts`
+  - `engine/runtime/src/signaling/socketAuth.ts`
+  - `engine/runtime/src/signaling/signalingRelay.ts`
+  - `engine/runtime/src/signaling/engineErrorHandlers.ts`
+  - `engine/runtime/src/signaling/startGameHandlers.ts`
+  - `engine/runtime/src/signaling/inputHandlers.ts`
+
+Remaining validation:
+
+- Docker build smoke was attempted on 2026-05-28 but Docker daemon was not reachable from the CLI at that moment.
 
 Acceptance criteria:
 
@@ -201,46 +220,50 @@ Acceptance criteria:
 
 Implementation note: the pairing panel now classifies local, LAN, and custom engine URLs; checks `/health.exposureMode`; rejects LAN-looking URLs when the engine reports local-only mode; and gives clearer wrong-token, unreachable-LAN, and hosted-HTTPS-to-HTTP-LAN failure messages.
 
-Confirmed risk: the hosted Vercel app is HTTPS while LAN engine URLs are currently HTTP. A Chrome smoke test from `https://pixelated-studio-edition.vercel.app` to a reachable mock engine at `http://192.168.1.11:8080` failed with `LocalNetworkAccessPermissionDenied`, even when the mock engine returned permissive CORS and `Access-Control-Allow-Private-Network: true`.
-
-Next architecture decision: local HTTPS for the engine, a local companion web origin, or another browser-approved private-network access strategy.
+Remaining risk: the hosted Vercel app is HTTPS while LAN engine URLs are currently HTTP. Some browsers may block HTTP private-network requests from an HTTPS origin. If this blocks real guest pairing, the next architecture decision is local HTTPS for the engine, a local companion page, or another browser-approved private-network access strategy.
 
 ### Phase 3: Lobby And Roles
 
-Status: planned.
+Status: engine-side foundation implemented on 2026-05-28; React lobby UI and full LAN transport remain pending.
 
 Deliverables:
 
-- Convert the relevant engine signaling/session modules to TypeScript before adding role state.
-- Add local engine session/lobby state.
-- Add `host`, `player`, and `spectator` roles.
-- Add join/leave events.
-- Add player slot assignment.
-- Let host kick/revoke participants.
+- Convert the relevant engine signaling/session modules to TypeScript before adding role state. Completed in Phase 0A.
+- Add local engine session/lobby state. Completed for the local engine process.
+- Add `host`, `player`, and `spectator` roles. Completed engine-side.
+- Add join/leave events. Completed engine-side through Socket.IO lobby events.
+- Add player slot assignment. Completed engine-side for host slot 1 and guest slot requests.
+- Let host kick/revoke participants. Completed engine-side.
+- Add React lobby UI that consumes `lobby-state`.
+- Add guest invite/join UX that makes the roles and slots visible.
 
 Acceptance criteria:
 
-- Host can see connected participants.
-- Guests cannot start/stop games unless assigned host permissions.
-- Spectators receive stream but cannot send input.
+- Host can see connected participants. Pending React UI.
+- Guests cannot start/stop games unless assigned host permissions. Implemented engine-side.
+- Spectators receive stream but cannot send input. Pending Phase 4 input authorization and Phase 5 multi-viewer validation.
+
+Implementation note: the first browser socket joining a session becomes `host` and receives player slot 1. Later host requests are downgraded to `spectator`; guests can request open player slots. Start/stop and lobby kick actions are restricted to the lobby host. The current single-player browser path still works because `join-session` automatically joins the lobby before `start-game`.
 
 ### Phase 4: Multiplayer Input Routing
 
-Status: planned.
+Status: implemented for keyboard player slots 1 and 2 on 2026-05-28; manual RetroArch smoke pending.
 
 Deliverables:
 
-- Convert input event contracts and routing helpers to TypeScript before expanding player slots.
-- Extend React input events with `playerIndex`.
-- Add engine-side participant/slot validation.
-- Add player 2+ key/gamepad mapping strategy.
-- Add tests for rejected unauthorized input.
+- Convert input event contracts and routing helpers to TypeScript before expanding player slots. Completed in Phase 0A.
+- Extend React input events with `playerIndex`. Completed with player 1 as the current UI default.
+- Add engine-side participant/slot validation. Completed through lobby `canSendInput`.
+- Add player 2+ key/gamepad mapping strategy. Completed for keyboard slot 2; slots 3 and 4 still need a virtual gamepad or RetroArch-specific mapping decision.
+- Add tests for rejected unauthorized input. Completed.
 
 Acceptance criteria:
 
-- Player 1 and Player 2 input routes to distinct emulator controls in a test ROM or RetroArch input diagnostic.
-- A spectator cannot control the emulator.
-- A guest assigned to slot 2 cannot emit slot 1 input.
+- Player 1 and Player 2 input routes to distinct emulator controls in a test ROM or RetroArch input diagnostic. Automated mapping exists; manual emulator smoke pending.
+- A spectator cannot control the emulator. Covered by automated tests.
+- A guest assigned to slot 2 cannot emit slot 1 input. Covered by automated tests.
+
+Implementation note: browser key events now include `playerIndex`. The engine rejects spectator or wrong-slot input before calling `xdotool`. Player 1 keeps the existing arrow/Z/X/Enter/Shift mapping; player 2 maps the same browser controls onto W/A/S/D/F/G/R/T and writes matching RetroArch player 2 binds into `/app/retroarch.cfg`.
 
 ### Phase 5: Multi-Viewer WebRTC Validation
 
@@ -304,6 +327,6 @@ Manual:
 
 ## Recommended Next Implementation Task
 
-Proceed with Phase 0A before Phase 3: TypeScript migration for engine signaling/session modules.
+Start with Phase 1: explicit LAN mode toggle in the desktop app.
 
-LAN browser access from hosted Vercel also needs a design pass. The leading product direction is local HTTPS for the engine, but multiplayer contracts should be typed before lobby/role/input work expands.
+That is the smallest valuable slice because it preserves the secure default while giving the project a real LAN surface to test before adding lobbies, player slots, and multi-viewer media behavior.

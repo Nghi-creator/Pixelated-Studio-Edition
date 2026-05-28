@@ -35,6 +35,13 @@ type CommentRow = {
   user_id: string | null;
 };
 
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
+
+type ModerationRouteOptions = {
+  requireUser?: typeof requireSupabaseUser;
+  supabase?: SupabaseServiceLike | null;
+};
+
 function isAdminRole(role: string | null | undefined) {
   return role === "admin" || role === "super_admin";
 }
@@ -43,17 +50,23 @@ function isSuperAdminRole(role: string | null | undefined) {
   return role === "super_admin";
 }
 
-export async function registerModerationRoutes(app: FastifyInstance) {
+export async function registerModerationRoutes(
+  app: FastifyInstance,
+  options: ModerationRouteOptions = {},
+) {
+  const requireUser = options.requireUser || requireSupabaseUser;
+  const service = options.supabase === undefined ? supabaseService : options.supabase;
+
   app.post(
     "/moderation/comments/:commentId/report",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
 
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -71,7 +84,7 @@ export async function registerModerationRoutes(app: FastifyInstance) {
         });
       }
 
-      const { error } = await supabaseService.from("reported_comments").insert({
+      const { error } = await service.from("reported_comments").insert({
         comment_id: parsedParams.data.commentId,
         reporter_id: user.id,
         reason: parsedBody.data.reason,
@@ -95,20 +108,20 @@ export async function registerModerationRoutes(app: FastifyInstance) {
 
   app.get(
     "/admin/reports",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
 
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
 
-      const { data: actorProfile, error: actorError } = await supabaseService
+      const { data: actorProfile, error: actorError } = await service
         .from("profiles")
         .select("role")
         .eq("id", user.id)
@@ -123,7 +136,7 @@ export async function registerModerationRoutes(app: FastifyInstance) {
         return reply.status(403).send({ error: "Admin access required" });
       }
 
-      const { data, error } = await supabaseService
+      const { data, error } = await service
         .from("reported_comments")
         .select(
           `
@@ -151,14 +164,14 @@ export async function registerModerationRoutes(app: FastifyInstance) {
 
   app.post(
     "/admin/reports/:reportId/action",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
 
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -174,7 +187,7 @@ export async function registerModerationRoutes(app: FastifyInstance) {
         return reply.status(400).send({ error: "Invalid report action" });
       }
 
-      const { data: actorProfile, error: actorError } = await supabaseService
+      const { data: actorProfile, error: actorError } = await service
         .from("profiles")
         .select("role")
         .eq("id", user.id)
@@ -189,7 +202,7 @@ export async function registerModerationRoutes(app: FastifyInstance) {
         return reply.status(403).send({ error: "Admin access required" });
       }
 
-      const { data: report, error: reportError } = await supabaseService
+      const { data: report, error: reportError } = await service
         .from("reported_comments")
         .select("comment_id, reporter_id")
         .eq("id", parsedParams.data.reportId)
@@ -210,7 +223,7 @@ export async function registerModerationRoutes(app: FastifyInstance) {
         });
       }
 
-      const { data: comment, error: commentError } = await supabaseService
+      const { data: comment, error: commentError } = await service
         .from("comments")
         .select("user_id")
         .eq("id", report.comment_id)
@@ -222,14 +235,14 @@ export async function registerModerationRoutes(app: FastifyInstance) {
       }
 
       if (!comment?.user_id) {
-        await supabaseService
+        await service
           .from("reported_comments")
           .delete()
           .eq("id", parsedParams.data.reportId);
         return reply.status(404).send({ error: "Comment not found" });
       }
 
-      const { data: targetProfile, error: targetError } = await supabaseService
+      const { data: targetProfile, error: targetError } = await service
         .from("profiles")
         .select("role, is_banned")
         .eq("id", comment.user_id)
@@ -250,7 +263,7 @@ export async function registerModerationRoutes(app: FastifyInstance) {
       }
 
       if (parsedBody.data.action === "ignore") {
-        const { error } = await supabaseService
+        const { error } = await service
           .from("reported_comments")
           .delete()
           .eq("id", parsedParams.data.reportId);
@@ -273,7 +286,7 @@ export async function registerModerationRoutes(app: FastifyInstance) {
           return reply.status(403).send({ error: "Admins cannot ban themselves" });
         }
 
-        const { error } = await supabaseService
+        const { error } = await service
           .from("profiles")
           .update({ is_banned: true })
           .eq("id", comment.user_id);
@@ -284,7 +297,7 @@ export async function registerModerationRoutes(app: FastifyInstance) {
         }
       }
 
-      const { error: deleteError } = await supabaseService
+      const { error: deleteError } = await service
         .from("comments")
         .delete()
         .eq("id", report.comment_id);

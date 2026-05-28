@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "build": "tsc -p tsconfig.json",
     "lint": "eslint .",
+    "smoke:staging": "tsx scripts/stagingSmoke.ts",
     "test": "tsx --test \"tests/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
