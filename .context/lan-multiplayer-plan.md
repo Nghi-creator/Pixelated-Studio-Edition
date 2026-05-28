@@ -222,6 +222,38 @@ Implementation note: the pairing panel now classifies local, LAN, and custom eng
 
 Confirmed browser blocker: Chrome blocked `https://pixelated-studio-edition.vercel.app` fetching an HTTP LAN engine URL with `LocalNetworkAccessPermissionDenied` during a hosted-browser LAN smoke attempt on 2026-05-28, even with permissive engine CORS and `Access-Control-Allow-Private-Network`. The next architecture decision is local HTTPS for the engine, a local companion origin, or another browser-approved private-network access strategy.
 
+### Phase 2B: HTTPS To LAN Transport Strategy
+
+Status: first desktop companion foundation implemented on 2026-05-28; full two-device certificate/browser smoke pending.
+
+Recommended approach: ship a local HTTPS companion origin in the desktop app, not raw HTTP LAN access from hosted Vercel.
+
+Reasoning:
+
+- Chrome Private Network Access is explicitly aimed at restricting public websites from reaching private-network endpoints.
+- Local Network Access permission prompts may improve this path over time, but current support is still evolving and does not yet cover every transport shape Pixelated depends on.
+- Serving the player from the host machine over local HTTPS avoids the hosted-public-origin-to-private-network fetch problem and keeps engine secrets local.
+
+Target architecture:
+
+- Keep hosted Vercel as the public library, account, and discovery surface.
+- When LAN mode is enabled, desktop starts a local HTTPS companion origin such as `https://pixelated.local:<port>` or `https://<lan-ip>:<port>`.
+- The companion origin serves the built React player or a thin join shell from the host machine.
+- That companion origin talks to the local engine on loopback or same-host Docker networking, so guests use one LAN HTTPS origin instead of Vercel directly fetching an HTTP LAN engine.
+- Desktop displays a LAN join URL and token/invite code together.
+
+Implementation phases:
+
+- Generate or install a local development/self-signed certificate path for the desktop companion server. Implemented with runtime OpenSSL self-signed cert generation under the Electron user data directory.
+- Add a small desktop-hosted HTTPS static server for the player/join shell. Implemented as a LAN-only companion server on `PIXELATED_COMPANION_PORT`, default `8090`.
+- Add explicit browser copy for first-time certificate trust if self-signed certs are used. Implemented in the desktop LAN companion panel.
+- Prefer short-lived invite codes over exposing the raw pairing token in a URL.
+- Keep HTTP LAN engine support available only as an advanced/dev fallback. Current desktop still displays the raw LAN engine URL for debugging.
+
+Open decision: choose between a self-signed/local CA flow, a localhost-style companion that only works on the host, or a tunnel/relay provider. For LAN guests, self-signed/local CA or a trusted tunnel are the realistic choices; plain HTTP LAN from hosted Vercel is not a reliable product path.
+
+Implementation note: the companion serves the built React app over local HTTPS and injects `pixelated_engine_url = window.location.origin`, so the player uses the companion origin. The companion proxies engine HTTP routes and Socket.IO/WebSocket traffic to `127.0.0.1:8080`, avoiding browser-side HTTPS-to-HTTP LAN fetches. It requires `apps/web/dist` to exist when running from the monorepo.
+
 ### Phase 3: Lobby And Roles
 
 Status: engine-side foundation implemented on 2026-05-28; React lobby UI and full LAN transport remain pending.
@@ -325,6 +357,67 @@ Acceptance criteria:
 
 Implementation note: the API now exposes `PUT /multiplayer/lobbies/:sessionId`, `GET /multiplayer/lobbies/recent`, and `DELETE /multiplayer/lobbies/:sessionId`. React publishes host-owned lobby snapshots when `lobby-state` changes and marks the backend lobby ended when the host leaves. This is intentionally observability/control-plane metadata only; guests still need the local engine URL plus browser-local engine token to connect.
 
+### Phase 8: Player-Ready LAN UX
+
+Status: first UX pass implemented on 2026-05-28; full two-device UX smoke pending.
+
+Deliverables:
+
+- Add clearer desktop LAN enable/disable flow with warning copy and restart explanation. Partially implemented with HTTPS companion-focused LAN copy.
+- Show a single join package: local HTTPS join URL, engine exposure state, and invite/token instructions. Implemented in the desktop LAN companion panel.
+- Add visible guest/host connection states in the React lobby. Implemented for connected participants.
+- Add host kick/revoke buttons in the React lobby. Implemented for non-host participants.
+- Add empty/error states for guest pairing, wrong token, LAN disabled, and host stopped.
+- Keep advanced engine URL/token fields available for debugging, but make the happy path copy/invite driven.
+
+Acceptance criteria:
+
+- A non-developer can enable LAN mode, copy one invite, and understand what the guest must do.
+- Host can see whether guests are viewing, assigned to a slot, disconnected, or blocked.
+- Host can remove a guest without restarting the whole engine.
+
+Implementation note: the desktop LAN panel now emphasizes the HTTPS join page and gives a short invite checklist. The React lobby shows connected state and exposes a host-only remove button wired to the existing `lobby-kick` engine event.
+
+### Phase 9: Input Strategy Beyond Two Players
+
+Status: virtual gamepad foundation implemented on 2026-05-28; Docker/device smoke pending.
+
+Recommended approach: use virtual gamepads for P1-P4 when `/dev/uinput` is available, with keyboard fallback for P1/P2 only.
+
+Deliverables:
+
+- Evaluate virtual gamepad options inside the Linux container. Implemented with Python `evdev` and Linux `uinput`.
+- Evaluate RetroArch input/device config for multiple ports. Implemented as udev/autodetect plus four libretro joypad ports; emulator smoke pending.
+- Decide whether the first public LAN release caps active players at 2 while allowing extra spectators. Revisit after Docker/Desktop `/dev/uinput` smoke.
+- Add a test ROM/input diagnostic smoke checklist before enabling P3/P4.
+
+Acceptance criteria:
+
+- P3/P4 input does not depend on crowded shared keyboard mappings. Implemented through virtual gamepad bridge.
+- Input routing remains slot-authorized. Covered by automated tests.
+- UI max player settings match the engine's real supported input mode. Pending device smoke and possible UX gating if `/dev/uinput` is unavailable.
+
+Implementation note: browser controls stay the same for every player. React emits `playerIndex`, the engine verifies slot ownership, then Node writes normalized controller events to `input_gamepad.py`. The Python bridge creates four virtual controllers via `evdev.UInput`. If `/dev/uinput` is unavailable, P1/P2 fall back to keyboard injection and P3/P4 get a clear engine error.
+
+### Phase 10: Multiplayer Performance Validation
+
+Status: engine measurement foundation implemented on 2026-05-28; real multi-viewer measurements pending.
+
+Deliverables:
+
+- Measure CPU/memory with one host plus one guest viewer. Engine `/health` now exposes process resource snapshots; manual measurement pending.
+- Measure CPU/memory with additional spectators. Engine `/health` now exposes camera peer count; manual measurement pending.
+- Track WebRTC FPS, bitrate, packet loss, jitter, and ICE state per peer. Browser telemetry already tracks these per viewer and persists sampled authenticated metrics.
+- Decide whether the current per-peer GStreamer pipeline is acceptable or whether a fanout/relay architecture is needed.
+
+Acceptance criteria:
+
+- Two viewers can watch without unacceptable frame drops on a target host machine.
+- The UI can warn or limit spectators if local CPU usage is too high.
+- Performance notes are documented before calling LAN multiplayer production-ready.
+
+Implementation note: `camera.py` writes peer state to `/tmp/pixelated_camera_peers.json`, and `/health` now reports `checks.resources.cameraPeers`, process RSS, and average CPU since process start for RetroArch/camera where `/proc` is available. This gives the manual smoke a concrete before/after measurement surface without adding another metrics service.
+
 ## Test Plan
 
 Automated:
@@ -358,4 +451,4 @@ Continue with manual multiplayer smoke and deployment wiring.
 
 The engine can now represent roles/slots, enforce slot-aware input, route multiple WebRTC peers independently, React can show/share/join a local lobby, and the backend can store non-secret lobby metadata. The next useful slice is deploying the API/web changes, confirming the hosted multiplayer route exists, then running a real Docker/RetroArch smoke with two browser clients. In parallel, decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing.
 
-Smoke note, 2026-05-28: hosted API health passed, but `GET /multiplayer/lobbies/recent` returned route-not-found, which means Render did not yet have the Phase 7 API code. Docker Desktop was not reachable from this shell, so the local two-browser engine smoke could not run here.
+Smoke note, 2026-05-28: hosted API health passed and `GET /multiplayer/lobbies/recent` now returns `401 Missing bearer token`, confirming Render has the Phase 7 route. The desktop HTTPS companion passed a local temporary-port smoke. Docker Desktop was not reachable from this shell, so the local two-browser engine smoke could not run here.

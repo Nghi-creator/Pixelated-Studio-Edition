@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
     python3-gi \
+    python3-evdev \
     python3-gst-1.0 \
     gir1.2-gst-plugins-bad-1.0 \
     gir1.2-gst-plugins-base-1.0 \

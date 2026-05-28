@@ -55,6 +55,7 @@ export default function Player() {
     (playerMode === "host" ? "Host" : "Guest");
   const {
     lobbyState,
+    kickParticipant,
     localParticipant,
     releasePlayerSlot,
     requestPlayerSlot,
@@ -194,6 +195,7 @@ export default function Player() {
       <LobbyPanel
         currentParticipant={localParticipant}
         lobbyState={lobbyState}
+        onKickParticipant={kickParticipant}
         onReleaseSlot={releasePlayerSlot}
         onRequestSlot={requestPlayerSlot}
         shareUrl={shareUrl}

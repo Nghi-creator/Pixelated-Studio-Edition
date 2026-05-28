@@ -8,4 +8,5 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onEngineStopped: (callback) => ipcRenderer.on("engine-stopped", callback),
   onEngineToken: (callback) => ipcRenderer.on("engine-token", callback),
   onEngineExposure: (callback) => ipcRenderer.on("engine-exposure", callback),
+  onEngineCompanion: (callback) => ipcRenderer.on("engine-companion", callback),
 });

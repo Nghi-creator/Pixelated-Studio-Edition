@@ -121,8 +121,7 @@
             Engine binds to this computer only.
           </p>
           <div id="lan-warning" class="hidden mt-3 text-xs leading-5 text-amber-300">
-            LAN mode exposes the engine to devices on your network. Share the URL
-            and token only with people you trust.
+            LAN mode exposes the engine to devices on your network. Share the HTTPS join page and token only with people you trust.
           </div>
           <div id="lan-url-panel" class="hidden mt-3">
             <p class="text-[10px] uppercase tracking-widest text-gray-400">
@@ -132,6 +131,32 @@
               id="lan-urls"
               class="mt-1 space-y-1 font-mono text-xs text-synth-secondary"
             ></div>
+          </div>
+          <div id="companion-panel" class="hidden mt-3 border-t border-synth-border pt-3">
+            <div class="flex items-center justify-between gap-3">
+              <p class="text-[10px] uppercase tracking-widest text-gray-400">
+                HTTPS Join Page
+              </p>
+              <button
+                id="copy-companion"
+                class="text-xs font-bold text-synth-primary hover:text-synth-secondary transition-colors"
+                type="button"
+              >
+                Copy
+              </button>
+            </div>
+            <div
+              id="companion-urls"
+              class="mt-1 space-y-1 font-mono text-xs text-synth-secondary"
+            ></div>
+            <p id="companion-copy" class="mt-2 text-xs leading-5 text-gray-400">
+              Guests may need to trust the local certificate the first time they open this page.
+            </p>
+            <ol class="mt-3 list-decimal space-y-1 pl-4 text-xs leading-5 text-gray-400">
+              <li>Copy the HTTPS join page after the engine is ready.</li>
+              <li>Send the join page and Web Pairing Token to your LAN guest.</li>
+              <li>The guest opens the join page, accepts the local certificate warning if shown, then pairs with the token.</li>
+            </ol>
           </div>
         </div>
 

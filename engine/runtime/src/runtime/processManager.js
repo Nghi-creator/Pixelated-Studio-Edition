@@ -1,9 +1,13 @@
 const { exec, spawn } = require("child_process");
 const fs = require("fs");
+const { createGamepadBridge } = require("../input/gamepadBridge");
+const { injectKey } = require("../input/injectKey");
+const { translateKey } = require("../input/translateKey");
 const { removeFileIfExists } = require("../roms/cloudRomDownloader");
 
 function createProcessManager(options) {
-  const { cameraPath, engineToken } = options;
+  const { cameraPath, cameraPeerStatePath, engineToken, gamepadBridgePath } = options;
+  const gamepads = createGamepadBridge({ gamepadBridgePath });
   let retroarchProcess = null;
   let cameraProcess = null;
   let pulseAudioProcess = null;
@@ -34,25 +38,15 @@ function createProcessManager(options) {
       'audio_driver = "pulse"\n' +
         'audio_sync = "true"\n' +
         'video_vsync = "false"\n' +
+        'input_driver = "udev"\n' +
+        'joypad_driver = "udev"\n' +
+        'input_autodetect_enable = "true"\n' +
         'input_libretro_device_p1 = "1"\n' +
-        'input_player1_up = "up"\n' +
-        'input_player1_down = "down"\n' +
-        'input_player1_left = "left"\n' +
-        'input_player1_right = "right"\n' +
-        'input_player1_b = "z"\n' +
-        'input_player1_a = "x"\n' +
-        'input_player1_start = "enter"\n' +
-        'input_player1_select = "rshift"\n' +
         'input_libretro_device_p2 = "1"\n' +
-        'input_player2_up = "w"\n' +
-        'input_player2_down = "s"\n' +
-        'input_player2_left = "a"\n' +
-        'input_player2_right = "d"\n' +
-        'input_player2_b = "f"\n' +
-        'input_player2_a = "g"\n' +
-        'input_player2_start = "r"\n' +
-        'input_player2_select = "t"\n',
+        'input_libretro_device_p3 = "1"\n' +
+        'input_libretro_device_p4 = "1"\n',
     );
+    gamepads.start();
   }
 
   function cleanupActiveSession(sessionId) {
@@ -74,6 +68,18 @@ function createProcessManager(options) {
     }
 
     activeSessionId = null;
+  }
+
+  function sendInput(action, browserKey, playerIndex) {
+    if (gamepads.sendInput(action, browserKey, playerIndex)) return true;
+
+    if (playerIndex > 2) return false;
+
+    const linuxKey = translateKey(browserKey, playerIndex);
+    if (!linuxKey) return true;
+
+    injectKey(action, linuxKey);
+    return true;
   }
 
   function bootGame(absoluteRomPath, sessionId, bootOptions = {}) {
@@ -109,6 +115,7 @@ function createProcessManager(options) {
           PULSE_SERVER: "127.0.0.1",
           PIXELATED_SESSION_ID: sessionId,
           PIXELATED_ENGINE_TOKEN: engineToken,
+          PIXELATED_CAMERA_PEER_STATE_PATH: cameraPeerStatePath,
           PIXELATED_ICE_SERVERS: JSON.stringify(bootOptions.iceServers || []),
           PIXELATED_STREAM_PROFILE: JSON.stringify(
             bootOptions.streamProfile || {},
@@ -135,6 +142,8 @@ function createProcessManager(options) {
       pulseAudioProcess,
       retroarchProcess,
       virtualDisplayProcess,
+      gamepads: gamepads.getState(),
+      cameraPeerStatePath,
     };
   }
 
@@ -143,6 +152,7 @@ function createProcessManager(options) {
     cleanupActiveSession,
     getActiveSessionId,
     getRuntimeState,
+    sendInput,
     startVirtualDisplay,
   };
 }

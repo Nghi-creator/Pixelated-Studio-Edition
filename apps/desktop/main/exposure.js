@@ -32,8 +32,40 @@ function getAdvertisedEngineUrls(exposureMode) {
   return urls.length > 0 ? urls : ["http://<your-lan-ip>:8080"];
 }
 
+function getLanIpv4Addresses() {
+  const addresses = [];
+  const interfaces = os.networkInterfaces();
+
+  Object.values(interfaces).forEach((entries = []) => {
+    entries.forEach((entry) => {
+      if (
+        entry &&
+        entry.family === "IPv4" &&
+        !entry.internal &&
+        entry.address
+      ) {
+        addresses.push(entry.address);
+      }
+    });
+  });
+
+  return addresses;
+}
+
+function getAdvertisedCompanionUrls(exposureMode, port) {
+  if (exposureMode !== "lan") return [];
+
+  const urls = getLanIpv4Addresses().map(
+    (address) => `https://${address}:${port}`,
+  );
+
+  return urls.length > 0 ? urls : [`https://<your-lan-ip>:${port}`];
+}
+
 module.exports = {
   getAdvertisedEngineUrls,
+  getAdvertisedCompanionUrls,
+  getLanIpv4Addresses,
   getDockerPublishHost,
   normalizeExposureMode,
 };

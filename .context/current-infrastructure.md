@@ -108,6 +108,7 @@ Current important frontend behaviors:
 - The player page now includes a local lobby panel. It displays participants, host/player/spectator roles, assigned player slots, and a copyable `?session=<id>&role=spectator` invite URL.
 - Guest player pages opened with a session URL join the existing local-engine session without emitting `start-game`; the engine replays `python-ready` for late joiners when the requested game session is already active.
 - Guests can request/release player slots through the lobby panel. Input is attached only when the local participant owns a player slot.
+- The lobby panel shows connected participants and lets the host remove non-host guests through the engine `lobby-kick` event.
 - Signed-in hosts publish non-secret lobby snapshots to the backend when local `lobby-state` changes. Anonymous/local-only play continues if that backend call is unauthorized or unavailable.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
@@ -148,6 +149,11 @@ Notable constraints:
 - Build happens on user machine from the distributed app folder.
 - Health verifies core local engine dependencies: Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
 - LAN/multiplayer support is planned in `.context/lan-multiplayer-plan.md`. Current engine exposure defaults to loopback-only, with explicit desktop LAN mode available for LAN testing.
+- LAN mode now also starts a desktop-hosted HTTPS companion server on `PIXELATED_COMPANION_PORT`, defaulting to `8090`.
+- The companion server serves the built React app from `apps/web/dist`, injects the engine URL override to its own origin, and proxies engine HTTP plus Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
+- The companion uses a runtime-generated self-signed certificate under the Electron user data directory. Guests may need to trust/bypass that certificate warning during the first LAN test.
+- The desktop UI displays HTTPS companion join URLs separately from raw LAN engine URLs.
+- The desktop LAN panel now includes a short invite checklist: copy HTTPS join page, send it with the pairing token, and have the guest accept the local certificate warning if shown.
 
 ## Engine Container
 
@@ -193,6 +199,8 @@ Streaming/signaling:
 - WebRTC signaling now includes a browser-generated `peerId`. Node places each browser in a peer-specific room so camera answers and ICE candidates route only to the matching browser instead of broadcasting to every viewer in the session.
 - `camera.py` now tracks one GStreamer `webrtcbin` pipeline per peer inside the camera process, allowing multiple viewers to negotiate against the same running game session in principle. A real two-browser Docker/RetroArch smoke is still pending.
 - Viewer cleanup emits `webrtc-peer-disconnect`, letting the camera tear down that peer pipeline without stopping the host game session.
+- `camera.py` writes a small peer-state file so `/health` can report current camera peer count and peer ids during multiplayer smoke tests.
+- `/health` now includes `checks.resources` with camera peer state, Node RSS, and RetroArch/camera process RSS plus average CPU since process start when Linux `/proc` data is available.
 - The local engine now keeps in-memory lobby state per session. The first browser participant becomes `host` with player slot 1; later participants can join as `player` or `spectator`, request/release player slots, and receive `lobby-state` updates.
 - Lobby host permissions gate start, stop, and kick actions engine-side. Host disconnect stops the session; guest disconnect only cleans up that peer/viewer path.
 - React forwards API-issued ICE server config in `start-game`; Node passes it to `camera.py` through `PIXELATED_ICE_SERVERS`; Python configures GStreamer `webrtcbin` with the matching STUN/TURN servers.
@@ -206,9 +214,11 @@ Input:
 - Browser keydown/keyup events are attached by `apps/web/src/lib/webrtcInput.ts` and go through Socket.IO.
 - Browser keydown/keyup events include `playerIndex`, defaulting to player 1 until the lobby UI exposes assigned slots.
 - Node authorizes input against local lobby slot state before injecting any key.
-- Node maps browser keys to X11 key names. Player 1 keeps arrow/Z/X/Enter/Shift; player 2 maps the same browser controls onto W/A/S/D/F/G/R/T.
+- Preferred input path is now virtual gamepads: Node forwards normalized controller actions to `input_gamepad.py`, which creates four Linux `uinput` gamepads through Python `evdev`.
+- When `/dev/uinput` is unavailable, Node falls back to X11 keyboard injection for player 1 and player 2 only.
+- Player 3 and player 4 require virtual gamepad support; if unavailable, the engine rejects their input with a clear error.
 - Node executes `xdotool keydown/keyup` against display `:99`.
-- RetroArch config generation now writes explicit player 1 and player 2 keyboard binds. Slots 3 and 4 still need a virtual gamepad or RetroArch mapping decision before real input is enabled.
+- RetroArch config generation enables udev/autodetect and four libretro joypad ports for the virtual gamepad path.
 - React emits `stop-session` during player cleanup; Node stops the active emulator/camera processes and removes the active temp cloud ROM.
 
 ## Supabase

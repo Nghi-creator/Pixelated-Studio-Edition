@@ -19,6 +19,139 @@ Recommended direction:
 
 ## Done
 
+### Multiplayer Performance Measurement Foundation
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `engine/runtime/camera.py`
+- `engine/runtime/server.js`
+- `engine/runtime/src/config.ts`
+- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/telemetry/healthSnapshot.js`
+- `engine/runtime/src/telemetry/resourceSnapshot.js`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `camera.py` now writes current WebRTC peer state to `/tmp/pixelated_camera_peers.json`.
+- The engine passes the peer-state path into the camera process.
+- `/health` now reports camera peer count and peer ids through `checks.resources.cameraPeers`.
+- `/health` now reports Node RSS and RetroArch/camera process RSS plus average CPU since process start when `/proc` is available.
+- This gives the two-browser smoke a concrete measurement surface without adding another service.
+
+Remaining follow-up:
+
+- Run the two-browser Docker/RetroArch smoke and capture `/health` before/after guest joins.
+- Decide viewer limits based on CPU/RSS and browser WebRTC telemetry.
+- Add UI warnings or spectator caps if local host load is too high.
+
+### Virtual Gamepad Input Foundation
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `engine/runtime/input_gamepad.py`
+- `engine/runtime/Dockerfile`
+- `engine/runtime/server.js`
+- `engine/runtime/src/config.ts`
+- `engine/runtime/src/input/gamepadBridge.js`
+- `engine/runtime/src/input/translateGamepadButton.js`
+- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/signaling/inputHandlers.ts`
+- `engine/runtime/src/signaling/inputHandlers.test.ts`
+- `engine/runtime/src/telemetry/healthSnapshot.js`
+- `apps/desktop/main/docker.js`
+- `apps/desktop/main/engineController.js`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added a Python `evdev` bridge that creates four virtual Linux gamepads via `/dev/uinput`.
+- Browser controls can now stay the same for every player; engine routing uses `playerIndex` to select the virtual controller.
+- Engine input routing now prefers virtual gamepads for P1-P4.
+- If virtual gamepads are unavailable, P1/P2 fall back to the existing keyboard path.
+- P3/P4 now receive a clear engine error instead of fake keyboard support when `/dev/uinput` is unavailable.
+- Docker image installs `python3-evdev`.
+- Desktop Docker launch passes `--device /dev/uinput` when the host exposes that device.
+- Health snapshot now reports gamepad bridge state.
+- Added automated tests for slot 4 routing and unavailable-virtual-gamepad errors.
+
+Remaining follow-up:
+
+- Docker/RetroArch smoke on a host where `/dev/uinput` is available.
+- Confirm whether Docker Desktop on macOS can expose `uinput`; if not, gate P3/P4 in the UI on health status.
+- Add a RetroArch input diagnostic/test ROM checklist before calling P3/P4 production-ready.
+
+### Player-Ready LAN UX Pass
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/desktop/index.html`
+- `apps/desktop/renderer/exposure.js`
+- `apps/web/src/features/player/LobbyPanel.tsx`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/pages/user/Player.tsx`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Desktop LAN copy now points users toward the HTTPS join page instead of raw engine URL first.
+- Desktop LAN panel now includes a short invite checklist for host and guest.
+- React lobby displays connected participant state.
+- React lobby exposes a host-only remove button for non-host guests.
+- `useWebRTC` exposes `kickParticipant`, wired to the engine `lobby-kick` event.
+
+Remaining follow-up:
+
+- Two-device UX smoke with the HTTPS companion page.
+- Better empty/error states for LAN disabled, wrong token, host stopped, and certificate trust problems.
+- True disconnected-but-remembered participant state if the lobby should show recently disconnected guests.
+
+### Desktop HTTPS LAN Companion Foundation
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/desktop/main/companionServer.js`
+- `apps/desktop/main/config.js`
+- `apps/desktop/main/engineController.js`
+- `apps/desktop/main/exposure.js`
+- `apps/desktop/preload.js`
+- `apps/desktop/index.html`
+- `apps/desktop/renderer.js`
+- `apps/desktop/renderer/exposure.js`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- LAN mode now starts a local HTTPS companion server on `PIXELATED_COMPANION_PORT`, defaulting to `8090`.
+- The companion generates a self-signed certificate at runtime under the Electron user data directory.
+- The companion serves the built React app from `apps/web/dist`.
+- Served HTML injects `pixelated_engine_url = window.location.origin`, so React talks to the companion origin.
+- The companion proxies engine HTTP routes and Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
+- Desktop UI now shows HTTPS join page URLs separately from raw LAN engine URLs.
+- Desktop UI tells guests they may need to trust the local certificate on first open.
+
+Remaining follow-up:
+
+- Two-device LAN smoke with Docker Desktop running.
+- Decide whether self-signed certificate trust is acceptable or whether to move to local CA/tunnel packaging.
+- Ensure packaged desktop builds include the web `dist` assets or generate them during release packaging.
+
 ### Backend Multiplayer Lobby Metadata
 
 Completed: 2026-05-28
@@ -56,7 +189,7 @@ Remaining follow-up:
 Smoke note, 2026-05-28:
 
 - Hosted Render API health passed at `https://pixelated-api-services.onrender.com/health`.
-- Hosted Render API still returned `404 Route GET:/multiplayer/lobbies/recent not found`, so the migration was pushed but the API code with multiplayer routes was not deployed yet.
+- Hosted Render API now returns `401 Missing bearer token` for `GET /multiplayer/lobbies/recent`, confirming the multiplayer route is deployed and auth-gated.
 - Local API tests passed with the multiplayer lobby metadata coverage.
 - Docker CLI could not reach Docker Desktop from this shell, so the two-browser Docker/RetroArch smoke remains blocked.
 
@@ -1439,9 +1572,10 @@ The local engine now defaults to host loopback, has an explicit desktop LAN mode
 Recommended next implementation slice:
 
 - Deploy the API and web changes.
-- Recheck hosted `GET /multiplayer/lobbies/recent`; it should return auth gating instead of route-not-found once Render has the latest API code.
 - Validate the multi-viewer WebRTC path with two browser clients against one Docker engine session.
-- Decide the local HTTPS/private-network strategy because Chrome blocked hosted Vercel to HTTP LAN engine fetches with `LocalNetworkAccessPermissionDenied`.
+- Improve LAN error states after the first two-device UX smoke.
+- Smoke virtual gamepads with Docker/RetroArch and gate P3/P4 in the UI if `/dev/uinput` is unavailable.
+- Run CPU/memory validation for the current per-peer GStreamer pipeline using `/health.checks.resources`.
 - Runtime-smoke true two-device LAN once the browser transport decision is made.
 
 ## Database And Supabase Suggestions

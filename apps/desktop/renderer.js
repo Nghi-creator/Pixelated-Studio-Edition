@@ -6,6 +6,7 @@ const statusBadge = document.querySelector(".status-badge");
 const tokenPanel = document.getElementById("token-panel");
 const tokenValue = document.getElementById("engine-token");
 const copyTokenBtn = document.getElementById("copy-token");
+const copyCompanionBtn = document.getElementById("copy-companion");
 
 let isRunning = false;
 
@@ -13,6 +14,9 @@ const logs = window.PixelatedLogs.createLogController({
   logBox: document.getElementById("log"),
 });
 const exposure = window.PixelatedExposure.createExposureController({
+  companionCopy: document.getElementById("companion-copy"),
+  companionPanel: document.getElementById("companion-panel"),
+  companionUrls: document.getElementById("companion-urls"),
   exposureCopy: document.getElementById("exposure-copy"),
   exposureLabel: document.getElementById("exposure-label"),
   lanToggle: document.getElementById("lan-toggle"),
@@ -66,6 +70,7 @@ function setStatusBadge(active) {
   tokenPanel.classList.add("hidden");
   tokenValue.innerText = "";
   exposure.renderUrls([]);
+  exposure.renderCompanionUrls([]);
   exposure.setEnabled(true);
   phases.render({ status: "stopped", phase: "idle" });
   isRunning = false;
@@ -82,6 +87,7 @@ function resetFailedUi() {
   tokenPanel.classList.add("hidden");
   tokenValue.innerText = "";
   exposure.renderUrls([]);
+  exposure.renderCompanionUrls([]);
   exposure.setEnabled(true);
   isRunning = false;
   powerBtn.disabled = false;
@@ -172,6 +178,23 @@ copyTokenBtn.addEventListener("click", async () => {
   }
 });
 
+copyCompanionBtn.addEventListener("click", async () => {
+  const url = document.querySelector("#companion-urls code")?.innerText;
+  if (!url) return;
+
+  try {
+    await navigator.clipboard.writeText(url);
+    copyCompanionBtn.innerText = "Copied";
+    setTimeout(() => {
+      copyCompanionBtn.innerText = "Copy";
+    }, 1200);
+  } catch (err) {
+    logs.append(
+      '<span class="text-red-400">Failed to copy HTTPS join page. Select it manually.</span>',
+    );
+  }
+});
+
 window.electronAPI.onEngineToken((event, token) => {
   tokenValue.innerText = token;
   tokenPanel.classList.remove("hidden");
@@ -179,6 +202,11 @@ window.electronAPI.onEngineToken((event, token) => {
 
 window.electronAPI.onEngineExposure((event, payload) => {
   exposure.renderUrls(payload.advertisedUrls || []);
+  exposure.renderCompanionUrls(payload.companionUrls || []);
+});
+
+window.electronAPI.onEngineCompanion((event, payload) => {
+  exposure.setCompanionStatus(payload);
 });
 
 window.electronAPI.onEngineState((event, state) => {
