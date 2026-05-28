@@ -19,6 +19,40 @@ Recommended direction:
 
 ## Done
 
+### Backend Multiplayer Lobby Metadata
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `services/api/src/routes/multiplayer.ts`
+- `services/api/src/server.ts`
+- `services/api/tests/controlPlane.test.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `supabase/migrations/20260528143000_multiplayer_lobby_metadata.sql`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added `multiplayer_lobbies` migration for host-owned multiplayer metadata.
+- Added API routes to upsert, list, and end multiplayer lobbies.
+- Lobby metadata stores session id, game id, engine URL, exposure mode, status, max players, and sanitized participant role/slot display data.
+- The API does not accept or store desktop engine tokens.
+- Signed-in hosts now publish lobby snapshots when local `lobby-state` changes.
+- Host cleanup marks the backend lobby ended.
+- Anonymous/local-only play continues when the backend metadata call returns auth/service errors.
+- Added control-plane tests proving lobby metadata persists and no engine token field is stored.
+
+Remaining follow-up:
+
+- Push `supabase/migrations/20260528143000_multiplayer_lobby_metadata.sql` before relying on the hosted API route.
+- Deploy API and web changes together.
+- Add a visible recent/active lobby surface later if users need to resume or inspect hosted metadata.
+- Run the real two-browser Docker/RetroArch smoke.
+
 ### React Lobby And Guest Join UI
 
 Completed: 2026-05-28
@@ -1397,6 +1431,8 @@ The local engine now defaults to host loopback, has an explicit desktop LAN mode
 
 Recommended next implementation slice:
 
+- Push the multiplayer lobby migration to hosted Supabase.
+- Deploy the API and web changes.
 - Validate the multi-viewer WebRTC path with two browser clients against one Docker engine session.
 - Decide the local HTTPS/private-network strategy because Chrome blocked hosted Vercel to HTTP LAN engine fetches with `LocalNetworkAccessPermissionDenied`.
 - Runtime-smoke true two-device LAN once the browser transport decision is made.

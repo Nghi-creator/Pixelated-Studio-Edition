@@ -146,6 +146,18 @@ export type ApiIceServersResponse = {
   ttlSeconds: number;
 };
 
+export type ApiMultiplayerLobbyPayload = {
+  engineUrl: string | null;
+  exposureMode: "lan" | "local" | "unknown";
+  gameId: string;
+  maxPlayers: number;
+  participants: {
+    displayName: string;
+    playerIndex: number | null;
+    role: "host" | "player" | "spectator";
+  }[];
+};
+
 export type ApiAdminReportAction = "ban_user" | "delete_comment" | "ignore";
 
 export type ApiAdminReportActionResponse = {
@@ -255,6 +267,15 @@ export const api = {
       method: "POST",
     }),
   me: () => apiRequest<ApiMeResponse>("/me"),
+  multiplayerLobby: (sessionId: string, payload: ApiMultiplayerLobbyPayload) =>
+    apiRequest<{ lobby: unknown }>(`/multiplayer/lobbies/${sessionId}`, {
+      body: JSON.stringify(payload),
+      method: "PUT",
+    }),
+  endMultiplayerLobby: (sessionId: string) =>
+    apiRequest<void>(`/multiplayer/lobbies/${sessionId}`, {
+      method: "DELETE",
+    }),
   pairLocalEngine: (engineUrl: string) =>
     apiRequest<ApiLocalPairingResponse>("/local-pairings", {
       body: JSON.stringify({ engineUrl }),

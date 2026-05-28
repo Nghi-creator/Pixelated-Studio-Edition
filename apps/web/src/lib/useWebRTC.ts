@@ -347,6 +347,28 @@ export function useWebRTC(
           participant.playerIndex,
         );
       }
+
+      if (participant?.role === "host") {
+        api
+          .multiplayerLobby(sessionId, {
+            engineUrl: getEngineUrl(),
+            exposureMode: "unknown",
+            gameId,
+            maxPlayers: nextLobbyState.maxPlayers,
+            participants: nextLobbyState.participants.map((entry) => ({
+              displayName: entry.displayName,
+              playerIndex: entry.playerIndex,
+              role: entry.role,
+            })),
+          })
+          .catch((err) => {
+            if (err instanceof ApiError && [401, 503].includes(err.status)) {
+              return;
+            }
+
+            console.warn("[WebRTC] Failed to save multiplayer lobby:", err);
+          });
+      }
     });
 
     socket.on("lobby-kicked", () => {
@@ -375,6 +397,13 @@ export function useWebRTC(
       }
       socket.emit("webrtc-peer-disconnect", { peerId, sessionId });
       if (localParticipantRef.current?.role === "host") {
+        api.endMultiplayerLobby(sessionId).catch((err) => {
+          if (err instanceof ApiError && [401, 503].includes(err.status)) {
+            return;
+          }
+
+          console.warn("[WebRTC] Failed to end multiplayer lobby:", err);
+        });
         socket.emit("stop-session", { sessionId });
       }
       socket.disconnect();

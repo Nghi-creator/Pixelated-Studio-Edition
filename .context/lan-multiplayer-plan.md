@@ -308,20 +308,22 @@ Implementation note: `useWebRTC` now exposes lobby state, the local participant,
 
 ### Phase 7: Backend Multiplayer Support
 
-Status: planned, after local LAN proof.
+Status: metadata foundation implemented on 2026-05-28; Supabase migration still needs to be pushed before hosted API use.
 
 Deliverables:
 
-- Move shared lobby/session payload types into a shared TypeScript package if web, API, engine, and desktop all need the same contracts.
-- Add backend lobby records for signed-in users if needed.
-- Add optional invite metadata without storing engine tokens.
-- Add audit/metrics for multiplayer sessions.
-- Keep engine token exchange local.
+- Move shared lobby/session payload types into a shared TypeScript package if web, API, engine, and desktop all need the same contracts. Deferred until contracts stabilize further.
+- Add backend lobby records for signed-in users if needed. Implemented through `multiplayer_lobbies`.
+- Add optional invite metadata without storing engine tokens. Implemented as non-secret session/game/engine URL/participant metadata; no engine token is accepted or stored.
+- Add audit/metrics for multiplayer sessions. Implemented as recent/active lobby metadata; deeper audit can build on this table later.
+- Keep engine token exchange local. Preserved.
 
 Acceptance criteria:
 
-- Backend can show recent/active multiplayer metadata without being able to control a user's local engine.
-- Secret material remains local to the host and invited browser clients.
+- Backend can show recent/active multiplayer metadata without being able to control a user's local engine. Implemented for the authenticated host's own active lobbies.
+- Secret material remains local to the host and invited browser clients. Preserved; API schema does not include the desktop engine token.
+
+Implementation note: the API now exposes `PUT /multiplayer/lobbies/:sessionId`, `GET /multiplayer/lobbies/recent`, and `DELETE /multiplayer/lobbies/:sessionId`. React publishes host-owned lobby snapshots when `lobby-state` changes and marks the backend lobby ended when the host leaves. This is intentionally observability/control-plane metadata only; guests still need the local engine URL plus browser-local engine token to connect.
 
 ## Test Plan
 
@@ -352,6 +354,6 @@ Manual:
 
 ## Recommended Next Implementation Task
 
-Continue with manual multiplayer smoke before backend multiplayer metadata.
+Continue with manual multiplayer smoke and deployment wiring.
 
-The engine can now represent roles/slots, enforce slot-aware input, route multiple WebRTC peers independently, and React can show/share/join a local lobby. The next useful slice is a real Docker/RetroArch smoke with two browser clients. In parallel, decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing.
+The engine can now represent roles/slots, enforce slot-aware input, route multiple WebRTC peers independently, React can show/share/join a local lobby, and the backend can store non-secret lobby metadata. The next useful slice is pushing the new Supabase migration, deploying the API/web changes, then running a real Docker/RetroArch smoke with two browser clients. In parallel, decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing.

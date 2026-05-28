@@ -45,6 +45,9 @@ Current status:
 - `POST /sessions/:sessionId/verify` verifies a short-lived session token and returns the backend-approved boot target to the local engine.
 - `POST /local-pairings` persists authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
 - `GET /local-pairings/current` and `DELETE /local-pairings/current` expose/clear the current user's local pairing metadata.
+- `PUT /multiplayer/lobbies/:sessionId` persists authenticated host-owned multiplayer lobby metadata without storing engine tokens.
+- `GET /multiplayer/lobbies/recent` returns the authenticated host's recent active multiplayer lobbies.
+- `DELETE /multiplayer/lobbies/:sessionId` marks the authenticated host's lobby ended.
 - `POST /metrics/stream` persists authenticated, sampled WebRTC telemetry snapshots.
 - `GET /metrics/stream/recent` returns recent persisted telemetry snapshots for the authenticated user.
 - `GET /webrtc/ice-servers` returns authenticated WebRTC ICE configuration. It always supports configured STUN URLs and can issue short-lived coturn REST credentials when `TURN_URLS` and `TURN_SHARED_SECRET` are configured.
@@ -105,6 +108,7 @@ Current important frontend behaviors:
 - The player page now includes a local lobby panel. It displays participants, host/player/spectator roles, assigned player slots, and a copyable `?session=<id>&role=spectator` invite URL.
 - Guest player pages opened with a session URL join the existing local-engine session without emitting `start-game`; the engine replays `python-ready` for late joiners when the requested game session is already active.
 - Guests can request/release player slots through the lobby panel. Input is attached only when the local participant owns a player slot.
+- Signed-in hosts publish non-secret lobby snapshots to the backend when local `lobby-state` changes. Anonymous/local-only play continues if that backend call is unauthorized or unavailable.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
 - Game catalog, favorites, comments, reactions, profile updates/deletion, admin users, admin reports, and admin access logs are loaded or mutated through the API instead of direct browser Supabase table/RPC/realtime calls.
@@ -229,6 +233,7 @@ Core tables inferred from migrations:
 - `game_submissions`: developer upload applications.
 - `backend_sessions`: backend-owned playable session records with hashed session tokens and approved boot targets.
 - `local_engine_pairings`: backend-owned local engine pairing intent metadata without desktop pairing secrets.
+- `multiplayer_lobbies`: backend-owned host lobby metadata for multiplayer sessions without desktop engine tokens.
 - `stream_metrics`: sampled WebRTC telemetry for authenticated user sessions.
 
 Storage buckets inferred from migrations:
