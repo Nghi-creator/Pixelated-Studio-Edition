@@ -182,8 +182,8 @@ What changed:
 
 Remaining follow-up:
 
-- Hosted-browser LAN smoke confirmed Chrome blocks HTTP LAN engine fetches from the HTTPS Vercel origin with `LocalNetworkAccessPermissionDenied`.
-- Decide between local engine HTTPS, a local companion web origin, or another browser-approved private-network access strategy before calling LAN pairing shippable.
+- Hosted-browser LAN smoke with two devices on the same network.
+- Decide whether HTTP LAN access from hosted HTTPS is good enough in target browsers or whether the engine needs local HTTPS/private-network-access hardening.
 
 ### Backend Session Intent Validation
 

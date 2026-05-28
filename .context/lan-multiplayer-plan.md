@@ -203,7 +203,7 @@ Implementation note: the current desktop UI locks exposure mode while the engine
 
 ### Phase 2: LAN Pairing UX
 
-Status: implemented in code on 2026-05-28; hosted-browser LAN smoke confirms HTTP LAN access is blocked by Chrome private-network checks.
+Status: implemented in code on 2026-05-28; pending hosted-browser LAN smoke.
 
 Deliverables:
 
@@ -220,7 +220,7 @@ Acceptance criteria:
 
 Implementation note: the pairing panel now classifies local, LAN, and custom engine URLs; checks `/health.exposureMode`; rejects LAN-looking URLs when the engine reports local-only mode; and gives clearer wrong-token, unreachable-LAN, and hosted-HTTPS-to-HTTP-LAN failure messages.
 
-Remaining risk: the hosted Vercel app is HTTPS while LAN engine URLs are currently HTTP. Some browsers may block HTTP private-network requests from an HTTPS origin. If this blocks real guest pairing, the next architecture decision is local HTTPS for the engine, a local companion page, or another browser-approved private-network access strategy.
+Confirmed browser blocker: Chrome blocked `https://pixelated-studio-edition.vercel.app` fetching an HTTP LAN engine URL with `LocalNetworkAccessPermissionDenied` during a hosted-browser LAN smoke attempt on 2026-05-28, even with permissive engine CORS and `Access-Control-Allow-Private-Network`. The next architecture decision is local HTTPS for the engine, a local companion origin, or another browser-approved private-network access strategy.
 
 ### Phase 3: Lobby And Roles
 
@@ -327,6 +327,6 @@ Manual:
 
 ## Recommended Next Implementation Task
 
-Start with Phase 1: explicit LAN mode toggle in the desktop app.
+Continue with Phase 5: multi-viewer WebRTC validation.
 
-That is the smallest valuable slice because it preserves the secure default while giving the project a real LAN surface to test before adding lobbies, player slots, and multi-viewer media behavior.
+The local engine now has lobby roles and slot-aware input authorization for player 1 and player 2. The next risky unknown is whether the current `camera.py`/GStreamer `webrtcbin` path can serve multiple browser viewers from one running game, or whether the engine needs a per-viewer sender/fanout design. In parallel, decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing because Chrome already blocked direct HTTPS-to-HTTP LAN fetches during smoke testing.
