@@ -308,7 +308,7 @@ Implementation note: `useWebRTC` now exposes lobby state, the local participant,
 
 ### Phase 7: Backend Multiplayer Support
 
-Status: metadata foundation implemented on 2026-05-28; Supabase migration still needs to be pushed before hosted API use.
+Status: metadata foundation implemented on 2026-05-28; Supabase migration was pushed by the project owner, but hosted Render API was still serving an older build during smoke.
 
 Deliverables:
 
@@ -356,4 +356,6 @@ Manual:
 
 Continue with manual multiplayer smoke and deployment wiring.
 
-The engine can now represent roles/slots, enforce slot-aware input, route multiple WebRTC peers independently, React can show/share/join a local lobby, and the backend can store non-secret lobby metadata. The next useful slice is pushing the new Supabase migration, deploying the API/web changes, then running a real Docker/RetroArch smoke with two browser clients. In parallel, decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing.
+The engine can now represent roles/slots, enforce slot-aware input, route multiple WebRTC peers independently, React can show/share/join a local lobby, and the backend can store non-secret lobby metadata. The next useful slice is deploying the API/web changes, confirming the hosted multiplayer route exists, then running a real Docker/RetroArch smoke with two browser clients. In parallel, decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing.
+
+Smoke note, 2026-05-28: hosted API health passed, but `GET /multiplayer/lobbies/recent` returned route-not-found, which means Render did not yet have the Phase 7 API code. Docker Desktop was not reachable from this shell, so the local two-browser engine smoke could not run here.

@@ -53,6 +53,13 @@ Remaining follow-up:
 - Add a visible recent/active lobby surface later if users need to resume or inspect hosted metadata.
 - Run the real two-browser Docker/RetroArch smoke.
 
+Smoke note, 2026-05-28:
+
+- Hosted Render API health passed at `https://pixelated-api-services.onrender.com/health`.
+- Hosted Render API still returned `404 Route GET:/multiplayer/lobbies/recent not found`, so the migration was pushed but the API code with multiplayer routes was not deployed yet.
+- Local API tests passed with the multiplayer lobby metadata coverage.
+- Docker CLI could not reach Docker Desktop from this shell, so the two-browser Docker/RetroArch smoke remains blocked.
+
 ### React Lobby And Guest Join UI
 
 Completed: 2026-05-28
@@ -1431,8 +1438,8 @@ The local engine now defaults to host loopback, has an explicit desktop LAN mode
 
 Recommended next implementation slice:
 
-- Push the multiplayer lobby migration to hosted Supabase.
 - Deploy the API and web changes.
+- Recheck hosted `GET /multiplayer/lobbies/recent`; it should return auth gating instead of route-not-found once Render has the latest API code.
 - Validate the multi-viewer WebRTC path with two browser clients against one Docker engine session.
 - Decide the local HTTPS/private-network strategy because Chrome blocked hosted Vercel to HTTP LAN engine fetches with `LocalNetworkAccessPermissionDenied`.
 - Runtime-smoke true two-device LAN once the browser transport decision is made.
