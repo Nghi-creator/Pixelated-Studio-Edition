@@ -1,6 +1,4 @@
 import type { Socket } from "socket.io";
-import { injectKey } from "../input/injectKey";
-import { translateKey } from "../input/translateKey";
 
 type InputPayload = {
   key?: unknown;
@@ -10,6 +8,11 @@ type InputPayload = {
 
 type RuntimeWithActiveSession = {
   getActiveSessionId(): string | null;
+  sendInput?: (
+    action: "keydown" | "keyup",
+    browserKey: unknown,
+    playerIndex: number,
+  ) => boolean;
 };
 
 type InputHandlerOptions = {
@@ -18,7 +21,11 @@ type InputHandlerOptions = {
     sessionId: string | null,
     playerIndex: number,
   ) => boolean;
-  injectKey?: (action: "keydown" | "keyup", linuxKey: string) => void;
+  sendInput?: (
+    action: "keydown" | "keyup",
+    browserKey: unknown,
+    playerIndex: number,
+  ) => boolean;
 };
 
 function normalizePlayerIndex(payload: InputPayload, socket: Socket) {
@@ -69,15 +76,18 @@ function handleKeyAction(
     return;
   }
 
-  if (playerIndex > 2) {
-    socket.emit("engine-error", {
-      message: "Keyboard input is only mapped for player slots 1 and 2.",
-    });
-    return;
-  }
+  const didSendInput = (options.sendInput || runtime.sendInput)?.(
+    action,
+    payload.key,
+    playerIndex,
+  );
 
-  const linuxKey = translateKey(payload.key, playerIndex);
-  if (linuxKey) (options.injectKey || injectKey)(action, linuxKey);
+  if (didSendInput === false) {
+    socket.emit("engine-error", {
+      message:
+        "Player slots 3 and 4 need virtual gamepad support. Start the engine with /dev/uinput available.",
+    });
+  }
 }
 
 export function registerInputHandlers(

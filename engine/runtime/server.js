@@ -36,6 +36,7 @@ const auth = createEngineTokenAuth(ENGINE_TOKEN);
 const runtime = createProcessManager({
   cameraPath: HEALTH_PATHS.cameraBridge,
   engineToken: ENGINE_TOKEN,
+  gamepadBridgePath: HEALTH_PATHS.gamepadBridge,
 });
 const cloudRoms = createCloudRomDownloader({
   allowedRomHosts,

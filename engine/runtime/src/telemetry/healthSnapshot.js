@@ -50,6 +50,10 @@ function createHealthSnapshot(options) {
         pythonExists: pathExists(healthPaths.pythonBinary),
         gstreamerExists: pathExists(healthPaths.gstreamerBinary),
       },
+      gamepadBridge: {
+        fileExists: pathExists(healthPaths.gamepadBridge),
+        ...runtimeState.gamepads,
+      },
       storage: {
         romsDirectoryExists: pathExists(healthPaths.roms),
         romsDirectoryWritable: canWriteDirectory(healthPaths.roms),

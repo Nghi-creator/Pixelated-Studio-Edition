@@ -212,9 +212,11 @@ Input:
 - Browser keydown/keyup events are attached by `apps/web/src/lib/webrtcInput.ts` and go through Socket.IO.
 - Browser keydown/keyup events include `playerIndex`, defaulting to player 1 until the lobby UI exposes assigned slots.
 - Node authorizes input against local lobby slot state before injecting any key.
-- Node maps browser keys to X11 key names. Player 1 keeps arrow/Z/X/Enter/Shift; player 2 maps the same browser controls onto W/A/S/D/F/G/R/T.
+- Preferred input path is now virtual gamepads: Node forwards normalized controller actions to `input_gamepad.py`, which creates four Linux `uinput` gamepads through Python `evdev`.
+- When `/dev/uinput` is unavailable, Node falls back to X11 keyboard injection for player 1 and player 2 only.
+- Player 3 and player 4 require virtual gamepad support; if unavailable, the engine rejects their input with a clear error.
 - Node executes `xdotool keydown/keyup` against display `:99`.
-- RetroArch config generation now writes explicit player 1 and player 2 keyboard binds. Slots 3 and 4 still need a virtual gamepad or RetroArch mapping decision before real input is enabled.
+- RetroArch config generation enables udev/autodetect and four libretro joypad ports for the virtual gamepad path.
 - React emits `stop-session` during player cleanup; Node stops the active emulator/camera processes and removes the active temp cloud ROM.
 
 ## Supabase

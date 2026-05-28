@@ -380,22 +380,24 @@ Implementation note: the desktop LAN panel now emphasizes the HTTPS join page an
 
 ### Phase 9: Input Strategy Beyond Two Players
 
-Status: planned.
+Status: virtual gamepad foundation implemented on 2026-05-28; Docker/device smoke pending.
 
-Recommended approach: do not extend keyboard mapping past P2. Investigate virtual gamepads or RetroArch-native input configuration for P3/P4.
+Recommended approach: use virtual gamepads for P1-P4 when `/dev/uinput` is available, with keyboard fallback for P1/P2 only.
 
 Deliverables:
 
-- Evaluate virtual gamepad options inside the Linux container.
-- Evaluate RetroArch input/device config for multiple ports.
-- Decide whether the first public LAN release caps active players at 2 while allowing extra spectators.
+- Evaluate virtual gamepad options inside the Linux container. Implemented with Python `evdev` and Linux `uinput`.
+- Evaluate RetroArch input/device config for multiple ports. Implemented as udev/autodetect plus four libretro joypad ports; emulator smoke pending.
+- Decide whether the first public LAN release caps active players at 2 while allowing extra spectators. Revisit after Docker/Desktop `/dev/uinput` smoke.
 - Add a test ROM/input diagnostic smoke checklist before enabling P3/P4.
 
 Acceptance criteria:
 
-- P3/P4 input does not depend on crowded shared keyboard mappings.
-- Input routing remains slot-authorized.
-- UI max player settings match the engine's real supported input mode.
+- P3/P4 input does not depend on crowded shared keyboard mappings. Implemented through virtual gamepad bridge.
+- Input routing remains slot-authorized. Covered by automated tests.
+- UI max player settings match the engine's real supported input mode. Pending device smoke and possible UX gating if `/dev/uinput` is unavailable.
+
+Implementation note: browser controls stay the same for every player. React emits `playerIndex`, the engine verifies slot ownership, then Node writes normalized controller events to `input_gamepad.py`. The Python bridge creates four virtual controllers via `evdev.UInput`. If `/dev/uinput` is unavailable, P1/P2 fall back to keyboard injection and P3/P4 get a clear engine error.
 
 ### Phase 10: Multiplayer Performance Validation
 

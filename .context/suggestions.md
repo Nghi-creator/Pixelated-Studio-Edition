@@ -19,6 +19,46 @@ Recommended direction:
 
 ## Done
 
+### Virtual Gamepad Input Foundation
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `engine/runtime/input_gamepad.py`
+- `engine/runtime/Dockerfile`
+- `engine/runtime/server.js`
+- `engine/runtime/src/config.ts`
+- `engine/runtime/src/input/gamepadBridge.js`
+- `engine/runtime/src/input/translateGamepadButton.js`
+- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/signaling/inputHandlers.ts`
+- `engine/runtime/src/signaling/inputHandlers.test.ts`
+- `engine/runtime/src/telemetry/healthSnapshot.js`
+- `apps/desktop/main/docker.js`
+- `apps/desktop/main/engineController.js`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added a Python `evdev` bridge that creates four virtual Linux gamepads via `/dev/uinput`.
+- Browser controls can now stay the same for every player; engine routing uses `playerIndex` to select the virtual controller.
+- Engine input routing now prefers virtual gamepads for P1-P4.
+- If virtual gamepads are unavailable, P1/P2 fall back to the existing keyboard path.
+- P3/P4 now receive a clear engine error instead of fake keyboard support when `/dev/uinput` is unavailable.
+- Docker image installs `python3-evdev`.
+- Desktop Docker launch passes `--device /dev/uinput` when the host exposes that device.
+- Health snapshot now reports gamepad bridge state.
+- Added automated tests for slot 4 routing and unavailable-virtual-gamepad errors.
+
+Remaining follow-up:
+
+- Docker/RetroArch smoke on a host where `/dev/uinput` is available.
+- Confirm whether Docker Desktop on macOS can expose `uinput`; if not, gate P3/P4 in the UI on health status.
+- Add a RetroArch input diagnostic/test ROM checklist before calling P3/P4 production-ready.
+
 ### Player-Ready LAN UX Pass
 
 Completed: 2026-05-28
@@ -1504,7 +1544,7 @@ Recommended next implementation slice:
 - Deploy the API and web changes.
 - Validate the multi-viewer WebRTC path with two browser clients against one Docker engine session.
 - Improve LAN error states after the first two-device UX smoke.
-- Decide whether the first public LAN release caps active players at two while P3/P4 input moves to virtual gamepads or RetroArch-native device mapping.
+- Smoke virtual gamepads with Docker/RetroArch and gate P3/P4 in the UI if `/dev/uinput` is unavailable.
 - Run CPU/memory validation for the current per-peer GStreamer pipeline.
 - Runtime-smoke true two-device LAN once the browser transport decision is made.
 

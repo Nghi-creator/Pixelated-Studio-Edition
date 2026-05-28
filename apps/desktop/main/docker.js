@@ -1,4 +1,5 @@
 const { exec } = require("child_process");
+const fs = require("fs");
 const {
   buildFallback,
   engineImage,
@@ -95,6 +96,7 @@ module.exports = {
   exec,
   execCommand,
   getSafeEnv,
+  hasHostUinput: () => fs.existsSync("/dev/uinput"),
   isSafeDockerImageRef,
   prepareEngineImage,
   quoteDockerEnvValue,
