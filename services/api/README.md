@@ -182,3 +182,20 @@ npm run test
 ```
 
 Tests live under `services/api/tests/`. The current tests use Fastify injection and a fake Supabase service, so they do not require local database access.
+
+## Staging Smoke
+
+Run the hosted-stack smoke test with a real signed-in Supabase access token:
+
+```bash
+STAGING_BEARER_TOKEN=<supabase-access-token> npm run smoke:staging
+```
+
+Environment variables:
+
+- `STAGING_BEARER_TOKEN` or `SUPABASE_ACCESS_TOKEN`: required signed-in bearer token.
+- `STAGING_API_URL` or `API_URL`: optional API base URL, defaulting to `https://pixelated-api-services.onrender.com`.
+- `STAGING_GAME_ID`: optional game id for cloud session creation. If omitted, the runner discovers the first catalog game with a ROM target.
+- `STAGING_SMOKE_ENGINE_URL`: optional local pairing URL, defaulting to `http://127.0.0.1:8080`.
+
+The runner checks `/me`, `/me/permissions`, local pairing save/read/delete with restore, cloud session create/read/verify/delete, and stream metric write/read. It intentionally writes one stream metric row and temporarily changes local pairing metadata for the signed-in user.

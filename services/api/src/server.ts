@@ -12,6 +12,7 @@ import { registerLocalPairingRoutes } from "./routes/localPairings.js";
 import { registerMeRoutes } from "./routes/me.js";
 import { registerMetricRoutes } from "./routes/metrics.js";
 import { registerModerationRoutes } from "./routes/moderation.js";
+import { registerMultiplayerRoutes } from "./routes/multiplayer.js";
 import { registerProfileRoutes } from "./routes/profiles.js";
 import { registerSessionRoutes } from "./routes/sessions.js";
 import { registerSubmissionRoutes } from "./routes/submissions.js";
@@ -35,6 +36,7 @@ export async function buildServer() {
   await registerSubmissionRoutes(app);
   await registerSessionRoutes(app);
   await registerMetricRoutes(app);
+  await registerMultiplayerRoutes(app);
   await registerWebRTCRoutes(app);
   scheduleControlPlaneCleanup(app);
 

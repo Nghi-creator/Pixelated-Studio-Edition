@@ -5,6 +5,7 @@ import type { FastifyRequest } from "fastify";
 import { cleanupControlPlaneState } from "../src/modules/maintenance/controlPlaneCleanup.js";
 import { registerLocalPairingRoutes } from "../src/routes/localPairings.js";
 import { registerMetricRoutes } from "../src/routes/metrics.js";
+import { registerMultiplayerRoutes } from "../src/routes/multiplayer.js";
 import { registerSessionRoutes } from "../src/routes/sessions.js";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
@@ -15,6 +16,7 @@ type TableName =
   | "backend_sessions"
   | "games"
   | "local_engine_pairings"
+  | "multiplayer_lobbies"
   | "stream_metrics";
 
 type RecordRow = Record<string, unknown>;
@@ -34,6 +36,7 @@ class FakeSupabase {
   games = new Map<string, RecordRow>();
   sessions = new Map<string, RecordRow>();
   pairings = new Map<string, RecordRow>();
+  multiplayerLobbies = new Map<string, RecordRow>();
   metrics: RecordRow[] = [];
 
   from(table: TableName) {
@@ -44,6 +47,9 @@ class FakeSupabase {
     if (table === "games") return Array.from(this.games.values());
     if (table === "backend_sessions") return Array.from(this.sessions.values());
     if (table === "local_engine_pairings") return Array.from(this.pairings.values());
+    if (table === "multiplayer_lobbies") {
+      return Array.from(this.multiplayerLobbies.values());
+    }
     return this.metrics;
   }
 }
@@ -235,6 +241,17 @@ class FakeQueryBuilder {
         ...row,
       });
     }
+
+    if (this.table === "multiplayer_lobbies") {
+      const key = `${row.host_user_id}:${row.session_id}`;
+      const existing = this.db.multiplayerLobbies.get(key);
+      this.db.multiplayerLobbies.set(key, {
+        created_at: existing?.created_at || new Date().toISOString(),
+        id: existing?.id || "lobby-1",
+        ...existing,
+        ...row,
+      });
+    }
   }
 
   private deleteRows() {
@@ -247,6 +264,13 @@ class FakeQueryBuilder {
     }
     if (this.table === "stream_metrics") {
       this.db.metrics = this.db.metrics.filter((row) => !rows.includes(row));
+    }
+    if (this.table === "multiplayer_lobbies") {
+      for (const row of rows) {
+        this.db.multiplayerLobbies.delete(
+          `${row.host_user_id}:${row.session_id}`,
+        );
+      }
     }
   }
 }
@@ -274,6 +298,7 @@ async function createTestApp(db: FakeSupabase, userId = USER_ID) {
   await registerSessionRoutes(app, options);
   await registerLocalPairingRoutes(app, options);
   await registerMetricRoutes(app, options);
+  await registerMultiplayerRoutes(app, options);
   return app;
 }
 
@@ -415,6 +440,53 @@ test("stream metrics persist and rate-limit per user session", async () => {
   });
   assert.equal(recentResponse.statusCode, 200);
   assert.equal(recentResponse.json<{ metrics: unknown[] }>().metrics.length, 1);
+  await app.close();
+});
+
+test("multiplayer lobbies persist metadata without storing engine tokens", async () => {
+  const db = new FakeSupabase();
+  const app = await createTestApp(db);
+
+  const saveResponse = await app.inject({
+    method: "PUT",
+    payload: {
+      engineUrl: "http://192.168.1.10:8080/",
+      exposureMode: "lan",
+      gameId: GAME_ID,
+      maxPlayers: 4,
+      participants: [
+        { displayName: "Host", playerIndex: 1, role: "host" },
+        { displayName: "Guest", playerIndex: null, role: "spectator" },
+      ],
+    },
+    url: "/multiplayer/lobbies/session-1",
+  });
+
+  assert.equal(saveResponse.statusCode, 200);
+  const storedLobby = db.multiplayerLobbies.get(`${USER_ID}:session-1`);
+  assert.ok(storedLobby);
+  assert.equal(storedLobby.engine_url, "http://192.168.1.10:8080");
+  assert.equal("engine_token" in storedLobby, false);
+
+  const recentResponse = await app.inject({
+    method: "GET",
+    url: "/multiplayer/lobbies/recent",
+  });
+  assert.equal(recentResponse.statusCode, 200);
+  assert.equal(
+    recentResponse.json<{ lobbies: unknown[] }>().lobbies.length,
+    1,
+  );
+
+  const deleteResponse = await app.inject({
+    method: "DELETE",
+    url: "/multiplayer/lobbies/session-1",
+  });
+  assert.equal(deleteResponse.statusCode, 204);
+  assert.equal(
+    db.multiplayerLobbies.get(`${USER_ID}:session-1`)?.status,
+    "ended",
+  );
   await app.close();
 });
 

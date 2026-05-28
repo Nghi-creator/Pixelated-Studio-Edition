@@ -111,14 +111,21 @@ curl http://127.0.0.1:4000/health
 curl http://127.0.0.1:4000/ready
 ```
 
-Optional deeper local test with a real signed-in Supabase access token:
+Optional hosted-stack smoke with a real signed-in Supabase access token:
 
 ```sh
-curl -H "Authorization: Bearer <token>" http://127.0.0.1:4000/me
-curl -H "Authorization: Bearer <token>" http://127.0.0.1:4000/me/permissions
+STAGING_BEARER_TOKEN=<token> npm run smoke:staging
 ```
 
-This was not run by Codex because no user access token was provided in the repo context. It should be tested from the browser after staging deploy.
+Run from `services/api`. Optional overrides:
+
+```sh
+STAGING_API_URL=https://pixelated-api-services.onrender.com
+STAGING_GAME_ID=<known-game-id>
+STAGING_SMOKE_ENGINE_URL=http://127.0.0.1:8080
+```
+
+This was not run by Codex because no user access token was provided in the repo context. The command checks `/me`, permissions, local pairing save/read/delete with restore, cloud session create/read/verify/delete, and stream metric write/read against the hosted API.
 
 ## Vercel Frontend Env
 
@@ -141,10 +148,9 @@ For future API-owned social/profile/admin boundary changes:
 1. Deploy the Render API build with catalog, favorites, reactions, comments, profiles, admin users, and admin access-log routes.
 2. Deploy the Vercel web build that calls those routes through `apps/web/src/lib/apiClient.ts`.
 3. Push any migration that removes old direct-browser policies.
-4. Smoke-test signed-in library, favorites, player comments/reactions, profile update, admin user management, admin access logs, cloud play, local pairing, and stream metrics.
+4. Run `STAGING_BEARER_TOKEN=<token> npm run smoke:staging` from `services/api`, then smoke-test signed-in library, favorites, player comments/reactions, profile update, admin user management, admin access logs, and cloud play from the browser as needed.
 
 ## Remaining Production Gaps
 
-- Add automated API tests for catalog/social/profile/admin user/admin access-log behavior.
 - No API rate limiting yet.
 - No hosted engine fleet assignment yet.

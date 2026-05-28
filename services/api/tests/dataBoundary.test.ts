@@ -2,10 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
 import type { FastifyRequest } from "fastify";
+import type { User } from "@supabase/supabase-js";
 import { registerAccessLogRoutes } from "../src/routes/accessLogs.js";
 import { registerAdminUserRoutes } from "../src/routes/adminUsers.js";
 import { registerCatalogRoutes } from "../src/routes/catalog.js";
+import { registerGameRoutes } from "../src/routes/games.js";
+import { registerLocalPairingRoutes } from "../src/routes/localPairings.js";
+import { registerMeRoutes } from "../src/routes/me.js";
+import { registerMetricRoutes } from "../src/routes/metrics.js";
+import { registerModerationRoutes } from "../src/routes/moderation.js";
 import { registerProfileRoutes } from "../src/routes/profiles.js";
+import { registerSubmissionRoutes } from "../src/routes/submissions.js";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const OTHER_USER_ID = "22222222-2222-4222-8222-222222222222";
@@ -13,14 +20,19 @@ const ADMIN_ID = "33333333-3333-4333-8333-333333333333";
 const SUPER_ADMIN_ID = "44444444-4444-4444-8444-444444444444";
 const GAME_ID = "55555555-5555-4555-8555-555555555555";
 const COMMENT_ID = "66666666-6666-4666-8666-666666666666";
+const REPORT_ID = "77777777-7777-4777-8777-777777777777";
 
 type TableName =
   | "access_logs"
   | "comment_likes"
   | "comments"
   | "favorites"
+  | "game_submissions"
   | "games"
   | "likes"
+  | "local_engine_pairings"
+  | "reported_comments"
+  | "stream_metrics"
   | "profiles";
 
 type RecordRow = Record<string, unknown>;
@@ -31,6 +43,10 @@ type Filter = {
   value: unknown;
 };
 
+type TestRequest = FastifyRequest & {
+  user?: User;
+};
+
 class FakeSupabase {
   deletedUsers: string[] = [];
   rows: Record<TableName, RecordRow[]> = {
@@ -38,10 +54,15 @@ class FakeSupabase {
     comment_likes: [],
     comments: [],
     favorites: [],
+    game_submissions: [],
     games: [],
     likes: [],
+    local_engine_pairings: [],
+    reported_comments: [],
+    stream_metrics: [],
     profiles: [],
   };
+  rpcCalls: { fn: string; params: RecordRow }[] = [];
   auth = {
     admin: {
       deleteUser: async (userId: string) => {
@@ -53,6 +74,11 @@ class FakeSupabase {
 
   from(table: TableName) {
     return new FakeQueryBuilder(this, table);
+  }
+
+  async rpc(fn: string, params: RecordRow) {
+    this.rpcCalls.push({ fn, params });
+    return { data: null, error: null };
   }
 }
 
@@ -88,6 +114,13 @@ class FakeQueryBuilder {
   limit(count: number) {
     this.limitCount = count;
     return this;
+  }
+
+  returns<T>() {
+    return this.execute().then((result) => ({
+      data: result.data as T,
+      error: result.error,
+    }));
   }
 
   range(start: number, end: number) {
@@ -153,9 +186,21 @@ class FakeQueryBuilder {
     }
 
     if (this.action === "upsert" && this.payload) {
-      const existing = this.filteredRows()[0];
+      const existing =
+        this.filteredRows()[0] ||
+        (this.table === "local_engine_pairings"
+          ? this.db.rows[this.table].find(
+              (row) => row.user_id === this.payload?.user_id,
+            )
+          : undefined);
       if (existing) Object.assign(existing, this.payload);
-      else this.db.rows[this.table].push({ ...this.payload });
+      else {
+        this.db.rows[this.table].push({
+          created_at: new Date().toISOString(),
+          id: `${this.table}-${this.db.rows[this.table].length + 1}`,
+          ...this.payload,
+        });
+      }
     }
 
     if (this.action === "update" && this.payload) {
@@ -201,10 +246,12 @@ class FakeQueryBuilder {
 
 function requireUser(userId = USER_ID) {
   return async (request: FastifyRequest) => {
-    request.user = {
+    const testRequest = request as TestRequest;
+    testRequest.user = {
       app_metadata: {},
       aud: "authenticated",
       created_at: new Date().toISOString(),
+      email: `${userId}@example.com`,
       id: userId,
       user_metadata: {},
     };
@@ -222,7 +269,16 @@ async function createDataBoundaryApp(db: FakeSupabase, userId = USER_ID) {
   await registerAccessLogRoutes(app, options);
   await registerAdminUserRoutes(app, options);
   await registerCatalogRoutes(app, options);
+  await registerGameRoutes(app, options);
+  await registerLocalPairingRoutes(app, options);
+  await registerMeRoutes(app, options);
+  await registerMetricRoutes(app, options);
+  await registerModerationRoutes(app, options);
   await registerProfileRoutes(app, options);
+  await registerSubmissionRoutes(app, {
+    ...options,
+    notifySubmission: async () => undefined,
+  });
   return app;
 }
 
@@ -394,4 +450,183 @@ test("admin user and access-log routes require privileged roles", async () => {
   assert.equal(logsResponse.statusCode, 200);
   assert.equal(logsResponse.json<{ logs: unknown[] }>().logs.length, 1);
   await superAdminApp.close();
+});
+
+test("me permissions are loaded from backend-owned profile state", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  Object.assign(db.rows.profiles.find((row) => row.id === ADMIN_ID) || {}, {
+    avatar_url: "https://example.com/avatar.png",
+    email: "admin@example.com",
+    is_banned: false,
+    is_developer: true,
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const response = await app.inject({ method: "GET", url: "/me/permissions" });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(
+    response.json<{ abilities: { canAccessAdmin: boolean } }>().abilities
+      .canAccessAdmin,
+    true,
+  );
+  assert.equal(
+    response.json<{ profile: { username: string } }>().profile.username,
+    "admin",
+  );
+  await app.close();
+});
+
+test("moderation reports are created and resolved through admin routes", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.rows.comments.push({
+    content: "needs review",
+    game_id: GAME_ID,
+    id: COMMENT_ID,
+    user_id: OTHER_USER_ID,
+  });
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const reportResponse = await app.inject({
+    method: "POST",
+    payload: { reason: "Spoiler in the comments" },
+    url: `/moderation/comments/${COMMENT_ID}/report`,
+  });
+  assert.equal(reportResponse.statusCode, 200);
+  assert.equal(db.rows.reported_comments.length, 1);
+
+  db.rows.reported_comments[0] = {
+    ...db.rows.reported_comments[0],
+    id: REPORT_ID,
+  };
+  await app.close();
+
+  const adminApp = await createDataBoundaryApp(db, ADMIN_ID);
+  const reportsResponse = await adminApp.inject({
+    method: "GET",
+    url: "/admin/reports",
+  });
+  assert.equal(reportsResponse.statusCode, 200);
+  assert.equal(reportsResponse.json<{ reports: unknown[] }>().reports.length, 1);
+
+  const actionResponse = await adminApp.inject({
+    method: "POST",
+    payload: { action: "delete_comment" },
+    url: `/admin/reports/${REPORT_ID}/action`,
+  });
+  assert.equal(actionResponse.statusCode, 200);
+  assert.equal(db.rows.comments.length, 0);
+  await adminApp.close();
+});
+
+test("submissions persist metadata for the authenticated submitter", async () => {
+  const db = new FakeSupabase();
+  const app = await createDataBoundaryApp(db, USER_ID);
+  const storageBase =
+    process.env.SUPABASE_URL?.replace(/\/+$/, "") || "https://example.com";
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      authorName: "Pixel Dev",
+      bannerUrl: `${storageBase}/storage/v1/object/public/submissions/banner.png`,
+      coverUrl: `${storageBase}/storage/v1/object/public/submissions/cover.png`,
+      description: "A small NES game",
+      email: "dev@example.com",
+      gameTitle: "Tiny Quest",
+      romUrl: `${storageBase}/storage/v1/object/public/submissions/tiny.nes`,
+    },
+    url: "/submissions/games",
+  });
+
+  assert.equal(response.statusCode, 201);
+  assert.equal(db.rows.game_submissions.length, 1);
+  assert.equal(db.rows.game_submissions[0]?.submitter_id, USER_ID);
+  assert.equal(db.rows.game_submissions[0]?.game_title, "Tiny Quest");
+  await app.close();
+});
+
+test("play counts are incremented through the backend RPC boundary", async () => {
+  const db = new FakeSupabase();
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "POST",
+    url: `/games/${GAME_ID}/play-count`,
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(db.rpcCalls, [
+    { fn: "increment_play_count", params: { game_id: GAME_ID } },
+  ]);
+  await app.close();
+});
+
+test("local pairings stay scoped to the authenticated user", async () => {
+  const db = new FakeSupabase();
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const createResponse = await app.inject({
+    method: "POST",
+    payload: { engineUrl: "http://localhost:8080/" },
+    url: "/local-pairings",
+  });
+  assert.equal(createResponse.statusCode, 200);
+  assert.equal(db.rows.local_engine_pairings[0]?.user_id, USER_ID);
+  assert.equal(db.rows.local_engine_pairings[0]?.engine_url, "http://localhost:8080");
+
+  const otherApp = await createDataBoundaryApp(db, OTHER_USER_ID);
+  const otherResponse = await otherApp.inject({
+    method: "GET",
+    url: "/local-pairings/current",
+  });
+  assert.equal(otherResponse.statusCode, 404);
+  await app.close();
+  await otherApp.close();
+});
+
+test("stream metrics are written and read only for the authenticated user", async () => {
+  const db = new FakeSupabase();
+  db.rows.stream_metrics.push({
+    bitrate_kbps: 900,
+    connection_state: "connected",
+    fps: 30,
+    ice_connection_state: "connected",
+    jitter_ms: 5,
+    metric_timestamp: "2026-05-27T12:00:00.000Z",
+    packets_lost: 1,
+    received_at: "2026-05-27T12:00:00.000Z",
+    session_id: "other-session",
+    user_id: OTHER_USER_ID,
+  });
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      bitrateKbps: 1200,
+      connectionState: "connected",
+      fps: 60,
+      iceConnectionState: "connected",
+      jitterMs: 3,
+      packetsLost: 0,
+      sessionId: "session-1",
+      timestamp: "2026-05-27T12:01:00.000Z",
+    },
+    url: "/metrics/stream",
+  });
+  assert.equal(response.statusCode, 202);
+  assert.equal(response.json<{ accepted: boolean }>().accepted, true);
+  assert.equal(db.rows.stream_metrics.length, 2);
+
+  const recentResponse = await app.inject({
+    method: "GET",
+    url: "/metrics/stream/recent",
+  });
+  const metrics = recentResponse.json<{ metrics: { sessionId: string }[] }>().metrics;
+  assert.equal(recentResponse.statusCode, 200);
+  assert.deepEqual(metrics.map((metric) => metric.sessionId), ["session-1"]);
+  await app.close();
 });

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CommentsPanel } from "../../features/player/comments/CommentsPanel";
+import { LobbyPanel } from "../../features/player/LobbyPanel";
 import { ReportModal } from "../../features/player/comments/ReportModal";
 import { useCommentReporting } from "../../features/player/comments/useCommentReporting";
 import { useComments } from "../../features/player/comments/useComments";
@@ -27,6 +28,7 @@ const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
 
 export default function Player() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -37,12 +39,36 @@ export default function Player() {
     ).id;
   });
   const streamProfile = getStreamProfile(streamProfileId);
-  const { retry, stream, status, telemetry } = useWebRTC(
-    id || "",
-    streamProfile,
-  );
   const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
   const currentUser = useAuthUser();
+  const lobbySearch = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search],
+  );
+  const invitedSessionId = lobbySearch.get("session");
+  const invitedRole =
+    lobbySearch.get("role") === "player" ? "player" : "spectator";
+  const playerMode = invitedSessionId ? "guest" : "host";
+  const displayName =
+    currentUser?.user_metadata?.username ||
+    currentUser?.email?.split("@")[0] ||
+    (playerMode === "host" ? "Host" : "Guest");
+  const {
+    lobbyState,
+    localParticipant,
+    releasePlayerSlot,
+    requestPlayerSlot,
+    retry,
+    sessionId,
+    stream,
+    status,
+    telemetry,
+  } = useWebRTC(id || "", streamProfile, {
+    displayName,
+    mode: playerMode,
+    requestedRole: playerMode === "host" ? "host" : invitedRole,
+    sessionId: invitedSessionId,
+  });
   const { authorName, gameTitle } = useGameMetadata(id);
   const [showStreamTelemetry, setShowStreamTelemetry] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -128,6 +154,12 @@ export default function Player() {
   const backText = isLocalGame
     ? "Back to Local Vault"
     : "Back to Cloud Library";
+  const shareUrl = useMemo(() => {
+    const nextSearch = new URLSearchParams(location.search);
+    nextSearch.set("session", sessionId);
+    nextSearch.set("role", "spectator");
+    return `${window.location.origin}${location.pathname}?${nextSearch.toString()}`;
+  }, [location.pathname, location.search, sessionId]);
 
   return (
     <div className="flex flex-col items-center pt-24 pb-24 px-4 min-h-screen">
@@ -157,6 +189,14 @@ export default function Player() {
         status={status}
         telemetry={telemetry}
         videoRef={videoRef}
+      />
+
+      <LobbyPanel
+        currentParticipant={localParticipant}
+        lobbyState={lobbyState}
+        onReleaseSlot={releasePlayerSlot}
+        onRequestSlot={requestPlayerSlot}
+        shareUrl={shareUrl}
       />
 
       {showStreamTelemetry && <StreamTelemetryPanel telemetry={telemetry} />}

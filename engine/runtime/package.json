@@ -2,16 +2,22 @@
   "name": "@pixelated/engine-runtime",
   "version": "1.0.0",
   "private": true,
-  "main": "server.js",
+  "main": "dist/server.js",
   "scripts": {
-    "check": "node --check server.js && find src -name '*.js' -exec node --check {} \\;",
-    "test": "node --test src/**/*.test.js",
-    "start": "node server.js"
+    "build": "tsc -p tsconfig.json",
+    "check": "npm run build && node --check dist/server.js && find dist/src -name '*.js' -exec node --check {} \\;",
+    "test": "npm run build && node --test dist/src/**/*.test.js",
+    "start": "node dist/server.js"
   },
   "dependencies": {
     "cors": "^2.8.6",
     "express": "^5.2.1",
     "multer": "^2.1.1",
     "socket.io": "^4.8.3"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^25.9.1",
+    "typescript": "^6.0.3"
   }
 }

@@ -1,6 +1,6 @@
 # Suggestions
 
-Last reviewed: 2026-05-27
+Last reviewed: 2026-05-28
 
 This file tracks advisory recommendations and implementation status. Completed tasks are moved into the Done section so the active backlog stays clean.
 
@@ -19,6 +19,213 @@ Recommended direction:
 
 ## Done
 
+### Backend Multiplayer Lobby Metadata
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `services/api/src/routes/multiplayer.ts`
+- `services/api/src/server.ts`
+- `services/api/tests/controlPlane.test.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `supabase/migrations/20260528143000_multiplayer_lobby_metadata.sql`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added `multiplayer_lobbies` migration for host-owned multiplayer metadata.
+- Added API routes to upsert, list, and end multiplayer lobbies.
+- Lobby metadata stores session id, game id, engine URL, exposure mode, status, max players, and sanitized participant role/slot display data.
+- The API does not accept or store desktop engine tokens.
+- Signed-in hosts now publish lobby snapshots when local `lobby-state` changes.
+- Host cleanup marks the backend lobby ended.
+- Anonymous/local-only play continues when the backend metadata call returns auth/service errors.
+- Added control-plane tests proving lobby metadata persists and no engine token field is stored.
+
+Remaining follow-up:
+
+- Push `supabase/migrations/20260528143000_multiplayer_lobby_metadata.sql` before relying on the hosted API route.
+- Deploy API and web changes together.
+- Add a visible recent/active lobby surface later if users need to resume or inspect hosted metadata.
+- Run the real two-browser Docker/RetroArch smoke.
+
+Smoke note, 2026-05-28:
+
+- Hosted Render API health passed at `https://pixelated-api-services.onrender.com/health`.
+- Hosted Render API still returned `404 Route GET:/multiplayer/lobbies/recent not found`, so the migration was pushed but the API code with multiplayer routes was not deployed yet.
+- Local API tests passed with the multiplayer lobby metadata coverage.
+- Docker CLI could not reach Docker Desktop from this shell, so the two-browser Docker/RetroArch smoke remains blocked.
+
+### React Lobby And Guest Join UI
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/web/src/features/player/LobbyPanel.tsx`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/pages/user/Player.tsx`
+- `engine/runtime/server.js`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added a player-page lobby panel that shows participants, roles, and player slots.
+- Added a copyable session invite URL using `?session=<id>&role=spectator`.
+- `useWebRTC` now supports host and guest modes.
+- Guests opened from a session URL join the existing local-engine session without emitting `start-game`.
+- The engine replays `python-ready` to late-joining browsers when the requested session is already active.
+- The hook now exposes lobby state, local participant state, current session id, and request/release slot actions.
+- Input attachment now follows the local participant's assigned slot.
+- Guest cleanup no longer emits `stop-session`; host-only stop remains enforced by the engine.
+
+Remaining follow-up:
+
+- Manual two-browser smoke against the Docker engine.
+- Add a host kick button in the React lobby once the UX needs moderation controls.
+- Decide whether invite links should default to spectator or player requests once the LAN flow is tested with real users.
+
+### Multi-Viewer WebRTC Fanout Foundation
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/web/src/lib/webrtcPeer.ts`
+- `apps/web/src/lib/useWebRTC.ts`
+- `engine/runtime/camera.py`
+- `engine/runtime/src/signaling/signalingRelay.ts`
+- `engine/runtime/src/signaling/signalingRelay.test.ts`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added a browser-generated `peerId` to WebRTC offers and ICE candidates.
+- Node now joins browser sockets to peer-specific rooms and routes camera answers/candidates only to the matching peer.
+- `camera.py` now keeps a `peers` dictionary and creates a separate GStreamer `webrtcbin` pipeline per browser peer.
+- Duplicate offers for the same peer are ignored without blocking other peers.
+- Viewer cleanup now emits `webrtc-peer-disconnect`, allowing the camera to tear down only that peer pipeline.
+- Host-only stop behavior remains enforced by lobby state, so a guest viewer leaving should not stop the host session.
+- Added signaling tests for peer-room offer routing, peer-targeted answers, peer-targeted ICE, and peer cleanup relay.
+
+Remaining follow-up:
+
+- Run a real two-browser Docker/RetroArch smoke to confirm the per-peer camera pipelines can both receive audio/video.
+- Watch CPU usage during multi-viewer sessions; each peer currently creates its own capture/encode pipeline.
+- Add React lobby/guest join UI so users can intentionally join the same host session.
+
+### Multiplayer Input Routing
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/web/src/lib/webrtcInput.ts`
+- `engine/runtime/server.js`
+- `engine/runtime/src/input/translateKey.js`
+- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/signaling/inputHandlers.ts`
+- `engine/runtime/src/signaling/inputHandlers.test.ts`
+- `engine/runtime/src/signaling/lobby.ts`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- React input events now include `playerIndex`, defaulting to player 1 for the current single-player UI.
+- The engine validates keyboard input against lobby slot ownership before injecting keys.
+- Spectators cannot control the emulator.
+- A guest assigned to player slot 2 cannot emit player slot 1 input.
+- Player 1 keeps the existing arrow/Z/X/Enter/Shift keyboard path.
+- Player 2 maps the same browser controls onto W/A/S/D/F/G/R/T before `xdotool` injection.
+- RetroArch config generation now writes explicit player 1 and player 2 keyboard binds.
+- Added automated tests for host input, player 2 mapping, spectator rejection, and wrong-slot rejection.
+
+Remaining follow-up:
+
+- Manual smoke with a two-player test ROM or RetroArch input diagnostic.
+- Add React lobby UI so guests can see and request their assigned slots.
+- Decide the slots 3 and 4 input strategy, likely virtual gamepads or deeper RetroArch input config instead of more shared keyboard mapping.
+
+### Engine Lobby Role Foundation
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `engine/runtime/server.js`
+- `engine/runtime/src/signaling/lobby.ts`
+- `engine/runtime/src/signaling/lobby.test.ts`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added in-memory local engine lobby state keyed by session id.
+- The first browser participant becomes the `host` and receives player slot 1.
+- Later participants can join as `player` or `spectator`; duplicate host requests are downgraded to spectator.
+- Added player slot request/release behavior.
+- Added host-only lobby kick behavior.
+- Added `lobby-state`, `lobby-error`, and `lobby-kicked` Socket.IO events.
+- Restricted engine-side game start/stop to the lobby host when lobby state exists.
+- Added focused engine tests for host assignment, duplicate host handling, slot requests, host kicks, and guest kick rejection.
+
+Remaining follow-up:
+
+- Add React lobby UI that consumes `lobby-state` and exposes participants/slots.
+- Add guest invite/join UX for LAN sessions.
+- Implement Phase 4 slot-aware input authorization before guests can control the emulator.
+- Decide the local HTTPS/private-network strategy because hosted Vercel to HTTP LAN engine fetches are blocked in Chrome.
+
+### Engine Runtime TypeScript Phase 0A
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `engine/runtime/tsconfig.json`
+- `engine/runtime/package.json`
+- `engine/runtime/package-lock.json`
+- `engine/runtime/Dockerfile`
+- `engine/runtime/src/config.ts`
+- `engine/runtime/src/signaling/sessionRooms.ts`
+- `engine/runtime/src/signaling/socketAuth.ts`
+- `engine/runtime/src/signaling/signalingRelay.ts`
+- `engine/runtime/src/signaling/engineErrorHandlers.ts`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
+- `engine/runtime/src/signaling/inputHandlers.ts`
+- `engine/runtime/README.md`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added TypeScript build support to `engine/runtime`.
+- The runtime now compiles mixed `.ts` and `.js` source into `dist/`.
+- `npm run check`, `npm test`, and `npm start` now use compiled JavaScript.
+- Docker image builds now run `npm run build` and start with `npm start`.
+- Converted the engine config and multiplayer-adjacent signaling/session/input modules to TypeScript.
+- Typed core start-game payloads, ICE server normalization, stream profile normalization, session-room helpers, socket token auth, signaling relay events, engine-error relay, and input handler payloads.
+- Kept remaining engine modules as JavaScript for later targeted migration.
+
+Remaining follow-up:
+
+- Docker build smoke once Docker Desktop is reachable from the CLI again.
+- Convert runtime process manager and Local Vault route/storage modules when multiplayer slots or local identity hardening touches them.
+- Desktop TypeScript migration remains a later Phase 0B task.
+
 ### Explicit Desktop LAN Mode Toggle
 
 Completed: 2026-05-28
@@ -28,7 +235,7 @@ Implemented in:
 - `apps/desktop/main.js`
 - `apps/desktop/preload.js`
 - `apps/desktop/index.html`
-- `engine/runtime/src/config.js`
+- `engine/runtime/src/config.ts`
 - `engine/runtime/src/telemetry/healthSnapshot.js`
 - `engine/runtime/server.js`
 - `.context/lan-multiplayer-plan.md`
@@ -88,7 +295,7 @@ Completed: 2026-05-27
 Implemented in:
 
 - `apps/web/src/lib/webrtcSession.ts`
-- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
 - `engine/runtime/src/sessions/verifyBackendSession.js`
 - `engine/runtime/src/signaling/startGameHandlers.test.js`
 - `.context/project-flows.md`
@@ -397,16 +604,16 @@ Completed: 2026-05-25
 Implemented in:
 
 - `engine/runtime/server.js`
-- `engine/runtime/src/config.js`
+- `engine/runtime/src/config.ts`
 - `engine/runtime/src/http/healthRoutes.js`
 - `engine/runtime/src/http/localVaultRoutes.js`
 - `engine/runtime/src/http/errorHandlers.js`
-- `engine/runtime/src/signaling/socketAuth.js`
-- `engine/runtime/src/signaling/sessionRooms.js`
-- `engine/runtime/src/signaling/signalingRelay.js`
-- `engine/runtime/src/signaling/startGameHandlers.js`
-- `engine/runtime/src/signaling/inputHandlers.js`
-- `engine/runtime/src/signaling/engineErrorHandlers.js`
+- `engine/runtime/src/signaling/socketAuth.ts`
+- `engine/runtime/src/signaling/sessionRooms.ts`
+- `engine/runtime/src/signaling/signalingRelay.ts`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
+- `engine/runtime/src/signaling/inputHandlers.ts`
+- `engine/runtime/src/signaling/engineErrorHandlers.ts`
 - `engine/runtime/src/runtime/processManager.js`
 - `engine/runtime/src/roms/cloudRomDownloader.js`
 - `engine/runtime/src/roms/localRomStore.js`
@@ -607,8 +814,8 @@ Implemented in:
 
 - `services/api/src/routes/sessions.ts`
 - `engine/runtime/server.js`
-- `engine/runtime/src/config.js`
-- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/config.ts`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
 - `engine/runtime/src/sessions/verifyBackendSession.js`
 - `apps/desktop/main.js`
 - `apps/desktop/README.md`
@@ -1087,7 +1294,7 @@ Implemented in:
 - `apps/web/src/lib/apiClient.ts`
 - `apps/web/src/lib/useWebRTC.ts`
 - `apps/web/src/lib/webrtcPeer.ts`
-- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
 - `engine/runtime/src/runtime/processManager.js`
 - `engine/runtime/camera.py`
 - `engine/runtime/README.md`
@@ -1169,7 +1376,7 @@ Implemented in:
 - `apps/web/src/lib/useWebRTC.ts`
 - `apps/web/src/features/player/PlayerControls.tsx`
 - `apps/web/src/pages/user/Player.tsx`
-- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
 - `engine/runtime/src/signaling/startGameHandlers.test.js`
 - `engine/runtime/src/runtime/processManager.js`
 - `engine/runtime/camera.py`
@@ -1227,13 +1434,15 @@ Smoke checklist:
 
 ### 1. Decide Explicit LAN Support
 
-The local engine now defaults to host loopback, has an explicit desktop LAN mode for testing, and the React pairing panel understands LAN URLs. LAN streaming is tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
+The local engine now defaults to host loopback, has an explicit desktop LAN mode for testing, the React pairing panel understands LAN URLs, and the engine has a lobby/role foundation. LAN streaming is tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
 
 Recommended next implementation slice:
 
-- Runtime-smoke Phase 1 with two devices on the same LAN.
-- Decide the HTTPS-hosted-app to HTTP-LAN-engine strategy if browser private-network restrictions block guest pairing.
-- Then proceed to Phase 0A before Phase 3: TypeScript migration for engine signaling/session modules.
+- Deploy the API and web changes.
+- Recheck hosted `GET /multiplayer/lobbies/recent`; it should return auth gating instead of route-not-found once Render has the latest API code.
+- Validate the multi-viewer WebRTC path with two browser clients against one Docker engine session.
+- Decide the local HTTPS/private-network strategy because Chrome blocked hosted Vercel to HTTP LAN engine fetches with `LocalNetworkAccessPermissionDenied`.
+- Runtime-smoke true two-device LAN once the browser transport decision is made.
 
 ## Database And Supabase Suggestions
 

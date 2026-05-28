@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-05-27
+Last reviewed: 2026-05-28
 
 ## Project Shape
 
@@ -10,7 +10,7 @@ Top-level areas:
 
 - `apps/web/`: Vite, React 19, TypeScript, Tailwind frontend.
 - `apps/desktop/`: Electron desktop launcher and Docker orchestration UI.
-- `engine/runtime/`: local Express/Socket.IO bridge, Docker image, RetroArch/GStreamer runtime, and Python WebRTC sender.
+- `engine/runtime/`: local Express/Socket.IO bridge, Docker image, RetroArch/GStreamer runtime, Python WebRTC sender, and a mixed TypeScript/JavaScript Node runtime that builds to `dist/`.
 - `services/api/`: localhost-first Fastify + TypeScript backend control-plane skeleton.
 - `supabase/`: database, storage, RLS, RPC, and realtime migrations.
 - `assets/`: README/banner architecture imagery.
@@ -45,6 +45,9 @@ Current status:
 - `POST /sessions/:sessionId/verify` verifies a short-lived session token and returns the backend-approved boot target to the local engine.
 - `POST /local-pairings` persists authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
 - `GET /local-pairings/current` and `DELETE /local-pairings/current` expose/clear the current user's local pairing metadata.
+- `PUT /multiplayer/lobbies/:sessionId` persists authenticated host-owned multiplayer lobby metadata without storing engine tokens.
+- `GET /multiplayer/lobbies/recent` returns the authenticated host's recent active multiplayer lobbies.
+- `DELETE /multiplayer/lobbies/:sessionId` marks the authenticated host's lobby ended.
 - `POST /metrics/stream` persists authenticated, sampled WebRTC telemetry snapshots.
 - `GET /metrics/stream/recent` returns recent persisted telemetry snapshots for the authenticated user.
 - `GET /webrtc/ice-servers` returns authenticated WebRTC ICE configuration. It always supports configured STUN URLs and can issue short-lived coturn REST credentials when `TURN_URLS` and `TURN_SHARED_SECRET` are configured.
@@ -95,12 +98,17 @@ Current important frontend behaviors:
 - The prompt-only engine token flow has been replaced by a local engine pairing panel in the player and Local Vault UI.
 - The pairing panel classifies local, LAN, and custom engine URLs; LAN-looking URLs must match an engine reporting `exposureMode: "lan"` from `/health`.
 - Pairing errors now distinguish rejected tokens, local-only engines reached through LAN URLs, unreachable LAN hosts, and likely HTTPS-hosted-app to HTTP-LAN browser blocking.
+- Hosted Vercel to HTTP LAN engine pairing was blocked by Chrome with `LocalNetworkAccessPermissionDenied` during a 2026-05-28 smoke attempt, so LAN multiplayer still needs a local HTTPS or browser-approved private-network access strategy.
 - The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
 - `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
 - `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.
 - `useWebRTC` asks the API for ICE servers before creating the browser peer connection. If the API is unavailable or the user is unsigned, it falls back to Google STUN.
 - Failed or long-disconnected WebRTC sessions now show a retry action that creates a fresh session id and restarts negotiation without leaving the player page.
 - `/play/:id` is composed from `apps/web/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
+- The player page now includes a local lobby panel. It displays participants, host/player/spectator roles, assigned player slots, and a copyable `?session=<id>&role=spectator` invite URL.
+- Guest player pages opened with a session URL join the existing local-engine session without emitting `start-game`; the engine replays `python-ready` for late joiners when the requested game session is already active.
+- Guests can request/release player slots through the lobby panel. Input is attached only when the local participant owns a player slot.
+- Signed-in hosts publish non-secret lobby snapshots to the backend when local `lobby-state` changes. Anonymous/local-only play continues if that backend call is unauthorized or unavailable.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
 - Game catalog, favorites, comments, reactions, profile updates/deletion, admin users, admin reports, and admin access logs are loaded or mutated through the API instead of direct browser Supabase table/RPC/realtime calls.
@@ -160,12 +168,13 @@ Installed runtime pieces:
 
 Runtime processes:
 
-- `server.js`: Express + Socket.IO composition root.
-- `engine/runtime/src/`: local engine modules for config, health/local vault HTTP routes, Socket.IO signaling, ROM download/storage, runtime process control, input injection, and health telemetry.
+- `server.js`: Express + Socket.IO composition root, compiled to `dist/server.js` for runtime start.
+- `engine/runtime/src/`: local engine modules for config, health/local vault HTTP routes, Socket.IO signaling, ROM download/storage, runtime process control, input injection, and health telemetry. Config and signaling/session/input contract modules are now TypeScript.
 - `Xvfb :99`: virtual screen.
 - PulseAudio system daemon.
 - RetroArch process per game.
 - `camera.py`: GStreamer `webrtcbin` sender for X11 capture and PulseAudio monitor.
+- `npm run build` compiles the runtime to `dist/`; `npm run check`, `npm test`, and Docker startup use compiled JavaScript.
 
 Data paths:
 
@@ -181,6 +190,11 @@ Streaming/signaling:
 - Node forwards WebRTC offers, answers, and ICE candidates between browser and Python sender inside a Socket.IO room named `session:<id>`.
 - Python connects back to Node at `http://localhost:8080`.
 - Browser receives VP8 video and Opus audio.
+- WebRTC signaling now includes a browser-generated `peerId`. Node places each browser in a peer-specific room so camera answers and ICE candidates route only to the matching browser instead of broadcasting to every viewer in the session.
+- `camera.py` now tracks one GStreamer `webrtcbin` pipeline per peer inside the camera process, allowing multiple viewers to negotiate against the same running game session in principle. A real two-browser Docker/RetroArch smoke is still pending.
+- Viewer cleanup emits `webrtc-peer-disconnect`, letting the camera tear down that peer pipeline without stopping the host game session.
+- The local engine now keeps in-memory lobby state per session. The first browser participant becomes `host` with player slot 1; later participants can join as `player` or `spectator`, request/release player slots, and receive `lobby-state` updates.
+- Lobby host permissions gate start, stop, and kick actions engine-side. Host disconnect stops the session; guest disconnect only cleans up that peer/viewer path.
 - React forwards API-issued ICE server config in `start-game`; Node passes it to `camera.py` through `PIXELATED_ICE_SERVERS`; Python configures GStreamer `webrtcbin` with the matching STUN/TURN servers.
 - React forwards the selected stream profile in `start-game`; Node validates bitrate/framerate bounds and passes it to `camera.py` through `PIXELATED_STREAM_PROFILE`; Python applies the profile to GStreamer capture framerate and VP8 target bitrate.
 - React generates the current session id, Node passes it into `camera.py` through `PIXELATED_SESSION_ID`, and both browser/camera sockets join the same room before WebRTC negotiation.
@@ -190,8 +204,11 @@ Streaming/signaling:
 Input:
 
 - Browser keydown/keyup events are attached by `apps/web/src/lib/webrtcInput.ts` and go through Socket.IO.
-- Node maps browser keys to X11 key names.
+- Browser keydown/keyup events include `playerIndex`, defaulting to player 1 until the lobby UI exposes assigned slots.
+- Node authorizes input against local lobby slot state before injecting any key.
+- Node maps browser keys to X11 key names. Player 1 keeps arrow/Z/X/Enter/Shift; player 2 maps the same browser controls onto W/A/S/D/F/G/R/T.
 - Node executes `xdotool keydown/keyup` against display `:99`.
+- RetroArch config generation now writes explicit player 1 and player 2 keyboard binds. Slots 3 and 4 still need a virtual gamepad or RetroArch mapping decision before real input is enabled.
 - React emits `stop-session` during player cleanup; Node stops the active emulator/camera processes and removes the active temp cloud ROM.
 
 ## Supabase
@@ -216,6 +233,7 @@ Core tables inferred from migrations:
 - `game_submissions`: developer upload applications.
 - `backend_sessions`: backend-owned playable session records with hashed session tokens and approved boot targets.
 - `local_engine_pairings`: backend-owned local engine pairing intent metadata without desktop pairing secrets.
+- `multiplayer_lobbies`: backend-owned host lobby metadata for multiplayer sessions without desktop engine tokens.
 - `stream_metrics`: sampled WebRTC telemetry for authenticated user sessions.
 
 Storage buckets inferred from migrations:

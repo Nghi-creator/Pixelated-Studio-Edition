@@ -29,7 +29,17 @@ function isSubmissionStorageUrl(url: string) {
   );
 }
 
-async function notifySubmission(submission: z.infer<typeof submissionBodySchema>) {
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
+
+type SubmissionRouteOptions = {
+  notifySubmission?: (submission: z.infer<typeof submissionBodySchema>) => Promise<void>;
+  requireUser?: typeof requireSupabaseUser;
+  supabase?: SupabaseServiceLike | null;
+};
+
+async function defaultNotifySubmission(
+  submission: z.infer<typeof submissionBodySchema>,
+) {
   if (!env.FORMSPREE_SUBMISSION_URL) return;
 
   const response = await fetch(env.FORMSPREE_SUBMISSION_URL, {
@@ -55,17 +65,24 @@ async function notifySubmission(submission: z.infer<typeof submissionBodySchema>
   }
 }
 
-export async function registerSubmissionRoutes(app: FastifyInstance) {
+export async function registerSubmissionRoutes(
+  app: FastifyInstance,
+  options: SubmissionRouteOptions = {},
+) {
+  const requireUser = options.requireUser || requireSupabaseUser;
+  const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const notifySubmission = options.notifySubmission || defaultNotifySubmission;
+
   app.post(
     "/submissions/games",
-    { preHandler: requireSupabaseUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
 
-      if (!supabaseService) {
+      if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
@@ -93,7 +110,7 @@ export async function registerSubmissionRoutes(app: FastifyInstance) {
         });
       }
 
-      const { data, error } = await supabaseService
+      const { data, error } = await service
         .from("game_submissions")
         .insert({
           author_name: submission.authorName,

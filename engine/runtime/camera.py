@@ -16,8 +16,7 @@ SESSION_ID = os.environ.get('PIXELATED_SESSION_ID', 'default-session')
 ENGINE_TOKEN = os.environ.get('PIXELATED_ENGINE_TOKEN', '')
 ICE_SERVERS = os.environ.get('PIXELATED_ICE_SERVERS', '[]')
 STREAM_PROFILE = os.environ.get('PIXELATED_STREAM_PROFILE', '{}')
-webrtcbin = None
-pipeline = None
+peers = {}
 
 def parse_ice_servers():
     try:
@@ -92,12 +91,25 @@ def emit_engine_error(message):
     except Exception as exc:
         print(f"[Python] Failed to emit engine-error: {exc}")
 
-def handle_offer(offer):
-    global webrtcbin, pipeline
-    print("[Python] Received React Offer! Building WebRTC Pipeline...")
+def normalize_peer_id(payload):
+    peer_id = payload.get('peerId') if isinstance(payload, dict) else None
+    return peer_id if isinstance(peer_id, str) and peer_id else 'default'
 
-    if pipeline is not None:
-        print("[Python] Pipeline already running! Ignoring duplicate React offer.")
+def cleanup_peer(peer_id):
+    peer = peers.pop(peer_id, None)
+    if not peer:
+        return
+
+    pipeline = peer.get('pipeline')
+    if pipeline:
+        pipeline.set_state(Gst.State.NULL)
+
+def handle_offer(offer):
+    peer_id = normalize_peer_id(offer)
+    print(f"[Python] Received React Offer for peer {peer_id}! Building WebRTC Pipeline...")
+
+    if peer_id in peers:
+        print(f"[Python] Pipeline already running for peer {peer_id}! Ignoring duplicate offer.")
         return
 
     stream_profile = parse_stream_profile()
@@ -123,6 +135,10 @@ def handle_offer(offer):
     pipeline = Gst.parse_launch(pipeline_str)
     webrtcbin = pipeline.get_by_name('sendrecv')
     configure_ice_servers(webrtcbin)
+    peers[peer_id] = {
+        'pipeline': pipeline,
+        'webrtcbin': webrtcbin,
+    }
 
     bus = pipeline.get_bus()
     bus.add_signal_watch()
@@ -130,12 +146,13 @@ def handle_offer(offer):
     def on_bus_message(_, message):
         if message.type == Gst.MessageType.ERROR:
             err, debug = message.parse_error()
-            emit_engine_error(f"GStreamer error: {err.message}")
+            emit_engine_error(f"GStreamer error for peer {peer_id}: {err.message}")
             if debug:
                 print(f"[Python] GStreamer debug: {debug}")
+            cleanup_peer(peer_id)
         elif message.type == Gst.MessageType.WARNING:
             warn, debug = message.parse_warning()
-            print(f"[Python] GStreamer warning: {warn.message}")
+            print(f"[Python] GStreamer warning for peer {peer_id}: {warn.message}")
             if debug:
                 print(f"[Python] GStreamer warning debug: {debug}")
 
@@ -146,6 +163,7 @@ def handle_offer(offer):
     def on_ice_candidate(webrtc, mlineindex, candidate):
         sio.emit('webrtc-ice-candidate-backend', {
             'sessionId': SESSION_ID,
+            'peerId': peer_id,
             'candidate': {'sdpMLineIndex': mlineindex, 'candidate': candidate}
         })
     webrtcbin.connect('on-ice-candidate', on_ice_candidate)
@@ -156,6 +174,7 @@ def handle_offer(offer):
         webrtcbin.emit('set-local-description', answer, None)
         sio.emit('webrtc-answer', {
             'sessionId': SESSION_ID,
+            'peerId': peer_id,
             'type': answer.type.value_nick,
             'sdp': answer.sdp.as_text()
         })
@@ -181,10 +200,21 @@ def on_offer(offer):
 
 @sio.on('webrtc-ice-candidate')
 def on_ice(candidate):
+    peer_id = normalize_peer_id(candidate)
     def handle_ice():
+        peer = peers.get(peer_id)
+        webrtcbin = peer.get('webrtcbin') if peer else None
         if webrtcbin:
             webrtcbin.emit('add-ice-candidate', candidate['sdpMLineIndex'], candidate['candidate'])
     GLib.idle_add(handle_ice)
+
+@sio.on('webrtc-peer-disconnect')
+def on_peer_disconnect(payload):
+    peer_id = normalize_peer_id(payload)
+    def handle_disconnect():
+        print(f"[Python] Cleaning up WebRTC pipeline for peer {peer_id}.")
+        cleanup_peer(peer_id)
+    GLib.idle_add(handle_disconnect)
 
 sio.connect('http://localhost:8080', auth={'token': ENGINE_TOKEN})
 loop = GLib.MainLoop()
