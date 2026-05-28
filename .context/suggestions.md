@@ -19,6 +19,40 @@ Recommended direction:
 
 ## Done
 
+### Desktop HTTPS LAN Companion Foundation
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/desktop/main/companionServer.js`
+- `apps/desktop/main/config.js`
+- `apps/desktop/main/engineController.js`
+- `apps/desktop/main/exposure.js`
+- `apps/desktop/preload.js`
+- `apps/desktop/index.html`
+- `apps/desktop/renderer.js`
+- `apps/desktop/renderer/exposure.js`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- LAN mode now starts a local HTTPS companion server on `PIXELATED_COMPANION_PORT`, defaulting to `8090`.
+- The companion generates a self-signed certificate at runtime under the Electron user data directory.
+- The companion serves the built React app from `apps/web/dist`.
+- Served HTML injects `pixelated_engine_url = window.location.origin`, so React talks to the companion origin.
+- The companion proxies engine HTTP routes and Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
+- Desktop UI now shows HTTPS join page URLs separately from raw LAN engine URLs.
+- Desktop UI tells guests they may need to trust the local certificate on first open.
+
+Remaining follow-up:
+
+- Two-device LAN smoke with Docker Desktop running.
+- Decide whether self-signed certificate trust is acceptable or whether to move to local CA/tunnel packaging.
+- Ensure packaged desktop builds include the web `dist` assets or generate them during release packaging.
+
 ### Backend Multiplayer Lobby Metadata
 
 Completed: 2026-05-28
@@ -56,7 +90,7 @@ Remaining follow-up:
 Smoke note, 2026-05-28:
 
 - Hosted Render API health passed at `https://pixelated-api-services.onrender.com/health`.
-- Hosted Render API still returned `404 Route GET:/multiplayer/lobbies/recent not found`, so the migration was pushed but the API code with multiplayer routes was not deployed yet.
+- Hosted Render API now returns `401 Missing bearer token` for `GET /multiplayer/lobbies/recent`, confirming the multiplayer route is deployed and auth-gated.
 - Local API tests passed with the multiplayer lobby metadata coverage.
 - Docker CLI could not reach Docker Desktop from this shell, so the two-browser Docker/RetroArch smoke remains blocked.
 
@@ -1439,9 +1473,10 @@ The local engine now defaults to host loopback, has an explicit desktop LAN mode
 Recommended next implementation slice:
 
 - Deploy the API and web changes.
-- Recheck hosted `GET /multiplayer/lobbies/recent`; it should return auth gating instead of route-not-found once Render has the latest API code.
 - Validate the multi-viewer WebRTC path with two browser clients against one Docker engine session.
-- Decide the local HTTPS/private-network strategy because Chrome blocked hosted Vercel to HTTP LAN engine fetches with `LocalNetworkAccessPermissionDenied`.
+- Make LAN UX player-ready: clearer enable flow, invite instructions, host/guest connection states, and host kick controls.
+- Decide whether the first public LAN release caps active players at two while P3/P4 input moves to virtual gamepads or RetroArch-native device mapping.
+- Run CPU/memory validation for the current per-peer GStreamer pipeline.
 - Runtime-smoke true two-device LAN once the browser transport decision is made.
 
 ## Database And Supabase Suggestions

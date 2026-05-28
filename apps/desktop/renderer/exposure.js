@@ -2,6 +2,9 @@
   function createExposureController({
     exposureCopy,
     exposureLabel,
+    companionCopy,
+    companionPanel,
+    companionUrls,
     lanToggle,
     lanUrlPanel,
     lanUrls,
@@ -25,6 +28,34 @@
       );
     }
 
+    function renderCompanionUrls(urls = []) {
+      companionUrls.innerHTML = "";
+      urls.forEach((url) => {
+        const item = document.createElement("code");
+        item.className = "block break-all";
+        item.innerText = url;
+        companionUrls.appendChild(item);
+      });
+      companionPanel.classList.toggle(
+        "hidden",
+        getMode() !== "lan" || urls.length === 0,
+      );
+    }
+
+    function setCompanionStatus(payload = {}) {
+      if (!payload.enabled) {
+        companionPanel.classList.add("hidden");
+        if (payload.error) {
+          companionCopy.innerText = payload.error;
+        }
+        return;
+      }
+
+      renderCompanionUrls(payload.urls || []);
+      companionCopy.innerText =
+        "Guests may need to trust the local certificate the first time they open this page.";
+    }
+
     function render() {
       const isLan = getMode() === "lan";
 
@@ -34,6 +65,10 @@
         : "Engine binds to this computer only.";
       lanWarning.classList.toggle("hidden", !isLan);
       lanUrlPanel.classList.toggle("hidden", !isLan || !lanUrls.innerText);
+      companionPanel.classList.toggle(
+        "hidden",
+        !isLan || !companionUrls.innerText,
+      );
     }
 
     function setEnabled(enabled) {
@@ -50,8 +85,10 @@
     return {
       getMode,
       render,
+      renderCompanionUrls,
       renderUrls,
       setEnabled,
+      setCompanionStatus,
     };
   }
 

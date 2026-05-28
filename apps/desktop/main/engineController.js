@@ -1,5 +1,16 @@
 const crypto = require("crypto");
-const { backendApiUrl, engineImage } = require("./config");
+const { app } = require("electron");
+const path = require("path");
+const {
+  backendApiUrl,
+  companionPort,
+  engineImage,
+  webDistDir,
+} = require("./config");
+const {
+  startCompanionServer,
+  stopCompanionServer,
+} = require("./companionServer");
 const {
   exec,
   execCommand,
@@ -10,7 +21,9 @@ const {
 } = require("./docker");
 const {
   getAdvertisedEngineUrls,
+  getAdvertisedCompanionUrls,
   getDockerPublishHost,
+  getLanIpv4Addresses,
   normalizeExposureMode,
 } = require("./exposure");
 const { waitForEngineHealth } = require("./health");
@@ -41,12 +54,52 @@ function createEngineLaunchContext(options = {}) {
   const exposureMode = normalizeExposureMode(options.exposureMode);
   const publishHost = getDockerPublishHost(exposureMode);
   const advertisedUrls = getAdvertisedEngineUrls(exposureMode);
+  const companionUrls = getAdvertisedCompanionUrls(exposureMode, companionPort);
 
   return {
     advertisedUrls,
+    companionUrls,
     exposureMode,
     publishHost,
   };
+}
+
+async function startLanCompanion(event, launchContext) {
+  if (launchContext.exposureMode !== "lan") {
+    event.reply("engine-companion", {
+      enabled: false,
+      urls: [],
+    });
+    return;
+  }
+
+  try {
+    const companion = await startCompanionServer({
+      certDir: path.join(app.getPath("userData"), "certificates"),
+      lanAddresses: getLanIpv4Addresses(),
+      port: companionPort,
+      webDistDir,
+    });
+    event.reply("engine-companion", {
+      certPath: companion.certPath,
+      enabled: true,
+      urls: launchContext.companionUrls,
+    });
+    event.reply(
+      "server-log",
+      `LAN companion HTTPS server ready on port ${companion.port}.`,
+    );
+  } catch (err) {
+    event.reply("engine-companion", {
+      enabled: false,
+      error: err.message,
+      urls: [],
+    });
+    event.reply(
+      "server-log",
+      `<span class="text-amber-300">Warning: LAN HTTPS companion could not start: ${err.message}</span>`,
+    );
+  }
 }
 
 function startContainer(event, safeEnv, launchContext) {
@@ -66,6 +119,7 @@ function startContainer(event, safeEnv, launchContext) {
 }
 
 function handleStartupFailure(event, safeEnv, startErr) {
+  stopCompanionServer();
   emitEngineState(event, "FAILED", startErr.message);
   event.reply(
     "server-log",
@@ -88,9 +142,11 @@ function startEngine(event, options = {}) {
   const launchContext = createEngineLaunchContext(options);
 
   engineToken = crypto.randomBytes(24).toString("base64url");
+  stopCompanionServer();
   event.reply("engine-token", engineToken);
   event.reply("engine-exposure", {
     advertisedUrls: launchContext.advertisedUrls,
+    companionUrls: launchContext.companionUrls,
     exposureMode: launchContext.exposureMode,
   });
 
@@ -124,10 +180,12 @@ function startEngine(event, options = {}) {
       })
       .then(() => {
         emitEngineState(event, "READY", "http://127.0.0.1:8080/health");
-        event.reply(
-          "server-log",
-          '<span class="text-green-500">SUCCESS: PIXELATED Engine healthy on Port 8080.</span>',
-        );
+        return startLanCompanion(event, launchContext).then(() => {
+          event.reply(
+            "server-log",
+            '<span class="text-green-500">SUCCESS: PIXELATED Engine healthy on Port 8080.</span>',
+          );
+        });
       })
       .catch((startErr) => handleStartupFailure(event, safeEnv, startErr));
   });
@@ -137,6 +195,7 @@ function stopEngine(event) {
   emitEngineState(event, "STOPPING");
   event.reply("server-log", "Initiating shutdown sequence...");
   const safeEnv = getSafeEnv();
+  stopCompanionServer();
 
   exec("docker rm -f pixelated-node", { env: safeEnv }, (err) => {
     if (err) {
@@ -154,6 +213,7 @@ function stopEngine(event) {
 
 function cleanupEngine() {
   const safeEnv = getSafeEnv();
+  stopCompanionServer();
   exec("docker rm -f pixelated-node", { env: safeEnv });
 }
 

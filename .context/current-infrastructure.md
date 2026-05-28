@@ -148,6 +148,10 @@ Notable constraints:
 - Build happens on user machine from the distributed app folder.
 - Health verifies core local engine dependencies: Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
 - LAN/multiplayer support is planned in `.context/lan-multiplayer-plan.md`. Current engine exposure defaults to loopback-only, with explicit desktop LAN mode available for LAN testing.
+- LAN mode now also starts a desktop-hosted HTTPS companion server on `PIXELATED_COMPANION_PORT`, defaulting to `8090`.
+- The companion server serves the built React app from `apps/web/dist`, injects the engine URL override to its own origin, and proxies engine HTTP plus Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
+- The companion uses a runtime-generated self-signed certificate under the Electron user data directory. Guests may need to trust/bypass that certificate warning during the first LAN test.
+- The desktop UI displays HTTPS companion join URLs separately from raw LAN engine URLs.
 
 ## Engine Container
 
