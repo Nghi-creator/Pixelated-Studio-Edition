@@ -16,7 +16,19 @@ SESSION_ID = os.environ.get('PIXELATED_SESSION_ID', 'default-session')
 ENGINE_TOKEN = os.environ.get('PIXELATED_ENGINE_TOKEN', '')
 ICE_SERVERS = os.environ.get('PIXELATED_ICE_SERVERS', '[]')
 STREAM_PROFILE = os.environ.get('PIXELATED_STREAM_PROFILE', '{}')
+PEER_STATE_PATH = os.environ.get('PIXELATED_CAMERA_PEER_STATE_PATH', '/tmp/pixelated_camera_peers.json')
 peers = {}
+
+def write_peer_state():
+    try:
+        with open(PEER_STATE_PATH, 'w', encoding='utf-8') as state_file:
+            json.dump({
+                'peerCount': len(peers),
+                'peerIds': sorted(peers.keys()),
+                'sessionId': SESSION_ID
+            }, state_file)
+    except Exception as exc:
+        print(f"[Python] Failed to write peer state: {exc}")
 
 def parse_ice_servers():
     try:
@@ -103,6 +115,7 @@ def cleanup_peer(peer_id):
     pipeline = peer.get('pipeline')
     if pipeline:
         pipeline.set_state(Gst.State.NULL)
+    write_peer_state()
 
 def handle_offer(offer):
     peer_id = normalize_peer_id(offer)
@@ -139,6 +152,7 @@ def handle_offer(offer):
         'pipeline': pipeline,
         'webrtcbin': webrtcbin,
     }
+    write_peer_state()
 
     bus = pipeline.get_bus()
     bus.add_signal_watch()
@@ -191,6 +205,7 @@ def handle_offer(offer):
 @sio.event
 def connect():
     print("[Python] Connected to Node.js Switchboard!")
+    write_peer_state()
     sio.emit('join-session', {'sessionId': SESSION_ID, 'role': 'camera'})
     sio.emit('python-ready', {'sessionId': SESSION_ID})
 

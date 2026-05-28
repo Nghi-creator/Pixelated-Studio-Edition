@@ -56,6 +56,7 @@ export const allowedRomHosts = (process.env.PIXELATED_ALLOWED_ROM_HOSTS || "")
 
 export const HEALTH_PATHS = {
   cameraBridge: path.join(process.cwd(), "camera.py"),
+  cameraPeerState: "/tmp/pixelated_camera_peers.json",
   gamepadBridge: path.join(process.cwd(), "input_gamepad.py"),
   gstreamerBinary: "/usr/bin/gst-launch-1.0",
   mesenCore: "/cores/mesen_libretro.so",

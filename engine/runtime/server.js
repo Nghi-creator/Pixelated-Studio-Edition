@@ -35,6 +35,7 @@ app.use(cors(corsOptions));
 const auth = createEngineTokenAuth(ENGINE_TOKEN);
 const runtime = createProcessManager({
   cameraPath: HEALTH_PATHS.cameraBridge,
+  cameraPeerStatePath: HEALTH_PATHS.cameraPeerState,
   engineToken: ENGINE_TOKEN,
   gamepadBridgePath: HEALTH_PATHS.gamepadBridge,
 });

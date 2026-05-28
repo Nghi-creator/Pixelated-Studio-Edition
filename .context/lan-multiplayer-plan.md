@@ -401,13 +401,13 @@ Implementation note: browser controls stay the same for every player. React emit
 
 ### Phase 10: Multiplayer Performance Validation
 
-Status: planned.
+Status: engine measurement foundation implemented on 2026-05-28; real multi-viewer measurements pending.
 
 Deliverables:
 
-- Measure CPU/memory with one host plus one guest viewer.
-- Measure CPU/memory with additional spectators.
-- Track WebRTC FPS, bitrate, packet loss, jitter, and ICE state per peer.
+- Measure CPU/memory with one host plus one guest viewer. Engine `/health` now exposes process resource snapshots; manual measurement pending.
+- Measure CPU/memory with additional spectators. Engine `/health` now exposes camera peer count; manual measurement pending.
+- Track WebRTC FPS, bitrate, packet loss, jitter, and ICE state per peer. Browser telemetry already tracks these per viewer and persists sampled authenticated metrics.
 - Decide whether the current per-peer GStreamer pipeline is acceptable or whether a fanout/relay architecture is needed.
 
 Acceptance criteria:
@@ -415,6 +415,8 @@ Acceptance criteria:
 - Two viewers can watch without unacceptable frame drops on a target host machine.
 - The UI can warn or limit spectators if local CPU usage is too high.
 - Performance notes are documented before calling LAN multiplayer production-ready.
+
+Implementation note: `camera.py` writes peer state to `/tmp/pixelated_camera_peers.json`, and `/health` now reports `checks.resources.cameraPeers`, process RSS, and average CPU since process start for RetroArch/camera where `/proc` is available. This gives the manual smoke a concrete before/after measurement surface without adding another metrics service.
 
 ## Test Plan
 

@@ -6,7 +6,7 @@ const { translateKey } = require("../input/translateKey");
 const { removeFileIfExists } = require("../roms/cloudRomDownloader");
 
 function createProcessManager(options) {
-  const { cameraPath, engineToken, gamepadBridgePath } = options;
+  const { cameraPath, cameraPeerStatePath, engineToken, gamepadBridgePath } = options;
   const gamepads = createGamepadBridge({ gamepadBridgePath });
   let retroarchProcess = null;
   let cameraProcess = null;
@@ -115,6 +115,7 @@ function createProcessManager(options) {
           PULSE_SERVER: "127.0.0.1",
           PIXELATED_SESSION_ID: sessionId,
           PIXELATED_ENGINE_TOKEN: engineToken,
+          PIXELATED_CAMERA_PEER_STATE_PATH: cameraPeerStatePath,
           PIXELATED_ICE_SERVERS: JSON.stringify(bootOptions.iceServers || []),
           PIXELATED_STREAM_PROFILE: JSON.stringify(
             bootOptions.streamProfile || {},
@@ -142,6 +143,7 @@ function createProcessManager(options) {
       retroarchProcess,
       virtualDisplayProcess,
       gamepads: gamepads.getState(),
+      cameraPeerStatePath,
     };
   }
 

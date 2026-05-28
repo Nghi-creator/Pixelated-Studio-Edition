@@ -19,6 +19,36 @@ Recommended direction:
 
 ## Done
 
+### Multiplayer Performance Measurement Foundation
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `engine/runtime/camera.py`
+- `engine/runtime/server.js`
+- `engine/runtime/src/config.ts`
+- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/telemetry/healthSnapshot.js`
+- `engine/runtime/src/telemetry/resourceSnapshot.js`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `camera.py` now writes current WebRTC peer state to `/tmp/pixelated_camera_peers.json`.
+- The engine passes the peer-state path into the camera process.
+- `/health` now reports camera peer count and peer ids through `checks.resources.cameraPeers`.
+- `/health` now reports Node RSS and RetroArch/camera process RSS plus average CPU since process start when `/proc` is available.
+- This gives the two-browser smoke a concrete measurement surface without adding another service.
+
+Remaining follow-up:
+
+- Run the two-browser Docker/RetroArch smoke and capture `/health` before/after guest joins.
+- Decide viewer limits based on CPU/RSS and browser WebRTC telemetry.
+- Add UI warnings or spectator caps if local host load is too high.
+
 ### Virtual Gamepad Input Foundation
 
 Completed: 2026-05-28
@@ -1545,7 +1575,7 @@ Recommended next implementation slice:
 - Validate the multi-viewer WebRTC path with two browser clients against one Docker engine session.
 - Improve LAN error states after the first two-device UX smoke.
 - Smoke virtual gamepads with Docker/RetroArch and gate P3/P4 in the UI if `/dev/uinput` is unavailable.
-- Run CPU/memory validation for the current per-peer GStreamer pipeline.
+- Run CPU/memory validation for the current per-peer GStreamer pipeline using `/health.checks.resources`.
 - Runtime-smoke true two-device LAN once the browser transport decision is made.
 
 ## Database And Supabase Suggestions

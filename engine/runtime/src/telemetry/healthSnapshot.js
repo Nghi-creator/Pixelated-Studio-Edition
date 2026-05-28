@@ -1,4 +1,5 @@
 const fs = require("fs");
+const { createResourceSnapshot } = require("./resourceSnapshot");
 
 function pathExists(filePath) {
   return fs.existsSync(filePath);
@@ -70,6 +71,7 @@ function createHealthSnapshot(options) {
         ),
         activeCloudRomPath: runtimeState.activeCloudRomPath,
       },
+      resources: createResourceSnapshot(runtimeState),
     };
 
     const ok =
