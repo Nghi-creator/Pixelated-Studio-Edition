@@ -48,6 +48,7 @@ type Runtime = {
 
 type RegisterStartGameOptions = {
   apiUrl: string;
+  canStartGame?: (socket: Socket, sessionId: string) => boolean;
   downloadCloudRom(romUrl: string, destinationPath: string): Promise<void>;
   runtime: Runtime;
   verifyBackendSession(options: {
@@ -117,7 +118,13 @@ export function registerStartGameHandler(
   socket: Socket,
   options: RegisterStartGameOptions,
 ) {
-  const { apiUrl, downloadCloudRom, runtime, verifyBackendSession } = options;
+  const {
+    apiUrl,
+    canStartGame,
+    downloadCloudRom,
+    runtime,
+    verifyBackendSession,
+  } = options;
 
   socket.on("start-game", async (payload: StartGamePayload = {}) => {
     const sessionId =
@@ -131,6 +138,13 @@ export function registerStartGameHandler(
     socket.join(getSessionRoom(sessionId));
     const iceServers = normalizeIceServers(payload.iceServers);
     const streamProfile = normalizeStreamProfile(payload.streamProfile);
+
+    if (canStartGame && !canStartGame(socket, sessionId)) {
+      socket.emit("engine-error", {
+        message: "Only the lobby host can start a game.",
+      });
+      return;
+    }
 
     console.log(
       `\n[Node.js] React requested game boot for session ${sessionId}: ${romFileOrUrl}`,

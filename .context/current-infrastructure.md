@@ -95,6 +95,7 @@ Current important frontend behaviors:
 - The prompt-only engine token flow has been replaced by a local engine pairing panel in the player and Local Vault UI.
 - The pairing panel classifies local, LAN, and custom engine URLs; LAN-looking URLs must match an engine reporting `exposureMode: "lan"` from `/health`.
 - Pairing errors now distinguish rejected tokens, local-only engines reached through LAN URLs, unreachable LAN hosts, and likely HTTPS-hosted-app to HTTP-LAN browser blocking.
+- Hosted Vercel to HTTP LAN engine pairing was blocked by Chrome with `LocalNetworkAccessPermissionDenied` during a 2026-05-28 smoke attempt, so LAN multiplayer still needs a local HTTPS or browser-approved private-network access strategy.
 - The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
 - `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
 - `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.
@@ -182,6 +183,8 @@ Streaming/signaling:
 - Node forwards WebRTC offers, answers, and ICE candidates between browser and Python sender inside a Socket.IO room named `session:<id>`.
 - Python connects back to Node at `http://localhost:8080`.
 - Browser receives VP8 video and Opus audio.
+- The local engine now keeps in-memory lobby state per session. The first browser participant becomes `host` with player slot 1; later participants can join as `player` or `spectator`, request/release player slots, and receive `lobby-state` updates.
+- Lobby host permissions gate start, stop, and kick actions engine-side. The React lobby UI and guest invite surface are still pending.
 - React forwards API-issued ICE server config in `start-game`; Node passes it to `camera.py` through `PIXELATED_ICE_SERVERS`; Python configures GStreamer `webrtcbin` with the matching STUN/TURN servers.
 - React forwards the selected stream profile in `start-game`; Node validates bitrate/framerate bounds and passes it to `camera.py` through `PIXELATED_STREAM_PROFILE`; Python applies the profile to GStreamer capture framerate and VP8 target bitrate.
 - React generates the current session id, Node passes it into `camera.py` through `PIXELATED_SESSION_ID`, and both browser/camera sockets join the same room before WebRTC negotiation.
@@ -193,6 +196,7 @@ Input:
 - Browser keydown/keyup events are attached by `apps/web/src/lib/webrtcInput.ts` and go through Socket.IO.
 - Node maps browser keys to X11 key names.
 - Node executes `xdotool keydown/keyup` against display `:99`.
+- Multiplayer slot-aware input routing is not implemented yet; Phase 4 in `.context/lan-multiplayer-plan.md` will add `playerIndex` payloads and reject spectator or wrong-slot input.
 - React emits `stop-session` during player cleanup; Node stops the active emulator/camera processes and removes the active temp cloud ROM.
 
 ## Supabase

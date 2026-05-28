@@ -19,6 +19,38 @@ Recommended direction:
 
 ## Done
 
+### Engine Lobby Role Foundation
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `engine/runtime/server.js`
+- `engine/runtime/src/signaling/lobby.ts`
+- `engine/runtime/src/signaling/lobby.test.ts`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added in-memory local engine lobby state keyed by session id.
+- The first browser participant becomes the `host` and receives player slot 1.
+- Later participants can join as `player` or `spectator`; duplicate host requests are downgraded to spectator.
+- Added player slot request/release behavior.
+- Added host-only lobby kick behavior.
+- Added `lobby-state`, `lobby-error`, and `lobby-kicked` Socket.IO events.
+- Restricted engine-side game start/stop to the lobby host when lobby state exists.
+- Added focused engine tests for host assignment, duplicate host handling, slot requests, host kicks, and guest kick rejection.
+
+Remaining follow-up:
+
+- Add React lobby UI that consumes `lobby-state` and exposes participants/slots.
+- Add guest invite/join UX for LAN sessions.
+- Implement Phase 4 slot-aware input authorization before guests can control the emulator.
+- Decide the local HTTPS/private-network strategy because hosted Vercel to HTTP LAN engine fetches are blocked in Chrome.
+
 ### Engine Runtime TypeScript Phase 0A
 
 Completed: 2026-05-28
@@ -1265,13 +1297,14 @@ Smoke checklist:
 
 ### 1. Decide Explicit LAN Support
 
-The local engine now defaults to host loopback, has an explicit desktop LAN mode for testing, and the React pairing panel understands LAN URLs. LAN streaming is tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
+The local engine now defaults to host loopback, has an explicit desktop LAN mode for testing, the React pairing panel understands LAN URLs, and the engine has a lobby/role foundation. LAN streaming is tracked as a dedicated multiplayer feature plan in `.context/lan-multiplayer-plan.md`.
 
 Recommended next implementation slice:
 
-- Runtime-smoke Phase 1 with two devices on the same LAN.
-- Decide the HTTPS-hosted-app to HTTP-LAN-engine strategy if browser private-network restrictions block guest pairing.
-- Then proceed to Phase 0A before Phase 3: TypeScript migration for engine signaling/session modules.
+- Implement Phase 4 slot-aware input routing so only the assigned player socket can control its own slot.
+- Add React lobby UI and guest join/invite UX after the input boundary is safe.
+- Decide the local HTTPS/private-network strategy because Chrome blocked hosted Vercel to HTTP LAN engine fetches with `LocalNetworkAccessPermissionDenied`.
+- Runtime-smoke true two-device LAN once the browser transport decision is made.
 
 ## Database And Supabase Suggestions
 

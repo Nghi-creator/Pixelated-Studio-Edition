@@ -220,26 +220,30 @@ Acceptance criteria:
 
 Implementation note: the pairing panel now classifies local, LAN, and custom engine URLs; checks `/health.exposureMode`; rejects LAN-looking URLs when the engine reports local-only mode; and gives clearer wrong-token, unreachable-LAN, and hosted-HTTPS-to-HTTP-LAN failure messages.
 
-Remaining risk: the hosted Vercel app is HTTPS while LAN engine URLs are currently HTTP. Some browsers may block HTTP private-network requests from an HTTPS origin. If this blocks real guest pairing, the next architecture decision is local HTTPS for the engine, a local companion page, or another browser-approved private-network access strategy.
+Confirmed browser blocker: Chrome blocked `https://pixelated-studio-edition.vercel.app` fetching an HTTP LAN engine URL with `LocalNetworkAccessPermissionDenied` during a hosted-browser LAN smoke attempt on 2026-05-28, even with permissive engine CORS and `Access-Control-Allow-Private-Network`. The next architecture decision is local HTTPS for the engine, a local companion origin, or another browser-approved private-network access strategy.
 
 ### Phase 3: Lobby And Roles
 
-Status: planned.
+Status: engine-side foundation implemented on 2026-05-28; React lobby UI and full LAN transport remain pending.
 
 Deliverables:
 
-- Convert the relevant engine signaling/session modules to TypeScript before adding role state.
-- Add local engine session/lobby state.
-- Add `host`, `player`, and `spectator` roles.
-- Add join/leave events.
-- Add player slot assignment.
-- Let host kick/revoke participants.
+- Convert the relevant engine signaling/session modules to TypeScript before adding role state. Completed in Phase 0A.
+- Add local engine session/lobby state. Completed for the local engine process.
+- Add `host`, `player`, and `spectator` roles. Completed engine-side.
+- Add join/leave events. Completed engine-side through Socket.IO lobby events.
+- Add player slot assignment. Completed engine-side for host slot 1 and guest slot requests.
+- Let host kick/revoke participants. Completed engine-side.
+- Add React lobby UI that consumes `lobby-state`.
+- Add guest invite/join UX that makes the roles and slots visible.
 
 Acceptance criteria:
 
-- Host can see connected participants.
-- Guests cannot start/stop games unless assigned host permissions.
-- Spectators receive stream but cannot send input.
+- Host can see connected participants. Pending React UI.
+- Guests cannot start/stop games unless assigned host permissions. Implemented engine-side.
+- Spectators receive stream but cannot send input. Pending Phase 4 input authorization and Phase 5 multi-viewer validation.
+
+Implementation note: the first browser socket joining a session becomes `host` and receives player slot 1. Later host requests are downgraded to `spectator`; guests can request open player slots. Start/stop and lobby kick actions are restricted to the lobby host. The current single-player browser path still works because `join-session` automatically joins the lobby before `start-game`.
 
 ### Phase 4: Multiplayer Input Routing
 
@@ -321,6 +325,6 @@ Manual:
 
 ## Recommended Next Implementation Task
 
-Start with Phase 1: explicit LAN mode toggle in the desktop app.
+Continue with Phase 4: multiplayer input routing.
 
-That is the smallest valuable slice because it preserves the secure default while giving the project a real LAN surface to test before adding lobbies, player slots, and multi-viewer media behavior.
+Phase 3 now has engine-side lobby roles and slots, so the next valuable slice is enforcing those slots at the input boundary before the UI lets guests control anything. In parallel, decide the local HTTPS/private-network strategy for hosted Vercel to LAN engine pairing because Chrome already blocked direct HTTPS-to-HTTP LAN fetches during smoke testing.
