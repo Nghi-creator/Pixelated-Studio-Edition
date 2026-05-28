@@ -1,4 +1,12 @@
-import { Copy, Crown, Gamepad2, Link2, Monitor, UserRound } from "lucide-react";
+import {
+  Copy,
+  Crown,
+  Gamepad2,
+  Link2,
+  Monitor,
+  UserRound,
+  X,
+} from "lucide-react";
 import type {
   LobbyParticipant,
   LobbyState,
@@ -7,6 +15,7 @@ import type {
 type LobbyPanelProps = {
   currentParticipant: LobbyParticipant | null;
   lobbyState: LobbyState | null;
+  onKickParticipant: (socketId: string) => void;
   onReleaseSlot: () => void;
   onRequestSlot: (playerIndex: number) => void;
   shareUrl: string;
@@ -21,6 +30,7 @@ function getRoleIcon(participant: LobbyParticipant) {
 export function LobbyPanel({
   currentParticipant,
   lobbyState,
+  onKickParticipant,
   onReleaseSlot,
   onRequestSlot,
   shareUrl,
@@ -28,6 +38,7 @@ export function LobbyPanel({
   const participants = lobbyState?.participants || [];
   const currentSlot = currentParticipant?.playerIndex || null;
   const maxPlayers = lobbyState?.maxPlayers || 4;
+  const canKickParticipants = currentParticipant?.role === "host";
   const occupiedSlots = new Set(
     participants
       .map((participant) => participant.playerIndex)
@@ -70,15 +81,34 @@ export function LobbyPanel({
                 >
                   <div className="flex min-w-0 items-center gap-2">
                     <RoleIcon className="h-4 w-4 shrink-0 text-synth-primary" />
-                    <span className="truncate text-sm font-medium text-gray-200">
-                      {participant.displayName}
-                    </span>
+                    <div className="min-w-0">
+                      <span className="block truncate text-sm font-medium text-gray-200">
+                        {participant.displayName}
+                      </span>
+                      <span className="block text-[10px] uppercase tracking-wide text-emerald-400">
+                        Connected
+                      </span>
+                    </div>
                   </div>
-                  <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    {participant.playerIndex
-                      ? `P${participant.playerIndex}`
-                      : "View"}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      {participant.playerIndex
+                        ? `P${participant.playerIndex}`
+                        : "View"}
+                    </span>
+                    {canKickParticipants &&
+                      !isCurrent &&
+                      participant.role !== "host" && (
+                        <button
+                          type="button"
+                          onClick={() => onKickParticipant(participant.socketId)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-synth-border text-gray-400 transition-colors hover:border-red-400/70 hover:text-red-300"
+                          title={`Remove ${participant.displayName}`}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                  </div>
                 </div>
               );
             })}

@@ -19,6 +19,35 @@ Recommended direction:
 
 ## Done
 
+### Player-Ready LAN UX Pass
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `apps/desktop/index.html`
+- `apps/desktop/renderer/exposure.js`
+- `apps/web/src/features/player/LobbyPanel.tsx`
+- `apps/web/src/lib/useWebRTC.ts`
+- `apps/web/src/pages/user/Player.tsx`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Desktop LAN copy now points users toward the HTTPS join page instead of raw engine URL first.
+- Desktop LAN panel now includes a short invite checklist for host and guest.
+- React lobby displays connected participant state.
+- React lobby exposes a host-only remove button for non-host guests.
+- `useWebRTC` exposes `kickParticipant`, wired to the engine `lobby-kick` event.
+
+Remaining follow-up:
+
+- Two-device UX smoke with the HTTPS companion page.
+- Better empty/error states for LAN disabled, wrong token, host stopped, and certificate trust problems.
+- True disconnected-but-remembered participant state if the lobby should show recently disconnected guests.
+
 ### Desktop HTTPS LAN Companion Foundation
 
 Completed: 2026-05-28
@@ -1474,7 +1503,7 @@ Recommended next implementation slice:
 
 - Deploy the API and web changes.
 - Validate the multi-viewer WebRTC path with two browser clients against one Docker engine session.
-- Make LAN UX player-ready: clearer enable flow, invite instructions, host/guest connection states, and host kick controls.
+- Improve LAN error states after the first two-device UX smoke.
 - Decide whether the first public LAN release caps active players at two while P3/P4 input moves to virtual gamepads or RetroArch-native device mapping.
 - Run CPU/memory validation for the current per-peer GStreamer pipeline.
 - Runtime-smoke true two-device LAN once the browser transport decision is made.

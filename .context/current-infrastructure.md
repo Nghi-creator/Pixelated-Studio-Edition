@@ -108,6 +108,7 @@ Current important frontend behaviors:
 - The player page now includes a local lobby panel. It displays participants, host/player/spectator roles, assigned player slots, and a copyable `?session=<id>&role=spectator` invite URL.
 - Guest player pages opened with a session URL join the existing local-engine session without emitting `start-game`; the engine replays `python-ready` for late joiners when the requested game session is already active.
 - Guests can request/release player slots through the lobby panel. Input is attached only when the local participant owns a player slot.
+- The lobby panel shows connected participants and lets the host remove non-host guests through the engine `lobby-kick` event.
 - Signed-in hosts publish non-secret lobby snapshots to the backend when local `lobby-state` changes. Anonymous/local-only play continues if that backend call is unauthorized or unavailable.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
@@ -152,6 +153,7 @@ Notable constraints:
 - The companion server serves the built React app from `apps/web/dist`, injects the engine URL override to its own origin, and proxies engine HTTP plus Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
 - The companion uses a runtime-generated self-signed certificate under the Electron user data directory. Guests may need to trust/bypass that certificate warning during the first LAN test.
 - The desktop UI displays HTTPS companion join URLs separately from raw LAN engine URLs.
+- The desktop LAN panel now includes a short invite checklist: copy HTTPS join page, send it with the pairing token, and have the guest accept the local certificate warning if shown.
 
 ## Engine Container
 

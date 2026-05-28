@@ -61,7 +61,7 @@
 
       exposureLabel.innerText = isLan ? "LAN multiplayer" : "Local only";
       exposureCopy.innerText = isLan
-        ? "Engine will bind to your LAN when initialized."
+        ? "Engine will start a LAN HTTPS join page when initialized."
         : "Engine binds to this computer only.";
       lanWarning.classList.toggle("hidden", !isLan);
       lanUrlPanel.classList.toggle("hidden", !isLan || !lanUrls.innerText);

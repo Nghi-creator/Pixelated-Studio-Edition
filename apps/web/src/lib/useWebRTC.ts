@@ -456,7 +456,15 @@ export function useWebRTC(
     });
   };
 
+  const kickParticipant = (socketId: string) => {
+    socketRef.current?.emit("lobby-kick", {
+      sessionId: sessionIdRef.current,
+      socketId,
+    });
+  };
+
   return {
+    kickParticipant,
     lobbyState,
     localParticipant,
     releasePlayerSlot,

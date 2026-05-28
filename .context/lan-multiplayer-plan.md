@@ -359,14 +359,14 @@ Implementation note: the API now exposes `PUT /multiplayer/lobbies/:sessionId`, 
 
 ### Phase 8: Player-Ready LAN UX
 
-Status: planned.
+Status: first UX pass implemented on 2026-05-28; full two-device UX smoke pending.
 
 Deliverables:
 
-- Add clearer desktop LAN enable/disable flow with warning copy and restart explanation.
-- Show a single join package: local HTTPS join URL, engine exposure state, and invite/token instructions.
-- Add visible guest/host connection states in the React lobby.
-- Add host kick/revoke buttons in the React lobby.
+- Add clearer desktop LAN enable/disable flow with warning copy and restart explanation. Partially implemented with HTTPS companion-focused LAN copy.
+- Show a single join package: local HTTPS join URL, engine exposure state, and invite/token instructions. Implemented in the desktop LAN companion panel.
+- Add visible guest/host connection states in the React lobby. Implemented for connected participants.
+- Add host kick/revoke buttons in the React lobby. Implemented for non-host participants.
 - Add empty/error states for guest pairing, wrong token, LAN disabled, and host stopped.
 - Keep advanced engine URL/token fields available for debugging, but make the happy path copy/invite driven.
 
@@ -375,6 +375,8 @@ Acceptance criteria:
 - A non-developer can enable LAN mode, copy one invite, and understand what the guest must do.
 - Host can see whether guests are viewing, assigned to a slot, disconnected, or blocked.
 - Host can remove a guest without restarting the whole engine.
+
+Implementation note: the desktop LAN panel now emphasizes the HTTPS join page and gives a short invite checklist. The React lobby shows connected state and exposes a host-only remove button wired to the existing `lobby-kick` engine event.
 
 ### Phase 9: Input Strategy Beyond Two Players
 
