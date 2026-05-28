@@ -1,6 +1,6 @@
 # Suggestions
 
-Last reviewed: 2026-05-27
+Last reviewed: 2026-05-28
 
 This file tracks advisory recommendations and implementation status. Completed tasks are moved into the Done section so the active backlog stays clean.
 
@@ -19,6 +19,44 @@ Recommended direction:
 
 ## Done
 
+### Engine Runtime TypeScript Phase 0A
+
+Completed: 2026-05-28
+
+Implemented in:
+
+- `engine/runtime/tsconfig.json`
+- `engine/runtime/package.json`
+- `engine/runtime/package-lock.json`
+- `engine/runtime/Dockerfile`
+- `engine/runtime/src/config.ts`
+- `engine/runtime/src/signaling/sessionRooms.ts`
+- `engine/runtime/src/signaling/socketAuth.ts`
+- `engine/runtime/src/signaling/signalingRelay.ts`
+- `engine/runtime/src/signaling/engineErrorHandlers.ts`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
+- `engine/runtime/src/signaling/inputHandlers.ts`
+- `engine/runtime/README.md`
+- `.context/lan-multiplayer-plan.md`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Added TypeScript build support to `engine/runtime`.
+- The runtime now compiles mixed `.ts` and `.js` source into `dist/`.
+- `npm run check`, `npm test`, and `npm start` now use compiled JavaScript.
+- Docker image builds now run `npm run build` and start with `npm start`.
+- Converted the engine config and multiplayer-adjacent signaling/session/input modules to TypeScript.
+- Typed core start-game payloads, ICE server normalization, stream profile normalization, session-room helpers, socket token auth, signaling relay events, engine-error relay, and input handler payloads.
+- Kept remaining engine modules as JavaScript for later targeted migration.
+
+Remaining follow-up:
+
+- Docker build smoke once Docker Desktop is reachable from the CLI again.
+- Convert runtime process manager and Local Vault route/storage modules when multiplayer slots or local identity hardening touches them.
+- Desktop TypeScript migration remains a later Phase 0B task.
+
 ### Explicit Desktop LAN Mode Toggle
 
 Completed: 2026-05-28
@@ -28,7 +66,7 @@ Implemented in:
 - `apps/desktop/main.js`
 - `apps/desktop/preload.js`
 - `apps/desktop/index.html`
-- `engine/runtime/src/config.js`
+- `engine/runtime/src/config.ts`
 - `engine/runtime/src/telemetry/healthSnapshot.js`
 - `engine/runtime/server.js`
 - `.context/lan-multiplayer-plan.md`
@@ -88,7 +126,7 @@ Completed: 2026-05-27
 Implemented in:
 
 - `apps/web/src/lib/webrtcSession.ts`
-- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
 - `engine/runtime/src/sessions/verifyBackendSession.js`
 - `engine/runtime/src/signaling/startGameHandlers.test.js`
 - `.context/project-flows.md`
@@ -397,16 +435,16 @@ Completed: 2026-05-25
 Implemented in:
 
 - `engine/runtime/server.js`
-- `engine/runtime/src/config.js`
+- `engine/runtime/src/config.ts`
 - `engine/runtime/src/http/healthRoutes.js`
 - `engine/runtime/src/http/localVaultRoutes.js`
 - `engine/runtime/src/http/errorHandlers.js`
-- `engine/runtime/src/signaling/socketAuth.js`
-- `engine/runtime/src/signaling/sessionRooms.js`
-- `engine/runtime/src/signaling/signalingRelay.js`
-- `engine/runtime/src/signaling/startGameHandlers.js`
-- `engine/runtime/src/signaling/inputHandlers.js`
-- `engine/runtime/src/signaling/engineErrorHandlers.js`
+- `engine/runtime/src/signaling/socketAuth.ts`
+- `engine/runtime/src/signaling/sessionRooms.ts`
+- `engine/runtime/src/signaling/signalingRelay.ts`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
+- `engine/runtime/src/signaling/inputHandlers.ts`
+- `engine/runtime/src/signaling/engineErrorHandlers.ts`
 - `engine/runtime/src/runtime/processManager.js`
 - `engine/runtime/src/roms/cloudRomDownloader.js`
 - `engine/runtime/src/roms/localRomStore.js`
@@ -607,8 +645,8 @@ Implemented in:
 
 - `services/api/src/routes/sessions.ts`
 - `engine/runtime/server.js`
-- `engine/runtime/src/config.js`
-- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/config.ts`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
 - `engine/runtime/src/sessions/verifyBackendSession.js`
 - `apps/desktop/main.js`
 - `apps/desktop/README.md`
@@ -1087,7 +1125,7 @@ Implemented in:
 - `apps/web/src/lib/apiClient.ts`
 - `apps/web/src/lib/useWebRTC.ts`
 - `apps/web/src/lib/webrtcPeer.ts`
-- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
 - `engine/runtime/src/runtime/processManager.js`
 - `engine/runtime/camera.py`
 - `engine/runtime/README.md`
@@ -1169,7 +1207,7 @@ Implemented in:
 - `apps/web/src/lib/useWebRTC.ts`
 - `apps/web/src/features/player/PlayerControls.tsx`
 - `apps/web/src/pages/user/Player.tsx`
-- `engine/runtime/src/signaling/startGameHandlers.js`
+- `engine/runtime/src/signaling/startGameHandlers.ts`
 - `engine/runtime/src/signaling/startGameHandlers.test.js`
 - `engine/runtime/src/runtime/processManager.js`
 - `engine/runtime/camera.py`

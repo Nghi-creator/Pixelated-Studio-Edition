@@ -1,14 +1,20 @@
-function normalizeSessionId(sessionId) {
+import type { Socket } from "socket.io";
+
+export function normalizeSessionId(sessionId: unknown) {
   return typeof sessionId === "string" && /^[a-zA-Z0-9_-]+$/.test(sessionId)
     ? sessionId
     : null;
 }
 
-function getSessionRoom(sessionId) {
+export function getSessionRoom(sessionId: string) {
   return `session:${sessionId}`;
 }
 
-function joinSession(socket, sessionId, role = "unknown") {
+export function joinSession(
+  socket: Socket,
+  sessionId: unknown,
+  role = "unknown",
+) {
   const safeSessionId = normalizeSessionId(sessionId);
 
   if (!safeSessionId) {
@@ -25,9 +31,17 @@ function joinSession(socket, sessionId, role = "unknown") {
   return safeSessionId;
 }
 
-function relayToSession(socket, eventName, payload) {
+export function relayToSession(
+  socket: Socket,
+  eventName: string,
+  payload?: unknown,
+) {
+  const sessionPayload =
+    payload && typeof payload === "object"
+      ? (payload as { sessionId?: unknown })
+      : {};
   const sessionId =
-    normalizeSessionId(payload?.sessionId) || socket.data.sessionId;
+    normalizeSessionId(sessionPayload.sessionId) || socket.data.sessionId;
 
   if (!sessionId) {
     console.warn(`[Node.js] Dropping ${eventName}: missing session id`);
@@ -36,10 +50,3 @@ function relayToSession(socket, eventName, payload) {
 
   socket.to(getSessionRoom(sessionId)).emit(eventName, payload);
 }
-
-module.exports = {
-  getSessionRoom,
-  joinSession,
-  normalizeSessionId,
-  relayToSession,
-};

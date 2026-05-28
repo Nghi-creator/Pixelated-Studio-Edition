@@ -1,7 +1,9 @@
-const crypto = require("crypto");
+import crypto from "crypto";
+import type { NextFunction, Request, Response } from "express";
+import type { Socket } from "socket.io";
 
-function createEngineTokenAuth(engineToken) {
-  function isValidEngineToken(token) {
+export function createEngineTokenAuth(engineToken: string) {
+  function isValidEngineToken(token: unknown) {
     if (!engineToken) return true;
     if (typeof token !== "string" || !token) return false;
 
@@ -14,7 +16,7 @@ function createEngineTokenAuth(engineToken) {
     );
   }
 
-  function requireEngineToken(req, res, next) {
+  function requireEngineToken(req: Request, res: Response, next: NextFunction) {
     if (isValidEngineToken(req.get("x-engine-token"))) {
       next();
       return;
@@ -23,7 +25,7 @@ function createEngineTokenAuth(engineToken) {
     res.status(401).json({ error: "Invalid engine pairing token" });
   }
 
-  function useSocketEngineToken(socket, next) {
+  function useSocketEngineToken(socket: Socket, next: (err?: Error) => void) {
     const token =
       socket.handshake.auth?.token || socket.handshake.headers["x-engine-token"];
 
@@ -41,5 +43,3 @@ function createEngineTokenAuth(engineToken) {
     useSocketEngineToken,
   };
 }
-
-module.exports = { createEngineTokenAuth };

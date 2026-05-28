@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-05-27
+Last reviewed: 2026-05-28
 
 ## Project Shape
 
@@ -10,7 +10,7 @@ Top-level areas:
 
 - `apps/web/`: Vite, React 19, TypeScript, Tailwind frontend.
 - `apps/desktop/`: Electron desktop launcher and Docker orchestration UI.
-- `engine/runtime/`: local Express/Socket.IO bridge, Docker image, RetroArch/GStreamer runtime, and Python WebRTC sender.
+- `engine/runtime/`: local Express/Socket.IO bridge, Docker image, RetroArch/GStreamer runtime, Python WebRTC sender, and a mixed TypeScript/JavaScript Node runtime that builds to `dist/`.
 - `services/api/`: localhost-first Fastify + TypeScript backend control-plane skeleton.
 - `supabase/`: database, storage, RLS, RPC, and realtime migrations.
 - `assets/`: README/banner architecture imagery.
@@ -160,12 +160,13 @@ Installed runtime pieces:
 
 Runtime processes:
 
-- `server.js`: Express + Socket.IO composition root.
-- `engine/runtime/src/`: local engine modules for config, health/local vault HTTP routes, Socket.IO signaling, ROM download/storage, runtime process control, input injection, and health telemetry.
+- `server.js`: Express + Socket.IO composition root, compiled to `dist/server.js` for runtime start.
+- `engine/runtime/src/`: local engine modules for config, health/local vault HTTP routes, Socket.IO signaling, ROM download/storage, runtime process control, input injection, and health telemetry. Config and signaling/session/input contract modules are now TypeScript.
 - `Xvfb :99`: virtual screen.
 - PulseAudio system daemon.
 - RetroArch process per game.
 - `camera.py`: GStreamer `webrtcbin` sender for X11 capture and PulseAudio monitor.
+- `npm run build` compiles the runtime to `dist/`; `npm run check`, `npm test`, and Docker startup use compiled JavaScript.
 
 Data paths:
 

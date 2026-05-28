@@ -1,52 +1,107 @@
-const crypto = require("crypto");
-const path = require("path");
-const {
+import crypto from "crypto";
+import path from "path";
+import type { Socket } from "socket.io";
+import {
   getSessionRoom,
   joinSession,
   normalizeSessionId,
-} = require("./sessionRooms");
-const { sanitizeUserId } = require("../roms/localRomStore");
+} from "./sessionRooms";
+import { sanitizeUserId } from "../roms/localRomStore";
 
-function normalizeStartMode(mode) {
+type IceServer = {
+  credential?: string;
+  urls: string | string[];
+  username?: string;
+};
+
+export type StreamProfile = {
+  bitrateKbps: number;
+  fps: number;
+  id: string;
+};
+
+type StartGamePayload = {
+  iceServers?: unknown;
+  mode?: unknown;
+  romFilename?: unknown;
+  sessionId?: unknown;
+  sessionToken?: unknown;
+  streamProfile?: unknown;
+  userId?: unknown;
+};
+
+type VerifiedBackendSession = {
+  mode: string;
+  romTarget: string;
+  userId?: string | null;
+};
+
+type RuntimeBootOptions = {
+  iceServers?: IceServer[];
+  isCloudRom?: boolean;
+  streamProfile: StreamProfile;
+};
+
+type Runtime = {
+  bootGame(romPath: string, sessionId: string, options: RuntimeBootOptions): void;
+};
+
+type RegisterStartGameOptions = {
+  apiUrl: string;
+  downloadCloudRom(romUrl: string, destinationPath: string): Promise<void>;
+  runtime: Runtime;
+  verifyBackendSession(options: {
+    apiUrl: string;
+    sessionId: string;
+    sessionToken: string;
+  }): Promise<VerifiedBackendSession>;
+};
+
+function normalizeStartMode(mode: unknown) {
   return typeof mode === "string" ? mode.trim().toLowerCase() : "";
 }
 
-function hasCloudSessionIntent(payload) {
+export function hasCloudSessionIntent(payload: StartGamePayload) {
   return (
     normalizeStartMode(payload.mode) === "cloud" || Boolean(payload.sessionToken)
   );
 }
 
-function normalizeIceServers(value) {
+export function normalizeIceServers(value: unknown): IceServer[] {
   return Array.isArray(value)
     ? value
-        .map((server) => {
+        .map((server): IceServer | null => {
           if (!server || typeof server !== "object") return null;
-          const urls = Array.isArray(server.urls)
-            ? server.urls.filter((url) => typeof url === "string")
-            : typeof server.urls === "string"
-              ? server.urls
+          const rawServer = server as Record<string, unknown>;
+          const urls = Array.isArray(rawServer.urls)
+            ? rawServer.urls.filter((url): url is string => typeof url === "string")
+            : typeof rawServer.urls === "string"
+              ? rawServer.urls
               : null;
           if (!urls || (Array.isArray(urls) && urls.length === 0)) return null;
-          return {
+          const normalized: IceServer = {
             credential:
-              typeof server.credential === "string"
-                ? server.credential
+              typeof rawServer.credential === "string"
+                ? rawServer.credential
                 : undefined,
             urls,
             username:
-              typeof server.username === "string" ? server.username : undefined,
+              typeof rawServer.username === "string"
+                ? rawServer.username
+                : undefined,
           };
+          return normalized;
         })
-        .filter(Boolean)
+        .filter((server): server is IceServer => Boolean(server))
     : [];
 }
 
-function normalizeStreamProfile(value) {
+export function normalizeStreamProfile(value: unknown): StreamProfile {
   const profile = value && typeof value === "object" ? value : {};
-  const fps = Number(profile.fps);
-  const bitrateKbps = Number(profile.bitrateKbps);
-  const id = typeof profile.id === "string" ? profile.id : "balanced";
+  const rawProfile = profile as Record<string, unknown>;
+  const fps = Number(rawProfile.fps);
+  const bitrateKbps = Number(rawProfile.bitrateKbps);
+  const id = typeof rawProfile.id === "string" ? rawProfile.id : "balanced";
 
   return {
     bitrateKbps:
@@ -58,10 +113,13 @@ function normalizeStreamProfile(value) {
   };
 }
 
-function registerStartGameHandler(socket, options) {
+export function registerStartGameHandler(
+  socket: Socket,
+  options: RegisterStartGameOptions,
+) {
   const { apiUrl, downloadCloudRom, runtime, verifyBackendSession } = options;
 
-  socket.on("start-game", async (payload = {}) => {
+  socket.on("start-game", async (payload: StartGamePayload = {}) => {
     const sessionId =
       normalizeSessionId(payload.sessionId) ||
       socket.data.sessionId ||
@@ -84,7 +142,7 @@ function registerStartGameHandler(socket, options) {
     }
 
     if (hasCloudSessionIntent(payload)) {
-      if (!payload.sessionToken) {
+      if (typeof payload.sessionToken !== "string" || !payload.sessionToken) {
         socket.emit("engine-error", {
           message: "Cloud games require a backend session token.",
         });
@@ -154,10 +212,3 @@ function registerStartGameHandler(socket, options) {
     }
   });
 }
-
-module.exports = {
-  hasCloudSessionIntent,
-  normalizeIceServers,
-  normalizeStreamProfile,
-  registerStartGameHandler,
-};

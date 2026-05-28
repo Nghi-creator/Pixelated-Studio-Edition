@@ -139,17 +139,36 @@ Open technical question: GStreamer `webrtcbin` may need one peer connection per 
 
 ### Phase 0: TypeScript Migration Track
 
-Status: planned alongside multiplayer work.
+Status: Phase 0A implemented for engine signaling on 2026-05-28; desktop TypeScript migration remains planned.
 
 The engine runtime and desktop launcher are still JavaScript while the web app and API are TypeScript. Multiplayer will add socket payload contracts, role/slot state, invite data, and desktop IPC state, so TypeScript should be introduced as part of the feature path rather than as a separate cosmetic rename.
 
 Recommended migration order:
 
-- Add TypeScript config/build support to `engine/runtime/` first.
-- Convert engine config, signaling payload validators, session room helpers, and input routing modules before implementing player slots.
+- Add TypeScript config/build support to `engine/runtime/` first. Completed in Phase 0A.
+- Convert engine config, signaling payload validators, session room helpers, and input routing modules before implementing player slots. Completed in Phase 0A for config, session rooms, socket auth, signaling relay, engine errors, start-game handling, and input handlers.
 - Add TypeScript config/build support to `apps/desktop/` after LAN mode stabilizes.
 - Convert desktop IPC contracts, Docker command construction, LAN interface discovery, and lifecycle state handling.
 - Keep `camera.py` as Python and type the JSON contracts it receives through env/socket payloads on the Node side.
+
+Phase 0A implementation notes:
+
+- `engine/runtime` now has `tsconfig.json`.
+- `npm run build` compiles mixed `.ts` and `.js` source into `dist/`.
+- `npm run check`, `npm test`, and `npm start` run against compiled output.
+- The Docker image runs `npm run build` during image creation and starts with `npm start`.
+- Converted files:
+  - `engine/runtime/src/config.ts`
+  - `engine/runtime/src/signaling/sessionRooms.ts`
+  - `engine/runtime/src/signaling/socketAuth.ts`
+  - `engine/runtime/src/signaling/signalingRelay.ts`
+  - `engine/runtime/src/signaling/engineErrorHandlers.ts`
+  - `engine/runtime/src/signaling/startGameHandlers.ts`
+  - `engine/runtime/src/signaling/inputHandlers.ts`
+
+Remaining validation:
+
+- Docker build smoke was attempted on 2026-05-28 but Docker daemon was not reachable from the CLI at that moment.
 
 Acceptance criteria:
 
