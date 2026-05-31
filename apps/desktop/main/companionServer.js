@@ -128,16 +128,25 @@ function injectCompanionBootstrap(html) {
 }
 
 function serveStatic(req, res, webDistDir) {
-  if (!fs.existsSync(webDistDir)) {
+  const indexPath = path.join(webDistDir, "index.html");
+  if (!fs.existsSync(indexPath)) {
     res.writeHead(503, { "content-type": "text/html; charset=utf-8" });
     res.end(
-      "Pixelated web build is missing. Run npm run build in apps/web first.",
+      `Pixelated web build is missing at ${webDistDir}. Build apps/web before packaging the desktop app.`,
     );
     return;
   }
 
-  const url = new URL(req.url || "/", "https://pixelated.local");
-  const requestedPath = decodeURIComponent(url.pathname);
+  let requestedPath = "/";
+  try {
+    const url = new URL(req.url || "/", "https://pixelated.local");
+    requestedPath = decodeURIComponent(url.pathname);
+  } catch {
+    res.writeHead(400, { "content-type": "text/plain; charset=utf-8" });
+    res.end("Invalid request path");
+    return;
+  }
+
   const relativePath = requestedPath === "/" ? "index.html" : requestedPath.slice(1);
   const absolutePath = path.resolve(webDistDir, relativePath);
   const safeRoot = path.resolve(webDistDir);
@@ -150,7 +159,7 @@ function serveStatic(req, res, webDistDir) {
   const filePath =
     isReadableFile
       ? absolutePath
-      : path.join(safeRoot, "index.html");
+      : indexPath;
 
   if (path.basename(filePath) === "index.html") {
     const html = fs.readFileSync(filePath, "utf8");

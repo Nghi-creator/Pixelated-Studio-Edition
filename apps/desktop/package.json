@@ -4,7 +4,8 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dist": "electron-builder"
+    "prepare:web": "node scripts/prepareWebDist.js",
+    "dist": "npm run prepare:web && electron-builder"
   },
   "devDependencies": {
     "electron": "^29.0.0",
@@ -27,6 +28,15 @@
     "files": [
       "**/*",
       "!dist/**"
+    ],
+    "extraResources": [
+      {
+        "from": "../web/dist",
+        "to": "web-dist",
+        "filter": [
+          "**/*"
+        ]
+      }
     ]
   }
 }

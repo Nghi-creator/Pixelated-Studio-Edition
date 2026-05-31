@@ -1,6 +1,6 @@
 # LAN And Multiplayer Feature Plan
 
-Last reviewed: 2026-05-28
+Last reviewed: 2026-05-31
 
 This plan tracks explicit LAN support and the multiplayer feature path. The project currently has a secure local-default engine: Docker publishes the engine only on host loopback, React pairs with a local engine URL, and the desktop pairing token gates engine HTTP and Socket.IO access.
 
@@ -252,7 +252,7 @@ Implementation phases:
 
 Open decision: choose between a self-signed/local CA flow, a localhost-style companion that only works on the host, or a tunnel/relay provider. For LAN guests, self-signed/local CA or a trusted tunnel are the realistic choices; plain HTTP LAN from hosted Vercel is not a reliable product path.
 
-Implementation note: the companion serves the built React app over local HTTPS and injects `pixelated_engine_url = window.location.origin`, so the player uses the companion origin. The companion proxies engine HTTP routes and Socket.IO/WebSocket traffic to `127.0.0.1:8080`, avoiding browser-side HTTPS-to-HTTP LAN fetches. It requires `apps/web/dist` to exist when running from the monorepo.
+Implementation note: the companion serves the built React app over local HTTPS and injects `pixelated_engine_url = window.location.origin`, so the player uses the companion origin. The companion proxies engine HTTP routes and Socket.IO/WebSocket traffic to `127.0.0.1:8080`, avoiding browser-side HTTPS-to-HTTP LAN fetches. In development it resolves `apps/web/dist`; packaged Electron builds resolve the bundled `resources/web-dist` copy. The desktop release path is now `cd apps/desktop && npm run dist`, which builds `apps/web/dist` before electron-builder packages it as an extra resource. `PIXELATED_WEB_DIST_DIR` remains available for custom layouts and smoke tests.
 
 ### Phase 3: Lobby And Roles
 

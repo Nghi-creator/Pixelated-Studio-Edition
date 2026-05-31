@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-05-28
+Last reviewed: 2026-05-31
 
 ## Project Shape
 
@@ -14,6 +14,11 @@ Top-level areas:
 - `services/api/`: localhost-first Fastify + TypeScript backend control-plane skeleton.
 - `supabase/`: database, storage, RLS, RPC, and realtime migrations.
 - `assets/`: README/banner architecture imagery.
+
+Release packaging note: desktop artifacts are produced from `apps/desktop` with
+`npm run dist`. That script builds `apps/web/dist` first, and electron-builder
+bundles that React production output into the app as `resources/web-dist` for
+the LAN HTTPS companion.
 
 ## Backend API
 
@@ -122,6 +127,7 @@ Runtime stack:
 - Electron app in `apps/desktop/main.js`.
 - Renderer files: `apps/desktop/index.html` and `apps/desktop/preload.js`.
 - Uses local Docker CLI through `child_process.exec`.
+- Packaged releases are built with `cd apps/desktop && npm run dist`; this script runs the React production build first and electron-builder bundles `apps/web/dist` as `resources/web-dist`.
 
 Current lifecycle:
 
@@ -150,10 +156,11 @@ Notable constraints:
 - Health verifies core local engine dependencies: Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
 - LAN/multiplayer support is planned in `.context/lan-multiplayer-plan.md`. Current engine exposure defaults to loopback-only, with explicit desktop LAN mode available for LAN testing.
 - LAN mode now also starts a desktop-hosted HTTPS companion server on `PIXELATED_COMPANION_PORT`, defaulting to `8090`.
-- The companion server serves the built React app from `apps/web/dist`, injects the engine URL override to its own origin, and proxies engine HTTP plus Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
+- The companion server serves the built React app from `apps/web/dist` in development and from bundled `resources/web-dist` in packaged desktop builds. It injects the engine URL override to its own origin and proxies engine HTTP plus Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
 - The companion uses a runtime-generated self-signed certificate under the Electron user data directory. Guests may need to trust/bypass that certificate warning during the first LAN test.
 - The desktop UI displays HTTPS companion join URLs separately from raw LAN engine URLs.
 - The desktop LAN panel now includes a short invite checklist: copy HTTPS join page, send it with the pairing token, and have the guest accept the local certificate warning if shown.
+- `PIXELATED_WEB_DIST_DIR` can override the companion asset directory for custom layouts, but release artifacts should use the bundled `resources/web-dist` contract.
 
 ## Engine Container
 
