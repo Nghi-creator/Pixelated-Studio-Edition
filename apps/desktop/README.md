@@ -8,6 +8,19 @@ Run from this folder:
 npm start
 ```
 
+Package a release from this folder:
+
+```sh
+npm run dist
+```
+
+The desktop `dist` script first runs the React production build in `../web`,
+then electron-builder bundles `../web/dist` into packaged desktop artifacts as
+`resources/web-dist`. Packaged builds resolve the LAN HTTPS companion player
+from that bundled resource. Local development still resolves the companion
+player from `apps/web/dist`, so run `npm run build` in `apps/web` before
+testing LAN companion mode with `npm start`.
+
 By default the desktop app builds the engine image from:
 
 ```txt
@@ -42,4 +55,10 @@ The desktop app passes `PIXELATED_API_URL` into the engine so cloud sessions can
 
 ```txt
 PIXELATED_API_URL=http://127.0.0.1:4000
+```
+
+Override the companion web asset path for custom layouts with:
+
+```txt
+PIXELATED_WEB_DIST_DIR=/absolute/path/to/apps/web/dist
 ```

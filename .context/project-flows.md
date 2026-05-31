@@ -1,6 +1,6 @@
 # Project Flows
 
-Last reviewed: 2026-05-27
+Last reviewed: 2026-05-31
 
 This file describes the runtime flows in PIXELATED Studio, using `assets/Pixelated.png` plus the current code in `apps/web/` and `apps/desktop/` as the source of truth.
 
@@ -36,9 +36,11 @@ Purpose: start the local Dockerized game streaming node.
 13. `startVirtualDisplay()` removes stale X11 lock files, starts `Xvfb :99`, starts PulseAudio, and writes `/app/retroarch.cfg`.
 14. Electron polls `http://127.0.0.1:8080/health`.
 15. `/health` checks Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
-16. If health returns `ok: true`, Electron marks the engine as successful.
-17. If health times out, Electron removes `pixelated-node` and returns the UI to stopped state.
-18. Electron displays log messages from the Docker lifecycle back in the desktop UI.
+16. If health returns `ok: true` and LAN mode is enabled, Electron starts the LAN HTTPS companion server.
+17. The companion serves the React production build from `apps/web/dist` in development or `resources/web-dist` in packaged builds, then proxies engine HTTP and Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
+18. If health returns `ok: true`, Electron marks the engine as successful.
+19. If health times out or engine startup fails, Electron removes `pixelated-node` and returns the UI to stopped state.
+20. Electron displays log messages from the Docker lifecycle back in the desktop UI.
 
 Current limitation: health is still readiness-focused. It does not yet expose live stream telemetry such as FPS, bitrate, ICE state, or encoder errors.
 

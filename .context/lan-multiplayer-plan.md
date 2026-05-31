@@ -1,6 +1,6 @@
 # LAN And Multiplayer Feature Plan
 
-Last reviewed: 2026-05-28
+Last reviewed: 2026-05-31
 
 This plan tracks explicit LAN support and the multiplayer feature path. The project currently has a secure local-default engine: Docker publishes the engine only on host loopback, React pairs with a local engine URL, and the desktop pairing token gates engine HTTP and Socket.IO access.
 
@@ -139,14 +139,14 @@ Open technical question: GStreamer `webrtcbin` may need one peer connection per 
 
 ### Phase 0: TypeScript Migration Track
 
-Status: Phase 0A implemented for engine signaling on 2026-05-28; desktop TypeScript migration remains planned.
+Status: Phase 0A implemented for engine signaling on 2026-05-28; engine input/telemetry, runtime/ROM/session, HTTP route, and root server conversion continued on 2026-05-31; desktop TypeScript migration remains planned.
 
 The engine runtime and desktop launcher are still JavaScript while the web app and API are TypeScript. Multiplayer will add socket payload contracts, role/slot state, invite data, and desktop IPC state, so TypeScript should be introduced as part of the feature path rather than as a separate cosmetic rename.
 
 Recommended migration order:
 
 - Add TypeScript config/build support to `engine/runtime/` first. Completed in Phase 0A.
-- Convert engine config, signaling payload validators, session room helpers, and input routing modules before implementing player slots. Completed in Phase 0A for config, session rooms, socket auth, signaling relay, engine errors, start-game handling, and input handlers.
+- Convert engine config, HTTP routes, signaling payload validators, session room helpers, input routing modules, runtime process control, ROM/session helpers, and runtime health/telemetry helpers before expanding multiplayer. Completed for the root server composition file, config, HTTP routes, session rooms, socket auth, signaling relay, engine errors, start-game handling, input handlers, input mapping/bridge helpers, runtime process control, ROM/session helpers, and health/resource telemetry helpers.
 - Add TypeScript config/build support to `apps/desktop/` after LAN mode stabilizes.
 - Convert desktop IPC contracts, Docker command construction, LAN interface discovery, and lifecycle state handling.
 - Keep `camera.py` as Python and type the JSON contracts it receives through env/socket payloads on the Node side.
@@ -165,6 +165,40 @@ Phase 0A implementation notes:
   - `engine/runtime/src/signaling/engineErrorHandlers.ts`
   - `engine/runtime/src/signaling/startGameHandlers.ts`
   - `engine/runtime/src/signaling/inputHandlers.ts`
+
+Phase 0B implementation notes:
+
+- Converted the engine input helper layer:
+  - `engine/runtime/src/input/injectKey.ts`
+  - `engine/runtime/src/input/translateKey.ts`
+  - `engine/runtime/src/input/translateGamepadButton.ts`
+  - `engine/runtime/src/input/gamepadBridge.ts`
+- Converted engine health and resource telemetry helpers:
+  - `engine/runtime/src/telemetry/healthSnapshot.ts`
+  - `engine/runtime/src/telemetry/resourceSnapshot.ts`
+- `npm run build`, `npm test`, and `npm run check` passed in `engine/runtime` after the conversion.
+
+Phase 0C implementation notes:
+
+- Converted the engine runtime process manager:
+  - `engine/runtime/src/runtime/processManager.ts`
+- Converted engine ROM/session helpers:
+  - `engine/runtime/src/roms/cloudRomDownloader.ts`
+  - `engine/runtime/src/roms/localRomStore.ts`
+  - `engine/runtime/src/sessions/verifyBackendSession.ts`
+- Typed runtime boot options, active process state, cloud ROM download validation, local ROM user folder sanitization, and backend session verification responses.
+- `npm run build`, `npm test`, and `npm run check` passed in `engine/runtime` after the conversion.
+
+Phase 0D implementation notes:
+
+- Converted HTTP route modules:
+  - `engine/runtime/src/http/errorHandlers.ts`
+  - `engine/runtime/src/http/healthRoutes.ts`
+  - `engine/runtime/src/http/localVaultRoutes.ts`
+- Converted the root engine server composition file:
+  - `engine/runtime/server.ts`
+- `server.ts` still compiles to `dist/server.js`, so the package entrypoint and Docker startup command remain unchanged.
+- `npm run build`, `npm test`, and `npm run check` passed in `engine/runtime` after the conversion.
 
 Remaining validation:
 
@@ -252,7 +286,7 @@ Implementation phases:
 
 Open decision: choose between a self-signed/local CA flow, a localhost-style companion that only works on the host, or a tunnel/relay provider. For LAN guests, self-signed/local CA or a trusted tunnel are the realistic choices; plain HTTP LAN from hosted Vercel is not a reliable product path.
 
-Implementation note: the companion serves the built React app over local HTTPS and injects `pixelated_engine_url = window.location.origin`, so the player uses the companion origin. The companion proxies engine HTTP routes and Socket.IO/WebSocket traffic to `127.0.0.1:8080`, avoiding browser-side HTTPS-to-HTTP LAN fetches. It requires `apps/web/dist` to exist when running from the monorepo.
+Implementation note: the companion serves the built React app over local HTTPS and injects `pixelated_engine_url = window.location.origin`, so the player uses the companion origin. The companion proxies engine HTTP routes and Socket.IO/WebSocket traffic to `127.0.0.1:8080`, avoiding browser-side HTTPS-to-HTTP LAN fetches. In development it resolves `apps/web/dist`; packaged Electron builds resolve the bundled `resources/web-dist` copy. The desktop release path is now `cd apps/desktop && npm run dist`, which builds `apps/web/dist` before electron-builder packages it as an extra resource. `PIXELATED_WEB_DIST_DIR` remains available for custom layouts and smoke tests.
 
 ### Phase 3: Lobby And Roles
 
@@ -283,7 +317,7 @@ Status: implemented for keyboard player slots 1 and 2 on 2026-05-28; manual Retr
 
 Deliverables:
 
-- Convert input event contracts and routing helpers to TypeScript before expanding player slots. Completed in Phase 0A.
+- Convert input event contracts and routing helpers to TypeScript before expanding player slots. Completed across Phase 0A and Phase 0B.
 - Extend React input events with `playerIndex`. Completed with player 1 as the current UI default.
 - Add engine-side participant/slot validation. Completed through lobby `canSendInput`.
 - Add player 2+ key/gamepad mapping strategy. Completed for keyboard slot 2; slots 3 and 4 still need a virtual gamepad or RetroArch-specific mapping decision.
@@ -317,7 +351,7 @@ Implementation note: WebRTC signaling now carries a browser-generated `peerId`. 
 
 ### Phase 6: React Lobby And Guest Join UI
 
-Status: first local-engine UI slice implemented on 2026-05-28; real two-browser smoke pending.
+Status: first local-engine UI slice implemented on 2026-05-28; health-gated slot UI added on 2026-05-31; real two-browser smoke pending.
 
 Deliverables:
 
@@ -325,6 +359,7 @@ Deliverables:
 - Show a copyable session invite URL for the current host session.
 - Let guests join an existing local-engine session from a `?session=<id>` URL.
 - Let guests request/release player slots from the player page.
+- Gate active player slot requests using the engine `/health` gamepad bridge payload.
 - Ensure guests do not boot or stop the host game.
 - Wake late-joining guests when a camera process is already active for that session.
 
@@ -332,11 +367,12 @@ Acceptance criteria:
 
 - Host can copy a session link from the player page.
 - Guest opening the link joins as a spectator by default.
-- Guest can request an open player slot and input uses that slot.
+- Guest can request an open supported player slot and input uses that slot.
+- If `/dev/uinput` or the virtual gamepad bridge is unavailable, P3/P4 are disabled with an explanation while spectator invites still work.
 - Guest disconnect does not stop the host game.
 - Host disconnect still stops the active session.
 
-Implementation note: `useWebRTC` now exposes lobby state, the local participant, session id, and slot actions. Player links use `?session=<id>&role=spectator`; guest clients join the existing session and wait for/receive `python-ready` without emitting `start-game`. The engine re-emits `python-ready` to a newly joined browser when the requested session is already active.
+Implementation note: `useWebRTC` now exposes lobby state, the local participant, session id, slot actions, and health-derived input capabilities. Player links use `?session=<id>&role=spectator`; guest clients join the existing session and wait for/receive `python-ready` without emitting `start-game`. The engine re-emits `python-ready` to a newly joined browser when the requested session is already active. The web lobby reads `checks.gamepadBridge` from `/health`; when `fileExists`, `uinputAvailable`, and bridge health allow virtual gamepads, P1-P4 are offered. If the bridge is missing, failed, or `/dev/uinput` is unavailable, active play is capped to P1/P2, P3/P4 buttons are disabled, and watch-only/spectator flow remains available.
 
 ### Phase 7: Backend Multiplayer Support
 
@@ -380,7 +416,7 @@ Implementation note: the desktop LAN panel now emphasizes the HTTPS join page an
 
 ### Phase 9: Input Strategy Beyond Two Players
 
-Status: virtual gamepad foundation implemented on 2026-05-28; Docker/device smoke pending.
+Status: virtual gamepad foundation implemented on 2026-05-28; web health-gates active slots on 2026-05-31; Docker/device smoke pending.
 
 Recommended approach: use virtual gamepads for P1-P4 when `/dev/uinput` is available, with keyboard fallback for P1/P2 only.
 
@@ -388,20 +424,20 @@ Deliverables:
 
 - Evaluate virtual gamepad options inside the Linux container. Implemented with Python `evdev` and Linux `uinput`.
 - Evaluate RetroArch input/device config for multiple ports. Implemented as udev/autodetect plus four libretro joypad ports; emulator smoke pending.
-- Decide whether the first public LAN release caps active players at 2 while allowing extra spectators. Revisit after Docker/Desktop `/dev/uinput` smoke.
+- Cap active players at 2 when `/health` reports missing or failed virtual gamepad support, while allowing extra spectators. Implemented in the React lobby.
 - Add a test ROM/input diagnostic smoke checklist before enabling P3/P4.
 
 Acceptance criteria:
 
 - P3/P4 input does not depend on crowded shared keyboard mappings. Implemented through virtual gamepad bridge.
 - Input routing remains slot-authorized. Covered by automated tests.
-- UI max player settings match the engine's real supported input mode. Pending device smoke and possible UX gating if `/dev/uinput` is unavailable.
+- UI max player settings match the engine's real supported input mode. Implemented by deriving the active slot cap from `/health.checks.gamepadBridge`.
 
-Implementation note: browser controls stay the same for every player. React emits `playerIndex`, the engine verifies slot ownership, then Node writes normalized controller events to `input_gamepad.py`. The Python bridge creates four virtual controllers via `evdev.UInput`. If `/dev/uinput` is unavailable, P1/P2 fall back to keyboard injection and P3/P4 get a clear engine error.
+Implementation note: browser controls stay the same for every player. React emits `playerIndex`, the engine verifies slot ownership, then Node writes normalized controller events to `input_gamepad.py`. The Python bridge creates four virtual controllers via `evdev.UInput`. If `/dev/uinput` is unavailable or the bridge is missing/failed, P1/P2 fall back to keyboard injection. The web lobby also reads `/health` and disables P3/P4 with a short reason before guests can request unsupported slots; spectators are unaffected.
 
 ### Phase 10: Multiplayer Performance Validation
 
-Status: engine measurement foundation implemented on 2026-05-28; real multi-viewer measurements pending.
+Status: engine measurement foundation implemented on 2026-05-28; repeatable health/peer smoke harness added on 2026-05-31; first local two-viewer CPU/RSS sample captured on 2026-05-31; real two-device and browser WebRTC-stat measurements still pending.
 
 Deliverables:
 
@@ -418,7 +454,36 @@ Acceptance criteria:
 
 Implementation note: `camera.py` writes peer state to `/tmp/pixelated_camera_peers.json`, and `/health` now reports `checks.resources.cameraPeers`, process RSS, and average CPU since process start for RetroArch/camera where `/proc` is available. This gives the manual smoke a concrete before/after measurement surface without adding another metrics service.
 
+Local measurement note from 2026-05-31: with one synthetic RetroArch smoke session and two local Chrome viewer tabs, `/health` reported two camera peers for six 5-second samples. Camera CPU rose to roughly 25.1-25.7%, camera RSS held at 96.66 MB, RetroArch CPU held around 58.2-58.5%, RetroArch RSS held at 191.11 MB, and Node RSS stayed around 53-54.5 MB. This is enough to prove the measurement surface works, but it is not yet a target-device performance pass because both viewers were on the same machine and the ROM was a synthetic smoke ROM.
+
+Repeatable smoke harness:
+
+```sh
+node scripts/multiplayerSmoke.mjs --engine-url http://127.0.0.1:8080 --expected-guests 1
+```
+
+Run it after the host game is already streaming and before guests open the LAN HTTPS join page. The harness captures a baseline `/health` snapshot, waits for `checks.resources.cameraPeers.peerCount` to increase by the expected guest count, validates `checks.runtime.activeSessionId` and camera peer `sessionId` stay on the host session, then waits for guest disconnect cleanup unless `--skip-disconnect` is passed. It writes a concise JSON report plus NDJSON poll log under `.context/smoke-artifacts/` by default. The harness observes real camera peer state; it does not fake peers with Socket.IO-only clients.
+
 ## Test Plan
+
+## Remaining Multiplayer Execution Tracks
+
+These are the remaining proof steps before calling LAN multiplayer production-ready:
+
+1. Real two-device smoke: host and guest must both receive the stream, and guest disconnect must not kill the host session.
+2. Performance validation: measure engine CPU/RSS and browser WebRTC stats with two or more viewers.
+3. LAN HTTPS UX validation: confirm the self-signed companion flow is acceptable for normal players, or choose a local CA/tunnel strategy.
+4. P3/P4 validation: virtual gamepad support is coded, but still needs Docker/RetroArch smoke on the target host setup.
+5. Desktop TypeScript migration: not required for multiplayer functionality, but it remains the next code-quality and orchestration-safety phase.
+
+Current execution status:
+
+- Track 1 has a local two-browser validation pass. Docker Desktop was started, the engine image was rebuilt, `pixelated-node` was launched with Vercel plus local Vite origins, a synthetic `codex-smoke` session booted, and `scripts/multiplayerSmoke.mjs` passed with one baseline browser peer plus one additional browser peer. Closing the added peer returned camera peer count to baseline without killing the host session. Artifacts: `.context/smoke-artifacts/two-browser-peer-smoke-2026-05-31T12-38-00-268Z.json` and `.context/smoke-artifacts/two-browser-peer-smoke-2026-05-31T12-38-00-268Z.ndjson`.
+- Track 1 still needs a true two-device LAN pass where the host and guest are on separate machines and both visually confirm playback.
+- Track 2 has a first local two-viewer CPU/RSS sample. Browser-side WebRTC stats and target-host CPU observations are still pending.
+- Track 3 should be evaluated during the same two-device smoke by noting whether the guest can understand and accept the local HTTPS certificate flow.
+- Track 4 remains blocked in this Docker Desktop smoke because `/dev/uinput` is unavailable to the engine. `/health.checks.gamepadBridge` correctly reports `failed: true`, `ready: false`, and P3/P4 are disabled in React.
+- Track 5 should start after the real two-device LAN and HTTPS UX checks are no longer blocked.
 
 Automated:
 
@@ -434,13 +499,14 @@ Manual:
 - Host enables LAN mode and confirms LAN device can reach `/health`.
 - LAN guest pairs through hosted React using LAN URL plus token.
 - Host starts a game and guest receives stream.
+- Run `node scripts/multiplayerSmoke.mjs --engine-url <engine-or-companion-origin> --expected-guests <n>` before guests join, and keep the report/NDJSON artifacts with the smoke notes.
 - Guest input works only for assigned slot.
 - Host disables LAN mode and guest connection fails closed.
 
 ## Open Decisions
 
 - Should LAN mode bind to `0.0.0.0` or a selected host interface/IP?
-- Should the first multiplayer build use shared keyboard mapping, virtual gamepads, or RetroArch netplay?
+- Should the long-term multiplayer input path remain virtual gamepads or move to RetroArch netplay?
 - Should invite codes be implemented before any LAN pairing ships publicly?
 - Should guest pairing require signed-in users, or should LAN guests be allowed as token-only guests?
 - Should the host be able to choose max players and spectator permissions per session?

@@ -1,27 +1,61 @@
-const { exec, spawn } = require("child_process");
-const fs = require("fs");
-const { createGamepadBridge } = require("../input/gamepadBridge");
-const { injectKey } = require("../input/injectKey");
-const { translateKey } = require("../input/translateKey");
-const { removeFileIfExists } = require("../roms/cloudRomDownloader");
+import { exec, spawn, type ChildProcess } from "child_process";
+import fs from "fs";
+import { createGamepadBridge } from "../input/gamepadBridge";
+import { injectKey, type KeyAction } from "../input/injectKey";
+import { translateKey } from "../input/translateKey";
+import { removeFileIfExists } from "../roms/cloudRomDownloader";
+import type { StreamProfile } from "../signaling/startGameHandlers";
 
-function createProcessManager(options) {
-  const { cameraPath, cameraPeerStatePath, engineToken, gamepadBridgePath } = options;
+type IceServer = {
+  credential?: string;
+  urls: string | string[];
+  username?: string;
+};
+
+type ProcessManagerOptions = {
+  cameraPath: string;
+  cameraPeerStatePath: string;
+  engineToken: string;
+  gamepadBridgePath: string;
+};
+
+type BootOptions = {
+  iceServers?: IceServer[];
+  isCloudRom?: boolean;
+  streamProfile?: StreamProfile;
+};
+
+type RuntimeState = {
+  activeCloudRomPath: string | null;
+  activeSessionId: string | null;
+  cameraPeerStatePath: string;
+  cameraProcess: ChildProcess | null;
+  gamepads: ReturnType<ReturnType<typeof createGamepadBridge>["getState"]>;
+  pulseAudioProcess: ChildProcess | null;
+  retroarchProcess: ChildProcess | null;
+  virtualDisplayProcess: ChildProcess | null;
+};
+
+export function createProcessManager(options: ProcessManagerOptions) {
+  const { cameraPath, cameraPeerStatePath, engineToken, gamepadBridgePath } =
+    options;
   const gamepads = createGamepadBridge({ gamepadBridgePath });
-  let retroarchProcess = null;
-  let cameraProcess = null;
-  let pulseAudioProcess = null;
-  let virtualDisplayProcess = null;
-  let activeSessionId = null;
-  let activeCloudRomPath = null;
+  let retroarchProcess: ChildProcess | null = null;
+  let cameraProcess: ChildProcess | null = null;
+  let pulseAudioProcess: ChildProcess | null = null;
+  let virtualDisplayProcess: ChildProcess | null = null;
+  let activeSessionId: string | null = null;
+  let activeCloudRomPath: string | null = null;
 
-  function startVirtualDisplay() {
+  function startVirtualDisplay(): void {
     console.log("Booting Virtual Display (Xvfb) and PulseAudio...");
 
-    if (fs.existsSync("/tmp/.X99-lock"))
+    if (fs.existsSync("/tmp/.X99-lock")) {
       fs.rmSync("/tmp/.X99-lock", { force: true });
-    if (fs.existsSync("/tmp/.X11-unix/X99"))
+    }
+    if (fs.existsSync("/tmp/.X11-unix/X99")) {
       fs.rmSync("/tmp/.X11-unix/X99", { force: true, recursive: true });
+    }
 
     virtualDisplayProcess = spawn("Xvfb", [
       ":99",
@@ -49,7 +83,7 @@ function createProcessManager(options) {
     gamepads.start();
   }
 
-  function cleanupActiveSession(sessionId) {
+  function cleanupActiveSession(sessionId?: string | null): void {
     if (sessionId && activeSessionId && sessionId !== activeSessionId) return;
 
     if (retroarchProcess) {
@@ -70,7 +104,11 @@ function createProcessManager(options) {
     activeSessionId = null;
   }
 
-  function sendInput(action, browserKey, playerIndex) {
+  function sendInput(
+    action: KeyAction,
+    browserKey: unknown,
+    playerIndex: number,
+  ): boolean {
     if (gamepads.sendInput(action, browserKey, playerIndex)) return true;
 
     if (playerIndex > 2) return false;
@@ -82,7 +120,11 @@ function createProcessManager(options) {
     return true;
   }
 
-  function bootGame(absoluteRomPath, sessionId, bootOptions = {}) {
+  function bootGame(
+    absoluteRomPath: string,
+    sessionId: string,
+    bootOptions: BootOptions = {},
+  ): void {
     if (retroarchProcess) retroarchProcess.kill();
     if (cameraProcess) cameraProcess.kill();
     if (activeCloudRomPath) removeFileIfExists(activeCloudRomPath);
@@ -123,18 +165,20 @@ function createProcessManager(options) {
         },
       });
 
-      cameraProcess.stdout.on("data", (data) => console.log(`[Camera] ${data}`));
-      cameraProcess.stderr.on("data", (data) =>
+      cameraProcess.stdout?.on("data", (data: Buffer) =>
+        console.log(`[Camera] ${data}`),
+      );
+      cameraProcess.stderr?.on("data", (data: Buffer) =>
         console.error(`[Camera Error] ${data}`),
       );
     }, 1000);
   }
 
-  function getActiveSessionId() {
+  function getActiveSessionId(): string | null {
     return activeSessionId;
   }
 
-  function getRuntimeState() {
+  function getRuntimeState(): RuntimeState {
     return {
       activeCloudRomPath,
       activeSessionId,
@@ -156,5 +200,3 @@ function createProcessManager(options) {
     startVirtualDisplay,
   };
 }
-
-module.exports = { createProcessManager };
