@@ -54,6 +54,7 @@ export default function Player() {
     currentUser?.email?.split("@")[0] ||
     (playerMode === "host" ? "Host" : "Guest");
   const {
+    inputCapabilities,
     lobbyState,
     kickParticipant,
     localParticipant,
@@ -194,6 +195,7 @@ export default function Player() {
 
       <LobbyPanel
         currentParticipant={localParticipant}
+        inputCapabilities={inputCapabilities}
         lobbyState={lobbyState}
         onKickParticipant={kickParticipant}
         onReleaseSlot={releasePlayerSlot}

@@ -140,7 +140,7 @@ What changed:
 
 - LAN mode now starts a local HTTPS companion server on `PIXELATED_COMPANION_PORT`, defaulting to `8090`.
 - The companion generates a self-signed certificate at runtime under the Electron user data directory.
-- The companion serves the built React app from `apps/web/dist`.
+- The companion serves the built React app from `apps/web/dist` in development and from bundled `resources/web-dist` in packaged desktop builds.
 - Served HTML injects `pixelated_engine_url = window.location.origin`, so React talks to the companion origin.
 - The companion proxies engine HTTP routes and Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
 - Desktop UI now shows HTTPS join page URLs separately from raw LAN engine URLs.
@@ -150,7 +150,7 @@ Remaining follow-up:
 
 - Two-device LAN smoke with Docker Desktop running.
 - Decide whether self-signed certificate trust is acceptable or whether to move to local CA/tunnel packaging.
-- Ensure packaged desktop builds include the web `dist` assets or generate them during release packaging.
+- Two-device smoke against an installed packaged desktop build, confirming the LAN join page loads from bundled `resources/web-dist`.
 
 ### Backend Multiplayer Lobby Metadata
 

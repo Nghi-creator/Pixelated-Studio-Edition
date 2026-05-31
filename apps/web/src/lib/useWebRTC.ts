@@ -6,7 +6,7 @@ import {
   ENGINE_PAIRING_EVENT,
   ensureEngineToken,
 } from "./engineAuth";
-import { getEngineUrl } from "./engineConfig";
+import { engineEndpoint, getEngineUrl } from "./engineConfig";
 import { attachEngineInput } from "./webrtcInput";
 import {
   createAndSendOffer,
@@ -29,6 +29,8 @@ const DISCONNECTED_GRACE_MS = 5_000;
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
 ];
+const KEYBOARD_FALLBACK_PLAYER_COUNT = 2;
+const VIRTUAL_GAMEPAD_PLAYER_COUNT = 4;
 
 export type LobbyRole = "host" | "player" | "spectator";
 
@@ -45,6 +47,23 @@ export type LobbyState = {
   maxPlayers: number;
   participants: LobbyParticipant[];
   sessionId: string;
+};
+
+export type EngineInputCapabilities = {
+  limitationReason: string | null;
+  source: "checking" | "health" | "unavailable";
+  supportedPlayerCount: number;
+};
+
+type EngineHealthPayload = {
+  checks?: {
+    gamepadBridge?: {
+      failed?: boolean;
+      fileExists?: boolean;
+      ready?: boolean;
+      uinputAvailable?: boolean;
+    };
+  };
 };
 
 export type WebRTCMode = "host" | "guest";
@@ -66,6 +85,62 @@ async function loadIceServers() {
   }
 }
 
+function getInputCapabilitiesFromHealth(
+  health: EngineHealthPayload,
+): EngineInputCapabilities {
+  const bridge = health.checks?.gamepadBridge;
+
+  if (!bridge?.fileExists) {
+    return {
+      limitationReason:
+        "P3/P4 are disabled because the virtual gamepad bridge is missing. Spectators can still join and watch.",
+      source: "health",
+      supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
+    };
+  }
+
+  if (!bridge.uinputAvailable) {
+    return {
+      limitationReason:
+        "P3/P4 are disabled because /dev/uinput is not available to the engine. P1/P2 use keyboard fallback; spectators can still join.",
+      source: "health",
+      supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
+    };
+  }
+
+  if (bridge.failed) {
+    return {
+      limitationReason:
+        "P3/P4 are disabled because the virtual gamepad bridge failed to start. P1/P2 remain playable and spectators can still join.",
+      source: "health",
+      supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
+    };
+  }
+
+  return {
+    limitationReason: null,
+    source: "health",
+    supportedPlayerCount: VIRTUAL_GAMEPAD_PLAYER_COUNT,
+  };
+}
+
+async function loadEngineInputCapabilities(): Promise<EngineInputCapabilities> {
+  try {
+    const response = await fetch(engineEndpoint("/health"));
+    if (!response.ok) throw new Error("Engine health check failed.");
+    const health = (await response.json()) as EngineHealthPayload;
+    return getInputCapabilitiesFromHealth(health);
+  } catch (err) {
+    console.warn("[WebRTC] Could not load engine input capabilities:", err);
+    return {
+      limitationReason:
+        "P3/P4 are disabled because engine health is unavailable. P1/P2 remain playable and spectators can still join.",
+      source: "unavailable",
+      supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
+    };
+  }
+}
+
 export function useWebRTC(
   gameId: string,
   streamProfile: StreamProfile,
@@ -78,6 +153,13 @@ export function useWebRTC(
   const [lobbyState, setLobbyState] = useState<LobbyState | null>(null);
   const [localParticipant, setLocalParticipant] =
     useState<LobbyParticipant | null>(null);
+  const [inputCapabilities, setInputCapabilities] =
+    useState<EngineInputCapabilities>({
+      limitationReason:
+        "Checking engine gamepad support before enabling P3/P4. Spectators can still join.",
+      source: "checking",
+      supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
+    });
   const [telemetry, setTelemetry] = useState<WebRTCTelemetry>(
     INITIAL_WEBRTC_TELEMETRY,
   );
@@ -92,12 +174,17 @@ export function useWebRTC(
   const sessionIdRef = useRef(sessionId);
   const socketRef = useRef<ReturnType<typeof io> | null>(null);
   const localParticipantRef = useRef<LobbyParticipant | null>(null);
+  const inputCapabilitiesRef = useRef(inputCapabilities);
   const lastMetricSentAtRef = useRef(0);
   const metricsDisabledRef = useRef(false);
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
   }, [sessionId]);
+
+  useEffect(() => {
+    inputCapabilitiesRef.current = inputCapabilities;
+  }, [inputCapabilities]);
 
   useEffect(() => {
     const handlePairingChange = () =>
@@ -158,11 +245,22 @@ export function useWebRTC(
       setLobbyState(null);
       setLocalParticipant(null);
       localParticipantRef.current = null;
+      setInputCapabilities({
+        limitationReason:
+          "Checking engine gamepad support before enabling P3/P4. Spectators can still join.",
+        source: "checking",
+        supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
+      });
       setTelemetry(INITIAL_WEBRTC_TELEMETRY);
       lastMetricSentAtRef.current = 0;
 
-      iceServersForSession = await loadIceServers();
+      const [nextIceServers, nextInputCapabilities] = await Promise.all([
+        loadIceServers(),
+        loadEngineInputCapabilities(),
+      ]);
       if (disposed) return;
+      iceServersForSession = nextIceServers;
+      setInputCapabilities(nextInputCapabilities);
 
       pc = createEnginePeerConnection({
         iceServers: iceServersForSession,
@@ -349,12 +447,16 @@ export function useWebRTC(
       }
 
       if (participant?.role === "host") {
+        const supportedMaxPlayers = Math.min(
+          nextLobbyState.maxPlayers,
+          inputCapabilitiesRef.current.supportedPlayerCount,
+        );
         api
           .multiplayerLobby(sessionId, {
             engineUrl: getEngineUrl(),
             exposureMode: "unknown",
             gameId,
-            maxPlayers: nextLobbyState.maxPlayers,
+            maxPlayers: supportedMaxPlayers,
             participants: nextLobbyState.participants.map((entry) => ({
               displayName: entry.displayName,
               playerIndex: entry.playerIndex,
@@ -377,6 +479,9 @@ export function useWebRTC(
 
     socket.on("python-ready", async () => {
       console.log("[WebRTC] Python is awake! Generating and sending Offer...");
+      loadEngineInputCapabilities().then((nextInputCapabilities) => {
+        if (!disposed) setInputCapabilities(nextInputCapabilities);
+      });
       if (pc) {
         await createAndSendOffer(pc, socket, sessionId, peerId);
       }
@@ -444,6 +549,19 @@ export function useWebRTC(
   };
 
   const requestPlayerSlot = (playerIndex: number) => {
+    const supportedPlayerCount =
+      inputCapabilitiesRef.current.supportedPlayerCount;
+    if (playerIndex > supportedPlayerCount) {
+      setTelemetry((currentTelemetry) => ({
+        ...currentTelemetry,
+        lastEngineError:
+          inputCapabilitiesRef.current.limitationReason ||
+          `Player slot ${playerIndex} is not available on this engine.`,
+        lastUpdatedAt: Date.now(),
+      }));
+      return;
+    }
+
     socketRef.current?.emit("request-player-slot", {
       playerIndex,
       sessionId: sessionIdRef.current,
@@ -465,6 +583,7 @@ export function useWebRTC(
 
   return {
     kickParticipant,
+    inputCapabilities,
     lobbyState,
     localParticipant,
     releasePlayerSlot,

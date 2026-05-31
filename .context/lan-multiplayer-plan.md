@@ -317,7 +317,7 @@ Implementation note: WebRTC signaling now carries a browser-generated `peerId`. 
 
 ### Phase 6: React Lobby And Guest Join UI
 
-Status: first local-engine UI slice implemented on 2026-05-28; real two-browser smoke pending.
+Status: first local-engine UI slice implemented on 2026-05-28; health-gated slot UI added on 2026-05-31; real two-browser smoke pending.
 
 Deliverables:
 
@@ -325,6 +325,7 @@ Deliverables:
 - Show a copyable session invite URL for the current host session.
 - Let guests join an existing local-engine session from a `?session=<id>` URL.
 - Let guests request/release player slots from the player page.
+- Gate active player slot requests using the engine `/health` gamepad bridge payload.
 - Ensure guests do not boot or stop the host game.
 - Wake late-joining guests when a camera process is already active for that session.
 
@@ -332,11 +333,12 @@ Acceptance criteria:
 
 - Host can copy a session link from the player page.
 - Guest opening the link joins as a spectator by default.
-- Guest can request an open player slot and input uses that slot.
+- Guest can request an open supported player slot and input uses that slot.
+- If `/dev/uinput` or the virtual gamepad bridge is unavailable, P3/P4 are disabled with an explanation while spectator invites still work.
 - Guest disconnect does not stop the host game.
 - Host disconnect still stops the active session.
 
-Implementation note: `useWebRTC` now exposes lobby state, the local participant, session id, and slot actions. Player links use `?session=<id>&role=spectator`; guest clients join the existing session and wait for/receive `python-ready` without emitting `start-game`. The engine re-emits `python-ready` to a newly joined browser when the requested session is already active.
+Implementation note: `useWebRTC` now exposes lobby state, the local participant, session id, slot actions, and health-derived input capabilities. Player links use `?session=<id>&role=spectator`; guest clients join the existing session and wait for/receive `python-ready` without emitting `start-game`. The engine re-emits `python-ready` to a newly joined browser when the requested session is already active. The web lobby reads `checks.gamepadBridge` from `/health`; when `fileExists`, `uinputAvailable`, and bridge health allow virtual gamepads, P1-P4 are offered. If the bridge is missing, failed, or `/dev/uinput` is unavailable, active play is capped to P1/P2, P3/P4 buttons are disabled, and watch-only/spectator flow remains available.
 
 ### Phase 7: Backend Multiplayer Support
 
@@ -380,7 +382,7 @@ Implementation note: the desktop LAN panel now emphasizes the HTTPS join page an
 
 ### Phase 9: Input Strategy Beyond Two Players
 
-Status: virtual gamepad foundation implemented on 2026-05-28; Docker/device smoke pending.
+Status: virtual gamepad foundation implemented on 2026-05-28; web health-gates active slots on 2026-05-31; Docker/device smoke pending.
 
 Recommended approach: use virtual gamepads for P1-P4 when `/dev/uinput` is available, with keyboard fallback for P1/P2 only.
 
@@ -388,16 +390,16 @@ Deliverables:
 
 - Evaluate virtual gamepad options inside the Linux container. Implemented with Python `evdev` and Linux `uinput`.
 - Evaluate RetroArch input/device config for multiple ports. Implemented as udev/autodetect plus four libretro joypad ports; emulator smoke pending.
-- Decide whether the first public LAN release caps active players at 2 while allowing extra spectators. Revisit after Docker/Desktop `/dev/uinput` smoke.
+- Cap active players at 2 when `/health` reports missing or failed virtual gamepad support, while allowing extra spectators. Implemented in the React lobby.
 - Add a test ROM/input diagnostic smoke checklist before enabling P3/P4.
 
 Acceptance criteria:
 
 - P3/P4 input does not depend on crowded shared keyboard mappings. Implemented through virtual gamepad bridge.
 - Input routing remains slot-authorized. Covered by automated tests.
-- UI max player settings match the engine's real supported input mode. Pending device smoke and possible UX gating if `/dev/uinput` is unavailable.
+- UI max player settings match the engine's real supported input mode. Implemented by deriving the active slot cap from `/health.checks.gamepadBridge`.
 
-Implementation note: browser controls stay the same for every player. React emits `playerIndex`, the engine verifies slot ownership, then Node writes normalized controller events to `input_gamepad.py`. The Python bridge creates four virtual controllers via `evdev.UInput`. If `/dev/uinput` is unavailable, P1/P2 fall back to keyboard injection and P3/P4 get a clear engine error.
+Implementation note: browser controls stay the same for every player. React emits `playerIndex`, the engine verifies slot ownership, then Node writes normalized controller events to `input_gamepad.py`. The Python bridge creates four virtual controllers via `evdev.UInput`. If `/dev/uinput` is unavailable or the bridge is missing/failed, P1/P2 fall back to keyboard injection. The web lobby also reads `/health` and disables P3/P4 with a short reason before guests can request unsupported slots; spectators are unaffected.
 
 ### Phase 10: Multiplayer Performance Validation
 
@@ -440,7 +442,7 @@ Manual:
 ## Open Decisions
 
 - Should LAN mode bind to `0.0.0.0` or a selected host interface/IP?
-- Should the first multiplayer build use shared keyboard mapping, virtual gamepads, or RetroArch netplay?
+- Should the long-term multiplayer input path remain virtual gamepads or move to RetroArch netplay?
 - Should invite codes be implemented before any LAN pairing ships publicly?
 - Should guest pairing require signed-in users, or should LAN guests be allowed as token-only guests?
 - Should the host be able to choose max players and spectator permissions per session?

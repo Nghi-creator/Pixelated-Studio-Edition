@@ -8,12 +8,14 @@ import {
   X,
 } from "lucide-react";
 import type {
+  EngineInputCapabilities,
   LobbyParticipant,
   LobbyState,
 } from "../../lib/useWebRTC";
 
 type LobbyPanelProps = {
   currentParticipant: LobbyParticipant | null;
+  inputCapabilities: EngineInputCapabilities;
   lobbyState: LobbyState | null;
   onKickParticipant: (socketId: string) => void;
   onReleaseSlot: () => void;
@@ -29,6 +31,7 @@ function getRoleIcon(participant: LobbyParticipant) {
 
 export function LobbyPanel({
   currentParticipant,
+  inputCapabilities,
   lobbyState,
   onKickParticipant,
   onReleaseSlot,
@@ -38,6 +41,10 @@ export function LobbyPanel({
   const participants = lobbyState?.participants || [];
   const currentSlot = currentParticipant?.playerIndex || null;
   const maxPlayers = lobbyState?.maxPlayers || 4;
+  const supportedPlayerCount = Math.min(
+    maxPlayers,
+    inputCapabilities.supportedPlayerCount,
+  );
   const canKickParticipants = currentParticipant?.role === "host";
   const occupiedSlots = new Set(
     participants
@@ -137,17 +144,26 @@ export function LobbyPanel({
                 const isCurrentSlot = currentSlot === playerIndex;
                 const isOccupied =
                   occupiedSlots.has(playerIndex) && !isCurrentSlot;
+                const isUnsupported = playerIndex > supportedPlayerCount;
+                const isDisabled = isOccupied || isUnsupported;
 
                 return (
                   <button
                     key={playerIndex}
                     type="button"
-                    disabled={isOccupied}
+                    disabled={isDisabled}
                     onClick={() => onRequestSlot(playerIndex)}
+                    title={
+                      isUnsupported
+                        ? inputCapabilities.limitationReason || "Slot disabled"
+                        : isOccupied
+                          ? `P${playerIndex} is already taken`
+                          : `Request P${playerIndex}`
+                    }
                     className={`h-10 rounded-lg border text-sm font-semibold transition-colors ${
                       isCurrentSlot
                         ? "border-synth-primary bg-synth-primary/20 text-white"
-                        : isOccupied
+                        : isDisabled
                           ? "cursor-not-allowed border-synth-border bg-synth-bg text-gray-600"
                           : "border-synth-border bg-synth-surface text-gray-300 hover:border-synth-primary/70 hover:text-white"
                     }`}
@@ -158,6 +174,12 @@ export function LobbyPanel({
               },
             )}
           </div>
+
+          {inputCapabilities.limitationReason && (
+            <p className="text-xs leading-5 text-gray-400">
+              {inputCapabilities.limitationReason}
+            </p>
+          )}
 
           {currentParticipant?.role !== "host" && currentSlot && (
             <button
