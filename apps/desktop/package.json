@@ -1,15 +1,18 @@
 {
   "name": "pixelated-desktop",
   "version": "1.0.0",
-  "main": "main.js",
+  "main": "dist/main.js",
   "scripts": {
-    "start": "electron .",
+    "build": "tsc -p tsconfig.json",
+    "start": "npm run build && electron .",
     "prepare:web": "node scripts/prepareWebDist.js",
-    "dist": "npm run prepare:web && electron-builder"
+    "dist": "npm run prepare:web && npm run build && electron-builder"
   },
   "devDependencies": {
+    "@types/node": "^20.19.39",
     "electron": "^29.0.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.9.3"
   },
   "dependencies": {},
   "build": {

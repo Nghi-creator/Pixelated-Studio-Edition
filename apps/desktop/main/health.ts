@@ -1,6 +1,11 @@
-const http = require("http");
+import http from "http";
 
-function waitForEngineHealth(attempts = 30, delayMs = 1000) {
+type EngineHealthPayload = {
+  ok?: boolean;
+  [key: string]: unknown;
+};
+
+export function waitForEngineHealth(attempts = 30, delayMs = 1000) {
   return new Promise((resolve, reject) => {
     let attempt = 0;
 
@@ -27,7 +32,7 @@ function waitForEngineHealth(attempts = 30, delayMs = 1000) {
         res.on("end", () => {
           if (res.statusCode === 200) {
             try {
-              const payload = JSON.parse(body);
+              const payload = JSON.parse(body) as EngineHealthPayload;
               if (payload.ok) {
                 settled = true;
                 resolve(payload);
@@ -55,7 +60,3 @@ function waitForEngineHealth(attempts = 30, delayMs = 1000) {
     check();
   });
 }
-
-module.exports = {
-  waitForEngineHealth,
-};

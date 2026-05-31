@@ -1,19 +1,21 @@
-const os = require("os");
+import os from "os";
 
-function normalizeExposureMode(value) {
+export type ExposureMode = "local" | "lan";
+
+export function normalizeExposureMode(value: unknown): ExposureMode {
   return value === "lan" ? "lan" : "local";
 }
 
-function getDockerPublishHost(exposureMode) {
+export function getDockerPublishHost(exposureMode: ExposureMode) {
   return exposureMode === "lan" ? "0.0.0.0" : "127.0.0.1";
 }
 
-function getAdvertisedEngineUrls(exposureMode) {
+export function getAdvertisedEngineUrls(exposureMode: ExposureMode) {
   if (exposureMode !== "lan") {
     return ["http://localhost:8080"];
   }
 
-  const urls = [];
+  const urls: string[] = [];
   const interfaces = os.networkInterfaces();
 
   Object.values(interfaces).forEach((entries = []) => {
@@ -32,8 +34,8 @@ function getAdvertisedEngineUrls(exposureMode) {
   return urls.length > 0 ? urls : ["http://<your-lan-ip>:8080"];
 }
 
-function getLanIpv4Addresses() {
-  const addresses = [];
+export function getLanIpv4Addresses() {
+  const addresses: string[] = [];
   const interfaces = os.networkInterfaces();
 
   Object.values(interfaces).forEach((entries = []) => {
@@ -52,7 +54,7 @@ function getLanIpv4Addresses() {
   return addresses;
 }
 
-function getAdvertisedCompanionUrls(exposureMode, port) {
+export function getAdvertisedCompanionUrls(exposureMode: ExposureMode, port: number) {
   if (exposureMode !== "lan") return [];
 
   const urls = getLanIpv4Addresses().map(
@@ -61,11 +63,3 @@ function getAdvertisedCompanionUrls(exposureMode, port) {
 
   return urls.length > 0 ? urls : [`https://<your-lan-ip>:${port}`];
 }
-
-module.exports = {
-  getAdvertisedEngineUrls,
-  getAdvertisedCompanionUrls,
-  getLanIpv4Addresses,
-  getDockerPublishHost,
-  normalizeExposureMode,
-};

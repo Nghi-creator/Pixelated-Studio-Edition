@@ -1,6 +1,39 @@
-let currentEnginePhase = "idle";
+import type { IpcMainEvent } from "electron";
 
-const engineStates = {
+export type EngineStateKey =
+  | "CHECKING_DOCKER"
+  | "PULLING_IMAGE"
+  | "BUILDING_IMAGE"
+  | "REMOVING_STALE"
+  | "STARTING_CONTAINER"
+  | "WAITING_HEALTH"
+  | "READY"
+  | "STOPPING"
+  | "STOPPED"
+  | "FAILED";
+
+type EnginePhase =
+  | "cleanup"
+  | "container"
+  | "docker"
+  | "health"
+  | "idle"
+  | "image"
+  | "ready"
+  | "stopping";
+
+type EngineStatus = "failed" | "ready" | "starting" | "stopped" | "stopping";
+
+type EngineState = {
+  detail?: string;
+  label: string;
+  phase?: EnginePhase;
+  status: EngineStatus;
+};
+
+let currentEnginePhase: EnginePhase = "idle";
+
+const engineStates: Record<EngineStateKey, EngineState> = {
   CHECKING_DOCKER: {
     detail: "docker info",
     label: "Checking Docker",
@@ -57,13 +90,17 @@ const engineStates = {
     label: "Engine Failed",
     status: "failed",
   },
-};
+} as const;
 
-function setCurrentEnginePhase(phase) {
+export function setCurrentEnginePhase(phase: EnginePhase) {
   currentEnginePhase = phase;
 }
 
-function emitEngineState(event, key, detail = "") {
+export function emitEngineState(
+  event: IpcMainEvent,
+  key: EngineStateKey,
+  detail = "",
+) {
   const state = engineStates[key] || engineStates.FAILED;
   const phase =
     state.phase || (state.status === "failed" ? currentEnginePhase : "idle");
@@ -75,8 +112,3 @@ function emitEngineState(event, key, detail = "") {
     phase,
   });
 }
-
-module.exports = {
-  emitEngineState,
-  setCurrentEnginePhase,
-};

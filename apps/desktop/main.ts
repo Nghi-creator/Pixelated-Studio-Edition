@@ -1,12 +1,12 @@
-const { app, BrowserWindow, ipcMain } = require("electron");
-const path = require("path");
-const {
+import { app, BrowserWindow, ipcMain, type IpcMainEvent } from "electron";
+import path from "path";
+import {
   cleanupEngine,
   startEngine,
   stopEngine,
-} = require("./main/engineController");
+} from "./main/engineController";
 
-let mainWindow;
+let mainWindow: BrowserWindow | null = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -16,17 +16,17 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      preload: path.join(__dirname, "preload.js"),
+      preload: path.join(__dirname, "../preload.js"),
     },
   });
-  mainWindow.loadFile("index.html");
+  mainWindow.loadFile(path.join(__dirname, "../index.html"));
 }
 
-ipcMain.on("start-docker", (event, options = {}) => {
+ipcMain.on("start-docker", (event: IpcMainEvent, options = {}) => {
   startEngine(event, options);
 });
 
-ipcMain.on("stop-docker", (event) => {
+ipcMain.on("stop-docker", (event: IpcMainEvent) => {
   stopEngine(event);
 });
 

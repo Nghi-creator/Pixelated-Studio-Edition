@@ -28,7 +28,7 @@ Expected first version:
 
 ## Current Constraints
 
-- `apps/desktop/main.js` currently starts Docker with `-p 127.0.0.1:8080:8080`.
+- `apps/desktop/main.ts` starts Docker with `-p 127.0.0.1:8080:8080` in local mode, compiled through the desktop TypeScript build.
 - The engine process listens on `0.0.0.0:8080` inside the container, but Docker only exposes it on host loopback.
 - React defaults to `http://localhost:8080`, with an engine URL override stored in browser local storage.
 - The pairing token is generated per desktop engine run and is required for local engine HTTP routes and Socket.IO.
@@ -139,16 +139,16 @@ Open technical question: GStreamer `webrtcbin` may need one peer connection per 
 
 ### Phase 0: TypeScript Migration Track
 
-Status: Phase 0A implemented for engine signaling on 2026-05-28; engine input/telemetry, runtime/ROM/session, HTTP route, and root server conversion continued on 2026-05-31; desktop TypeScript migration remains planned.
+Status: Phase 0A implemented for engine signaling on 2026-05-28; engine input/telemetry, runtime/ROM/session, HTTP route, and root server conversion continued on 2026-05-31; desktop main-process TypeScript migration started on 2026-06-01.
 
-The engine runtime and desktop launcher are still JavaScript while the web app and API are TypeScript. Multiplayer will add socket payload contracts, role/slot state, invite data, and desktop IPC state, so TypeScript should be introduced as part of the feature path rather than as a separate cosmetic rename.
+The engine runtime, web app, API, and desktop main process now have TypeScript build paths. The desktop renderer/preload files and LAN companion server remain JavaScript for later targeted migration. Multiplayer adds socket payload contracts, role/slot state, invite data, and desktop IPC state, so TypeScript should be introduced as part of the feature path rather than as a separate cosmetic rename.
 
 Recommended migration order:
 
 - Add TypeScript config/build support to `engine/runtime/` first. Completed in Phase 0A.
 - Convert engine config, HTTP routes, signaling payload validators, session room helpers, input routing modules, runtime process control, ROM/session helpers, and runtime health/telemetry helpers before expanding multiplayer. Completed for the root server composition file, config, HTTP routes, session rooms, socket auth, signaling relay, engine errors, start-game handling, input handlers, input mapping/bridge helpers, runtime process control, ROM/session helpers, and health/resource telemetry helpers.
-- Add TypeScript config/build support to `apps/desktop/` after LAN mode stabilizes.
-- Convert desktop IPC contracts, Docker command construction, LAN interface discovery, and lifecycle state handling.
+- Add TypeScript config/build support to `apps/desktop/` after LAN mode stabilizes. Started on 2026-06-01.
+- Convert desktop IPC contracts, Docker command construction, LAN interface discovery, and lifecycle state handling. Started for main-process orchestration on 2026-06-01.
 - Keep `camera.py` as Python and type the JSON contracts it receives through env/socket payloads on the Node side.
 
 Phase 0A implementation notes:
@@ -199,6 +199,23 @@ Phase 0D implementation notes:
   - `engine/runtime/server.ts`
 - `server.ts` still compiles to `dist/server.js`, so the package entrypoint and Docker startup command remain unchanged.
 - `npm run build`, `npm test`, and `npm run check` passed in `engine/runtime` after the conversion.
+
+Phase 0E implementation notes:
+
+- Added `apps/desktop/tsconfig.json`.
+- Desktop package entrypoint now points at `dist/main.js`.
+- `npm start` and `npm run dist` now compile the desktop main process before launching or packaging.
+- Converted desktop main-process orchestration files:
+  - `apps/desktop/main.ts`
+  - `apps/desktop/main/config.ts`
+  - `apps/desktop/main/docker.ts`
+  - `apps/desktop/main/engineController.ts`
+  - `apps/desktop/main/exposure.ts`
+  - `apps/desktop/main/health.ts`
+  - `apps/desktop/main/state.ts`
+- Left `apps/desktop/main/companionServer.js`, `apps/desktop/preload.js`, and renderer files as JavaScript for a later slice.
+- `npm run build` passed in `apps/desktop`.
+- `npm start` launched successfully through the compiled `dist/main.js` entrypoint.
 
 Remaining validation:
 

@@ -124,8 +124,9 @@ Current important frontend behaviors:
 
 Runtime stack:
 
-- Electron app in `apps/desktop/main.js`.
+- Electron main process source in `apps/desktop/main.ts`, compiled to `apps/desktop/dist/main.js`.
 - Renderer files: `apps/desktop/index.html` and `apps/desktop/preload.js`.
+- Desktop main-process helpers under `apps/desktop/main/` are now mixed TypeScript/JavaScript. Docker orchestration, exposure mode, health polling, config, and lifecycle state helpers are TypeScript; the LAN HTTPS companion server remains JavaScript for now.
 - Uses local Docker CLI through `child_process.exec`.
 - Packaged releases are built with `cd apps/desktop && npm run dist`; this script runs the React production build first and electron-builder bundles `apps/web/dist` as `resources/web-dist`.
 

@@ -1,17 +1,17 @@
-const crypto = require("crypto");
-const { app } = require("electron");
-const path = require("path");
-const {
+import crypto from "crypto";
+import { app, type IpcMainEvent } from "electron";
+import path from "path";
+import {
   backendApiUrl,
   companionPort,
   engineImage,
   webDistDir,
-} = require("./config");
-const {
+} from "./config";
+import {
   startCompanionServer,
   stopCompanionServer,
-} = require("./companionServer");
-const {
+} from "./companionServer";
+import {
   exec,
   execCommand,
   getSafeEnv,
@@ -19,18 +19,41 @@ const {
   isSafeDockerImageRef,
   prepareEngineImage,
   quoteDockerEnvValue,
-} = require("./docker");
-const {
+} from "./docker";
+import {
   getAdvertisedEngineUrls,
   getAdvertisedCompanionUrls,
   getDockerPublishHost,
   getLanIpv4Addresses,
   normalizeExposureMode,
-} = require("./exposure");
-const { waitForEngineHealth } = require("./health");
-const { emitEngineState, setCurrentEnginePhase } = require("./state");
+  type ExposureMode,
+} from "./exposure";
+import { waitForEngineHealth } from "./health";
+import { emitEngineState, setCurrentEnginePhase } from "./state";
 
-let engineToken = null;
+type StartEngineOptions = {
+  exposureMode?: unknown;
+};
+
+type EngineLaunchContext = {
+  advertisedUrls: string[];
+  companionUrls: string[];
+  deviceArgs: string;
+  exposureMode: ExposureMode;
+  publishHost: string;
+};
+
+type DockerRunOptions = EngineLaunchContext & {
+  engineToken: string;
+};
+
+type CompanionServerResult = {
+  certPath: string;
+  keyPath: string;
+  port: number;
+};
+
+let engineToken: string | null = null;
 
 function buildDockerRunCommand({
   advertisedUrls,
@@ -38,11 +61,11 @@ function buildDockerRunCommand({
   engineToken,
   exposureMode,
   publishHost,
-}) {
+}: DockerRunOptions) {
   return `docker run -d --name pixelated-node -p ${publishHost}:8080:8080 ${deviceArgs} -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="${quoteDockerEnvValue(backendApiUrl)}" -e PIXELATED_ENGINE_TOKEN="${quoteDockerEnvValue(engineToken)}" -e PIXELATED_ENGINE_EXPOSURE_MODE="${exposureMode}" -e PIXELATED_ADVERTISED_URLS="${quoteDockerEnvValue(advertisedUrls.join(","))}" ${engineImage}`;
 }
 
-function rejectInvalidImage(event) {
+function rejectInvalidImage(event: IpcMainEvent) {
   setCurrentEnginePhase("image");
   emitEngineState(event, "FAILED", "Invalid image reference");
   event.reply(
@@ -52,7 +75,7 @@ function rejectInvalidImage(event) {
   event.reply("engine-stopped");
 }
 
-function createEngineLaunchContext(options = {}) {
+function createEngineLaunchContext(options: StartEngineOptions = {}): EngineLaunchContext {
   const exposureMode = normalizeExposureMode(options.exposureMode);
   const publishHost = getDockerPublishHost(exposureMode);
   const advertisedUrls = getAdvertisedEngineUrls(exposureMode);
@@ -68,7 +91,10 @@ function createEngineLaunchContext(options = {}) {
   };
 }
 
-async function startLanCompanion(event, launchContext) {
+async function startLanCompanion(
+  event: IpcMainEvent,
+  launchContext: EngineLaunchContext,
+) {
   if (launchContext.exposureMode !== "lan") {
     event.reply("engine-companion", {
       enabled: false,
@@ -83,7 +109,7 @@ async function startLanCompanion(event, launchContext) {
       lanAddresses: getLanIpv4Addresses(),
       port: companionPort,
       webDistDir,
-    });
+    }) as CompanionServerResult;
     event.reply("engine-companion", {
       certPath: companion.certPath,
       enabled: true,
@@ -94,19 +120,32 @@ async function startLanCompanion(event, launchContext) {
       `LAN companion HTTPS server ready on port ${companion.port}.`,
     );
   } catch (err) {
+    const message = getErrorMessage(err);
     event.reply("engine-companion", {
       enabled: false,
-      error: err.message,
+      error: message,
       urls: [],
     });
     event.reply(
       "server-log",
-      `<span class="text-amber-300">Warning: LAN HTTPS companion could not start: ${err.message}</span>`,
+      `<span class="text-amber-300">Warning: LAN HTTPS companion could not start: ${message}</span>`,
     );
   }
 }
 
-function startContainer(event, safeEnv, launchContext) {
+function getErrorMessage(err: unknown) {
+  return err instanceof Error ? err.message : String(err);
+}
+
+function startContainer(
+  event: IpcMainEvent,
+  safeEnv: NodeJS.ProcessEnv,
+  launchContext: EngineLaunchContext,
+) {
+  if (!engineToken) {
+    throw new Error("Engine token has not been initialized.");
+  }
+
   emitEngineState(event, "STARTING_CONTAINER", `${launchContext.publishHost}:8080`);
   event.reply(
     "server-log",
@@ -122,19 +161,24 @@ function startContainer(event, safeEnv, launchContext) {
   );
 }
 
-function handleStartupFailure(event, safeEnv, startErr) {
+function handleStartupFailure(
+  event: IpcMainEvent,
+  safeEnv: NodeJS.ProcessEnv,
+  startErr: unknown,
+) {
   stopCompanionServer();
-  emitEngineState(event, "FAILED", startErr.message);
+  const message = getErrorMessage(startErr);
+  emitEngineState(event, "FAILED", message);
   event.reply(
     "server-log",
-    `<span class="text-red-500">ERROR: ${startErr.message}</span>`,
+    `<span class="text-red-500">ERROR: ${message}</span>`,
   );
   exec("docker rm -f pixelated-node", { env: safeEnv }, () => {
     event.reply("engine-stopped");
   });
 }
 
-function startEngine(event, options = {}) {
+export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {}) {
   if (!isSafeDockerImageRef(engineImage)) {
     rejectInvalidImage(event);
     return;
@@ -195,7 +239,7 @@ function startEngine(event, options = {}) {
   });
 }
 
-function stopEngine(event) {
+export function stopEngine(event: IpcMainEvent) {
   emitEngineState(event, "STOPPING");
   event.reply("server-log", "Initiating shutdown sequence...");
   const safeEnv = getSafeEnv();
@@ -215,14 +259,8 @@ function stopEngine(event) {
   });
 }
 
-function cleanupEngine() {
+export function cleanupEngine() {
   const safeEnv = getSafeEnv();
   stopCompanionServer();
   exec("docker rm -f pixelated-node", { env: safeEnv });
 }
-
-module.exports = {
-  cleanupEngine,
-  startEngine,
-  stopEngine,
-};
