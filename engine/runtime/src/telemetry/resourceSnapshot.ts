@@ -1,9 +1,31 @@
-const fs = require("fs");
+import fs from "fs";
 
 const CLOCK_TICKS_PER_SECOND = 100;
 const PAGE_SIZE_BYTES = 4096;
 
-function readNumberFile(filePath) {
+type ProcessRef = {
+  pid?: number | null;
+} | null | undefined;
+
+type RuntimeState = {
+  cameraPeerStatePath?: string | null;
+  cameraProcess?: ProcessRef;
+  retroarchProcess?: ProcessRef;
+};
+
+export type ProcessResourceSnapshot = {
+  averageCpuPercent: number | null;
+  pid: number;
+  rssMb: number;
+};
+
+export type CameraPeerState = {
+  peerCount: number;
+  peerIds: string[];
+  sessionId: string | null;
+};
+
+export function readNumberFile(filePath: string): number | null {
   try {
     return Number(fs.readFileSync(filePath, "utf8").trim());
   } catch (err) {
@@ -11,7 +33,7 @@ function readNumberFile(filePath) {
   }
 }
 
-function readSystemUptimeSeconds() {
+function readSystemUptimeSeconds(): number | null {
   try {
     return Number(fs.readFileSync("/proc/uptime", "utf8").split(" ")[0]);
   } catch (err) {
@@ -19,7 +41,9 @@ function readSystemUptimeSeconds() {
   }
 }
 
-function readProcessSnapshot(pid) {
+export function readProcessSnapshot(
+  pid?: number | null,
+): ProcessResourceSnapshot | null {
   if (!pid || !fs.existsSync(`/proc/${pid}`)) return null;
 
   try {
@@ -56,7 +80,9 @@ function readProcessSnapshot(pid) {
   }
 }
 
-function readCameraPeerState(filePath) {
+export function readCameraPeerState(
+  filePath?: string | null,
+): CameraPeerState {
   if (!filePath) {
     return {
       peerCount: 0,
@@ -66,11 +92,18 @@ function readCameraPeerState(filePath) {
   }
 
   try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as {
+      peerCount?: unknown;
+      peerIds?: unknown;
+      sessionId?: unknown;
+    };
+
     return {
       peerCount: Number(parsed.peerCount) || 0,
       peerIds: Array.isArray(parsed.peerIds)
-        ? parsed.peerIds.filter((peerId) => typeof peerId === "string")
+        ? parsed.peerIds.filter(
+            (peerId): peerId is string => typeof peerId === "string",
+          )
         : [],
       sessionId: typeof parsed.sessionId === "string" ? parsed.sessionId : null,
     };
@@ -83,7 +116,7 @@ function readCameraPeerState(filePath) {
   }
 }
 
-function createResourceSnapshot(runtimeState) {
+export function createResourceSnapshot(runtimeState: RuntimeState) {
   return {
     camera: readProcessSnapshot(runtimeState.cameraProcess?.pid),
     cameraPeers: readCameraPeerState(runtimeState.cameraPeerStatePath),
@@ -95,10 +128,3 @@ function createResourceSnapshot(runtimeState) {
     retroarch: readProcessSnapshot(runtimeState.retroarchProcess?.pid),
   };
 }
-
-module.exports = {
-  createResourceSnapshot,
-  readCameraPeerState,
-  readNumberFile,
-  readProcessSnapshot,
-};

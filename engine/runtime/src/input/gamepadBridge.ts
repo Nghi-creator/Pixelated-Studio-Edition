@@ -1,32 +1,46 @@
-const fs = require("fs");
-const { spawn } = require("child_process");
-const { translateGamepadButton } = require("./translateGamepadButton");
+import fs from "fs";
+import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
+import { translateGamepadButton } from "./translateGamepadButton";
+import type { KeyAction } from "./injectKey";
 
-function createGamepadBridge({ gamepadBridgePath }) {
-  let bridgeProcess = null;
+type GamepadBridgeOptions = {
+  gamepadBridgePath: string;
+};
+
+export type GamepadBridgeState = {
+  enabled: boolean;
+  failed: boolean;
+  ready: boolean;
+  uinputAvailable: boolean;
+};
+
+export function createGamepadBridge({ gamepadBridgePath }: GamepadBridgeOptions) {
+  let bridgeProcess: ChildProcessWithoutNullStreams | null = null;
   let ready = false;
   let failed = false;
 
-  function start() {
+  function start(): void {
     if (bridgeProcess || failed) return;
 
     if (!fs.existsSync("/dev/uinput")) {
       failed = true;
-      console.warn("[Gamepad] /dev/uinput is unavailable; using keyboard fallback.");
+      console.warn(
+        "[Gamepad] /dev/uinput is unavailable; using keyboard fallback.",
+      );
       return;
     }
 
     bridgeProcess = spawn("python3", ["-u", gamepadBridgePath], {
       stdio: ["pipe", "pipe", "pipe"],
-    });
+    }) as ChildProcessWithoutNullStreams;
 
-    bridgeProcess.stdout.on("data", (data) => {
+    bridgeProcess.stdout.on("data", (data: Buffer) => {
       const message = data.toString().trim();
       if (message.includes("[Gamepad] ready")) ready = true;
       if (message) console.log(message);
     });
 
-    bridgeProcess.stderr.on("data", (data) =>
+    bridgeProcess.stderr.on("data", (data: Buffer) =>
       console.error(`[Gamepad Error] ${data}`),
     );
 
@@ -38,14 +52,18 @@ function createGamepadBridge({ gamepadBridgePath }) {
     });
   }
 
-  function stop() {
+  function stop(): void {
     if (!bridgeProcess) return;
     bridgeProcess.kill();
     bridgeProcess = null;
     ready = false;
   }
 
-  function sendInput(action, browserKey, playerIndex) {
+  function sendInput(
+    action: KeyAction,
+    browserKey: unknown,
+    playerIndex: number,
+  ): boolean {
     if (!bridgeProcess || !ready || !bridgeProcess.stdin.writable) {
       return false;
     }
@@ -59,7 +77,7 @@ function createGamepadBridge({ gamepadBridgePath }) {
     return true;
   }
 
-  function getState() {
+  function getState(): GamepadBridgeState {
     return {
       enabled: Boolean(bridgeProcess),
       failed,
@@ -75,5 +93,3 @@ function createGamepadBridge({ gamepadBridgePath }) {
     stop,
   };
 }
-
-module.exports = { createGamepadBridge };

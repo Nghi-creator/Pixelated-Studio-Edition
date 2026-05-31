@@ -1,11 +1,48 @@
-const fs = require("fs");
-const { createResourceSnapshot } = require("./resourceSnapshot");
+import fs from "fs";
+import { createResourceSnapshot } from "./resourceSnapshot";
 
-function pathExists(filePath) {
+type ProcessRef = {
+  exitCode?: number | null;
+  pid?: number | null;
+} | null | undefined;
+
+type RuntimeState = {
+  activeCloudRomPath?: string | null;
+  activeSessionId?: string | null;
+  cameraPeerStatePath?: string | null;
+  cameraProcess?: ProcessRef;
+  gamepads?: Record<string, unknown>;
+  pulseAudioProcess?: ProcessRef;
+  retroarchProcess?: ProcessRef;
+  virtualDisplayProcess?: ProcessRef;
+};
+
+type HealthPaths = {
+  cameraBridge: string;
+  cameraPeerState: string;
+  gamepadBridge: string;
+  gstreamerBinary: string;
+  mesenCore: string;
+  pythonBinary: string;
+  retroarchBinary: string;
+  retroarchConfig: string;
+  roms: string;
+  xvfbSocket: string;
+};
+
+type HealthSnapshotOptions = {
+  advertisedUrls?: string[];
+  engineToken?: string;
+  exposureMode?: "local" | "lan";
+  getRuntimeState: () => RuntimeState;
+  healthPaths: HealthPaths;
+};
+
+function pathExists(filePath: string): boolean {
   return fs.existsSync(filePath);
 }
 
-function canWriteDirectory(dirPath) {
+function canWriteDirectory(dirPath: string): boolean {
   try {
     fs.accessSync(dirPath, fs.constants.W_OK);
     return true;
@@ -14,14 +51,14 @@ function canWriteDirectory(dirPath) {
   }
 }
 
-function processStarted(processRef) {
+function processStarted(processRef: ProcessRef): boolean {
   return (
     Boolean(processRef) &&
-    (processRef.exitCode === null || processRef.exitCode === 0)
+    (processRef?.exitCode === null || processRef?.exitCode === 0)
   );
 }
 
-function createHealthSnapshot(options) {
+export function createHealthSnapshot(options: HealthSnapshotOptions) {
   const {
     advertisedUrls = [],
     engineToken,
@@ -98,5 +135,3 @@ function createHealthSnapshot(options) {
     };
   };
 }
-
-module.exports = { createHealthSnapshot };

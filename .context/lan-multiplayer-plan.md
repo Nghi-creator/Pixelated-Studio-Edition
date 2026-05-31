@@ -139,14 +139,14 @@ Open technical question: GStreamer `webrtcbin` may need one peer connection per 
 
 ### Phase 0: TypeScript Migration Track
 
-Status: Phase 0A implemented for engine signaling on 2026-05-28; desktop TypeScript migration remains planned.
+Status: Phase 0A implemented for engine signaling on 2026-05-28; engine input/telemetry helper conversion continued on 2026-05-31; desktop TypeScript migration remains planned.
 
 The engine runtime and desktop launcher are still JavaScript while the web app and API are TypeScript. Multiplayer will add socket payload contracts, role/slot state, invite data, and desktop IPC state, so TypeScript should be introduced as part of the feature path rather than as a separate cosmetic rename.
 
 Recommended migration order:
 
 - Add TypeScript config/build support to `engine/runtime/` first. Completed in Phase 0A.
-- Convert engine config, signaling payload validators, session room helpers, and input routing modules before implementing player slots. Completed in Phase 0A for config, session rooms, socket auth, signaling relay, engine errors, start-game handling, and input handlers.
+- Convert engine config, signaling payload validators, session room helpers, input routing modules, and runtime health/telemetry helpers before expanding multiplayer. Completed for config, session rooms, socket auth, signaling relay, engine errors, start-game handling, input handlers, input mapping/bridge helpers, and health/resource telemetry helpers.
 - Add TypeScript config/build support to `apps/desktop/` after LAN mode stabilizes.
 - Convert desktop IPC contracts, Docker command construction, LAN interface discovery, and lifecycle state handling.
 - Keep `camera.py` as Python and type the JSON contracts it receives through env/socket payloads on the Node side.
@@ -165,6 +165,18 @@ Phase 0A implementation notes:
   - `engine/runtime/src/signaling/engineErrorHandlers.ts`
   - `engine/runtime/src/signaling/startGameHandlers.ts`
   - `engine/runtime/src/signaling/inputHandlers.ts`
+
+Phase 0B implementation notes:
+
+- Converted the engine input helper layer:
+  - `engine/runtime/src/input/injectKey.ts`
+  - `engine/runtime/src/input/translateKey.ts`
+  - `engine/runtime/src/input/translateGamepadButton.ts`
+  - `engine/runtime/src/input/gamepadBridge.ts`
+- Converted engine health and resource telemetry helpers:
+  - `engine/runtime/src/telemetry/healthSnapshot.ts`
+  - `engine/runtime/src/telemetry/resourceSnapshot.ts`
+- `npm run build`, `npm test`, and `npm run check` passed in `engine/runtime` after the conversion.
 
 Remaining validation:
 
@@ -283,7 +295,7 @@ Status: implemented for keyboard player slots 1 and 2 on 2026-05-28; manual Retr
 
 Deliverables:
 
-- Convert input event contracts and routing helpers to TypeScript before expanding player slots. Completed in Phase 0A.
+- Convert input event contracts and routing helpers to TypeScript before expanding player slots. Completed across Phase 0A and Phase 0B.
 - Extend React input events with `playerIndex`. Completed with player 1 as the current UI default.
 - Add engine-side participant/slot validation. Completed through lobby `canSendInput`.
 - Add player 2+ key/gamepad mapping strategy. Completed for keyboard slot 2; slots 3 and 4 still need a virtual gamepad or RetroArch-specific mapping decision.

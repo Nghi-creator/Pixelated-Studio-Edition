@@ -1,6 +1,6 @@
 # Suggestions
 
-Last reviewed: 2026-05-28
+Last reviewed: 2026-05-31
 
 This file tracks advisory recommendations and implementation status. Completed tasks are moved into the Done section so the active backlog stays clean.
 
@@ -19,6 +19,42 @@ Recommended direction:
 
 ## Done
 
+### Engine Runtime TypeScript Phase 0B
+
+Completed: 2026-05-31
+
+Implemented in:
+
+- `engine/runtime/src/input/injectKey.ts`
+- `engine/runtime/src/input/translateKey.ts`
+- `engine/runtime/src/input/translateGamepadButton.ts`
+- `engine/runtime/src/input/gamepadBridge.ts`
+- `engine/runtime/src/telemetry/healthSnapshot.ts`
+- `engine/runtime/src/telemetry/resourceSnapshot.ts`
+- `.context/current-infrastructure.md`
+- `.context/lan-multiplayer-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Converted the engine input helper layer from JavaScript to TypeScript.
+- Typed keyboard action injection, P1/P2 keyboard mapping, browser-to-gamepad button mapping, and the Python gamepad bridge wrapper.
+- Converted engine health/resource telemetry helpers to TypeScript.
+- Typed the `/health` runtime-state shape, gamepad bridge state, camera peer-state parsing, and `/proc` resource snapshots.
+- Preserved the CommonJS build output path so the still-JavaScript runtime manager and server composition root continue to work while migration proceeds incrementally.
+
+Validation:
+
+- `npm run build` passed in `engine/runtime`.
+- `npm test` passed in `engine/runtime` with 20 tests.
+- `npm run check` passed in `engine/runtime`.
+
+Remaining follow-up:
+
+- Convert `engine/runtime/src/runtime/processManager.js` next, because it now consumes typed input helpers but still owns untyped process/session state.
+- Convert HTTP route and ROM/session helper modules after `processManager.js`.
+- Start the desktop TypeScript migration after the engine runtime JavaScript surface is smaller.
+
 ### Multiplayer Performance Measurement Foundation
 
 Completed: 2026-05-28
@@ -29,8 +65,8 @@ Implemented in:
 - `engine/runtime/server.js`
 - `engine/runtime/src/config.ts`
 - `engine/runtime/src/runtime/processManager.js`
-- `engine/runtime/src/telemetry/healthSnapshot.js`
-- `engine/runtime/src/telemetry/resourceSnapshot.js`
+- `engine/runtime/src/telemetry/healthSnapshot.ts`
+- `engine/runtime/src/telemetry/resourceSnapshot.ts`
 - `.context/lan-multiplayer-plan.md`
 - `.context/current-infrastructure.md`
 - `.context/suggestions.md`
@@ -59,12 +95,12 @@ Implemented in:
 - `engine/runtime/Dockerfile`
 - `engine/runtime/server.js`
 - `engine/runtime/src/config.ts`
-- `engine/runtime/src/input/gamepadBridge.js`
-- `engine/runtime/src/input/translateGamepadButton.js`
+- `engine/runtime/src/input/gamepadBridge.ts`
+- `engine/runtime/src/input/translateGamepadButton.ts`
 - `engine/runtime/src/runtime/processManager.js`
 - `engine/runtime/src/signaling/inputHandlers.ts`
 - `engine/runtime/src/signaling/inputHandlers.test.ts`
-- `engine/runtime/src/telemetry/healthSnapshot.js`
+- `engine/runtime/src/telemetry/healthSnapshot.ts`
 - `apps/desktop/main/docker.js`
 - `apps/desktop/main/engineController.js`
 - `.context/lan-multiplayer-plan.md`
@@ -263,7 +299,7 @@ Implemented in:
 
 - `apps/web/src/lib/webrtcInput.ts`
 - `engine/runtime/server.js`
-- `engine/runtime/src/input/translateKey.js`
+- `engine/runtime/src/input/translateKey.ts`
 - `engine/runtime/src/runtime/processManager.js`
 - `engine/runtime/src/signaling/inputHandlers.ts`
 - `engine/runtime/src/signaling/inputHandlers.test.ts`
@@ -369,7 +405,7 @@ Implemented in:
 - `apps/desktop/preload.js`
 - `apps/desktop/index.html`
 - `engine/runtime/src/config.ts`
-- `engine/runtime/src/telemetry/healthSnapshot.js`
+- `engine/runtime/src/telemetry/healthSnapshot.ts`
 - `engine/runtime/server.js`
 - `.context/lan-multiplayer-plan.md`
 - `.context/current-infrastructure.md`
@@ -750,9 +786,9 @@ Implemented in:
 - `engine/runtime/src/runtime/processManager.js`
 - `engine/runtime/src/roms/cloudRomDownloader.js`
 - `engine/runtime/src/roms/localRomStore.js`
-- `engine/runtime/src/input/translateKey.js`
-- `engine/runtime/src/input/injectKey.js`
-- `engine/runtime/src/telemetry/healthSnapshot.js`
+- `engine/runtime/src/input/translateKey.ts`
+- `engine/runtime/src/input/injectKey.ts`
+- `engine/runtime/src/telemetry/healthSnapshot.ts`
 - `.context/current-infrastructure.md`
 - `.context/refurbishment-execution-plan.md`
 - `.context/suggestions.md`
@@ -766,7 +802,7 @@ What changed:
 - Start-game, input, and engine-error socket handlers moved out of `server.js`.
 - Cloud ROM validation/download and local ROM folder helpers moved out of `server.js`.
 - Runtime process state, virtual display startup, game booting, and cleanup moved into `processManager.js`.
-- Deep health snapshot generation moved into `telemetry/healthSnapshot.js`.
+- Deep health snapshot generation moved into `telemetry/healthSnapshot.ts`.
 
 Remaining follow-up:
 
