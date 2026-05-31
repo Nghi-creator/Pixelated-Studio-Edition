@@ -437,7 +437,7 @@ Implementation note: browser controls stay the same for every player. React emit
 
 ### Phase 10: Multiplayer Performance Validation
 
-Status: engine measurement foundation implemented on 2026-05-28; real multi-viewer measurements pending.
+Status: engine measurement foundation implemented on 2026-05-28; repeatable health/peer smoke harness added on 2026-05-31; real multi-viewer measurements pending.
 
 Deliverables:
 
@@ -454,7 +454,33 @@ Acceptance criteria:
 
 Implementation note: `camera.py` writes peer state to `/tmp/pixelated_camera_peers.json`, and `/health` now reports `checks.resources.cameraPeers`, process RSS, and average CPU since process start for RetroArch/camera where `/proc` is available. This gives the manual smoke a concrete before/after measurement surface without adding another metrics service.
 
+Repeatable smoke harness:
+
+```sh
+node scripts/multiplayerSmoke.mjs --engine-url http://127.0.0.1:8080 --expected-guests 1
+```
+
+Run it after the host game is already streaming and before guests open the LAN HTTPS join page. The harness captures a baseline `/health` snapshot, waits for `checks.resources.cameraPeers.peerCount` to increase by the expected guest count, validates `checks.runtime.activeSessionId` and camera peer `sessionId` stay on the host session, then waits for guest disconnect cleanup unless `--skip-disconnect` is passed. It writes a concise JSON report plus NDJSON poll log under `.context/smoke-artifacts/` by default. The harness observes real camera peer state; it does not fake peers with Socket.IO-only clients.
+
 ## Test Plan
+
+## Remaining Multiplayer Execution Tracks
+
+These are the remaining proof steps before calling LAN multiplayer production-ready:
+
+1. Real two-device smoke: host and guest must both receive the stream, and guest disconnect must not kill the host session.
+2. Performance validation: measure engine CPU/RSS and browser WebRTC stats with two or more viewers.
+3. LAN HTTPS UX validation: confirm the self-signed companion flow is acceptable for normal players, or choose a local CA/tunnel strategy.
+4. P3/P4 validation: virtual gamepad support is coded, but still needs Docker/RetroArch smoke on the target host setup.
+5. Desktop TypeScript migration: not required for multiplayer functionality, but it remains the next code-quality and orchestration-safety phase.
+
+Current execution status:
+
+- Track 1 is in progress. First harness attempt on 2026-05-31 failed before baseline because `http://127.0.0.1:8080/health` was unreachable and Docker daemon inspection reported Docker was not running/reachable from this shell. Start the desktop engine, boot a host game, confirm `/health` responds, then rerun `scripts/multiplayerSmoke.mjs` while a guest joins and disconnects.
+- Track 2 depends on Track 1 producing a stable two-viewer session.
+- Track 3 should be evaluated during the same two-device smoke by noting whether the guest can understand and accept the local HTTPS certificate flow.
+- Track 4 needs a host environment where `/dev/uinput` is available to Docker, plus a ROM/input diagnostic.
+- Track 5 should start after the current multiplayer smoke loop is no longer blocked.
 
 Automated:
 
@@ -470,6 +496,7 @@ Manual:
 - Host enables LAN mode and confirms LAN device can reach `/health`.
 - LAN guest pairs through hosted React using LAN URL plus token.
 - Host starts a game and guest receives stream.
+- Run `node scripts/multiplayerSmoke.mjs --engine-url <engine-or-companion-origin> --expected-guests <n>` before guests join, and keep the report/NDJSON artifacts with the smoke notes.
 - Guest input works only for assigned slot.
 - Host disables LAN mode and guest connection fails closed.
 
