@@ -437,7 +437,7 @@ Implementation note: browser controls stay the same for every player. React emit
 
 ### Phase 10: Multiplayer Performance Validation
 
-Status: engine measurement foundation implemented on 2026-05-28; repeatable health/peer smoke harness added on 2026-05-31; real multi-viewer measurements pending.
+Status: engine measurement foundation implemented on 2026-05-28; repeatable health/peer smoke harness added on 2026-05-31; first local two-viewer CPU/RSS sample captured on 2026-05-31; real two-device and browser WebRTC-stat measurements still pending.
 
 Deliverables:
 
@@ -453,6 +453,8 @@ Acceptance criteria:
 - Performance notes are documented before calling LAN multiplayer production-ready.
 
 Implementation note: `camera.py` writes peer state to `/tmp/pixelated_camera_peers.json`, and `/health` now reports `checks.resources.cameraPeers`, process RSS, and average CPU since process start for RetroArch/camera where `/proc` is available. This gives the manual smoke a concrete before/after measurement surface without adding another metrics service.
+
+Local measurement note from 2026-05-31: with one synthetic RetroArch smoke session and two local Chrome viewer tabs, `/health` reported two camera peers for six 5-second samples. Camera CPU rose to roughly 25.1-25.7%, camera RSS held at 96.66 MB, RetroArch CPU held around 58.2-58.5%, RetroArch RSS held at 191.11 MB, and Node RSS stayed around 53-54.5 MB. This is enough to prove the measurement surface works, but it is not yet a target-device performance pass because both viewers were on the same machine and the ROM was a synthetic smoke ROM.
 
 Repeatable smoke harness:
 
@@ -476,11 +478,12 @@ These are the remaining proof steps before calling LAN multiplayer production-re
 
 Current execution status:
 
-- Track 1 is in progress. First harness attempt on 2026-05-31 failed before baseline because `http://127.0.0.1:8080/health` was unreachable and Docker daemon inspection reported Docker was not running/reachable from this shell. Start the desktop engine, boot a host game, confirm `/health` responds, then rerun `scripts/multiplayerSmoke.mjs` while a guest joins and disconnects.
-- Track 2 depends on Track 1 producing a stable two-viewer session.
+- Track 1 has a local two-browser validation pass. Docker Desktop was started, the engine image was rebuilt, `pixelated-node` was launched with Vercel plus local Vite origins, a synthetic `codex-smoke` session booted, and `scripts/multiplayerSmoke.mjs` passed with one baseline browser peer plus one additional browser peer. Closing the added peer returned camera peer count to baseline without killing the host session. Artifacts: `.context/smoke-artifacts/two-browser-peer-smoke-2026-05-31T12-38-00-268Z.json` and `.context/smoke-artifacts/two-browser-peer-smoke-2026-05-31T12-38-00-268Z.ndjson`.
+- Track 1 still needs a true two-device LAN pass where the host and guest are on separate machines and both visually confirm playback.
+- Track 2 has a first local two-viewer CPU/RSS sample. Browser-side WebRTC stats and target-host CPU observations are still pending.
 - Track 3 should be evaluated during the same two-device smoke by noting whether the guest can understand and accept the local HTTPS certificate flow.
-- Track 4 needs a host environment where `/dev/uinput` is available to Docker, plus a ROM/input diagnostic.
-- Track 5 should start after the current multiplayer smoke loop is no longer blocked.
+- Track 4 remains blocked in this Docker Desktop smoke because `/dev/uinput` is unavailable to the engine. `/health.checks.gamepadBridge` correctly reports `failed: true`, `ready: false`, and P3/P4 are disabled in React.
+- Track 5 should start after the real two-device LAN and HTTPS UX checks are no longer blocked.
 
 Automated:
 
