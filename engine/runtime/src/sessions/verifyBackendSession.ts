@@ -1,4 +1,18 @@
-async function verifyBackendSession(options) {
+type VerifyBackendSessionOptions = {
+  apiUrl: string;
+  sessionId: string;
+  sessionToken: string;
+};
+
+export type VerifiedBackendSession = {
+  mode: string;
+  romTarget: string;
+  userId?: string;
+};
+
+export async function verifyBackendSession(
+  options: VerifyBackendSessionOptions,
+): Promise<VerifiedBackendSession> {
   const { apiUrl, sessionId, sessionToken } = options;
 
   if (!apiUrl) {
@@ -27,22 +41,37 @@ async function verifyBackendSession(options) {
       throw new Error(`Backend rejected cloud session (${response.status}).`);
     }
 
-    const verifiedSession = await response.json();
+    const verifiedSession = (await response.json()) as {
+      boot?: {
+        romFilename?: unknown;
+        romUrl?: unknown;
+      };
+      mode?: unknown;
+      user?: {
+        id?: unknown;
+      };
+    };
     const romTarget =
-      verifiedSession?.boot?.romUrl || verifiedSession?.boot?.romFilename;
+      typeof verifiedSession.boot?.romUrl === "string"
+        ? verifiedSession.boot.romUrl
+        : typeof verifiedSession.boot?.romFilename === "string"
+          ? verifiedSession.boot.romFilename
+          : "";
 
     if (!romTarget) {
       throw new Error("Backend session has no approved ROM target.");
     }
 
     return {
-      mode: verifiedSession?.mode,
+      mode:
+        typeof verifiedSession.mode === "string" ? verifiedSession.mode : "",
       romTarget,
-      userId: verifiedSession?.user?.id,
+      userId:
+        typeof verifiedSession.user?.id === "string"
+          ? verifiedSession.user.id
+          : undefined,
     };
   } finally {
     clearTimeout(timeout);
   }
 }
-
-module.exports = { verifyBackendSession };

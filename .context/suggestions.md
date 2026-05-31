@@ -51,9 +51,72 @@ Validation:
 
 Remaining follow-up:
 
-- Convert `engine/runtime/src/runtime/processManager.js` next, because it now consumes typed input helpers but still owns untyped process/session state.
-- Convert HTTP route and ROM/session helper modules after `processManager.js`.
+- Continue with the remaining engine TypeScript cleanup after the HTTP routes and root server conversion.
 - Start the desktop TypeScript migration after the engine runtime JavaScript surface is smaller.
+
+### Engine Runtime TypeScript Phase 0C
+
+Completed: 2026-05-31
+
+Implemented in:
+
+- `engine/runtime/src/runtime/processManager.ts`
+- `engine/runtime/src/roms/cloudRomDownloader.ts`
+- `engine/runtime/src/roms/localRomStore.ts`
+- `engine/runtime/src/sessions/verifyBackendSession.ts`
+- `.context/current-infrastructure.md`
+- `.context/lan-multiplayer-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Converted runtime process management from JavaScript to TypeScript.
+- Typed virtual display startup state, RetroArch/camera process handles, active session cleanup, active cloud ROM cleanup, input fallback routing, camera environment setup, and runtime health state.
+- Converted cloud ROM download/cleanup and local ROM folder helpers to TypeScript.
+- Converted backend session verification to TypeScript with explicit response normalization before returning the approved boot target.
+
+Validation:
+
+- `npm run build` passed in `engine/runtime`.
+- `npm test` passed in `engine/runtime` with 20 tests.
+- `npm run check` passed in `engine/runtime`.
+
+Remaining follow-up:
+
+- Convert `engine/runtime/server.ts` entrypoint-adjacent tests or remaining JS test fixtures only if needed.
+- Desktop TypeScript migration remains the next larger track after the engine runtime is mostly typed.
+
+### Engine Runtime TypeScript Phase 0D
+
+Completed: 2026-05-31
+
+Implemented in:
+
+- `engine/runtime/server.ts`
+- `engine/runtime/src/http/errorHandlers.ts`
+- `engine/runtime/src/http/healthRoutes.ts`
+- `engine/runtime/src/http/localVaultRoutes.ts`
+- `.context/current-infrastructure.md`
+- `.context/lan-multiplayer-plan.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- Converted the root Express/Socket.IO composition file from JavaScript to TypeScript.
+- Converted health, Local Vault, and final HTTP error route modules to TypeScript.
+- Typed the Socket.IO payload normalization for `join-session` and `stop-session`.
+- Kept the compiled entrypoint as `dist/server.js`, so `npm start` and Docker startup do not need a command change.
+
+Validation:
+
+- `npm run build` passed in `engine/runtime`.
+- `npm test` passed in `engine/runtime` with 20 tests.
+- `npm run check` passed in `engine/runtime`.
+
+Remaining follow-up:
+
+- Decide whether to convert JS test fixtures to TypeScript or leave them as generated-runtime tests.
+- Desktop TypeScript migration remains the next larger track.
 
 ### Multiplayer Performance Measurement Foundation
 
@@ -62,9 +125,9 @@ Completed: 2026-05-28
 Implemented in:
 
 - `engine/runtime/camera.py`
-- `engine/runtime/server.js`
+- `engine/runtime/server.ts`
 - `engine/runtime/src/config.ts`
-- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/runtime/processManager.ts`
 - `engine/runtime/src/telemetry/healthSnapshot.ts`
 - `engine/runtime/src/telemetry/resourceSnapshot.ts`
 - `.context/lan-multiplayer-plan.md`
@@ -93,11 +156,11 @@ Implemented in:
 
 - `engine/runtime/input_gamepad.py`
 - `engine/runtime/Dockerfile`
-- `engine/runtime/server.js`
+- `engine/runtime/server.ts`
 - `engine/runtime/src/config.ts`
 - `engine/runtime/src/input/gamepadBridge.ts`
 - `engine/runtime/src/input/translateGamepadButton.ts`
-- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/runtime/processManager.ts`
 - `engine/runtime/src/signaling/inputHandlers.ts`
 - `engine/runtime/src/signaling/inputHandlers.test.ts`
 - `engine/runtime/src/telemetry/healthSnapshot.ts`
@@ -238,7 +301,7 @@ Implemented in:
 - `apps/web/src/features/player/LobbyPanel.tsx`
 - `apps/web/src/lib/useWebRTC.ts`
 - `apps/web/src/pages/user/Player.tsx`
-- `engine/runtime/server.js`
+- `engine/runtime/server.ts`
 - `.context/lan-multiplayer-plan.md`
 - `.context/current-infrastructure.md`
 - `.context/suggestions.md`
@@ -300,7 +363,7 @@ Implemented in:
 - `apps/web/src/lib/webrtcInput.ts`
 - `engine/runtime/server.js`
 - `engine/runtime/src/input/translateKey.ts`
-- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/runtime/processManager.ts`
 - `engine/runtime/src/signaling/inputHandlers.ts`
 - `engine/runtime/src/signaling/inputHandlers.test.ts`
 - `engine/runtime/src/signaling/lobby.ts`
@@ -465,7 +528,7 @@ Implemented in:
 
 - `apps/web/src/lib/webrtcSession.ts`
 - `engine/runtime/src/signaling/startGameHandlers.ts`
-- `engine/runtime/src/sessions/verifyBackendSession.js`
+- `engine/runtime/src/sessions/verifyBackendSession.ts`
 - `engine/runtime/src/signaling/startGameHandlers.test.js`
 - `.context/project-flows.md`
 - `.context/current-infrastructure.md`
@@ -774,18 +837,18 @@ Implemented in:
 
 - `engine/runtime/server.js`
 - `engine/runtime/src/config.ts`
-- `engine/runtime/src/http/healthRoutes.js`
-- `engine/runtime/src/http/localVaultRoutes.js`
-- `engine/runtime/src/http/errorHandlers.js`
+- `engine/runtime/src/http/healthRoutes.ts`
+- `engine/runtime/src/http/localVaultRoutes.ts`
+- `engine/runtime/src/http/errorHandlers.ts`
 - `engine/runtime/src/signaling/socketAuth.ts`
 - `engine/runtime/src/signaling/sessionRooms.ts`
 - `engine/runtime/src/signaling/signalingRelay.ts`
 - `engine/runtime/src/signaling/startGameHandlers.ts`
 - `engine/runtime/src/signaling/inputHandlers.ts`
 - `engine/runtime/src/signaling/engineErrorHandlers.ts`
-- `engine/runtime/src/runtime/processManager.js`
-- `engine/runtime/src/roms/cloudRomDownloader.js`
-- `engine/runtime/src/roms/localRomStore.js`
+- `engine/runtime/src/runtime/processManager.ts`
+- `engine/runtime/src/roms/cloudRomDownloader.ts`
+- `engine/runtime/src/roms/localRomStore.ts`
 - `engine/runtime/src/input/translateKey.ts`
 - `engine/runtime/src/input/injectKey.ts`
 - `engine/runtime/src/telemetry/healthSnapshot.ts`
@@ -795,13 +858,13 @@ Implemented in:
 
 What changed:
 
-- `engine/runtime/server.js` is now a composition root for Express, Socket.IO, routes, auth, runtime, and health wiring.
-- Local Vault HTTP routes moved out of `server.js`.
-- Engine token HTTP and Socket.IO auth moved out of `server.js`.
-- Session room helpers and signaling relay handlers moved out of `server.js`.
-- Start-game, input, and engine-error socket handlers moved out of `server.js`.
-- Cloud ROM validation/download and local ROM folder helpers moved out of `server.js`.
-- Runtime process state, virtual display startup, game booting, and cleanup moved into `processManager.js`.
+- `engine/runtime/server.ts` is now a composition root for Express, Socket.IO, routes, auth, runtime, and health wiring.
+- Local Vault HTTP routes moved out of the root server file.
+- Engine token HTTP and Socket.IO auth moved out of the root server file.
+- Session room helpers and signaling relay handlers moved out of the root server file.
+- Start-game, input, and engine-error socket handlers moved out of the root server file.
+- Cloud ROM validation/download and local ROM folder helpers moved out of the root server file.
+- Runtime process state, virtual display startup, game booting, and cleanup moved into `processManager.ts`.
 - Deep health snapshot generation moved into `telemetry/healthSnapshot.ts`.
 
 Remaining follow-up:
@@ -985,7 +1048,7 @@ Implemented in:
 - `engine/runtime/server.js`
 - `engine/runtime/src/config.ts`
 - `engine/runtime/src/signaling/startGameHandlers.ts`
-- `engine/runtime/src/sessions/verifyBackendSession.js`
+- `engine/runtime/src/sessions/verifyBackendSession.ts`
 - `apps/desktop/main.js`
 - `apps/desktop/README.md`
 - `engine/runtime/README.md`
@@ -1464,7 +1527,7 @@ Implemented in:
 - `apps/web/src/lib/useWebRTC.ts`
 - `apps/web/src/lib/webrtcPeer.ts`
 - `engine/runtime/src/signaling/startGameHandlers.ts`
-- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/runtime/processManager.ts`
 - `engine/runtime/camera.py`
 - `engine/runtime/README.md`
 - `.context/current-infrastructure.md`
@@ -1547,7 +1610,7 @@ Implemented in:
 - `apps/web/src/pages/user/Player.tsx`
 - `engine/runtime/src/signaling/startGameHandlers.ts`
 - `engine/runtime/src/signaling/startGameHandlers.test.js`
-- `engine/runtime/src/runtime/processManager.js`
+- `engine/runtime/src/runtime/processManager.ts`
 - `engine/runtime/camera.py`
 - `engine/runtime/README.md`
 - `.context/current-infrastructure.md`

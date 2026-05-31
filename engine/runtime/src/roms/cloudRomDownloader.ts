@@ -1,15 +1,21 @@
-const fs = require("fs");
-const https = require("https");
+import fs from "fs";
+import https from "https";
 
-function removeFileIfExists(filePath) {
+type CloudRomDownloaderOptions = {
+  allowedRomHosts: string[];
+  maxCloudRomSizeBytes: number;
+  timeoutMs: number;
+};
+
+export function removeFileIfExists(filePath: string): void {
   fs.unlink(filePath, () => {});
 }
 
-function createCloudRomDownloader(options) {
+export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
   const { allowedRomHosts, maxCloudRomSizeBytes, timeoutMs } = options;
 
-  function validateCloudRomUrl(romUrl) {
-    let parsedUrl;
+  function validateCloudRomUrl(romUrl: string): URL {
+    let parsedUrl: URL;
 
     try {
       parsedUrl = new URL(romUrl);
@@ -31,7 +37,10 @@ function createCloudRomDownloader(options) {
     return parsedUrl;
   }
 
-  function downloadCloudRom(romUrl, destinationPath) {
+  function downloadCloudRom(
+    romUrl: string,
+    destinationPath: string,
+  ): Promise<void> {
     const parsedUrl = validateCloudRomUrl(romUrl);
 
     return new Promise((resolve, reject) => {
@@ -39,7 +48,7 @@ function createCloudRomDownloader(options) {
       let downloadedBytes = 0;
       let settled = false;
 
-      const fail = (err) => {
+      const fail = (err: Error) => {
         if (settled) return;
         settled = true;
         file.destroy();
@@ -69,7 +78,7 @@ function createCloudRomDownloader(options) {
           return;
         }
 
-        response.on("data", (chunk) => {
+        response.on("data", (chunk: Buffer) => {
           downloadedBytes += chunk.length;
           if (downloadedBytes > maxCloudRomSizeBytes) {
             response.destroy(
@@ -85,7 +94,7 @@ function createCloudRomDownloader(options) {
         file.on("finish", () => {
           if (settled) return;
           settled = true;
-          file.close(resolve);
+          file.close(() => resolve());
         });
 
         response.pipe(file);
@@ -103,8 +112,3 @@ function createCloudRomDownloader(options) {
     validateCloudRomUrl,
   };
 }
-
-module.exports = {
-  createCloudRomDownloader,
-  removeFileIfExists,
-};

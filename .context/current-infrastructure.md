@@ -181,8 +181,8 @@ Installed runtime pieces:
 
 Runtime processes:
 
-- `server.js`: Express + Socket.IO composition root, compiled to `dist/server.js` for runtime start.
-- `engine/runtime/src/`: local engine modules for config, health/local vault HTTP routes, Socket.IO signaling, ROM download/storage, runtime process control, input injection, and health telemetry. Config, signaling/session contracts, input helpers, and health/resource telemetry helpers are now TypeScript.
+- `server.ts`: Express + Socket.IO composition root, compiled to `dist/server.js` for runtime start.
+- `engine/runtime/src/`: local engine modules for config, health/local vault HTTP routes, Socket.IO signaling, ROM download/storage, runtime process control, input injection, and health telemetry. Config, HTTP routes, signaling/session contracts, runtime process control, ROM/session helpers, input helpers, and health/resource telemetry helpers are now TypeScript.
 - `Xvfb :99`: virtual screen.
 - PulseAudio system daemon.
 - RetroArch process per game.

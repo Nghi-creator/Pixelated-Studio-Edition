@@ -139,14 +139,14 @@ Open technical question: GStreamer `webrtcbin` may need one peer connection per 
 
 ### Phase 0: TypeScript Migration Track
 
-Status: Phase 0A implemented for engine signaling on 2026-05-28; engine input/telemetry helper conversion continued on 2026-05-31; desktop TypeScript migration remains planned.
+Status: Phase 0A implemented for engine signaling on 2026-05-28; engine input/telemetry, runtime/ROM/session, HTTP route, and root server conversion continued on 2026-05-31; desktop TypeScript migration remains planned.
 
 The engine runtime and desktop launcher are still JavaScript while the web app and API are TypeScript. Multiplayer will add socket payload contracts, role/slot state, invite data, and desktop IPC state, so TypeScript should be introduced as part of the feature path rather than as a separate cosmetic rename.
 
 Recommended migration order:
 
 - Add TypeScript config/build support to `engine/runtime/` first. Completed in Phase 0A.
-- Convert engine config, signaling payload validators, session room helpers, input routing modules, and runtime health/telemetry helpers before expanding multiplayer. Completed for config, session rooms, socket auth, signaling relay, engine errors, start-game handling, input handlers, input mapping/bridge helpers, and health/resource telemetry helpers.
+- Convert engine config, HTTP routes, signaling payload validators, session room helpers, input routing modules, runtime process control, ROM/session helpers, and runtime health/telemetry helpers before expanding multiplayer. Completed for the root server composition file, config, HTTP routes, session rooms, socket auth, signaling relay, engine errors, start-game handling, input handlers, input mapping/bridge helpers, runtime process control, ROM/session helpers, and health/resource telemetry helpers.
 - Add TypeScript config/build support to `apps/desktop/` after LAN mode stabilizes.
 - Convert desktop IPC contracts, Docker command construction, LAN interface discovery, and lifecycle state handling.
 - Keep `camera.py` as Python and type the JSON contracts it receives through env/socket payloads on the Node side.
@@ -176,6 +176,28 @@ Phase 0B implementation notes:
 - Converted engine health and resource telemetry helpers:
   - `engine/runtime/src/telemetry/healthSnapshot.ts`
   - `engine/runtime/src/telemetry/resourceSnapshot.ts`
+- `npm run build`, `npm test`, and `npm run check` passed in `engine/runtime` after the conversion.
+
+Phase 0C implementation notes:
+
+- Converted the engine runtime process manager:
+  - `engine/runtime/src/runtime/processManager.ts`
+- Converted engine ROM/session helpers:
+  - `engine/runtime/src/roms/cloudRomDownloader.ts`
+  - `engine/runtime/src/roms/localRomStore.ts`
+  - `engine/runtime/src/sessions/verifyBackendSession.ts`
+- Typed runtime boot options, active process state, cloud ROM download validation, local ROM user folder sanitization, and backend session verification responses.
+- `npm run build`, `npm test`, and `npm run check` passed in `engine/runtime` after the conversion.
+
+Phase 0D implementation notes:
+
+- Converted HTTP route modules:
+  - `engine/runtime/src/http/errorHandlers.ts`
+  - `engine/runtime/src/http/healthRoutes.ts`
+  - `engine/runtime/src/http/localVaultRoutes.ts`
+- Converted the root engine server composition file:
+  - `engine/runtime/server.ts`
+- `server.ts` still compiles to `dist/server.js`, so the package entrypoint and Docker startup command remain unchanged.
 - `npm run build`, `npm test`, and `npm run check` passed in `engine/runtime` after the conversion.
 
 Remaining validation:

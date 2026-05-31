@@ -1,8 +1,7 @@
-const express = require("express");
-const http = require("http");
-const cors = require("cors");
-const { Server } = require("socket.io");
-const {
+import express from "express";
+import http from "http";
+import { Server } from "socket.io";
+import {
   allowedRomHosts,
   ADVERTISED_URLS,
   CLOUD_ROM_DOWNLOAD_TIMEOUT_MS,
@@ -13,21 +12,38 @@ const {
   MAX_CLOUD_ROM_SIZE_BYTES,
   MAX_ROM_SIZE_BYTES,
   PIXELATED_API_URL,
-} = require("./src/config");
-const { registerErrorHandlers } = require("./src/http/errorHandlers");
-const { registerHealthRoutes } = require("./src/http/healthRoutes");
-const { registerLocalVaultRoutes } = require("./src/http/localVaultRoutes");
-const { createCloudRomDownloader } = require("./src/roms/cloudRomDownloader");
-const { createProcessManager } = require("./src/runtime/processManager");
-const { registerEngineErrorHandlers } = require("./src/signaling/engineErrorHandlers");
-const { registerInputHandlers } = require("./src/signaling/inputHandlers");
-const { joinSession, normalizeSessionId } = require("./src/signaling/sessionRooms");
-const { createLobbyManager } = require("./src/signaling/lobby");
-const { registerSignalingRelayHandlers } = require("./src/signaling/signalingRelay");
-const { createEngineTokenAuth } = require("./src/signaling/socketAuth");
-const { registerStartGameHandler } = require("./src/signaling/startGameHandlers");
-const { verifyBackendSession } = require("./src/sessions/verifyBackendSession");
-const { createHealthSnapshot } = require("./src/telemetry/healthSnapshot");
+} from "./src/config";
+import { registerErrorHandlers } from "./src/http/errorHandlers";
+import { registerHealthRoutes } from "./src/http/healthRoutes";
+import { registerLocalVaultRoutes } from "./src/http/localVaultRoutes";
+import { createCloudRomDownloader } from "./src/roms/cloudRomDownloader";
+import { createProcessManager } from "./src/runtime/processManager";
+import { registerEngineErrorHandlers } from "./src/signaling/engineErrorHandlers";
+import { registerInputHandlers } from "./src/signaling/inputHandlers";
+import { createLobbyManager } from "./src/signaling/lobby";
+import {
+  joinSession,
+  normalizeSessionId,
+} from "./src/signaling/sessionRooms";
+import { registerSignalingRelayHandlers } from "./src/signaling/signalingRelay";
+import { createEngineTokenAuth } from "./src/signaling/socketAuth";
+import { registerStartGameHandler } from "./src/signaling/startGameHandlers";
+import { verifyBackendSession } from "./src/sessions/verifyBackendSession";
+import { createHealthSnapshot } from "./src/telemetry/healthSnapshot";
+
+const cors = require("cors");
+
+type SocketPayload = Record<string, unknown>;
+
+function normalizeSocketPayload(payload: unknown): SocketPayload {
+  return payload && typeof payload === "object"
+    ? (payload as SocketPayload)
+    : {};
+}
+
+function normalizeSocketRole(role: unknown): string {
+  return typeof role === "string" ? role : "unknown";
+}
 
 const app = express();
 app.use(cors(corsOptions));
@@ -70,12 +86,15 @@ io.use(auth.useSocketEngineToken);
 io.on("connection", (socket) => {
   console.log(`[Node.js] Client connected! ID: ${socket.id}`);
 
-  socket.on("join-session", (payload = {}) => {
-    const sessionId = joinSession(socket, payload.sessionId, payload.role);
-    if (sessionId && payload.role !== "camera") {
+  socket.on("join-session", (rawPayload: unknown = {}) => {
+    const payload = normalizeSocketPayload(rawPayload);
+    const role = normalizeSocketRole(payload.role);
+    const sessionId = joinSession(socket, payload.sessionId, role);
+
+    if (sessionId && role !== "camera") {
       lobby.joinLobby(socket, {
         displayName: payload.displayName,
-        requestedRole: payload.role === "browser" ? "host" : payload.role,
+        requestedRole: role === "browser" ? "host" : role,
         sessionId,
       });
       if (runtime.getActiveSessionId() === sessionId) {
@@ -98,9 +117,12 @@ io.on("connection", (socket) => {
     canSendInput: lobby.canSendInput,
   });
 
-  socket.on("stop-session", (payload = {}) => {
+  socket.on("stop-session", (rawPayload: unknown = {}) => {
+    const payload = normalizeSocketPayload(rawPayload);
     const sessionId =
-      normalizeSessionId(payload.sessionId) || socket.data.sessionId;
+      normalizeSessionId(payload.sessionId) ||
+      (typeof socket.data.sessionId === "string" ? socket.data.sessionId : null);
+
     if (!lobby.canControlSession(socket, sessionId)) {
       socket.emit("engine-error", {
         message: "Only the lobby host can stop a game.",
