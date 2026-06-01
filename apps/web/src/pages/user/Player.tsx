@@ -205,15 +205,25 @@ export default function Player() {
         videoRef={videoRef}
       />
 
-      <LobbyPanel
-        currentParticipant={localParticipant}
-        inputCapabilities={inputCapabilities}
-        lobbyState={lobbyState}
-        onKickParticipant={kickParticipant}
-        onReleaseSlot={releasePlayerSlot}
-        onRequestSlot={requestPlayerSlot}
-        shareUrl={shareUrl}
-      />
+      <div className="mt-3 flex w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        {authorName ? (
+          <p className="text-sm font-medium text-synth-primary">
+            Developed by: {authorName}
+          </p>
+        ) : (
+          <span />
+        )}
+
+        <LobbyPanel
+          currentParticipant={localParticipant}
+          inputCapabilities={inputCapabilities}
+          lobbyState={lobbyState}
+          onKickParticipant={kickParticipant}
+          onReleaseSlot={releasePlayerSlot}
+          onRequestSlot={requestPlayerSlot}
+          shareUrl={shareUrl}
+        />
+      </div>
 
       {showStreamTelemetry && (
         <StreamTelemetryPanel
@@ -227,7 +237,6 @@ export default function Player() {
       )}
 
       <PlayerControls
-        authorName={authorName}
         onStreamProfileChange={setStreamProfileId}
         selectedStreamProfileId={streamProfileId}
         streamProfiles={STREAM_PROFILES}

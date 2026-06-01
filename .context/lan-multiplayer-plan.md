@@ -419,6 +419,8 @@ Implementation note: `useWebRTC` now exposes lobby state, the local participant,
 
 UI restructure note, 2026-06-01: the navbar now exposes a dedicated Multiplayer route. `/multiplayer` starts with Host Game and Join Game modes, keeps engine pairing there, lets hosts choose cloud or Local Vault games before opening `/play/:id`, and lets guests paste a play invite before joining. The Player page now keeps only a compact handoff to Multiplayer when the engine is unpaired, so active play is no longer dominated by setup UI.
 
+Player UI note, 2026-06-01: the active player page now keeps the developer credit directly under the stream stage and moves lobby management into a toggleable left-side drawer. The default page shows only a compact Lobby trigger; invite copy, participants, slot requests, host kick controls, and watch-only controls live inside the drawer.
+
 ### Phase 7: Backend Multiplayer Support
 
 Status: metadata foundation implemented on 2026-05-28; Supabase migration was pushed by the project owner, but hosted Render API was still serving an older build during smoke.

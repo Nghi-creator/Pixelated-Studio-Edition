@@ -54,10 +54,11 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
   };
 
   return (
-    <div className="w-full max-w-5xl mt-3">
-      <div className="mb-2 flex justify-end">
+    <section className="mt-3 w-full max-w-5xl rounded-lg border border-synth-border bg-synth-surface p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-gray-300">Stream Stats</p>
         <button
-          className="inline-flex items-center gap-2 rounded-md border border-synth-border bg-synth-surface/80 px-3 py-2 text-xs font-semibold text-gray-200 transition hover:border-synth-primary/70 hover:text-white"
+          className="inline-flex items-center gap-2 rounded-md border border-synth-border bg-synth-bg px-3 py-2 text-xs font-semibold text-gray-200 transition hover:border-synth-primary/70 hover:text-white"
           onClick={copyTelemetry}
           title="Copy stream telemetry JSON"
           type="button"
@@ -71,38 +72,38 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
         </button>
       </div>
       <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
-      <div className="min-h-16 rounded-lg border border-synth-border bg-synth-surface/80 px-3 py-2">
-        <div className="flex items-center gap-2 text-xs uppercase text-gray-500">
-          <Activity className="w-3.5 h-3.5" />
-          FPS
+        <div className="min-h-16 rounded-lg border border-synth-border bg-synth-bg px-3 py-2">
+          <div className="flex items-center gap-2 text-xs uppercase text-gray-500">
+            <Activity className="w-3.5 h-3.5" />
+            FPS
+          </div>
+          <div className="mt-1 text-lg font-bold text-white tabular-nums">
+            {formatNumber(telemetry.fps)}
+          </div>
         </div>
-        <div className="mt-1 text-lg font-bold text-white tabular-nums">
-          {formatNumber(telemetry.fps)}
+        <div className="min-h-16 rounded-lg border border-synth-border bg-synth-bg px-3 py-2">
+          <div className="text-xs uppercase text-gray-500">Bitrate</div>
+          <div className="mt-1 text-lg font-bold text-white tabular-nums">
+            {formatNumber(telemetry.bitrateKbps)}{" "}
+            <span className="text-xs font-medium text-gray-500">kbps</span>
+          </div>
+        </div>
+        <div className="min-h-16 rounded-lg border border-synth-border bg-synth-bg px-3 py-2">
+          <div className="text-xs uppercase text-gray-500">ICE</div>
+          <div className="mt-1 text-lg font-bold text-white capitalize">
+            {telemetry.iceConnectionState}
+          </div>
+        </div>
+        <div className="min-h-16 rounded-lg border border-synth-border bg-synth-bg px-3 py-2">
+          <div className="text-xs uppercase text-gray-500">Loss / Jitter</div>
+          <div className="mt-1 text-lg font-bold text-white tabular-nums">
+            {telemetry.packetsLost}{" "}
+            <span className="text-xs font-medium text-gray-500">
+              / {formatNumber(telemetry.jitterMs, 1)} ms
+            </span>
+          </div>
         </div>
       </div>
-      <div className="min-h-16 rounded-lg border border-synth-border bg-synth-surface/80 px-3 py-2">
-        <div className="text-xs uppercase text-gray-500">Bitrate</div>
-        <div className="mt-1 text-lg font-bold text-white tabular-nums">
-          {formatNumber(telemetry.bitrateKbps)}{" "}
-          <span className="text-xs font-medium text-gray-500">kbps</span>
-        </div>
-      </div>
-      <div className="min-h-16 rounded-lg border border-synth-border bg-synth-surface/80 px-3 py-2">
-        <div className="text-xs uppercase text-gray-500">ICE</div>
-        <div className="mt-1 text-lg font-bold text-white capitalize">
-          {telemetry.iceConnectionState}
-        </div>
-      </div>
-      <div className="min-h-16 rounded-lg border border-synth-border bg-synth-surface/80 px-3 py-2">
-        <div className="text-xs uppercase text-gray-500">Loss / Jitter</div>
-        <div className="mt-1 text-lg font-bold text-white tabular-nums">
-          {telemetry.packetsLost}{" "}
-          <span className="text-xs font-medium text-gray-500">
-            / {formatNumber(telemetry.jitterMs, 1)} ms
-          </span>
-        </div>
-      </div>
-      </div>
-    </div>
+    </section>
   );
 }

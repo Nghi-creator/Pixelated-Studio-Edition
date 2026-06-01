@@ -4,14 +4,12 @@ import type {
 } from "../../lib/streamProfiles";
 
 type PlayerControlsProps = {
-  authorName: string | null;
   onStreamProfileChange: (profileId: StreamProfileId) => void;
   selectedStreamProfileId: StreamProfileId;
   streamProfiles: StreamProfile[];
 };
 
 export function PlayerControls({
-  authorName,
   onStreamProfileChange,
   selectedStreamProfileId,
   streamProfiles,
@@ -38,11 +36,6 @@ export function PlayerControls({
             </span>
           </div>
 
-          {authorName && (
-            <p className="mt-3 text-sm font-medium text-synth-primary">
-              Developed by: {authorName}
-            </p>
-          )}
         </div>
 
         <div className="min-w-0 md:justify-self-end">
