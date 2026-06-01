@@ -203,7 +203,16 @@ export default function Player() {
         shareUrl={shareUrl}
       />
 
-      {showStreamTelemetry && <StreamTelemetryPanel telemetry={telemetry} />}
+      {showStreamTelemetry && (
+        <StreamTelemetryPanel
+          gameId={id}
+          playerMode={playerMode}
+          sessionId={sessionId}
+          shareUrl={shareUrl}
+          status={status}
+          telemetry={telemetry}
+        />
+      )}
 
       <PlayerControls
         authorName={authorName}
