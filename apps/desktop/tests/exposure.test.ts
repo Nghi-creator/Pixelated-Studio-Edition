@@ -5,7 +5,7 @@ import {
   getAdvertisedEngineUrls,
   getDockerPublishHost,
   normalizeExposureMode,
-} from "./exposure";
+} from "../main/exposure";
 
 describe("desktop exposure helpers", () => {
   it("defaults unknown exposure modes to local", () => {
