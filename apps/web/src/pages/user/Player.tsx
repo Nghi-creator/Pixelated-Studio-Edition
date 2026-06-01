@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { CommentsPanel } from "../../features/player/comments/CommentsPanel";
 import { LobbyPanel } from "../../features/player/LobbyPanel";
 import { ReportModal } from "../../features/player/comments/ReportModal";
@@ -14,7 +14,6 @@ import { useAuthUser } from "../../features/player/useAuthUser";
 import { useGameMetadata } from "../../features/player/useGameMetadata";
 import { useGameReactions } from "../../features/player/useGameReactions";
 import { usePlayCount } from "../../features/player/usePlayCount";
-import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
 import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engineAuth";
 import {
   getStreamProfile,
@@ -178,10 +177,23 @@ export default function Player() {
 
       {!isEnginePaired && (
         <div className="mb-5 w-full max-w-5xl">
-          <EnginePairingPanel
-            compact
-            onPaired={() => setIsEnginePaired(true)}
-          />
+          <div className="flex flex-col gap-3 rounded-lg border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-100 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="font-bold text-white">
+                Engine pairing is not configured.
+              </p>
+              <p className="mt-1 text-amber-100/80">
+                Use Multiplayer to pair, host, or join before starting a LAN
+                session.
+              </p>
+            </div>
+            <Link
+              className="inline-flex h-10 items-center justify-center rounded-lg border border-amber-300/40 bg-amber-300/10 px-4 font-bold text-white transition-colors hover:bg-amber-300/20"
+              to="/multiplayer"
+            >
+              Open Multiplayer
+            </Link>
+          </div>
         </div>
       )}
 

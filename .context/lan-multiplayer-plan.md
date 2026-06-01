@@ -393,7 +393,7 @@ Implementation note: WebRTC signaling now carries a browser-generated `peerId`. 
 
 ### Phase 6: React Lobby And Guest Join UI
 
-Status: first local-engine UI slice implemented on 2026-05-28; health-gated slot UI added on 2026-05-31; real two-browser smoke pending.
+Status: first local-engine UI slice implemented on 2026-05-28; health-gated slot UI added on 2026-05-31; dedicated Multiplayer route added on 2026-06-01; real two-browser smoke pending.
 
 Deliverables:
 
@@ -404,6 +404,7 @@ Deliverables:
 - Gate active player slot requests using the engine `/health` gamepad bridge payload.
 - Ensure guests do not boot or stop the host game.
 - Wake late-joining guests when a camera process is already active for that session.
+- Move pairing, host setup, join setup, and pre-game game selection out of the active player screen. Implemented with `/multiplayer`.
 
 Acceptance criteria:
 
@@ -415,6 +416,8 @@ Acceptance criteria:
 - Host disconnect still stops the active session.
 
 Implementation note: `useWebRTC` now exposes lobby state, the local participant, session id, slot actions, and health-derived input capabilities. Player links use `?session=<id>&role=spectator`; guest clients join the existing session and wait for/receive `python-ready` without emitting `start-game`. The engine re-emits `python-ready` to a newly joined browser when the requested session is already active. The web lobby reads `checks.gamepadBridge` from `/health`; when `fileExists`, `uinputAvailable`, and bridge health allow virtual gamepads, P1-P4 are offered. If the bridge is missing, failed, or `/dev/uinput` is unavailable, active play is capped to P1/P2, P3/P4 buttons are disabled, and watch-only/spectator flow remains available.
+
+UI restructure note, 2026-06-01: the navbar now exposes a dedicated Multiplayer route. `/multiplayer` starts with Host Game and Join Game modes, keeps engine pairing there, lets hosts choose cloud or Local Vault games before opening `/play/:id`, and lets guests paste a play invite before joining. The Player page now keeps only a compact handoff to Multiplayer when the engine is unpaired, so active play is no longer dominated by setup UI.
 
 ### Phase 7: Backend Multiplayer Support
 

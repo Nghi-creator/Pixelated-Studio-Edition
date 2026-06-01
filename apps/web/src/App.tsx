@@ -16,6 +16,7 @@ import Favorites from "./pages/user/Favorites";
 import Profile from "./pages/user/Profile";
 import ResetPassword from "./pages/user/ResetPassword";
 import Publish from "./pages/user/Publish";
+import Multiplayer from "./pages/user/Multiplayer";
 
 import UserManagement from "./pages/admin/UserManagement";
 import Dashboard from "./pages/admin/Dashboard";
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/local" element={<LocalVault />} />
+          <Route path="/multiplayer" element={<Multiplayer />} />
           <Route path="/publish" element={<Publish />} />
         </Route>
       </Routes>
