@@ -8,6 +8,7 @@ import {
   HardDrive,
   UploadCloud,
   Code,
+  Users,
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
@@ -103,6 +104,7 @@ export default function Navbar() {
 
   const isFavoritesPage = location.pathname === "/favorites";
   const isLocalPage = location.pathname === "/local";
+  const isMultiplayerPage = location.pathname === "/multiplayer";
   const isPublishPage = location.pathname === "/publish";
 
   return (
@@ -133,6 +135,20 @@ export default function Navbar() {
             )}
 
             {/* LOCAL VAULT LINK */}
+            <Link
+              to="/multiplayer"
+              title="Multiplayer"
+              className={`transition-colors ${
+                isMultiplayerPage
+                  ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
+                  : "text-gray-400 hover:text-synth-primary"
+              }`}
+            >
+              <Users
+                className={`w-6 h-6 ${isMultiplayerPage ? "fill-synth-primary/20" : ""}`}
+              />
+            </Link>
+
             <Link
               to="/local"
               title="Local Vault"
