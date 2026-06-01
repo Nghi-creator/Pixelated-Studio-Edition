@@ -32,6 +32,13 @@ type EngineHealthPayload = {
   ok?: boolean;
 };
 
+type PairingFailureContext = {
+  error: unknown;
+  parsedUrl: URL;
+  scope: EngineUrlScope;
+  status?: number;
+};
+
 type EnginePairingPanelProps = {
   compact?: boolean;
   onPaired?: () => void;
@@ -106,6 +113,50 @@ const getScopeDescription = (scope: EngineUrlScope) => {
   }
 
   return "Connects to an engine running on this computer.";
+};
+
+const isLikelyCompanionUrl = (url: URL) =>
+  url.protocol === "https:" && url.port === "8090";
+
+const getPairingFailureMessage = ({
+  error,
+  parsedUrl,
+  scope,
+  status,
+}: PairingFailureContext) => {
+  if (status === 401) {
+    return "That token was rejected by the engine. Copy the current token from the desktop app and try again.";
+  }
+
+  if (status === 502 && isLikelyCompanionUrl(parsedUrl)) {
+    return "The HTTPS join page is reachable, but it cannot reach the local engine. Keep the host desktop app open, confirm the engine is initialized, then try again.";
+  }
+
+  if (status && status >= 500) {
+    return "The engine responded with an internal error. Restart the desktop engine and try pairing again.";
+  }
+
+  if (
+    scope === "lan" &&
+    window.location.protocol === "https:" &&
+    parsedUrl.protocol === "http:"
+  ) {
+    return "The hosted HTTPS app may be blocked from reaching an HTTP LAN engine. Use the HTTPS companion join page from the desktop app instead.";
+  }
+
+  if (scope === "lan" && parsedUrl.protocol === "https:") {
+    return "Could not reach the HTTPS LAN join page. If the browser shows a privacy or certificate warning, open the join URL directly, accept the local certificate for this test, then retry pairing.";
+  }
+
+  if (scope === "lan") {
+    return "Could not reach that LAN engine. Confirm LAN mode is enabled, the host desktop app is running, and both devices are on the same network.";
+  }
+
+  if (error instanceof TypeError) {
+    return "Could not reach the local engine. Make sure the desktop app is running and the URL points to this computer.";
+  }
+
+  return "Could not reach the local engine at that URL.";
 };
 
 export function EnginePairingPanel({
@@ -183,7 +234,16 @@ export function EnginePairingPanel({
         engineUrlEndpoint(normalizedUrl, "/health"),
       );
       if (!healthResponse.ok) {
-        throw new Error("Engine health check failed.");
+        setPairingState("error");
+        setMessage(
+          getPairingFailureMessage({
+            error: new Error("Engine health check failed."),
+            parsedUrl,
+            scope: getEngineUrlScope(normalizedUrl),
+            status: healthResponse.status,
+          }),
+        );
+        return;
       }
       const health = (await healthResponse.json()) as EngineHealthPayload;
       const reportedExposureMode = health.exposureMode || "local";
@@ -210,13 +270,27 @@ export function EnginePairingPanel({
       if (authResponse.status === 401) {
         setPairingState("error");
         setMessage(
-          "That token was rejected by the engine. Copy the current token from the desktop app and try again.",
+          getPairingFailureMessage({
+            error: new Error("Engine token check failed."),
+            parsedUrl,
+            scope: actualScope,
+            status: authResponse.status,
+          }),
         );
         return;
       }
 
       if (!authResponse.ok) {
-        throw new Error("Engine token check failed.");
+        setPairingState("error");
+        setMessage(
+          getPairingFailureMessage({
+            error: new Error("Engine token check failed."),
+            parsedUrl,
+            scope: actualScope,
+            status: authResponse.status,
+          }),
+        );
+        return;
       }
 
       setEngineUrl(normalizedUrl);
@@ -246,22 +320,12 @@ export function EnginePairingPanel({
     } catch (err) {
       console.error("Failed to pair local engine:", err);
       setPairingState("error");
-      const scope = getEngineUrlScope(normalizedUrl);
-      if (
-        scope === "lan" &&
-        window.location.protocol === "https:" &&
-        parsedUrl.protocol === "http:"
-      ) {
-        setMessage(
-          "Could not reach that LAN engine. Your browser may be blocking HTTP LAN access from the hosted HTTPS app; confirm LAN mode is enabled, the URL is correct, and test from a browser/network that allows private-network requests.",
-        );
-        return;
-      }
-
       setMessage(
-        scope === "lan"
-          ? "Could not reach that LAN engine. Confirm the host desktop app is running in LAN mode and both devices are on the same network."
-          : "Could not reach the local engine at that URL.",
+        getPairingFailureMessage({
+          error: err,
+          parsedUrl,
+          scope: getEngineUrlScope(normalizedUrl),
+        }),
       );
     }
   };

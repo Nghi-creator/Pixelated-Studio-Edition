@@ -228,6 +228,7 @@ Phase 0E implementation notes:
 - `electron-builder` packaging now includes `dist/`, which is required because the desktop package entrypoint is compiled.
 - No first-party JavaScript source files remain under `apps/desktop/` outside generated/ignored build output.
 - `npm run build` passed in `apps/desktop`.
+- `npm test` passed in `apps/desktop`, covering exposure-mode normalization, local/LAN Docker publish host selection, local advertised engine URL, and companion URL gating.
 - `npm run prepare:web` passed in `apps/desktop`.
 - `npm start` launched successfully through the compiled `dist/main.js` entrypoint and compiled preload/renderer scripts.
 
@@ -500,6 +501,7 @@ Manual smoke checklist:
 
 - `.context/lan-manual-smoke-checklist.md` records host/guest steps, expected results, failure notes, and places to paste host/guest copied telemetry JSON.
 - The player's hidden stream telemetry panel has a `Copy Stats` action that copies a JSON payload containing session id, player mode, share URL, user agent, connection state, FPS, bitrate, packet loss, jitter, and timestamps.
+- Engine pairing errors now distinguish wrong token, HTTPS companion certificate/trust failures, companion proxy cannot reach engine, hosted HTTPS to HTTP LAN blocking, and generic same-network reachability failures.
 
 ## Test Plan
 

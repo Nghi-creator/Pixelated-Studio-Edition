@@ -89,5 +89,7 @@ Close the guest tab when the harness prints that join was validated. The harness
 
 - Certificate page is too scary/confusing: consider local CA packaging or a tunnel strategy.
 - Companion loads but pairing fails: check token, LAN mode, and whether the companion can proxy `/health`.
+- Pairing says the HTTPS join page cannot be reached: open the companion URL directly and accept the local certificate warning, then retry pairing.
+- Pairing says the join page cannot reach the local engine: keep the desktop app open, initialize the engine, and retry after `/health` is ready.
 - Hosted Vercel direct-to-LAN HTTP fails: expected in Chrome; use the HTTPS companion instead.
 - P3/P4 disabled: expected on Docker Desktop setups without `/dev/uinput`; validate P3/P4 later on a Linux host with uinput access.
