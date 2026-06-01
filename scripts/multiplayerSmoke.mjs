@@ -29,6 +29,9 @@ Flow:
   2. Run this script before guests open the LAN join page.
   3. Have guests join as spectators or players.
   4. If disconnect validation is enabled, close guest tabs after join passes.
+
+Reports include camera peer counts, session survival checks, input mode, and
+engine process CPU/RSS snapshots from /health.
 `);
 }
 
@@ -142,6 +145,32 @@ function getInputMode(health) {
   };
 }
 
+function summarizeProcess(processSnapshot) {
+  if (!processSnapshot || typeof processSnapshot !== "object") {
+    return null;
+  }
+
+  return {
+    averageCpuPercent:
+      typeof processSnapshot.averageCpuPercent === "number"
+        ? processSnapshot.averageCpuPercent
+        : null,
+    pid: typeof processSnapshot.pid === "number" ? processSnapshot.pid : null,
+    rssMb:
+      typeof processSnapshot.rssMb === "number" ? processSnapshot.rssMb : null,
+  };
+}
+
+function getResourceSnapshot(health) {
+  const resources = health?.checks?.resources || {};
+
+  return {
+    camera: summarizeProcess(resources.camera),
+    node: summarizeProcess(resources.node),
+    retroarch: summarizeProcess(resources.retroarch),
+  };
+}
+
 function summarizeHealth(health) {
   const cameraPeers = getCameraPeerState(health);
   const runtimeActiveSessionId = getRuntimeActiveSessionId(health);
@@ -150,6 +179,7 @@ function summarizeHealth(health) {
     cameraPeers,
     input: getInputMode(health),
     ok: Boolean(health?.ok),
+    resources: getResourceSnapshot(health),
     runtimeActiveSessionId,
     runtimeCameraRunning: Boolean(health?.checks?.runtime?.cameraRunning),
     runtimeRetroarchRunning: Boolean(health?.checks?.runtime?.retroarchRunning),

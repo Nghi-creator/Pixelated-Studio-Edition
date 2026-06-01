@@ -1,22 +1,32 @@
 {
   "name": "pixelated-desktop",
   "version": "1.0.0",
-  "main": "main.js",
+  "description": "Desktop companion for Pixelated Studio local and LAN game streaming.",
+  "author": "Pixelated Studio",
+  "main": "dist/main.js",
   "scripts": {
-    "start": "electron .",
-    "prepare:web": "node scripts/prepareWebDist.js",
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test dist/tests/*.test.js",
+    "start": "npm run build && electron .",
+    "prepare:web": "npm run build && npm --prefix ../web run build && node dist/scripts/prepareWebDist.js",
     "dist": "npm run prepare:web && electron-builder"
   },
   "devDependencies": {
+    "@types/node": "^20.19.39",
     "electron": "^29.0.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "typescript": "^5.9.3"
   },
   "dependencies": {},
   "build": {
     "appId": "com.pixelated.studio",
     "productName": "Pixelated Studio",
-    "asar": false,
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
     "mac": {
+      "icon": "build/icon.png",
       "target": "dmg"
     },
     "win": {
@@ -26,8 +36,21 @@
       "target": "AppImage"
     },
     "files": [
-      "**/*",
-      "!dist/**"
+      "package.json",
+      "index.html",
+      "dist/**",
+      "!release/**",
+      "!tests/**",
+      "!dist/tests/**",
+      "!dist/**/*.test.js",
+      "!dist/scripts/**",
+      "!dist/mac{,/**/*}",
+      "!dist/mac-arm64{,/**/*}",
+      "!dist/*.dmg",
+      "!dist/*.zip",
+      "!dist/*.blockmap",
+      "!dist/builder-debug.yml",
+      "!dist/builder-effective-config.yaml"
     ],
     "extraResources": [
       {
@@ -35,6 +58,19 @@
         "to": "web-dist",
         "filter": [
           "**/*"
+        ]
+      },
+      {
+        "from": "../../engine/runtime",
+        "to": "engine-runtime",
+        "filter": [
+          "**/*",
+          "!node_modules/**",
+          "!dist/**",
+          "!__pycache__/**",
+          "!**/__pycache__/**",
+          "!*.pyc",
+          "!**/*.pyc"
         ]
       }
     ]

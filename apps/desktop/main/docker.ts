@@ -1,14 +1,20 @@
-const { exec } = require("child_process");
-const fs = require("fs");
-const {
+import { exec, type ExecOptions } from "child_process";
+import type { IpcMainEvent } from "electron";
+import fs from "fs";
+import {
   buildFallback,
   engineImage,
   engineRuntimeDir,
   pullEngineImage,
-} = require("./config");
-const { emitEngineState } = require("./state");
+} from "./config";
+import { emitEngineState } from "./state";
 
-function getSafeEnv() {
+type ExecCommandResult = {
+  stderr: string;
+  stdout: string;
+};
+
+export function getSafeEnv() {
   if (process.platform === "win32") {
     return process.env;
   }
@@ -19,7 +25,7 @@ function getSafeEnv() {
   };
 }
 
-function quoteDockerEnvValue(value) {
+export function quoteDockerEnvValue(value: unknown) {
   return String(value)
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"')
@@ -27,18 +33,18 @@ function quoteDockerEnvValue(value) {
     .replace(/`/g, "\\`");
 }
 
-function isSafeDockerImageRef(value) {
+export function isSafeDockerImageRef(value: string) {
   return /^[a-zA-Z0-9][a-zA-Z0-9._/-]*(?::[a-zA-Z0-9._-]+)?$/.test(value);
 }
 
-function streamCommand(event, command, options) {
-  return new Promise((resolve, reject) => {
+function streamCommand(event: IpcMainEvent, command: string, options: ExecOptions) {
+  return new Promise<void>((resolve, reject) => {
     const child = exec(command, options);
 
-    child.stdout.on("data", (data) =>
+    child.stdout?.on("data", (data) =>
       event.reply("server-log", data.toString().trim()),
     );
-    child.stderr.on("data", (data) =>
+    child.stderr?.on("data", (data) =>
       event.reply("server-log", data.toString().trim()),
     );
     child.on("error", reject);
@@ -52,19 +58,22 @@ function streamCommand(event, command, options) {
   });
 }
 
-function execCommand(command, options) {
-  return new Promise((resolve, reject) => {
+export function execCommand(command: string, options: ExecOptions) {
+  return new Promise<ExecCommandResult>((resolve, reject) => {
     exec(command, options, (err, stdout, stderr) => {
       if (err) {
         reject(err);
         return;
       }
-      resolve({ stderr, stdout });
+      resolve({ stderr: String(stderr), stdout: String(stdout) });
     });
   });
 }
 
-async function prepareEngineImage(event, safeEnv) {
+export async function prepareEngineImage(
+  event: IpcMainEvent,
+  safeEnv: NodeJS.ProcessEnv,
+) {
   if (!isSafeDockerImageRef(engineImage)) {
     throw new Error("Invalid PIXELATED_ENGINE_IMAGE value.");
   }
@@ -92,12 +101,8 @@ async function prepareEngineImage(event, safeEnv) {
   });
 }
 
-module.exports = {
+export {
   exec,
-  execCommand,
-  getSafeEnv,
-  hasHostUinput: () => fs.existsSync("/dev/uinput"),
-  isSafeDockerImageRef,
-  prepareEngineImage,
-  quoteDockerEnvValue,
 };
+
+export const hasHostUinput = () => fs.existsSync("/dev/uinput");

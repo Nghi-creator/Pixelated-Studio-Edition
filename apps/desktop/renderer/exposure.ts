@@ -1,4 +1,24 @@
 (function () {
+  type ExposureMode = "local" | "lan";
+
+  type CompanionStatus = {
+    enabled?: boolean;
+    error?: string;
+    urls?: string[];
+  };
+
+  type ExposureControllerElements = {
+    exposureCopy: HTMLElement;
+    exposureLabel: HTMLElement;
+    companionCopy: HTMLElement;
+    companionPanel: HTMLElement;
+    companionUrls: HTMLElement;
+    lanToggle: HTMLInputElement;
+    lanUrlPanel: HTMLElement;
+    lanUrls: HTMLElement;
+    lanWarning: HTMLElement;
+  };
+
   function createExposureController({
     exposureCopy,
     exposureLabel,
@@ -9,12 +29,12 @@
     lanUrlPanel,
     lanUrls,
     lanWarning,
-  }) {
-    function getMode() {
+  }: ExposureControllerElements) {
+    function getMode(): ExposureMode {
       return lanToggle.checked ? "lan" : "local";
     }
 
-    function renderUrls(urls = []) {
+    function renderUrls(urls: string[] = []) {
       lanUrls.innerHTML = "";
       urls.forEach((url) => {
         const item = document.createElement("code");
@@ -28,7 +48,7 @@
       );
     }
 
-    function renderCompanionUrls(urls = []) {
+    function renderCompanionUrls(urls: string[] = []) {
       companionUrls.innerHTML = "";
       urls.forEach((url) => {
         const item = document.createElement("code");
@@ -42,7 +62,7 @@
       );
     }
 
-    function setCompanionStatus(payload = {}) {
+    function setCompanionStatus(payload: CompanionStatus = {}) {
       if (!payload.enabled) {
         companionPanel.classList.add("hidden");
         if (payload.error) {
@@ -71,10 +91,10 @@
       );
     }
 
-    function setEnabled(enabled) {
+    function setEnabled(enabled: boolean) {
       lanToggle.disabled = !enabled;
-      lanToggle.parentElement.classList.toggle("opacity-50", !enabled);
-      lanToggle.parentElement.classList.toggle("cursor-not-allowed", !enabled);
+      lanToggle.parentElement?.classList.toggle("opacity-50", !enabled);
+      lanToggle.parentElement?.classList.toggle("cursor-not-allowed", !enabled);
     }
 
     lanToggle.addEventListener("change", () => {
@@ -92,7 +112,11 @@
     };
   }
 
-  window.PixelatedExposure = {
+  (window as unknown as Window & {
+    PixelatedExposure: {
+      createExposureController: typeof createExposureController;
+    };
+  }).PixelatedExposure = {
     createExposureController,
   };
 })();

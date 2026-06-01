@@ -1,5 +1,28 @@
 (function () {
-  const startupPhases = [
+  type LifecycleStatus = "failed" | "idle" | "ready" | "starting" | "stopped" | "stopping";
+  type PhaseVisualStatus = "active" | "done" | "failed" | "pending";
+
+  type EngineState = {
+    detail?: string;
+    key?: string;
+    phase?: string;
+    status: LifecycleStatus;
+  };
+
+  type StartupPhase = {
+    id: string;
+    idleDetail: string;
+    key?: string;
+    keys?: string[];
+    label: string;
+  };
+
+  type PhaseTrackerElements = {
+    phaseList: HTMLElement;
+    phaseSummary: HTMLElement;
+  };
+
+  const startupPhases: StartupPhase[] = [
     {
       id: "docker",
       key: "CHECKING_DOCKER",
@@ -40,7 +63,7 @@
 
   const phaseOrder = startupPhases.map((phase) => phase.id);
 
-  function getPhaseForState(state) {
+  function getPhaseForState(state: EngineState) {
     if (state.phase) return state.phase;
 
     const match = startupPhases.find((phase) => {
@@ -50,11 +73,15 @@
     return match?.id || "idle";
   }
 
-  function getPhaseLabel(phaseId) {
+  function getPhaseLabel(phaseId: string) {
     return startupPhases.find((phase) => phase.id === phaseId)?.label || phaseId;
   }
 
-  function getPhaseStatus(phaseId, activePhase, lifecycleStatus) {
+  function getPhaseStatus(
+    phaseId: string,
+    activePhase: string,
+    lifecycleStatus: LifecycleStatus,
+  ): PhaseVisualStatus {
     if (lifecycleStatus === "ready") {
       return "done";
     }
@@ -76,7 +103,7 @@
       : "pending";
   }
 
-  function getPhaseClasses(status) {
+  function getPhaseClasses(status: PhaseVisualStatus) {
     if (status === "done") {
       return {
         dot: "bg-green-400",
@@ -112,7 +139,11 @@
     };
   }
 
-  function getPhaseDetail(phase, phaseStatus, state) {
+  function getPhaseDetail(
+    phase: StartupPhase,
+    phaseStatus: PhaseVisualStatus,
+    state: EngineState,
+  ) {
     if (phaseStatus === "active" || phaseStatus === "failed") {
       return state.detail || phase.idleDetail;
     }
@@ -124,8 +155,8 @@
     return phase.idleDetail;
   }
 
-  function createPhaseTracker({ phaseList, phaseSummary }) {
-    function render(state = { status: "idle", phase: "idle" }) {
+  function createPhaseTracker({ phaseList, phaseSummary }: PhaseTrackerElements) {
+    function render(state: EngineState = { status: "idle", phase: "idle" }) {
       const activePhase = getPhaseForState(state);
       phaseSummary.innerText =
         state.status === "ready"
@@ -168,7 +199,11 @@
     return { render };
   }
 
-  window.PixelatedPhases = {
+  (window as unknown as Window & {
+    PixelatedPhases: {
+      createPhaseTracker: typeof createPhaseTracker;
+    };
+  }).PixelatedPhases = {
     createPhaseTracker,
   };
 })();
