@@ -15,6 +15,7 @@ type CommentsPanelProps = {
   onPostComment: (event: React.FormEvent<HTMLFormElement>) => void;
   onReportComment: (commentId: string) => void;
   onSignIn: () => void;
+  reactionButtons: React.ReactNode;
   setNewComment: (comment: string) => void;
 };
 
@@ -30,14 +31,18 @@ export function CommentsPanel({
   onPostComment,
   onReportComment,
   onSignIn,
+  reactionButtons,
   setNewComment,
 }: CommentsPanelProps) {
   return (
     <div className="w-full max-w-5xl mt-12 border-t border-synth-border pt-8">
-      <h3 className="text-xl font-bold text-white mb-6">
-        Comments ({comments.length}
-        {hasMoreComments ? "+" : ""})
-      </h3>
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h3 className="text-xl font-bold text-white">
+          Comments ({comments.length}
+          {hasMoreComments ? "+" : ""})
+        </h3>
+        {reactionButtons}
+      </div>
 
       <CommentForm
         isSubmittingComment={isSubmittingComment}

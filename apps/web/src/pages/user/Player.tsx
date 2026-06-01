@@ -229,14 +229,6 @@ export default function Player() {
       <PlayerControls
         authorName={authorName}
         onStreamProfileChange={setStreamProfileId}
-        reactionButtons={
-          <ReactionButtons
-            dislikes={dislikes}
-            likes={likes}
-            onReaction={handleReaction}
-            userReaction={userReaction}
-          />
-        }
         selectedStreamProfileId={streamProfileId}
         streamProfiles={STREAM_PROFILES}
       />
@@ -253,6 +245,14 @@ export default function Player() {
         onPostComment={handlePostComment}
         onReportComment={setReportingCommentId}
         onSignIn={() => navigate("/login")}
+        reactionButtons={
+          <ReactionButtons
+            dislikes={dislikes}
+            likes={likes}
+            onReaction={handleReaction}
+            userReaction={userReaction}
+          />
+        }
         setNewComment={setNewComment}
       />
 
