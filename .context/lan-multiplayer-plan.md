@@ -226,10 +226,15 @@ Phase 0E implementation notes:
   - `apps/desktop/scripts/prepareWebDist.ts`
 - `apps/desktop/index.html` now loads compiled renderer scripts from `apps/desktop/dist/`.
 - `electron-builder` packaging now includes `dist/`, which is required because the desktop package entrypoint is compiled.
+- `electron-builder` package artifacts now output to `apps/desktop/release/`, while compiled TypeScript remains in `apps/desktop/dist/`; this avoids the packager overwriting the compiled app entrypoint.
+- Stale package artifacts under `apps/desktop/dist/` are explicitly excluded from future packages, because `dist/` is now the compiled TypeScript app payload.
+- Packaged desktop builds now bundle `engine/runtime` as `resources/engine-runtime`, so a fresh install can build the default `pixelated-engine` Docker image without requiring the source repo checkout.
 - No first-party JavaScript source files remain under `apps/desktop/` outside generated/ignored build output.
 - `npm run build` passed in `apps/desktop`.
 - `npm test` passed in `apps/desktop`, covering exposure-mode normalization, local/LAN Docker publish host selection, local advertised engine URL, and companion URL gating.
 - `npm run prepare:web` passed in `apps/desktop`.
+- `npm run dist` passed in `apps/desktop` with macOS package permissions, producing `apps/desktop/release/Pixelated Studio-1.0.0-arm64.dmg`.
+- Packaging warnings remaining before public distribution: no app icon configured, DMG is unsigned because no valid Developer ID identity is installed, and the web app still emits the existing large chunk warning.
 - `npm start` launched successfully through the compiled `dist/main.js` entrypoint and compiled preload/renderer scripts.
 
 Remaining validation:

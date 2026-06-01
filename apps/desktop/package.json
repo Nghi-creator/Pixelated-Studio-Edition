@@ -1,6 +1,8 @@
 {
   "name": "pixelated-desktop",
   "version": "1.0.0",
+  "description": "Desktop companion for Pixelated Studio local and LAN game streaming.",
+  "author": "Pixelated Studio",
   "main": "dist/main.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -20,6 +22,9 @@
     "appId": "com.pixelated.studio",
     "productName": "Pixelated Studio",
     "asar": false,
+    "directories": {
+      "output": "release"
+    },
     "mac": {
       "target": "dmg"
     },
@@ -30,7 +35,15 @@
       "target": "AppImage"
     },
     "files": [
-      "**/*"
+      "**/*",
+      "!release/**",
+      "!dist/mac{,/**/*}",
+      "!dist/mac-arm64{,/**/*}",
+      "!dist/*.dmg",
+      "!dist/*.zip",
+      "!dist/*.blockmap",
+      "!dist/builder-debug.yml",
+      "!dist/builder-effective-config.yaml"
     ],
     "extraResources": [
       {
@@ -38,6 +51,19 @@
         "to": "web-dist",
         "filter": [
           "**/*"
+        ]
+      },
+      {
+        "from": "../../engine/runtime",
+        "to": "engine-runtime",
+        "filter": [
+          "**/*",
+          "!node_modules/**",
+          "!dist/**",
+          "!__pycache__/**",
+          "!**/__pycache__/**",
+          "!*.pyc",
+          "!**/*.pyc"
         ]
       }
     ]

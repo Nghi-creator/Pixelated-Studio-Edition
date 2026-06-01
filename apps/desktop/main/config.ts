@@ -29,7 +29,12 @@ function resolveWebDistDir() {
 
 export const engineRuntimeDir =
   process.env.PIXELATED_ENGINE_RUNTIME_DIR ||
-  path.resolve(__dirname, "../../../engine/runtime");
+  firstAvailablePath([
+    process.resourcesPath
+      ? path.join(process.resourcesPath, "engine-runtime")
+      : path.resolve(__dirname, "../engine-runtime"),
+    path.resolve(__dirname, "../../../engine/runtime"),
+  ]);
 export const backendApiUrl =
   process.env.PIXELATED_API_URL || "https://pixelated-api-services.onrender.com";
 export const companionPort = Number(process.env.PIXELATED_COMPANION_PORT || 8090);

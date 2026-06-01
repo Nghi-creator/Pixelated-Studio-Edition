@@ -21,7 +21,9 @@ from that bundled resource. Local development still resolves the companion
 player from `apps/web/dist`, so run `npm run build` in `apps/web` before
 testing LAN companion mode with `npm start`.
 
-By default the desktop app builds the engine image from:
+By default the desktop app builds the engine image from the bundled
+`resources/engine-runtime` directory in packaged builds, falling back to the
+workspace source path during local development:
 
 ```txt
 ../../engine/runtime
