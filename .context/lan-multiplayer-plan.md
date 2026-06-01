@@ -468,13 +468,14 @@ Implementation note: browser controls stay the same for every player. React emit
 
 ### Phase 10: Multiplayer Performance Validation
 
-Status: engine measurement foundation implemented on 2026-05-28; repeatable health/peer smoke harness added on 2026-05-31; first local two-viewer CPU/RSS sample captured on 2026-05-31; real two-device and browser WebRTC-stat measurements still pending.
+Status: engine measurement foundation implemented on 2026-05-28; repeatable health/peer smoke harness added on 2026-05-31; first local two-viewer CPU/RSS sample captured on 2026-05-31; browser telemetry copy support and manual checklist added on 2026-06-01; real two-device measurements still pending.
 
 Deliverables:
 
 - Measure CPU/memory with one host plus one guest viewer. Engine `/health` now exposes process resource snapshots; manual measurement pending.
 - Measure CPU/memory with additional spectators. Engine `/health` now exposes camera peer count; manual measurement pending.
 - Track WebRTC FPS, bitrate, packet loss, jitter, and ICE state per peer. Browser telemetry already tracks these per viewer and persists sampled authenticated metrics.
+- Let manual testers copy browser WebRTC telemetry from host and guest screens. Implemented behind the existing stream telemetry toggle.
 - Decide whether the current per-peer GStreamer pipeline is acceptable or whether a fanout/relay architecture is needed.
 
 Acceptance criteria:
@@ -495,6 +496,11 @@ node scripts/multiplayerSmoke.mjs --engine-url http://127.0.0.1:8080 --expected-
 
 Run it after the host game is already streaming and before guests open the LAN HTTPS join page. The harness captures a baseline `/health` snapshot, waits for `checks.resources.cameraPeers.peerCount` to increase by the expected guest count, validates `checks.runtime.activeSessionId` and camera peer `sessionId` stay on the host session, then waits for guest disconnect cleanup unless `--skip-disconnect` is passed. It writes a concise JSON report plus NDJSON poll log under `.context/smoke-artifacts/` by default. The harness observes real camera peer state; it does not fake peers with Socket.IO-only clients. The report and every health poll now include engine process CPU/RSS summaries for the camera bridge, RetroArch, and Node runtime, so Track 2 engine-side performance evidence is captured during the same smoke.
 
+Manual smoke checklist:
+
+- `.context/lan-manual-smoke-checklist.md` records host/guest steps, expected results, failure notes, and places to paste host/guest copied telemetry JSON.
+- The player's hidden stream telemetry panel has a `Copy Stats` action that copies a JSON payload containing session id, player mode, share URL, user agent, connection state, FPS, bitrate, packet loss, jitter, and timestamps.
+
 ## Test Plan
 
 ## Remaining Multiplayer Execution Tracks
@@ -511,7 +517,7 @@ Current execution status:
 
 - Track 1 has a local two-browser validation pass. Docker Desktop was started, the engine image was rebuilt, `pixelated-node` was launched with Vercel plus local Vite origins, a synthetic `codex-smoke` session booted, and `scripts/multiplayerSmoke.mjs` passed with one baseline browser peer plus one additional browser peer. Closing the added peer returned camera peer count to baseline without killing the host session. Artifacts: `.context/smoke-artifacts/two-browser-peer-smoke-2026-05-31T12-38-00-268Z.json` and `.context/smoke-artifacts/two-browser-peer-smoke-2026-05-31T12-38-00-268Z.ndjson`.
 - Track 1 still needs a true two-device LAN pass where the host and guest are on separate machines and both visually confirm playback.
-- Track 2 has a first local two-viewer CPU/RSS sample, and `scripts/multiplayerSmoke.mjs` now records camera, RetroArch, and Node CPU/RSS snapshots in its JSON/NDJSON artifacts. Browser-side WebRTC stats and target-host CPU observations are still pending.
+- Track 2 has a first local two-viewer CPU/RSS sample, and `scripts/multiplayerSmoke.mjs` now records camera, RetroArch, and Node CPU/RSS snapshots in its JSON/NDJSON artifacts. Browser-side WebRTC stats can now be copied from the host/guest telemetry panel during the manual test. Target-host CPU observations are still pending.
 - Track 3 should be evaluated during the same two-device smoke by noting whether the guest can understand and accept the local HTTPS certificate flow.
 - Track 4 remains blocked in this Docker Desktop smoke because `/dev/uinput` is unavailable to the engine. `/health.checks.gamepadBridge` correctly reports `failed: true`, `ready: false`, and P3/P4 are disabled in React.
 - Track 5 should start after the real two-device LAN and HTTPS UX checks are no longer blocked.
