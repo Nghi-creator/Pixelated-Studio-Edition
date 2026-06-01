@@ -141,7 +141,7 @@ Open technical question: GStreamer `webrtcbin` may need one peer connection per 
 
 Status: Phase 0A implemented for engine signaling on 2026-05-28; engine input/telemetry, runtime/ROM/session, HTTP route, and root server conversion continued on 2026-05-31; desktop main-process TypeScript migration started on 2026-06-01.
 
-The engine runtime, web app, API, and desktop main process now have TypeScript build paths. The desktop renderer/preload files and LAN companion server remain JavaScript for later targeted migration. Multiplayer adds socket payload contracts, role/slot state, invite data, and desktop IPC state, so TypeScript should be introduced as part of the feature path rather than as a separate cosmetic rename.
+The engine runtime, web app, API, and desktop app now have TypeScript build paths. Multiplayer adds socket payload contracts, role/slot state, invite data, and desktop IPC state, so TypeScript should be introduced as part of the feature path rather than as a separate cosmetic rename.
 
 Recommended migration order:
 
@@ -207,15 +207,29 @@ Phase 0E implementation notes:
 - `npm start` and `npm run dist` now compile the desktop main process before launching or packaging.
 - Converted desktop main-process orchestration files:
   - `apps/desktop/main.ts`
+  - `apps/desktop/main/companionServer.ts`
   - `apps/desktop/main/config.ts`
   - `apps/desktop/main/docker.ts`
   - `apps/desktop/main/engineController.ts`
   - `apps/desktop/main/exposure.ts`
   - `apps/desktop/main/health.ts`
   - `apps/desktop/main/state.ts`
-- Left `apps/desktop/main/companionServer.js`, `apps/desktop/preload.js`, and renderer files as JavaScript for a later slice.
+- Converted the desktop preload bridge:
+  - `apps/desktop/preload.ts`
+- Converted the desktop renderer wiring and helper modules:
+  - `apps/desktop/renderer.ts`
+  - `apps/desktop/renderer/exposure.ts`
+  - `apps/desktop/renderer/logs.ts`
+  - `apps/desktop/renderer/modal.ts`
+  - `apps/desktop/renderer/phases.ts`
+- Converted the desktop packaging helper:
+  - `apps/desktop/scripts/prepareWebDist.ts`
+- `apps/desktop/index.html` now loads compiled renderer scripts from `apps/desktop/dist/`.
+- `electron-builder` packaging now includes `dist/`, which is required because the desktop package entrypoint is compiled.
+- No first-party JavaScript source files remain under `apps/desktop/` outside generated/ignored build output.
 - `npm run build` passed in `apps/desktop`.
-- `npm start` launched successfully through the compiled `dist/main.js` entrypoint.
+- `npm run prepare:web` passed in `apps/desktop`.
+- `npm start` launched successfully through the compiled `dist/main.js` entrypoint and compiled preload/renderer scripts.
 
 Remaining validation:
 

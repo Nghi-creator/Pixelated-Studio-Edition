@@ -5,8 +5,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "start": "npm run build && electron .",
-    "prepare:web": "node scripts/prepareWebDist.js",
-    "dist": "npm run prepare:web && npm run build && electron-builder"
+    "prepare:web": "npm run build && npm --prefix ../web run build && node dist/scripts/prepareWebDist.js",
+    "dist": "npm run prepare:web && electron-builder"
   },
   "devDependencies": {
     "@types/node": "^20.19.39",
@@ -29,8 +29,7 @@
       "target": "AppImage"
     },
     "files": [
-      "**/*",
-      "!dist/**"
+      "**/*"
     ],
     "extraResources": [
       {

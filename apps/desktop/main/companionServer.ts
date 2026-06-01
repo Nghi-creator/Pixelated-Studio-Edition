@@ -1,17 +1,36 @@
-const { execFileSync } = require("child_process");
-const fs = require("fs");
-const http = require("http");
-const https = require("https");
-const net = require("net");
-const path = require("path");
+import { execFileSync } from "child_process";
+import fs from "fs";
+import http, { type IncomingMessage, type ServerResponse } from "http";
+import https from "https";
+import net, { type Socket } from "net";
+import path from "path";
 
 const ENGINE_HOST = "127.0.0.1";
 const ENGINE_PORT = 8080;
 const PROXY_PREFIXES = ["/health", "/local-games", "/socket.io", "/upload"];
 
-let companionServer = null;
+type CertificatePaths = {
+  certPath: string;
+  keyPath: string;
+};
 
-function createCertificate(certDir, lanAddresses = []) {
+export type CompanionServerOptions = {
+  certDir: string;
+  lanAddresses: string[];
+  port: number;
+  webDistDir: string;
+};
+
+export type CompanionServerResult = CertificatePaths & {
+  port: number;
+};
+
+let companionServer: https.Server | null = null;
+
+function createCertificate(
+  certDir: string,
+  lanAddresses: string[] = [],
+): CertificatePaths {
   fs.mkdirSync(certDir, { recursive: true });
   const certPath = path.join(certDir, "pixelated-companion.crt");
   const keyPath = path.join(certDir, "pixelated-companion.key");
@@ -55,7 +74,7 @@ function shouldProxy(url = "") {
   });
 }
 
-function proxyHttpRequest(req, res) {
+function proxyHttpRequest(req: IncomingMessage, res: ServerResponse) {
   const upstream = http.request(
     {
       headers: {
@@ -81,7 +100,12 @@ function proxyHttpRequest(req, res) {
   req.pipe(upstream);
 }
 
-function proxyWebSocket(req, socket, head) {
+function serializeHeaderValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value.join(", ");
+  return value ?? "";
+}
+
+function proxyWebSocket(req: IncomingMessage, socket: Socket, head: Buffer) {
   if (!shouldProxy(req.url || "")) {
     socket.destroy();
     return;
@@ -93,7 +117,7 @@ function proxyWebSocket(req, socket, head) {
       host: `${ENGINE_HOST}:${ENGINE_PORT}`,
     };
     const headerLines = Object.entries(headers)
-      .map(([name, value]) => `${name}: ${value}`)
+      .map(([name, value]) => `${name}: ${serializeHeaderValue(value)}`)
       .join("\r\n");
 
     upstream.write(`${req.method} ${req.url} HTTP/${req.httpVersion}\r\n`);
@@ -105,7 +129,7 @@ function proxyWebSocket(req, socket, head) {
   upstream.on("error", () => socket.destroy());
 }
 
-function getContentType(filePath) {
+function getContentType(filePath: string) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === ".html") return "text/html; charset=utf-8";
   if (ext === ".js") return "text/javascript; charset=utf-8";
@@ -117,7 +141,7 @@ function getContentType(filePath) {
   return "application/octet-stream";
 }
 
-function injectCompanionBootstrap(html) {
+function injectCompanionBootstrap(html: string) {
   const bootstrap = `
     <script>
       window.localStorage.setItem("pixelated_engine_url", window.location.origin);
@@ -127,7 +151,11 @@ function injectCompanionBootstrap(html) {
   return html.replace("</head>", `${bootstrap}</head>`);
 }
 
-function serveStatic(req, res, webDistDir) {
+function serveStatic(
+  req: IncomingMessage,
+  res: ServerResponse,
+  webDistDir: string,
+) {
   const indexPath = path.join(webDistDir, "index.html");
   if (!fs.existsSync(indexPath)) {
     res.writeHead(503, { "content-type": "text/html; charset=utf-8" });
@@ -172,12 +200,12 @@ function serveStatic(req, res, webDistDir) {
   fs.createReadStream(filePath).pipe(res);
 }
 
-function startCompanionServer({
+export function startCompanionServer({
   certDir,
   lanAddresses,
   port,
   webDistDir,
-}) {
+}: CompanionServerOptions) {
   stopCompanionServer();
 
   const { certPath, keyPath } = createCertificate(certDir, lanAddresses);
@@ -198,8 +226,8 @@ function startCompanionServer({
 
   server.on("upgrade", proxyWebSocket);
 
-  return new Promise((resolve, reject) => {
-    const handleListenError = (err) => {
+  return new Promise<CompanionServerResult>((resolve, reject) => {
+    const handleListenError = (err: Error) => {
       server.close();
       reject(err);
     };
@@ -217,14 +245,9 @@ function startCompanionServer({
   });
 }
 
-function stopCompanionServer() {
+export function stopCompanionServer() {
   if (!companionServer) return;
 
   companionServer.close();
   companionServer = null;
 }
-
-module.exports = {
-  startCompanionServer,
-  stopCompanionServer,
-};

@@ -1,5 +1,11 @@
 (function () {
-  function bindDocsModal({ closeButton, modal, openButton }) {
+  type DocsModalElements = {
+    closeButton: HTMLElement;
+    modal: HTMLElement;
+    openButton: HTMLElement;
+  };
+
+  function bindDocsModal({ closeButton, modal, openButton }: DocsModalElements) {
     function open() {
       modal.classList.remove("opacity-0", "pointer-events-none");
     }
@@ -15,7 +21,11 @@
     });
   }
 
-  window.PixelatedModal = {
+  (window as unknown as Window & {
+    PixelatedModal: {
+      bindDocsModal: typeof bindDocsModal;
+    };
+  }).PixelatedModal = {
     bindDocsModal,
   };
 })();

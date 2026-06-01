@@ -10,6 +10,7 @@ import {
 import {
   startCompanionServer,
   stopCompanionServer,
+  type CompanionServerResult,
 } from "./companionServer";
 import {
   exec,
@@ -45,12 +46,6 @@ type EngineLaunchContext = {
 
 type DockerRunOptions = EngineLaunchContext & {
   engineToken: string;
-};
-
-type CompanionServerResult = {
-  certPath: string;
-  keyPath: string;
-  port: number;
 };
 
 let engineToken: string | null = null;
@@ -104,12 +99,12 @@ async function startLanCompanion(
   }
 
   try {
-    const companion = await startCompanionServer({
+    const companion: CompanionServerResult = await startCompanionServer({
       certDir: path.join(app.getPath("userData"), "certificates"),
       lanAddresses: getLanIpv4Addresses(),
       port: companionPort,
       webDistDir,
-    }) as CompanionServerResult;
+    });
     event.reply("engine-companion", {
       certPath: companion.certPath,
       enabled: true,
