@@ -3,11 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
   CheckCircle2,
-  Cloud,
   Copy,
   Crown,
   Gamepad2,
-  HardDrive,
   Loader2,
   LogIn,
   Play,
@@ -377,13 +375,13 @@ export default function Multiplayer() {
             <div className="grid gap-3 sm:grid-cols-[auto_auto_minmax(220px,320px)]">
               <ModeButton
                 active={gameSource === "cloud"}
-                icon={<Cloud className="h-4 w-4" />}
+                icon={null}
                 label="Cloud"
                 onClick={() => setGameSource("cloud")}
               />
               <ModeButton
                 active={gameSource === "local"}
-                icon={<HardDrive className="h-4 w-4" />}
+                icon={null}
                 label="Local"
                 onClick={() => setGameSource("local")}
               />

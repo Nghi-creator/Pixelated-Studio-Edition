@@ -443,9 +443,7 @@ export function EnginePairingPanel({
           >
             {pairingState === "checking" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <PlugZap className="h-4 w-4" />
-            )}
+            ) : null}
             {pairingState === "paired" ? "Update" : "Pair"}
           </button>
 
