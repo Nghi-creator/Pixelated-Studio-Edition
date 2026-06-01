@@ -4,7 +4,6 @@ import {
   Gamepad2,
   Link2,
   Monitor,
-  UserRound,
   X,
 } from "lucide-react";
 import type {
@@ -61,7 +60,6 @@ export function LobbyPanel({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-sm font-semibold text-gray-200">
-            <UserRound className="h-4 w-4 text-synth-primary" />
             Lobby
             {currentParticipant && (
               <span className="rounded-full border border-synth-border px-2 py-0.5 text-xs font-medium capitalize text-gray-400">
