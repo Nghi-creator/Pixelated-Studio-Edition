@@ -11,6 +11,11 @@ const accessLogBodySchema = z.object({
   path: z.string().trim().min(1).max(2048),
 });
 
+const accessLogQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 type SupabaseAnonLike = NonNullable<typeof supabaseAnon>;
 
@@ -89,18 +94,36 @@ export async function registerAccessLogRoutes(
         return reply.status(403).send({ error: "Admin access required" });
       }
 
-      const { data, error } = await service
+      const parsedQuery = accessLogQuerySchema.safeParse(request.query);
+      if (!parsedQuery.success) {
+        return reply.status(400).send({ error: "Invalid access log query" });
+      }
+
+      const { page, pageSize } = parsedQuery.data;
+      const rangeStart = (page - 1) * pageSize;
+      const rangeEnd = rangeStart + pageSize - 1;
+
+      const { count, data, error } = await service
         .from("access_logs")
-        .select("id,created_at,user_id,path,profiles(username)")
+        .select("id,created_at,user_id,path,profiles(username)", {
+          count: "exact",
+        })
         .order("created_at", { ascending: false })
-        .limit(100);
+        .range(rangeStart, rangeEnd);
 
       if (error) {
         request.log.error({ err: error }, "Failed to load access logs");
         return reply.status(500).send({ error: "Failed to load access logs" });
       }
 
-      return { logs: data || [] };
+      const total = count || 0;
+      return {
+        logs: data || [],
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      };
     },
   );
 }
