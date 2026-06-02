@@ -19,6 +19,32 @@ Recommended direction:
 
 ## Done
 
+### Admin Moderation Queue Pagination At API Boundary
+
+Completed: 2026-06-03
+
+Implemented in:
+
+- `services/api/src/routes/moderation.ts`
+- `services/api/tests/dataBoundary.test.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/admin/Dashboard.tsx`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `GET /admin/reports` now accepts `page` and `pageSize`.
+- The API applies Supabase range/count pagination after verifying the actor is an admin or super admin.
+- The API response includes `reports`, `page`, `pageSize`, `total`, and `totalPages`.
+- The admin moderation dashboard now requests one queue page at a time, shows backend pending totals, and provides Previous/Next controls.
+- The existing target filter remains a current-page UI filter; pushing that filter fully into nested backend queries is left for a later moderation-specific pass if needed.
+
+Validation:
+
+- Added API test coverage for server-side moderation queue pagination.
+
 ### Admin User Management Pagination At API Boundary
 
 Completed: 2026-06-03

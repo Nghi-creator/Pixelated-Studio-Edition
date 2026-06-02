@@ -748,6 +748,48 @@ test("moderation reports are created and resolved through admin routes", async (
   await adminApp.close();
 });
 
+test("admin reports are paginated server-side", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  for (let index = 1; index <= 12; index += 1) {
+    db.rows.reported_comments.push({
+      comments: {
+        content: `reported comment ${index}`,
+        id: `comment-${index}`,
+        profiles: { id: USER_ID, role: "user", username: "player" },
+      },
+      created_at: `2026-05-${String(index).padStart(2, "0")}T00:00:00.000Z`,
+      id: `report-${index}`,
+      profiles: { id: OTHER_USER_ID, username: "other" },
+      reason: `reason ${index}`,
+    });
+  }
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/admin/reports?page=2&pageSize=5",
+  });
+
+  assert.equal(response.statusCode, 200);
+  const body = response.json<{
+    page: number;
+    pageSize: number;
+    reports: { id: string }[];
+    total: number;
+    totalPages: number;
+  }>();
+  assert.deepEqual(
+    body.reports.map((report) => report.id),
+    ["report-7", "report-6", "report-5", "report-4", "report-3"],
+  );
+  assert.equal(body.page, 2);
+  assert.equal(body.pageSize, 5);
+  assert.equal(body.total, 12);
+  assert.equal(body.totalPages, 3);
+  await app.close();
+});
+
 test("submissions persist metadata for the authenticated submitter", async () => {
   const db = new FakeSupabase();
   const app = await createDataBoundaryApp(db, USER_ID);

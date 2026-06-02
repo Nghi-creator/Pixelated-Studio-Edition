@@ -199,6 +199,14 @@ export type ApiPaginatedUsersResponse<TUser> = {
   users: TUser[];
 };
 
+export type ApiPaginatedReportsResponse<TReport> = {
+  page: number;
+  pageSize: number;
+  reports: TReport[];
+  total: number;
+  totalPages: number;
+};
+
 export type ApiGameSubmissionPayload = {
   authorName: string;
   bannerUrl: string | null;
@@ -240,8 +248,10 @@ export const api = {
     apiRequest<ApiPaginatedAccessLogsResponse<TLog>>(
       `/admin/access-logs?page=${page}&pageSize=${pageSize}`,
     ),
-  adminReports: <TReport>() =>
-    apiRequest<{ reports: TReport[] }>("/admin/reports"),
+  adminReports: <TReport>(page = 1, pageSize = 25) =>
+    apiRequest<ApiPaginatedReportsResponse<TReport>>(
+      `/admin/reports?page=${page}&pageSize=${pageSize}`,
+    ),
   adminReportAction: (reportId: string, action: ApiAdminReportAction) =>
     apiRequest<ApiAdminReportActionResponse>(
       `/admin/reports/${reportId}/action`,

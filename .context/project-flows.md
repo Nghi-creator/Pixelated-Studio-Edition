@@ -357,9 +357,11 @@ Comments:
 
 Reports:
 
-1. User reports a comment by inserting into `reported_comments`.
-2. Admin dashboard reads `reported_comments` with nested comment/profile data.
-3. Admin actions delete report rows, delete comments, or update a profile's `is_banned` flag.
+1. User reports a comment through `POST /moderation/comments/:commentId/report`.
+2. The backend records the report in `reported_comments`, deriving the reporter from the Supabase bearer token.
+3. Admin dashboard calls `GET /admin/reports?page=<page>&pageSize=25`.
+4. The backend verifies admin/super-admin role, then returns a paginated moderation queue with nested comment/profile data plus `total` and `totalPages`.
+5. Admin actions call `POST /admin/reports/:reportId/action`; the backend enforces peer-review, admin-target, and self-ban rules before ignoring reports, deleting comments, or banning users.
 
 ## 12. Play Count Flow
 

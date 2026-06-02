@@ -42,6 +42,7 @@ Current status:
 - `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
 - `POST /admin/reports/:reportId/action` resolves moderation queue actions through the API for ignore, delete-comment, and ban-user actions.
 - `GET /admin/reports` loads the moderation queue through the API for authenticated admins/super admins.
+- `GET /admin/reports` accepts `page` and `pageSize` for server-side moderation queue pagination.
 - `GET /admin/users` and `PATCH /admin/users/:userId` move admin user management through the API.
 - `GET /admin/users` accepts `page`, `pageSize`, and optional `search` for server-side user-management pagination and username filtering.
 - `GET /admin/access-logs` loads access logs through the API for authenticated admins/super admins.
