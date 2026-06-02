@@ -19,6 +19,32 @@ Recommended direction:
 
 ## Done
 
+### Homepage Catalog Pagination At API Boundary
+
+Completed: 2026-06-02
+
+Implemented in:
+
+- `services/api/src/routes/catalog.ts`
+- `services/api/tests/dataBoundary.test.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/user/Landing.tsx`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `GET /games` now accepts `page`, `pageSize`, and optional `search`.
+- The API applies Supabase range/count pagination and title search server-side.
+- The API response includes `page`, `pageSize`, `total`, `totalPages`, and `featuredGames`.
+- The homepage requests one catalog page at a time instead of fetching the full catalog and slicing in React.
+- The hero continues to use a small top-play-count featured list from the full catalog, so it is not tied to the currently displayed page.
+
+Validation:
+
+- Added API test coverage for paginated/search catalog results and featured games.
+
 ### Engine Runtime TypeScript Phase 0B
 
 Completed: 2026-05-31

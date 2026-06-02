@@ -40,7 +40,7 @@ type RecordRow = Record<string, unknown>;
 
 type Filter = {
   field: string;
-  op: "eq" | "gte";
+  op: "eq" | "gte" | "ilike";
   value: unknown;
 };
 
@@ -125,6 +125,11 @@ class FakeQueryBuilder {
 
   gte(field: string, value: unknown) {
     this.filters.push({ field, op: "gte", value });
+    return this;
+  }
+
+  ilike(field: string, value: string) {
+    this.filters.push({ field, op: "ilike", value });
     return this;
   }
 
@@ -246,8 +251,19 @@ class FakeQueryBuilder {
     let rows = this.filteredRows();
     if (this.orderConfig) {
       rows = [...rows].sort((left, right) => {
-        const leftValue = String(left[this.orderConfig?.field || ""]);
-        const rightValue = String(right[this.orderConfig?.field || ""]);
+        const leftRawValue = left[this.orderConfig?.field || ""];
+        const rightRawValue = right[this.orderConfig?.field || ""];
+        if (
+          typeof leftRawValue === "number" &&
+          typeof rightRawValue === "number"
+        ) {
+          return this.orderConfig?.ascending
+            ? leftRawValue - rightRawValue
+            : rightRawValue - leftRawValue;
+        }
+
+        const leftValue = String(leftRawValue || "");
+        const rightValue = String(rightRawValue || "");
         return this.orderConfig?.ascending
           ? leftValue.localeCompare(rightValue)
           : rightValue.localeCompare(leftValue);
@@ -268,6 +284,14 @@ class FakeQueryBuilder {
       this.filters.every((filter) => {
         if (filter.op === "gte") {
           return String(row[filter.field]) >= String(filter.value);
+        }
+        if (filter.op === "ilike") {
+          const pattern = String(filter.value)
+            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            .replaceAll("%", ".*");
+          return new RegExp(`^${pattern}$`, "i").test(
+            String(row[filter.field] || ""),
+          );
         }
 
         return row[filter.field] === filter.value;
@@ -362,6 +386,45 @@ test("catalog and favorites are served through backend routes", async () => {
   });
   assert.equal(deleteResponse.statusCode, 204);
   assert.equal(db.rows.favorites.length, 0);
+  await app.close();
+});
+
+test("catalog route paginates, searches, and returns featured games", async () => {
+  const db = new FakeSupabase();
+  db.rows.games.push(
+    { cover_url: "/a.png", id: "game-a", play_count: 2, title: "Alpha Quest" },
+    { cover_url: "/b.png", id: "game-b", play_count: 20, title: "Beta Quest" },
+    { cover_url: "/c.png", id: "game-c", play_count: 5, title: "Gamma Run" },
+    { cover_url: "/d.png", id: "game-d", play_count: 7, title: "Quest Drift" },
+  );
+  const app = await createDataBoundaryApp(db);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/games?page=2&pageSize=2&search=quest",
+  });
+
+  assert.equal(response.statusCode, 200);
+  const body = response.json<{
+    featuredGames: { id: string }[];
+    games: { id: string }[];
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  }>();
+  assert.deepEqual(
+    body.games.map((game) => game.id),
+    ["game-d"],
+  );
+  assert.deepEqual(
+    body.featuredGames.map((game) => game.id),
+    ["game-b", "game-d", "game-c"],
+  );
+  assert.equal(body.page, 2);
+  assert.equal(body.pageSize, 2);
+  assert.equal(body.total, 3);
+  assert.equal(body.totalPages, 2);
   await app.close();
 });
 

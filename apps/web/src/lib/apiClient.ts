@@ -182,6 +182,15 @@ export type ApiPaginatedAccessLogsResponse<TLog> = {
   totalPages: number;
 };
 
+export type ApiPaginatedGamesResponse = {
+  featuredGames: ApiGame[];
+  games: ApiGame[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 export type ApiGameSubmissionPayload = {
   authorName: string;
   bannerUrl: string | null;
@@ -260,7 +269,25 @@ export const api = {
     }),
   favoriteStatus: (gameId: string) =>
     apiRequest<{ favorited: boolean }>(`/favorites/${gameId}`),
-  games: () => apiRequest<{ games: ApiGame[] }>("/games", { authenticated: false }),
+  games: ({
+    page = 1,
+    pageSize = 15,
+    search = "",
+  }: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+  } = {}) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    if (search.trim()) params.set("search", search.trim());
+
+    return apiRequest<ApiPaginatedGamesResponse>(`/games?${params}`, {
+      authenticated: false,
+    });
+  },
   game: (gameId: string) =>
     apiRequest<{ game: ApiGame }>(`/games/${gameId}`, { authenticated: false }),
   gameComments: <TComment>(gameId: string, page: number) =>
