@@ -5,6 +5,7 @@ import type { FastifyRequest } from "fastify";
 import type { User } from "@supabase/supabase-js";
 import { registerAccessLogRoutes } from "../src/routes/accessLogs.js";
 import { registerAdminUserRoutes } from "../src/routes/adminUsers.js";
+import { registerAuthMethodsRoutes } from "../src/routes/authMethods.js";
 import { registerCatalogRoutes } from "../src/routes/catalog.js";
 import { registerGameRoutes } from "../src/routes/games.js";
 import { registerLocalPairingRoutes } from "../src/routes/localPairings.js";
@@ -48,6 +49,7 @@ type TestRequest = FastifyRequest & {
 };
 
 class FakeSupabase {
+  authUsers: User[] = [];
   deletedUsers: string[] = [];
   rows: Record<TableName, RecordRow[]> = {
     access_logs: [],
@@ -68,6 +70,19 @@ class FakeSupabase {
       deleteUser: async (userId: string) => {
         this.deletedUsers.push(userId);
         return { error: null };
+      },
+      listUsers: async ({
+        page = 1,
+        perPage = 1000,
+      }: {
+        page?: number;
+        perPage?: number;
+      } = {}) => {
+        const start = (page - 1) * perPage;
+        return {
+          data: { users: this.authUsers.slice(start, start + perPage) },
+          error: null,
+        };
       },
     },
   };
@@ -274,6 +289,7 @@ async function createDataBoundaryApp(db: FakeSupabase, userId = USER_ID) {
 
   await registerAccessLogRoutes(app, options);
   await registerAdminUserRoutes(app, options);
+  await registerAuthMethodsRoutes(app, options);
   await registerCatalogRoutes(app, options);
   await registerGameRoutes(app, options);
   await registerLocalPairingRoutes(app, options);
@@ -295,6 +311,17 @@ function seedProfiles(db: FakeSupabase) {
     { id: ADMIN_ID, role: "admin", username: "admin" },
     { id: SUPER_ADMIN_ID, role: "super_admin", username: "root" },
   );
+}
+
+function makeAuthUser(email: string, providers: string[]): User {
+  return {
+    app_metadata: { providers },
+    aud: "authenticated",
+    created_at: new Date().toISOString(),
+    email,
+    id: `${email}-id`,
+    user_metadata: {},
+  };
 }
 
 test("catalog and favorites are served through backend routes", async () => {
@@ -324,6 +351,51 @@ test("catalog and favorites are served through backend routes", async () => {
   });
   assert.equal(deleteResponse.statusCode, 204);
   assert.equal(db.rows.favorites.length, 0);
+  await app.close();
+});
+
+test("auth account methods expose provider metadata for login decisions", async () => {
+  const db = new FakeSupabase();
+  db.authUsers.push(
+    makeAuthUser("oauth@example.com", ["google"]),
+    makeAuthUser("email@example.com", ["email"]),
+  );
+  const app = await createDataBoundaryApp(db);
+
+  const oauthResponse = await app.inject({
+    method: "POST",
+    payload: { email: "OAUTH@example.com" },
+    url: "/auth/account-methods",
+  });
+  assert.equal(oauthResponse.statusCode, 200);
+  assert.deepEqual(oauthResponse.json(), {
+    exists: true,
+    hasEmailProvider: false,
+    providers: ["google"],
+  });
+
+  const emailResponse = await app.inject({
+    method: "POST",
+    payload: { email: "email@example.com" },
+    url: "/auth/account-methods",
+  });
+  assert.equal(emailResponse.statusCode, 200);
+  assert.equal(
+    emailResponse.json<{ hasEmailProvider: boolean }>().hasEmailProvider,
+    true,
+  );
+
+  const missingResponse = await app.inject({
+    method: "POST",
+    payload: { email: "missing@example.com" },
+    url: "/auth/account-methods",
+  });
+  assert.equal(missingResponse.statusCode, 200);
+  assert.deepEqual(missingResponse.json(), {
+    exists: false,
+    hasEmailProvider: false,
+    providers: [],
+  });
   await app.close();
 });
 
