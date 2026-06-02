@@ -5,6 +5,7 @@ import { createLoggerOptions } from "./plugins/logger.js";
 import { registerCors } from "./plugins/cors.js";
 import { registerAccessLogRoutes } from "./routes/accessLogs.js";
 import { registerAdminUserRoutes } from "./routes/adminUsers.js";
+import { registerAuthMethodsRoutes } from "./routes/authMethods.js";
 import { registerCatalogRoutes } from "./routes/catalog.js";
 import { registerGameRoutes } from "./routes/games.js";
 import { registerHealthRoutes } from "./routes/health.js";
@@ -25,6 +26,7 @@ export async function buildServer() {
 
   await registerCors(app);
   await registerHealthRoutes(app);
+  await registerAuthMethodsRoutes(app);
   await registerAccessLogRoutes(app);
   await registerCatalogRoutes(app);
   await registerMeRoutes(app);

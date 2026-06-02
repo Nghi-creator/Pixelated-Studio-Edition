@@ -3,6 +3,24 @@ import { useNavigate } from "react-router-dom";
 import { Mail, Lock, Gamepad2, Loader2, ArrowLeft } from "lucide-react";
 import { FaGithub, FaGoogle } from "react-icons/fa";
 import { supabase } from "../../lib/supabaseClient";
+import { getPublicAppUrl } from "../../lib/appUrl";
+import { api } from "../../lib/apiClient";
+
+const providerLabels: Record<string, string> = {
+  email: "email and password",
+  github: "GitHub",
+  google: "Google",
+};
+
+const formatProviders = (providers: string[]) => {
+  const labels = providers
+    .filter((provider) => provider !== "email")
+    .map((provider) => providerLabels[provider] || provider);
+
+  if (labels.length === 0) return "your connected provider";
+  if (labels.length === 1) return labels[0];
+  return `${labels.slice(0, -1).join(", ")} or ${labels[labels.length - 1]}`;
+};
 
 export default function Auth() {
   const navigate = useNavigate();
@@ -29,7 +47,25 @@ export default function Auth() {
         if (error) throw error;
         navigate("/");
       } else {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const accountMethods = await api.accountMethods(email);
+        if (accountMethods.exists && !accountMethods.hasEmailProvider) {
+          throw new Error(
+            `This email is already connected with ${formatProviders(accountMethods.providers)}. Continue with that sign-in option instead.`,
+          );
+        }
+        if (accountMethods.exists && accountMethods.hasEmailProvider) {
+          throw new Error(
+            "An account already exists for this email. Sign in or use password reset instead.",
+          );
+        }
+
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: getPublicAppUrl(),
+          },
+        });
         if (error) throw error;
         setMessage("Success! Check your email to verify your account.");
       }
@@ -51,8 +87,15 @@ export default function Auth() {
     setMessage(null);
 
     try {
+      const accountMethods = await api.accountMethods(email);
+      if (accountMethods.exists && !accountMethods.hasEmailProvider) {
+        throw new Error(
+          `This account uses ${formatProviders(accountMethods.providers)} sign-in. Use that provider instead of password reset.`,
+        );
+      }
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${getPublicAppUrl()}/reset-password`,
       });
       if (error) throw error;
       setMessage("Password reset link sent! Check your email.");
@@ -71,7 +114,7 @@ export default function Auth() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: window.location.origin },
+      options: { redirectTo: getPublicAppUrl() },
     });
     if (error) setError(error.message);
     setLoading(false);

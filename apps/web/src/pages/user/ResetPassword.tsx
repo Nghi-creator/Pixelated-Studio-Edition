@@ -12,11 +12,39 @@ export default function ResetPassword() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    let isMounted = true;
+    const hasAuthHash =
+      window.location.hash.includes("access_token") ||
+      window.location.hash.includes("type=recovery");
+    const clearAuthHash = () => {
+      if (hasAuthHash) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
+      if (!isMounted) return;
+      if (session) {
+        clearAuthHash();
+        return;
+      }
+      if (!hasAuthHash) {
         navigate("/login");
       }
     });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        clearAuthHash();
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      subscription.unsubscribe();
+    };
   }, [navigate]);
 
   const handlePasswordReset = async (e: React.SubmitEvent<HTMLFormElement>) => {
