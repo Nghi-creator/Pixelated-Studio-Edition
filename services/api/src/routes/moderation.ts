@@ -17,6 +17,11 @@ const adminReportParamsSchema = z.object({
   reportId: z.string().uuid(),
 });
 
+const adminReportsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+});
+
 const adminReportActionSchema = z.object({
   action: z.enum(["ban_user", "delete_comment", "ignore"]),
 });
@@ -136,7 +141,16 @@ export async function registerModerationRoutes(
         return reply.status(403).send({ error: "Admin access required" });
       }
 
-      const { data, error } = await service
+      const parsedQuery = adminReportsQuerySchema.safeParse(request.query);
+      if (!parsedQuery.success) {
+        return reply.status(400).send({ error: "Invalid reports query" });
+      }
+
+      const { page, pageSize } = parsedQuery.data;
+      const start = (page - 1) * pageSize;
+      const end = start + pageSize - 1;
+
+      const { data, count, error } = await service
         .from("reported_comments")
         .select(
           `
@@ -150,15 +164,24 @@ export async function registerModerationRoutes(
           ),
           profiles ( id, username )
         `,
+          { count: "exact" },
         )
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: false })
+        .range(start, end);
 
       if (error) {
         request.log.error(error, "Failed to load moderation reports");
         return reply.status(500).send({ error: "Failed to load reports" });
       }
 
-      return { reports: data || [] };
+      const total = count || 0;
+      return {
+        page,
+        pageSize,
+        reports: data || [],
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      };
     },
   );
 

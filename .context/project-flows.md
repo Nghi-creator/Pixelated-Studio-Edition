@@ -331,11 +331,11 @@ Purpose: authenticate users and attach app metadata.
 
 Purpose: show the game catalog and user favorites.
 
-1. Landing/library components query Supabase `games`.
-2. Game cards display title, cover/backdrop, author, and play metadata.
-3. User favorite state is read from `favorites`.
-4. Favorite/unfavorite writes go directly from React to Supabase.
-5. Realtime is enabled for `favorites`, so favorites pages can update from Supabase realtime events.
+1. Landing calls `GET /games?page=<page>&pageSize=15`, optionally adding `search=<query>`.
+2. The API queries Supabase `games` with server-side range/count and title search, then returns `games`, `page`, `pageSize`, `total`, `totalPages`, and `featuredGames`.
+3. The homepage grid renders only the requested page. Pagination controls use backend totals instead of slicing a full browser-side catalog.
+4. The hero uses API-provided `featuredGames`, currently the highest play-count games from the full catalog, so it stays sensible when the grid is paginated or searched.
+5. User favorite state is read and written through API routes: `GET /favorites`, `GET /favorites/:gameId`, `PUT /favorites/:gameId`, and `DELETE /favorites/:gameId`.
 
 ## 11. Social Comments/Reactions Flow
 
@@ -357,9 +357,11 @@ Comments:
 
 Reports:
 
-1. User reports a comment by inserting into `reported_comments`.
-2. Admin dashboard reads `reported_comments` with nested comment/profile data.
-3. Admin actions delete report rows, delete comments, or update a profile's `is_banned` flag.
+1. User reports a comment through `POST /moderation/comments/:commentId/report`.
+2. The backend records the report in `reported_comments`, deriving the reporter from the Supabase bearer token.
+3. Admin dashboard calls `GET /admin/reports?page=<page>&pageSize=25`.
+4. The backend verifies admin/super-admin role, then returns a paginated moderation queue with nested comment/profile data plus `total` and `totalPages`.
+5. Admin actions call `POST /admin/reports/:reportId/action`; the backend enforces peer-review, admin-target, and self-ban rules before ignoring reports, deleting comments, or banning users.
 
 ## 12. Play Count Flow
 

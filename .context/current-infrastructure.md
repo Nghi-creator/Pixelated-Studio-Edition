@@ -33,6 +33,7 @@ Current status:
 - `GET /me` verifies a Supabase bearer token and returns the authenticated user id/email.
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - `GET /games` and `GET /games/:gameId` read approved game catalog metadata through the API.
+- `GET /games` accepts `page`, `pageSize`, and optional `search`; the backend returns paginated catalog metadata plus a small `featuredGames` list for the homepage hero.
 - `GET /favorites`, `GET /favorites/:gameId`, `PUT /favorites/:gameId`, and `DELETE /favorites/:gameId` manage favorites through the API.
 - `GET /games/:gameId/reactions` and `PUT /games/:gameId/reaction` manage game reactions through the API.
 - `GET /games/:gameId/comments`, `POST /games/:gameId/comments`, `DELETE /comments/:commentId`, and `PUT /comments/:commentId/reaction` manage player comments and comment reactions through the API.
@@ -41,7 +42,9 @@ Current status:
 - `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
 - `POST /admin/reports/:reportId/action` resolves moderation queue actions through the API for ignore, delete-comment, and ban-user actions.
 - `GET /admin/reports` loads the moderation queue through the API for authenticated admins/super admins.
+- `GET /admin/reports` accepts `page` and `pageSize` for server-side moderation queue pagination.
 - `GET /admin/users` and `PATCH /admin/users/:userId` move admin user management through the API.
+- `GET /admin/users` accepts `page`, `pageSize`, and optional `search` for server-side user-management pagination and username filtering.
 - `GET /admin/access-logs` loads access logs through the API for authenticated admins/super admins.
 - `POST /submissions/games` creates developer game submission records through the API for authenticated users.
 - `POST /submissions/games` can optionally send the submission notification server-side when `FORMSPREE_SUBMISSION_URL` is configured.
@@ -116,8 +119,8 @@ Current important frontend behaviors:
 - The lobby panel shows connected participants and lets the host remove non-host guests through the engine `lobby-kick` event.
 - Signed-in hosts publish non-secret lobby snapshots to the backend when local `lobby-state` changes. Anonymous/local-only play continues if that backend call is unauthorized or unavailable.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
-- Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
-- Game catalog, favorites, comments, reactions, profile updates/deletion, admin users, admin reports, and admin access logs are loaded or mutated through the API instead of direct browser Supabase table/RPC/realtime calls.
+- Publishing requires a signed-in non-super-admin user, uploads ROM/images directly from the browser to the authenticated user's folder in Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
+- Game catalog pagination/search, favorites, comments, reactions, profile updates/deletion, admin user pagination/search, admin reports, and admin access logs are loaded or mutated through the API instead of direct browser Supabase table/RPC/realtime calls.
 - Session tracking calls the API to insert browser-load access logs; the backend derives user id from the optional Supabase bearer token.
 
 ## Desktop Orchestrator

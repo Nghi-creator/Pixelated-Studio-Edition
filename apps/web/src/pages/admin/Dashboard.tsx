@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Check, LayoutDashboard, Filter } from "lucide-react";
 import ReportCard, { type Report } from "../../components/admin/ReportCard";
 import { api, ApiError, type ApiAdminReportAction } from "../../lib/apiClient";
+
+const REPORTS_PER_PAGE = 25;
 
 type FilterType = "all" | "users" | "admins";
 
@@ -12,33 +14,69 @@ export default function Dashboard() {
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [filter, setFilter] = useState<FilterType>("all");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalReports, setTotalReports] = useState(0);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) setCurrentUserId(session.user.id);
-    });
+    let isMounted = true;
 
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
+    const fetchCurrentUser = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (session?.user) {
-        setCurrentUserId(session.user.id);
+        if (isMounted) setCurrentUserId(session.user.id);
 
         const data = await api.permissions();
-        setCurrentUserRole(data.profile.role);
+        if (isMounted) setCurrentUserRole(data.profile.role);
+      } else if (isMounted) {
+        setLoading(false);
       }
-    });
-
-    const fetchReports = async () => {
-      try {
-        const data = await api.adminReports<Report>();
-        setReports(data.reports);
-      } catch (error) {
-        console.error("Error fetching reports:", error);
-      }
-      setLoading(false);
     };
 
-    fetchReports();
+    fetchCurrentUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const fetchReports = useCallback(
+    async (isMounted = true) => {
+      if (currentUserRole !== "admin" && currentUserRole !== "super_admin") {
+        if (currentUserRole) setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        const data = await api.adminReports<Report>(page, REPORTS_PER_PAGE);
+        if (!isMounted) return;
+
+        setReports(data.reports);
+        setTotalReports(data.total);
+        setTotalPages(data.totalPages);
+        if (page > data.totalPages) {
+          setPage(data.totalPages);
+        }
+      } catch (error) {
+        console.error("Error fetching reports:", error);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    },
+    [currentUserRole, page],
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchReports(isMounted);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchReports]);
 
   const resolveReport = async (
     reportId: string,
@@ -51,6 +89,7 @@ export default function Dashboard() {
           ? prev.filter((report) => report.id !== result.reportId)
           : prev.filter((report) => report.comments?.id !== result.commentId),
       );
+      setTotalReports((currentTotal) => Math.max(0, currentTotal - 1));
     } catch (err) {
       console.error("Failed to resolve report:", err);
       const message =
@@ -90,6 +129,9 @@ export default function Dashboard() {
     return <div className="text-gray-400">Loading moderation queue...</div>;
   }
 
+  const pageStart = totalReports === 0 ? 0 : (page - 1) * REPORTS_PER_PAGE + 1;
+  const pageEnd = Math.min(pageStart + reports.length - 1, totalReports);
+
   return (
     <div className="space-y-6">
       {/* Header & Controls */}
@@ -115,7 +157,7 @@ export default function Dashboard() {
           </div>
 
           <span className="bg-synth-primary/15 text-synth-primary border border-synth-primary/30 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap">
-            {filteredReports.length} Pending
+            {totalReports} Pending
           </span>
         </div>
       </div>
@@ -144,6 +186,36 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-gray-500">
+          Showing {pageStart}-{pageEnd} of {totalReports}
+          {filter !== "all" && " before filter"}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+            disabled={page === 1 || loading}
+            className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span className="rounded-lg border border-synth-border bg-synth-bg px-4 py-2 text-sm font-semibold text-gray-300">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setPage((currentPage) => Math.min(totalPages, currentPage + 1))
+            }
+            disabled={page >= totalPages || loading}
+            className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
