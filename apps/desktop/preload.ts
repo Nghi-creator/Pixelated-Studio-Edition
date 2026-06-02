@@ -26,6 +26,8 @@ type EngineCompanionPayload = {
   certPath?: string;
   enabled: boolean;
   error?: string;
+  inviteCode?: string;
+  inviteExpiresAt?: string;
   urls: string[];
 };
 

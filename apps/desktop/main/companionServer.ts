@@ -1,12 +1,19 @@
 import { execFileSync } from "child_process";
+import crypto from "crypto";
 import fs from "fs";
-import http, { type IncomingMessage, type ServerResponse } from "http";
+import http, {
+  type IncomingMessage,
+  type OutgoingHttpHeaders,
+  type ServerResponse,
+} from "http";
 import https from "https";
 import net, { type Socket } from "net";
 import path from "path";
 
 const ENGINE_HOST = "127.0.0.1";
 const ENGINE_PORT = 8080;
+const INVITE_PATH = "/invite";
+const REDEEM_INVITE_PATH = "/invite/redeem";
 const PROXY_PREFIXES = ["/health", "/local-games", "/socket.io", "/upload"];
 
 type CertificatePaths = {
@@ -16,6 +23,9 @@ type CertificatePaths = {
 
 export type CompanionServerOptions = {
   certDir: string;
+  engineToken: string;
+  inviteCode: string;
+  inviteExpiresAt: number;
   lanAddresses: string[];
   port: number;
   webDistDir: string;
@@ -26,6 +36,12 @@ export type CompanionServerResult = CertificatePaths & {
 };
 
 let companionServer: https.Server | null = null;
+
+type CompanionAccessToken = {
+  expiresAt: number;
+};
+
+const companionAccessTokens = new Map<string, CompanionAccessToken>();
 
 function createCertificate(
   certDir: string,
@@ -74,13 +90,150 @@ function shouldProxy(url = "") {
   });
 }
 
-function proxyHttpRequest(req: IncomingMessage, res: ServerResponse) {
+function normalizeInviteCode(value: unknown) {
+  return typeof value === "string"
+    ? value.toUpperCase().replace(/[^A-Z0-9]/g, "")
+    : "";
+}
+
+function readJsonBody(req: IncomingMessage) {
+  return new Promise<unknown>((resolve, reject) => {
+    let body = "";
+    req.on("data", (chunk: Buffer) => {
+      body += chunk.toString("utf8");
+      if (body.length > 1024) {
+        reject(new Error("Request body is too large"));
+        req.destroy();
+      }
+    });
+    req.on("end", () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch {
+        reject(new Error("Invalid JSON body"));
+      }
+    });
+    req.on("error", reject);
+  });
+}
+
+function sendJson(
+  res: ServerResponse,
+  statusCode: number,
+  payload: Record<string, unknown>,
+) {
+  res.writeHead(statusCode, { "content-type": "application/json" });
+  res.end(JSON.stringify(payload));
+}
+
+function isValidCompanionAccessToken(token: string, now = Date.now()) {
+  const record = companionAccessTokens.get(token);
+  if (!record) return false;
+  if (record.expiresAt <= now) {
+    companionAccessTokens.delete(token);
+    return false;
+  }
+  return true;
+}
+
+function createCompanionAccessToken(expiresAt: number) {
+  const token = crypto.randomBytes(24).toString("base64url");
+  companionAccessTokens.set(token, { expiresAt });
+  return token;
+}
+
+function getCompanionTokenFromRequest(req: IncomingMessage) {
+  const headerToken = serializeHeaderValue(req.headers["x-engine-token"]);
+  if (headerToken) return headerToken;
+
+  try {
+    const url = new URL(req.url || "/", "https://pixelated.local");
+    return url.searchParams.get("companionToken") || "";
+  } catch {
+    return "";
+  }
+}
+
+function getProxiedHeaders(
+  req: IncomingMessage,
+  engineToken: string,
+): OutgoingHttpHeaders {
+  const headers: OutgoingHttpHeaders = {
+    ...req.headers,
+    host: `${ENGINE_HOST}:${ENGINE_PORT}`,
+  };
+  const companionToken = getCompanionTokenFromRequest(req);
+
+  if (companionToken && isValidCompanionAccessToken(companionToken)) {
+    headers["x-engine-token"] = engineToken;
+  }
+
+  return headers;
+}
+
+async function handleInviteRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  {
+    engineToken,
+    inviteCode,
+    inviteExpiresAt,
+  }: Pick<
+    CompanionServerOptions,
+    "engineToken" | "inviteCode" | "inviteExpiresAt"
+  >,
+) {
+  if (req.method === "GET" && req.url?.startsWith(INVITE_PATH)) {
+    sendJson(res, 200, {
+      codeLength: inviteCode.length,
+      expiresAt: new Date(inviteExpiresAt).toISOString(),
+    });
+    return true;
+  }
+
+  if (req.method !== "POST" || !req.url?.startsWith(REDEEM_INVITE_PATH)) {
+    return false;
+  }
+
+  if (Date.now() >= inviteExpiresAt) {
+    sendJson(res, 410, { error: "Invite code expired" });
+    return true;
+  }
+
+  try {
+    const body = await readJsonBody(req);
+    const submittedCode = normalizeInviteCode(
+      body && typeof body === "object"
+        ? (body as { code?: unknown }).code
+        : undefined,
+    );
+
+    if (submittedCode !== inviteCode) {
+      sendJson(res, 401, { error: "Invalid invite code" });
+      return true;
+    }
+
+    sendJson(res, 200, {
+      companionToken: createCompanionAccessToken(inviteExpiresAt),
+      engineUrl: "",
+      expiresAt: new Date(inviteExpiresAt).toISOString(),
+      tokenStoredBy: "browser-local-storage",
+    });
+  } catch (err) {
+    sendJson(res, 400, { error: err instanceof Error ? err.message : String(err) });
+  }
+
+  return true;
+}
+
+function proxyHttpRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  engineToken: string,
+) {
   const upstream = http.request(
     {
-      headers: {
-        ...req.headers,
-        host: `${ENGINE_HOST}:${ENGINE_PORT}`,
-      },
+      headers: getProxiedHeaders(req, engineToken),
       hostname: ENGINE_HOST,
       method: req.method,
       path: req.url,
@@ -100,22 +253,24 @@ function proxyHttpRequest(req: IncomingMessage, res: ServerResponse) {
   req.pipe(upstream);
 }
 
-function serializeHeaderValue(value: string | string[] | undefined) {
+function serializeHeaderValue(value: number | string | string[] | undefined) {
   if (Array.isArray(value)) return value.join(", ");
-  return value ?? "";
+  return value === undefined ? "" : String(value);
 }
 
-function proxyWebSocket(req: IncomingMessage, socket: Socket, head: Buffer) {
+function proxyWebSocket(
+  req: IncomingMessage,
+  socket: Socket,
+  head: Buffer,
+  engineToken: string,
+) {
   if (!shouldProxy(req.url || "")) {
     socket.destroy();
     return;
   }
 
   const upstream = net.connect(ENGINE_PORT, ENGINE_HOST, () => {
-    const headers = {
-      ...req.headers,
-      host: `${ENGINE_HOST}:${ENGINE_PORT}`,
-    };
+    const headers = getProxiedHeaders(req, engineToken);
     const headerLines = Object.entries(headers)
       .map(([name, value]) => `${name}: ${serializeHeaderValue(value)}`)
       .join("\r\n");
@@ -202,11 +357,15 @@ function serveStatic(
 
 export function startCompanionServer({
   certDir,
+  engineToken,
+  inviteCode,
+  inviteExpiresAt,
   lanAddresses,
   port,
   webDistDir,
 }: CompanionServerOptions) {
   stopCompanionServer();
+  companionAccessTokens.clear();
 
   const { certPath, keyPath } = createCertificate(certDir, lanAddresses);
   const server = https.createServer(
@@ -214,9 +373,19 @@ export function startCompanionServer({
       cert: fs.readFileSync(certPath),
       key: fs.readFileSync(keyPath),
     },
-    (req, res) => {
+    async (req, res) => {
+      if (
+        await handleInviteRequest(req, res, {
+          engineToken,
+          inviteCode,
+          inviteExpiresAt,
+        })
+      ) {
+        return;
+      }
+
       if (shouldProxy(req.url || "")) {
-        proxyHttpRequest(req, res);
+        proxyHttpRequest(req, res, engineToken);
         return;
       }
 
@@ -224,7 +393,9 @@ export function startCompanionServer({
     },
   );
 
-  server.on("upgrade", proxyWebSocket);
+  server.on("upgrade", (req, socket, head) =>
+    proxyWebSocket(req, socket as Socket, head, engineToken),
+  );
 
   return new Promise<CompanionServerResult>((resolve, reject) => {
     const handleListenError = (err: Error) => {
@@ -250,4 +421,5 @@ export function stopCompanionServer() {
 
   companionServer.close();
   companionServer = null;
+  companionAccessTokens.clear();
 }

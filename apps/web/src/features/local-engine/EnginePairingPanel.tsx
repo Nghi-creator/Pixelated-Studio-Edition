@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { api, ApiError } from "../../lib/apiClient";
 import {
   clearEngineToken,
+  createCompanionEngineToken,
   ENGINE_PAIRING_EVENT,
   getEngineToken,
   setEngineToken,
@@ -30,6 +31,13 @@ type EngineHealthPayload = {
   engineTokenRequired?: boolean;
   exposureMode?: "local" | "lan";
   ok?: boolean;
+};
+
+type InviteRedeemPayload = {
+  companionToken?: string;
+  engineUrl?: string;
+  error?: string;
+  expiresAt?: string;
 };
 
 type PairingFailureContext = {
@@ -118,6 +126,20 @@ const getScopeDescription = (scope: EngineUrlScope) => {
 const isLikelyCompanionUrl = (url: URL) =>
   url.protocol === "https:" && url.port === "8090";
 
+const getStoredCompanionAccessToken = (token: string) =>
+  token.startsWith("companion:") ? token.slice("companion:".length) : "";
+
+const getInviteFailureMessage = (status: number) => {
+  if (status === 401) return "That invite code was not accepted by the host.";
+  if (status === 410) {
+    return "That invite code expired. Ask the host for a fresh code.";
+  }
+  if (status >= 500) {
+    return "The host join page is reachable, but invite redemption failed. Ask the host to restart LAN mode.";
+  }
+  return "Could not redeem that invite code.";
+};
+
 const getPairingFailureMessage = ({
   error,
   parsedUrl,
@@ -164,6 +186,7 @@ export function EnginePairingPanel({
   onPaired,
 }: EnginePairingPanelProps) {
   const [engineUrl, setEngineUrlInput] = useState(getEngineUrl);
+  const [inviteCode, setInviteCode] = useState("");
   const [token, setToken] = useState(getEngineToken);
   const [pairingState, setPairingState] = useState<PairingState>(
     token ? "paired" : "idle",
@@ -175,6 +198,10 @@ export function EnginePairingPanel({
       : "",
   );
   const engineUrlScope = getEngineUrlScope(engineUrl);
+  const parsedEngineUrl = parseEngineUrl(engineUrl);
+  const isCompanionJoin = Boolean(
+    parsedEngineUrl && isLikelyCompanionUrl(parsedEngineUrl),
+  );
 
   useEffect(() => {
     const refreshPairingState = () => {
@@ -195,6 +222,9 @@ export function EnginePairingPanel({
   }, []);
 
   useEffect(() => {
+    const currentUrl = parseEngineUrl(getEngineUrl());
+    if (currentUrl && isLikelyCompanionUrl(currentUrl)) return;
+
     api
       .localPairing()
       .then(({ pairing }) => {
@@ -209,12 +239,24 @@ export function EnginePairingPanel({
 
   const pairEngine = async () => {
     const normalizedUrl = normalizeEngineUrl(engineUrl);
-    const normalizedToken = token.trim();
     const parsedUrl = parseEngineUrl(normalizedUrl);
+    const joiningWithInvite = Boolean(
+      parsedUrl && isLikelyCompanionUrl(parsedUrl),
+    );
+    const normalizedInviteCode = inviteCode
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, "");
+    let normalizedToken = token.trim();
 
-    if (!normalizedUrl || !normalizedToken) {
+    if (!normalizedUrl || (!joiningWithInvite && !normalizedToken)) {
       setPairingState("error");
       setMessage("Enter the engine URL and desktop pairing token.");
+      return;
+    }
+
+    if (joiningWithInvite && !normalizedInviteCode) {
+      setPairingState("error");
+      setMessage("Enter the invite code from the host desktop app.");
       return;
     }
 
@@ -226,10 +268,41 @@ export function EnginePairingPanel({
 
     setPairingState("checking");
     setMessage(
-      `Checking ${getScopeLabel(getEngineUrlScope(normalizedUrl)).toLowerCase()}...`,
+      joiningWithInvite
+        ? "Checking invite code..."
+        : `Checking ${getScopeLabel(getEngineUrlScope(normalizedUrl)).toLowerCase()}...`,
     );
 
     try {
+      if (joiningWithInvite) {
+        const inviteResponse = await fetch(
+          engineUrlEndpoint(normalizedUrl, "/invite/redeem"),
+          {
+            body: JSON.stringify({ code: normalizedInviteCode }),
+            headers: { "Content-Type": "application/json" },
+            method: "POST",
+          },
+        );
+
+        if (!inviteResponse.ok) {
+          setPairingState("error");
+          setMessage(getInviteFailureMessage(inviteResponse.status));
+          return;
+        }
+
+        const invitePayload =
+          (await inviteResponse.json()) as InviteRedeemPayload;
+        if (!invitePayload.companionToken) {
+          setPairingState("error");
+          setMessage("The host join page did not return a companion credential.");
+          return;
+        }
+
+        normalizedToken = createCompanionEngineToken(
+          invitePayload.companionToken,
+        );
+      }
+
       const healthResponse = await fetch(
         engineUrlEndpoint(normalizedUrl, "/health"),
       );
@@ -261,7 +334,9 @@ export function EnginePairingPanel({
         engineUrlEndpoint(normalizedUrl, "/local-games"),
         {
           headers: {
-            "X-Engine-Token": normalizedToken,
+            "X-Engine-Token": joiningWithInvite
+              ? getStoredCompanionAccessToken(normalizedToken)
+              : normalizedToken,
             "X-User-Id": "pairing-check",
           },
         },
@@ -297,20 +372,26 @@ export function EnginePairingPanel({
       setEngineToken(normalizedToken);
 
       let successMessage =
-        actualScope === "lan"
-          ? "LAN engine paired. Keep the desktop app running while guests connect."
-          : "Local engine paired.";
+        joiningWithInvite
+          ? "Joined the host engine. Keep this page open while you play."
+          : actualScope === "lan"
+            ? "LAN engine paired. Keep the desktop app running while guests connect."
+            : "Local engine paired.";
 
       try {
         await api.pairLocalEngine(normalizedUrl);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
           successMessage =
-            "Engine token saved locally. Sign in to register pairing intent with the API.";
+            joiningWithInvite
+              ? "Joined the host engine. Sign in to register pairing intent with the API."
+              : "Engine token saved locally. Sign in to register pairing intent with the API.";
         } else {
           console.warn("Local engine paired, but API registration failed:", err);
           successMessage =
-            "Engine token saved locally. Backend pairing registration is unavailable.";
+            joiningWithInvite
+              ? "Joined the host engine. Backend pairing registration is unavailable."
+              : "Engine token saved locally. Backend pairing registration is unavailable.";
         }
       }
 
@@ -364,11 +445,17 @@ export function EnginePairingPanel({
               <PlugZap className="h-5 w-5 text-synth-primary" />
             )}
             <h3 className="text-base font-semibold text-white">
-              Local Engine Pairing
+              {isCompanionJoin ? "Join Host Engine" : "Local Engine Pairing"}
             </h3>
           </div>
 
-          <div className="grid gap-3 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
+          <div
+            className={`grid gap-3 ${
+              isCompanionJoin
+                ? "md:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)]"
+                : "md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]"
+            }`}
+          >
             <label className="block">
               <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
                 Engine URL
@@ -381,33 +468,52 @@ export function EnginePairingPanel({
               />
             </label>
 
-            <label className="relative block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
-                Pairing token
-              </span>
-              <input
-                value={token}
-                onChange={(event) => setToken(event.target.value)}
-                className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg px-3 pr-11 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-primary"
-                placeholder="Desktop app token"
-                type={showToken ? "text" : "password"}
-              />
-              <button
-                aria-label={
-                  showToken ? "Hide pairing token" : "Show pairing token"
-                }
-                className="absolute right-2 top-7 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:text-white"
-                onClick={() => setShowToken((isVisible) => !isVisible)}
-                title={showToken ? "Hide token" : "Show token"}
-                type="button"
-              >
-                {showToken ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </button>
-            </label>
+            {isCompanionJoin ? (
+              <label className="block">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Invite code
+                </span>
+                <input
+                  value={inviteCode}
+                  onChange={(event) =>
+                    setInviteCode(
+                      event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+                    )
+                  }
+                  className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg px-3 font-mono text-sm tracking-widest text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-primary"
+                  maxLength={8}
+                  placeholder="A1B2C3D4"
+                />
+              </label>
+            ) : (
+              <label className="relative block">
+                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                  Pairing token
+                </span>
+                <input
+                  value={token}
+                  onChange={(event) => setToken(event.target.value)}
+                  className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg px-3 pr-11 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-primary"
+                  placeholder="Desktop app token"
+                  type={showToken ? "text" : "password"}
+                />
+                <button
+                  aria-label={
+                    showToken ? "Hide pairing token" : "Show pairing token"
+                  }
+                  className="absolute right-2 top-7 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition-colors hover:text-white"
+                  onClick={() => setShowToken((isVisible) => !isVisible)}
+                  title={showToken ? "Hide token" : "Show token"}
+                  type="button"
+                >
+                  {showToken ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </label>
+            )}
           </div>
 
           <div
@@ -418,9 +524,14 @@ export function EnginePairingPanel({
             }`}
           >
             <span className="font-semibold text-white">
-              {getScopeLabel(engineUrlScope)}:
+              {isCompanionJoin
+                ? "HTTPS join page"
+                : getScopeLabel(engineUrlScope)}
+              :
             </span>{" "}
-            {getScopeDescription(engineUrlScope)}
+            {isCompanionJoin
+              ? "Enter the short-lived invite code from the host desktop app. The raw engine token stays on the host."
+              : getScopeDescription(engineUrlScope)}
           </div>
 
           {message && (
@@ -444,7 +555,13 @@ export function EnginePairingPanel({
             {pairingState === "checking" ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : null}
-            {pairingState === "paired" ? "Update" : "Pair"}
+            {isCompanionJoin
+              ? pairingState === "paired"
+                ? "Update"
+                : "Join"
+              : pairingState === "paired"
+                ? "Update"
+                : "Pair"}
           </button>
 
           {pairingState === "paired" && (
