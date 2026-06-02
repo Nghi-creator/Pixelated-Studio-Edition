@@ -17,6 +17,7 @@ import { api } from "../../lib/apiClient";
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [dbUsername, setDbUsername] = useState<string | null>(null);
+  const [dbAvatarUrl, setDbAvatarUrl] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isDeveloper, setIsDeveloper] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -47,10 +48,12 @@ export default function Navbar() {
         }
 
         setDbUsername(data.profile.username);
+        setDbAvatarUrl(data.profile.avatar_url);
         setUserRole(data.profile.role);
         setIsDeveloper(data.profile.is_developer || false);
       } else {
         setDbUsername(null);
+        setDbAvatarUrl(null);
         setUserRole(null);
         setIsDeveloper(false);
       }
@@ -97,7 +100,7 @@ export default function Navbar() {
   };
 
   const avatarUrl =
-    user?.user_metadata?.avatar_url ||
+    dbAvatarUrl ||
     (user?.email
       ? `https://ui-avatars.com/api/?name=${user.email}&background=FF4D8F&color=000000&bold=true`
       : null);
