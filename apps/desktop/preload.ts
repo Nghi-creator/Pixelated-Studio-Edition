@@ -28,6 +28,8 @@ type EngineCompanionPayload = {
   error?: string;
   inviteCode?: string;
   inviteExpiresAt?: string;
+  inviteRevoked?: boolean;
+  inviteStatus?: string;
   urls: string[];
 };
 
@@ -40,6 +42,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   startDocker: (options: StartDockerOptions) =>
     ipcRenderer.send("start-docker", options),
   stopDocker: () => ipcRenderer.send("stop-docker"),
+  regenerateLanInvite: () => ipcRenderer.send("regenerate-lan-invite"),
+  revokeLanInvite: () => ipcRenderer.send("revoke-lan-invite"),
   onServerLog: (callback: IpcCallback<[string]>) =>
     ipcRenderer.on("server-log", callback),
   onEngineState: (callback: IpcCallback<[EngineStatePayload]>) =>

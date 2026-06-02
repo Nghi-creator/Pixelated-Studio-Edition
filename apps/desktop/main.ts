@@ -2,6 +2,8 @@ import { app, BrowserWindow, ipcMain, type IpcMainEvent } from "electron";
 import path from "path";
 import {
   cleanupEngine,
+  regenerateLanInvite,
+  revokeLanInvite,
   startEngine,
   stopEngine,
 } from "./main/engineController";
@@ -28,6 +30,14 @@ ipcMain.on("start-docker", (event: IpcMainEvent, options = {}) => {
 
 ipcMain.on("stop-docker", (event: IpcMainEvent) => {
   stopEngine(event);
+});
+
+ipcMain.on("regenerate-lan-invite", (event: IpcMainEvent) => {
+  regenerateLanInvite(event);
+});
+
+ipcMain.on("revoke-lan-invite", (event: IpcMainEvent) => {
+  revokeLanInvite(event);
 });
 
 app.whenReady().then(createWindow);

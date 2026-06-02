@@ -23,6 +23,8 @@ type EngineCompanionPayload = {
   error?: string;
   inviteCode?: string;
   inviteExpiresAt?: string;
+  inviteRevoked?: boolean;
+  inviteStatus?: string;
   urls?: string[];
 };
 
@@ -46,6 +48,8 @@ type PhaseTracker = {
 };
 
 type ElectronApi = {
+  regenerateLanInvite: () => void;
+  revokeLanInvite: () => void;
   startDocker: (options: { exposureMode?: ExposureMode }) => void;
   stopDocker: () => void;
   onServerLog: (callback: (event: unknown, message: string) => void) => void;
@@ -68,9 +72,11 @@ type PixelatedWindow = Window &
     PixelatedExposure: {
       createExposureController: (elements: {
         companionCopy: HTMLElement;
+        companionInviteActions: HTMLElement;
         companionInvite: HTMLElement;
         companionInviteCode: HTMLElement;
         companionInviteExpiry: HTMLElement;
+        companionInviteStatus: HTMLElement;
         companionPanel: HTMLElement;
         companionUrls: HTMLElement;
         exposureCopy: HTMLElement;
@@ -132,17 +138,36 @@ const tokenPanel = requiredElement("token-panel");
 const tokenValue = requiredElement("engine-token");
 const copyTokenBtn = requiredElement("copy-token", HTMLButtonElement);
 const copyCompanionBtn = requiredElement("copy-companion", HTMLButtonElement);
+const regenerateInviteBtn = requiredElement(
+  "regenerate-invite",
+  HTMLButtonElement,
+);
+const revokeInviteBtn = requiredElement("revoke-invite", HTMLButtonElement);
 
 let isRunning = false;
+
+function setInviteButtonsPending(isPending: boolean) {
+  regenerateInviteBtn.disabled = isPending;
+  revokeInviteBtn.disabled = isPending;
+  if (isPending) {
+    regenerateInviteBtn.innerText = "Updating...";
+    return;
+  }
+
+  regenerateInviteBtn.innerText = "Regenerate";
+  revokeInviteBtn.innerText = "Revoke";
+}
 
 const logs = pixelatedWindow.PixelatedLogs.createLogController({
   logBox: requiredElement("log"),
 });
 const exposure = pixelatedWindow.PixelatedExposure.createExposureController({
   companionCopy: requiredElement("companion-copy"),
+  companionInviteActions: requiredElement("companion-invite-actions"),
   companionInvite: requiredElement("companion-invite"),
   companionInviteCode: requiredElement("companion-invite-code"),
   companionInviteExpiry: requiredElement("companion-invite-expiry"),
+  companionInviteStatus: requiredElement("companion-invite-status"),
   companionPanel: requiredElement("companion-panel"),
   companionUrls: requiredElement("companion-urls"),
   exposureCopy: requiredElement("exposure-copy"),
@@ -200,6 +225,8 @@ function setStatusBadge(active: boolean) {
   exposure.renderUrls([]);
   exposure.renderCompanionUrls([]);
   exposure.resetInviteCode();
+  regenerateInviteBtn.disabled = true;
+  revokeInviteBtn.disabled = true;
   exposure.setEnabled(true);
   phases.render({ status: "stopped", phase: "idle" });
   isRunning = false;
@@ -218,6 +245,8 @@ function resetFailedUi() {
   exposure.renderUrls([]);
   exposure.renderCompanionUrls([]);
   exposure.resetInviteCode();
+  regenerateInviteBtn.disabled = true;
+  revokeInviteBtn.disabled = true;
   exposure.setEnabled(true);
   isRunning = false;
   powerBtn.disabled = false;
@@ -326,6 +355,16 @@ copyCompanionBtn.addEventListener("click", async () => {
   }
 });
 
+regenerateInviteBtn.addEventListener("click", () => {
+  setInviteButtonsPending(true);
+  pixelatedWindow.electronAPI.regenerateLanInvite();
+});
+
+revokeInviteBtn.addEventListener("click", () => {
+  setInviteButtonsPending(true);
+  pixelatedWindow.electronAPI.revokeLanInvite();
+});
+
 pixelatedWindow.electronAPI.onEngineToken((event, token) => {
   tokenValue.innerText = token;
   tokenPanel.classList.remove("hidden");
@@ -338,6 +377,9 @@ pixelatedWindow.electronAPI.onEngineExposure((event, payload) => {
 
 pixelatedWindow.electronAPI.onEngineCompanion((event, payload) => {
   exposure.setCompanionStatus(payload);
+  setInviteButtonsPending(false);
+  regenerateInviteBtn.disabled = !payload.enabled;
+  revokeInviteBtn.disabled = !payload.enabled || Boolean(payload.inviteRevoked);
 });
 
 pixelatedWindow.electronAPI.onEngineState((event, state) => {
@@ -356,3 +398,5 @@ pixelatedWindow.electronAPI.onEngineStopped(() => {
 
 exposure.render();
 phases.render();
+regenerateInviteBtn.disabled = true;
+revokeInviteBtn.disabled = true;
