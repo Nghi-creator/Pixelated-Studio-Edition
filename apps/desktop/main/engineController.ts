@@ -41,6 +41,8 @@ type EngineLaunchContext = {
   companionUrls: string[];
   deviceArgs: string;
   exposureMode: ExposureMode;
+  inviteCode?: string;
+  inviteExpiresAt?: number;
   publishHost: string;
 };
 
@@ -49,6 +51,12 @@ type DockerRunOptions = EngineLaunchContext & {
 };
 
 let engineToken: string | null = null;
+
+const INVITE_CODE_TTL_MS = 10 * 60 * 1000;
+
+function createInviteCode() {
+  return crypto.randomBytes(4).toString("hex").toUpperCase();
+}
 
 function buildDockerRunCommand({
   advertisedUrls,
@@ -76,12 +84,17 @@ function createEngineLaunchContext(options: StartEngineOptions = {}): EngineLaun
   const advertisedUrls = getAdvertisedEngineUrls(exposureMode);
   const companionUrls = getAdvertisedCompanionUrls(exposureMode, companionPort);
   const deviceArgs = hasHostUinput() ? "--device /dev/uinput" : "";
+  const inviteCode = exposureMode === "lan" ? createInviteCode() : undefined;
+  const inviteExpiresAt =
+    exposureMode === "lan" ? Date.now() + INVITE_CODE_TTL_MS : undefined;
 
   return {
     advertisedUrls,
     companionUrls,
     deviceArgs,
     exposureMode,
+    inviteCode,
+    inviteExpiresAt,
     publishHost,
   };
 }
@@ -98,9 +111,16 @@ async function startLanCompanion(
     return;
   }
 
+  if (!engineToken || !launchContext.inviteCode || !launchContext.inviteExpiresAt) {
+    throw new Error("LAN invite code has not been initialized.");
+  }
+
   try {
     const companion: CompanionServerResult = await startCompanionServer({
       certDir: path.join(app.getPath("userData"), "certificates"),
+      engineToken,
+      inviteCode: launchContext.inviteCode,
+      inviteExpiresAt: launchContext.inviteExpiresAt,
       lanAddresses: getLanIpv4Addresses(),
       port: companionPort,
       webDistDir,
@@ -108,6 +128,8 @@ async function startLanCompanion(
     event.reply("engine-companion", {
       certPath: companion.certPath,
       enabled: true,
+      inviteCode: launchContext.inviteCode,
+      inviteExpiresAt: new Date(launchContext.inviteExpiresAt).toISOString(),
       urls: launchContext.companionUrls,
     });
     event.reply(

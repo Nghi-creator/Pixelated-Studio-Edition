@@ -4,6 +4,8 @@
   type CompanionStatus = {
     enabled?: boolean;
     error?: string;
+    inviteCode?: string;
+    inviteExpiresAt?: string;
     urls?: string[];
   };
 
@@ -11,6 +13,9 @@
     exposureCopy: HTMLElement;
     exposureLabel: HTMLElement;
     companionCopy: HTMLElement;
+    companionInvite: HTMLElement;
+    companionInviteCode: HTMLElement;
+    companionInviteExpiry: HTMLElement;
     companionPanel: HTMLElement;
     companionUrls: HTMLElement;
     lanToggle: HTMLInputElement;
@@ -23,6 +28,9 @@
     exposureCopy,
     exposureLabel,
     companionCopy,
+    companionInvite,
+    companionInviteCode,
+    companionInviteExpiry,
     companionPanel,
     companionUrls,
     lanToggle,
@@ -62,9 +70,27 @@
       );
     }
 
+    function renderInviteCode(payload: CompanionStatus = {}) {
+      companionInviteCode.innerText = payload.inviteCode || "";
+      companionInviteExpiry.innerText = payload.inviteExpiresAt
+        ? `Expires ${new Date(payload.inviteExpiresAt).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}`
+        : "";
+      companionInvite.classList.toggle("hidden", !payload.inviteCode);
+    }
+
+    function resetInviteCode() {
+      companionInviteCode.innerText = "";
+      companionInviteExpiry.innerText = "";
+      companionInvite.classList.add("hidden");
+    }
+
     function setCompanionStatus(payload: CompanionStatus = {}) {
       if (!payload.enabled) {
         companionPanel.classList.add("hidden");
+        resetInviteCode();
         if (payload.error) {
           companionCopy.innerText = payload.error;
         }
@@ -72,8 +98,9 @@
       }
 
       renderCompanionUrls(payload.urls || []);
+      renderInviteCode(payload);
       companionCopy.innerText =
-        "Guests may need to trust the local certificate the first time they open this page.";
+        "Guests may need to trust the local certificate the first time they open this page. The invite code is short-lived and the engine token stays on this host.";
     }
 
     function render() {
@@ -107,6 +134,7 @@
       render,
       renderCompanionUrls,
       renderUrls,
+      resetInviteCode,
       setEnabled,
       setCompanionStatus,
     };

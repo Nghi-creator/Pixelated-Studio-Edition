@@ -27,7 +27,7 @@ Purpose: start the local Dockerized game streaming node.
 4. `main.js` runs `docker info` to check whether Docker is available.
 5. `main.js` builds the image with `docker build -t pixelated-engine .` from `engine/runtime/`.
 6. Electron generates a random pairing token for this engine run.
-7. Electron sends the token to the desktop renderer, which displays it with a copy button.
+7. Electron sends the token to the desktop renderer, which displays it for host-local use with a warning not to share it with LAN guests.
 8. `main.js` removes any stale `pixelated-node` container.
 9. `main.js` starts a detached container. In local mode it uses `-p 127.0.0.1:8080:8080`; in explicit LAN mode it uses `-p 0.0.0.0:8080:8080`. The command also mounts `-v pixelated-roms:/roms` and passes `PIXELATED_ALLOWED_ORIGINS`, `PIXELATED_ALLOWED_ROM_HOSTS`, `PIXELATED_API_URL`, `PIXELATED_ENGINE_TOKEN`, `PIXELATED_ENGINE_EXPOSURE_MODE`, and `PIXELATED_ADVERTISED_URLS`.
 10. The container starts `node server.js`.
@@ -36,11 +36,12 @@ Purpose: start the local Dockerized game streaming node.
 13. `startVirtualDisplay()` removes stale X11 lock files, starts `Xvfb :99`, starts PulseAudio, and writes `/app/retroarch.cfg`.
 14. Electron polls `http://127.0.0.1:8080/health`.
 15. `/health` checks Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
-16. If health returns `ok: true` and LAN mode is enabled, Electron starts the LAN HTTPS companion server.
+16. If health returns `ok: true` and LAN mode is enabled, Electron starts the LAN HTTPS companion server with a 10-minute invite code.
 17. The companion serves the React production build from `apps/web/dist` in development or `resources/web-dist` in packaged builds, then proxies engine HTTP and Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
-18. If health returns `ok: true`, Electron marks the engine as successful.
-19. If health times out or engine startup fails, Electron removes `pixelated-node` and returns the UI to stopped state.
-20. Electron displays log messages from the Docker lifecycle back in the desktop UI.
+18. LAN guests redeem the invite code with `POST /invite/redeem`; the companion returns a short-lived companion credential and maps it to the real engine token while proxying.
+19. If health returns `ok: true`, Electron marks the engine as successful.
+20. If health times out or engine startup fails, Electron removes `pixelated-node` and returns the UI to stopped state.
+21. Electron displays log messages from the Docker lifecycle back in the desktop UI.
 
 Current limitation: health is still readiness-focused. It does not yet expose live stream telemetry such as FPS, bitrate, ICE state, or encoder errors.
 
@@ -192,6 +193,16 @@ Purpose: make local-engine intent explicit without sending the desktop pairing t
 13. WebRTC uses the stored token for Socket.IO auth.
 14. If the engine rejects the token, React clears it and shows the pairing panel again.
 15. If a hosted HTTPS browser cannot reach an HTTP LAN engine URL, React shows a private-network/mixed-content oriented error instead of a generic unreachable message.
+
+LAN HTTPS companion join variant:
+
+1. Electron starts LAN mode and shows the HTTPS companion join URL plus a short-lived invite code.
+2. The companion-served React app detects the `https://<host-lan-ip>:8090` engine URL and shows an invite-code join UI instead of the raw pairing token field.
+3. React calls `POST <companionUrl>/invite/redeem` with the invite code.
+4. The companion validates the code locally, returns a short-lived companion credential, and never sends the raw engine token to the guest.
+5. React stores the engine URL plus `companion:<credential>` in browser `localStorage`.
+6. REST calls send the companion credential through `X-Engine-Token`; Socket.IO joins send it as a `companionToken` query parameter.
+7. The companion validates the credential and injects the host-local engine token while proxying to `127.0.0.1:8080`.
 
 ## 5A. Live Stream Telemetry And Error Flow
 

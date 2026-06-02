@@ -1,5 +1,6 @@
 export const ENGINE_TOKEN_STORAGE_KEY = "pixelated_engine_token";
 export const ENGINE_PAIRING_EVENT = "pixelated-engine-pairing-changed";
+const COMPANION_TOKEN_PREFIX = "companion:";
 
 export const getEngineToken = () =>
   window.localStorage.getItem(ENGINE_TOKEN_STORAGE_KEY) || "";
@@ -18,7 +19,22 @@ export const hasEngineToken = () => Boolean(getEngineToken());
 
 export const ensureEngineToken = () => getEngineToken();
 
+export const createCompanionEngineToken = (token: string) =>
+  `${COMPANION_TOKEN_PREFIX}${token.trim()}`;
+
+export const getCompanionAccessToken = (token = getEngineToken()) =>
+  token.startsWith(COMPANION_TOKEN_PREFIX)
+    ? token.slice(COMPANION_TOKEN_PREFIX.length)
+    : "";
+
+export const isCompanionEngineToken = (token = getEngineToken()) =>
+  Boolean(getCompanionAccessToken(token));
+
 export const engineAuthHeaders = (): Record<string, string> => {
   const token = getEngineToken();
-  return token ? { "X-Engine-Token": token } : {};
+  if (!token) return {};
+
+  return {
+    "X-Engine-Token": getCompanionAccessToken(token) || token,
+  };
 };

@@ -90,14 +90,16 @@ class FakeQueryBuilder {
   private orderConfig: { ascending: boolean; field: string } | null = null;
   private payload: RecordRow | null = null;
   private rangeConfig: { end: number; start: number } | null = null;
+  private shouldCount = false;
 
   constructor(
     private readonly db: FakeSupabase,
     private readonly table: TableName,
   ) {}
 
-  select() {
+  select(_columns?: string, options?: { count?: "exact" }) {
     this.action = this.action || "select";
+    this.shouldCount = options?.count === "exact";
     return this;
   }
 
@@ -174,7 +176,11 @@ class FakeQueryBuilder {
 
   private async execute() {
     const rows = await this.executeRows();
-    return { data: rows, error: null };
+    return {
+      count: this.shouldCount ? this.filteredRows().length : null,
+      data: rows,
+      error: null,
+    };
   }
 
   private async executeRows() {
@@ -448,8 +454,44 @@ test("admin user and access-log routes require privileged roles", async () => {
     app.inject({ method: "GET", url: "/admin/access-logs" }).finally(() => app.close()),
   );
   assert.equal(logsResponse.statusCode, 200);
-  assert.equal(logsResponse.json<{ logs: unknown[] }>().logs.length, 1);
+  assert.equal(logsResponse.json<{ logs: unknown[]; total: number }>().logs.length, 1);
+  assert.equal(logsResponse.json<{ logs: unknown[]; total: number }>().total, 1);
   await superAdminApp.close();
+});
+
+test("admin access logs are paginated server-side", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  for (let index = 1; index <= 30; index += 1) {
+    db.rows.access_logs.push({
+      created_at: `2026-05-27T00:${String(index).padStart(2, "0")}:00.000Z`,
+      id: `log-${index}`,
+      path: `/page-${index}`,
+      user_id: index % 2 === 0 ? USER_ID : null,
+    });
+  }
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/admin/access-logs?page=2&pageSize=10",
+  });
+
+  assert.equal(response.statusCode, 200);
+  const body = response.json<{
+    logs: { id: string }[];
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  }>();
+  assert.equal(body.logs.length, 10);
+  assert.equal(body.logs[0]?.id, "log-20");
+  assert.equal(body.page, 2);
+  assert.equal(body.pageSize, 10);
+  assert.equal(body.total, 30);
+  assert.equal(body.totalPages, 3);
+  await app.close();
 });
 
 test("me permissions are loaded from backend-owned profile state", async () => {

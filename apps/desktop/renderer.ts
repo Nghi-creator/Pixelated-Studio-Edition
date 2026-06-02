@@ -21,6 +21,8 @@ type EngineCompanionPayload = {
   certPath?: string;
   enabled?: boolean;
   error?: string;
+  inviteCode?: string;
+  inviteExpiresAt?: string;
   urls?: string[];
 };
 
@@ -34,6 +36,7 @@ type ExposureController = {
   render: () => void;
   renderCompanionUrls: (urls?: string[]) => void;
   renderUrls: (urls?: string[]) => void;
+  resetInviteCode: () => void;
   setCompanionStatus: (payload?: EngineCompanionPayload) => void;
   setEnabled: (enabled: boolean) => void;
 };
@@ -65,6 +68,9 @@ type PixelatedWindow = Window &
     PixelatedExposure: {
       createExposureController: (elements: {
         companionCopy: HTMLElement;
+        companionInvite: HTMLElement;
+        companionInviteCode: HTMLElement;
+        companionInviteExpiry: HTMLElement;
         companionPanel: HTMLElement;
         companionUrls: HTMLElement;
         exposureCopy: HTMLElement;
@@ -134,6 +140,9 @@ const logs = pixelatedWindow.PixelatedLogs.createLogController({
 });
 const exposure = pixelatedWindow.PixelatedExposure.createExposureController({
   companionCopy: requiredElement("companion-copy"),
+  companionInvite: requiredElement("companion-invite"),
+  companionInviteCode: requiredElement("companion-invite-code"),
+  companionInviteExpiry: requiredElement("companion-invite-expiry"),
   companionPanel: requiredElement("companion-panel"),
   companionUrls: requiredElement("companion-urls"),
   exposureCopy: requiredElement("exposure-copy"),
@@ -190,6 +199,7 @@ function setStatusBadge(active: boolean) {
   tokenValue.innerText = "";
   exposure.renderUrls([]);
   exposure.renderCompanionUrls([]);
+  exposure.resetInviteCode();
   exposure.setEnabled(true);
   phases.render({ status: "stopped", phase: "idle" });
   isRunning = false;
@@ -207,6 +217,7 @@ function resetFailedUi() {
   tokenValue.innerText = "";
   exposure.renderUrls([]);
   exposure.renderCompanionUrls([]);
+  exposure.resetInviteCode();
   exposure.setEnabled(true);
   isRunning = false;
   powerBtn.disabled = false;

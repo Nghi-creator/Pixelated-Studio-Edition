@@ -1,6 +1,6 @@
 # LAN Multiplayer Manual Smoke Checklist
 
-Last updated: 2026-06-01
+Last updated: 2026-06-02
 
 Use this checklist for the real two-device LAN validation. The local two-browser smoke has already passed; this checklist is for the host desktop plus a separate guest device.
 
@@ -19,7 +19,8 @@ Use this checklist for the real two-device LAN validation. The local two-browser
 3. Initialize the engine.
 4. Confirm the desktop shows:
    - HTTPS companion join URL, usually `https://<host-lan-ip>:8090`.
-   - Pairing token.
+   - Short-lived invite code.
+   - Host-local pairing token with copy warning.
    - LAN warning/checklist copy.
 5. Open the host player and start a game.
 6. Confirm host stream reaches `LIVE STREAM ACTIVE`.
@@ -30,7 +31,7 @@ Use this checklist for the real two-device LAN validation. The local two-browser
 
 1. Open the HTTPS companion join URL from the host.
 2. Accept the local/self-signed certificate warning if shown.
-3. Pair with the token shown by the desktop app.
+3. Enter the invite code shown by the desktop app.
 4. Join the invite/session as spectator first.
 5. Confirm guest stream reaches `LIVE STREAM ACTIVE`.
 6. Toggle stream telemetry on.
@@ -41,7 +42,7 @@ Use this checklist for the real two-device LAN validation. The local two-browser
 ## Expected Results
 
 - Guest can load the companion page over HTTPS.
-- Guest can pair with the host token.
+- Guest can redeem the invite code without seeing the raw host pairing token.
 - Host stream stays active when guest joins.
 - Guest receives video/audio from the same running session.
 - Closing the guest tab does not stop the host stream.
@@ -88,7 +89,7 @@ Close the guest tab when the harness prints that join was validated. The harness
 ## Failure Notes
 
 - Certificate page is too scary/confusing: consider local CA packaging or a tunnel strategy.
-- Companion loads but pairing fails: check token, LAN mode, and whether the companion can proxy `/health`.
+- Companion loads but invite redemption fails: check the invite code expiry, LAN mode, and whether the companion can proxy `/health`.
 - Pairing says the HTTPS join page cannot be reached: open the companion URL directly and accept the local certificate warning, then retry pairing.
 - Pairing says the join page cannot reach the local engine: keep the desktop app open, initialize the engine, and retry after `/health` is ready.
 - Hosted Vercel direct-to-LAN HTTP fails: expected in Chrome; use the HTTPS companion instead.

@@ -5,6 +5,7 @@ import {
   clearEngineToken,
   ENGINE_PAIRING_EVENT,
   ensureEngineToken,
+  getCompanionAccessToken,
 } from "./engineAuth";
 import { engineEndpoint, getEngineUrl } from "./engineConfig";
 import { attachEngineInput } from "./webrtcInput";
@@ -219,9 +220,15 @@ export function useWebRTC(
       return;
     }
 
-    const socket = io(getEngineUrl(), { autoConnect: false });
+    const companionAccessToken = getCompanionAccessToken(engineToken);
+    const socket = io(getEngineUrl(), {
+      autoConnect: false,
+      query: companionAccessToken
+        ? { companionToken: companionAccessToken }
+        : undefined,
+    });
     socketRef.current = socket;
-    socket.auth = { token: engineToken };
+    socket.auth = companionAccessToken ? {} : { token: engineToken };
     let pc: RTCPeerConnection | null = null;
     let stopTelemetry: () => void = () => undefined;
     let detachEngineInput: () => void = () => undefined;
