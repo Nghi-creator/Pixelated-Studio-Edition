@@ -191,6 +191,14 @@ export type ApiPaginatedGamesResponse = {
   totalPages: number;
 };
 
+export type ApiPaginatedUsersResponse<TUser> = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  users: TUser[];
+};
+
 export type ApiGameSubmissionPayload = {
   authorName: string;
   bannerUrl: string | null;
@@ -387,5 +395,23 @@ export const api = {
       body: JSON.stringify(payload),
       method: "PATCH",
     }),
-  users: () => apiRequest<{ users: Required<ApiProfile>[] }>("/admin/users"),
+  users: <TUser = Required<ApiProfile>>({
+    page = 1,
+    pageSize = 25,
+    search = "",
+  }: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+  } = {}) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    if (search.trim()) params.set("search", search.trim());
+
+    return apiRequest<ApiPaginatedUsersResponse<TUser>>(
+      `/admin/users?${params}`,
+    );
+  },
 };

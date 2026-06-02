@@ -640,6 +640,45 @@ test("admin access logs are paginated server-side", async () => {
   await app.close();
 });
 
+test("admin users are paginated and searchable server-side", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  for (let index = 1; index <= 30; index += 1) {
+    db.rows.profiles.push({
+      created_at: `2026-05-${String(index).padStart(2, "0")}T00:00:00.000Z`,
+      id: `55555555-5555-4555-8555-${String(index).padStart(12, "0")}`,
+      is_banned: false,
+      role: "user",
+      username: index % 2 === 0 ? `player-${index}` : `viewer-${index}`,
+    });
+  }
+  const app = await createDataBoundaryApp(db, SUPER_ADMIN_ID);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/admin/users?page=2&pageSize=5&search=player-",
+  });
+
+  assert.equal(response.statusCode, 200);
+  const body = response.json<{
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    users: { username: string }[];
+  }>();
+  assert.equal(body.users.length, 5);
+  assert.deepEqual(
+    body.users.map((user) => user.username),
+    ["player-20", "player-18", "player-16", "player-14", "player-12"],
+  );
+  assert.equal(body.page, 2);
+  assert.equal(body.pageSize, 5);
+  assert.equal(body.total, 15);
+  assert.equal(body.totalPages, 3);
+  await app.close();
+});
+
 test("me permissions are loaded from backend-owned profile state", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);

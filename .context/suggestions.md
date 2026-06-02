@@ -19,6 +19,31 @@ Recommended direction:
 
 ## Done
 
+### Admin User Management Pagination At API Boundary
+
+Completed: 2026-06-03
+
+Implemented in:
+
+- `services/api/src/routes/adminUsers.ts`
+- `services/api/tests/dataBoundary.test.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/admin/UserManagement.tsx`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `GET /admin/users` now accepts `page`, `pageSize`, and optional `search`.
+- The API applies Supabase range/count pagination and username search server-side after verifying the actor is a super admin.
+- The API response includes `users`, `page`, `pageSize`, `total`, and `totalPages`.
+- The admin User Management screen now requests one page at a time, shows total users from backend metadata, and provides username search with debounced fetching.
+- Non-super-admin viewers are no longer sent through the users list fetch before seeing Access Denied.
+
+Validation:
+
+- Added API test coverage for server-side admin user pagination/search.
+
 ### Homepage Catalog Pagination At API Boundary
 
 Completed: 2026-06-02

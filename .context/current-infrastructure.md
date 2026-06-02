@@ -43,6 +43,7 @@ Current status:
 - `POST /admin/reports/:reportId/action` resolves moderation queue actions through the API for ignore, delete-comment, and ban-user actions.
 - `GET /admin/reports` loads the moderation queue through the API for authenticated admins/super admins.
 - `GET /admin/users` and `PATCH /admin/users/:userId` move admin user management through the API.
+- `GET /admin/users` accepts `page`, `pageSize`, and optional `search` for server-side user-management pagination and username filtering.
 - `GET /admin/access-logs` loads access logs through the API for authenticated admins/super admins.
 - `POST /submissions/games` creates developer game submission records through the API for authenticated users.
 - `POST /submissions/games` can optionally send the submission notification server-side when `FORMSPREE_SUBMISSION_URL` is configured.
@@ -118,7 +119,7 @@ Current important frontend behaviors:
 - Signed-in hosts publish non-secret lobby snapshots to the backend when local `lobby-state` changes. Anonymous/local-only play continues if that backend call is unauthorized or unavailable.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
 - Publishing requires a signed-in non-super-admin user, uploads ROM/images directly from the browser to the authenticated user's folder in Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
-- Game catalog pagination/search, favorites, comments, reactions, profile updates/deletion, admin users, admin reports, and admin access logs are loaded or mutated through the API instead of direct browser Supabase table/RPC/realtime calls.
+- Game catalog pagination/search, favorites, comments, reactions, profile updates/deletion, admin user pagination/search, admin reports, and admin access logs are loaded or mutated through the API instead of direct browser Supabase table/RPC/realtime calls.
 - Session tracking calls the API to insert browser-load access logs; the backend derives user id from the optional Supabase bearer token.
 
 ## Desktop Orchestrator

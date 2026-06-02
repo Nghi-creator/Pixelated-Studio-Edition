@@ -5,6 +5,11 @@ import {
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
 
+const usersQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  search: z.string().trim().max(120).optional(),
+});
 const userParamsSchema = z.object({ userId: z.string().uuid() });
 const userUpdateSchema = z
   .object({
@@ -69,17 +74,39 @@ export async function registerAdminUserRoutes(
         return reply.status(403).send({ error: "Super admin access required" });
       }
 
-      const { data, error } = await service
+      const parsedQuery = usersQuerySchema.safeParse(request.query);
+      if (!parsedQuery.success) {
+        return reply.status(400).send({ error: "Invalid users query" });
+      }
+
+      const { page, pageSize, search } = parsedQuery.data;
+      const start = (page - 1) * pageSize;
+      const end = start + pageSize - 1;
+
+      let usersQuery = service
         .from("profiles")
-        .select("*")
+        .select("*", { count: "exact" })
         .order("created_at", { ascending: false });
+
+      if (search) {
+        usersQuery = usersQuery.ilike("username", `%${search}%`);
+      }
+
+      const { data, count, error } = await usersQuery.range(start, end);
 
       if (error) {
         request.log.error({ err: error }, "Failed to load users");
         return reply.status(500).send({ error: "Failed to load users" });
       }
 
-      return { users: data || [] };
+      const total = count || 0;
+      return {
+        page,
+        pageSize,
+        total,
+        totalPages: Math.max(1, Math.ceil(total / pageSize)),
+        users: data || [],
+      };
     },
   );
 
