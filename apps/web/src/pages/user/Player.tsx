@@ -15,6 +15,7 @@ import { useGameMetadata } from "../../features/player/useGameMetadata";
 import { useGameReactions } from "../../features/player/useGameReactions";
 import { usePlayCount } from "../../features/player/usePlayCount";
 import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engineAuth";
+import { api } from "../../lib/apiClient";
 import {
   getStreamProfile,
   STREAM_PROFILES,
@@ -40,6 +41,10 @@ export default function Player() {
   const streamProfile = getStreamProfile(streamProfileId);
   const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
   const currentUser = useAuthUser();
+  const [profileIdentity, setProfileIdentity] = useState<{
+    userId: string;
+    username: string | null;
+  } | null>(null);
   const lobbySearch = useMemo(
     () => new URLSearchParams(location.search),
     [location.search],
@@ -48,8 +53,12 @@ export default function Player() {
   const invitedRole =
     lobbySearch.get("role") === "player" ? "player" : "spectator";
   const playerMode = invitedSessionId ? "guest" : "host";
+  const profileUsername =
+    profileIdentity && profileIdentity.userId === currentUser?.id
+      ? profileIdentity.username
+      : null;
   const displayName =
-    currentUser?.user_metadata?.username ||
+    profileUsername ||
     currentUser?.email?.split("@")[0] ||
     (playerMode === "host" ? "Host" : "Guest");
   const {
@@ -71,6 +80,37 @@ export default function Player() {
     sessionId: invitedSessionId,
   });
   const { authorName, gameTitle } = useGameMetadata(id);
+
+  useEffect(() => {
+    if (!currentUser) {
+      return;
+    }
+
+    let isMounted = true;
+    api
+      .permissions()
+      .then(({ profile }) => {
+        if (isMounted) {
+          setProfileIdentity({
+            userId: currentUser.id,
+            username: profile.username,
+          });
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setProfileIdentity({
+            userId: currentUser.id,
+            username: null,
+          });
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUser]);
+
   const [showStreamTelemetry, setShowStreamTelemetry] = useState(() => {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(STREAM_TELEMETRY_VISIBILITY_KEY) === "1";

@@ -17,6 +17,7 @@ import { api } from "../../lib/apiClient";
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
   const [dbUsername, setDbUsername] = useState<string | null>(null);
+  const [dbAvatarUrl, setDbAvatarUrl] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isDeveloper, setIsDeveloper] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -47,10 +48,12 @@ export default function Navbar() {
         }
 
         setDbUsername(data.profile.username);
+        setDbAvatarUrl(data.profile.avatar_url);
         setUserRole(data.profile.role);
         setIsDeveloper(data.profile.is_developer || false);
       } else {
         setDbUsername(null);
+        setDbAvatarUrl(null);
         setUserRole(null);
         setIsDeveloper(false);
       }
@@ -97,7 +100,7 @@ export default function Navbar() {
   };
 
   const avatarUrl =
-    user?.user_metadata?.avatar_url ||
+    dbAvatarUrl ||
     (user?.email
       ? `https://ui-avatars.com/api/?name=${user.email}&background=FF4D8F&color=000000&bold=true`
       : null);
@@ -118,21 +121,20 @@ export default function Navbar() {
           </Link>
 
           <div className="flex items-center gap-4 sm:gap-6">
-            {user && userRole !== "super_admin" && (
-              <Link
-                to="/publish"
-                title="Publish a Game"
-                className={`transition-colors ${
-                  isPublishPage
-                    ? "text-synth-secondary drop-shadow-[0_0_8px_rgba(255,159,67,0.4)]"
-                    : "text-gray-400 hover:text-synth-secondary"
-                }`}
-              >
-                <UploadCloud
-                  className={`w-5 h-5 ${isPublishPage ? "fill-synth-secondary/20" : ""}`}
-                />
-              </Link>
-            )}
+            <Link
+              to="/publish"
+              title="Submit a Game"
+              className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm font-bold transition-colors sm:px-3 ${
+                isPublishPage
+                  ? "border-synth-secondary/70 bg-synth-secondary/10 text-synth-secondary shadow-glow-primary-sm"
+                  : "border-synth-border bg-synth-surface/60 text-gray-300 hover:border-synth-secondary hover:text-synth-secondary"
+              }`}
+            >
+              <UploadCloud
+                className={`w-4 h-4 ${isPublishPage ? "fill-synth-secondary/20" : ""}`}
+              />
+              <span className="hidden xl:inline">Submit Game</span>
+            </Link>
 
             {/* LOCAL VAULT LINK */}
             <Link

@@ -16,17 +16,36 @@ const submissionBodySchema = z.object({
   romUrl: z.string().url(),
 });
 
+const SUBMISSION_RATE_LIMIT = 3;
+const SUBMISSION_RATE_WINDOW_MS = 60 * 60 * 1000;
+
 function normalizeOptionalUrl(value: string | null | undefined) {
   return value || null;
 }
 
-function isSubmissionStorageUrl(url: string) {
-  if (!env.SUPABASE_URL) return true;
+function getSubmissionObjectPath(url: string) {
+  const storagePathPrefix = "/storage/v1/object/public/submissions/";
+  if (!env.SUPABASE_URL) {
+    const parsedUrl = new URL(url);
+    if (!parsedUrl.pathname.startsWith(storagePathPrefix)) return null;
+
+    return decodeURIComponent(
+      parsedUrl.pathname.slice(storagePathPrefix.length),
+    );
+  }
 
   const normalizedSupabaseUrl = env.SUPABASE_URL.replace(/\/+$/, "");
-  return url.startsWith(
-    `${normalizedSupabaseUrl}/storage/v1/object/public/submissions/`,
-  );
+  const prefix = `${normalizedSupabaseUrl}/storage/v1/object/public/submissions/`;
+  if (!url.startsWith(prefix)) return null;
+
+  return decodeURIComponent(url.slice(prefix.length));
+}
+
+function isSubmissionStorageUrl(url: string, userId: string) {
+  const objectPath = getSubmissionObjectPath(url);
+  if (!objectPath) return false;
+
+  return objectPath.startsWith(`${userId}/`);
 }
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
@@ -104,9 +123,29 @@ export async function registerSubmissionRoutes(
         return reply.status(400).send({ error: "ROM URL must point to a .nes file" });
       }
 
-      if (!urls.every(isSubmissionStorageUrl)) {
+      if (!urls.every((url) => isSubmissionStorageUrl(url, user.id))) {
         return reply.status(400).send({
-          error: "Submission files must be uploaded to the submissions bucket",
+          error: "Submission files must be uploaded to your submissions folder",
+        });
+      }
+
+      const rateWindowStart = new Date(
+        Date.now() - SUBMISSION_RATE_WINDOW_MS,
+      ).toISOString();
+      const { count, error: rateError } = await service
+        .from("game_submissions")
+        .select("id", { count: "exact" })
+        .eq("submitter_id", user.id)
+        .gte("created_at", rateWindowStart);
+
+      if (rateError) {
+        request.log.error({ err: rateError }, "Failed to check submission rate");
+        return reply.status(500).send({ error: "Failed to create submission" });
+      }
+
+      if ((count || 0) >= SUBMISSION_RATE_LIMIT) {
+        return reply.status(429).send({
+          error: "Submission limit reached. Please try again later.",
         });
       }
 

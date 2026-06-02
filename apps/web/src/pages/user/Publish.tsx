@@ -53,9 +53,13 @@ export default function Publish() {
     }
   };
 
-  const uploadToSupabase = async (file: File, folder: string) => {
-    const fileExt = file.name.split(".").pop();
-    const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+  const uploadToSupabase = async (
+    file: File,
+    folder: string,
+    userId: string,
+  ) => {
+    const fileExt = file.name.split(".").pop()?.toLowerCase() || "bin";
+    const fileName = `${userId}/${folder}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
 
     const { error } = await supabase.storage
       .from("submissions")
@@ -88,13 +92,25 @@ export default function Publish() {
       }
 
       // 1. Upload ROM
-      const romUrl = await uploadToSupabase(romFile, "roms");
+      const romUrl = await uploadToSupabase(
+        romFile,
+        "roms",
+        session.user.id,
+      );
 
       // 2. Upload Optional Images
       let coverUrl = null;
       let bannerUrl = null;
-      if (coverFile) coverUrl = await uploadToSupabase(coverFile, "covers");
-      if (bannerFile) bannerUrl = await uploadToSupabase(bannerFile, "banners");
+      if (coverFile) {
+        coverUrl = await uploadToSupabase(coverFile, "covers", session.user.id);
+      }
+      if (bannerFile) {
+        bannerUrl = await uploadToSupabase(
+          bannerFile,
+          "banners",
+          session.user.id,
+        );
+      }
 
       // 3. Save submission metadata through the backend
       await api.submitGame({

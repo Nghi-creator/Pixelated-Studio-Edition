@@ -40,7 +40,7 @@ type RecordRow = Record<string, unknown>;
 
 type Filter = {
   field: string;
-  op: "eq";
+  op: "eq" | "gte";
   value: unknown;
 };
 
@@ -120,6 +120,11 @@ class FakeQueryBuilder {
 
   eq(field: string, value: unknown) {
     this.filters.push({ field, op: "eq", value });
+    return this;
+  }
+
+  gte(field: string, value: unknown) {
+    this.filters.push({ field, op: "gte", value });
     return this;
   }
 
@@ -260,7 +265,13 @@ class FakeQueryBuilder {
 
   private filteredRows() {
     return this.db.rows[this.table].filter((row) =>
-      this.filters.every((filter) => row[filter.field] === filter.value),
+      this.filters.every((filter) => {
+        if (filter.op === "gte") {
+          return String(row[filter.field]) >= String(filter.value);
+        }
+
+        return row[filter.field] === filter.value;
+      }),
     );
   }
 }
@@ -645,12 +656,12 @@ test("submissions persist metadata for the authenticated submitter", async () =>
     method: "POST",
     payload: {
       authorName: "Pixel Dev",
-      bannerUrl: `${storageBase}/storage/v1/object/public/submissions/banner.png`,
-      coverUrl: `${storageBase}/storage/v1/object/public/submissions/cover.png`,
+      bannerUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/banners/banner.png`,
+      coverUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/covers/cover.png`,
       description: "A small NES game",
       email: "dev@example.com",
       gameTitle: "Tiny Quest",
-      romUrl: `${storageBase}/storage/v1/object/public/submissions/tiny.nes`,
+      romUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.nes`,
     },
     url: "/submissions/games",
   });
@@ -659,6 +670,59 @@ test("submissions persist metadata for the authenticated submitter", async () =>
   assert.equal(db.rows.game_submissions.length, 1);
   assert.equal(db.rows.game_submissions[0]?.submitter_id, USER_ID);
   assert.equal(db.rows.game_submissions[0]?.game_title, "Tiny Quest");
+  await app.close();
+});
+
+test("submissions reject files outside the authenticated user's folder", async () => {
+  const db = new FakeSupabase();
+  const app = await createDataBoundaryApp(db, USER_ID);
+  const storageBase =
+    process.env.SUPABASE_URL?.replace(/\/+$/, "") || "https://example.com";
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      authorName: "Pixel Dev",
+      description: null,
+      email: "dev@example.com",
+      gameTitle: "Tiny Quest",
+      romUrl: `${storageBase}/storage/v1/object/public/submissions/${OTHER_USER_ID}/roms/tiny.nes`,
+    },
+    url: "/submissions/games",
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(db.rows.game_submissions.length, 0);
+  await app.close();
+});
+
+test("submissions are rate limited per authenticated user", async () => {
+  const db = new FakeSupabase();
+  const recentTime = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+  db.rows.game_submissions.push(
+    { created_at: recentTime, submitter_id: USER_ID },
+    { created_at: recentTime, submitter_id: USER_ID },
+    { created_at: recentTime, submitter_id: USER_ID },
+    { created_at: recentTime, submitter_id: OTHER_USER_ID },
+  );
+  const app = await createDataBoundaryApp(db, USER_ID);
+  const storageBase =
+    process.env.SUPABASE_URL?.replace(/\/+$/, "") || "https://example.com";
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      authorName: "Pixel Dev",
+      description: null,
+      email: "dev@example.com",
+      gameTitle: "Tiny Quest",
+      romUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.nes`,
+    },
+    url: "/submissions/games",
+  });
+
+  assert.equal(response.statusCode, 429);
+  assert.equal(db.rows.game_submissions.length, 4);
   await app.close();
 });
 
