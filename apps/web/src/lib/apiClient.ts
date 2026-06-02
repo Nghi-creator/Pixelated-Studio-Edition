@@ -168,6 +168,14 @@ export type ApiAdminReportActionResponse = {
   targetUserId?: string;
 };
 
+export type ApiPaginatedAccessLogsResponse<TLog> = {
+  logs: TLog[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 export type ApiGameSubmissionPayload = {
   authorName: string;
   bannerUrl: string | null;
@@ -199,7 +207,10 @@ export type ApiProfile = {
 };
 
 export const api = {
-  accessLogs: <TLog>() => apiRequest<{ logs: TLog[] }>("/admin/access-logs"),
+  accessLogs: <TLog>(page = 1, pageSize = 25) =>
+    apiRequest<ApiPaginatedAccessLogsResponse<TLog>>(
+      `/admin/access-logs?page=${page}&pageSize=${pageSize}`,
+    ),
   adminReports: <TReport>() =>
     apiRequest<{ reports: TReport[] }>("/admin/reports"),
   adminReportAction: (reportId: string, action: ApiAdminReportAction) =>
