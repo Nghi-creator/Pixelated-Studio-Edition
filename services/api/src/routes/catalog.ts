@@ -6,6 +6,11 @@ import {
 } from "../modules/auth/supabaseAuth.js";
 
 const gameParamsSchema = z.object({ gameId: z.string().min(1).max(200) });
+const gamesQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(15),
+  search: z.string().trim().max(120).optional(),
+});
 const commentParamsSchema = z.object({ commentId: z.string().uuid() });
 const commentsQuerySchema = z.object({
   page: z.coerce.number().int().min(0).default(0),
@@ -59,17 +64,50 @@ export async function registerCatalogRoutes(
       });
     }
 
-    const { data, error } = await service
+    const query = gamesQuerySchema.safeParse(request.query);
+    if (!query.success) {
+      return reply.status(400).send({ error: "Invalid games query" });
+    }
+
+    const { page, pageSize, search } = query.data;
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize - 1;
+
+    let gamesQuery = service
       .from("games")
-      .select("*")
+      .select("*", { count: "exact" })
       .order("title");
+
+    if (search) {
+      gamesQuery = gamesQuery.ilike("title", `%${search}%`);
+    }
+
+    const { data, count, error } = await gamesQuery.range(start, end);
 
     if (error) {
       request.log.error({ err: error }, "Failed to load games");
       return reply.status(500).send({ error: "Failed to load games" });
     }
 
-    return { games: data || [] };
+    const { data: featuredData, error: featuredError } = await service
+      .from("games")
+      .select("id,title,cover_url,backdrop_url,play_count")
+      .order("play_count", { ascending: false })
+      .limit(3);
+
+    if (featuredError) {
+      request.log.warn({ err: featuredError }, "Failed to load featured games");
+    }
+
+    const total = count || 0;
+    return {
+      featuredGames: featuredError ? [] : featuredData || [],
+      games: data || [],
+      page,
+      pageSize,
+      total,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    };
   });
 
   app.get("/games/:gameId", async (request, reply) => {

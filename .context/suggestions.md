@@ -19,6 +19,83 @@ Recommended direction:
 
 ## Done
 
+### Admin Moderation Queue Pagination At API Boundary
+
+Completed: 2026-06-03
+
+Implemented in:
+
+- `services/api/src/routes/moderation.ts`
+- `services/api/tests/dataBoundary.test.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/admin/Dashboard.tsx`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `GET /admin/reports` now accepts `page` and `pageSize`.
+- The API applies Supabase range/count pagination after verifying the actor is an admin or super admin.
+- The API response includes `reports`, `page`, `pageSize`, `total`, and `totalPages`.
+- The admin moderation dashboard now requests one queue page at a time, shows backend pending totals, and provides Previous/Next controls.
+- The existing target filter remains a current-page UI filter; pushing that filter fully into nested backend queries is left for a later moderation-specific pass if needed.
+
+Validation:
+
+- Added API test coverage for server-side moderation queue pagination.
+
+### Admin User Management Pagination At API Boundary
+
+Completed: 2026-06-03
+
+Implemented in:
+
+- `services/api/src/routes/adminUsers.ts`
+- `services/api/tests/dataBoundary.test.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/admin/UserManagement.tsx`
+- `.context/current-infrastructure.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `GET /admin/users` now accepts `page`, `pageSize`, and optional `search`.
+- The API applies Supabase range/count pagination and username search server-side after verifying the actor is a super admin.
+- The API response includes `users`, `page`, `pageSize`, `total`, and `totalPages`.
+- The admin User Management screen now requests one page at a time, shows total users from backend metadata, and provides username search with debounced fetching.
+- Non-super-admin viewers are no longer sent through the users list fetch before seeing Access Denied.
+
+Validation:
+
+- Added API test coverage for server-side admin user pagination/search.
+
+### Homepage Catalog Pagination At API Boundary
+
+Completed: 2026-06-02
+
+Implemented in:
+
+- `services/api/src/routes/catalog.ts`
+- `services/api/tests/dataBoundary.test.ts`
+- `apps/web/src/lib/apiClient.ts`
+- `apps/web/src/pages/user/Landing.tsx`
+- `.context/current-infrastructure.md`
+- `.context/project-flows.md`
+- `.context/suggestions.md`
+
+What changed:
+
+- `GET /games` now accepts `page`, `pageSize`, and optional `search`.
+- The API applies Supabase range/count pagination and title search server-side.
+- The API response includes `page`, `pageSize`, `total`, `totalPages`, and `featuredGames`.
+- The homepage requests one catalog page at a time instead of fetching the full catalog and slicing in React.
+- The hero continues to use a small top-play-count featured list from the full catalog, so it is not tied to the currently displayed page.
+
+Validation:
+
+- Added API test coverage for paginated/search catalog results and featured games.
+
 ### Engine Runtime TypeScript Phase 0B
 
 Completed: 2026-05-31

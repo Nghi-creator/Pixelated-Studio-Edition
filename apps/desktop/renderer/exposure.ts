@@ -6,6 +6,8 @@
     error?: string;
     inviteCode?: string;
     inviteExpiresAt?: string;
+    inviteRevoked?: boolean;
+    inviteStatus?: string;
     urls?: string[];
   };
 
@@ -13,9 +15,11 @@
     exposureCopy: HTMLElement;
     exposureLabel: HTMLElement;
     companionCopy: HTMLElement;
+    companionInviteActions: HTMLElement;
     companionInvite: HTMLElement;
     companionInviteCode: HTMLElement;
     companionInviteExpiry: HTMLElement;
+    companionInviteStatus: HTMLElement;
     companionPanel: HTMLElement;
     companionUrls: HTMLElement;
     lanToggle: HTMLInputElement;
@@ -28,9 +32,11 @@
     exposureCopy,
     exposureLabel,
     companionCopy,
+    companionInviteActions,
     companionInvite,
     companionInviteCode,
     companionInviteExpiry,
+    companionInviteStatus,
     companionPanel,
     companionUrls,
     lanToggle,
@@ -78,13 +84,24 @@
             minute: "2-digit",
           })}`
         : "";
-      companionInvite.classList.toggle("hidden", !payload.inviteCode);
+      companionInviteStatus.innerText =
+        payload.inviteStatus ||
+        (payload.inviteRevoked
+          ? "Invite code revoked. Regenerate a code before inviting more guests."
+          : "Invite code active.");
+      companionInvite.classList.toggle(
+        "hidden",
+        !payload.inviteCode && !payload.inviteRevoked,
+      );
+      companionInviteActions.classList.toggle("hidden", !payload.enabled);
     }
 
     function resetInviteCode() {
       companionInviteCode.innerText = "";
       companionInviteExpiry.innerText = "";
+      companionInviteStatus.innerText = "";
       companionInvite.classList.add("hidden");
+      companionInviteActions.classList.add("hidden");
     }
 
     function setCompanionStatus(payload: CompanionStatus = {}) {

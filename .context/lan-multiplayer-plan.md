@@ -43,6 +43,7 @@ Expected first version:
 - Loopback-only stays the default for normal single-player local use.
 - Enabling or disabling LAN mode rotates the desktop pairing token.
 - The UI explains that LAN guests should receive the HTTPS join page and invite code, not the raw host-local pairing token.
+- The host can regenerate or revoke invite codes from the desktop LAN panel without restarting the engine.
 - CORS stays explicit: hosted Vercel, local dev origins, and no wildcard origin.
 - The backend may store engine URL metadata, but never stores the desktop pairing token.
 - Tokens and invite links should be short-lived where possible.
@@ -78,11 +79,12 @@ Current LAN pairing uses the desktop HTTPS companion invite flow:
 4. The companion-served React app redeems the invite code with `POST /invite/redeem`.
 5. React stores the returned `companion:` credential in browser local storage.
 6. The companion maps that credential to the host-local engine token while proxying REST and Socket.IO handshakes to `127.0.0.1:8080`.
+7. Host can press Regenerate to replace the active invite code and clear unconnected companion credentials.
+8. Host can press Revoke to remove the active code while leaving the engine and HTTPS join page running; guests need a regenerated code before new redemption can succeed.
 
 Next hardening layer:
 
-- Let host revoke active invites.
-- Add code regeneration without restarting LAN mode.
+- Add explicit guest-kick/disconnect controls for already-upgraded live connections.
 - Consider a local CA or tunnel strategy to reduce self-signed certificate friction.
 
 ### Multiplayer Session Model

@@ -26,6 +26,9 @@ Use this checklist for the real two-device LAN validation. The local two-browser
 6. Confirm host stream reaches `LIVE STREAM ACTIVE`.
 7. Toggle stream telemetry on.
 8. Copy the host telemetry JSON after the guest joins.
+9. Press Regenerate in the desktop LAN panel and confirm the code/status updates without stopping the engine.
+10. Press Revoke and confirm the status says the invite is revoked while the engine remains active.
+11. Press Regenerate again before any additional guest join attempt.
 
 ## Guest Steps
 
@@ -43,6 +46,8 @@ Use this checklist for the real two-device LAN validation. The local two-browser
 
 - Guest can load the companion page over HTTPS.
 - Guest can redeem the invite code without seeing the raw host pairing token.
+- Host can regenerate and revoke invite codes without restarting the engine.
+- A revoked invite code cannot be redeemed; a regenerated code can be redeemed.
 - Host stream stays active when guest joins.
 - Guest receives video/audio from the same running session.
 - Closing the guest tab does not stop the host stream.
@@ -89,7 +94,7 @@ Close the guest tab when the harness prints that join was validated. The harness
 ## Failure Notes
 
 - Certificate page is too scary/confusing: consider local CA packaging or a tunnel strategy.
-- Companion loads but invite redemption fails: check the invite code expiry, LAN mode, and whether the companion can proxy `/health`.
+- Companion loads but invite redemption fails: check whether the invite code expired or was revoked, confirm LAN mode, and verify the companion can proxy `/health`.
 - Pairing says the HTTPS join page cannot be reached: open the companion URL directly and accept the local certificate warning, then retry pairing.
 - Pairing says the join page cannot reach the local engine: keep the desktop app open, initialize the engine, and retry after `/health` is ready.
 - Hosted Vercel direct-to-LAN HTTP fails: expected in Chrome; use the HTTPS companion instead.

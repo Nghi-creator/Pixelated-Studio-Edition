@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
-import { Users } from "lucide-react";
+import { Search, Users } from "lucide-react";
 import { api } from "../../lib/apiClient";
+
+const USERS_PER_PAGE = 25;
 
 interface Profile {
   id: string;
@@ -17,24 +19,72 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string>("");
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
+  const [page, setPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
+    let isMounted = true;
+
+    const fetchCurrentUser = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (session?.user && isMounted) {
         setCurrentUserId(session.user.id);
         const data = await api.permissions();
-        setCurrentUserRole(data.profile.role);
+        if (isMounted) {
+          setCurrentUserRole(data.profile.role);
+          if (data.profile.role !== "super_admin") setLoading(false);
+        }
+      } else if (isMounted) {
+        setLoading(false);
       }
-    });
-
-    const fetchUsers = async () => {
-      const data = await api.users();
-      setUsers(data.users);
-      setLoading(false);
     };
 
-    fetchUsers();
+    fetchCurrentUser();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
+
+  const fetchUsers = useCallback(
+    async (isMounted = true) => {
+      if (currentUserRole !== "super_admin") return;
+
+      setLoading(true);
+      const data = await api.users<Profile>({
+        page,
+        pageSize: USERS_PER_PAGE,
+        search: searchQuery,
+      });
+      if (!isMounted) return;
+
+      setUsers(data.users);
+      setTotalUsers(data.total);
+      setTotalPages(data.totalPages);
+      if (page > data.totalPages) {
+        setPage(data.totalPages);
+      }
+      setLoading(false);
+    },
+    [currentUserRole, page, searchQuery],
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+    const timeout = window.setTimeout(() => {
+      fetchUsers(isMounted);
+    }, searchQuery ? 250 : 0);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeout);
+    };
+  }, [fetchUsers, searchQuery]);
 
   // --- TOGGLE ROLE ---
   const handleToggleRole = async (userId: string, currentRole: string) => {
@@ -95,16 +145,38 @@ export default function UserManagement() {
     );
   }
 
+  const pageStart = totalUsers === 0 ? 0 : (page - 1) * USERS_PER_PAGE + 1;
+  const pageEnd = Math.min(pageStart + users.length - 1, totalUsers);
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
           <Users className="text-synth-primary w-8 h-8 drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
           User Management
         </h1>
-        <span className="bg-synth-secondary/15 text-synth-secondary border border-synth-secondary/30 px-4 py-2 rounded-full font-semibold">
-          {users.length} Total Users
-        </span>
+
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:w-72">
+            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+              <Search className="h-4 w-4 text-gray-500" />
+            </div>
+            <input
+              type="text"
+              placeholder="Search username..."
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                setPage(1);
+              }}
+              className="block w-full rounded-lg border border-synth-border bg-synth-surface py-2 pl-10 pr-3 text-sm text-gray-300 placeholder-gray-500 shadow-inner transition-colors focus:border-synth-primary focus:outline-none focus:ring-1 focus:ring-synth-primary"
+            />
+          </div>
+
+          <span className="bg-synth-secondary/15 text-synth-secondary border border-synth-secondary/30 px-4 py-2 rounded-full font-semibold whitespace-nowrap">
+            {totalUsers} Total Users
+          </span>
+        </div>
       </div>
 
       <div className="bg-synth-surface border border-synth-border rounded-xl overflow-hidden shadow-glow-card">
@@ -119,7 +191,17 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-synth-border/80">
-              {users.map((user) => {
+              {users.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="p-10 text-center text-sm text-gray-500"
+                  >
+                    No users found.
+                  </td>
+                </tr>
+              ) : (
+                users.map((user) => {
                 const isSelf = user.id === currentUserId;
                 const isTargetSuperAdmin = user.role === "super_admin";
 
@@ -224,9 +306,39 @@ export default function UserManagement() {
                     </td>
                   </tr>
                 );
-              })}
+                })
+              )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-gray-500">
+          Showing {pageStart}-{pageEnd} of {totalUsers}
+        </p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
+            disabled={page === 1 || loading}
+            className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Previous
+          </button>
+          <span className="rounded-lg border border-synth-border bg-synth-bg px-4 py-2 text-sm font-semibold text-gray-300">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() =>
+              setPage((currentPage) => Math.min(totalPages, currentPage + 1))
+            }
+            disabled={page >= totalPages || loading}
+            className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next
+          </button>
         </div>
       </div>
     </div>

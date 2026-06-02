@@ -41,7 +41,36 @@ type CompanionAccessToken = {
   expiresAt: number;
 };
 
+type CompanionInviteState = {
+  code: string | null;
+  expiresAt: number | null;
+  revokedAt: number | null;
+};
+
 const companionAccessTokens = new Map<string, CompanionAccessToken>();
+let companionInviteState: CompanionInviteState = {
+  code: null,
+  expiresAt: null,
+  revokedAt: null,
+};
+
+export function updateCompanionInvite(inviteCode: string, inviteExpiresAt: number) {
+  companionInviteState = {
+    code: normalizeInviteCode(inviteCode),
+    expiresAt: inviteExpiresAt,
+    revokedAt: null,
+  };
+  companionAccessTokens.clear();
+}
+
+export function revokeCompanionInvite() {
+  companionInviteState = {
+    code: null,
+    expiresAt: null,
+    revokedAt: Date.now(),
+  };
+  companionAccessTokens.clear();
+}
 
 function createCertificate(
   certDir: string,
@@ -174,19 +203,17 @@ function getProxiedHeaders(
 async function handleInviteRequest(
   req: IncomingMessage,
   res: ServerResponse,
-  {
-    engineToken,
-    inviteCode,
-    inviteExpiresAt,
-  }: Pick<
-    CompanionServerOptions,
-    "engineToken" | "inviteCode" | "inviteExpiresAt"
-  >,
 ) {
   if (req.method === "GET" && req.url?.startsWith(INVITE_PATH)) {
     sendJson(res, 200, {
-      codeLength: inviteCode.length,
-      expiresAt: new Date(inviteExpiresAt).toISOString(),
+      codeLength: companionInviteState.code?.length || 8,
+      expiresAt: companionInviteState.expiresAt
+        ? new Date(companionInviteState.expiresAt).toISOString()
+        : null,
+      revoked: !companionInviteState.code,
+      revokedAt: companionInviteState.revokedAt
+        ? new Date(companionInviteState.revokedAt).toISOString()
+        : null,
     });
     return true;
   }
@@ -195,7 +222,12 @@ async function handleInviteRequest(
     return false;
   }
 
-  if (Date.now() >= inviteExpiresAt) {
+  if (!companionInviteState.code || !companionInviteState.expiresAt) {
+    sendJson(res, 410, { error: "Invite code revoked" });
+    return true;
+  }
+
+  if (Date.now() >= companionInviteState.expiresAt) {
     sendJson(res, 410, { error: "Invite code expired" });
     return true;
   }
@@ -208,15 +240,15 @@ async function handleInviteRequest(
         : undefined,
     );
 
-    if (submittedCode !== inviteCode) {
+    if (submittedCode !== companionInviteState.code) {
       sendJson(res, 401, { error: "Invalid invite code" });
       return true;
     }
 
     sendJson(res, 200, {
-      companionToken: createCompanionAccessToken(inviteExpiresAt),
+      companionToken: createCompanionAccessToken(companionInviteState.expiresAt),
       engineUrl: "",
-      expiresAt: new Date(inviteExpiresAt).toISOString(),
+      expiresAt: new Date(companionInviteState.expiresAt).toISOString(),
       tokenStoredBy: "browser-local-storage",
     });
   } catch (err) {
@@ -365,7 +397,7 @@ export function startCompanionServer({
   webDistDir,
 }: CompanionServerOptions) {
   stopCompanionServer();
-  companionAccessTokens.clear();
+  updateCompanionInvite(inviteCode, inviteExpiresAt);
 
   const { certPath, keyPath } = createCertificate(certDir, lanAddresses);
   const server = https.createServer(
@@ -374,13 +406,7 @@ export function startCompanionServer({
       key: fs.readFileSync(keyPath),
     },
     async (req, res) => {
-      if (
-        await handleInviteRequest(req, res, {
-          engineToken,
-          inviteCode,
-          inviteExpiresAt,
-        })
-      ) {
+      if (await handleInviteRequest(req, res)) {
         return;
       }
 
@@ -421,5 +447,5 @@ export function stopCompanionServer() {
 
   companionServer.close();
   companionServer = null;
-  companionAccessTokens.clear();
+  revokeCompanionInvite();
 }

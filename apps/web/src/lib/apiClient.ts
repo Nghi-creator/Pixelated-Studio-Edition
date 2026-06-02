@@ -182,6 +182,31 @@ export type ApiPaginatedAccessLogsResponse<TLog> = {
   totalPages: number;
 };
 
+export type ApiPaginatedGamesResponse = {
+  featuredGames: ApiGame[];
+  games: ApiGame[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export type ApiPaginatedUsersResponse<TUser> = {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+  users: TUser[];
+};
+
+export type ApiPaginatedReportsResponse<TReport> = {
+  page: number;
+  pageSize: number;
+  reports: TReport[];
+  total: number;
+  totalPages: number;
+};
+
 export type ApiGameSubmissionPayload = {
   authorName: string;
   bannerUrl: string | null;
@@ -223,8 +248,10 @@ export const api = {
     apiRequest<ApiPaginatedAccessLogsResponse<TLog>>(
       `/admin/access-logs?page=${page}&pageSize=${pageSize}`,
     ),
-  adminReports: <TReport>() =>
-    apiRequest<{ reports: TReport[] }>("/admin/reports"),
+  adminReports: <TReport>(page = 1, pageSize = 25) =>
+    apiRequest<ApiPaginatedReportsResponse<TReport>>(
+      `/admin/reports?page=${page}&pageSize=${pageSize}`,
+    ),
   adminReportAction: (reportId: string, action: ApiAdminReportAction) =>
     apiRequest<ApiAdminReportActionResponse>(
       `/admin/reports/${reportId}/action`,
@@ -260,7 +287,25 @@ export const api = {
     }),
   favoriteStatus: (gameId: string) =>
     apiRequest<{ favorited: boolean }>(`/favorites/${gameId}`),
-  games: () => apiRequest<{ games: ApiGame[] }>("/games", { authenticated: false }),
+  games: ({
+    page = 1,
+    pageSize = 15,
+    search = "",
+  }: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+  } = {}) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    if (search.trim()) params.set("search", search.trim());
+
+    return apiRequest<ApiPaginatedGamesResponse>(`/games?${params}`, {
+      authenticated: false,
+    });
+  },
   game: (gameId: string) =>
     apiRequest<{ game: ApiGame }>(`/games/${gameId}`, { authenticated: false }),
   gameComments: <TComment>(gameId: string, page: number) =>
@@ -360,5 +405,23 @@ export const api = {
       body: JSON.stringify(payload),
       method: "PATCH",
     }),
-  users: () => apiRequest<{ users: Required<ApiProfile>[] }>("/admin/users"),
+  users: <TUser = Required<ApiProfile>>({
+    page = 1,
+    pageSize = 25,
+    search = "",
+  }: {
+    page?: number;
+    pageSize?: number;
+    search?: string;
+  } = {}) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+    });
+    if (search.trim()) params.set("search", search.trim());
+
+    return apiRequest<ApiPaginatedUsersResponse<TUser>>(
+      `/admin/users?${params}`,
+    );
+  },
 };

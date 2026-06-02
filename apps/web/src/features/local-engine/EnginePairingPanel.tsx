@@ -132,7 +132,7 @@ const getStoredCompanionAccessToken = (token: string) =>
 const getInviteFailureMessage = (status: number) => {
   if (status === 401) return "That invite code was not accepted by the host.";
   if (status === 410) {
-    return "That invite code expired. Ask the host for a fresh code.";
+    return "That invite code expired or was revoked. Ask the host for a fresh code.";
   }
   if (status >= 500) {
     return "The host join page is reachable, but invite redemption failed. Ask the host to restart LAN mode.";

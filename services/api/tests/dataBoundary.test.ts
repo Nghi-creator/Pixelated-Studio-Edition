@@ -40,7 +40,7 @@ type RecordRow = Record<string, unknown>;
 
 type Filter = {
   field: string;
-  op: "eq" | "gte";
+  op: "eq" | "gte" | "ilike";
   value: unknown;
 };
 
@@ -125,6 +125,11 @@ class FakeQueryBuilder {
 
   gte(field: string, value: unknown) {
     this.filters.push({ field, op: "gte", value });
+    return this;
+  }
+
+  ilike(field: string, value: string) {
+    this.filters.push({ field, op: "ilike", value });
     return this;
   }
 
@@ -246,8 +251,19 @@ class FakeQueryBuilder {
     let rows = this.filteredRows();
     if (this.orderConfig) {
       rows = [...rows].sort((left, right) => {
-        const leftValue = String(left[this.orderConfig?.field || ""]);
-        const rightValue = String(right[this.orderConfig?.field || ""]);
+        const leftRawValue = left[this.orderConfig?.field || ""];
+        const rightRawValue = right[this.orderConfig?.field || ""];
+        if (
+          typeof leftRawValue === "number" &&
+          typeof rightRawValue === "number"
+        ) {
+          return this.orderConfig?.ascending
+            ? leftRawValue - rightRawValue
+            : rightRawValue - leftRawValue;
+        }
+
+        const leftValue = String(leftRawValue || "");
+        const rightValue = String(rightRawValue || "");
         return this.orderConfig?.ascending
           ? leftValue.localeCompare(rightValue)
           : rightValue.localeCompare(leftValue);
@@ -268,6 +284,14 @@ class FakeQueryBuilder {
       this.filters.every((filter) => {
         if (filter.op === "gte") {
           return String(row[filter.field]) >= String(filter.value);
+        }
+        if (filter.op === "ilike") {
+          const pattern = String(filter.value)
+            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            .replaceAll("%", ".*");
+          return new RegExp(`^${pattern}$`, "i").test(
+            String(row[filter.field] || ""),
+          );
         }
 
         return row[filter.field] === filter.value;
@@ -362,6 +386,45 @@ test("catalog and favorites are served through backend routes", async () => {
   });
   assert.equal(deleteResponse.statusCode, 204);
   assert.equal(db.rows.favorites.length, 0);
+  await app.close();
+});
+
+test("catalog route paginates, searches, and returns featured games", async () => {
+  const db = new FakeSupabase();
+  db.rows.games.push(
+    { cover_url: "/a.png", id: "game-a", play_count: 2, title: "Alpha Quest" },
+    { cover_url: "/b.png", id: "game-b", play_count: 20, title: "Beta Quest" },
+    { cover_url: "/c.png", id: "game-c", play_count: 5, title: "Gamma Run" },
+    { cover_url: "/d.png", id: "game-d", play_count: 7, title: "Quest Drift" },
+  );
+  const app = await createDataBoundaryApp(db);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/games?page=2&pageSize=2&search=quest",
+  });
+
+  assert.equal(response.statusCode, 200);
+  const body = response.json<{
+    featuredGames: { id: string }[];
+    games: { id: string }[];
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+  }>();
+  assert.deepEqual(
+    body.games.map((game) => game.id),
+    ["game-d"],
+  );
+  assert.deepEqual(
+    body.featuredGames.map((game) => game.id),
+    ["game-b", "game-d", "game-c"],
+  );
+  assert.equal(body.page, 2);
+  assert.equal(body.pageSize, 2);
+  assert.equal(body.total, 3);
+  assert.equal(body.totalPages, 2);
   await app.close();
 });
 
@@ -577,6 +640,45 @@ test("admin access logs are paginated server-side", async () => {
   await app.close();
 });
 
+test("admin users are paginated and searchable server-side", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  for (let index = 1; index <= 30; index += 1) {
+    db.rows.profiles.push({
+      created_at: `2026-05-${String(index).padStart(2, "0")}T00:00:00.000Z`,
+      id: `55555555-5555-4555-8555-${String(index).padStart(12, "0")}`,
+      is_banned: false,
+      role: "user",
+      username: index % 2 === 0 ? `player-${index}` : `viewer-${index}`,
+    });
+  }
+  const app = await createDataBoundaryApp(db, SUPER_ADMIN_ID);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/admin/users?page=2&pageSize=5&search=player-",
+  });
+
+  assert.equal(response.statusCode, 200);
+  const body = response.json<{
+    page: number;
+    pageSize: number;
+    total: number;
+    totalPages: number;
+    users: { username: string }[];
+  }>();
+  assert.equal(body.users.length, 5);
+  assert.deepEqual(
+    body.users.map((user) => user.username),
+    ["player-20", "player-18", "player-16", "player-14", "player-12"],
+  );
+  assert.equal(body.page, 2);
+  assert.equal(body.pageSize, 5);
+  assert.equal(body.total, 15);
+  assert.equal(body.totalPages, 3);
+  await app.close();
+});
+
 test("me permissions are loaded from backend-owned profile state", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
@@ -644,6 +746,48 @@ test("moderation reports are created and resolved through admin routes", async (
   assert.equal(actionResponse.statusCode, 200);
   assert.equal(db.rows.comments.length, 0);
   await adminApp.close();
+});
+
+test("admin reports are paginated server-side", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  for (let index = 1; index <= 12; index += 1) {
+    db.rows.reported_comments.push({
+      comments: {
+        content: `reported comment ${index}`,
+        id: `comment-${index}`,
+        profiles: { id: USER_ID, role: "user", username: "player" },
+      },
+      created_at: `2026-05-${String(index).padStart(2, "0")}T00:00:00.000Z`,
+      id: `report-${index}`,
+      profiles: { id: OTHER_USER_ID, username: "other" },
+      reason: `reason ${index}`,
+    });
+  }
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/admin/reports?page=2&pageSize=5",
+  });
+
+  assert.equal(response.statusCode, 200);
+  const body = response.json<{
+    page: number;
+    pageSize: number;
+    reports: { id: string }[];
+    total: number;
+    totalPages: number;
+  }>();
+  assert.deepEqual(
+    body.reports.map((report) => report.id),
+    ["report-7", "report-6", "report-5", "report-4", "report-3"],
+  );
+  assert.equal(body.page, 2);
+  assert.equal(body.pageSize, 5);
+  assert.equal(body.total, 12);
+  assert.equal(body.totalPages, 3);
+  await app.close();
 });
 
 test("submissions persist metadata for the authenticated submitter", async () => {

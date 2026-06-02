@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Search } from "lucide-react";
 import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
@@ -22,52 +22,48 @@ export default function Landing() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalGames, setTotalGames] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
 
-  useEffect(() => {
-    fetchGames();
-  }, []);
-
-  const fetchGames = async () => {
+  const fetchGames = useCallback(async (isMounted = true) => {
     try {
       setLoadError("");
-      const data = await api.games();
-      if (data.games) {
+      setLoading(true);
+      const data = await api.games({
+        page: currentPage,
+        pageSize: GAMES_PER_PAGE,
+        search: searchQuery,
+      });
+      if (isMounted) {
         setGames(data.games);
-
-        const sortedByTrending = [...data.games].sort((a, b) => {
-          const countB = b.play_count || 0;
-          const countA = a.play_count || 0;
-
-          if (countB === countA) {
-            return Math.random() - 0.5;
-          }
-          return countB - countA;
-        });
-
-        setFeaturedGames(sortedByTrending.slice(0, 3));
+        setFeaturedGames(data.featuredGames);
+        setTotalGames(data.total);
+        setTotalPages(data.totalPages);
       }
     } catch (error) {
       console.error("Error fetching games:", error);
-      setLoadError("Could not load the game library. Check the API connection.");
+      if (isMounted) {
+        setLoadError("Could not load the game library. Check the API connection.");
+      }
     } finally {
-      setLoading(false);
+      if (isMounted) setLoading(false);
     }
-  };
-
-  const filteredGames = games.filter((game) =>
-    game.title.toLowerCase().includes(searchQuery.toLowerCase()),
-  );
-  const totalPages = Math.max(1, Math.ceil(filteredGames.length / GAMES_PER_PAGE));
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const pageStart = (safeCurrentPage - 1) * GAMES_PER_PAGE;
-  const paginatedGames = filteredGames.slice(
-    pageStart,
-    pageStart + GAMES_PER_PAGE,
-  );
+  }, [currentPage, searchQuery]);
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery]);
+    let isMounted = true;
+    const timeout = window.setTimeout(() => {
+      fetchGames(isMounted);
+    }, searchQuery ? 250 : 0);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(timeout);
+    };
+  }, [fetchGames, searchQuery]);
+
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStart = (safeCurrentPage - 1) * GAMES_PER_PAGE;
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -92,7 +88,7 @@ export default function Landing() {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  if (loading) {
+  if (loading && games.length === 0) {
     return (
       <div className="flex items-center justify-center h-[80vh]">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-synth-primary shadow-glow-primary-sm"></div>
@@ -122,7 +118,10 @@ export default function Landing() {
               type="text"
               placeholder="Search games..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               className="block w-full pl-10 pr-3 py-2 border border-synth-border rounded-lg leading-5 bg-synth-surface text-gray-300 placeholder-gray-500 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-colors shadow-inner"
             />
           </div>
@@ -133,7 +132,7 @@ export default function Landing() {
           <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-8 text-center text-red-200">
             {loadError}
           </div>
-        ) : filteredGames.length === 0 ? (
+        ) : games.length === 0 ? (
           <div className="text-center py-20 text-gray-500">
             <Search className="w-12 h-12 mx-auto mb-4 opacity-20" />
             <p className="text-xl">No games found matching "{searchQuery}"</p>
@@ -141,7 +140,7 @@ export default function Landing() {
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-              {paginatedGames.map((game) => (
+              {games.map((game) => (
                 <GameCard
                   key={game.id}
                   id={game.id}
@@ -155,8 +154,8 @@ export default function Landing() {
               <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-gray-500">
                   Showing {pageStart + 1}-
-                  {Math.min(pageStart + GAMES_PER_PAGE, filteredGames.length)} of{" "}
-                  {filteredGames.length}
+                  {Math.min(pageStart + games.length, totalGames)} of{" "}
+                  {totalGames}
                 </p>
 
                 <div className="flex flex-wrap items-center gap-2">

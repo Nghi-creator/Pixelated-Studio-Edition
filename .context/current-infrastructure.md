@@ -33,6 +33,7 @@ Current status:
 - `GET /me` verifies a Supabase bearer token and returns the authenticated user id/email.
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - `GET /games` and `GET /games/:gameId` read approved game catalog metadata through the API.
+- `GET /games` accepts `page`, `pageSize`, and optional `search`; the backend returns paginated catalog metadata plus a small `featuredGames` list for the homepage hero.
 - `GET /favorites`, `GET /favorites/:gameId`, `PUT /favorites/:gameId`, and `DELETE /favorites/:gameId` manage favorites through the API.
 - `GET /games/:gameId/reactions` and `PUT /games/:gameId/reaction` manage game reactions through the API.
 - `GET /games/:gameId/comments`, `POST /games/:gameId/comments`, `DELETE /comments/:commentId`, and `PUT /comments/:commentId/reaction` manage player comments and comment reactions through the API.
@@ -41,7 +42,9 @@ Current status:
 - `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
 - `POST /admin/reports/:reportId/action` resolves moderation queue actions through the API for ignore, delete-comment, and ban-user actions.
 - `GET /admin/reports` loads the moderation queue through the API for authenticated admins/super admins.
+- `GET /admin/reports` accepts `page` and `pageSize` for server-side moderation queue pagination.
 - `GET /admin/users` and `PATCH /admin/users/:userId` move admin user management through the API.
+- `GET /admin/users` accepts `page`, `pageSize`, and optional `search` for server-side user-management pagination and username filtering.
 - `GET /admin/access-logs` loads access logs through the API for authenticated admins/super admins.
 - `POST /submissions/games` creates developer game submission records through the API for authenticated users.
 - `POST /submissions/games` can optionally send the submission notification server-side when `FORMSPREE_SUBMISSION_URL` is configured.
@@ -116,8 +119,8 @@ Current important frontend behaviors:
 - The lobby panel shows connected participants and lets the host remove non-host guests through the engine `lobby-kick` event.
 - Signed-in hosts publish non-secret lobby snapshots to the backend when local `lobby-state` changes. Anonymous/local-only play continues if that backend call is unauthorized or unavailable.
 - Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
-- Publishing requires a signed-in user, uploads ROM/images directly from the browser to Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
-- Game catalog, favorites, comments, reactions, profile updates/deletion, admin users, admin reports, and admin access logs are loaded or mutated through the API instead of direct browser Supabase table/RPC/realtime calls.
+- Publishing requires a signed-in non-super-admin user, uploads ROM/images directly from the browser to the authenticated user's folder in Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
+- Game catalog pagination/search, favorites, comments, reactions, profile updates/deletion, admin user pagination/search, admin reports, and admin access logs are loaded or mutated through the API instead of direct browser Supabase table/RPC/realtime calls.
 - Session tracking calls the API to insert browser-load access logs; the backend derives user id from the optional Supabase bearer token.
 
 ## Desktop Orchestrator
@@ -163,6 +166,7 @@ Notable constraints:
 - The companion uses a runtime-generated self-signed certificate under the Electron user data directory. Guests may need to trust/bypass that certificate warning during the first LAN test.
 - The desktop UI displays HTTPS companion join URLs separately from raw LAN engine URLs.
 - LAN mode creates an 8-character invite code that expires after 10 minutes. The companion exposes `POST /invite/redeem` on the HTTPS join page; a valid code returns a short-lived companion credential, not the raw engine token.
+- Hosts can regenerate or revoke the active LAN invite code from the desktop LAN panel without restarting the engine or HTTPS companion. Regeneration replaces the active code and clears unconnected companion credentials; revocation leaves the join page up but makes `/invite/redeem` fail closed until a new code is generated.
 - The companion translates valid companion credentials into the real `X-Engine-Token` header while proxying to `127.0.0.1:8080`, including Socket.IO handshakes through the `companionToken` query parameter.
 - The desktop LAN panel now includes a short invite checklist: copy HTTPS join page, send it with the invite code, and have the guest accept the local certificate warning if shown.
 - `PIXELATED_WEB_DIST_DIR` can override the companion asset directory for custom layouts, but release artifacts should use the bundled `resources/web-dist` contract.
@@ -272,6 +276,7 @@ Security model today:
 - Admin pages still do client-side role checks for routing/UX, but the API performs the real admin/super-admin authorization for admin reads and mutations.
 - Local engine HTTP routes and Socket.IO handshakes require the per-run pairing token generated by Electron.
 - LAN guests should not receive the raw pairing token. They redeem the short-lived desktop invite code against the host's HTTPS companion, store the returned companion credential locally, and the companion maps that credential to the host-local engine token while proxying.
+- Desktop invite regeneration/revocation does not rotate the engine token or restart the container. It only changes the companion-side invite state and clears unconnected companion credentials.
 - Cloud game boot also requires backend-created session intent: `mode: "cloud"` plus a session token that the engine verifies with the API before downloading or booting the approved ROM target.
 - Direct/local React pairing stores the pairing token in browser `localStorage` and sends it through `X-Engine-Token` for REST calls and Socket.IO auth for streaming. Companion joins store a `companion:` credential instead; REST sends the companion credential in `X-Engine-Token`, while Socket.IO sends it as `companionToken` query data for host-side translation.
 - The Python camera bridge receives `PIXELATED_ENGINE_TOKEN` through env and uses it when connecting to Node Socket.IO.

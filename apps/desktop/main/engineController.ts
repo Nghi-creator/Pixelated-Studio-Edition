@@ -8,8 +8,10 @@ import {
   webDistDir,
 } from "./config";
 import {
+  revokeCompanionInvite,
   startCompanionServer,
   stopCompanionServer,
+  updateCompanionInvite,
   type CompanionServerResult,
 } from "./companionServer";
 import {
@@ -50,7 +52,13 @@ type DockerRunOptions = EngineLaunchContext & {
   engineToken: string;
 };
 
+type ActiveCompanion = {
+  certPath: string;
+  urls: string[];
+};
+
 let engineToken: string | null = null;
+let activeCompanion: ActiveCompanion | null = null;
 
 const INVITE_CODE_TTL_MS = 10 * 60 * 1000;
 
@@ -125,11 +133,17 @@ async function startLanCompanion(
       port: companionPort,
       webDistDir,
     });
+    activeCompanion = {
+      certPath: companion.certPath,
+      urls: launchContext.companionUrls,
+    };
     event.reply("engine-companion", {
       certPath: companion.certPath,
       enabled: true,
       inviteCode: launchContext.inviteCode,
       inviteExpiresAt: new Date(launchContext.inviteExpiresAt).toISOString(),
+      inviteRevoked: false,
+      inviteStatus: "Invite code active.",
       urls: launchContext.companionUrls,
     });
     event.reply(
@@ -138,6 +152,7 @@ async function startLanCompanion(
     );
   } catch (err) {
     const message = getErrorMessage(err);
+    activeCompanion = null;
     event.reply("engine-companion", {
       enabled: false,
       error: message,
@@ -150,8 +165,80 @@ async function startLanCompanion(
   }
 }
 
+export function regenerateLanInvite(event: IpcMainEvent) {
+  if (!engineToken || !activeCompanion) {
+    event.reply("engine-companion", {
+      enabled: false,
+      error: "Start the engine in LAN mode before changing invite codes.",
+      urls: [],
+    });
+    return;
+  }
+
+  const inviteCode = createInviteCode();
+  const inviteExpiresAt = Date.now() + INVITE_CODE_TTL_MS;
+  updateCompanionInvite(inviteCode, inviteExpiresAt);
+  emitCompanionInvite(event, {
+    inviteCode,
+    inviteExpiresAt,
+    inviteRevoked: false,
+    inviteStatus: "Invite code regenerated. Previous codes no longer work.",
+  });
+  event.reply("server-log", "LAN invite code regenerated.");
+}
+
+export function revokeLanInvite(event: IpcMainEvent) {
+  if (!activeCompanion) {
+    event.reply("engine-companion", {
+      enabled: false,
+      error: "Start the engine in LAN mode before revoking invite codes.",
+      urls: [],
+    });
+    return;
+  }
+
+  revokeCompanionInvite();
+  emitCompanionInvite(event, {
+    inviteRevoked: true,
+    inviteStatus:
+      "Invite code revoked. Regenerate a code before inviting more guests.",
+  });
+  event.reply("server-log", "LAN invite code revoked.");
+}
+
 function getErrorMessage(err: unknown) {
   return err instanceof Error ? err.message : String(err);
+}
+
+function emitCompanionInvite(
+  event: IpcMainEvent,
+  payload: {
+    inviteCode?: string;
+    inviteExpiresAt?: number;
+    inviteRevoked?: boolean;
+    inviteStatus: string;
+  },
+) {
+  if (!activeCompanion) {
+    event.reply("engine-companion", {
+      enabled: false,
+      error: "LAN companion is not running.",
+      urls: [],
+    });
+    return;
+  }
+
+  event.reply("engine-companion", {
+    certPath: activeCompanion.certPath,
+    enabled: true,
+    inviteCode: payload.inviteCode,
+    inviteExpiresAt: payload.inviteExpiresAt
+      ? new Date(payload.inviteExpiresAt).toISOString()
+      : undefined,
+    inviteRevoked: payload.inviteRevoked,
+    inviteStatus: payload.inviteStatus,
+    urls: activeCompanion.urls,
+  });
 }
 
 function startContainer(
@@ -184,6 +271,7 @@ function handleStartupFailure(
   startErr: unknown,
 ) {
   stopCompanionServer();
+  activeCompanion = null;
   const message = getErrorMessage(startErr);
   emitEngineState(event, "FAILED", message);
   event.reply(
@@ -208,6 +296,7 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
 
   engineToken = crypto.randomBytes(24).toString("base64url");
   stopCompanionServer();
+  activeCompanion = null;
   event.reply("engine-token", engineToken);
   event.reply("engine-exposure", {
     advertisedUrls: launchContext.advertisedUrls,
@@ -261,6 +350,7 @@ export function stopEngine(event: IpcMainEvent) {
   event.reply("server-log", "Initiating shutdown sequence...");
   const safeEnv = getSafeEnv();
   stopCompanionServer();
+  activeCompanion = null;
 
   exec("docker rm -f pixelated-node", { env: safeEnv }, (err) => {
     if (err) {
@@ -279,5 +369,6 @@ export function stopEngine(event: IpcMainEvent) {
 export function cleanupEngine() {
   const safeEnv = getSafeEnv();
   stopCompanionServer();
+  activeCompanion = null;
   exec("docker rm -f pixelated-node", { env: safeEnv });
 }
