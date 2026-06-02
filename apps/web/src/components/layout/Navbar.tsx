@@ -121,21 +121,20 @@ export default function Navbar() {
           </Link>
 
           <div className="flex items-center gap-4 sm:gap-6">
-            {user && userRole !== "super_admin" && (
-              <Link
-                to="/publish"
-                title="Publish a Game"
-                className={`transition-colors ${
-                  isPublishPage
-                    ? "text-synth-secondary drop-shadow-[0_0_8px_rgba(255,159,67,0.4)]"
-                    : "text-gray-400 hover:text-synth-secondary"
-                }`}
-              >
-                <UploadCloud
-                  className={`w-5 h-5 ${isPublishPage ? "fill-synth-secondary/20" : ""}`}
-                />
-              </Link>
-            )}
+            <Link
+              to="/publish"
+              title="Submit a Game"
+              className={`flex items-center gap-2 rounded-lg border px-2.5 py-2 text-sm font-bold transition-colors sm:px-3 ${
+                isPublishPage
+                  ? "border-synth-secondary/70 bg-synth-secondary/10 text-synth-secondary shadow-glow-primary-sm"
+                  : "border-synth-border bg-synth-surface/60 text-gray-300 hover:border-synth-secondary hover:text-synth-secondary"
+              }`}
+            >
+              <UploadCloud
+                className={`w-4 h-4 ${isPublishPage ? "fill-synth-secondary/20" : ""}`}
+              />
+              <span className="hidden xl:inline">Submit Game</span>
+            </Link>
 
             {/* LOCAL VAULT LINK */}
             <Link
