@@ -4,6 +4,8 @@ import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
 import { api } from "../../lib/apiClient";
 
+const GAMES_PER_PAGE = 15;
+
 interface Game {
   id: string;
   title: string;
@@ -19,6 +21,7 @@ export default function Landing() {
   const [featuredGames, setFeaturedGames] = useState<Game[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchGames();
@@ -54,6 +57,40 @@ export default function Landing() {
   const filteredGames = games.filter((game) =>
     game.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
+  const totalPages = Math.max(1, Math.ceil(filteredGames.length / GAMES_PER_PAGE));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const pageStart = (safeCurrentPage - 1) * GAMES_PER_PAGE;
+  const paginatedGames = filteredGames.slice(
+    pageStart,
+    pageStart + GAMES_PER_PAGE,
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const visiblePageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1)
+    .filter((page) => {
+      if (totalPages <= 5) return true;
+      return (
+        page === 1 ||
+        page === totalPages ||
+        Math.abs(page - safeCurrentPage) <= 1
+      );
+    });
+
+  const changePage = (page: number) => {
+    setCurrentPage(page);
+    document
+      .getElementById("all-games")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   if (loading) {
     return (
@@ -70,7 +107,10 @@ export default function Landing() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
         {/* Header & Search Bar Row */}
         <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h2 className="text-2xl font-bold border-l-4 border-synth-secondary pl-3 drop-shadow-[0_0_12px_rgba(255,159,67,0.2)]">
+          <h2
+            id="all-games"
+            className="scroll-mt-24 text-2xl font-bold border-l-4 border-synth-secondary pl-3 drop-shadow-[0_0_12px_rgba(255,159,67,0.2)]"
+          >
             All Games
           </h2>
 
@@ -99,16 +139,74 @@ export default function Landing() {
             <p className="text-xl">No games found matching "{searchQuery}"</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {filteredGames.map((game) => (
-              <GameCard
-                key={game.id}
-                id={game.id}
-                title={game.title}
-                coverUrl={game.cover_url}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
+              {paginatedGames.map((game) => (
+                <GameCard
+                  key={game.id}
+                  id={game.id}
+                  title={game.title}
+                  coverUrl={game.cover_url}
+                />
+              ))}
+            </div>
+
+            {totalPages > 1 && (
+              <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-gray-500">
+                  Showing {pageStart + 1}-
+                  {Math.min(pageStart + GAMES_PER_PAGE, filteredGames.length)} of{" "}
+                  {filteredGames.length}
+                </p>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => changePage(Math.max(1, safeCurrentPage - 1))}
+                    disabled={safeCurrentPage === 1}
+                    className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Previous
+                  </button>
+
+                  {visiblePageNumbers.map((page, index) => {
+                    const previousPage = visiblePageNumbers[index - 1];
+                    const needsGap = previousPage && page - previousPage > 1;
+
+                    return (
+                      <span key={page} className="inline-flex items-center gap-2">
+                        {needsGap && (
+                          <span className="px-1 text-sm text-gray-600">...</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => changePage(page)}
+                          className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-bold transition-colors ${
+                            page === safeCurrentPage
+                              ? "border-synth-primary bg-synth-primary/15 text-white"
+                              : "border-synth-border bg-synth-surface text-gray-400 hover:border-synth-primary/70 hover:text-white"
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      </span>
+                    );
+                  })}
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      changePage(Math.min(totalPages, safeCurrentPage + 1))
+                    }
+                    disabled={safeCurrentPage === totalPages}
+                    className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
