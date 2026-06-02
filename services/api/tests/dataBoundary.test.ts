@@ -673,6 +673,30 @@ test("submissions persist metadata for the authenticated submitter", async () =>
   await app.close();
 });
 
+test("super admins cannot submit games for review", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const app = await createDataBoundaryApp(db, SUPER_ADMIN_ID);
+  const storageBase =
+    process.env.SUPABASE_URL?.replace(/\/+$/, "") || "https://example.com";
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      authorName: "Root",
+      description: null,
+      email: "root@example.com",
+      gameTitle: "Root Quest",
+      romUrl: `${storageBase}/storage/v1/object/public/submissions/${SUPER_ADMIN_ID}/roms/root.nes`,
+    },
+    url: "/submissions/games",
+  });
+
+  assert.equal(response.statusCode, 403);
+  assert.equal(db.rows.game_submissions.length, 0);
+  await app.close();
+});
+
 test("submissions reject files outside the authenticated user's folder", async () => {
   const db = new FakeSupabase();
   const app = await createDataBoundaryApp(db, USER_ID);

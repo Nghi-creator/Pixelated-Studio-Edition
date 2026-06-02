@@ -56,6 +56,21 @@ type SubmissionRouteOptions = {
   supabase?: SupabaseServiceLike | null;
 };
 
+async function getSubmitterRole(
+  service: SupabaseServiceLike,
+  userId: string,
+) {
+  const { data, error } = await service
+    .from("profiles")
+    .select("role")
+    .eq("id", userId)
+    .maybeSingle<{ role: string | null }>();
+
+  if (error) throw error;
+
+  return data?.role || "user";
+}
+
 async function defaultNotifySubmission(
   submission: z.infer<typeof submissionBodySchema>,
 ) {
@@ -104,6 +119,20 @@ export async function registerSubmissionRoutes(
       if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
+        });
+      }
+
+      let submitterRole = "user";
+      try {
+        submitterRole = await getSubmitterRole(service, user.id);
+      } catch (err) {
+        request.log.error({ err }, "Failed to load submitter role");
+        return reply.status(500).send({ error: "Failed to create submission" });
+      }
+
+      if (submitterRole === "super_admin") {
+        return reply.status(403).send({
+          error: "Super admins cannot submit games for review",
         });
       }
 
