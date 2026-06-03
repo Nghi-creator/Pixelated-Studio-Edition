@@ -390,9 +390,9 @@ export const api = {
       service: string;
       uptimeSeconds: number;
     }>("/health", { authenticated: false }),
-  logAccess: (path: string) =>
+  logAccess: (path: string, sessionId: string) =>
     apiRequest<{ success: true }>("/access-logs", {
-      body: JSON.stringify({ path }),
+      body: JSON.stringify({ path, sessionId }),
       method: "POST",
     }),
   me: () => apiRequest<ApiMeResponse>("/me"),

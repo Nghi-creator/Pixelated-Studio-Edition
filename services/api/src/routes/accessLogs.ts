@@ -9,6 +9,7 @@ import {
 
 const accessLogBodySchema = z.object({
   path: z.string().trim().min(1).max(2048),
+  sessionId: z.string().trim().min(12).max(128),
 });
 
 const accessLogQuerySchema = z.object({
@@ -20,14 +21,11 @@ type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 type SupabaseAnonLike = NonNullable<typeof supabaseAnon>;
 
 type AccessLogRow = {
-  created_at: string;
-  id: string;
-  path: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  sessions_count: number;
+  total_count: number;
   user_id: string | null;
-};
-
-type ProfileRow = {
-  id: string;
   username: string | null;
 };
 
@@ -85,10 +83,28 @@ export async function registerAccessLogRoutes(
       }
     }
 
-    const { error } = await service.from("access_logs").insert({
-      path: parsedBody.data.path,
-      user_id: userId,
-    });
+    const now = new Date().toISOString();
+    const { data: existingLog, error: existingLogError } = await service
+      .from("access_logs")
+      .select("access_count")
+      .eq("session_id", parsedBody.data.sessionId)
+      .maybeSingle<{ access_count: number | null }>();
+
+    if (existingLogError) {
+      request.log.error({ err: existingLogError }, "Failed to load access log session");
+      return reply.status(500).send({ error: "Failed to create access log" });
+    }
+
+    const { error } = await service.from("access_logs").upsert(
+      {
+        access_count: (existingLog?.access_count || 0) + 1,
+        last_seen_at: now,
+        path: parsedBody.data.path,
+        session_id: parsedBody.data.sessionId,
+        user_id: userId,
+      },
+      { onConflict: "session_id" },
+    );
 
     if (error) {
       request.log.error({ err: error }, "Failed to create access log");
@@ -134,16 +150,10 @@ export async function registerAccessLogRoutes(
       }
 
       const { page, pageSize } = parsedQuery.data;
-      const rangeStart = (page - 1) * pageSize;
-      const rangeEnd = rangeStart + pageSize - 1;
-
-      const { count, data, error } = await service
-        .from("access_logs")
-        .select("id,created_at,user_id,path", {
-          count: "exact",
-        })
-        .order("created_at", { ascending: false })
-        .range(rangeStart, rangeEnd);
+      const { data, error } = await service.rpc("admin_access_log_summary", {
+        p_page: page,
+        p_page_size: pageSize,
+      });
 
       if (error) {
         request.log.error({ err: error }, "Failed to load access logs");
@@ -154,43 +164,14 @@ export async function registerAccessLogRoutes(
       }
 
       const logs = (data || []) as AccessLogRow[];
-      const userIds = Array.from(
-        new Set(
-          logs
-            .map((log) => log.user_id)
-            .filter((userId): userId is string => Boolean(userId)),
-        ),
-      );
-      const profileMap = new Map<string, ProfileRow>();
-
-      if (userIds.length > 0) {
-        const { data: profiles, error: profilesError } = await service
-          .from("profiles")
-          .select("id,username")
-          .in("id", userIds)
-          .returns<ProfileRow[]>();
-
-        if (profilesError) {
-          request.log.warn(
-            { err: profilesError },
-            "Failed to hydrate access log profiles",
-          );
-        } else {
-          for (const profile of profiles || []) {
-            profileMap.set(profile.id, profile);
-          }
-        }
-      }
-
-      const total = count || 0;
+      const total = logs[0]?.total_count || 0;
       return {
         logs: logs.map((log) => ({
-          ...log,
-          profiles: log.user_id
-            ? {
-                username: profileMap.get(log.user_id)?.username || null,
-              }
-            : null,
+          first_seen_at: log.first_seen_at,
+          last_seen_at: log.last_seen_at,
+          sessions_count: log.sessions_count,
+          user_id: log.user_id,
+          username: log.username,
         })),
         page,
         pageSize,

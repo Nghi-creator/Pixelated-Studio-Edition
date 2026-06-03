@@ -23,6 +23,8 @@ Pre-hosting checks passed on 2026-05-26:
 
 On 2026-06-03, hosted access-log reads exposed schema drift: Render returned Supabase error `42703` because the hosted `public.access_logs` table did not have the `path` column expected by the API. Push `supabase/migrations/20260603090000_repair_access_logs_path.sql` before relying on hosted `/admin/access-logs`.
 
+On 2026-06-04, access logs moved from raw route rows to user session summaries. Push `supabase/migrations/20260604090000_access_log_sessions_summary.sql` with the API/web deploy so `POST /access-logs` can upsert by `session_id` and `GET /admin/access-logs` can call `public.admin_access_log_summary`.
+
 ## Local `.env`
 
 Created at:

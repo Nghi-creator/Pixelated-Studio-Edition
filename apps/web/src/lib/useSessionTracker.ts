@@ -2,24 +2,37 @@ import { useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import { api } from "./apiClient";
 
+const SESSION_ID_KEY = "pixelated_access_session_id";
+const LOGGED_STATE_PREFIX = "pixelated_logged_user_";
+
+function getAccessSessionId() {
+  const existingSessionId = sessionStorage.getItem(SESSION_ID_KEY);
+  if (existingSessionId) return existingSessionId;
+
+  const nextSessionId =
+    typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  sessionStorage.setItem(SESSION_ID_KEY, nextSessionId);
+  return nextSessionId;
+}
+
 export function useSessionTracker() {
   useEffect(() => {
     let isSubscribed = true;
+    const accessSessionId = getAccessSessionId();
 
     const logSession = async (user_id: string | null = null) => {
-      // Create a unique key for tracking either purely guest sessions or a specific user_id
-      const sessionKey = "pixelated_logged_user_" + (user_id || "guest");
-      
-      // Check if we strictly already logged THIS specific state this browser load
+      const sessionKey = LOGGED_STATE_PREFIX + (user_id || "guest");
+
       if (sessionStorage.getItem(sessionKey) === "true") {
         return;
       }
-      
-      // Lock it synchronously BEFORE the async call to prevent race conditions from auth events!
+
       sessionStorage.setItem(sessionKey, "true");
-      
+
       try {
-        await api.logAccess(window.location.pathname);
+        await api.logAccess(window.location.pathname, accessSessionId);
       } catch (err) {
         console.error("Exception in logSession", err);
         sessionStorage.removeItem(sessionKey);

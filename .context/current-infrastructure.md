@@ -75,6 +75,7 @@ Current status:
 - The web app has no direct Supabase table/RPC/realtime calls under `apps/web/src`; Supabase remains in the browser for auth/session management and Storage uploads.
 - `supabase/migrations/20260527111500_api_owned_social_writes.sql` was pushed to hosted Supabase on 2026-05-27, removing direct browser data policies for workflows now owned by the API.
 - Hosted Supabase access logs need `supabase/migrations/20260603090000_repair_access_logs_path.sql` pushed after a 2026-06-03 schema-drift check found `public.access_logs.path` missing in production.
+- Access logging is now session-oriented instead of route-oriented. The Vercel web app creates one browser-session id in `sessionStorage`, posts it to the API on app entry/auth transitions, and the API upserts `public.access_logs` by `session_id`. Admin access logs are summarized through `public.admin_access_log_summary`, showing user, first seen, last seen, and session count instead of individual paths.
 
 ## Web App
 

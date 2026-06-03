@@ -85,6 +85,12 @@ class FakeSupabase {
         };
       },
     },
+    getUser: async (token: string) => ({
+      data: {
+        user: this.authUsers.find((user) => user.id === token) || null,
+      },
+      error: null,
+    }),
   };
 
   from(table: TableName) {
@@ -93,6 +99,63 @@ class FakeSupabase {
 
   async rpc(fn: string, params: RecordRow) {
     this.rpcCalls.push({ fn, params });
+    if (fn === "admin_access_log_summary") {
+      const page = Math.max(1, Number(params.p_page || 1));
+      const pageSize = Math.min(100, Math.max(1, Number(params.p_page_size || 25)));
+      const profiles = new Map(
+        this.rows.profiles.map((profile) => [
+          profile.id,
+          profile.username || null,
+        ]),
+      );
+      const grouped = new Map<
+        string,
+        {
+          first_seen_at: string;
+          last_seen_at: string;
+          sessions_count: number;
+          user_id: string | null;
+          username: unknown;
+        }
+      >();
+
+      for (const log of this.rows.access_logs) {
+        const userId = typeof log.user_id === "string" ? log.user_id : null;
+        const groupKey = userId || "guest";
+        const createdAt = String(log.created_at);
+        const lastSeenAt = String(log.last_seen_at || log.created_at);
+        const existing = grouped.get(groupKey);
+        if (existing) {
+          existing.first_seen_at =
+            createdAt < existing.first_seen_at ? createdAt : existing.first_seen_at;
+          existing.last_seen_at =
+            lastSeenAt > existing.last_seen_at ? lastSeenAt : existing.last_seen_at;
+          existing.sessions_count += 1;
+        } else {
+          grouped.set(groupKey, {
+            first_seen_at: createdAt,
+            last_seen_at: lastSeenAt,
+            sessions_count: 1,
+            user_id: userId,
+            username: userId ? profiles.get(userId) || null : null,
+          });
+        }
+      }
+
+      const summaries = [...grouped.values()].sort((left, right) =>
+        right.last_seen_at.localeCompare(left.last_seen_at),
+      );
+      const totalCount = summaries.length;
+      const start = (page - 1) * pageSize;
+      return {
+        data: summaries.slice(start, start + pageSize).map((summary) => ({
+          ...summary,
+          total_count: totalCount,
+        })),
+        error: null,
+      };
+    }
+
     return { data: null, error: null };
   }
 }
@@ -172,7 +235,7 @@ class FakeQueryBuilder {
     return this;
   }
 
-  upsert(payload: RecordRow) {
+  upsert(payload: RecordRow, _options?: RecordRow) {
     this.action = "upsert";
     this.payload = payload;
     return this;
@@ -228,6 +291,10 @@ class FakeQueryBuilder {
           ? this.db.rows[this.table].find(
               (row) => row.user_id === this.payload?.user_id,
             )
+          : this.table === "access_logs"
+            ? this.db.rows[this.table].find(
+                (row) => row.session_id === this.payload?.session_id,
+              )
           : undefined);
       if (existing) Object.assign(existing, this.payload);
       else {
@@ -328,6 +395,7 @@ async function createDataBoundaryApp(db: FakeSupabase, userId = USER_ID) {
   const options = {
     requireUser: requireUser(userId),
     supabase: db as never,
+    supabaseAnon: db as never,
   };
 
   await registerAccessLogRoutes(app, options);
@@ -613,40 +681,85 @@ test("admin user and access-log routes require privileged roles", async () => {
   await superAdminApp.close();
 });
 
-test("admin access logs are paginated server-side", async () => {
+test("access logs upsert browser sessions", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.authUsers.push({
+    app_metadata: {},
+    aud: "authenticated",
+    created_at: new Date().toISOString(),
+    id: USER_ID,
+    user_metadata: {},
+  } as User);
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const firstResponse = await app.inject({
+    headers: { authorization: `Bearer ${USER_ID}` },
+    method: "POST",
+    payload: { path: "/", sessionId: "browser-session-1" },
+    url: "/access-logs",
+  });
+  const secondResponse = await app.inject({
+    headers: { authorization: `Bearer ${USER_ID}` },
+    method: "POST",
+    payload: { path: "/play/test-game", sessionId: "browser-session-1" },
+    url: "/access-logs",
+  });
+
+  assert.equal(firstResponse.statusCode, 202);
+  assert.equal(secondResponse.statusCode, 202);
+  assert.equal(db.rows.access_logs.length, 1);
+  assert.equal(db.rows.access_logs[0]?.session_id, "browser-session-1");
+  assert.equal(db.rows.access_logs[0]?.path, "/play/test-game");
+  assert.equal(db.rows.access_logs[0]?.access_count, 2);
+  assert.equal(db.rows.access_logs[0]?.user_id, USER_ID);
+  await app.close();
+});
+
+test("admin access logs summarize users and sessions server-side", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
   for (let index = 1; index <= 30; index += 1) {
     db.rows.access_logs.push({
       created_at: `2026-05-27T00:${String(index).padStart(2, "0")}:00.000Z`,
       id: `log-${index}`,
+      last_seen_at: `2026-05-27T01:${String(index).padStart(2, "0")}:00.000Z`,
       path: `/page-${index}`,
-      user_id: index % 2 === 0 ? USER_ID : null,
+      session_id: `session-${index}`,
+      user_id:
+        index <= 12 ? USER_ID : index <= 20 ? OTHER_USER_ID : null,
     });
   }
   const app = await createDataBoundaryApp(db, ADMIN_ID);
 
   const response = await app.inject({
     method: "GET",
-    url: "/admin/access-logs?page=2&pageSize=10",
+    url: "/admin/access-logs?page=1&pageSize=10",
   });
 
   assert.equal(response.statusCode, 200);
   const body = response.json<{
-    logs: { id: string; profiles: { username: string | null } | null }[];
+    logs: {
+      sessions_count: number;
+      user_id: string | null;
+      username: string | null;
+    }[];
     page: number;
     pageSize: number;
     total: number;
     totalPages: number;
   }>();
-  assert.equal(body.logs.length, 10);
-  assert.equal(body.logs[0]?.id, "log-20");
-  assert.equal(body.logs[0]?.profiles?.username, "player");
-  assert.equal(body.logs[1]?.profiles, null);
-  assert.equal(body.page, 2);
+  assert.equal(body.logs.length, 3);
+  assert.equal(body.logs[0]?.user_id, null);
+  assert.equal(body.logs[0]?.sessions_count, 10);
+  assert.equal(body.logs[1]?.user_id, OTHER_USER_ID);
+  assert.equal(body.logs[1]?.sessions_count, 8);
+  assert.equal(body.logs[2]?.username, "player");
+  assert.equal(body.logs[2]?.sessions_count, 12);
+  assert.equal(body.page, 1);
   assert.equal(body.pageSize, 10);
-  assert.equal(body.total, 30);
-  assert.equal(body.totalPages, 3);
+  assert.equal(body.total, 3);
+  assert.equal(body.totalPages, 1);
   await app.close();
 });
 

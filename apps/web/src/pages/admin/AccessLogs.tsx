@@ -6,13 +6,11 @@ const LOGS_PER_PAGE = 25;
 const ACCESS_LOGS_TIMEOUT_MS = 10_000;
 
 interface AccessLog {
-  id: string;
-  created_at: string;
+  first_seen_at: string;
+  last_seen_at: string;
+  sessions_count: number;
   user_id: string | null;
-  path?: string;
-  profiles: {
-    username: string;
-  } | null;
+  username: string | null;
 }
 
 type AccessLogsErrorPayload = {
@@ -122,14 +120,15 @@ export default function AccessLogs() {
             <thead>
               <tr className="bg-synth-bg border-b border-synth-border text-xs uppercase tracking-wider text-gray-500 font-bold">
                 <th className="p-4">User</th>
-                <th className="p-4">Path</th>
-                <th className="p-4">Session Logged At</th>
+                <th className="p-4">Sessions</th>
+                <th className="p-4">First Seen</th>
+                <th className="p-4">Last Seen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-synth-border/80">
               {loadError ? (
                 <tr>
-                  <td colSpan={3} className="p-10 text-center text-sm text-red-300">
+                  <td colSpan={4} className="p-10 text-center text-sm text-red-300">
                     <div className="flex flex-col items-center gap-4">
                       <span>{loadError}</span>
                       <button
@@ -144,25 +143,33 @@ export default function AccessLogs() {
                 </tr>
               ) : logs.length === 0 ? (
                 <tr>
-                  <td colSpan={3} className="p-10 text-center text-sm text-gray-500">
-                    No access logs found.
+                  <td colSpan={4} className="p-10 text-center text-sm text-gray-500">
+                    No user sessions found.
                   </td>
                 </tr>
               ) : (
                 logs.map((log) => (
-                  <tr key={log.id} className="hover:bg-synth-primary/5 transition-colors">
+                  <tr
+                    key={log.user_id || "guest"}
+                    className="hover:bg-synth-primary/5 transition-colors"
+                  >
                     <td className="p-4">
-                      {log.profiles ? (
-                        <span className="text-white font-bold">@{log.profiles.username}</span>
+                      {log.user_id ? (
+                        <span className="text-white font-bold">
+                          @{log.username || "unknown"}
+                        </span>
                       ) : (
                         <span className="text-gray-400 italic">Guest</span>
                       )}
                     </td>
-                    <td className="p-4 text-gray-400 text-sm">
-                      {log.path || "/"}
+                    <td className="p-4 text-gray-300 text-sm font-semibold">
+                      {log.sessions_count}
                     </td>
                     <td className="p-4 text-gray-400 text-sm">
-                      {new Date(log.created_at).toLocaleString()}
+                      {new Date(log.first_seen_at).toLocaleString()}
+                    </td>
+                    <td className="p-4 text-gray-400 text-sm">
+                      {new Date(log.last_seen_at).toLocaleString()}
                     </td>
                   </tr>
                 ))
