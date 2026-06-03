@@ -74,6 +74,7 @@ Current status:
 - Cloud/library game boot, game catalog reads, favorites, reactions, comments, profiles, player play-count tracking, game submission metadata/notification, access logging, admin user management, admin access-log reads, admin reports, and comment reporting now depend on the API.
 - The web app has no direct Supabase table/RPC/realtime calls under `apps/web/src`; Supabase remains in the browser for auth/session management and Storage uploads.
 - `supabase/migrations/20260527111500_api_owned_social_writes.sql` was pushed to hosted Supabase on 2026-05-27, removing direct browser data policies for workflows now owned by the API.
+- Hosted Supabase access logs need `supabase/migrations/20260603090000_repair_access_logs_path.sql` pushed after a 2026-06-03 schema-drift check found `public.access_logs.path` missing in production.
 
 ## Web App
 

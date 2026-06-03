@@ -1,6 +1,6 @@
 # Backend Hosting Checklist
 
-Updated: 2026-05-27
+Updated: 2026-06-03
 
 ## Current Recommendation
 
@@ -20,6 +20,8 @@ Pre-hosting checks passed on 2026-05-26:
 - `GET /` and `HEAD /` returned `200` for provider root probes.
 
 `supabase/migrations/20260527093000_backend_control_plane_state.sql`, `20260527103000_secure_game_submissions.sql`, `20260527104500_backend_access_logs.sql`, and `20260527111500_api_owned_social_writes.sql` were pushed to the hosted Supabase project on 2026-05-27.
+
+On 2026-06-03, hosted access-log reads exposed schema drift: Render returned Supabase error `42703` because the hosted `public.access_logs` table did not have the `path` column expected by the API. Push `supabase/migrations/20260603090000_repair_access_logs_path.sql` before relying on hosted `/admin/access-logs`.
 
 ## Local `.env`
 
