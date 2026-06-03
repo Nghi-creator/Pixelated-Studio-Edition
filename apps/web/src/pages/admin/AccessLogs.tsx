@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Activity } from "lucide-react";
-import { api } from "../../lib/apiClient";
+import { api, ApiError } from "../../lib/apiClient";
 
 const LOGS_PER_PAGE = 25;
+const ACCESS_LOGS_TIMEOUT_MS = 10_000;
 
 interface AccessLog {
   id: string;
@@ -14,25 +15,87 @@ interface AccessLog {
   } | null;
 }
 
+type AccessLogsErrorPayload = {
+  details?: {
+    code?: string;
+    details?: string;
+    hint?: string;
+    message?: string;
+  };
+  error?: string;
+};
+
+function getAccessLogsErrorMessage(error: unknown) {
+  if (!(error instanceof ApiError) || typeof error.payload !== "object") {
+    return "Could not load access logs.";
+  }
+
+  const payload = error.payload as AccessLogsErrorPayload | null;
+  const baseMessage = payload?.error || "Could not load access logs.";
+  const details = payload?.details;
+  const detailMessage = [
+    details?.code,
+    details?.message,
+    details?.details,
+    details?.hint,
+  ]
+    .filter(Boolean)
+    .join(" - ");
+
+  return detailMessage ? `${baseMessage}: ${detailMessage}` : baseMessage;
+}
+
 export default function AccessLogs() {
   const [logs, setLogs] = useState<AccessLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
+  const [loadError, setLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   const [totalLogs, setTotalLogs] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      setLoading(true);
-      const data = await api.accessLogs<AccessLog>(page, LOGS_PER_PAGE);
-      setLogs(data.logs);
-      setTotalLogs(data.total);
-      setTotalPages(data.totalPages);
+    let isMounted = true;
+    const watchdog = window.setTimeout(() => {
+      if (!isMounted) return;
+
+      setLoadError(
+        "Access logs are taking too long to load. Make sure the local API is running on http://127.0.0.1:4000, then retry.",
+      );
       setLoading(false);
+    }, ACCESS_LOGS_TIMEOUT_MS);
+
+    const fetchLogs = async () => {
+      try {
+        setLoading(true);
+        setLoadError("");
+        const data = await api.accessLogs<AccessLog>(page, LOGS_PER_PAGE);
+        if (!isMounted) return;
+
+        setLogs(data.logs);
+        setTotalLogs(data.total);
+        setTotalPages(data.totalPages);
+        if (page > data.totalPages) {
+          setPage(data.totalPages);
+        }
+      } catch (error) {
+        console.error("Error fetching access logs:", error);
+        if (!isMounted) return;
+
+        setLoadError(getAccessLogsErrorMessage(error));
+      } finally {
+        window.clearTimeout(watchdog);
+        if (isMounted) setLoading(false);
+      }
     };
 
     fetchLogs();
-  }, [page]);
+
+    return () => {
+      isMounted = false;
+      window.clearTimeout(watchdog);
+    };
+  }, [page, reloadKey]);
 
   const pageStart = totalLogs === 0 ? 0 : (page - 1) * LOGS_PER_PAGE + 1;
   const pageEnd = Math.min(page * LOGS_PER_PAGE, totalLogs);
@@ -64,23 +127,46 @@ export default function AccessLogs() {
               </tr>
             </thead>
             <tbody className="divide-y divide-synth-border/80">
-              {logs.map((log) => (
-                <tr key={log.id} className="hover:bg-synth-primary/5 transition-colors">
-                  <td className="p-4">
-                    {log.profiles ? (
-                      <span className="text-white font-bold">@{log.profiles.username}</span>
-                    ) : (
-                      <span className="text-gray-400 italic">Guest</span>
-                    )}
-                  </td>
-                  <td className="p-4 text-gray-400 text-sm">
-                    {log.path || "/"}
-                  </td>
-                  <td className="p-4 text-gray-400 text-sm">
-                    {new Date(log.created_at).toLocaleString()}
+              {loadError ? (
+                <tr>
+                  <td colSpan={3} className="p-10 text-center text-sm text-red-300">
+                    <div className="flex flex-col items-center gap-4">
+                      <span>{loadError}</span>
+                      <button
+                        type="button"
+                        onClick={() => setReloadKey((key) => key + 1)}
+                        className="h-10 rounded-lg border border-red-400/40 bg-red-500/10 px-4 text-sm font-semibold text-red-200 transition-colors hover:border-red-300 hover:bg-red-500/20"
+                      >
+                        Retry
+                      </button>
+                    </div>
                   </td>
                 </tr>
-              ))}
+              ) : logs.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="p-10 text-center text-sm text-gray-500">
+                    No access logs found.
+                  </td>
+                </tr>
+              ) : (
+                logs.map((log) => (
+                  <tr key={log.id} className="hover:bg-synth-primary/5 transition-colors">
+                    <td className="p-4">
+                      {log.profiles ? (
+                        <span className="text-white font-bold">@{log.profiles.username}</span>
+                      ) : (
+                        <span className="text-gray-400 italic">Guest</span>
+                      )}
+                    </td>
+                    <td className="p-4 text-gray-400 text-sm">
+                      {log.path || "/"}
+                    </td>
+                    <td className="p-4 text-gray-400 text-sm">
+                      {new Date(log.created_at).toLocaleString()}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>

@@ -19,11 +19,42 @@ const accessLogQuerySchema = z.object({
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 type SupabaseAnonLike = NonNullable<typeof supabaseAnon>;
 
+type AccessLogRow = {
+  created_at: string;
+  id: string;
+  path: string | null;
+  user_id: string | null;
+};
+
+type ProfileRow = {
+  id: string;
+  username: string | null;
+};
+
+type SupabaseErrorDetails = {
+  code?: string;
+  details?: string;
+  hint?: string;
+  message?: string;
+};
+
 type AccessLogRouteOptions = {
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
   supabaseAnon?: SupabaseAnonLike | null;
 };
+
+function getSupabaseErrorDetails(error: unknown): SupabaseErrorDetails | undefined {
+  if (!error || typeof error !== "object") return undefined;
+
+  const supabaseError = error as SupabaseErrorDetails;
+  return {
+    code: supabaseError.code,
+    details: supabaseError.details,
+    hint: supabaseError.hint,
+    message: supabaseError.message,
+  };
+}
 
 export async function registerAccessLogRoutes(
   app: FastifyInstance,
@@ -88,7 +119,10 @@ export async function registerAccessLogRoutes(
         .maybeSingle<{ role: string | null }>();
       if (profileError) {
         request.log.error({ err: profileError }, "Failed to load admin profile");
-        return reply.status(500).send({ error: "Failed to authorize logs" });
+        return reply.status(500).send({
+          details: getSupabaseErrorDetails(profileError),
+          error: "Failed to authorize logs",
+        });
       }
       if (!["admin", "super_admin"].includes(profile?.role || "")) {
         return reply.status(403).send({ error: "Admin access required" });
@@ -105,7 +139,7 @@ export async function registerAccessLogRoutes(
 
       const { count, data, error } = await service
         .from("access_logs")
-        .select("id,created_at,user_id,path,profiles(username)", {
+        .select("id,created_at,user_id,path", {
           count: "exact",
         })
         .order("created_at", { ascending: false })
@@ -113,12 +147,51 @@ export async function registerAccessLogRoutes(
 
       if (error) {
         request.log.error({ err: error }, "Failed to load access logs");
-        return reply.status(500).send({ error: "Failed to load access logs" });
+        return reply.status(500).send({
+          details: getSupabaseErrorDetails(error),
+          error: "Failed to load access logs",
+        });
+      }
+
+      const logs = (data || []) as AccessLogRow[];
+      const userIds = Array.from(
+        new Set(
+          logs
+            .map((log) => log.user_id)
+            .filter((userId): userId is string => Boolean(userId)),
+        ),
+      );
+      const profileMap = new Map<string, ProfileRow>();
+
+      if (userIds.length > 0) {
+        const { data: profiles, error: profilesError } = await service
+          .from("profiles")
+          .select("id,username")
+          .in("id", userIds)
+          .returns<ProfileRow[]>();
+
+        if (profilesError) {
+          request.log.warn(
+            { err: profilesError },
+            "Failed to hydrate access log profiles",
+          );
+        } else {
+          for (const profile of profiles || []) {
+            profileMap.set(profile.id, profile);
+          }
+        }
       }
 
       const total = count || 0;
       return {
-        logs: data || [],
+        logs: logs.map((log) => ({
+          ...log,
+          profiles: log.user_id
+            ? {
+                username: profileMap.get(log.user_id)?.username || null,
+              }
+            : null,
+        })),
         page,
         pageSize,
         total,

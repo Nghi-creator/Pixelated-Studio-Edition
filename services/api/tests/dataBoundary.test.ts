@@ -40,7 +40,7 @@ type RecordRow = Record<string, unknown>;
 
 type Filter = {
   field: string;
-  op: "eq" | "gte" | "ilike";
+  op: "eq" | "gte" | "ilike" | "in";
   value: unknown;
 };
 
@@ -130,6 +130,11 @@ class FakeQueryBuilder {
 
   ilike(field: string, value: string) {
     this.filters.push({ field, op: "ilike", value });
+    return this;
+  }
+
+  in(field: string, value: unknown[]) {
+    this.filters.push({ field, op: "in", value });
     return this;
   }
 
@@ -292,6 +297,9 @@ class FakeQueryBuilder {
           return new RegExp(`^${pattern}$`, "i").test(
             String(row[filter.field] || ""),
           );
+        }
+        if (filter.op === "in" && Array.isArray(filter.value)) {
+          return filter.value.includes(row[filter.field]);
         }
 
         return row[filter.field] === filter.value;
@@ -625,7 +633,7 @@ test("admin access logs are paginated server-side", async () => {
 
   assert.equal(response.statusCode, 200);
   const body = response.json<{
-    logs: { id: string }[];
+    logs: { id: string; profiles: { username: string | null } | null }[];
     page: number;
     pageSize: number;
     total: number;
@@ -633,6 +641,8 @@ test("admin access logs are paginated server-side", async () => {
   }>();
   assert.equal(body.logs.length, 10);
   assert.equal(body.logs[0]?.id, "log-20");
+  assert.equal(body.logs[0]?.profiles?.username, "player");
+  assert.equal(body.logs[1]?.profiles, null);
   assert.equal(body.page, 2);
   assert.equal(body.pageSize, 10);
   assert.equal(body.total, 30);

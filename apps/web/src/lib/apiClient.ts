@@ -2,6 +2,7 @@ import { supabase } from "./supabaseClient";
 
 const LOCAL_API_URL = "http://127.0.0.1:4000";
 const PRODUCTION_API_URL = "https://pixelated-api-services.onrender.com";
+const DEFAULT_API_TIMEOUT_MS = 30_000;
 
 const isLocalBrowserHost = () => {
   if (typeof window === "undefined") return true;
@@ -21,6 +22,7 @@ export const API_URL =
 
 type ApiRequestOptions = RequestInit & {
   authenticated?: boolean;
+  timeoutMs?: number;
 };
 
 export class ApiError extends Error {
@@ -35,9 +37,34 @@ export class ApiError extends Error {
   }
 }
 
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  message: string,
+) {
+  let timeout: number | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeout = window.setTimeout(() => {
+          reject(new ApiError(0, { error: message }));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout !== undefined) window.clearTimeout(timeout);
+  }
+}
+
 export async function apiRequest<T>(
   path: string,
-  { authenticated = true, headers, ...options }: ApiRequestOptions = {},
+  {
+    authenticated = true,
+    headers,
+    timeoutMs = DEFAULT_API_TIMEOUT_MS,
+    ...options
+  }: ApiRequestOptions = {},
 ) {
   const requestHeaders = new Headers(headers);
   requestHeaders.set("Accept", "application/json");
@@ -49,17 +76,51 @@ export async function apiRequest<T>(
   if (authenticated) {
     const {
       data: { session },
-    } = await supabase.auth.getSession();
+    } = await withTimeout(
+      supabase.auth.getSession(),
+      timeoutMs,
+      "Authentication did not respond in time. Refresh the page and try again.",
+    );
 
     if (session?.access_token) {
       requestHeaders.set("Authorization", `Bearer ${session.access_token}`);
     }
   }
 
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: requestHeaders,
-  });
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+  const requestSignal = options.signal;
+
+  if (requestSignal?.aborted) {
+    controller.abort();
+  } else {
+    requestSignal?.addEventListener("abort", () => controller.abort(), {
+      once: true,
+    });
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      ...options,
+      headers: requestHeaders,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ApiError(0, {
+        error:
+          "The API did not respond in time. The backend may be waking up; try again shortly.",
+      });
+    }
+
+    throw error;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
