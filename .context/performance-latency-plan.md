@@ -58,6 +58,8 @@ Important timing fields:
 
 ### Phase 2: Add Database Indexes
 
+Status: implemented locally on 2026-06-04.
+
 Use Phase 1 timings to confirm exact hot queries. Likely migration candidates:
 
 - `games(title)` for catalog ordering.
@@ -69,7 +71,30 @@ Use Phase 1 timings to confirm exact hot queries. Likely migration candidates:
 - `reported_comments(created_at DESC)` and status/filter indexes for moderation.
 - `access_logs(session_id)` and `access_logs(last_seen_at DESC)` for session tracking.
 
+Implemented migration:
+
+- `supabase/migrations/20260604100000_performance_hot_path_indexes.sql`
+
+Indexes added:
+
+- `games_title_idx`
+- `games_play_count_desc_idx`
+- `profiles_role_idx`
+- `profiles_created_at_desc_idx`
+- `profiles_username_idx`
+- `reported_comments_created_at_desc_idx`
+- `reported_comments_comment_id_idx`
+- `reported_comments_reporter_id_idx`
+- `access_logs_user_id_idx`
+- `access_logs_last_seen_at_desc_idx`
+
 ### Phase 3: Cache Safe Public Reads
+
+Agreed caching order:
+
+1. Use Vercel/browser cache headers first where safe.
+2. Use backend in-memory TTL cache second for public catalog/featured reads.
+3. Keep Postgres indexes as the baseline database-side fix before adding Redis.
 
 Start simple with in-memory TTL cache in the API:
 
@@ -96,4 +121,4 @@ Improve perceived speed:
 
 ## Current Step
 
-Phase 1 is first. Do not add broad caching or indexes until timing logs show the slowest segment.
+Phase 1 timing visibility and Phase 2 hot-path indexes are implemented locally. Next caching work should follow the agreed Phase 3 order: cache headers first where useful, then backend in-memory TTL cache for public catalog and featured games.
