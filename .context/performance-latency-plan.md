@@ -114,11 +114,23 @@ Implemented:
 
 ### Phase 4: Cache Short-Lived Permission Checks
 
+Status: started locally on 2026-06-04.
+
 Add a tiny backend TTL cache for `user_id -> role` lookups:
 
 - TTL: 30-60 seconds.
 - Invalidate naturally by expiry.
 - Keep super-admin/user permission routes authoritative enough for current scale.
+
+Implemented:
+
+- Added a shared backend role cache with a 45-second TTL.
+- Admin page-load routes use the cached role lookup:
+  - `GET /admin/users`
+  - `GET /admin/reports`
+  - `GET /admin/access-logs`
+- Render timing logs include `roleCache: hit | miss` on these routes.
+- Admin user role updates clear the cached role for the actor and target user.
 
 ### Phase 5: Avatar Loading Optimization
 

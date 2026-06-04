@@ -4,6 +4,10 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import {
+  clearCachedUserRole,
+  getCachedUserRole,
+} from "../modules/auth/roleCache.js";
 import { logTiming, timed } from "../modules/observability/timing.js";
 
 const usersQuerySchema = z.object({
@@ -40,14 +44,10 @@ async function requireSuperAdmin(
 ) {
   if (!service) return false;
 
-  const { data, error } = await service
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle<ProfileRole>();
+  const { error, role } = await getCachedUserRole(service, userId);
 
   if (error) throw error;
-  return isSuperAdminRole(data?.role);
+  return isSuperAdminRole(role);
 }
 
 export async function registerAdminUserRoutes(
@@ -72,11 +72,16 @@ export async function registerAdminUserRoutes(
       }
 
       const timings = {};
-      const isSuperAdmin = await timed(timings, "admin_role_check_ms", () =>
-        requireSuperAdmin(service, user.id),
+      const roleLookup = await timed(timings, "admin_role_check_ms", () =>
+        getCachedUserRole(service, user.id),
       );
 
-      if (!isSuperAdmin) {
+      if (roleLookup.error) {
+        request.log.error({ err: roleLookup.error }, "Failed to load admin role");
+        return reply.status(500).send({ error: "Failed to authorize users" });
+      }
+
+      if (!isSuperAdminRole(roleLookup.role)) {
         return reply.status(403).send({ error: "Super admin access required" });
       }
 
@@ -114,6 +119,7 @@ export async function registerAdminUserRoutes(
         page,
         pageSize,
         resultCount: data?.length || 0,
+        roleCache: roleLookup.cache,
         search: Boolean(search),
         total,
       });
@@ -177,6 +183,8 @@ export async function registerAdminUserRoutes(
         return reply.status(500).send({ error: "Failed to update user" });
       }
 
+      clearCachedUserRole(params.data.userId);
+      clearCachedUserRole(user.id);
       return { user: data };
     },
   );

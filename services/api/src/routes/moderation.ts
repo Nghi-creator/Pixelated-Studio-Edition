@@ -4,6 +4,7 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import { getCachedUserRole } from "../modules/auth/roleCache.js";
 import { logTiming, timed } from "../modules/observability/timing.js";
 
 const commentParamsSchema = z.object({
@@ -128,23 +129,18 @@ export async function registerModerationRoutes(
       }
 
       const timings = {};
-      const { data: actorProfile, error: actorError } = await timed(
+      const roleLookup = await timed(
         timings,
         "admin_role_check_ms",
-        () =>
-          service
-            .from("profiles")
-            .select("role")
-            .eq("id", user.id)
-            .maybeSingle<ProfileRole>(),
+        () => getCachedUserRole(service, user.id),
       );
 
-      if (actorError) {
-        request.log.error(actorError, "Failed to load moderator profile");
+      if (roleLookup.error) {
+        request.log.error(roleLookup.error, "Failed to load moderator profile");
         return reply.status(500).send({ error: "Failed to authorize reports" });
       }
 
-      if (!isAdminRole(actorProfile?.role)) {
+      if (!isAdminRole(roleLookup.role)) {
         return reply.status(403).send({ error: "Admin access required" });
       }
 
@@ -191,6 +187,7 @@ export async function registerModerationRoutes(
         page,
         pageSize,
         resultCount: data?.length || 0,
+        roleCache: roleLookup.cache,
         total,
       });
 

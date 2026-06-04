@@ -6,6 +6,7 @@ import {
   supabaseAnon,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import { getCachedUserRole } from "../modules/auth/roleCache.js";
 import { logTiming, timed } from "../modules/observability/timing.js";
 
 const accessLogBodySchema = z.object({
@@ -147,24 +148,19 @@ export async function registerAccessLogRoutes(
       }
 
       const timings = {};
-      const { data: profile, error: profileError } = await timed(
+      const roleLookup = await timed(
         timings,
         "admin_role_check_ms",
-        () =>
-          service
-            .from("profiles")
-            .select("role")
-            .eq("id", user.id)
-            .maybeSingle<{ role: string | null }>(),
+        () => getCachedUserRole(service, user.id),
       );
-      if (profileError) {
-        request.log.error({ err: profileError }, "Failed to load admin profile");
+      if (roleLookup.error) {
+        request.log.error({ err: roleLookup.error }, "Failed to load admin profile");
         return reply.status(500).send({
-          details: getSupabaseErrorDetails(profileError),
+          details: getSupabaseErrorDetails(roleLookup.error),
           error: "Failed to authorize logs",
         });
       }
-      if (!["admin", "super_admin"].includes(profile?.role || "")) {
+      if (!["admin", "super_admin"].includes(roleLookup.role || "")) {
         return reply.status(403).send({ error: "Admin access required" });
       }
 
@@ -198,6 +194,7 @@ export async function registerAccessLogRoutes(
         page,
         pageSize,
         resultCount: logs.length,
+        roleCache: roleLookup.cache,
         total,
       });
 
