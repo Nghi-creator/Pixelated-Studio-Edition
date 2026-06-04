@@ -5,7 +5,11 @@ import {
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
 import { TtlCache } from "../modules/cache/ttlCache.js";
-import { logTiming, timed } from "../modules/observability/timing.js";
+import {
+  logTiming,
+  timed,
+  type TimingFields,
+} from "../modules/observability/timing.js";
 
 const gameParamsSchema = z.object({ gameId: z.string().min(1).max(200) });
 const gamesQuerySchema = z.object({
@@ -23,6 +27,8 @@ const commentBodySchema = z.object({
 const reactionBodySchema = z.object({
   isLike: z.boolean().nullable(),
 });
+const FEATURED_GAME_LIMIT = 3;
+const ZERO_PLAY_FEATURED_POOL_LIMIT = 5;
 
 type ProfileRole = {
   role: string | null;
@@ -44,8 +50,23 @@ type GamesCatalogResponse = {
   totalPages: number;
 };
 
+type CachedGamesCatalogResponse = Omit<GamesCatalogResponse, "featuredGames">;
+
 function isAdminRole(role: string | null | undefined) {
   return role === "admin" || role === "super_admin";
+}
+
+function shuffleRows<T>(rows: T[]) {
+  const shuffled = [...rows];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = Math.floor(Math.random() * (index + 1));
+    const currentRow = shuffled[index];
+    const swapRow = shuffled[swapIndex];
+    if (currentRow === undefined || swapRow === undefined) continue;
+    shuffled[index] = swapRow;
+    shuffled[swapIndex] = currentRow;
+  }
+  return shuffled;
 }
 
 async function getUserRole(service: SupabaseServiceLike | null, userId: string) {
@@ -67,7 +88,37 @@ export async function registerCatalogRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
-  const gamesCatalogCache = new TtlCache<GamesCatalogResponse>(60_000);
+  const gamesCatalogCache = new TtlCache<CachedGamesCatalogResponse>(60_000);
+
+  const fetchFeaturedGames = async (timings: TimingFields) => {
+    const { data, error } = await timed(
+      timings,
+      "featured_games_query_ms",
+      () =>
+        service!
+          .from("games")
+          .select("id,title,cover_url,backdrop_url,play_count")
+          .order("play_count", { ascending: false })
+          .limit(100),
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    const featuredPool = data || [];
+    if (featuredPool.length === 0) return [];
+
+    const hasAnyPlays = featuredPool.some(
+      (game) =>
+        typeof game.play_count === "number" && game.play_count > 0,
+    );
+
+    return (hasAnyPlays ? featuredPool : shuffleRows(featuredPool)).slice(
+      0,
+      hasAnyPlays ? FEATURED_GAME_LIMIT : ZERO_PLAY_FEATURED_POOL_LIMIT,
+    );
+  };
 
   app.get("/games", async (request, reply) => {
     if (!service) {
@@ -90,6 +141,13 @@ export async function registerCatalogRoutes(
     });
     const cachedResponse = gamesCatalogCache.get(cacheKey);
     if (cachedResponse) {
+      let featuredGames: unknown[] = [];
+      try {
+        featuredGames = await fetchFeaturedGames(timings);
+      } catch (err) {
+        request.log.warn({ err }, "Failed to load featured games");
+      }
+
       reply.header("Cache-Control", "public, max-age=30, s-maxage=60");
       reply.header("X-Pixelated-Cache", "HIT");
       logTiming(request.log, "Games catalog timing", timings, {
@@ -100,7 +158,10 @@ export async function registerCatalogRoutes(
         search: Boolean(search),
         total: cachedResponse.total,
       });
-      return cachedResponse;
+      return {
+        ...cachedResponse,
+        featuredGames,
+      };
     }
 
     const start = (page - 1) * pageSize;
@@ -126,24 +187,16 @@ export async function registerCatalogRoutes(
       return reply.status(500).send({ error: "Failed to load games" });
     }
 
-    const { data: featuredData, error: featuredError } = await timed(
-      timings,
-      "featured_games_query_ms",
-      () =>
-        service
-          .from("games")
-          .select("id,title,cover_url,backdrop_url,play_count")
-          .order("play_count", { ascending: false })
-          .limit(3),
-    );
-
-    if (featuredError) {
-      request.log.warn({ err: featuredError }, "Failed to load featured games");
+    let featuredGames: unknown[] = [];
+    try {
+      featuredGames = await fetchFeaturedGames(timings);
+    } catch (err) {
+      request.log.warn({ err }, "Failed to load featured games");
     }
 
     const total = count || 0;
     const response = {
-      featuredGames: featuredError ? [] : featuredData || [],
+      featuredGames,
       games: data || [],
       page,
       pageSize,
@@ -151,7 +204,13 @@ export async function registerCatalogRoutes(
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
     };
 
-    gamesCatalogCache.set(cacheKey, response);
+    gamesCatalogCache.set(cacheKey, {
+      games: response.games,
+      page: response.page,
+      pageSize: response.pageSize,
+      total: response.total,
+      totalPages: response.totalPages,
+    });
     reply.header("Cache-Control", "public, max-age=30, s-maxage=60");
     reply.header("X-Pixelated-Cache", "MISS");
     logTiming(request.log, "Games catalog timing", timings, {
@@ -164,6 +223,29 @@ export async function registerCatalogRoutes(
     });
 
     return response;
+  });
+
+  app.get("/games/featured", async (request, reply) => {
+    if (!service) {
+      return reply.status(503).send({
+        error: "Supabase service client is not configured for the API.",
+      });
+    }
+
+    const timings = {};
+    let featuredGames: unknown[] = [];
+    try {
+      featuredGames = await fetchFeaturedGames(timings);
+    } catch (err) {
+      request.log.warn({ err }, "Failed to load featured games");
+    }
+
+    reply.header("Cache-Control", "no-store");
+    logTiming(request.log, "Featured games timing", timings, {
+      resultCount: featuredGames.length,
+    });
+
+    return { featuredGames };
   });
 
   app.get("/games/:gameId", async (request, reply) => {

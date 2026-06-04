@@ -349,6 +349,10 @@ export type ApiPaginatedGamesResponse = {
   totalPages: number;
 };
 
+export type ApiFeaturedGamesResponse = {
+  featuredGames: ApiGame[];
+};
+
 export type ApiPaginatedUsersResponse<TUser> = {
   page: number;
   pageSize: number;
@@ -465,6 +469,11 @@ export const api = {
       authenticated: false,
     });
   },
+  featuredGames: () =>
+    apiRequest<ApiFeaturedGamesResponse>("/games/featured", {
+      authenticated: false,
+      cache: "no-store",
+    }),
   game: (gameId: string) =>
     apiRequest<{ game: ApiGame }>(`/games/${gameId}`, { authenticated: false }),
   gameComments: <TComment>(gameId: string, page: number) =>

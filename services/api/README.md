@@ -65,6 +65,7 @@ Implemented now:
 - Authenticated `GET /me`.
 - Authenticated `GET /me/permissions`.
 - `GET /games`.
+- `GET /games/featured`.
 - `GET /games/:gameId`.
 - Authenticated favorites routes.
 - Authenticated game reaction routes.
@@ -105,6 +106,7 @@ POST /access-logs
 GET /me
 GET /me/permissions
 GET /games
+GET /games/featured
 GET /games/:gameId
 GET /favorites
 GET /favorites/:gameId

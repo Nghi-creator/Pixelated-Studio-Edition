@@ -6,6 +6,7 @@ import { api } from "../../lib/apiClient";
 import { GameGridSkeleton, HeroSkeleton } from "../../components/ui/Skeleton";
 
 const GAMES_PER_PAGE = 15;
+const ZERO_PLAY_FEATURED_REFRESH_MS = 30_000;
 
 interface Game {
   id: string;
@@ -16,6 +17,10 @@ interface Game {
   play_count?: number | null;
 }
 
+const hasOnlyZeroPlayCounts = (games: Game[]) =>
+  games.length > 1 &&
+  games.every((game) => !game.play_count || game.play_count <= 0);
+
 export default function Landing() {
   const [games, setGames] = useState<Game[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,6 +30,17 @@ export default function Landing() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalGames, setTotalGames] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+
+  const fetchFeaturedGames = useCallback(async (isMounted = true) => {
+    try {
+      const data = await api.featuredGames();
+      if (isMounted && data.featuredGames.length > 0) {
+        setFeaturedGames(data.featuredGames);
+      }
+    } catch (error) {
+      console.error("Error fetching featured games:", error);
+    }
+  }, []);
 
   const fetchGames = useCallback(async (isMounted = true) => {
     try {
@@ -37,7 +53,11 @@ export default function Landing() {
       });
       if (isMounted) {
         setGames(data.games);
-        setFeaturedGames(data.featuredGames);
+        setFeaturedGames((currentFeaturedGames) =>
+          currentFeaturedGames.length > 0
+            ? currentFeaturedGames
+            : data.featuredGames,
+        );
         setTotalGames(data.total);
         setTotalPages(data.totalPages);
       }
@@ -62,6 +82,29 @@ export default function Landing() {
       window.clearTimeout(timeout);
     };
   }, [fetchGames, searchQuery]);
+
+  useEffect(() => {
+    let isMounted = true;
+    fetchFeaturedGames(isMounted);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fetchFeaturedGames]);
+
+  useEffect(() => {
+    if (!hasOnlyZeroPlayCounts(featuredGames)) return;
+
+    let isMounted = true;
+    const interval = window.setInterval(() => {
+      fetchFeaturedGames(isMounted);
+    }, ZERO_PLAY_FEATURED_REFRESH_MS);
+
+    return () => {
+      isMounted = false;
+      window.clearInterval(interval);
+    };
+  }, [featuredGames, fetchFeaturedGames]);
 
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStart = (safeCurrentPage - 1) * GAMES_PER_PAGE;

@@ -48,7 +48,7 @@ export function GameGridSkeleton({ count = 15 }: { count?: number }) {
 
 export function HeroSkeleton() {
   return (
-    <div className="relative h-[320px] w-full overflow-hidden bg-synth-bg md:h-[380px]">
+    <div className="relative h-[360px] w-full overflow-hidden bg-synth-bg md:h-[440px]">
       <Skeleton className="absolute inset-0 rounded-none" />
       <div className="absolute bottom-12 left-6 z-10 w-[min(540px,80vw)] space-y-4 md:left-16">
         <Skeleton className="h-8 w-3/4" />

@@ -528,6 +528,89 @@ test("catalog route caches public game pages briefly", async () => {
   await app.close();
 });
 
+test("catalog cache keeps featured games fresh", async () => {
+  const db = new FakeSupabase();
+  db.rows.games.push({
+    cover_url: "/a.png",
+    id: "cache-featured-a",
+    play_count: 1,
+    title: "Cache Featured Alpha",
+  });
+  const app = await createDataBoundaryApp(db);
+
+  const firstResponse = await app.inject({
+    method: "GET",
+    url: "/games?page=1&pageSize=15&search=cache-featured-alpha",
+  });
+  db.rows.games.push({
+    cover_url: "/b.png",
+    id: "cache-featured-b",
+    play_count: 20,
+    title: "Cache Featured Beta",
+  });
+  const secondResponse = await app.inject({
+    method: "GET",
+    url: "/games?page=1&pageSize=15&search=cache-featured-alpha",
+  });
+
+  assert.equal(firstResponse.statusCode, 200);
+  assert.equal(secondResponse.statusCode, 200);
+  assert.equal(secondResponse.headers["x-pixelated-cache"], "HIT");
+  assert.deepEqual(
+    secondResponse
+      .json<{ featuredGames: { id: string }[] }>()
+      .featuredGames.map((game) => game.id),
+    ["cache-featured-b", "cache-featured-a"],
+  );
+  await app.close();
+});
+
+test("featured games route bypasses shared catalog cache headers", async () => {
+  const db = new FakeSupabase();
+  db.rows.games.push({ id: "featured-a", play_count: 1, title: "Featured A" });
+  const app = await createDataBoundaryApp(db);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/games/featured",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers["cache-control"], "no-store");
+  assert.deepEqual(
+    response
+      .json<{ featuredGames: { id: string }[] }>()
+      .featuredGames.map((game) => game.id),
+    ["featured-a"],
+  );
+  await app.close();
+});
+
+test("featured games route returns a wider pool while all play counts are zero", async () => {
+  const db = new FakeSupabase();
+  db.rows.games.push(
+    { id: "zero-featured-a", play_count: 0, title: "Zero Featured A" },
+    { id: "zero-featured-b", play_count: 0, title: "Zero Featured B" },
+    { id: "zero-featured-c", play_count: 0, title: "Zero Featured C" },
+    { id: "zero-featured-d", play_count: 0, title: "Zero Featured D" },
+    { id: "zero-featured-e", play_count: 0, title: "Zero Featured E" },
+    { id: "zero-featured-f", play_count: 0, title: "Zero Featured F" },
+  );
+  const app = await createDataBoundaryApp(db);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/games/featured",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(
+    response.json<{ featuredGames: { id: string }[] }>().featuredGames.length,
+    5,
+  );
+  await app.close();
+});
+
 test("auth account methods expose provider metadata for login decisions", async () => {
   const db = new FakeSupabase();
   db.authUsers.push(
