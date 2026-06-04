@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
-import { api } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../ui/Avatar";
 
 export default function Navbar() {
@@ -60,7 +60,7 @@ export default function Navbar() {
       }
     };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    getAuthSession().then((session) => {
       fetchUserAndProfile(session?.user ?? null);
     });
 

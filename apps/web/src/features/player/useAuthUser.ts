@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { supabase } from "../../lib/supabaseClient";
+import { getAuthSession } from "../../lib/apiClient";
 
 export function useAuthUser() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    getAuthSession().then((session) => {
       setCurrentUser(session?.user ?? null);
     });
   }, []);

@@ -1,8 +1,10 @@
 import { supabase } from "./supabaseClient";
+import type { Session } from "@supabase/supabase-js";
 
 const LOCAL_API_URL = "http://127.0.0.1:4000";
 const PRODUCTION_API_URL = "https://pixelated-api-services.onrender.com";
 const DEFAULT_API_TIMEOUT_MS = 30_000;
+const CLIENT_CACHE_TTL_MS = 30_000;
 
 const isLocalBrowserHost = () => {
   if (typeof window === "undefined") return true;
@@ -35,6 +37,54 @@ export class ApiError extends Error {
     this.status = status;
     this.payload = payload;
   }
+}
+
+let sessionPromise: Promise<Session | null> | null = null;
+let permissionsCache:
+  | {
+      expiresAt: number;
+      promise: Promise<ApiPermissionsResponse>;
+      value?: ApiPermissionsResponse;
+    }
+  | null = null;
+let favoritesCache:
+  | {
+      expiresAt: number;
+      promise: Promise<Set<string>>;
+      value?: Set<string>;
+    }
+  | null = null;
+
+supabase.auth.onAuthStateChange(() => {
+  sessionPromise = null;
+  permissionsCache = null;
+  favoritesCache = null;
+});
+
+export async function getAuthSession() {
+  if (!sessionPromise) {
+    sessionPromise = supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => session ?? null)
+      .catch((error) => {
+        sessionPromise = null;
+        throw error;
+      });
+  }
+
+  return sessionPromise;
+}
+
+function isCacheFresh(cache: { expiresAt: number } | null) {
+  return Boolean(cache && cache.expiresAt > Date.now());
+}
+
+function clearFavoritesCache() {
+  favoritesCache = null;
+}
+
+function clearPermissionsCache() {
+  permissionsCache = null;
 }
 
 async function withTimeout<T>(
@@ -74,10 +124,8 @@ export async function apiRequest<T>(
   }
 
   if (authenticated) {
-    const {
-      data: { session },
-    } = await withTimeout(
-      supabase.auth.getSession(),
+    const session = await withTimeout(
+      getAuthSession(),
       timeoutMs,
       "Authentication did not respond in time. Refresh the page and try again.",
     );
@@ -128,6 +176,55 @@ export async function apiRequest<T>(
   }
 
   return payload as T;
+}
+
+async function getCachedPermissions(): Promise<ApiPermissionsResponse> {
+  if (isCacheFresh(permissionsCache) && permissionsCache) {
+    if (permissionsCache.value) return permissionsCache.value;
+    return permissionsCache.promise;
+  }
+
+  const promise = apiRequest<ApiPermissionsResponse>("/me/permissions").then(
+    (value) => {
+      if (permissionsCache) permissionsCache.value = value;
+      return value;
+    },
+  );
+  permissionsCache = {
+    expiresAt: Date.now() + CLIENT_CACHE_TTL_MS,
+    promise,
+  };
+  return promise;
+}
+
+type FavoriteLike = {
+  id?: string;
+  game_id?: string;
+};
+
+async function getFavoriteIds(): Promise<Set<string>> {
+  if (isCacheFresh(favoritesCache) && favoritesCache) {
+    if (favoritesCache.value) return favoritesCache.value;
+    return favoritesCache.promise;
+  }
+
+  const promise = apiRequest<{ favorites: FavoriteLike[] }>("/favorites").then(
+    ({ favorites }) => {
+      const favoriteIds = new Set(
+        favorites
+          .map((favorite) => favorite.id || favorite.game_id)
+          .filter((id): id is string => Boolean(id)),
+      );
+      if (favoritesCache) favoritesCache.value = favoriteIds;
+      return favoriteIds;
+    },
+  );
+
+  favoritesCache = {
+    expiresAt: Date.now() + CLIENT_CACHE_TTL_MS,
+    promise,
+  };
+  return promise;
 }
 
 export type ApiMeResponse = {
@@ -346,8 +443,9 @@ export const api = {
     apiRequest<void>(`/comments/${commentId}`, {
       method: "DELETE",
     }),
-  favoriteStatus: (gameId: string) =>
-    apiRequest<{ favorited: boolean }>(`/favorites/${gameId}`),
+  favoriteStatus: async (gameId: string) => ({
+    favorited: (await getFavoriteIds()).has(gameId),
+  }),
   games: ({
     page = 1,
     pageSize = 15,
@@ -410,7 +508,7 @@ export const api = {
       body: JSON.stringify({ engineUrl }),
       method: "POST",
     }),
-  permissions: () => apiRequest<ApiPermissionsResponse>("/me/permissions"),
+  permissions: () => getCachedPermissions(),
   postComment: (gameId: string, content: string) =>
     apiRequest<{ success: true }>(`/games/${gameId}/comments`, {
       body: JSON.stringify({ content }),
@@ -422,10 +520,13 @@ export const api = {
       body: JSON.stringify({ reason }),
       method: "POST",
     }),
-  saveFavorite: (gameId: string) =>
-    apiRequest<{ favorited: true }>(`/favorites/${gameId}`, {
+  saveFavorite: async (gameId: string) => {
+    const result = await apiRequest<{ favorited: true }>(`/favorites/${gameId}`, {
       method: "PUT",
-    }),
+    });
+    clearFavoritesCache();
+    return result;
+  },
   setCommentReaction: (commentId: string, isLike: boolean | null) =>
     apiRequest<{ reactions: { is_like: boolean; user_id: string }[] }>(
       `/comments/${commentId}/reaction`,
@@ -452,20 +553,26 @@ export const api = {
       body: JSON.stringify(metric),
       method: "POST",
     }),
-  removeFavorite: (gameId: string) =>
-    apiRequest<void>(`/favorites/${gameId}`, {
+  removeFavorite: async (gameId: string) => {
+    const result = await apiRequest<void>(`/favorites/${gameId}`, {
       method: "DELETE",
-    }),
+    });
+    clearFavoritesCache();
+    return result;
+  },
   updateAdminUser: (userId: string, patch: Partial<Pick<ApiProfile, "is_banned" | "role">>) =>
     apiRequest<{ user: ApiProfile }>(`/admin/users/${userId}`, {
       body: JSON.stringify(patch),
       method: "PATCH",
     }),
-  updateProfile: (payload: { avatarUrl: string | null; username: string }) =>
-    apiRequest<{ success: true }>("/profile", {
+  updateProfile: async (payload: { avatarUrl: string | null; username: string }) => {
+    const result = await apiRequest<{ success: true }>("/profile", {
       body: JSON.stringify(payload),
       method: "PATCH",
-    }),
+    });
+    clearPermissionsCache();
+    return result;
+  },
   users: <TUser = Required<ApiProfile>>({
     page = 1,
     pageSize = 25,

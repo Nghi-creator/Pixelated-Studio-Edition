@@ -17,7 +17,7 @@ import {
   hasEngineToken,
 } from "../../lib/engineAuth";
 import { engineEndpoint } from "../../lib/engineConfig";
-import { supabase } from "../../lib/supabaseClient";
+import { getAuthSession } from "../../lib/apiClient";
 
 export default function LocalVault() {
   const [localGames, setLocalGames] = useState<string[]>([]);
@@ -32,9 +32,7 @@ export default function LocalVault() {
 
   useEffect(() => {
     const initVault = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getAuthSession();
       const currentUserId = session?.user?.id || "anonymous";
       setUserId(currentUserId);
       if (hasEngineToken()) {

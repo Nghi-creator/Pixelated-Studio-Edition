@@ -9,7 +9,7 @@ import {
   Activity,
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
-import { api } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/apiClient";
 
 export default function AdminLayout() {
   const location = useLocation();
@@ -18,7 +18,7 @@ export default function AdminLayout() {
 
   useEffect(() => {
     const checkAccess = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const session = await getAuthSession();
       
       if (!session?.user) {
         navigate("/login");

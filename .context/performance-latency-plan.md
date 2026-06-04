@@ -16,6 +16,22 @@ Current likely causes:
 
 ## Implementation Phases
 
+### Phase 0: Reduce First-Load Request Storms
+
+Status: implemented locally on 2026-06-04.
+
+Goal: reduce latency on the first warm page load before backend caches have helped.
+
+Implemented:
+
+- Added shared client-side Supabase session coalescing through `getAuthSession()`.
+- `apiRequest()` now reuses the shared session promise instead of starting a new `supabase.auth.getSession()` call for every authenticated request.
+- Added a 30-second client permissions cache for `/me/permissions`.
+- Added a 30-second client favorites-id cache so homepage `GameCard`/hero favorite checks collapse into one `/favorites` request instead of one request per card.
+- Favorite mutations clear the favorites cache.
+- Profile updates clear the permissions/profile cache.
+- Converted the highest-impact startup paths to the shared session helper: Navbar, AdminLayout, admin pages, homepage favorite checks, Profile, Favorites, Local Vault, Multiplayer, player auth hook, WebRTC session boot, and access session tracking.
+
 ### Phase 1: Add Timing Visibility
 
 Status: implemented locally on 2026-06-04.

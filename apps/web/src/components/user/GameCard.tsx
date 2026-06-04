@@ -1,8 +1,7 @@
 import { Heart } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
-import { supabase } from "../../lib/supabaseClient";
-import { api } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/apiClient";
 
 interface GameCardProps {
   id: string;
@@ -16,9 +15,7 @@ export default function GameCard({ id, title, coverUrl }: GameCardProps) {
 
   useEffect(() => {
     const checkFavorite = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getAuthSession();
       if (!session) return;
 
       const data = await api.favoriteStatus(id);
@@ -32,9 +29,7 @@ export default function GameCard({ id, title, coverUrl }: GameCardProps) {
     e.preventDefault();
     e.stopPropagation();
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const session = await getAuthSession();
 
     if (!session) {
       alert("Please sign in to save games to your library!");

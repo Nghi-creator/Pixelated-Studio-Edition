@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { supabase } from "./supabaseClient";
-import { api } from "./apiClient";
+import { api, getAuthSession } from "./apiClient";
 
 const SESSION_ID_KEY = "pixelated_access_session_id";
 const LOGGED_STATE_PREFIX = "pixelated_logged_user_";
@@ -40,7 +40,7 @@ export function useSessionTracker() {
     };
 
     // First attempt to grab the user payload locally
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    getAuthSession().then((session) => {
       if (isSubscribed) {
         logSession(session?.user?.id || null);
       }

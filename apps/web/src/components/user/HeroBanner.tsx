@@ -1,8 +1,7 @@
 import { Play, Plus, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { supabase } from "../../lib/supabaseClient";
-import { api } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/apiClient";
 
 interface Game {
   id: string;
@@ -35,9 +34,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
     const checkFavoriteStatus = async () => {
       if (!currentGame) return;
 
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getAuthSession();
       if (!session) {
         setIsFavorited(false);
         return;
@@ -51,9 +48,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
   }, [currentGame]);
 
   const toggleFavorite = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
+    const session = await getAuthSession();
 
     if (!session) {
       alert("Please sign in to save games to your library!");

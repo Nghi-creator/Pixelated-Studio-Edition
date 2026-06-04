@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
 import { Check, LayoutDashboard, Filter } from "lucide-react";
 import ReportCard, { type Report } from "../../components/admin/ReportCard";
-import { api, ApiError, type ApiAdminReportAction } from "../../lib/apiClient";
+import {
+  api,
+  ApiError,
+  getAuthSession,
+  type ApiAdminReportAction,
+} from "../../lib/apiClient";
 
 const REPORTS_PER_PAGE = 25;
 
@@ -22,9 +26,7 @@ export default function Dashboard() {
     let isMounted = true;
 
     const fetchCurrentUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getAuthSession();
       if (session?.user) {
         if (isMounted) setCurrentUserId(session.user.id);
 

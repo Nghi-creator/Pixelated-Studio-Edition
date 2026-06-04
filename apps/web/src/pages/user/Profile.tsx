@@ -12,7 +12,7 @@ import {
 import Cropper from "react-easy-crop";
 import { supabase } from "../../lib/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
-import { api } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
 
 // ==========================================
@@ -115,11 +115,8 @@ export default function Profile() {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const {
-          data: { session },
-          error: authError,
-        } = await supabase.auth.getSession();
-        if (authError || !session) {
+        const session = await getAuthSession();
+        if (!session) {
           navigate("/login");
           return;
         }

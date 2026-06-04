@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "../../lib/supabaseClient";
 import { Search, Users } from "lucide-react";
-import { api } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
 
 const USERS_PER_PAGE = 25;
@@ -29,9 +28,7 @@ export default function UserManagement() {
     let isMounted = true;
 
     const fetchCurrentUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getAuthSession();
 
       if (session?.user && isMounted) {
         setCurrentUserId(session.user.id);

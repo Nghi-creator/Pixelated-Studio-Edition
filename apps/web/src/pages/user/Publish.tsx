@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../lib/supabaseClient";
-import { api } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/apiClient";
 
 export default function Publish() {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -82,9 +82,7 @@ export default function Publish() {
     setIsSubmitting(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getAuthSession();
 
       if (!session) {
         alert("Please sign in before submitting a game.");

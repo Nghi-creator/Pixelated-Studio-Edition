@@ -1,5 +1,4 @@
-import { api } from "./apiClient";
-import { supabase } from "./supabaseClient";
+import { api, getAuthSession } from "./apiClient";
 
 export type WebRTCStatus = "idle" | "connecting" | "playing" | "error";
 
@@ -15,9 +14,7 @@ export const resolveGameBootTarget = async (
   gameId: string,
   clientSessionId: string,
 ) => {
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const session = await getAuthSession();
   const userId = session?.user?.id || "anonymous";
 
   if (gameId.toLowerCase().endsWith(".nes")) {

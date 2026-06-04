@@ -14,14 +14,13 @@ import {
   Wifi,
 } from "lucide-react";
 import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
-import { api, type ApiGame } from "../../lib/apiClient";
+import { api, getAuthSession, type ApiGame } from "../../lib/apiClient";
 import {
   engineAuthHeaders,
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
 } from "../../lib/engineAuth";
 import { engineEndpoint, getEngineUrl } from "../../lib/engineConfig";
-import { supabase } from "../../lib/supabaseClient";
 
 type MultiplayerMode = "host" | "join";
 type GameSource = "cloud" | "local";
@@ -194,9 +193,7 @@ export default function Multiplayer() {
     setLocalMessage("");
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      const session = await getAuthSession();
       const userId = session?.user?.id || "anonymous";
       const response = await fetch(engineEndpoint("/local-games"), {
         headers: { "X-User-Id": userId, ...engineAuthHeaders() },

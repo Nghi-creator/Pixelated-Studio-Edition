@@ -1,9 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeartCrack, Loader2, Gamepad2, ArrowLeft } from "lucide-react";
-import { supabase } from "../../lib/supabaseClient";
 import GameCard from "../../components/user/GameCard";
-import { api } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/apiClient";
 
 interface SavedGame {
   id: string;
@@ -19,9 +18,7 @@ export default function Favorites() {
   useEffect(() => {
     const fetchFavoritesAndListen = async () => {
       try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        const session = await getAuthSession();
 
         if (!session) {
           navigate("/login");
