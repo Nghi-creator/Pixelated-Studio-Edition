@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import { api, getAuthSession } from "../../lib/apiClient";
+import { Skeleton } from "../ui/Skeleton";
 
 export default function AdminLayout() {
   const location = useLocation();
@@ -54,7 +55,11 @@ export default function AdminLayout() {
   if (!roleChecked) {
     return (
       <div className="h-screen bg-synth-bg flex items-center justify-center">
-        <div className="text-gray-400 font-bold animate-pulse text-lg">Authenticating Access...</div>
+        <div className="w-full max-w-sm rounded-xl border border-synth-border bg-synth-surface p-6 shadow-glow-card">
+          <Skeleton className="mx-auto mb-5 h-14 w-14 rounded-full" />
+          <Skeleton className="mx-auto mb-3 h-4 w-48" />
+          <Skeleton className="mx-auto h-3 w-32" />
+        </div>
       </div>
     );
   }

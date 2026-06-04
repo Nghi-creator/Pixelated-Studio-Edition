@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   AlertCircle,
+  ArrowLeft,
   CheckCircle2,
   Copy,
   Crown,
   Gamepad2,
-  Loader2,
   LogIn,
   Play,
   Search,
@@ -21,6 +21,7 @@ import {
   hasEngineToken,
 } from "../../lib/engineAuth";
 import { engineEndpoint, getEngineUrl } from "../../lib/engineConfig";
+import { Skeleton } from "../../components/ui/Skeleton";
 
 type MultiplayerMode = "host" | "join";
 type GameSource = "cloud" | "local";
@@ -50,6 +51,11 @@ const getJoinTarget = (invite: string) => {
 const getSessionFromInvite = (invite: string) => {
   const inviteUrl = getInvitePath(invite);
   return inviteUrl?.searchParams.get("session") || "";
+};
+
+const multiplayerBackState = {
+  backRoute: "/multiplayer",
+  backText: "Back to Multiplayer",
 };
 
 function ModeButton({
@@ -106,6 +112,7 @@ function CloudGameCard({ game }: { game: ApiGame }) {
   return (
     <Link
       className="group overflow-hidden rounded-lg border border-synth-border bg-synth-surface transition-all hover:border-synth-primary/60 hover:shadow-glow-primary-sm"
+      state={multiplayerBackState}
       to={`/play/${game.id}`}
     >
       <div className="aspect-[4/5] overflow-hidden bg-synth-bg">
@@ -132,6 +139,7 @@ function LocalGameCard({ game }: { game: LocalGame }) {
   return (
     <Link
       className="group flex min-h-44 flex-col justify-between rounded-lg border border-synth-border bg-synth-surface p-4 transition-all hover:border-synth-secondary/70 hover:shadow-glow-primary-sm"
+      state={multiplayerBackState}
       to={`/play/${encodeURIComponent(game.id)}`}
     >
       <div>
@@ -147,6 +155,26 @@ function LocalGameCard({ game }: { game: LocalGame }) {
         Host lobby
       </span>
     </Link>
+  );
+}
+
+function MultiplayerGameGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
+      {Array.from({ length: 10 }, (_, index) => (
+        <div
+          className="min-h-44 rounded-lg border border-synth-border bg-synth-surface p-4"
+          key={index}
+        >
+          <Skeleton className="mb-4 h-12 w-12 rounded-lg" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-4/5" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+          <Skeleton className="mt-10 h-3 w-20" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -249,6 +277,16 @@ export default function Multiplayer() {
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <div className="mb-6">
+        <Link
+          to="/"
+          className="inline-flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors font-medium group"
+        >
+          <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
+          Back to Library
+        </Link>
+      </div>
+
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div className="border-l-4 border-synth-secondary pl-3">
           <h1 className="text-3xl font-extrabold text-white">
@@ -407,15 +445,9 @@ export default function Multiplayer() {
           )}
 
           {gameSource === "cloud" && cloudLoading ? (
-            <div className="flex min-h-64 items-center justify-center text-gray-400">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Loading cloud games
-            </div>
+            <MultiplayerGameGridSkeleton />
           ) : gameSource === "local" && localLoading ? (
-            <div className="flex min-h-64 items-center justify-center text-gray-400">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Loading Local Vault
-            </div>
+            <MultiplayerGameGridSkeleton />
           ) : gameSource === "cloud" ? (
             filteredCloudGames.length > 0 ? (
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">

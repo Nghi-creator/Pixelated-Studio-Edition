@@ -3,6 +3,7 @@ import { Search } from "lucide-react";
 import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
 import { api } from "../../lib/apiClient";
+import { GameGridSkeleton, HeroSkeleton } from "../../components/ui/Skeleton";
 
 const GAMES_PER_PAGE = 15;
 
@@ -88,17 +89,13 @@ export default function Landing() {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  if (loading && games.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-[80vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-synth-primary shadow-glow-primary-sm"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col min-h-screen">
-      <HeroBanner featuredGames={featuredGames} />
+      {loading && featuredGames.length === 0 ? (
+        <HeroSkeleton />
+      ) : (
+        <HeroBanner featuredGames={featuredGames} />
+      )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
         {/* Header & Search Bar Row */}
@@ -128,7 +125,9 @@ export default function Landing() {
         </div>
 
         {/* The Game Grid */}
-        {loadError ? (
+        {loading && games.length === 0 ? (
+          <GameGridSkeleton />
+        ) : loadError ? (
           <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-8 text-center text-red-200">
             {loadError}
           </div>

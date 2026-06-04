@@ -128,6 +128,11 @@ Implemented:
 - Responses include `X-Pixelated-Cache: HIT` or `MISS` for browser/devtools and Render log debugging.
 - User-specific/admin routes are not cached.
 
+Later caching track:
+
+- Add Cloudflare in front of the hosted web/API surface after the custom domain is ready.
+- Add Redis only when the app needs shared cache across multiple backend instances, cache persistence across deploys, or heavier rate/session coordination than in-memory cache can safely provide.
+
 ### Phase 4: Cache Short-Lived Permission Checks
 
 Status: started locally on 2026-06-04.
@@ -164,6 +169,22 @@ Implemented:
 - Added a local reusable `Avatar` component with initials fallback, fixed dimensions, async image decoding, lazy loading by default, and broken-image fallback.
 - Removed remote `ui-avatars.com` generated fallback URLs from Navbar, Profile, Admin User Management, and game comments.
 - Real avatar URLs still load when present, but missing/slow/broken avatars no longer block visible UI or trigger an extra external generated-avatar request.
+
+### Phase 6: Skeleton Loading States
+
+Status: implemented locally on 2026-06-04.
+
+Goal: replace plain loading text and full-page spinners with shape-matching placeholders where the app is waiting on data.
+
+Implemented:
+
+- Added shared skeleton primitives for text, game grids, hero banners, admin tables, profile panels, and stream panels.
+- Replaced homepage initial spinner with hero and game-grid skeletons.
+- Replaced admin branch loading text with table-shaped skeleton panels.
+- Replaced profile and favorites full-page spinners with form/grid skeletons.
+- Replaced multiplayer game-list loading text with compact card skeletons.
+- Replaced WebRTC connecting spinner overlay with a stream-shaped skeleton.
+- Kept small button/upload/action spinners where they communicate an in-progress command rather than page/data loading.
 
 ## Current Step
 

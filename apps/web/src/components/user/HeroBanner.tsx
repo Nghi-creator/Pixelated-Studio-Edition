@@ -78,12 +78,12 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
 
   if (!featuredGames || featuredGames.length === 0) {
     return (
-      <div className="w-full h-[500px] md:h-[600px] bg-synth-bg animate-pulse"></div>
+      <div className="w-full h-[320px] md:h-[380px] bg-synth-bg animate-pulse"></div>
     );
   }
 
   return (
-    <div className="relative w-full h-[500px] md:h-[600px] transition-all duration-700 overflow-hidden group">
+    <div className="relative w-full h-[320px] md:h-[380px] transition-all duration-700 overflow-hidden group">
       {/* Gradients */}
       <div className="absolute inset-0 bg-gradient-to-r from-synth-bg via-synth-bg/65 to-transparent z-10"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-synth-bg via-synth-primary/10 to-transparent z-10"></div>
@@ -120,17 +120,18 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
       <div className="absolute top-1/2 left-0 transform -translate-y-1/2 z-20 w-full">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
-            <span className="px-3 py-1 rounded-full bg-synth-primary/20 text-synth-primary text-xs font-bold uppercase tracking-wide border border-synth-primary/50 mb-4 inline-block shadow-glow-primary-sm">
+            <span className="mb-3 inline-flex items-center gap-2 rounded-md border border-white/10 bg-white/10 px-2.5 py-1 text-[11px] font-bold uppercase text-synth-secondary shadow-glow-primary-sm backdrop-blur-md">
+              <span className="h-1.5 w-1.5 rounded-full bg-synth-primary shadow-glow-primary-sm" />
               Trending Now
             </span>
-            <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-4 text-white [text-shadow:0_0_40px_rgba(255,77,143,0.25),0_2px_12px_rgba(0,0,0,0.6)]">
+            <h1 className="mb-4 text-4xl font-extrabold text-white [text-shadow:0_0_40px_rgba(255,77,143,0.25),0_2px_12px_rgba(0,0,0,0.6)] md:text-6xl">
               {currentGame.title}
             </h1>
 
             <div className="flex flex-wrap gap-4">
               <button
                 onClick={() => navigate(`/play/${currentGame.id}`)}
-                className="bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-3 px-8 rounded-lg shadow-glow-primary transition-all flex items-center gap-2 active:scale-[0.98]"
+                className="bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-2.5 px-6 rounded-lg shadow-glow-primary transition-all flex items-center gap-2 active:scale-[0.98]"
               >
                 <Play className="w-5 h-5 fill-synth-ink" /> Play Now
               </button>
@@ -138,7 +139,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
               {/* Dynamic Add/Remove List Button */}
               <button
                 onClick={toggleFavorite}
-                className={`border font-bold py-3 px-8 rounded-lg transition-all flex items-center gap-2 ${
+                className={`border font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2 ${
                   isFavorited
                     ? "bg-synth-primary/10 border-synth-primary text-synth-primary hover:bg-synth-primary/20 shadow-glow-primary-sm"
                     : "bg-synth-surface/90 hover:bg-synth-elevated border-synth-border text-white hover:border-synth-secondary/50"
@@ -157,7 +158,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
             </div>
 
             {/* Little dot indicators at the bottom */}
-            <div className="flex gap-2 mt-8">
+            <div className="flex gap-2 mt-6">
               {featuredGames.map((_, idx) => (
                 <div
                   key={idx}
