@@ -33,7 +33,8 @@ Current status:
 - `GET /me` verifies a Supabase bearer token and returns the authenticated user id/email.
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - `GET /games` and `GET /games/:gameId` read approved game catalog metadata through the API.
-- `GET /games` accepts `page`, `pageSize`, and optional `search`; the backend returns paginated catalog metadata plus a small `featuredGames` list for the homepage hero.
+- `GET /games` accepts `page`, `pageSize`, and optional `search`; the backend returns paginated catalog metadata plus a compatibility `featuredGames` list.
+- `GET /games/featured` returns the uncached homepage hero list with `Cache-Control: no-store`, so banner rotation/random zero-play fallback is not frozen by the public catalog cache. When all sampled play counts are zero, the API returns up to 5 shuffled featured games and the homepage refreshes that pool every 30 seconds.
 - `GET /favorites`, `GET /favorites/:gameId`, `PUT /favorites/:gameId`, and `DELETE /favorites/:gameId` manage favorites through the API.
 - `GET /games/:gameId/reactions` and `PUT /games/:gameId/reaction` manage game reactions through the API.
 - `GET /games/:gameId/comments`, `POST /games/:gameId/comments`, `DELETE /comments/:commentId`, and `PUT /comments/:commentId/reaction` manage player comments and comment reactions through the API.

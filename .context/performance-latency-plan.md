@@ -111,21 +111,22 @@ Status: started locally on 2026-06-04.
 Agreed caching order:
 
 1. Use Vercel/browser cache headers first where safe.
-2. Use backend in-memory TTL cache second for public catalog/featured reads.
+2. Use backend in-memory TTL cache second for public catalog reads; keep featured banner selection uncached so zero-play rotation can vary.
 3. Keep Postgres indexes as the baseline database-side fix before adding Redis.
 
 Start simple with in-memory TTL cache in the API:
 
 - Cache `/games?page&pageSize&search` for 30-120 seconds.
-- Cache featured games separately for 60-300 seconds.
+- Do not cache featured games while the zero-play rotation fallback is active.
 - Do not cache user-specific admin data yet.
 
 Implemented:
 
-- `GET /games` now uses a per-process in-memory TTL cache for the complete public catalog response by `page`, `pageSize`, and normalized `search`.
+- `GET /games` now uses a per-process in-memory TTL cache for public catalog page data by `page`, `pageSize`, and normalized `search`.
 - TTL is 60 seconds.
 - Responses include `Cache-Control: public, max-age=30, s-maxage=60`.
 - Responses include `X-Pixelated-Cache: HIT` or `MISS` for browser/devtools and Render log debugging.
+- `GET /games/featured` is split out with `Cache-Control: no-store`; Landing calls it separately so hero rotation/random zero-play fallback is not frozen by the catalog cache. Zero-play featured responses return up to 5 shuffled games and the homepage refreshes that pool every 30 seconds while all featured play counts remain zero.
 - User-specific/admin routes are not cached.
 
 Later caching track:
