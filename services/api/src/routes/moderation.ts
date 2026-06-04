@@ -4,6 +4,8 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import { getCachedUserRole } from "../modules/auth/roleCache.js";
+import { logTiming, timed } from "../modules/observability/timing.js";
 
 const commentParamsSchema = z.object({
   commentId: z.string().uuid(),
@@ -126,18 +128,19 @@ export async function registerModerationRoutes(
         });
       }
 
-      const { data: actorProfile, error: actorError } = await service
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle<ProfileRole>();
+      const timings = {};
+      const roleLookup = await timed(
+        timings,
+        "admin_role_check_ms",
+        () => getCachedUserRole(service, user.id),
+      );
 
-      if (actorError) {
-        request.log.error(actorError, "Failed to load moderator profile");
+      if (roleLookup.error) {
+        request.log.error(roleLookup.error, "Failed to load moderator profile");
         return reply.status(500).send({ error: "Failed to authorize reports" });
       }
 
-      if (!isAdminRole(actorProfile?.role)) {
+      if (!isAdminRole(roleLookup.role)) {
         return reply.status(403).send({ error: "Admin access required" });
       }
 
@@ -150,24 +153,29 @@ export async function registerModerationRoutes(
       const start = (page - 1) * pageSize;
       const end = start + pageSize - 1;
 
-      const { data, count, error } = await service
-        .from("reported_comments")
-        .select(
-          `
-          id,
-          reason,
-          created_at,
-          comments (
-            id,
-            content,
-            profiles ( id, username, role )
-          ),
-          profiles ( id, username )
-        `,
-          { count: "exact" },
-        )
-        .order("created_at", { ascending: false })
-        .range(start, end);
+      const { data, count, error } = await timed(
+        timings,
+        "admin_reports_query_ms",
+        () =>
+          service
+            .from("reported_comments")
+            .select(
+              `
+              id,
+              reason,
+              created_at,
+              comments (
+                id,
+                content,
+                profiles ( id, username, role )
+              ),
+              profiles ( id, username )
+            `,
+              { count: "exact" },
+            )
+            .order("created_at", { ascending: false })
+            .range(start, end),
+      );
 
       if (error) {
         request.log.error(error, "Failed to load moderation reports");
@@ -175,6 +183,14 @@ export async function registerModerationRoutes(
       }
 
       const total = count || 0;
+      logTiming(request.log, "Admin reports timing", timings, {
+        page,
+        pageSize,
+        resultCount: data?.length || 0,
+        roleCache: roleLookup.cache,
+        total,
+      });
+
       return {
         page,
         pageSize,

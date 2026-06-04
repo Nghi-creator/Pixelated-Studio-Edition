@@ -504,6 +504,30 @@ test("catalog route paginates, searches, and returns featured games", async () =
   await app.close();
 });
 
+test("catalog route caches public game pages briefly", async () => {
+  const db = new FakeSupabase();
+  db.rows.games.push({ id: "cache-game-a", play_count: 1, title: "Cache Alpha" });
+  const app = await createDataBoundaryApp(db);
+
+  const firstResponse = await app.inject({
+    method: "GET",
+    url: "/games?page=1&pageSize=15&search=cache-alpha-unique",
+  });
+  db.rows.games.push({ id: "cache-game-b", play_count: 20, title: "Cache Alpha Unique" });
+  const secondResponse = await app.inject({
+    method: "GET",
+    url: "/games?page=1&pageSize=15&search=cache-alpha-unique",
+  });
+
+  assert.equal(firstResponse.statusCode, 200);
+  assert.equal(secondResponse.statusCode, 200);
+  assert.equal(firstResponse.headers["x-pixelated-cache"], "MISS");
+  assert.equal(secondResponse.headers["x-pixelated-cache"], "HIT");
+  assert.equal(firstResponse.json<{ total: number }>().total, 0);
+  assert.equal(secondResponse.json<{ total: number }>().total, 0);
+  await app.close();
+});
+
 test("auth account methods expose provider metadata for login decisions", async () => {
   const db = new FakeSupabase();
   db.authUsers.push(

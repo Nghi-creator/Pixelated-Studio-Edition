@@ -4,6 +4,11 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import {
+  clearCachedUserRole,
+  getCachedUserRole,
+} from "../modules/auth/roleCache.js";
+import { logTiming, timed } from "../modules/observability/timing.js";
 
 const usersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -39,14 +44,10 @@ async function requireSuperAdmin(
 ) {
   if (!service) return false;
 
-  const { data, error } = await service
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle<ProfileRole>();
+  const { error, role } = await getCachedUserRole(service, userId);
 
   if (error) throw error;
-  return isSuperAdminRole(data?.role);
+  return isSuperAdminRole(role);
 }
 
 export async function registerAdminUserRoutes(
@@ -70,7 +71,17 @@ export async function registerAdminUserRoutes(
         });
       }
 
-      if (!(await requireSuperAdmin(service, user.id))) {
+      const timings = {};
+      const roleLookup = await timed(timings, "admin_role_check_ms", () =>
+        getCachedUserRole(service, user.id),
+      );
+
+      if (roleLookup.error) {
+        request.log.error({ err: roleLookup.error }, "Failed to load admin role");
+        return reply.status(500).send({ error: "Failed to authorize users" });
+      }
+
+      if (!isSuperAdminRole(roleLookup.role)) {
         return reply.status(403).send({ error: "Super admin access required" });
       }
 
@@ -92,7 +103,11 @@ export async function registerAdminUserRoutes(
         usersQuery = usersQuery.ilike("username", `%${search}%`);
       }
 
-      const { data, count, error } = await usersQuery.range(start, end);
+      const { data, count, error } = await timed(
+        timings,
+        "admin_users_query_ms",
+        () => usersQuery.range(start, end),
+      );
 
       if (error) {
         request.log.error({ err: error }, "Failed to load users");
@@ -100,6 +115,15 @@ export async function registerAdminUserRoutes(
       }
 
       const total = count || 0;
+      logTiming(request.log, "Admin users timing", timings, {
+        page,
+        pageSize,
+        resultCount: data?.length || 0,
+        roleCache: roleLookup.cache,
+        search: Boolean(search),
+        total,
+      });
+
       return {
         page,
         pageSize,
@@ -159,6 +183,8 @@ export async function registerAdminUserRoutes(
         return reply.status(500).send({ error: "Failed to update user" });
       }
 
+      clearCachedUserRole(params.data.userId);
+      clearCachedUserRole(user.id);
       return { user: data };
     },
   );

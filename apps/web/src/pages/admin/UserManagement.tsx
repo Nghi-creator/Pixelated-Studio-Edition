@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../lib/supabaseClient";
 import { Search, Users } from "lucide-react";
 import { api } from "../../lib/apiClient";
+import { Avatar } from "../../components/ui/Avatar";
 
 const USERS_PER_PAGE = 25;
 
@@ -213,13 +214,10 @@ export default function UserManagement() {
                     {/* User Info */}
                     <td className="p-4">
                       <div className="flex items-center gap-3">
-                        <img
-                          src={
-                            user.avatar_url ||
-                            `https://ui-avatars.com/api/?name=${user.username}&background=FF4D8F&color=000000`
-                          }
+                        <Avatar
                           alt="avatar"
-                          className="w-10 h-10 rounded-full border border-synth-border object-cover"
+                          name={user.username || "Unknown"}
+                          src={user.avatar_url}
                         />
                         <div>
                           <div className="text-white font-bold flex items-center gap-2">

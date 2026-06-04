@@ -13,6 +13,7 @@ import {
 import { supabase } from "../../lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 import { api } from "../../lib/apiClient";
+import { Avatar } from "../ui/Avatar";
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
@@ -98,12 +99,6 @@ export default function Navbar() {
       navigate("/login");
     }
   };
-
-  const avatarUrl =
-    dbAvatarUrl ||
-    (user?.email
-      ? `https://ui-avatars.com/api/?name=${user.email}&background=FF4D8F&color=000000&bold=true`
-      : null);
 
   const isFavoritesPage = location.pathname === "/favorites";
   const isLocalPage = location.pathname === "/local";
@@ -195,10 +190,12 @@ export default function Navbar() {
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                     className="flex items-center gap-2 focus:outline-none"
                   >
-                    <img
-                      src={avatarUrl as string}
+                    <Avatar
                       alt="User Avatar"
-                      className="w-10 h-10 rounded-full border-2 border-transparent hover:border-synth-primary transition-all object-cover ring-0 hover:shadow-glow-primary-sm"
+                      className="border-2 border-transparent transition-all ring-0 hover:border-synth-primary hover:shadow-glow-primary-sm"
+                      loading="eager"
+                      name={dbUsername || user.email}
+                      src={dbAvatarUrl}
                     />
                   </button>
 
