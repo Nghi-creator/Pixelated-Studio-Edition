@@ -90,6 +90,8 @@ Indexes added:
 
 ### Phase 3: Cache Safe Public Reads
 
+Status: started locally on 2026-06-04.
+
 Agreed caching order:
 
 1. Use Vercel/browser cache headers first where safe.
@@ -101,6 +103,14 @@ Start simple with in-memory TTL cache in the API:
 - Cache `/games?page&pageSize&search` for 30-120 seconds.
 - Cache featured games separately for 60-300 seconds.
 - Do not cache user-specific admin data yet.
+
+Implemented:
+
+- `GET /games` now uses a per-process in-memory TTL cache for the complete public catalog response by `page`, `pageSize`, and normalized `search`.
+- TTL is 60 seconds.
+- Responses include `Cache-Control: public, max-age=30, s-maxage=60`.
+- Responses include `X-Pixelated-Cache: HIT` or `MISS` for browser/devtools and Render log debugging.
+- User-specific/admin routes are not cached.
 
 ### Phase 4: Cache Short-Lived Permission Checks
 

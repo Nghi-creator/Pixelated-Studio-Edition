@@ -4,6 +4,7 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import { TtlCache } from "../modules/cache/ttlCache.js";
 import { logTiming, timed } from "../modules/observability/timing.js";
 
 const gameParamsSchema = z.object({ gameId: z.string().min(1).max(200) });
@@ -34,6 +35,15 @@ type CatalogRouteOptions = {
   supabase?: SupabaseServiceLike | null;
 };
 
+type GamesCatalogResponse = {
+  featuredGames: unknown[];
+  games: unknown[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
 function isAdminRole(role: string | null | undefined) {
   return role === "admin" || role === "super_admin";
 }
@@ -57,6 +67,7 @@ export async function registerCatalogRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const gamesCatalogCache = new TtlCache<GamesCatalogResponse>(60_000);
 
   app.get("/games", async (request, reply) => {
     if (!service) {
@@ -72,6 +83,26 @@ export async function registerCatalogRoutes(
 
     const { page, pageSize, search } = query.data;
     const timings = {};
+    const cacheKey = JSON.stringify({
+      page,
+      pageSize,
+      search: search?.toLowerCase() || "",
+    });
+    const cachedResponse = gamesCatalogCache.get(cacheKey);
+    if (cachedResponse) {
+      reply.header("Cache-Control", "public, max-age=30, s-maxage=60");
+      reply.header("X-Pixelated-Cache", "HIT");
+      logTiming(request.log, "Games catalog timing", timings, {
+        cache: "hit",
+        page,
+        pageSize,
+        resultCount: cachedResponse.games.length,
+        search: Boolean(search),
+        total: cachedResponse.total,
+      });
+      return cachedResponse;
+    }
+
     const start = (page - 1) * pageSize;
     const end = start + pageSize - 1;
 
@@ -111,15 +142,7 @@ export async function registerCatalogRoutes(
     }
 
     const total = count || 0;
-    logTiming(request.log, "Games catalog timing", timings, {
-      page,
-      pageSize,
-      resultCount: data?.length || 0,
-      search: Boolean(search),
-      total,
-    });
-
-    return {
+    const response = {
       featuredGames: featuredError ? [] : featuredData || [],
       games: data || [],
       page,
@@ -127,6 +150,20 @@ export async function registerCatalogRoutes(
       total,
       totalPages: Math.max(1, Math.ceil(total / pageSize)),
     };
+
+    gamesCatalogCache.set(cacheKey, response);
+    reply.header("Cache-Control", "public, max-age=30, s-maxage=60");
+    reply.header("X-Pixelated-Cache", "MISS");
+    logTiming(request.log, "Games catalog timing", timings, {
+      cache: "miss",
+      page,
+      pageSize,
+      resultCount: data?.length || 0,
+      search: Boolean(search),
+      total,
+    });
+
+    return response;
   });
 
   app.get("/games/:gameId", async (request, reply) => {
