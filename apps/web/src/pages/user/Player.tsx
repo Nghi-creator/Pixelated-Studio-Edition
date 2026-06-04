@@ -26,6 +26,14 @@ import { useWebRTC } from "../../lib/useWebRTC";
 
 const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
 
+type PlayerBackState = {
+  backRoute?: unknown;
+  backText?: unknown;
+};
+
+const isPlayerBackState = (state: unknown): state is PlayerBackState =>
+  typeof state === "object" && state !== null;
+
 export default function Player() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
@@ -191,10 +199,19 @@ export default function Player() {
   }, []);
 
   const isLocalGame = id?.toLowerCase().endsWith(".nes");
-  const backRoute = isLocalGame ? "/local" : "/";
-  const backText = isLocalGame
+  const fallbackBackRoute = isLocalGame ? "/local" : "/";
+  const fallbackBackText = isLocalGame
     ? "Back to Local Vault"
     : "Back to Cloud Library";
+  const backState = isPlayerBackState(location.state) ? location.state : null;
+  const backRoute =
+    typeof backState?.backRoute === "string"
+      ? backState.backRoute
+      : fallbackBackRoute;
+  const backText =
+    typeof backState?.backText === "string"
+      ? backState.backText
+      : fallbackBackText;
   const shareUrl = useMemo(() => {
     const nextSearch = new URLSearchParams(location.search);
     nextSearch.set("session", sessionId);
