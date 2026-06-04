@@ -78,12 +78,12 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
 
   if (!featuredGames || featuredGames.length === 0) {
     return (
-      <div className="w-full h-[320px] md:h-[380px] bg-synth-bg animate-pulse"></div>
+      <div className="w-full h-[360px] md:h-[440px] bg-synth-bg animate-pulse"></div>
     );
   }
 
   return (
-    <div className="relative w-full h-[320px] md:h-[380px] transition-all duration-700 overflow-hidden group">
+    <div className="relative w-full h-[360px] md:h-[440px] transition-all duration-700 overflow-hidden group">
       {/* Gradients */}
       <div className="absolute inset-0 bg-gradient-to-r from-synth-bg via-synth-bg/65 to-transparent z-10"></div>
       <div className="absolute inset-0 bg-gradient-to-t from-synth-bg via-synth-primary/10 to-transparent z-10"></div>
@@ -92,7 +92,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
       {featuredGames.map((game, index) => (
         <img
           key={game.id}
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${index === currentIndex ? "opacity-80" : "opacity-0"}`}
+          className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-1000 ${index === currentIndex ? "opacity-80" : "opacity-0"}`}
           src={game.backdrop_url || game.cover_url}
           alt={game.title}
         />
