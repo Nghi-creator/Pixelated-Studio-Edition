@@ -1,7 +1,8 @@
-import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
+import { AlertTriangle, RotateCcw } from "lucide-react";
 import type { RefObject } from "react";
 import type { WebRTCStatus } from "../../lib/webrtcSession";
 import type { WebRTCTelemetry } from "../../lib/webrtcTelemetry";
+import { StreamSkeleton } from "../../components/ui/Skeleton";
 
 type StreamStageProps = {
   onRetry?: () => void;
@@ -22,10 +23,7 @@ export function StreamStage({
     <div className="relative w-full max-w-5xl aspect-video bg-black border border-synth-border rounded-xl overflow-hidden shadow-glow-card ring-1 ring-synth-primary/10 flex items-center justify-center">
       {status === "connecting" && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-synth-bg/90 backdrop-blur-sm">
-          <Loader2 className="w-12 h-12 text-synth-primary animate-spin mb-4 drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
-          <p className="text-lg text-gray-300 font-medium tracking-wide">
-            Establishing WebRTC Handshake...
-          </p>
+          <StreamSkeleton />
         </div>
       )}
       {status === "error" && (

@@ -7,6 +7,7 @@ import {
   getAuthSession,
   type ApiAdminReportAction,
 } from "../../lib/apiClient";
+import { ModerationQueueSkeleton } from "../../components/ui/Skeleton";
 
 const REPORTS_PER_PAGE = 25;
 
@@ -128,7 +129,7 @@ export default function Dashboard() {
   });
 
   if (loading) {
-    return <div className="text-gray-400">Loading moderation queue...</div>;
+    return <ModerationQueueSkeleton />;
   }
 
   const pageStart = totalReports === 0 ? 0 : (page - 1) * REPORTS_PER_PAGE + 1;

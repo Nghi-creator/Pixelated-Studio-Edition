@@ -14,6 +14,7 @@ import { supabase } from "../../lib/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
+import { ProfileSkeleton } from "../../components/ui/Skeleton";
 
 // ==========================================
 // UTILITY: Crop the image
@@ -304,8 +305,8 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[80vh]">
-        <Loader2 className="w-12 h-12 text-synth-primary animate-spin drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
+      <div className="flex min-h-screen flex-col">
+        <ProfileSkeleton />
       </div>
     );
   }

@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { HeartCrack, Loader2, Gamepad2, ArrowLeft } from "lucide-react";
+import { HeartCrack, Gamepad2, ArrowLeft } from "lucide-react";
 import GameCard from "../../components/user/GameCard";
 import { api, getAuthSession } from "../../lib/apiClient";
+import { GameGridSkeleton } from "../../components/ui/Skeleton";
 
 interface SavedGame {
   id: string;
@@ -40,8 +41,10 @@ export default function Favorites() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-[80vh]">
-        <Loader2 className="w-12 h-12 text-synth-primary animate-spin drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
+      <div className="flex min-h-screen flex-col">
+        <div className="mx-auto mt-20 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <GameGridSkeleton count={10} />
+        </div>
       </div>
     );
   }

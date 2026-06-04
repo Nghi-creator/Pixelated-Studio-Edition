@@ -6,7 +6,6 @@ import {
   Copy,
   Crown,
   Gamepad2,
-  Loader2,
   LogIn,
   Play,
   Search,
@@ -21,6 +20,7 @@ import {
   hasEngineToken,
 } from "../../lib/engineAuth";
 import { engineEndpoint, getEngineUrl } from "../../lib/engineConfig";
+import { Skeleton } from "../../components/ui/Skeleton";
 
 type MultiplayerMode = "host" | "join";
 type GameSource = "cloud" | "local";
@@ -147,6 +147,26 @@ function LocalGameCard({ game }: { game: LocalGame }) {
         Host lobby
       </span>
     </Link>
+  );
+}
+
+function MultiplayerGameGridSkeleton() {
+  return (
+    <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
+      {Array.from({ length: 10 }, (_, index) => (
+        <div
+          className="min-h-44 rounded-lg border border-synth-border bg-synth-surface p-4"
+          key={index}
+        >
+          <Skeleton className="mb-4 h-12 w-12 rounded-lg" />
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-4/5" />
+            <Skeleton className="h-3 w-2/3" />
+          </div>
+          <Skeleton className="mt-10 h-3 w-20" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -407,15 +427,9 @@ export default function Multiplayer() {
           )}
 
           {gameSource === "cloud" && cloudLoading ? (
-            <div className="flex min-h-64 items-center justify-center text-gray-400">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Loading cloud games
-            </div>
+            <MultiplayerGameGridSkeleton />
           ) : gameSource === "local" && localLoading ? (
-            <div className="flex min-h-64 items-center justify-center text-gray-400">
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-              Loading Local Vault
-            </div>
+            <MultiplayerGameGridSkeleton />
           ) : gameSource === "cloud" ? (
             filteredCloudGames.length > 0 ? (
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
