@@ -4,6 +4,7 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import { logTiming, timed } from "../modules/observability/timing.js";
 
 const usersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -70,7 +71,12 @@ export async function registerAdminUserRoutes(
         });
       }
 
-      if (!(await requireSuperAdmin(service, user.id))) {
+      const timings = {};
+      const isSuperAdmin = await timed(timings, "admin_role_check_ms", () =>
+        requireSuperAdmin(service, user.id),
+      );
+
+      if (!isSuperAdmin) {
         return reply.status(403).send({ error: "Super admin access required" });
       }
 
@@ -92,7 +98,11 @@ export async function registerAdminUserRoutes(
         usersQuery = usersQuery.ilike("username", `%${search}%`);
       }
 
-      const { data, count, error } = await usersQuery.range(start, end);
+      const { data, count, error } = await timed(
+        timings,
+        "admin_users_query_ms",
+        () => usersQuery.range(start, end),
+      );
 
       if (error) {
         request.log.error({ err: error }, "Failed to load users");
@@ -100,6 +110,14 @@ export async function registerAdminUserRoutes(
       }
 
       const total = count || 0;
+      logTiming(request.log, "Admin users timing", timings, {
+        page,
+        pageSize,
+        resultCount: data?.length || 0,
+        search: Boolean(search),
+        total,
+      });
+
       return {
         page,
         pageSize,

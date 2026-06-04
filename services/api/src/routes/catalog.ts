@@ -4,6 +4,7 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import { logTiming, timed } from "../modules/observability/timing.js";
 
 const gameParamsSchema = z.object({ gameId: z.string().min(1).max(200) });
 const gamesQuerySchema = z.object({
@@ -70,6 +71,7 @@ export async function registerCatalogRoutes(
     }
 
     const { page, pageSize, search } = query.data;
+    const timings = {};
     const start = (page - 1) * pageSize;
     const end = start + pageSize - 1;
 
@@ -82,24 +84,41 @@ export async function registerCatalogRoutes(
       gamesQuery = gamesQuery.ilike("title", `%${search}%`);
     }
 
-    const { data, count, error } = await gamesQuery.range(start, end);
+    const { data, count, error } = await timed(
+      timings,
+      "games_query_ms",
+      () => gamesQuery.range(start, end),
+    );
 
     if (error) {
       request.log.error({ err: error }, "Failed to load games");
       return reply.status(500).send({ error: "Failed to load games" });
     }
 
-    const { data: featuredData, error: featuredError } = await service
-      .from("games")
-      .select("id,title,cover_url,backdrop_url,play_count")
-      .order("play_count", { ascending: false })
-      .limit(3);
+    const { data: featuredData, error: featuredError } = await timed(
+      timings,
+      "featured_games_query_ms",
+      () =>
+        service
+          .from("games")
+          .select("id,title,cover_url,backdrop_url,play_count")
+          .order("play_count", { ascending: false })
+          .limit(3),
+    );
 
     if (featuredError) {
       request.log.warn({ err: featuredError }, "Failed to load featured games");
     }
 
     const total = count || 0;
+    logTiming(request.log, "Games catalog timing", timings, {
+      page,
+      pageSize,
+      resultCount: data?.length || 0,
+      search: Boolean(search),
+      total,
+    });
+
     return {
       featuredGames: featuredError ? [] : featuredData || [],
       games: data || [],

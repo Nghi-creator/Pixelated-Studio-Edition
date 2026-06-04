@@ -6,6 +6,7 @@ import {
   supabaseAnon,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import { logTiming, timed } from "../modules/observability/timing.js";
 
 const accessLogBodySchema = z.object({
   path: z.string().trim().min(1).max(2048),
@@ -75,41 +76,58 @@ export async function registerAccessLogRoutes(
     }
 
     let userId: string | null = null;
+    const timings = {};
     const token = getBearerToken(request);
     if (token && anon) {
-      const { data, error } = await anon.auth.getUser(token);
+      const { data, error } = await timed(timings, "auth_user_lookup_ms", () =>
+        anon.auth.getUser(token),
+      );
       if (!error && data.user) {
         userId = data.user.id;
       }
     }
 
     const now = new Date().toISOString();
-    const { data: existingLog, error: existingLogError } = await service
-      .from("access_logs")
-      .select("access_count")
-      .eq("session_id", parsedBody.data.sessionId)
-      .maybeSingle<{ access_count: number | null }>();
+    const { data: existingLog, error: existingLogError } = await timed(
+      timings,
+      "access_log_lookup_ms",
+      () =>
+        service
+          .from("access_logs")
+          .select("access_count")
+          .eq("session_id", parsedBody.data.sessionId)
+          .maybeSingle<{ access_count: number | null }>(),
+    );
 
     if (existingLogError) {
       request.log.error({ err: existingLogError }, "Failed to load access log session");
       return reply.status(500).send({ error: "Failed to create access log" });
     }
 
-    const { error } = await service.from("access_logs").upsert(
-      {
-        access_count: (existingLog?.access_count || 0) + 1,
-        last_seen_at: now,
-        path: parsedBody.data.path,
-        session_id: parsedBody.data.sessionId,
-        user_id: userId,
-      },
-      { onConflict: "session_id" },
+    const { error } = await timed(
+      timings,
+      "access_log_upsert_ms",
+      () =>
+        service.from("access_logs").upsert(
+          {
+            access_count: (existingLog?.access_count || 0) + 1,
+            last_seen_at: now,
+            path: parsedBody.data.path,
+            session_id: parsedBody.data.sessionId,
+            user_id: userId,
+          },
+          { onConflict: "session_id" },
+        ),
     );
 
     if (error) {
       request.log.error({ err: error }, "Failed to create access log");
       return reply.status(500).send({ error: "Failed to create access log" });
     }
+
+    logTiming(request.log, "Access log write timing", timings, {
+      authenticated: Boolean(userId),
+    });
 
     return reply.status(202).send({ success: true });
   });
@@ -128,11 +146,17 @@ export async function registerAccessLogRoutes(
         });
       }
 
-      const { data: profile, error: profileError } = await service
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle<{ role: string | null }>();
+      const timings = {};
+      const { data: profile, error: profileError } = await timed(
+        timings,
+        "admin_role_check_ms",
+        () =>
+          service
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .maybeSingle<{ role: string | null }>(),
+      );
       if (profileError) {
         request.log.error({ err: profileError }, "Failed to load admin profile");
         return reply.status(500).send({
@@ -150,10 +174,15 @@ export async function registerAccessLogRoutes(
       }
 
       const { page, pageSize } = parsedQuery.data;
-      const { data, error } = await service.rpc("admin_access_log_summary", {
-        p_page: page,
-        p_page_size: pageSize,
-      });
+      const { data, error } = await timed(
+        timings,
+        "access_log_summary_rpc_ms",
+        () =>
+          service.rpc("admin_access_log_summary", {
+            p_page: page,
+            p_page_size: pageSize,
+          }),
+      );
 
       if (error) {
         request.log.error({ err: error }, "Failed to load access logs");
@@ -165,6 +194,13 @@ export async function registerAccessLogRoutes(
 
       const logs = (data || []) as AccessLogRow[];
       const total = logs[0]?.total_count || 0;
+      logTiming(request.log, "Admin access logs timing", timings, {
+        page,
+        pageSize,
+        resultCount: logs.length,
+        total,
+      });
+
       return {
         logs: logs.map((log) => ({
           first_seen_at: log.first_seen_at,
