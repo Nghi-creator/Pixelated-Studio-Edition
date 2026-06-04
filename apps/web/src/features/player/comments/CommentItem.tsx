@@ -1,6 +1,7 @@
 import { Flag, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
 import type { GameComment } from "../types";
+import { Avatar } from "../../../components/ui/Avatar";
 
 type CommentItemProps = {
   comment: GameComment;
@@ -18,9 +19,6 @@ export function CommentItem({
   onReportComment,
 }: CommentItemProps) {
   const displayName = comment.profiles?.username || "Anonymous Player";
-  const avatar =
-    comment.profiles?.avatar_url ||
-    `https://ui-avatars.com/api/?name=${displayName}&background=FF4D8F&color=000000&bold=true`;
 
   let commentLikes = 0;
   let commentDislikes = 0;
@@ -36,10 +34,10 @@ export function CommentItem({
 
   return (
     <div className="flex gap-4 group">
-      <img
-        src={avatar}
+      <Avatar
         alt="Avatar"
-        className="w-10 h-10 rounded-full object-cover border border-synth-border"
+        name={displayName}
+        src={comment.profiles?.avatar_url}
       />
       <div className="flex-grow">
         <div className="flex justify-between items-start mb-1">

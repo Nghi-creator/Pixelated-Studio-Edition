@@ -134,12 +134,20 @@ Implemented:
 
 ### Phase 5: Avatar Loading Optimization
 
+Status: implemented locally on 2026-06-04.
+
 Improve perceived speed:
 
 - Render placeholders immediately.
 - Lazy-load non-critical avatars.
 - Ensure uploaded avatars use reasonably small images.
 - Consider an avatar proxy/cache later only if image timing proves it is the bottleneck.
+
+Implemented:
+
+- Added a local reusable `Avatar` component with initials fallback, fixed dimensions, async image decoding, lazy loading by default, and broken-image fallback.
+- Removed remote `ui-avatars.com` generated fallback URLs from Navbar, Profile, Admin User Management, and game comments.
+- Real avatar URLs still load when present, but missing/slow/broken avatars no longer block visible UI or trigger an extra external generated-avatar request.
 
 ## Current Step
 

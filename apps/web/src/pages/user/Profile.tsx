@@ -13,6 +13,7 @@ import Cropper from "react-easy-crop";
 import { supabase } from "../../lib/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { api } from "../../lib/apiClient";
+import { Avatar } from "../../components/ui/Avatar";
 
 // ==========================================
 // UTILITY: Crop the image
@@ -312,12 +313,7 @@ export default function Profile() {
     );
   }
 
-  const displayAvatar =
-    previewUrl ||
-    avatarUrl ||
-    (user?.email
-      ? `https://ui-avatars.com/api/?name=${user.email}&background=FF4D8F&color=000000&bold=true`
-      : "");
+  const displayAvatar = previewUrl || avatarUrl;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -491,10 +487,13 @@ export default function Profile() {
                   onClick={() => fileInputRef.current?.click()}
                   className="relative w-24 h-24 rounded-full overflow-hidden group cursor-pointer border-2 border-transparent hover:border-synth-primary transition-all shadow-lg ring-0 hover:shadow-glow-primary-sm"
                 >
-                  <img
-                    src={displayAvatar}
+                  <Avatar
                     alt="Avatar"
-                    className="w-full h-full object-cover"
+                    className="h-full w-full border-0"
+                    loading="eager"
+                    name={username || user?.email}
+                    size="lg"
+                    src={displayAvatar}
                   />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm">
                     <Camera className="w-6 h-6 text-white mb-1" />
