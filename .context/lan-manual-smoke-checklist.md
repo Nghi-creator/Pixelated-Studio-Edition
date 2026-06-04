@@ -1,6 +1,6 @@
 # LAN Multiplayer Manual Smoke Checklist
 
-Last updated: 2026-06-02
+Last updated: 2026-06-04
 
 Use this checklist for the real two-device LAN validation. The local two-browser smoke has already passed; this checklist is for the host desktop plus a separate guest device.
 
@@ -25,10 +25,11 @@ Use this checklist for the real two-device LAN validation. The local two-browser
 5. Open the host player and start a game.
 6. Confirm host stream reaches `LIVE STREAM ACTIVE`.
 7. Toggle stream telemetry on.
-8. Copy the host telemetry JSON after the guest joins.
-9. Press Regenerate in the desktop LAN panel and confirm the code/status updates without stopping the engine.
-10. Press Revoke and confirm the status says the invite is revoked while the engine remains active.
-11. Press Regenerate again before any additional guest join attempt.
+8. When the harness prints the bundle path, keep that folder open.
+9. Copy the host telemetry JSON after the guest joins and paste it into `host-stream-telemetry.json` in the bundle.
+10. Press Regenerate in the desktop LAN panel and confirm the code/status updates without stopping the engine.
+11. Press Revoke and confirm the status says the invite is revoked while the engine remains active.
+12. Press Regenerate again before any additional guest join attempt.
 
 ## Guest Steps
 
@@ -38,7 +39,7 @@ Use this checklist for the real two-device LAN validation. The local two-browser
 4. Join the invite/session as spectator first.
 5. Confirm guest stream reaches `LIVE STREAM ACTIVE`.
 6. Toggle stream telemetry on.
-7. Copy the guest telemetry JSON.
+7. Copy the guest telemetry JSON and paste it into `guest-stream-telemetry.json` in the bundle.
 8. Request P2, send a few inputs, then release the slot.
 9. Close the guest tab.
 
@@ -57,7 +58,22 @@ Use this checklist for the real two-device LAN validation. The local two-browser
 
 ## Record Results
 
-Paste these after the test:
+The harness creates one timestamped bundle under `.context/smoke-artifacts/`.
+Fill out `manual-smoke-notes.md` in that bundle while the run is fresh. Keep the
+copied Stream Stats JSON in:
+
+- `host-stream-telemetry.json`
+- `guest-stream-telemetry.json`
+
+The bundle should contain:
+
+- `engine-smoke-report.json`: pass/fail report, phase summaries, artifact paths.
+- `engine-health-events.ndjson`: every `/health` poll during baseline, join, and disconnect waits.
+- `manual-smoke-notes.md`: pass/fail checklist and human observations.
+- `host-stream-telemetry.json`: host player Stream Stats > Copy Stats JSON.
+- `guest-stream-telemetry.json`: guest player Stream Stats > Copy Stats JSON.
+
+Manual notes fields:
 
 ```text
 Date/time:
@@ -89,7 +105,17 @@ Run this from the repo after the host stream is already active and before the gu
 node scripts/multiplayerSmoke.mjs --engine-url https://<host-lan-ip>:8090 --allow-self-signed --expected-guests 1 --label real-two-device-lan
 ```
 
-Close the guest tab when the harness prints that join was validated. The harness should then pass after peer count returns to baseline.
+The harness prints `Bundle: .context/smoke-artifacts/<run-id>` as soon as it
+starts. Paste host/guest Stream Stats JSON into the two telemetry files in that
+folder. Close the guest tab when the harness prints that join was validated. The
+harness should then pass after peer count returns to baseline.
+
+If telemetry JSON or notes are already saved elsewhere before a run, start the
+harness with:
+
+```sh
+node scripts/multiplayerSmoke.mjs --engine-url https://<host-lan-ip>:8090 --allow-self-signed --expected-guests 1 --label real-two-device-lan --host-telemetry /path/to/host.json --guest-telemetry /path/to/guest.json --notes /path/to/completed-notes.md
+```
 
 ## Failure Notes
 
