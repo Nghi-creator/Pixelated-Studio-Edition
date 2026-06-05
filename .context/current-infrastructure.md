@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-05-31
+Last reviewed: 2026-06-05
 
 ## Project Shape
 
@@ -34,6 +34,7 @@ Current status:
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - `GET /games` and `GET /games/:gameId` read approved game catalog metadata through the API.
 - `GET /games` accepts `page`, `pageSize`, and optional `search`; the backend returns paginated catalog metadata plus a compatibility `featuredGames` list.
+- `GET /games` returns `Cache-Control: public, max-age=30, s-maxage=60` and reports backend catalog cache state through `X-Pixelated-Cache: MISS` or `HIT`.
 - `GET /games/featured` returns the uncached homepage hero list with `Cache-Control: no-store`, so banner rotation/random zero-play fallback is not frozen by the public catalog cache. When all sampled play counts are zero, the API returns up to 5 shuffled featured games and the homepage refreshes that pool every 30 seconds.
 - `GET /favorites`, `GET /favorites/:gameId`, `PUT /favorites/:gameId`, and `DELETE /favorites/:gameId` manage favorites through the API.
 - `GET /games/:gameId/reactions` and `PUT /games/:gameId/reaction` manage game reactions through the API.
@@ -69,6 +70,7 @@ Current status:
 - API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
 - `services/api/tests/` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
 - API tests also cover the backend-owned data boundary for catalog/favorites, comment ownership/reactions, profile update/account deletion, admin user authorization, and admin access-log authorization.
+- `npm run smoke:staging` verifies the hosted catalog cache contract, the uncached featured route, signed-in identity/permissions, local pairing restore, multiplayer lobby create/update/recent/delete, cloud session verification, and stream metric persistence.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - The web API client uses `VITE_API_URL` when configured. If it is missing, localhost browsers fall back to `http://127.0.0.1:4000`, while non-local browser hosts fall back to `https://pixelated-api-services.onrender.com` to avoid production builds accidentally calling viewer-local localhost.

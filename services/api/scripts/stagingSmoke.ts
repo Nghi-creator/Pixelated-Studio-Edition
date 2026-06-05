@@ -43,6 +43,14 @@ function uniqueId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function assertHeader(response: Response, name: string, expected: string | null) {
+  assert.equal(
+    response.headers.get(name),
+    expected,
+    `${name} should be ${expected ?? "absent"}`,
+  );
+}
+
 async function request<T = JsonRecord>(
   method: string,
   path: string,
@@ -86,6 +94,45 @@ function parseJson(text: string, path: string) {
   } catch (err) {
     throw new Error(`Expected JSON from ${path}; body=${text}`);
   }
+}
+
+async function smokeCatalogCaching() {
+  const cacheProbe = uniqueId("staging-smoke-cache");
+  const path = `/games?search=${encodeURIComponent(cacheProbe)}`;
+
+  logStep("checking public catalog cache miss");
+  const first = await request<{ games?: unknown[] }>("GET", path, {
+    auth: false,
+  });
+  assert.equal(Array.isArray(first.payload.games), true);
+  assertHeader(
+    first.response,
+    "Cache-Control",
+    "public, max-age=30, s-maxage=60",
+  );
+  assertHeader(first.response, "X-Pixelated-Cache", "MISS");
+
+  logStep("checking public catalog cache hit");
+  const second = await request<{ games?: unknown[] }>("GET", path, {
+    auth: false,
+  });
+  assert.equal(Array.isArray(second.payload.games), true);
+  assertHeader(
+    second.response,
+    "Cache-Control",
+    "public, max-age=30, s-maxage=60",
+  );
+  assertHeader(second.response, "X-Pixelated-Cache", "HIT");
+
+  logStep("checking featured games bypass catalog caching");
+  const featured = await request<{ featuredGames?: unknown[] }>(
+    "GET",
+    "/games/featured",
+    { auth: false },
+  );
+  assert.equal(Array.isArray(featured.payload.featuredGames), true);
+  assertHeader(featured.response, "Cache-Control", "no-store");
+  assertHeader(featured.response, "X-Pixelated-Cache", null);
 }
 
 async function findSmokeGameId() {
@@ -159,6 +206,111 @@ async function smokeLocalPairing() {
     if (previousEngineUrl) {
       await request("POST", "/local-pairings", {
         body: { engineUrl: previousEngineUrl },
+      });
+    }
+  }
+}
+
+async function smokeMultiplayerLobby(gameId: string) {
+  const sessionId = uniqueId("staging-smoke-lobby");
+  const normalizedEngineUrl = smokeEngineUrl.replace(/\/$/, "");
+  let deleted = false;
+
+  try {
+    logStep("creating multiplayer lobby");
+    const { payload: created } = await request<{
+      lobby?: {
+        engineUrl?: string | null;
+        gameId?: string;
+        lobbyId?: string;
+        maxPlayers?: number;
+        sessionId?: string;
+        status?: string;
+      };
+    }>("PUT", `/multiplayer/lobbies/${sessionId}`, {
+      body: {
+        engineUrl: null,
+        exposureMode: "unknown",
+        gameId,
+        maxPlayers: 2,
+        participants: [
+          { displayName: "Staging Smoke Host", playerIndex: 1, role: "host" },
+        ],
+      },
+    });
+    assert.equal(typeof created.lobby?.lobbyId, "string");
+    assert.equal(created.lobby?.sessionId, sessionId);
+    assert.equal(created.lobby?.gameId, gameId);
+    assert.equal(created.lobby?.engineUrl, null);
+    assert.equal(created.lobby?.maxPlayers, 2);
+    assert.equal(created.lobby?.status, "active");
+
+    logStep("updating multiplayer lobby");
+    const { payload: updated } = await request<{
+      lobby?: {
+        engineUrl?: string | null;
+        lobbyId?: string;
+        maxPlayers?: number;
+        participants?: unknown[];
+        sessionId?: string;
+      };
+    }>("PUT", `/multiplayer/lobbies/${sessionId}`, {
+      body: {
+        engineUrl: `${normalizedEngineUrl}/`,
+        exposureMode: "unknown",
+        gameId,
+        maxPlayers: 4,
+        participants: [
+          { displayName: "Staging Smoke Host", playerIndex: 1, role: "host" },
+          {
+            displayName: "Staging Smoke Guest",
+            playerIndex: null,
+            role: "spectator",
+          },
+        ],
+      },
+    });
+    assert.equal(updated.lobby?.lobbyId, created.lobby?.lobbyId);
+    assert.equal(updated.lobby?.sessionId, sessionId);
+    assert.equal(updated.lobby?.engineUrl, normalizedEngineUrl);
+    assert.equal(updated.lobby?.maxPlayers, 4);
+    assert.equal(updated.lobby?.participants?.length, 2);
+
+    logStep("reading recent multiplayer lobbies");
+    const { payload: recent } = await request<{
+      lobbies?: { engineUrl?: string | null; sessionId?: string }[];
+    }>("GET", "/multiplayer/lobbies/recent");
+    assert.equal(Array.isArray(recent.lobbies), true);
+    assert.equal(
+      recent.lobbies?.some(
+        (lobby) =>
+          lobby.sessionId === sessionId &&
+          lobby.engineUrl === normalizedEngineUrl,
+      ),
+      true,
+      "recent multiplayer lobbies should include the updated smoke lobby",
+    );
+
+    logStep("deleting multiplayer lobby");
+    await request("DELETE", `/multiplayer/lobbies/${sessionId}`, {
+      expected: 204,
+    });
+    deleted = true;
+
+    logStep("verifying deleted multiplayer lobby is no longer recent");
+    const { payload: afterDelete } = await request<{
+      lobbies?: { sessionId?: string }[];
+    }>("GET", "/multiplayer/lobbies/recent");
+    assert.equal(Array.isArray(afterDelete.lobbies), true);
+    assert.equal(
+      afterDelete.lobbies?.some((lobby) => lobby.sessionId === sessionId),
+      false,
+      "deleted smoke lobby should not remain in recent multiplayer lobbies",
+    );
+  } finally {
+    if (!deleted) {
+      await request("DELETE", `/multiplayer/lobbies/${sessionId}`, {
+        expected: 204,
       });
     }
   }
@@ -242,8 +394,10 @@ async function smokeSessionAndMetrics(gameId: string) {
 async function main() {
   console.log(`staging smoke target: ${apiUrl}`);
   const gameId = await findSmokeGameId();
+  await smokeCatalogCaching();
   await smokeIdentity();
   await smokeLocalPairing();
+  await smokeMultiplayerLobby(gameId);
   await smokeSessionAndMetrics(gameId);
   console.log("staging smoke passed");
 }
