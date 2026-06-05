@@ -17,6 +17,8 @@ import Profile from "./pages/user/Profile";
 import ResetPassword from "./pages/user/ResetPassword";
 import Publish from "./pages/user/Publish";
 import Multiplayer from "./pages/user/Multiplayer";
+import EngineConnection from "./pages/user/EngineConnection";
+import { RequireEngineConnection } from "./features/local-engine/RequireEngineConnection";
 
 import UserManagement from "./pages/admin/UserManagement";
 import Dashboard from "./pages/admin/Dashboard";
@@ -60,13 +62,16 @@ export default function App() {
         {/* STANDARD ROUTES */}
         <Route element={<StandardLayout />}>
           <Route path="/" element={<Landing />} />
-          <Route path="/play/:id" element={<Player />} />
           <Route path="/login" element={<Auth />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/favorites" element={<Favorites />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/local" element={<LocalVault />} />
-          <Route path="/multiplayer" element={<Multiplayer />} />
+          <Route path="/engine" element={<EngineConnection />} />
+          <Route element={<RequireEngineConnection />}>
+            <Route path="/play/:id" element={<Player />} />
+            <Route path="/local" element={<LocalVault />} />
+            <Route path="/multiplayer" element={<Multiplayer />} />
+          </Route>
           <Route path="/publish" element={<Publish />} />
         </Route>
       </Routes>

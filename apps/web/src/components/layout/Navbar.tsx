@@ -9,11 +9,13 @@ import {
   UploadCloud,
   Code,
   Users,
+  PlugZap,
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../ui/Avatar";
+import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engineAuth";
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
@@ -22,6 +24,7 @@ export default function Navbar() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isDeveloper, setIsDeveloper] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -74,6 +77,13 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
+    const refreshEnginePairing = () => setIsEnginePaired(hasEngineToken());
+    window.addEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
+    return () =>
+      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
         dropdownRef.current &&
@@ -101,6 +111,7 @@ export default function Navbar() {
   };
 
   const isFavoritesPage = location.pathname === "/favorites";
+  const isEnginePage = location.pathname === "/engine";
   const isLocalPage = location.pathname === "/local";
   const isMultiplayerPage = location.pathname === "/multiplayer";
   const isPublishPage = location.pathname === "/publish";
@@ -116,18 +127,35 @@ export default function Navbar() {
           </Link>
 
           <div className="flex items-center gap-4 sm:gap-6">
+            <Link
+              to="/engine"
+              title={isEnginePaired ? "Engine Connected" : "Connect Engine"}
+              className={`relative transition-colors ${
+                isEnginePage
+                  ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
+                  : "text-gray-400 hover:text-synth-primary"
+              }`}
+            >
+              <PlugZap className="h-6 w-6" />
+              <span
+                className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-synth-bg ${
+                  isEnginePaired ? "bg-emerald-400" : "bg-amber-400"
+                }`}
+              />
+            </Link>
+
             {userRole !== "super_admin" && (
               <Link
                 to="/publish"
                 title="Submit a Game"
                 className={`transition-colors ${
                   isPublishPage
-                    ? "text-synth-secondary drop-shadow-[0_0_8px_rgba(255,159,67,0.4)]"
-                    : "text-gray-400 hover:text-synth-secondary"
+                    ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
+                    : "text-gray-400 hover:text-synth-primary"
                 }`}
               >
                 <UploadCloud
-                  className={`w-5 h-5 ${isPublishPage ? "fill-synth-secondary/20" : ""}`}
+                  className={`w-5 h-5 ${isPublishPage ? "fill-synth-primary/20" : ""}`}
                 />
               </Link>
             )}
@@ -152,12 +180,12 @@ export default function Navbar() {
               title="Local Vault"
               className={`transition-colors ${
                 isLocalPage
-                  ? "text-synth-secondary drop-shadow-[0_0_8px_rgba(255,159,67,0.4)]"
-                  : "text-gray-400 hover:text-synth-secondary"
+                  ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
+                  : "text-gray-400 hover:text-synth-primary"
               }`}
             >
               <HardDrive
-                className={`w-6 h-6 ${isLocalPage ? "fill-synth-secondary/20" : ""}`}
+                className={`w-6 h-6 ${isLocalPage ? "fill-synth-primary/20" : ""}`}
               />
             </Link>
 

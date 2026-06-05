@@ -13,7 +13,6 @@ import {
   Users,
   Wifi,
 } from "lucide-react";
-import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
 import { api, getAuthSession, type ApiGame } from "../../lib/apiClient";
 import {
   engineAuthHeaders,
@@ -312,15 +311,6 @@ export default function Multiplayer() {
           icon={<LogIn className="h-4 w-4" />}
           label="Join Game"
           onClick={() => setMode("join")}
-        />
-      </div>
-
-      <div className="mb-8">
-        <EnginePairingPanel
-          onPaired={() => {
-            setIsEnginePaired(true);
-            if (gameSource === "local") fetchLocalGames();
-          }}
         />
       </div>
 
