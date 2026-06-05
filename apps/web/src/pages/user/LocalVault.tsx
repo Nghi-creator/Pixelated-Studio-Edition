@@ -9,7 +9,6 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
 import {
   clearEngineToken,
   engineAuthHeaders,
@@ -237,10 +236,6 @@ export default function LocalVault() {
           Your files stay on your machine and are securely isolated to your
           account.
         </p>
-      </div>
-
-      <div className="mb-8">
-        <EnginePairingPanel onPaired={() => fetchLocalGames(userId)} />
       </div>
 
       {vaultMessage && (

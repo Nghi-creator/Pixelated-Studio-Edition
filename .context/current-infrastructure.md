@@ -94,8 +94,10 @@ Runtime stack:
 Main user-facing routes:
 
 - `/`: cloud game library.
+- `/engine`: shared desktop-engine connection and pairing setup.
 - `/play/:id`: WebRTC player plus reactions/comments.
 - `/local`: local vault for uploaded `.nes` files on the local engine.
+- `/multiplayer`: LAN host/join setup and game selection.
 - `/favorites`, `/profile`, `/publish`, `/login`, `/reset-password`.
 
 Admin routes:
@@ -108,12 +110,14 @@ Current important frontend behaviors:
 
 - `useWebRTC` owns React stream/status lifecycle while helper modules resolve game boot targets, create WebRTC peer connections, and forward keyboard input.
 - For cloud/library games, `useWebRTC` asks the backend API to create a session before emitting `start-game` with `mode: "cloud"` and the backend `sessionToken` to the local engine.
-- The prompt-only engine token flow has been replaced by a local engine pairing panel in the player and Local Vault UI.
+- The prompt-only engine token flow has been replaced by a dedicated `/engine` connection page linked from the navbar.
+- `/play/:id`, `/local`, and `/multiplayer` require a saved engine token. Unpaired visits redirect to `/engine` and return to the requested route after successful pairing.
+- The navbar engine plug shows whether this browser currently has an engine token saved; pairing changes update it immediately.
 - The pairing panel classifies local, LAN, and custom engine URLs; LAN-looking URLs must match an engine reporting `exposureMode: "lan"` from `/health`.
 - Pairing errors now distinguish rejected tokens, local-only engines reached through LAN URLs, unreachable LAN hosts, and likely HTTPS-hosted-app to HTTP-LAN browser blocking.
 - Hosted Vercel to HTTP LAN engine pairing was blocked by Chrome with `LocalNetworkAccessPermissionDenied` during a 2026-05-28 smoke attempt, so LAN multiplayer still needs a local HTTPS or browser-approved private-network access strategy.
 - The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
-- `useWebRTC` reconnects when the pairing state changes, so pairing from the player page can immediately retry stream startup.
+- Pairing remains browser-local and is completed before the player mounts, keeping active play and Local Vault screens focused on their primary tasks.
 - `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.
 - `useWebRTC` asks the API for ICE servers before creating the browser peer connection. If the API is unavailable or the user is unsigned, it falls back to Google STUN.
 - Failed or long-disconnected WebRTC sessions now show a retry action that creates a fresh session id and restarts negotiation without leaving the player page.
@@ -139,6 +143,8 @@ Runtime stack:
 - Desktop packaging helper source is `apps/desktop/scripts/prepareWebDist.ts`, compiled to `apps/desktop/dist/scripts/prepareWebDist.js`.
 - Uses local Docker CLI through `child_process.exec`.
 - Packaged releases are built with `cd apps/desktop && npm run dist`; this script runs the React production build first and electron-builder bundles `apps/web/dist` as `resources/web-dist`.
+- Packaged renderer scripts must compile as browser scripts without CommonJS `exports` references. The sandboxed preload bridge must only use Electron-supported modules; QR generation runs in the main process through `ipcRenderer.invoke("create-companion-qr")`.
+- A June 6, 2026 packaged-release smoke caught and fixed an inert UI regression caused by CommonJS renderer output plus a preload-local-module import. The corrected release was verified through Initialize Engine, Docker image preparation, container start, health polling, and `ENGINE ACTIVE`.
 
 Current lifecycle:
 

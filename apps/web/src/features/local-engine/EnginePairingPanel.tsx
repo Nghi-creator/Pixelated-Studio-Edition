@@ -516,23 +516,25 @@ export function EnginePairingPanel({
             )}
           </div>
 
-          <div
-            className={`mt-3 rounded-lg border px-3 py-2 text-xs leading-5 ${
-              engineUrlScope === "lan"
-                ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
-                : "border-synth-border bg-synth-bg text-gray-400"
-            }`}
-          >
-            <span className="font-semibold text-white">
+          {(isCompanionJoin || engineUrlScope !== "local") && (
+            <div
+              className={`mt-3 rounded-lg border px-3 py-2 text-xs leading-5 ${
+                engineUrlScope === "lan"
+                  ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
+                  : "border-synth-border bg-synth-bg text-gray-400"
+              }`}
+            >
+              <span className="font-semibold text-white">
+                {isCompanionJoin
+                  ? "HTTPS join page"
+                  : getScopeLabel(engineUrlScope)}
+                :
+              </span>{" "}
               {isCompanionJoin
-                ? "HTTPS join page"
-                : getScopeLabel(engineUrlScope)}
-              :
-            </span>{" "}
-            {isCompanionJoin
-              ? "Enter the short-lived invite code from the host desktop app. The raw engine token stays on the host."
-              : getScopeDescription(engineUrlScope)}
-          </div>
+                ? "Enter the short-lived invite code from the host desktop app. The raw engine token stays on the host."
+                : getScopeDescription(engineUrlScope)}
+            </div>
+          )}
 
           {message && (
             <p

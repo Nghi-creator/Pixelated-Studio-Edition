@@ -179,20 +179,22 @@ Current limitation: signaling is room-scoped and token-gated, and ICE config can
 Purpose: make local-engine intent explicit without sending the desktop pairing token to the hosted backend.
 
 1. Electron starts the local engine and displays a per-run pairing token.
-2. React renders `EnginePairingPanel` in Local Vault and when the player needs a token.
-3. User enters the local engine URL and desktop pairing token.
-4. React classifies the URL as local, LAN, or custom based on hostname.
-5. React calls `GET <engineUrl>/health` without the token to verify the engine is reachable.
-6. If the URL looks like LAN but `/health` reports `exposureMode: "local"`, React rejects pairing and tells the user to enable LAN mode in the desktop app.
-7. React calls `GET <engineUrl>/local-games` with `X-Engine-Token` and a pairing-check user id to verify the token.
-8. React stores the engine URL and pairing token in browser `localStorage`.
-9. If the user is signed in, React calls `POST /local-pairings` on the backend with only `{ engineUrl }`.
-10. Backend persists pairing intent metadata for the authenticated user in `local_engine_pairings`.
-11. Backend does not receive or store the desktop pairing token.
-12. Local Vault uses the stored token for `X-Engine-Token` on upload/list/delete requests.
-13. WebRTC uses the stored token for Socket.IO auth.
-14. If the engine rejects the token, React clears it and shows the pairing panel again.
-15. If a hosted HTTPS browser cannot reach an HTTP LAN engine URL, React shows a private-network/mixed-content oriented error instead of a generic unreachable message.
+2. React exposes the shared `/engine` connection page and a navbar engine-status link.
+3. Unpaired visits to `/play/:id`, `/local`, or `/multiplayer` redirect to `/engine` while preserving the requested destination.
+4. User enters the local engine URL and desktop pairing token.
+5. React classifies the URL as local, LAN, or custom based on hostname.
+6. React calls `GET <engineUrl>/health` without the token to verify the engine is reachable.
+7. If the URL looks like LAN but `/health` reports `exposureMode: "local"`, React rejects pairing and tells the user to enable LAN mode in the desktop app.
+8. React calls `GET <engineUrl>/local-games` with `X-Engine-Token` and a pairing-check user id to verify the token.
+9. React stores the engine URL and pairing token in browser `localStorage`.
+10. If the user is signed in, React calls `POST /local-pairings` on the backend with only `{ engineUrl }`.
+11. Backend persists pairing intent metadata for the authenticated user in `local_engine_pairings`.
+12. Backend does not receive or store the desktop pairing token.
+13. After pairing, React returns to the originally requested route.
+14. Local Vault uses the stored token for `X-Engine-Token` on upload/list/delete requests.
+15. WebRTC uses the stored token for Socket.IO auth.
+16. If the engine rejects or clears the token, the shared route guard sends the user back to `/engine`.
+17. If a hosted HTTPS browser cannot reach an HTTP LAN engine URL, React shows a private-network/mixed-content oriented error instead of a generic unreachable message.
 
 LAN HTTPS companion join variant:
 

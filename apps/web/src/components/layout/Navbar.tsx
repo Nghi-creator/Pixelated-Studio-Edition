@@ -9,11 +9,13 @@ import {
   UploadCloud,
   Code,
   Users,
+  PlugZap,
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../ui/Avatar";
+import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engineAuth";
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
@@ -22,6 +24,7 @@ export default function Navbar() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [isDeveloper, setIsDeveloper] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -74,6 +77,13 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
+    const refreshEnginePairing = () => setIsEnginePaired(hasEngineToken());
+    window.addEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
+    return () =>
+      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
+  }, []);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
         dropdownRef.current &&
@@ -101,6 +111,7 @@ export default function Navbar() {
   };
 
   const isFavoritesPage = location.pathname === "/favorites";
+  const isEnginePage = location.pathname === "/engine";
   const isLocalPage = location.pathname === "/local";
   const isMultiplayerPage = location.pathname === "/multiplayer";
   const isPublishPage = location.pathname === "/publish";
@@ -116,6 +127,25 @@ export default function Navbar() {
           </Link>
 
           <div className="flex items-center gap-4 sm:gap-6">
+            <Link
+              to="/engine"
+              title={isEnginePaired ? "Engine Connected" : "Connect Engine"}
+              className={`relative transition-colors ${
+                isEnginePage
+                  ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
+                  : isEnginePaired
+                    ? "text-emerald-400 hover:text-emerald-300"
+                    : "text-amber-400 hover:text-amber-300"
+              }`}
+            >
+              <PlugZap className="h-6 w-6" />
+              <span
+                className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-synth-bg ${
+                  isEnginePaired ? "bg-emerald-400" : "bg-amber-400"
+                }`}
+              />
+            </Link>
+
             {userRole !== "super_admin" && (
               <Link
                 to="/publish"
