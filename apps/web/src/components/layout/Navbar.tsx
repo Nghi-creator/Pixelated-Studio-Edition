@@ -133,9 +133,7 @@ export default function Navbar() {
               className={`relative transition-colors ${
                 isEnginePage
                   ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
-                  : isEnginePaired
-                    ? "text-emerald-400 hover:text-emerald-300"
-                    : "text-amber-400 hover:text-amber-300"
+                  : "text-gray-400 hover:text-synth-primary"
               }`}
             >
               <PlugZap className="h-6 w-6" />
@@ -152,12 +150,12 @@ export default function Navbar() {
                 title="Submit a Game"
                 className={`transition-colors ${
                   isPublishPage
-                    ? "text-synth-secondary drop-shadow-[0_0_8px_rgba(255,159,67,0.4)]"
-                    : "text-gray-400 hover:text-synth-secondary"
+                    ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
+                    : "text-gray-400 hover:text-synth-primary"
                 }`}
               >
                 <UploadCloud
-                  className={`w-5 h-5 ${isPublishPage ? "fill-synth-secondary/20" : ""}`}
+                  className={`w-5 h-5 ${isPublishPage ? "fill-synth-primary/20" : ""}`}
                 />
               </Link>
             )}
@@ -182,12 +180,12 @@ export default function Navbar() {
               title="Local Vault"
               className={`transition-colors ${
                 isLocalPage
-                  ? "text-synth-secondary drop-shadow-[0_0_8px_rgba(255,159,67,0.4)]"
-                  : "text-gray-400 hover:text-synth-secondary"
+                  ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
+                  : "text-gray-400 hover:text-synth-primary"
               }`}
             >
               <HardDrive
-                className={`w-6 h-6 ${isLocalPage ? "fill-synth-secondary/20" : ""}`}
+                className={`w-6 h-6 ${isLocalPage ? "fill-synth-primary/20" : ""}`}
               />
             </Link>
 
