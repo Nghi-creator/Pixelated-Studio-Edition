@@ -13,11 +13,14 @@
   },
   "devDependencies": {
     "@types/node": "^20.19.39",
+    "@types/qrcode": "^1.5.6",
     "electron": "^29.0.0",
     "electron-builder": "^24.13.3",
     "typescript": "^5.9.3"
   },
-  "dependencies": {},
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
   "build": {
     "appId": "com.pixelated.studio",
     "productName": "Pixelated Studio",

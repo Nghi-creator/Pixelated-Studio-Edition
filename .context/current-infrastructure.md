@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-06-05
+Last reviewed: 2026-06-06
 
 ## Project Shape
 
@@ -169,11 +169,11 @@ Notable constraints:
 - LAN mode now also starts a desktop-hosted HTTPS companion server on `PIXELATED_COMPANION_PORT`, defaulting to `8090`.
 - The companion server serves the built React app from `apps/web/dist` in development and from bundled `resources/web-dist` in packaged desktop builds. It injects the engine URL override to its own origin and proxies engine HTTP plus Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
 - The companion uses a runtime-generated self-signed certificate under the Electron user data directory. Guests may need to trust/bypass that certificate warning during the first LAN test.
-- The desktop UI displays HTTPS companion join URLs separately from raw LAN engine URLs.
+- The desktop UI displays HTTPS companion join URLs separately from raw LAN engine URLs and renders the first companion join URL as a scan-to-join QR code.
 - LAN mode creates an 8-character invite code that expires after 10 minutes. The companion exposes `POST /invite/redeem` on the HTTPS join page; a valid code returns a short-lived companion credential, not the raw engine token.
 - Hosts can regenerate or revoke the active LAN invite code from the desktop LAN panel without restarting the engine or HTTPS companion. Regeneration replaces the active code and clears unconnected companion credentials; revocation leaves the join page up but makes `/invite/redeem` fail closed until a new code is generated.
 - The companion translates valid companion credentials into the real `X-Engine-Token` header while proxying to `127.0.0.1:8080`, including Socket.IO handshakes through the `companionToken` query parameter.
-- The desktop LAN panel now includes a short invite checklist: copy HTTPS join page, send it with the invite code, and have the guest accept the local certificate warning if shown.
+- The desktop LAN panel now includes a short invite checklist: scan the QR code or copy the HTTPS join page, share the invite code, and have the guest accept the local certificate warning if shown.
 - `PIXELATED_WEB_DIST_DIR` can override the companion asset directory for custom layouts, but release artifacts should use the bundled `resources/web-dist` contract.
 
 ## Engine Container

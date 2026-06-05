@@ -21,6 +21,7 @@ type DesktopPackageJson = {
       icon?: string;
     };
   };
+  dependencies?: Record<string, string>;
 };
 
 function readPackageJson(): DesktopPackageJson {
@@ -60,5 +61,11 @@ describe("desktop package config", () => {
     const packageJson = readPackageJson();
 
     assert.equal(packageJson.build.mac?.icon, "build/icon.png");
+  });
+
+  it("ships the QR encoder used by the preload bridge", () => {
+    const packageJson = readPackageJson();
+
+    assert.equal(packageJson.dependencies?.qrcode, "^1.5.4");
   });
 });

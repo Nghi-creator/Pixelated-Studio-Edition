@@ -48,6 +48,7 @@ type PhaseTracker = {
 };
 
 type ElectronApi = {
+  createCompanionQrDataUrl: (url: string) => Promise<string>;
   regenerateLanInvite: () => void;
   revokeLanInvite: () => void;
   startDocker: (options: { exposureMode?: ExposureMode }) => void;
@@ -78,7 +79,11 @@ type PixelatedWindow = Window &
         companionInviteExpiry: HTMLElement;
         companionInviteStatus: HTMLElement;
         companionPanel: HTMLElement;
+        companionQr: HTMLElement;
+        companionQrImage: HTMLImageElement;
+        companionQrStatus: HTMLElement;
         companionUrls: HTMLElement;
+        createCompanionQrDataUrl: (url: string) => Promise<string>;
         exposureCopy: HTMLElement;
         exposureLabel: HTMLElement;
         lanToggle: HTMLInputElement;
@@ -169,7 +174,11 @@ const exposure = pixelatedWindow.PixelatedExposure.createExposureController({
   companionInviteExpiry: requiredElement("companion-invite-expiry"),
   companionInviteStatus: requiredElement("companion-invite-status"),
   companionPanel: requiredElement("companion-panel"),
+  companionQr: requiredElement("companion-qr"),
+  companionQrImage: requiredElement("companion-qr-image", HTMLImageElement),
+  companionQrStatus: requiredElement("companion-qr-status"),
   companionUrls: requiredElement("companion-urls"),
+  createCompanionQrDataUrl: pixelatedWindow.electronAPI.createCompanionQrDataUrl,
   exposureCopy: requiredElement("exposure-copy"),
   exposureLabel: requiredElement("exposure-label"),
   lanToggle: requiredElement("lan-toggle", HTMLInputElement),

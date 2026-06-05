@@ -21,7 +21,11 @@
     companionInviteExpiry: HTMLElement;
     companionInviteStatus: HTMLElement;
     companionPanel: HTMLElement;
+    companionQr: HTMLElement;
+    companionQrImage: HTMLImageElement;
+    companionQrStatus: HTMLElement;
     companionUrls: HTMLElement;
+    createCompanionQrDataUrl: (url: string) => Promise<string>;
     lanToggle: HTMLInputElement;
     lanUrlPanel: HTMLElement;
     lanUrls: HTMLElement;
@@ -38,12 +42,18 @@
     companionInviteExpiry,
     companionInviteStatus,
     companionPanel,
+    companionQr,
+    companionQrImage,
+    companionQrStatus,
     companionUrls,
+    createCompanionQrDataUrl,
     lanToggle,
     lanUrlPanel,
     lanUrls,
     lanWarning,
   }: ExposureControllerElements) {
+    let qrRenderId = 0;
+
     function getMode(): ExposureMode {
       return lanToggle.checked ? "lan" : "local";
     }
@@ -62,6 +72,33 @@
       );
     }
 
+    async function renderCompanionQr(url?: string) {
+      const renderId = ++qrRenderId;
+      companionQr.classList.add("hidden");
+      companionQrImage.removeAttribute("src");
+
+      if (!url) {
+        companionQrStatus.innerText = "";
+        companionQrStatus.classList.add("hidden");
+        return;
+      }
+
+      companionQrStatus.innerText = "Preparing scan-to-join QR code...";
+      companionQrStatus.classList.remove("hidden");
+
+      try {
+        const dataUrl = await createCompanionQrDataUrl(url);
+        if (renderId !== qrRenderId) return;
+        companionQrImage.src = dataUrl;
+        companionQr.classList.remove("hidden");
+        companionQrStatus.classList.add("hidden");
+      } catch (err) {
+        if (renderId !== qrRenderId) return;
+        companionQrStatus.innerText =
+          "QR code unavailable. Copy the HTTPS join page instead.";
+      }
+    }
+
     function renderCompanionUrls(urls: string[] = []) {
       companionUrls.innerHTML = "";
       urls.forEach((url) => {
@@ -70,6 +107,7 @@
         item.innerText = url;
         companionUrls.appendChild(item);
       });
+      void renderCompanionQr(urls[0]);
       companionPanel.classList.toggle(
         "hidden",
         getMode() !== "lan" || urls.length === 0,
