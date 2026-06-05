@@ -110,6 +110,17 @@ starts. Paste host/guest Stream Stats JSON into the two telemetry files in that
 folder. Close the guest tab when the harness prints that join was validated. The
 harness should then pass after peer count returns to baseline.
 
+Summarize the completed bundle into one review verdict:
+
+```sh
+node scripts/summarizeSmokeArtifacts.mjs .context/smoke-artifacts/<run-id>
+```
+
+This writes `smoke-verdict.md` into the bundle, prints the same markdown, and
+exits nonzero for a FAIL verdict. The verdict requires all five source
+artifacts, session survival, peer join/disconnect transitions, healthy host and
+guest WebRTC telemetry, and completed manual notes with `Overall: PASS`.
+
 If telemetry JSON or notes are already saved elsewhere before a run, start the
 harness with:
 
