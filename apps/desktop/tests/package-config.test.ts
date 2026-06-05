@@ -21,6 +21,7 @@ type DesktopPackageJson = {
       icon?: string;
     };
   };
+  dependencies?: Record<string, string>;
 };
 
 function readPackageJson(): DesktopPackageJson {
@@ -60,5 +61,25 @@ describe("desktop package config", () => {
     const packageJson = readPackageJson();
 
     assert.equal(packageJson.build.mac?.icon, "build/icon.png");
+  });
+
+  it("ships the QR encoder used by the preload bridge", () => {
+    const packageJson = readPackageJson();
+
+    assert.equal(packageJson.dependencies?.qrcode, "^1.5.4");
+  });
+
+  it("keeps packaged preload sandbox-safe and renderer scripts browser-safe", () => {
+    const preloadPath = path.resolve(__dirname, "../preload.js");
+    const rendererPath = path.resolve(__dirname, "../renderer.js");
+    const rendererHelperPath = path.resolve(__dirname, "../renderer/logs.js");
+    const preload = fs.readFileSync(preloadPath, "utf8");
+    const renderer = fs.readFileSync(rendererPath, "utf8");
+    const rendererHelper = fs.readFileSync(rendererHelperPath, "utf8");
+
+    assert.doesNotMatch(preload, /require\("\.\/main\/companionQr"\)/);
+    assert.match(preload, /ipcRenderer\.invoke|electron_1\.ipcRenderer\.invoke/);
+    assert.doesNotMatch(renderer, /\bexports\b/);
+    assert.doesNotMatch(rendererHelper, /\bexports\b/);
   });
 });

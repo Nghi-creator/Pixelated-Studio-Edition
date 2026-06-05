@@ -13,7 +13,7 @@ Let a host run the Pixelated engine on their machine and invite other devices on
 Expected first version:
 
 - The host explicitly enables LAN mode in the desktop app.
-- The desktop app shows the HTTPS companion join URL, a short-lived invite code, and warning copy.
+- The desktop app shows the HTTPS companion join URL, a scan-to-join QR code for that URL, a short-lived invite code, and warning copy.
 - Another device on the same LAN opens the HTTPS companion page, enters the invite code, and can join a session without receiving the raw engine token.
 - The host can disable LAN mode and rotate the token.
 - Loopback-only mode remains the default.
@@ -526,7 +526,7 @@ Manual smoke checklist:
 
 These are the remaining proof steps before calling LAN multiplayer production-ready:
 
-1. Real two-device smoke: host and guest must both receive the stream, and guest disconnect must not kill the host session.
+1. Real two-device smoke: guest scans the desktop QR code to open the companion, host and guest both receive the stream, and guest disconnect does not kill the host session.
 2. Performance validation: measure engine CPU/RSS and browser WebRTC stats with two or more viewers.
 3. LAN HTTPS UX validation: confirm the self-signed companion flow is acceptable for normal players, or choose a local CA/tunnel strategy.
 4. P3/P4 validation: virtual gamepad support is coded, but still needs Docker/RetroArch smoke on the target host setup.

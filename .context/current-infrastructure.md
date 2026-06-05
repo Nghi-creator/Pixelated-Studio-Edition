@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-05-31
+Last reviewed: 2026-06-06
 
 ## Project Shape
 
@@ -34,6 +34,7 @@ Current status:
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - `GET /games` and `GET /games/:gameId` read approved game catalog metadata through the API.
 - `GET /games` accepts `page`, `pageSize`, and optional `search`; the backend returns paginated catalog metadata plus a compatibility `featuredGames` list.
+- `GET /games` returns `Cache-Control: public, max-age=30, s-maxage=60` and reports backend catalog cache state through `X-Pixelated-Cache: MISS` or `HIT`.
 - `GET /games/featured` returns the uncached homepage hero list with `Cache-Control: no-store`, so banner rotation/random zero-play fallback is not frozen by the public catalog cache. When all sampled play counts are zero, the API returns up to 5 shuffled featured games and the homepage refreshes that pool every 30 seconds.
 - `GET /favorites`, `GET /favorites/:gameId`, `PUT /favorites/:gameId`, and `DELETE /favorites/:gameId` manage favorites through the API.
 - `GET /games/:gameId/reactions` and `PUT /games/:gameId/reaction` manage game reactions through the API.
@@ -69,6 +70,7 @@ Current status:
 - API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
 - `services/api/tests/` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
 - API tests also cover the backend-owned data boundary for catalog/favorites, comment ownership/reactions, profile update/account deletion, admin user authorization, and admin access-log authorization.
+- `npm run smoke:staging` verifies the hosted catalog cache contract, the uncached featured route, signed-in identity/permissions, local pairing restore, multiplayer lobby create/update/recent/delete, cloud session verification, and stream metric persistence.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - The web API client uses `VITE_API_URL` when configured. If it is missing, localhost browsers fall back to `http://127.0.0.1:4000`, while non-local browser hosts fall back to `https://pixelated-api-services.onrender.com` to avoid production builds accidentally calling viewer-local localhost.
@@ -167,11 +169,11 @@ Notable constraints:
 - LAN mode now also starts a desktop-hosted HTTPS companion server on `PIXELATED_COMPANION_PORT`, defaulting to `8090`.
 - The companion server serves the built React app from `apps/web/dist` in development and from bundled `resources/web-dist` in packaged desktop builds. It injects the engine URL override to its own origin and proxies engine HTTP plus Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
 - The companion uses a runtime-generated self-signed certificate under the Electron user data directory. Guests may need to trust/bypass that certificate warning during the first LAN test.
-- The desktop UI displays HTTPS companion join URLs separately from raw LAN engine URLs.
+- The desktop UI displays HTTPS companion join URLs separately from raw LAN engine URLs and renders the first companion join URL as a scan-to-join QR code.
 - LAN mode creates an 8-character invite code that expires after 10 minutes. The companion exposes `POST /invite/redeem` on the HTTPS join page; a valid code returns a short-lived companion credential, not the raw engine token.
 - Hosts can regenerate or revoke the active LAN invite code from the desktop LAN panel without restarting the engine or HTTPS companion. Regeneration replaces the active code and clears unconnected companion credentials; revocation leaves the join page up but makes `/invite/redeem` fail closed until a new code is generated.
 - The companion translates valid companion credentials into the real `X-Engine-Token` header while proxying to `127.0.0.1:8080`, including Socket.IO handshakes through the `companionToken` query parameter.
-- The desktop LAN panel now includes a short invite checklist: copy HTTPS join page, send it with the invite code, and have the guest accept the local certificate warning if shown.
+- The desktop LAN panel now includes a short invite checklist: scan the QR code or copy the HTTPS join page, share the invite code, and have the guest accept the local certificate warning if shown.
 - `PIXELATED_WEB_DIST_DIR` can override the companion asset directory for custom layouts, but release artifacts should use the bundled `resources/web-dist` contract.
 
 ## Engine Container

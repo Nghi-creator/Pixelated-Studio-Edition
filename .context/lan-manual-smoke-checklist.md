@@ -1,6 +1,6 @@
 # LAN Multiplayer Manual Smoke Checklist
 
-Last updated: 2026-06-04
+Last updated: 2026-06-06
 
 Use this checklist for the real two-device LAN validation. The local two-browser smoke has already passed; this checklist is for the host desktop plus a separate guest device.
 
@@ -19,6 +19,7 @@ Use this checklist for the real two-device LAN validation. The local two-browser
 3. Initialize the engine.
 4. Confirm the desktop shows:
    - HTTPS companion join URL, usually `https://<host-lan-ip>:8090`.
+   - QR code for the same HTTPS companion join URL.
    - Short-lived invite code.
    - Host-local pairing token with copy warning.
    - LAN warning/checklist copy.
@@ -33,7 +34,7 @@ Use this checklist for the real two-device LAN validation. The local two-browser
 
 ## Guest Steps
 
-1. Open the HTTPS companion join URL from the host.
+1. Scan the desktop QR code to open the HTTPS companion join URL. Use the copyable URL as fallback.
 2. Accept the local/self-signed certificate warning if shown.
 3. Enter the invite code shown by the desktop app.
 4. Join the invite/session as spectator first.
@@ -46,6 +47,7 @@ Use this checklist for the real two-device LAN validation. The local two-browser
 ## Expected Results
 
 - Guest can load the companion page over HTTPS.
+- Desktop QR opens the same displayed HTTPS companion join URL on the guest device.
 - Guest can redeem the invite code without seeing the raw host pairing token.
 - Host can regenerate and revoke invite codes without restarting the engine.
 - A revoked invite code cannot be redeemed; a regenerated code can be redeemed.
@@ -109,6 +111,17 @@ The harness prints `Bundle: .context/smoke-artifacts/<run-id>` as soon as it
 starts. Paste host/guest Stream Stats JSON into the two telemetry files in that
 folder. Close the guest tab when the harness prints that join was validated. The
 harness should then pass after peer count returns to baseline.
+
+Summarize the completed bundle into one review verdict:
+
+```sh
+node scripts/summarizeSmokeArtifacts.mjs .context/smoke-artifacts/<run-id>
+```
+
+This writes `smoke-verdict.md` into the bundle, prints the same markdown, and
+exits nonzero for a FAIL verdict. The verdict requires all five source
+artifacts, session survival, peer join/disconnect transitions, healthy host and
+guest WebRTC telemetry, and completed manual notes with `Overall: PASS`.
 
 If telemetry JSON or notes are already saved elsewhere before a run, start the
 harness with:

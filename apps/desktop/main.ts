@@ -7,6 +7,7 @@ import {
   startEngine,
   stopEngine,
 } from "./main/engineController";
+import { createCompanionQrDataUrl } from "./main/companionQr";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -38,6 +39,13 @@ ipcMain.on("regenerate-lan-invite", (event: IpcMainEvent) => {
 
 ipcMain.on("revoke-lan-invite", (event: IpcMainEvent) => {
   revokeLanInvite(event);
+});
+
+ipcMain.handle("create-companion-qr", (_event, url: unknown) => {
+  if (typeof url !== "string") {
+    throw new Error("A companion join URL is required.");
+  }
+  return createCompanionQrDataUrl(url);
 });
 
 app.whenReady().then(createWindow);

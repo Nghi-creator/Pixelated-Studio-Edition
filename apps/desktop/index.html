@@ -150,6 +150,23 @@
               class="mt-1 space-y-1 font-mono text-xs text-synth-secondary"
             ></div>
             <div
+              id="companion-qr"
+              class="hidden mt-3 rounded-lg border border-synth-border bg-white p-3 text-center"
+            >
+              <img
+                id="companion-qr-image"
+                class="mx-auto h-52 w-52"
+                alt="QR code for the LAN HTTPS join page"
+              />
+              <p class="mt-2 text-xs font-bold text-synth-ink">
+                Scan to open the join page
+              </p>
+            </div>
+            <p
+              id="companion-qr-status"
+              class="hidden mt-2 text-xs leading-5 text-gray-400"
+            ></p>
+            <div
               id="companion-invite"
               class="hidden mt-3 rounded-lg border border-synth-primary/40 bg-synth-primary/10 p-3"
             >
@@ -196,9 +213,9 @@
               Guests may need to trust the local certificate the first time they open this page. The invite code is short-lived and the engine token stays on this host.
             </p>
             <ol class="mt-3 list-decimal space-y-1 pl-4 text-xs leading-5 text-gray-400">
-              <li>Copy the HTTPS join page after the engine is ready.</li>
-              <li>Send the join page and invite code to your LAN guest.</li>
-              <li>The guest opens the join page, accepts the local certificate warning if shown, then joins with the invite code.</li>
+              <li>Have the guest scan the QR code, or copy the HTTPS join page.</li>
+              <li>Share the short-lived invite code with your LAN guest.</li>
+              <li>The guest accepts the local certificate warning if shown, then joins with the invite code.</li>
             </ol>
           </div>
         </div>

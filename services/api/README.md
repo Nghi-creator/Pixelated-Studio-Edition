@@ -50,7 +50,7 @@ GET http://localhost:4000/ready
 
 ## Current Scope
 
-The API now handles authenticated identity/permissions, game catalog reads, favorites, reactions, comments, profile updates/deletion, admin reports, admin users, access logs, game submission metadata and notifications, WebRTC ICE server config, persisted local pairing metadata, persisted stream metric ingestion, and cloud game session creation/verification. The local engine still runs separately on `localhost:8080`.
+The API now handles authenticated identity/permissions, game catalog reads, favorites, reactions, comments, profile updates/deletion, admin reports, admin users, access logs, game submission metadata and notifications, WebRTC ICE server config, persisted local pairing and multiplayer lobby metadata, persisted stream metric ingestion, and cloud game session creation/verification. The local engine still runs separately on `localhost:8080`.
 
 Implemented now:
 
@@ -84,12 +84,13 @@ Implemented now:
 - Authenticated `POST /sessions`.
 - `POST /sessions/:sessionId/verify` for local engine cloud session verification.
 - Authenticated local pairing routes.
+- Authenticated multiplayer lobby control-plane routes.
 - Authenticated stream metric routes.
 - Supabase anon/service clients.
 
 Next phase:
 
-- Add integration smoke tests with a real staged Supabase access token when practical.
+- Run the hosted-stack smoke after API or Supabase control-plane changes.
 
 ## Auth Routes
 
@@ -136,6 +137,9 @@ DELETE /sessions/:sessionId
 POST /local-pairings
 GET /local-pairings/current
 DELETE /local-pairings/current
+PUT /multiplayer/lobbies/:sessionId
+GET /multiplayer/lobbies/recent
+DELETE /multiplayer/lobbies/:sessionId
 POST /metrics/stream
 GET /metrics/stream/recent
 ```
@@ -200,4 +204,4 @@ Environment variables:
 - `STAGING_GAME_ID`: optional game id for cloud session creation. If omitted, the runner discovers the first catalog game with a ROM target.
 - `STAGING_SMOKE_ENGINE_URL`: optional local pairing URL, defaulting to `http://127.0.0.1:8080`.
 
-The runner checks `/me`, `/me/permissions`, local pairing save/read/delete with restore, cloud session create/read/verify/delete, and stream metric write/read. It intentionally writes one stream metric row and temporarily changes local pairing metadata for the signed-in user.
+The runner checks `/games` cache headers and `MISS`-then-`HIT` behavior, verifies `/games/featured` remains `no-store`, checks `/me` and `/me/permissions`, exercises local pairing save/read/delete with restore, creates/updates/reads/deletes a multiplayer lobby, creates/reads/verifies/deletes a cloud session, and writes/reads a stream metric. It intentionally writes one stream metric row and temporarily changes local pairing metadata for the signed-in user; smoke lobbies and sessions are deleted before the run exits.
