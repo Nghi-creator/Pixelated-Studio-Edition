@@ -1,5 +1,4 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
-import { createCompanionQrDataUrl } from "./main/companionQr";
 
 type ExposureMode = "local" | "lan";
 
@@ -40,7 +39,8 @@ type IpcCallback<TArgs extends unknown[] = []> = (
 ) => void;
 
 contextBridge.exposeInMainWorld("electronAPI", {
-  createCompanionQrDataUrl,
+  createCompanionQrDataUrl: (url: string) =>
+    ipcRenderer.invoke("create-companion-qr", url) as Promise<string>,
   startDocker: (options: StartDockerOptions) =>
     ipcRenderer.send("start-docker", options),
   stopDocker: () => ipcRenderer.send("stop-docker"),

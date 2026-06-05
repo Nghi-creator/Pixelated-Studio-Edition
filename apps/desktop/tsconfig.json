@@ -6,6 +6,7 @@
     "forceConsistentCasingInFileNames": true,
     "lib": ["ES2022", "DOM"],
     "module": "Node16",
+    "moduleDetection": "legacy",
     "moduleResolution": "node16",
     "noImplicitReturns": true,
     "outDir": "dist",
