@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity } from "lucide-react";
 import { api, ApiError } from "../../lib/apiClient";
-import { AdminTableSkeleton } from "../../components/ui/Skeleton";
+import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
 
 const LOGS_PER_PAGE = 25;
 const ACCESS_LOGS_TIMEOUT_MS = 10_000;
@@ -100,7 +100,7 @@ export default function AccessLogs() {
   const pageEnd = Math.min(page * LOGS_PER_PAGE, totalLogs);
 
   if (loading) {
-    return <AdminTableSkeleton columns={4} />;
+    return <AdminTablePageSkeleton />;
   }
 
   return (

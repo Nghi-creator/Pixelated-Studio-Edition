@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Search, Users } from "lucide-react";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
-import { AdminTableSkeleton } from "../../components/ui/Skeleton";
+import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
 
 const USERS_PER_PAGE = 25;
 
@@ -129,7 +129,7 @@ export default function UserManagement() {
   };
 
   if (loading) {
-    return <AdminTableSkeleton columns={4} />;
+    return <AdminTablePageSkeleton hasSearch />;
   }
 
   if (currentUserRole !== "super_admin") {

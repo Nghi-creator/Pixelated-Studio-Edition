@@ -1,8 +1,7 @@
-import { AlertTriangle, RotateCcw } from "lucide-react";
+import { AlertTriangle, LoaderCircle, RotateCcw } from "lucide-react";
 import type { RefObject } from "react";
 import type { WebRTCStatus } from "../../lib/webrtcSession";
 import type { WebRTCTelemetry } from "../../lib/webrtcTelemetry";
-import { StreamSkeleton } from "../../components/ui/Skeleton";
 
 type StreamStageProps = {
   onRetry?: () => void;
@@ -22,8 +21,11 @@ export function StreamStage({
   return (
     <div className="relative w-full max-w-5xl aspect-video bg-black border border-synth-border rounded-xl overflow-hidden shadow-glow-card ring-1 ring-synth-primary/10 flex items-center justify-center">
       {status === "connecting" && (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-synth-bg/90 backdrop-blur-sm">
-          <StreamSkeleton />
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
+          <LoaderCircle
+            aria-label="Connecting stream"
+            className="h-10 w-10 animate-spin text-white"
+          />
         </div>
       )}
       {status === "error" && (
