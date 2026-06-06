@@ -25,6 +25,7 @@ export default function Navbar() {
   const [isDeveloper, setIsDeveloper] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
+  const [isIdentityLoading, setIsIdentityLoading] = useState(true);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -34,32 +35,38 @@ export default function Navbar() {
 
   useEffect(() => {
     const fetchUserAndProfile = async (sessionUser: User | null) => {
-      setUser(sessionUser);
-      if (sessionUser) {
-        const data = await api.permissions();
+      setIsIdentityLoading(true);
 
-        if (data.profile.is_banned) {
-          if (isKickingOut.current) return;
-          isKickingOut.current = true;
+      try {
+        setUser(sessionUser);
+        if (sessionUser) {
+          const data = await api.permissions();
 
-          await supabase.auth.signOut();
-          setUser(null);
-          alert("Your account has been permanently suspended.");
-          if (window.location.pathname !== "/login") {
-            window.location.href = "/login";
+          if (data.profile.is_banned) {
+            if (isKickingOut.current) return;
+            isKickingOut.current = true;
+
+            await supabase.auth.signOut();
+            setUser(null);
+            alert("Your account has been permanently suspended.");
+            if (window.location.pathname !== "/login") {
+              window.location.href = "/login";
+            }
+            return;
           }
-          return;
-        }
 
-        setDbUsername(data.profile.username);
-        setDbAvatarUrl(data.profile.avatar_url);
-        setUserRole(data.profile.role);
-        setIsDeveloper(data.profile.is_developer || false);
-      } else {
-        setDbUsername(null);
-        setDbAvatarUrl(null);
-        setUserRole(null);
-        setIsDeveloper(false);
+          setDbUsername(data.profile.username);
+          setDbAvatarUrl(data.profile.avatar_url);
+          setUserRole(data.profile.role);
+          setIsDeveloper(data.profile.is_developer || false);
+        } else {
+          setDbUsername(null);
+          setDbAvatarUrl(null);
+          setUserRole(null);
+          setIsDeveloper(false);
+        }
+      } finally {
+        setIsIdentityLoading(false);
       }
     };
 
@@ -146,7 +153,7 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-4 sm:gap-6">
-            {userRole !== "super_admin" && (
+            {!isIdentityLoading && userRole !== "super_admin" && (
               <Link
                 to="/publish"
                 title="Submit a Game"
