@@ -38,6 +38,13 @@ type SupabaseErrorDetails = {
   message?: string;
 };
 
+type AccessLogStorageErrorResponse = {
+  code?: "access_log_schema_drift";
+  details?: SupabaseErrorDetails;
+  error: string;
+  migrations?: string[];
+};
+
 type AccessLogRouteOptions = {
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
@@ -54,6 +61,35 @@ function getSupabaseErrorDetails(error: unknown): SupabaseErrorDetails | undefin
     hint: supabaseError.hint,
     message: supabaseError.message,
   };
+}
+
+const ACCESS_LOG_SCHEMA_ERROR_CODES = new Set([
+  "42703",
+  "42883",
+  "42P01",
+  "42P10",
+  "PGRST202",
+  "PGRST204",
+]);
+
+export function getAccessLogStorageErrorResponse(
+  error: unknown,
+  message: string,
+): AccessLogStorageErrorResponse {
+  const details = getSupabaseErrorDetails(error);
+  if (details?.code && ACCESS_LOG_SCHEMA_ERROR_CODES.has(details.code)) {
+    return {
+      code: "access_log_schema_drift",
+      details,
+      error: message,
+      migrations: [
+        "20260603090000_repair_access_logs_path.sql",
+        "20260604090000_access_log_sessions_summary.sql",
+      ],
+    };
+  }
+
+  return { error: message };
 }
 
 export async function registerAccessLogRoutes(
@@ -102,7 +138,14 @@ export async function registerAccessLogRoutes(
 
     if (existingLogError) {
       request.log.error({ err: existingLogError }, "Failed to load access log session");
-      return reply.status(500).send({ error: "Failed to create access log" });
+      return reply
+        .status(500)
+        .send(
+          getAccessLogStorageErrorResponse(
+            existingLogError,
+            "Failed to create access log",
+          ),
+        );
     }
 
     const { error } = await timed(
@@ -123,7 +166,9 @@ export async function registerAccessLogRoutes(
 
     if (error) {
       request.log.error({ err: error }, "Failed to create access log");
-      return reply.status(500).send({ error: "Failed to create access log" });
+      return reply
+        .status(500)
+        .send(getAccessLogStorageErrorResponse(error, "Failed to create access log"));
     }
 
     logTiming(request.log, "Access log write timing", timings, {
@@ -182,10 +227,9 @@ export async function registerAccessLogRoutes(
 
       if (error) {
         request.log.error({ err: error }, "Failed to load access logs");
-        return reply.status(500).send({
-          details: getSupabaseErrorDetails(error),
-          error: "Failed to load access logs",
-        });
+        return reply
+          .status(500)
+          .send(getAccessLogStorageErrorResponse(error, "Failed to load access logs"));
       }
 
       const logs = (data || []) as AccessLogRow[];

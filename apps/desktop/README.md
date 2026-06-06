@@ -16,10 +16,23 @@ npm run dist
 
 The desktop `dist` script first runs the React production build in `../web`,
 then electron-builder bundles `../web/dist` into packaged desktop artifacts as
-`resources/web-dist`. Packaged builds resolve the LAN HTTPS companion player
-from that bundled resource. Local development still resolves the companion
-player from `apps/web/dist`, so run `npm run build` in `apps/web` before
-testing LAN companion mode with `npm start`.
+`resources/web-dist`. It finishes by running `npm run smoke:release` against
+electron-builder's unpacked packaged app. The release command fails if
+`app.asar` is missing required main/preload/renderer files, HTML references
+missing or CommonJS renderer output, the preload imports unsupported sandbox
+modules or omits its IPC bridge, bundled `resources/web-dist` differs from the
+fresh `apps/web/dist` build, or bundled engine runtime resources are incomplete.
+
+Re-run the packaged artifact guard without rebuilding the installer:
+
+```sh
+npm run smoke:release
+```
+
+Packaged builds resolve the LAN HTTPS companion player from the bundled
+`resources/web-dist` resource. Local development still resolves the companion
+player from `apps/web/dist`, so run `npm run build` in `apps/web` before testing
+LAN companion mode with `npm start`.
 
 By default the desktop app builds the engine image from the bundled
 `resources/engine-runtime` directory in packaged builds, falling back to the

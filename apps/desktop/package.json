@@ -9,9 +9,11 @@
     "test": "npm run build && node --test dist/tests/*.test.js",
     "start": "npm run build && electron .",
     "prepare:web": "npm run build && npm --prefix ../web run build && node dist/scripts/prepareWebDist.js",
-    "dist": "npm run prepare:web && electron-builder"
+    "smoke:release": "npm run build && node dist/scripts/releaseSmoke.js",
+    "dist": "npm run prepare:web && electron-builder && npm run smoke:release"
   },
   "devDependencies": {
+    "@electron/asar": "^3.4.1",
     "@types/node": "^20.19.39",
     "@types/qrcode": "^1.5.6",
     "electron": "^29.0.0",

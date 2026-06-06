@@ -22,6 +22,7 @@ type DesktopPackageJson = {
     };
   };
   dependencies?: Record<string, string>;
+  scripts?: Record<string, string>;
 };
 
 function readPackageJson(): DesktopPackageJson {
@@ -81,5 +82,12 @@ describe("desktop package config", () => {
     assert.match(preload, /ipcRenderer\.invoke|electron_1\.ipcRenderer\.invoke/);
     assert.doesNotMatch(renderer, /\bexports\b/);
     assert.doesNotMatch(rendererHelper, /\bexports\b/);
+  });
+
+  it("runs the packaged release smoke as part of npm run dist", () => {
+    const packageJson = readPackageJson();
+
+    assert.match(packageJson.scripts?.["smoke:release"] || "", /releaseSmoke\.js/);
+    assert.match(packageJson.scripts?.dist || "", /npm run smoke:release/);
   });
 });
