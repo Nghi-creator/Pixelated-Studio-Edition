@@ -1,6 +1,6 @@
 # LAN And Multiplayer Feature Plan
 
-Last reviewed: 2026-06-06
+Last reviewed: 2026-06-07
 
 This plan tracks explicit LAN support and the multiplayer feature path. The project currently has a secure local-default engine: Docker publishes the engine only on host loopback, React pairs with a local engine URL, and the desktop pairing token gates engine HTTP and Socket.IO access.
 
@@ -243,6 +243,8 @@ Phase 0E implementation notes:
 - Desktop tests now live under `apps/desktop/tests/` and compile to `dist/tests/`.
 - `npm run prepare:web` passed in `apps/desktop`.
 - `npm run dist` passed in `apps/desktop` with macOS package permissions, producing `apps/desktop/release/Pixelated Studio-1.0.0-arm64.dmg`.
+- `npm run dist` now runs `npm run smoke:release` after electron-builder. The smoke opens the unpacked packaged `app.asar`, validates the exact main/preload/HTML/renderer contract that failed during the June 6, 2026 inert UI regression, and verifies bundled `resources/web-dist` assets plus the engine runtime resource.
+- Focused release-smoke unit tests reject CommonJS renderer output and preload-local-module imports before the full package step.
 - Packaging warnings remaining before public distribution: DMG is unsigned because no valid Developer ID identity is installed.
 - `npm start` launched successfully through the compiled `dist/main.js` entrypoint and compiled preload/renderer scripts.
 

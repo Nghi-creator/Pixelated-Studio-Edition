@@ -4,6 +4,15 @@ import "dotenv/config";
 import assert from "node:assert/strict";
 
 type JsonRecord = Record<string, unknown>;
+type AccessLogErrorPayload = {
+  code?: string;
+  details?: {
+    code?: string;
+    message?: string;
+  };
+  error?: string;
+  migrations?: string[];
+};
 
 const apiUrl = normalizeBaseUrl(
   process.env.STAGING_API_URL ||
@@ -75,6 +84,15 @@ async function request<T = JsonRecord>(
   const payload = text ? parseJson(text, path) : null;
 
   if (!expected.includes(response.status)) {
+    const accessLogError = payload as AccessLogErrorPayload | null;
+    if (accessLogError?.code === "access_log_schema_drift") {
+      throw new Error(
+        `${method} ${path} detected hosted access-log schema drift` +
+          `${accessLogError.details?.code ? ` (${accessLogError.details.code})` : ""}. ` +
+          `Push migrations: ${(accessLogError.migrations || []).join(", ") || "access-log repair migrations"}. ` +
+          `details=${accessLogError.details?.message || accessLogError.error || text}`,
+      );
+    }
     throw new Error(
       `${method} ${path} returned ${response.status}; expected ${expected.join(
         " or ",
@@ -174,6 +192,35 @@ async function smokeIdentity() {
     "object",
     "/me/permissions should include profile",
   );
+
+  return permissions;
+}
+
+async function smokeAccessLogStorage(canAccessAdmin: boolean) {
+  const sessionId = uniqueId("staging-smoke-access-log");
+
+  logStep("checking hosted access-log write schema");
+  await request("POST", "/access-logs", {
+    body: { path: "/staging-smoke/access-log/first", sessionId },
+    expected: 202,
+  });
+
+  logStep("checking hosted access-log session upsert schema");
+  await request("POST", "/access-logs", {
+    body: { path: "/staging-smoke/access-log/updated", sessionId },
+    expected: 202,
+  });
+
+  if (canAccessAdmin) {
+    logStep("checking hosted access-log summary RPC schema");
+    const { payload } = await request<{ logs?: unknown[] }>(
+      "GET",
+      "/admin/access-logs?page=1&pageSize=1",
+    );
+    assert.equal(Array.isArray(payload.logs), true);
+  } else {
+    logStep("skipping admin access-log summary RPC check for non-admin token");
+  }
 }
 
 async function smokeLocalPairing() {
@@ -395,7 +442,8 @@ async function main() {
   console.log(`staging smoke target: ${apiUrl}`);
   const gameId = await findSmokeGameId();
   await smokeCatalogCaching();
-  await smokeIdentity();
+  const permissions = await smokeIdentity();
+  await smokeAccessLogStorage(permissions.abilities?.canAccessAdmin === true);
   await smokeLocalPairing();
   await smokeMultiplayerLobby(gameId);
   await smokeSessionAndMetrics(gameId);

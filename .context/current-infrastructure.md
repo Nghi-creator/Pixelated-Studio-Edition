@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-06-06
+Last reviewed: 2026-06-07
 
 ## Project Shape
 
@@ -18,7 +18,9 @@ Top-level areas:
 Release packaging note: desktop artifacts are produced from `apps/desktop` with
 `npm run dist`. That script builds `apps/web/dist` first, and electron-builder
 bundles that React production output into the app as `resources/web-dist` for
-the LAN HTTPS companion.
+the LAN HTTPS companion. It then runs `npm run smoke:release` against the
+unpacked packaged app and fails the release if the archive or bundled resources
+violate the desktop runtime contract.
 
 ## Backend API
 
@@ -143,8 +145,10 @@ Runtime stack:
 - Desktop packaging helper source is `apps/desktop/scripts/prepareWebDist.ts`, compiled to `apps/desktop/dist/scripts/prepareWebDist.js`.
 - Uses local Docker CLI through `child_process.exec`.
 - Packaged releases are built with `cd apps/desktop && npm run dist`; this script runs the React production build first and electron-builder bundles `apps/web/dist` as `resources/web-dist`.
+- `npm run dist` now ends with `npm run smoke:release`, which inspects electron-builder's unpacked packaged `app.asar` plus external resources rather than trusting source or compile output alone.
+- The packaged release smoke requires the packaged main entry, desktop HTML, preload, and every HTML-loaded renderer script; verifies the main process points at the packaged preload/HTML; rejects CommonJS/`require` output in renderer browser scripts; rejects preload imports other than Electron; checks the expected preload IPC API; verifies bundled `resources/web-dist` exactly matches the fresh `apps/web/dist` tree and that its production index references valid assets; and checks the bundled engine runtime Dockerfile.
 - Packaged renderer scripts must compile as browser scripts without CommonJS `exports` references. The sandboxed preload bridge must only use Electron-supported modules; QR generation runs in the main process through `ipcRenderer.invoke("create-companion-qr")`.
-- A June 6, 2026 packaged-release smoke caught and fixed an inert UI regression caused by CommonJS renderer output plus a preload-local-module import. The corrected release was verified through Initialize Engine, Docker image preparation, container start, health polling, and `ENGINE ACTIVE`.
+- A June 6, 2026 manual packaged-release smoke caught and fixed an inert UI regression caused by CommonJS renderer output plus a preload-local-module import. The automated packaged release smoke added on June 7 encodes those failure signatures and runs inside the `npm run dist` contract.
 
 Current lifecycle:
 
