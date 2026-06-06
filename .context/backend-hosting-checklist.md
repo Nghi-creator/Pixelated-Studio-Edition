@@ -1,6 +1,6 @@
 # Backend Hosting Checklist
 
-Updated: 2026-06-03
+Updated: 2026-06-07
 
 ## Current Recommendation
 
@@ -24,6 +24,8 @@ Pre-hosting checks passed on 2026-05-26:
 On 2026-06-03, hosted access-log reads exposed schema drift: Render returned Supabase error `42703` because the hosted `public.access_logs` table did not have the `path` column expected by the API. Push `supabase/migrations/20260603090000_repair_access_logs_path.sql` before relying on hosted `/admin/access-logs`.
 
 On 2026-06-04, access logs moved from raw route rows to user session summaries. Push `supabase/migrations/20260604090000_access_log_sessions_summary.sql` with the API/web deploy so `POST /access-logs` can upsert by `session_id` and `GET /admin/access-logs` can call `public.admin_access_log_summary`.
+
+The hosted staging smoke now detects this access-log drift automatically. It writes the same unique session twice with different `path` values, which exercises `public.access_logs.path`, `session_id`, `last_seen_at`, `access_count`, and the `access_logs_session_id_key` upsert contract. With an admin token it also calls `/admin/access-logs` to verify `public.admin_access_log_summary`. Recognized Supabase schema errors return `access_log_schema_drift` plus the repair migration names.
 
 ## Local `.env`
 
@@ -129,7 +131,7 @@ STAGING_GAME_ID=<known-game-id>
 STAGING_SMOKE_ENGINE_URL=http://127.0.0.1:8080
 ```
 
-This was not run by Codex because no user access token was provided in the repo context. The command checks `/me`, permissions, local pairing save/read/delete with restore, cloud session create/read/verify/delete, and stream metric write/read against the hosted API.
+This was not run by Codex because no user access token was provided in the repo context. The command checks `/me`, permissions, hosted access-log write/upsert schema, admin access-log summary schema when authorized, local pairing save/read/delete with restore, multiplayer lobby lifecycle, cloud session create/read/verify/delete, and stream metric write/read against the hosted API.
 
 ## Vercel Frontend Env
 

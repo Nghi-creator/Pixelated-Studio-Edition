@@ -403,9 +403,11 @@ Purpose: record a simple visit/session signal.
 1. `SessionTracker` runs once inside `App.tsx`.
 2. `useSessionTracker` gets the current Supabase session.
 3. It builds a `sessionStorage` key for either a user id or guest.
-4. If the key was not logged in the current browser session, React inserts a row into `access_logs`.
-5. On auth sign-in/sign-out events, it logs the new auth state once.
-6. Admin access logs page reads `access_logs` through Supabase.
+4. If the key was not logged in the current browser session, React calls `POST /access-logs` with the browser session id and current path.
+5. The API uses its service-role client to upsert `public.access_logs` by `session_id`, update `path`/`last_seen_at`, and increment `access_count`.
+6. On auth sign-in/sign-out events, React logs the new auth state once.
+7. The admin access logs page calls `GET /admin/access-logs`; the API reads session summaries through `public.admin_access_log_summary`.
+8. The hosted staging smoke writes and updates one unique access-log session to detect schema drift, and verifies the summary RPC when run with an admin token.
 
 Current limitation: logging is client initiated and can be skipped or spoofed. It is adequate for rough dashboard activity, not authoritative analytics.
 

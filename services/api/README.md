@@ -204,4 +204,8 @@ Environment variables:
 - `STAGING_GAME_ID`: optional game id for cloud session creation. If omitted, the runner discovers the first catalog game with a ROM target.
 - `STAGING_SMOKE_ENGINE_URL`: optional local pairing URL, defaulting to `http://127.0.0.1:8080`.
 
-The runner checks `/games` cache headers and `MISS`-then-`HIT` behavior, verifies `/games/featured` remains `no-store`, checks `/me` and `/me/permissions`, exercises local pairing save/read/delete with restore, creates/updates/reads/deletes a multiplayer lobby, creates/reads/verifies/deletes a cloud session, and writes/reads a stream metric. It intentionally writes one stream metric row and temporarily changes local pairing metadata for the signed-in user; smoke lobbies and sessions are deleted before the run exits.
+The runner checks `/games` cache headers and `MISS`-then-`HIT` behavior, verifies `/games/featured` remains `no-store`, checks `/me` and `/me/permissions`, writes and updates one unique access-log session to detect hosted `public.access_logs` column/index drift, exercises local pairing save/read/delete with restore, creates/updates/reads/deletes a multiplayer lobby, creates/reads/verifies/deletes a cloud session, and writes/reads a stream metric. When the token has admin access, it also verifies the hosted `public.admin_access_log_summary` RPC through `/admin/access-logs`.
+
+Recognized Supabase access-log schema failures return API code `access_log_schema_drift` with the relevant migration names. The smoke also treats generic failures from the access-log routes as possible hosted drift, which keeps the check useful while an older API deployment is still active.
+
+The smoke intentionally writes one access-log session row and one stream metric row and temporarily changes local pairing metadata for the signed-in user; smoke lobbies and sessions are deleted before the run exits.

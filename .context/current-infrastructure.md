@@ -72,14 +72,14 @@ Current status:
 - API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
 - `services/api/tests/` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
 - API tests also cover the backend-owned data boundary for catalog/favorites, comment ownership/reactions, profile update/account deletion, admin user authorization, and admin access-log authorization.
-- `npm run smoke:staging` verifies the hosted catalog cache contract, the uncached featured route, signed-in identity/permissions, local pairing restore, multiplayer lobby create/update/recent/delete, cloud session verification, and stream metric persistence.
+- `npm run smoke:staging` verifies the hosted catalog cache contract, the uncached featured route, signed-in identity/permissions, access-log write/upsert schema, admin access-log summary RPC schema when authorized, local pairing restore, multiplayer lobby create/update/recent/delete, cloud session verification, and stream metric persistence.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - The web API client uses `VITE_API_URL` when configured. If it is missing, localhost browsers fall back to `http://127.0.0.1:4000`, while non-local browser hosts fall back to `https://pixelated-api-services.onrender.com` to avoid production builds accidentally calling viewer-local localhost.
 - Cloud/library game boot, game catalog reads, favorites, reactions, comments, profiles, player play-count tracking, game submission metadata/notification, access logging, admin user management, admin access-log reads, admin reports, and comment reporting now depend on the API.
 - The web app has no direct Supabase table/RPC/realtime calls under `apps/web/src`; Supabase remains in the browser for auth/session management and Storage uploads.
 - `supabase/migrations/20260527111500_api_owned_social_writes.sql` was pushed to hosted Supabase on 2026-05-27, removing direct browser data policies for workflows now owned by the API.
-- Hosted Supabase access logs need `supabase/migrations/20260603090000_repair_access_logs_path.sql` pushed after a 2026-06-03 schema-drift check found `public.access_logs.path` missing in production.
+- Hosted Supabase access logs need `supabase/migrations/20260603090000_repair_access_logs_path.sql` pushed after a 2026-06-03 schema-drift check found `public.access_logs.path` missing in production. The hosted staging smoke now probes this contract automatically by writing/updating one unique access-log session, and the API labels recognized Supabase column/index/RPC mismatches as `access_log_schema_drift` with the relevant repair migrations.
 - Access logging is now session-oriented instead of route-oriented. The Vercel web app creates one browser-session id in `sessionStorage`, posts it to the API on app entry/auth transitions, and the API upserts `public.access_logs` by `session_id`. Admin access logs are summarized through `public.admin_access_log_summary`, showing user, first seen, last seen, and session count instead of individual paths.
 
 ## Web App

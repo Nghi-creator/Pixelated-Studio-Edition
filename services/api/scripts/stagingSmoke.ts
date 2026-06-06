@@ -93,6 +93,13 @@ async function request<T = JsonRecord>(
           `details=${accessLogError.details?.message || accessLogError.error || text}`,
       );
     }
+    if (path.startsWith("/access-logs") || path.startsWith("/admin/access-logs")) {
+      throw new Error(
+        `${method} ${path} failed the hosted access-log storage contract with ${response.status}. ` +
+          `Possible schema drift: verify public.access_logs.path, session_id, last_seen_at, access_count, ` +
+          `the access_logs_session_id_key index, and public.admin_access_log_summary. body=${text || "<empty>"}`,
+      );
+    }
     throw new Error(
       `${method} ${path} returned ${response.status}; expected ${expected.join(
         " or ",
@@ -440,10 +447,10 @@ async function smokeSessionAndMetrics(gameId: string) {
 
 async function main() {
   console.log(`staging smoke target: ${apiUrl}`);
-  const gameId = await findSmokeGameId();
   await smokeCatalogCaching();
   const permissions = await smokeIdentity();
   await smokeAccessLogStorage(permissions.abilities?.canAccessAdmin === true);
+  const gameId = await findSmokeGameId();
   await smokeLocalPairing();
   await smokeMultiplayerLobby(gameId);
   await smokeSessionAndMetrics(gameId);
