@@ -35,7 +35,7 @@ Current status:
 - `GET /games` and `GET /games/:gameId` read approved game catalog metadata through the API.
 - `GET /games` accepts `page`, `pageSize`, and optional `search`; the backend returns paginated catalog metadata plus a compatibility `featuredGames` list.
 - `GET /games` returns `Cache-Control: public, max-age=30, s-maxage=60` and reports backend catalog cache state through `X-Pixelated-Cache: MISS` or `HIT`.
-- `GET /games/featured` returns the uncached homepage hero list with `Cache-Control: no-store`, so banner rotation/random zero-play fallback is not frozen by the public catalog cache. When all sampled play counts are zero, the API returns up to 5 shuffled featured games and the homepage refreshes that pool every 30 seconds.
+- `GET /games/featured` returns an uncached pool of up to 5 homepage hero games with `Cache-Control: no-store`, so banner rotation/random zero-play fallback is not frozen by the public catalog cache. Games with real play counts are ranked by play count; when all sampled play counts are zero, the pool is shuffled and the homepage refreshes it every 30 seconds.
 - `GET /favorites`, `GET /favorites/:gameId`, `PUT /favorites/:gameId`, and `DELETE /favorites/:gameId` manage favorites through the API.
 - `GET /games/:gameId/reactions` and `PUT /games/:gameId/reaction` manage game reactions through the API.
 - `GET /games/:gameId/comments`, `POST /games/:gameId/comments`, `DELETE /comments/:commentId`, and `PUT /comments/:commentId/reaction` manage player comments and comment reactions through the API.

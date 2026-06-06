@@ -126,7 +126,7 @@ Implemented:
 - TTL is 60 seconds.
 - Responses include `Cache-Control: public, max-age=30, s-maxage=60`.
 - Responses include `X-Pixelated-Cache: HIT` or `MISS` for browser/devtools and Render log debugging.
-- `GET /games/featured` is split out with `Cache-Control: no-store`; Landing calls it separately so hero rotation/random zero-play fallback is not frozen by the catalog cache. Zero-play featured responses return up to 5 shuffled games and the homepage refreshes that pool every 30 seconds while all featured play counts remain zero.
+- `GET /games/featured` is split out with `Cache-Control: no-store`; Landing calls it separately so hero rotation/random zero-play fallback is not frozen by the catalog cache. Featured responses return up to 5 games: ranked by play count when real counts exist, or shuffled when all counts are zero. The homepage refreshes the zero-play pool every 30 seconds.
 - User-specific/admin routes are not cached.
 
 Later caching track:

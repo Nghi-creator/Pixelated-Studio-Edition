@@ -472,6 +472,8 @@ test("catalog route paginates, searches, and returns featured games", async () =
     { cover_url: "/b.png", id: "game-b", play_count: 20, title: "Beta Quest" },
     { cover_url: "/c.png", id: "game-c", play_count: 5, title: "Gamma Run" },
     { cover_url: "/d.png", id: "game-d", play_count: 7, title: "Quest Drift" },
+    { cover_url: "/e.png", id: "game-e", play_count: 3, title: "Delta Run" },
+    { cover_url: "/f.png", id: "game-f", play_count: 1, title: "Echo Run" },
   );
   const app = await createDataBoundaryApp(db);
 
@@ -495,7 +497,7 @@ test("catalog route paginates, searches, and returns featured games", async () =
   );
   assert.deepEqual(
     body.featuredGames.map((game) => game.id),
-    ["game-b", "game-d", "game-c"],
+    ["game-b", "game-d", "game-c", "game-e", "game-a"],
   );
   assert.equal(body.page, 2);
   assert.equal(body.pageSize, 2);
