@@ -99,6 +99,40 @@ export function AdminTableSkeleton({
   );
 }
 
+export function AdminTablePageSkeleton({
+  hasSearch = false,
+  rows = 6,
+}: {
+  hasSearch?: boolean;
+  rows?: number;
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-lg" />
+          <Skeleton className="h-9 w-64 max-w-[65vw]" />
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {hasSearch && <Skeleton className="h-10 w-72 rounded-lg" />}
+          <Skeleton className="h-10 w-36 rounded-full" />
+        </div>
+      </div>
+
+      <AdminTableSkeleton columns={4} rows={rows} />
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Skeleton className="h-4 w-32" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-10 w-24 rounded-lg" />
+          <Skeleton className="h-10 w-28 rounded-lg" />
+          <Skeleton className="h-10 w-20 rounded-lg" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ModerationQueueSkeleton() {
   return (
     <div className="space-y-8">
@@ -187,19 +221,6 @@ export function ProfileSkeleton() {
             <Skeleton className="h-12 w-56 rounded-lg" />
           </div>
         </section>
-      </div>
-    </div>
-  );
-}
-
-export function StreamSkeleton() {
-  return (
-    <div className="relative flex aspect-video w-full max-w-5xl items-center justify-center overflow-hidden rounded-xl border border-synth-border bg-black shadow-glow-card ring-1 ring-synth-primary/10">
-      <Skeleton className="absolute inset-0 rounded-none bg-synth-surface/70" />
-      <div className="z-10 w-64 space-y-4">
-        <Skeleton className="mx-auto h-12 w-12 rounded-full" />
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="mx-auto h-3 w-2/3" />
       </div>
     </div>
   );

@@ -157,21 +157,40 @@ function LocalGameCard({ game }: { game: LocalGame }) {
   );
 }
 
-function MultiplayerGameGridSkeleton() {
+function MultiplayerGameGridSkeleton({
+  source,
+}: {
+  source: GameSource;
+}) {
   return (
     <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
       {Array.from({ length: 10 }, (_, index) => (
-        <div
-          className="min-h-44 rounded-lg border border-synth-border bg-synth-surface p-4"
-          key={index}
-        >
-          <Skeleton className="mb-4 h-12 w-12 rounded-lg" />
-          <div className="space-y-2">
-            <Skeleton className="h-4 w-4/5" />
-            <Skeleton className="h-3 w-2/3" />
+        source === "cloud" ? (
+          <div
+            className="overflow-hidden rounded-lg border border-synth-border bg-synth-surface"
+            key={index}
+          >
+            <Skeleton className="aspect-[4/5] w-full rounded-none" />
+            <div className="flex min-h-20 flex-col justify-between gap-3 p-3">
+              <Skeleton className="h-4 w-4/5" />
+              <Skeleton className="h-3 w-20" />
+            </div>
           </div>
-          <Skeleton className="mt-10 h-3 w-20" />
-        </div>
+        ) : (
+          <div
+            className="flex min-h-44 flex-col justify-between rounded-lg border border-synth-border bg-synth-surface p-4"
+            key={index}
+          >
+            <div>
+              <Skeleton className="mb-4 h-12 w-12 rounded-lg" />
+              <div className="space-y-2">
+                <Skeleton className="h-4 w-4/5" />
+                <Skeleton className="h-3 w-2/3" />
+              </div>
+            </div>
+            <Skeleton className="h-3 w-20" />
+          </div>
+        )
       ))}
     </div>
   );
@@ -435,9 +454,9 @@ export default function Multiplayer() {
           )}
 
           {gameSource === "cloud" && cloudLoading ? (
-            <MultiplayerGameGridSkeleton />
+            <MultiplayerGameGridSkeleton source="cloud" />
           ) : gameSource === "local" && localLoading ? (
-            <MultiplayerGameGridSkeleton />
+            <MultiplayerGameGridSkeleton source="local" />
           ) : gameSource === "cloud" ? (
             filteredCloudGames.length > 0 ? (
               <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
