@@ -81,11 +81,12 @@ export default function LocalVault() {
       setLocalGames(data);
     } catch (err) {
       console.error("Could not connect to local Docker engine:", err);
-      setVaultMessage((currentMessage) =>
-        currentMessage || {
-          tone: "error",
-          text: "Local engine is unreachable. Check the desktop app and engine URL.",
-        },
+      setVaultMessage(
+        (currentMessage) =>
+          currentMessage || {
+            tone: "error",
+            text: "Local engine is unreachable. Check the desktop app and engine URL.",
+          },
       );
     }
   };
@@ -233,8 +234,6 @@ export default function LocalVault() {
         </h2>
         <p className="text-gray-400 mt-1 flex items-center gap-2">
           Choose a ROM from your hard drive to play on our web-based emulator.
-          Your files stay on your machine and are securely isolated to your
-          account.
         </p>
       </div>
 

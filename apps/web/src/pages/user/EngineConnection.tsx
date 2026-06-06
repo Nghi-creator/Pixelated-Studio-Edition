@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import { ArrowLeft, CheckCircle2, MonitorCog } from "lucide-react";
-import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
 import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engineAuth";
 
@@ -56,10 +61,6 @@ export default function EngineConnection() {
         <h1 className="text-3xl font-extrabold text-white">
           Engine Connection
         </h1>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-400">
-          Initialize the desktop engine, copy its pairing token, then connect
-          this browser before playing.
-        </p>
       </div>
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
