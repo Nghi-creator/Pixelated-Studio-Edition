@@ -337,7 +337,7 @@ Purpose: show the game catalog and user favorites.
 2. The API queries Supabase `games` with server-side range/count and title search, then returns `games`, `page`, `pageSize`, `total`, `totalPages`, and a compatibility `featuredGames` list.
 3. Landing separately calls `GET /games/featured` with `cache: "no-store"` for the homepage hero.
 4. The homepage grid renders only the requested page. Pagination controls use backend totals instead of slicing a full browser-side catalog.
-5. The hero uses the uncached featured endpoint, currently highest play-count games when any plays exist; when sampled play counts are all zero, the API returns up to 5 shuffled games and Landing refreshes that pool every 30 seconds so first-time catalogs can keep rotating.
+5. The hero uses the uncached featured endpoint and rotates through up to 5 games. When real play counts exist, they are ranked by play count; when sampled play counts are all zero, the API shuffles the pool and Landing refreshes it every 30 seconds so first-time catalogs can keep rotating.
 6. User favorite state is read and written through API routes: `GET /favorites`, `GET /favorites/:gameId`, `PUT /favorites/:gameId`, and `DELETE /favorites/:gameId`.
 
 ## 11. Social Comments/Reactions Flow

@@ -27,7 +27,7 @@ const commentBodySchema = z.object({
 const reactionBodySchema = z.object({
   isLike: z.boolean().nullable(),
 });
-const FEATURED_GAME_LIMIT = 3;
+const FEATURED_GAME_LIMIT = 5;
 const ZERO_PLAY_FEATURED_POOL_LIMIT = 5;
 
 type ProfileRole = {
