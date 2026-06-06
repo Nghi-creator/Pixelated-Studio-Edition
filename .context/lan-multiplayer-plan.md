@@ -1,6 +1,6 @@
 # LAN And Multiplayer Feature Plan
 
-Last reviewed: 2026-06-02
+Last reviewed: 2026-06-06
 
 This plan tracks explicit LAN support and the multiplayer feature path. The project currently has a secure local-default engine: Docker publishes the engine only on host loopback, React pairs with a local engine URL, and the desktop pairing token gates engine HTTP and Socket.IO access.
 
@@ -76,11 +76,13 @@ Current LAN pairing uses the desktop HTTPS companion invite flow:
 1. Host enables LAN mode in desktop.
 2. Desktop rotates the engine token, starts the packaged HTTPS companion, and shows a 10-minute invite code.
 3. Guest opens `https://<host-lan-ip>:8090`.
-4. The companion-served React app redeems the invite code with `POST /invite/redeem`.
-5. React stores the returned `companion:` credential in browser local storage.
-6. The companion maps that credential to the host-local engine token while proxying REST and Socket.IO handshakes to `127.0.0.1:8080`.
-7. Host can press Regenerate to replace the active invite code and clear unconnected companion credentials.
-8. Host can press Revoke to remove the active code while leaving the engine and HTTPS join page running; guests need a regenerated code before new redemption can succeed.
+4. The companion-served React app runs `GET /invite/preflight` and shows explicit certificate trust, invite lifecycle, and host engine availability states.
+5. Join remains disabled until certificate access is accepted, the invite is active, and the host engine is healthy.
+6. React redeems the invite code with `POST /invite/redeem`.
+7. React stores the returned `companion:` credential in browser local storage.
+8. The companion maps that credential to the host-local engine token while proxying REST and Socket.IO handshakes to `127.0.0.1:8080`.
+9. Host can press Regenerate to replace the active invite code and clear unconnected companion credentials.
+10. Host can press Revoke to remove the active code while leaving the engine and HTTPS join page running; guests need a regenerated code before new redemption can succeed.
 
 Next hardening layer:
 

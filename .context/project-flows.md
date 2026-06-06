@@ -38,7 +38,8 @@ Purpose: start the local Dockerized game streaming node.
 15. `/health` checks Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
 16. If health returns `ok: true` and LAN mode is enabled, Electron starts the LAN HTTPS companion server with a 10-minute invite code.
 17. The companion serves the React production build from `apps/web/dist` in development or `resources/web-dist` in packaged builds, then proxies engine HTTP and Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
-18. LAN guests redeem the invite code with `POST /invite/redeem`; the companion returns a short-lived companion credential and maps it to the real engine token while proxying.
+18. LAN guests run `GET /invite/preflight`; the companion reports certificate acceptance, active/expired/revoked invite state, and host engine availability without exposing a secret.
+19. LAN guests redeem the invite code with `POST /invite/redeem`; the companion rechecks engine/invite readiness, returns a short-lived companion credential, and maps it to the real engine token while proxying.
 19. If health returns `ok: true`, Electron marks the engine as successful.
 20. If health times out or engine startup fails, Electron removes `pixelated-node` and returns the UI to stopped state.
 21. Electron displays log messages from the Docker lifecycle back in the desktop UI.
@@ -200,11 +201,13 @@ LAN HTTPS companion join variant:
 
 1. Electron starts LAN mode and shows the HTTPS companion join URL plus a short-lived invite code.
 2. The companion-served React app detects the `https://<host-lan-ip>:8090` engine URL and shows an invite-code join UI instead of the raw pairing token field.
-3. React calls `POST <companionUrl>/invite/redeem` with the invite code.
-4. The companion validates the code locally, returns a short-lived companion credential, and never sends the raw engine token to the guest.
-5. React stores the engine URL plus `companion:<credential>` in browser `localStorage`.
-6. REST calls send the companion credential through `X-Engine-Token`; Socket.IO joins send it as a `companionToken` query parameter.
-7. The companion validates the credential and injects the host-local engine token while proxying to `127.0.0.1:8080`.
+3. React calls `GET <companionUrl>/invite/preflight` and shows explicit Certificate, Invite, and Host engine states. Join remains disabled until all three pass.
+4. If the HTTPS request cannot complete, React presents a direct link to accept the companion certificate and a `Check again` action.
+5. React calls `POST <companionUrl>/invite/redeem` with the invite code.
+6. The companion validates the code, verifies the host engine is healthy, rechecks that the invite stayed active during the probe, returns a short-lived companion credential, and never sends the raw engine token to the guest.
+7. React stores the engine URL plus `companion:<credential>` in browser `localStorage`.
+8. REST calls send the companion credential through `X-Engine-Token`; Socket.IO joins send it as a `companionToken` query parameter.
+9. The companion validates the credential and injects the host-local engine token while proxying to `127.0.0.1:8080`.
 
 ## 5A. Live Stream Telemetry And Error Flow
 

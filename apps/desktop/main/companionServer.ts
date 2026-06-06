@@ -13,6 +13,7 @@ import path from "path";
 const ENGINE_HOST = "127.0.0.1";
 const ENGINE_PORT = 8080;
 const INVITE_PATH = "/invite";
+const PREFLIGHT_INVITE_PATH = "/invite/preflight";
 const REDEEM_INVITE_PATH = "/invite/redeem";
 const PROXY_PREFIXES = ["/health", "/local-games", "/socket.io", "/upload"];
 
@@ -47,6 +48,8 @@ type CompanionInviteState = {
   revokedAt: number | null;
 };
 
+export type CompanionInviteStatus = "active" | "expired" | "revoked";
+
 const companionAccessTokens = new Map<string, CompanionAccessToken>();
 let companionInviteState: CompanionInviteState = {
   code: null,
@@ -70,6 +73,14 @@ export function revokeCompanionInvite() {
     revokedAt: Date.now(),
   };
   companionAccessTokens.clear();
+}
+
+export function getCompanionInviteStatus(
+  state: CompanionInviteState = companionInviteState,
+  now = Date.now(),
+): CompanionInviteStatus {
+  if (!state.code || !state.expiresAt) return "revoked";
+  return now >= state.expiresAt ? "expired" : "active";
 }
 
 function createCertificate(
@@ -151,7 +162,10 @@ function sendJson(
   statusCode: number,
   payload: Record<string, unknown>,
 ) {
-  res.writeHead(statusCode, { "content-type": "application/json" });
+  res.writeHead(statusCode, {
+    "cache-control": "no-store",
+    "content-type": "application/json",
+  });
   res.end(JSON.stringify(payload));
 }
 
@@ -169,6 +183,50 @@ function createCompanionAccessToken(expiresAt: number) {
   const token = crypto.randomBytes(24).toString("base64url");
   companionAccessTokens.set(token, { expiresAt });
   return token;
+}
+
+function probeEngineHealth(timeoutMs = 1500) {
+  return new Promise<boolean>((resolve) => {
+    let settled = false;
+    const settle = (available: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(available);
+    };
+
+    const req = http.get(
+      {
+        hostname: ENGINE_HOST,
+        path: "/health",
+        port: ENGINE_PORT,
+      },
+      (res) => {
+        let body = "";
+        res.on("data", (chunk: Buffer) => {
+          body += chunk.toString("utf8");
+        });
+        res.on("end", () => {
+          if (res.statusCode !== 200) {
+            settle(false);
+            return;
+          }
+
+          try {
+            const payload = JSON.parse(body) as { ok?: unknown };
+            settle(payload.ok === true);
+          } catch {
+            settle(false);
+          }
+        });
+      },
+    );
+
+    req.on("error", () => settle(false));
+    req.setTimeout(timeoutMs, () => {
+      req.destroy();
+      settle(false);
+    });
+  });
 }
 
 function getCompanionTokenFromRequest(req: IncomingMessage) {
@@ -204,13 +262,36 @@ async function handleInviteRequest(
   req: IncomingMessage,
   res: ServerResponse,
 ) {
+  if (req.method === "GET" && req.url?.startsWith(PREFLIGHT_INVITE_PATH)) {
+    const engineAvailable = await probeEngineHealth();
+    const inviteStatus = getCompanionInviteStatus();
+    sendJson(res, 200, {
+      certificate: {
+        status: "accepted",
+      },
+      engine: {
+        status: engineAvailable ? "available" : "unavailable",
+      },
+      invite: {
+        expiresAt: companionInviteState.expiresAt
+          ? new Date(companionInviteState.expiresAt).toISOString()
+          : null,
+        status: inviteStatus,
+      },
+      ready: inviteStatus === "active" && engineAvailable,
+    });
+    return true;
+  }
+
   if (req.method === "GET" && req.url?.startsWith(INVITE_PATH)) {
+    const inviteStatus = getCompanionInviteStatus();
     sendJson(res, 200, {
       codeLength: companionInviteState.code?.length || 8,
       expiresAt: companionInviteState.expiresAt
         ? new Date(companionInviteState.expiresAt).toISOString()
         : null,
-      revoked: !companionInviteState.code,
+      expired: inviteStatus === "expired",
+      revoked: inviteStatus === "revoked",
       revokedAt: companionInviteState.revokedAt
         ? new Date(companionInviteState.revokedAt).toISOString()
         : null,
@@ -222,15 +303,25 @@ async function handleInviteRequest(
     return false;
   }
 
-  if (!companionInviteState.code || !companionInviteState.expiresAt) {
-    sendJson(res, 410, { error: "Invite code revoked" });
+  const inviteStatus = getCompanionInviteStatus();
+  if (inviteStatus === "revoked") {
+    sendJson(res, 410, {
+      code: "invite_revoked",
+      error: "Invite code revoked",
+    });
     return true;
   }
 
-  if (Date.now() >= companionInviteState.expiresAt) {
-    sendJson(res, 410, { error: "Invite code expired" });
+  if (inviteStatus === "expired") {
+    sendJson(res, 410, {
+      code: "invite_expired",
+      error: "Invite code expired",
+    });
     return true;
   }
+
+  const activeInviteCode = companionInviteState.code as string;
+  const activeInviteExpiresAt = companionInviteState.expiresAt as number;
 
   try {
     const body = await readJsonBody(req);
@@ -240,15 +331,37 @@ async function handleInviteRequest(
         : undefined,
     );
 
-    if (submittedCode !== companionInviteState.code) {
-      sendJson(res, 401, { error: "Invalid invite code" });
+    if (submittedCode !== activeInviteCode) {
+      sendJson(res, 401, {
+        code: "invite_invalid",
+        error: "Invalid invite code",
+      });
+      return true;
+    }
+
+    if (!(await probeEngineHealth())) {
+      sendJson(res, 503, {
+        code: "host_engine_unavailable",
+        error: "Host engine unavailable",
+      });
+      return true;
+    }
+
+    if (
+      companionInviteState.code !== activeInviteCode ||
+      getCompanionInviteStatus() !== "active"
+    ) {
+      sendJson(res, 410, {
+        code: "invite_replaced",
+        error: "Invite code is no longer active",
+      });
       return true;
     }
 
     sendJson(res, 200, {
-      companionToken: createCompanionAccessToken(companionInviteState.expiresAt),
+      companionToken: createCompanionAccessToken(activeInviteExpiresAt),
       engineUrl: "",
-      expiresAt: new Date(companionInviteState.expiresAt).toISOString(),
+      expiresAt: new Date(activeInviteExpiresAt).toISOString(),
       tokenStoredBy: "browser-local-storage",
     });
   } catch (err) {

@@ -1,13 +1,18 @@
 import {
+  AlertTriangle,
   CheckCircle2,
   Eye,
   EyeOff,
   Loader2,
   PlugZap,
+  RefreshCw,
+  Server,
+  ShieldCheck,
+  Ticket,
   Trash2,
   Wifi,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { api, ApiError } from "../../lib/apiClient";
 import {
   clearEngineToken,
@@ -34,11 +39,32 @@ type EngineHealthPayload = {
 };
 
 type InviteRedeemPayload = {
+  code?: string;
   companionToken?: string;
   engineUrl?: string;
   error?: string;
   expiresAt?: string;
 };
+
+type LanPreflightPayload = {
+  certificate?: {
+    status?: "accepted";
+  };
+  engine?: {
+    status?: "available" | "unavailable";
+  };
+  invite?: {
+    expiresAt?: string | null;
+    status?: "active" | "expired" | "revoked";
+  };
+  ready?: boolean;
+};
+
+type LanPreflightState =
+  | { status: "idle" }
+  | { status: "checking" }
+  | { payload: LanPreflightPayload; status: "complete" }
+  | { status: "unreachable" };
 
 type PairingFailureContext = {
   error: unknown;
@@ -129,10 +155,19 @@ const isLikelyCompanionUrl = (url: URL) =>
 const getStoredCompanionAccessToken = (token: string) =>
   token.startsWith("companion:") ? token.slice("companion:".length) : "";
 
-const getInviteFailureMessage = (status: number) => {
+const getInviteFailureMessage = (status: number, code?: string) => {
   if (status === 401) return "That invite code was not accepted by the host.";
+  if (code === "invite_expired") {
+    return "That invite code expired. Ask the host to regenerate it.";
+  }
+  if (code === "invite_revoked") {
+    return "That invite code was revoked. Ask the host to regenerate it.";
+  }
   if (status === 410) {
     return "That invite code expired or was revoked. Ask the host for a fresh code.";
+  }
+  if (code === "host_engine_unavailable" || status === 503) {
+    return "The join page is ready, but the host engine is unavailable. Ask the host to initialize or restart it.";
   }
   if (status >= 500) {
     return "The host join page is reachable, but invite redemption failed. Ask the host to restart LAN mode.";
@@ -181,6 +216,54 @@ const getPairingFailureMessage = ({
   return "Could not reach the local engine at that URL.";
 };
 
+const fetchLanPreflight = async (engineUrl: string) => {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 4_000);
+
+  try {
+    const response = await fetch(
+      engineUrlEndpoint(engineUrl, "/invite/preflight"),
+      { cache: "no-store", signal: controller.signal },
+    );
+    if (!response.ok) {
+      throw new Error("LAN join preflight failed.");
+    }
+    return (await response.json()) as LanPreflightPayload;
+  } finally {
+    window.clearTimeout(timeout);
+  }
+};
+
+function PreflightRow({
+  icon,
+  label,
+  message,
+  tone,
+}: {
+  icon: ReactNode;
+  label: string;
+  message: string;
+  tone: "checking" | "fail" | "pass" | "waiting";
+}) {
+  const toneClass =
+    tone === "pass"
+      ? "text-emerald-200"
+      : tone === "fail"
+        ? "text-red-200"
+        : tone === "checking"
+          ? "text-synth-secondary"
+          : "text-gray-400";
+
+  return (
+    <li className={`flex items-start gap-2 ${toneClass}`}>
+      <span className="mt-0.5 shrink-0">{icon}</span>
+      <span>
+        <strong className="text-white">{label}:</strong> {message}
+      </span>
+    </li>
+  );
+}
+
 export function EnginePairingPanel({
   compact = false,
   onPaired,
@@ -191,6 +274,13 @@ export function EnginePairingPanel({
   const [pairingState, setPairingState] = useState<PairingState>(
     token ? "paired" : "idle",
   );
+  const [lanPreflight, setLanPreflight] = useState<LanPreflightState>(() => {
+    const initialUrl = parseEngineUrl(getEngineUrl());
+    return {
+      status:
+        initialUrl && isLikelyCompanionUrl(initialUrl) ? "checking" : "idle",
+    };
+  });
   const [showToken, setShowToken] = useState(false);
   const [message, setMessage] = useState(
     token
@@ -202,6 +292,8 @@ export function EnginePairingPanel({
   const isCompanionJoin = Boolean(
     parsedEngineUrl && isLikelyCompanionUrl(parsedEngineUrl),
   );
+  const preflightReady =
+    lanPreflight.status === "complete" && lanPreflight.payload.ready === true;
 
   useEffect(() => {
     const refreshPairingState = () => {
@@ -237,6 +329,40 @@ export function EnginePairingPanel({
       });
   }, []);
 
+  useEffect(() => {
+    const parsedUrl = parseEngineUrl(engineUrl);
+    if (!parsedUrl || !isLikelyCompanionUrl(parsedUrl)) return;
+
+    let active = true;
+    const checkPreflight = () => {
+      fetchLanPreflight(normalizeEngineUrl(engineUrl))
+        .then((payload) => {
+          if (active) setLanPreflight({ payload, status: "complete" });
+        })
+        .catch(() => {
+          if (active) setLanPreflight({ status: "unreachable" });
+        });
+    };
+    checkPreflight();
+    const interval = window.setInterval(checkPreflight, 5_000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [engineUrl]);
+
+  const retryLanPreflight = async () => {
+    const normalizedUrl = normalizeEngineUrl(engineUrl);
+    setLanPreflight({ status: "checking" });
+    try {
+      const payload = await fetchLanPreflight(normalizedUrl);
+      setLanPreflight({ payload, status: "complete" });
+    } catch {
+      setLanPreflight({ status: "unreachable" });
+    }
+  };
+
   const pairEngine = async () => {
     const normalizedUrl = normalizeEngineUrl(engineUrl);
     const parsedUrl = parseEngineUrl(normalizedUrl);
@@ -257,6 +383,12 @@ export function EnginePairingPanel({
     if (joiningWithInvite && !normalizedInviteCode) {
       setPairingState("error");
       setMessage("Enter the invite code from the host desktop app.");
+      return;
+    }
+
+    if (joiningWithInvite && !preflightReady) {
+      setPairingState("error");
+      setMessage("Complete the LAN join checks before entering the invite code.");
       return;
     }
 
@@ -285,8 +417,15 @@ export function EnginePairingPanel({
         );
 
         if (!inviteResponse.ok) {
+          const failurePayload =
+            (await inviteResponse.json().catch(() => ({}))) as InviteRedeemPayload;
           setPairingState("error");
-          setMessage(getInviteFailureMessage(inviteResponse.status));
+          setMessage(
+            getInviteFailureMessage(inviteResponse.status, failurePayload.code),
+          );
+          if ([410, 503].includes(inviteResponse.status)) {
+            void retryLanPreflight();
+          }
           return;
         }
 
@@ -462,7 +601,17 @@ export function EnginePairingPanel({
               </span>
               <input
                 value={engineUrl}
-                onChange={(event) => setEngineUrlInput(event.target.value)}
+                onChange={(event) => {
+                  const nextUrl = event.target.value;
+                  const parsedNextUrl = parseEngineUrl(nextUrl);
+                  setEngineUrlInput(nextUrl);
+                  setLanPreflight({
+                    status:
+                      parsedNextUrl && isLikelyCompanionUrl(parsedNextUrl)
+                        ? "checking"
+                        : "idle",
+                  });
+                }}
                 className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-primary"
                 placeholder="http://localhost:8080 or http://192.168.1.20:8080"
               />
@@ -536,6 +685,113 @@ export function EnginePairingPanel({
             </div>
           )}
 
+          {isCompanionJoin && (
+            <div className="mt-3 rounded-lg border border-synth-border bg-synth-bg px-3 py-3 text-xs leading-5">
+              <div className="flex items-center justify-between gap-3">
+                <span className="font-semibold uppercase tracking-wide text-gray-300">
+                  LAN join checks
+                </span>
+                <button
+                  className="inline-flex items-center gap-1 font-semibold text-synth-secondary transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                  disabled={lanPreflight.status === "checking"}
+                  onClick={() => void retryLanPreflight()}
+                  type="button"
+                >
+                  <RefreshCw
+                    className={`h-3.5 w-3.5 ${
+                      lanPreflight.status === "checking" ? "animate-spin" : ""
+                    }`}
+                  />
+                  Check again
+                </button>
+              </div>
+              <ul className="mt-2 space-y-1.5">
+                <PreflightRow
+                  icon={<ShieldCheck className="h-4 w-4" />}
+                  label="Certificate"
+                  message={
+                    lanPreflight.status === "unreachable"
+                      ? "Trust required. Open this HTTPS join URL directly and accept the browser warning."
+                      : lanPreflight.status === "complete"
+                        ? "Accepted for this join page."
+                        : "Checking HTTPS trust..."
+                  }
+                  tone={
+                    lanPreflight.status === "unreachable"
+                      ? "fail"
+                      : lanPreflight.status === "complete"
+                        ? "pass"
+                        : "checking"
+                  }
+                />
+                <PreflightRow
+                  icon={<Ticket className="h-4 w-4" />}
+                  label="Invite"
+                  message={
+                    lanPreflight.status === "complete"
+                      ? lanPreflight.payload.invite?.status === "active"
+                        ? `Active${
+                            lanPreflight.payload.invite.expiresAt
+                              ? ` until ${new Date(
+                                  lanPreflight.payload.invite.expiresAt,
+                                ).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}`
+                              : ""
+                          }.`
+                        : lanPreflight.payload.invite?.status === "expired"
+                          ? "Expired. Ask the host to regenerate the code."
+                          : "Revoked. Ask the host to regenerate the code."
+                      : "Waiting for the HTTPS join page."
+                  }
+                  tone={
+                    lanPreflight.status !== "complete"
+                      ? "waiting"
+                      : lanPreflight.payload.invite?.status === "active"
+                        ? "pass"
+                        : "fail"
+                  }
+                />
+                <PreflightRow
+                  icon={
+                    lanPreflight.status === "complete" &&
+                    lanPreflight.payload.engine?.status === "unavailable" ? (
+                      <AlertTriangle className="h-4 w-4" />
+                    ) : (
+                      <Server className="h-4 w-4" />
+                    )
+                  }
+                  label="Host engine"
+                  message={
+                    lanPreflight.status === "complete"
+                      ? lanPreflight.payload.engine?.status === "available"
+                        ? "Available."
+                        : "Unavailable. Ask the host to initialize or restart it."
+                      : "Waiting for the HTTPS join page."
+                  }
+                  tone={
+                    lanPreflight.status !== "complete"
+                      ? "waiting"
+                      : lanPreflight.payload.engine?.status === "available"
+                        ? "pass"
+                        : "fail"
+                  }
+                />
+              </ul>
+              {lanPreflight.status === "unreachable" && (
+                <a
+                  className="mt-2 inline-flex font-semibold text-synth-secondary underline underline-offset-2 hover:text-white"
+                  href={normalizeEngineUrl(engineUrl)}
+                  rel="noreferrer"
+                  target="_blank"
+                >
+                  Open HTTPS join page to trust certificate
+                </a>
+              )}
+            </div>
+          )}
+
           {message && (
             <p
               className={`mt-3 text-sm ${
@@ -550,7 +806,10 @@ export function EnginePairingPanel({
         <div className="flex shrink-0 gap-2">
           <button
             onClick={pairEngine}
-            disabled={pairingState === "checking"}
+            disabled={
+              pairingState === "checking" ||
+              (isCompanionJoin && pairingState !== "paired" && !preflightReady)
+            }
             className="inline-flex h-11 items-center gap-2 rounded-lg border border-synth-primary/70 bg-synth-primary/15 px-4 text-sm font-semibold text-white transition-colors hover:bg-synth-primary/25 disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
           >

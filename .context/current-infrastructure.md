@@ -177,9 +177,11 @@ Notable constraints:
 - The companion uses a runtime-generated self-signed certificate under the Electron user data directory. Guests may need to trust/bypass that certificate warning during the first LAN test.
 - The desktop UI displays HTTPS companion join URLs separately from raw LAN engine URLs and renders the first companion join URL as a scan-to-join QR code.
 - LAN mode creates an 8-character invite code that expires after 10 minutes. The companion exposes `POST /invite/redeem` on the HTTPS join page; a valid code returns a short-lived companion credential, not the raw engine token.
+- The companion exposes unauthenticated, non-secret `GET /invite/preflight` state for the guest join page. A successful HTTPS response confirms certificate acceptance for that browser, classifies the invite as active/expired/revoked, probes `127.0.0.1:8080/health`, and reports whether Join is ready.
+- The companion refuses invite redemption with an explicit `host_engine_unavailable` response when its local engine health probe fails. It also rechecks that the invite was not regenerated, revoked, or expired while the probe was running.
 - Hosts can regenerate or revoke the active LAN invite code from the desktop LAN panel without restarting the engine or HTTPS companion. Regeneration replaces the active code and clears unconnected companion credentials; revocation leaves the join page up but makes `/invite/redeem` fail closed until a new code is generated.
 - The companion translates valid companion credentials into the real `X-Engine-Token` header while proxying to `127.0.0.1:8080`, including Socket.IO handshakes through the `companionToken` query parameter.
-- The desktop LAN panel now includes a short invite checklist: scan the QR code or copy the HTTPS join page, share the invite code, and have the guest accept the local certificate warning if shown.
+- The desktop LAN panel now tells hosts that the guest page runs certificate, invite, and engine checks before enabling Join.
 - `PIXELATED_WEB_DIST_DIR` can override the companion asset directory for custom layouts, but release artifacts should use the bundled `resources/web-dist` contract.
 
 ## Engine Container
