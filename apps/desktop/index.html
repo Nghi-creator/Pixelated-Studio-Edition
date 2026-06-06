@@ -210,12 +210,12 @@
               </div>
             </div>
             <p id="companion-copy" class="mt-2 text-xs leading-5 text-gray-400">
-              Guests may need to trust the local certificate the first time they open this page. The invite code is short-lived and the engine token stays on this host.
+              The guest join page checks certificate trust, invite status, and host engine availability before Join. The raw engine token stays on this host.
             </p>
             <ol class="mt-3 list-decimal space-y-1 pl-4 text-xs leading-5 text-gray-400">
               <li>Have the guest scan the QR code, or copy the HTTPS join page.</li>
               <li>Share the short-lived invite code with your LAN guest.</li>
-              <li>The guest accepts the local certificate warning if shown, then joins with the invite code.</li>
+              <li>The guest follows the join checks and enters the code when all three pass.</li>
             </ol>
           </div>
         </div>

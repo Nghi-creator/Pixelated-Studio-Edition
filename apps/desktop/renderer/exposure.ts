@@ -155,7 +155,7 @@
       renderCompanionUrls(payload.urls || []);
       renderInviteCode(payload);
       companionCopy.innerText =
-        "Guests may need to trust the local certificate the first time they open this page. The invite code is short-lived and the engine token stays on this host.";
+        "The guest join page now checks certificate trust, invite status, and host engine availability before Join. The raw engine token stays on this host.";
     }
 
     function render() {
