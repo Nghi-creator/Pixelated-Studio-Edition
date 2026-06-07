@@ -19,7 +19,7 @@ export function StreamStage({
   videoRef,
 }: StreamStageProps) {
   return (
-    <div className="relative w-full max-w-5xl aspect-video bg-black border border-synth-border rounded-xl overflow-hidden shadow-glow-card ring-1 ring-synth-primary/10 flex items-center justify-center">
+    <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl border border-synth-border bg-black shadow-glow-card ring-1 ring-synth-primary/10">
       {status === "connecting" && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
           <LoaderCircle

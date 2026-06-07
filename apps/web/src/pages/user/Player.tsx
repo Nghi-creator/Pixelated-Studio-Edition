@@ -222,13 +222,33 @@ export default function Player() {
         status={status}
       />
 
-      <StreamStage
-        onRetry={retry}
-        showStreamTelemetry={showStreamTelemetry}
-        status={status}
-        telemetry={telemetry}
-        videoRef={videoRef}
-      />
+      <div
+        className={`grid w-full gap-4 transition-[max-width,grid-template-columns] duration-300 ${
+          showStreamTelemetry
+            ? "max-w-7xl xl:grid-cols-[minmax(0,1fr)_18rem]"
+            : "max-w-5xl"
+        }`}
+      >
+        <StreamStage
+          onRetry={retry}
+          showStreamTelemetry={showStreamTelemetry}
+          status={status}
+          telemetry={telemetry}
+          videoRef={videoRef}
+        />
+
+        {showStreamTelemetry && (
+          <StreamTelemetryPanel
+            gameId={id}
+            onClose={() => setShowStreamTelemetry(false)}
+            playerMode={playerMode}
+            sessionId={sessionId}
+            shareUrl={shareUrl}
+            status={status}
+            telemetry={telemetry}
+          />
+        )}
+      </div>
 
       <div className="mt-3 flex w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {authorName ? (
@@ -249,18 +269,6 @@ export default function Player() {
           shareUrl={shareUrl}
         />
       </div>
-
-      {showStreamTelemetry && (
-        <StreamTelemetryPanel
-          gameId={id}
-          onClose={() => setShowStreamTelemetry(false)}
-          playerMode={playerMode}
-          sessionId={sessionId}
-          shareUrl={shareUrl}
-          status={status}
-          telemetry={telemetry}
-        />
-      )}
 
       <PlayerControls
         onStreamProfileChange={setStreamProfileId}
