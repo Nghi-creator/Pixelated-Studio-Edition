@@ -253,6 +253,7 @@ export default function Player() {
       {showStreamTelemetry && (
         <StreamTelemetryPanel
           gameId={id}
+          onClose={() => setShowStreamTelemetry(false)}
           playerMode={playerMode}
           sessionId={sessionId}
           shareUrl={shareUrl}
