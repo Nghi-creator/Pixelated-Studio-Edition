@@ -4,6 +4,7 @@ import path from "path";
 import {
   backendApiUrl,
   companionPort,
+  engineAllowedOrigins,
   engineImage,
   webDistDir,
 } from "./config";
@@ -73,7 +74,7 @@ function buildDockerRunCommand({
   exposureMode,
   publishHost,
 }: DockerRunOptions) {
-  return `docker run -d --name pixelated-node -p ${publishHost}:8080:8080 ${deviceArgs} -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="${quoteDockerEnvValue(backendApiUrl)}" -e PIXELATED_ENGINE_TOKEN="${quoteDockerEnvValue(engineToken)}" -e PIXELATED_ENGINE_EXPOSURE_MODE="${exposureMode}" -e PIXELATED_ADVERTISED_URLS="${quoteDockerEnvValue(advertisedUrls.join(","))}" ${engineImage}`;
+  return `docker run -d --name pixelated-node -p ${publishHost}:8080:8080 ${deviceArgs} -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="${quoteDockerEnvValue(engineAllowedOrigins)}" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="${quoteDockerEnvValue(backendApiUrl)}" -e PIXELATED_ENGINE_TOKEN="${quoteDockerEnvValue(engineToken)}" -e PIXELATED_ENGINE_EXPOSURE_MODE="${exposureMode}" -e PIXELATED_ADVERTISED_URLS="${quoteDockerEnvValue(advertisedUrls.join(","))}" ${engineImage}`;
 }
 
 function rejectInvalidImage(event: IpcMainEvent) {

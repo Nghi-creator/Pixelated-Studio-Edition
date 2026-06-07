@@ -90,4 +90,16 @@ describe("desktop package config", () => {
     assert.match(packageJson.scripts?.["smoke:release"] || "", /releaseSmoke\.js/);
     assert.match(packageJson.scripts?.dist || "", /npm run smoke:release/);
   });
+
+  it("allows hosted and local development web origins for the engine", () => {
+    const configPath = path.resolve(__dirname, "../main/config.js");
+    const controllerPath = path.resolve(__dirname, "../main/engineController.js");
+    const config = fs.readFileSync(configPath, "utf8");
+    const controller = fs.readFileSync(controllerPath, "utf8");
+
+    assert.match(config, /https:\/\/pixelated-studio-edition\.vercel\.app/);
+    assert.match(config, /http:\/\/localhost:5173/);
+    assert.match(config, /http:\/\/127\.0\.0\.1:5173/);
+    assert.match(controller, /engineAllowedOrigins|engine_allowed_origins/);
+  });
 });

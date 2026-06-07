@@ -72,6 +72,13 @@ The desktop app passes `PIXELATED_API_URL` into the engine so cloud sessions can
 PIXELATED_API_URL=http://127.0.0.1:4000
 ```
 
+The engine accepts the hosted app plus local Vite origins by default. Override
+the explicit comma-separated allowlist when testing another trusted web origin:
+
+```bash
+PIXELATED_ALLOWED_ORIGINS=https://pixelated-studio-edition.vercel.app,http://localhost:5173,http://127.0.0.1:5173
+```
+
 Override the companion web asset path for custom layouts with:
 
 ```txt

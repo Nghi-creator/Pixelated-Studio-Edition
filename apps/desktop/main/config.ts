@@ -37,6 +37,13 @@ export const engineRuntimeDir =
   ]);
 export const backendApiUrl =
   process.env.PIXELATED_API_URL || "https://pixelated-api-services.onrender.com";
+export const engineAllowedOrigins =
+  process.env.PIXELATED_ALLOWED_ORIGINS ||
+  [
+    "https://pixelated-studio-edition.vercel.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+  ].join(",");
 export const companionPort = Number(process.env.PIXELATED_COMPANION_PORT || 8090);
 export const engineImage = process.env.PIXELATED_ENGINE_IMAGE || "pixelated-engine";
 export const pullEngineImage =

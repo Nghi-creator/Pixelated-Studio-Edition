@@ -29,7 +29,7 @@ Purpose: start the local Dockerized game streaming node.
 6. Electron generates a random pairing token for this engine run.
 7. Electron sends the token to the desktop renderer, which displays it for host-local use with a warning not to share it with LAN guests.
 8. `main.js` removes any stale `pixelated-node` container.
-9. `main.js` starts a detached container. In local mode it uses `-p 127.0.0.1:8080:8080`; in explicit LAN mode it uses `-p 0.0.0.0:8080:8080`. The command also mounts `-v pixelated-roms:/roms` and passes `PIXELATED_ALLOWED_ORIGINS`, `PIXELATED_ALLOWED_ROM_HOSTS`, `PIXELATED_API_URL`, `PIXELATED_ENGINE_TOKEN`, `PIXELATED_ENGINE_EXPOSURE_MODE`, and `PIXELATED_ADVERTISED_URLS`.
+9. `main.js` starts a detached container. In local mode it uses `-p 127.0.0.1:8080:8080`; in explicit LAN mode it uses `-p 0.0.0.0:8080:8080`. The command also mounts `-v pixelated-roms:/roms` and passes an explicit `PIXELATED_ALLOWED_ORIGINS` list containing Vercel plus the local Vite origins by default, along with `PIXELATED_ALLOWED_ROM_HOSTS`, `PIXELATED_API_URL`, `PIXELATED_ENGINE_TOKEN`, `PIXELATED_ENGINE_EXPOSURE_MODE`, and `PIXELATED_ADVERTISED_URLS`.
 10. The container starts `node server.js`.
 11. `server.js` listens on `0.0.0.0:8080`.
 12. On server start, `server.js` calls `startVirtualDisplay()`.

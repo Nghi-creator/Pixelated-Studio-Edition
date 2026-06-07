@@ -158,7 +158,7 @@ Current lifecycle:
 4. Electron generates a random pairing token for this engine run.
 5. Electron displays the pairing token in the desktop UI for host-local use.
 6. Electron removes any stale `pixelated-node` container.
-7. Electron runs a detached container named `pixelated-node` with `-v pixelated-roms:/roms`. In local mode it publishes `-p 127.0.0.1:8080:8080`; in explicit LAN mode it publishes `-p 0.0.0.0:8080:8080`. It passes `PIXELATED_ALLOWED_ORIGINS="https://pixelated-studio-edition.vercel.app"`, `PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co"`, `PIXELATED_API_URL`, `PIXELATED_ENGINE_TOKEN`, `PIXELATED_ENGINE_EXPOSURE_MODE`, and `PIXELATED_ADVERTISED_URLS`.
+7. Electron runs a detached container named `pixelated-node` with `-v pixelated-roms:/roms`. In local mode it publishes `-p 127.0.0.1:8080:8080`; in explicit LAN mode it publishes `-p 0.0.0.0:8080:8080`. It passes an explicit `PIXELATED_ALLOWED_ORIGINS` allowlist containing the hosted Vercel app plus `http://localhost:5173` and `http://127.0.0.1:5173` by default, alongside `PIXELATED_ALLOWED_ROM_HOSTS`, `PIXELATED_API_URL`, `PIXELATED_ENGINE_TOKEN`, `PIXELATED_ENGINE_EXPOSURE_MODE`, and `PIXELATED_ADVERTISED_URLS`.
 8. Electron polls `http://127.0.0.1:8080/health` and only marks the engine successful after it returns `ok: true`.
 9. On stop/window close, Electron removes `pixelated-node`.
 
@@ -297,7 +297,7 @@ Security model today:
 - Cloud game boot also requires backend-created session intent: `mode: "cloud"` plus a session token that the engine verifies with the API before downloading or booting the approved ROM target.
 - Direct/local React pairing stores the pairing token in browser `localStorage` and sends it through `X-Engine-Token` for REST calls and Socket.IO auth for streaming. Companion joins store a `companion:` credential instead; REST sends the companion credential in `X-Engine-Token`, while Socket.IO sends it as `companionToken` query data for host-side translation.
 - The Python camera bridge receives `PIXELATED_ENGINE_TOKEN` through env and uses it when connecting to Node Socket.IO.
-- The Docker port is published only to host loopback and the engine CORS origin is set to the hosted Vercel app by Electron.
+- The Docker port is published only to host loopback in local mode. Engine CORS stays explicit and permits the hosted Vercel app plus the two local Vite development origins by default; unknown origins remain rejected.
 - Local vault uploads are limited to `.nes` filenames and capped by `PIXELATED_MAX_ROM_SIZE_BYTES`, defaulting to 8 MiB.
 - Developer submission storage uploads now require an authenticated Supabase user, and `game_submissions.submitter_id` records who submitted the game.
 - Direct public inserts into `access_logs` are disabled; access logs are created by the backend service-role client.
