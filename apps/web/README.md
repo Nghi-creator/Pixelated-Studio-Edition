@@ -19,3 +19,7 @@ VITE_ENGINE_URL=http://localhost:8080
 ```
 
 Set `VITE_PUBLIC_APP_URL` in Vercel and in Supabase Auth redirect settings so password recovery, email verification, and OAuth callbacks never fall back to localhost.
+
+The main library and multiplayer host catalog use the API's paginated `/games`
+endpoint. Searches are sent to the backend so results include the full cloud
+catalog, not only the currently visible page.

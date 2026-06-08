@@ -25,6 +25,8 @@ import { Skeleton } from "../../components/ui/Skeleton";
 type MultiplayerMode = "host" | "join";
 type GameSource = "cloud" | "local";
 
+const CLOUD_GAMES_PER_PAGE = 15;
+
 type LocalGame = {
   id: string;
   title: string;
@@ -199,17 +201,53 @@ export default function Multiplayer() {
   const [inviteUrl, setInviteUrl] = useState("");
   const [localMessage, setLocalMessage] = useState("");
   const [cloudLoading, setCloudLoading] = useState(true);
+  const [cloudLoadError, setCloudLoadError] = useState("");
+  const [cloudPage, setCloudPage] = useState(1);
+  const [cloudTotal, setCloudTotal] = useState(0);
+  const [cloudTotalPages, setCloudTotalPages] = useState(1);
   const [localLoading, setLocalLoading] = useState(false);
 
   useEffect(() => {
-    api
-      .games()
-      .then(({ games }) => setCloudGames(games))
-      .catch((error) => {
-        console.error("Failed to load multiplayer cloud games:", error);
-      })
-      .finally(() => setCloudLoading(false));
-  }, []);
+    if (mode !== "host" || gameSource !== "cloud") return;
+
+    let isCurrentRequest = true;
+    const timeout = window.setTimeout(
+      () => {
+        setCloudLoading(true);
+        setCloudLoadError("");
+
+        api
+          .games({
+            page: cloudPage,
+            pageSize: CLOUD_GAMES_PER_PAGE,
+            search: searchQuery,
+          })
+          .then(({ games, total, totalPages }) => {
+            if (!isCurrentRequest) return;
+            setCloudGames(games);
+            setCloudTotal(total);
+            setCloudTotalPages(totalPages);
+          })
+          .catch((error) => {
+            console.error("Failed to load multiplayer cloud games:", error);
+            if (isCurrentRequest) {
+              setCloudLoadError(
+                "Could not load cloud games. Check the API connection and try again.",
+              );
+            }
+          })
+          .finally(() => {
+            if (isCurrentRequest) setCloudLoading(false);
+          });
+      },
+      searchQuery ? 250 : 0,
+    );
+
+    return () => {
+      isCurrentRequest = false;
+      window.clearTimeout(timeout);
+    };
+  }, [cloudPage, gameSource, mode, searchQuery]);
 
   useEffect(() => {
     const refreshEnginePairing = () => {
@@ -264,13 +302,12 @@ export default function Multiplayer() {
     }
   }, [gameSource, isEnginePaired, mode]);
 
-  const filteredCloudGames = useMemo(
-    () =>
-      cloudGames.filter((game) =>
-        game.title.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
-    [cloudGames, searchQuery],
-  );
+  useEffect(() => {
+    if (cloudPage > cloudTotalPages) {
+      setCloudPage(cloudTotalPages);
+    }
+  }, [cloudPage, cloudTotalPages]);
+
   const filteredLocalGames = useMemo(
     () =>
       localGames.filter((game) =>
@@ -280,9 +317,29 @@ export default function Multiplayer() {
   );
   const joinTarget = getJoinTarget(inviteUrl);
   const inviteSessionId = getSessionFromInvite(inviteUrl);
+  const safeCloudPage = Math.min(cloudPage, cloudTotalPages);
+  const cloudPageStart = (safeCloudPage - 1) * CLOUD_GAMES_PER_PAGE;
+  const visibleCloudPageNumbers = Array.from(
+    { length: cloudTotalPages },
+    (_, index) => index + 1,
+  ).filter((page) => {
+    if (cloudTotalPages <= 5) return true;
+    return (
+      page === 1 ||
+      page === cloudTotalPages ||
+      Math.abs(page - safeCloudPage) <= 1
+    );
+  });
 
   const copyEngineUrl = async () => {
     await navigator.clipboard.writeText(getEngineUrl());
+  };
+
+  const changeCloudPage = (page: number) => {
+    setCloudPage(page);
+    document
+      .getElementById("multiplayer-game-catalog")
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   return (
@@ -389,7 +446,10 @@ export default function Multiplayer() {
           </div>
         </section>
       ) : (
-        <section className="rounded-lg border border-synth-border bg-synth-surface p-5">
+        <section
+          className="scroll-mt-24 rounded-lg border border-synth-border bg-synth-surface p-5"
+          id="multiplayer-game-catalog"
+        >
           <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="flex items-start gap-3">
               <div className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-synth-border bg-synth-bg text-synth-secondary">
@@ -423,7 +483,10 @@ export default function Multiplayer() {
                 <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-500" />
                 <input
                   className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg pl-10 pr-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-primary"
-                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onChange={(event) => {
+                    setSearchQuery(event.target.value);
+                    setCloudPage(1);
+                  }}
                   placeholder="Search games..."
                   value={searchQuery}
                 />
@@ -447,16 +510,94 @@ export default function Multiplayer() {
             <MultiplayerGameGridSkeleton source="cloud" />
           ) : gameSource === "local" && localLoading ? (
             <MultiplayerGameGridSkeleton source="local" />
+          ) : gameSource === "cloud" && cloudLoadError ? (
+            <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-16 text-center text-red-200">
+              {cloudLoadError}
+            </div>
           ) : gameSource === "cloud" ? (
-            filteredCloudGames.length > 0 ? (
-              <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
-                {filteredCloudGames.map((game) => (
-                  <CloudGameCard game={game} key={game.id} />
-                ))}
-              </div>
+            cloudGames.length > 0 ? (
+              <>
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
+                  {cloudGames.map((game) => (
+                    <CloudGameCard game={game} key={game.id} />
+                  ))}
+                </div>
+
+                {cloudTotalPages > 1 && (
+                  <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-sm text-gray-500">
+                      Showing {cloudPageStart + 1}-
+                      {Math.min(
+                        cloudPageStart + cloudGames.length,
+                        cloudTotal,
+                      )}{" "}
+                      of {cloudTotal}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        className="h-10 rounded-lg border border-synth-border bg-synth-bg px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={safeCloudPage === 1}
+                        onClick={() =>
+                          changeCloudPage(Math.max(1, safeCloudPage - 1))
+                        }
+                        type="button"
+                      >
+                        Previous
+                      </button>
+
+                      {visibleCloudPageNumbers.map((page, index) => {
+                        const previousPage =
+                          visibleCloudPageNumbers[index - 1];
+                        const needsGap =
+                          previousPage && page - previousPage > 1;
+
+                        return (
+                          <span
+                            className="inline-flex items-center gap-2"
+                            key={page}
+                          >
+                            {needsGap && (
+                              <span className="px-1 text-sm text-gray-600">
+                                ...
+                              </span>
+                            )}
+                            <button
+                              className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-bold transition-colors ${
+                                page === safeCloudPage
+                                  ? "border-synth-primary bg-synth-primary/15 text-white"
+                                  : "border-synth-border bg-synth-bg text-gray-400 hover:border-synth-primary/70 hover:text-white"
+                              }`}
+                              onClick={() => changeCloudPage(page)}
+                              type="button"
+                            >
+                              {page}
+                            </button>
+                          </span>
+                        );
+                      })}
+
+                      <button
+                        className="h-10 rounded-lg border border-synth-border bg-synth-bg px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                        disabled={safeCloudPage === cloudTotalPages}
+                        onClick={() =>
+                          changeCloudPage(
+                            Math.min(cloudTotalPages, safeCloudPage + 1),
+                          )
+                        }
+                        type="button"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             ) : (
               <div className="rounded-lg border border-synth-border bg-synth-bg px-4 py-16 text-center text-gray-500">
-                No cloud games match that search.
+                {searchQuery
+                  ? `No cloud games match "${searchQuery}".`
+                  : "No cloud games are available."}
               </div>
             )
           ) : filteredLocalGames.length > 0 ? (
