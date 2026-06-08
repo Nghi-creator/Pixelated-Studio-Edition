@@ -103,6 +103,10 @@ function telemetrySummary(payload) {
     jitterMs: numberOrNull(telemetry.jitterMs),
     lastEngineError,
     packetsLost: numberOrNull(telemetry.packetsLost),
+    playerMode:
+      payload.playerMode === "host" || payload.playerMode === "guest"
+        ? payload.playerMode
+        : null,
     sessionId: typeof payload.sessionId === "string" ? payload.sessionId : null,
   };
 }
@@ -246,6 +250,12 @@ export function summarizeSmokeArtifacts(runDir) {
   if (!engine.peerTransitionPassed) failures.push("peer join/disconnect transition was not proven");
   if (!host.complete || !host.healthy) failures.push("host telemetry is incomplete or unhealthy");
   if (!guest.complete || !guest.healthy) failures.push("guest telemetry is incomplete or unhealthy");
+  if (host.complete && host.playerMode !== "host") {
+    failures.push("host telemetry is not identified as a host snapshot");
+  }
+  if (guest.complete && guest.playerMode !== "guest") {
+    failures.push("guest telemetry is not identified as a guest snapshot");
+  }
   if (host.complete && host.sessionId !== engine.expectedSessionId) {
     failures.push("host telemetry session does not match the engine session");
   }

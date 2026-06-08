@@ -16,6 +16,7 @@ import {
 import { registerErrorHandlers } from "./src/http/errorHandlers";
 import { registerHealthRoutes } from "./src/http/healthRoutes";
 import { registerLocalVaultRoutes } from "./src/http/localVaultRoutes";
+import { registerSmokeTelemetryRoutes } from "./src/http/smokeTelemetryRoutes";
 import { createCloudRomDownloader } from "./src/roms/cloudRomDownloader";
 import { createProcessManager } from "./src/runtime/processManager";
 import { registerEngineErrorHandlers } from "./src/signaling/engineErrorHandlers";
@@ -72,6 +73,10 @@ const lobby = createLobbyManager();
 registerHealthRoutes(app, getHealthSnapshot);
 registerLocalVaultRoutes(app, {
   maxRomSizeBytes: MAX_ROM_SIZE_BYTES,
+  requireEngineToken: auth.requireEngineToken,
+});
+registerSmokeTelemetryRoutes(app, {
+  getActiveSessionId: runtime.getActiveSessionId,
   requireEngineToken: auth.requireEngineToken,
 });
 registerErrorHandlers(app);

@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
 import { Activity, Clipboard, X } from "lucide-react";
+import { engineAuthHeaders } from "../../lib/engineAuth";
+import { engineEndpoint } from "../../lib/engineConfig";
 import type { WebRTCTelemetry } from "../../lib/webrtcTelemetry";
 
 type StreamTelemetryPanelProps = {
@@ -123,9 +125,9 @@ function buildTelemetrySnapshot({
 
 export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
   const { onClose, telemetry } = props;
-  const [copyState, setCopyState] = useState<"copied" | "failed" | "idle">(
-    "idle",
-  );
+  const [copyState, setCopyState] = useState<
+    "copied" | "failed" | "idle" | "saved"
+  >("idle");
   const [history, setHistory] = useState<TelemetrySample[]>([]);
 
   useEffect(() => {
@@ -158,6 +160,24 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
     const snapshot = buildTelemetrySnapshot(props);
 
     try {
+      try {
+        const response = await fetch(engineEndpoint("/smoke/telemetry"), {
+          body: JSON.stringify(snapshot),
+          headers: {
+            "Content-Type": "application/json",
+            ...engineAuthHeaders(),
+          },
+          method: "POST",
+        });
+        if (response.ok) {
+          setCopyState("saved");
+          window.setTimeout(() => setCopyState("idle"), 1600);
+          return;
+        }
+      } catch {
+        // Clipboard export remains available when the local engine is offline.
+      }
+
       await navigator.clipboard.writeText(JSON.stringify(snapshot, null, 2));
       setCopyState("copied");
     } catch {
@@ -185,9 +205,11 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
             <Clipboard className="h-3.5 w-3.5" />
             {copyState === "copied"
               ? "Copied"
+              : copyState === "saved"
+                ? "Saved"
               : copyState === "failed"
                 ? "Failed"
-                : null}
+                : "Copy"}
           </button>
           <button
             aria-label="Hide stream stats"
