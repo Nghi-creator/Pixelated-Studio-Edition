@@ -191,6 +191,19 @@ Tests live under `services/api/tests/`. The current tests use Fastify injection 
 
 ## Staging Smoke
 
+Before triggering a Render API or Vercel web deploy, run the fail-fast hosted
+access-log schema gate with a real admin or super-admin Supabase access token:
+
+```bash
+STAGING_BEARER_TOKEN=<admin-supabase-access-token> npm run predeploy:hosted
+```
+
+`predeploy:hosted` first runs `check:access-log-schema` against the currently
+hosted API. It writes and updates one unique `public.access_logs` session and
+calls `public.admin_access_log_summary`; missing access-log migrations stop the
+command before typecheck, lint, or build. Configure `STAGING_API_URL` when
+checking a non-default Render service.
+
 Run the hosted-stack smoke test with a real signed-in Supabase access token:
 
 ```bash

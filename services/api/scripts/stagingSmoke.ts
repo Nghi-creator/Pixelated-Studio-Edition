@@ -14,6 +14,9 @@ type AccessLogErrorPayload = {
   migrations?: string[];
 };
 
+type SmokeMode = "access-log-schema" | "full";
+
+const mode = parseArgs(process.argv.slice(2));
 const apiUrl = normalizeBaseUrl(
   process.env.STAGING_API_URL ||
     process.env.API_URL ||
@@ -34,6 +37,17 @@ if (!bearerToken) {
 const authHeaders = {
   Authorization: `Bearer ${bearerToken}`,
 };
+
+function parseArgs(args: string[]): SmokeMode {
+  if (args.length === 0) return "full";
+  if (args.length === 1 && args[0] === "--access-log-schema-only") {
+    return "access-log-schema";
+  }
+
+  fail(
+    `Unknown arguments: ${args.join(" ")}. Supported option: --access-log-schema-only`,
+  );
+}
 
 function normalizeBaseUrl(value: string) {
   return value.replace(/\/+$/, "");
@@ -228,6 +242,17 @@ async function smokeAccessLogStorage(canAccessAdmin: boolean) {
   } else {
     logStep("skipping admin access-log summary RPC check for non-admin token");
   }
+}
+
+async function predeployAccessLogSchemaCheck() {
+  const permissions = await smokeIdentity();
+  if (permissions.abilities?.canAccessAdmin !== true) {
+    throw new Error(
+      "The hosted access-log predeploy check requires an admin or super-admin bearer token so public.admin_access_log_summary is verified.",
+    );
+  }
+
+  await smokeAccessLogStorage(true);
 }
 
 async function smokeLocalPairing() {
@@ -447,6 +472,12 @@ async function smokeSessionAndMetrics(gameId: string) {
 
 async function main() {
   console.log(`staging smoke target: ${apiUrl}`);
+  if (mode === "access-log-schema") {
+    await predeployAccessLogSchemaCheck();
+    console.log("hosted access-log schema predeploy check passed");
+    return;
+  }
+
   await smokeCatalogCaching();
   const permissions = await smokeIdentity();
   await smokeAccessLogStorage(permissions.abilities?.canAccessAdmin === true);

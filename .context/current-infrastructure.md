@@ -73,6 +73,10 @@ Current status:
 - `services/api/tests/` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
 - API tests also cover the backend-owned data boundary for catalog/favorites, comment ownership/reactions, profile update/account deletion, admin user authorization, and admin access-log authorization.
 - `npm run smoke:staging` verifies the hosted catalog cache contract, the uncached featured route, signed-in identity/permissions, access-log write/upsert schema, admin access-log summary RPC schema when authorized, local pairing restore, multiplayer lobby create/update/recent/delete, cloud session verification, and stream metric persistence.
+- `npm run predeploy:hosted` runs the strict hosted access-log schema probe first
+  with an admin token, then typecheck, lint, and build. It is the predeploy gate
+  for both Render API and Vercel web deploys so missing `public.access_logs` or
+  `public.admin_access_log_summary` migrations fail before deployment.
 - On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
 - `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
 - The web API client uses `VITE_API_URL` when configured. If it is missing, localhost browsers fall back to `http://127.0.0.1:4000`, while non-local browser hosts fall back to `https://pixelated-api-services.onrender.com` to avoid production builds accidentally calling viewer-local localhost.

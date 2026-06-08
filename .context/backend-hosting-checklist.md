@@ -1,6 +1,6 @@
 # Backend Hosting Checklist
 
-Updated: 2026-06-07
+Updated: 2026-06-08
 
 ## Current Recommendation
 
@@ -26,6 +26,17 @@ On 2026-06-03, hosted access-log reads exposed schema drift: Render returned Sup
 On 2026-06-04, access logs moved from raw route rows to user session summaries. Push `supabase/migrations/20260604090000_access_log_sessions_summary.sql` with the API/web deploy so `POST /access-logs` can upsert by `session_id` and `GET /admin/access-logs` can call `public.admin_access_log_summary`.
 
 The hosted staging smoke now detects this access-log drift automatically. It writes the same unique session twice with different `path` values, which exercises `public.access_logs.path`, `session_id`, `last_seen_at`, `access_count`, and the `access_logs_session_id_key` upsert contract. With an admin token it also calls `/admin/access-logs` to verify `public.admin_access_log_summary`. Recognized Supabase schema errors return `access_log_schema_drift` plus the repair migration names.
+
+Before every Render API or Vercel web deploy, run the strict hosted predeploy
+gate from `services/api`:
+
+```sh
+STAGING_BEARER_TOKEN=<admin-token> npm run predeploy:hosted
+```
+
+This runs `check:access-log-schema` first and requires an admin or super-admin
+token, so the summary RPC cannot be skipped. Missing access-log migrations fail
+before local typecheck, lint, or build starts.
 
 ## Local `.env`
 
@@ -104,11 +115,13 @@ GET /ready
 From `services/api`:
 
 ```sh
-npm run typecheck
-npm run lint
-npm run build
+STAGING_BEARER_TOKEN=<admin-token> npm run predeploy:hosted
 npm start
 ```
+
+Use `STAGING_API_URL=<render-api-url>` when deploying against a Render service
+other than the default staging target. Store the admin smoke token as a
+short-lived CI/deploy secret; never expose it to Vercel frontend runtime env.
 
 Then test:
 
@@ -151,10 +164,11 @@ VITE_API_URL=https://pixelated-api-services.onrender.com
 
 For future API-owned social/profile/admin boundary changes:
 
-1. Deploy the Render API build with catalog, favorites, reactions, comments, profiles, admin users, and admin access-log routes.
-2. Deploy the Vercel web build that calls those routes through `apps/web/src/lib/apiClient.ts`.
-3. Push any migration that removes old direct-browser policies.
-4. Run `STAGING_BEARER_TOKEN=<token> npm run smoke:staging` from `services/api`, then smoke-test signed-in library, favorites, player comments/reactions, profile update, admin user management, admin access logs, and cloud play from the browser as needed.
+1. Run `STAGING_BEARER_TOKEN=<admin-token> npm run predeploy:hosted` from `services/api`. Stop and push the named access-log repair migrations if it fails.
+2. Deploy the Render API build with catalog, favorites, reactions, comments, profiles, admin users, and admin access-log routes.
+3. Deploy the Vercel web build that calls those routes through `apps/web/src/lib/apiClient.ts`.
+4. Push any migration that removes old direct-browser policies.
+5. Run `STAGING_BEARER_TOKEN=<token> npm run smoke:staging` from `services/api`, then smoke-test signed-in library, favorites, player comments/reactions, profile update, admin user management, admin access logs, and cloud play from the browser as needed.
 
 ## Remaining Production Gaps
 
