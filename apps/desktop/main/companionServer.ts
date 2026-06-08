@@ -15,7 +15,13 @@ const ENGINE_PORT = 8080;
 const INVITE_PATH = "/invite";
 const PREFLIGHT_INVITE_PATH = "/invite/preflight";
 const REDEEM_INVITE_PATH = "/invite/redeem";
-const PROXY_PREFIXES = ["/health", "/local-games", "/socket.io", "/upload"];
+const PROXY_PREFIXES = [
+  "/health",
+  "/local-games",
+  "/smoke/telemetry",
+  "/socket.io",
+  "/upload",
+];
 
 type CertificatePaths = {
   certPath: string;
@@ -124,7 +130,7 @@ function createCertificate(
   return { certPath, keyPath };
 }
 
-function shouldProxy(url = "") {
+export function shouldProxy(url = "") {
   return PROXY_PREFIXES.some((prefix) => {
     return url === prefix || url.startsWith(`${prefix}/`) || url.startsWith(`${prefix}?`);
   });

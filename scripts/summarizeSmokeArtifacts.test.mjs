@@ -21,8 +21,9 @@ function summary(peerCount, offset = 0) {
   };
 }
 
-function telemetry() {
+function telemetry(playerMode = "host") {
   return {
+    playerMode,
     sessionId: "session-1",
     status: "LIVE STREAM ACTIVE",
     telemetry: {
@@ -52,8 +53,8 @@ function makeBundle() {
     path.join(dir, "engine-health-events.ndjson"),
     `${JSON.stringify({ event: "baseline", summary: summary(1) })}\n${JSON.stringify({ event: "after-join", summary: summary(2, 5) })}\n${JSON.stringify({ event: "after-disconnect", summary: summary(1, 1) })}\n`,
   );
-  writeJson(dir, "host-stream-telemetry.json", telemetry());
-  writeJson(dir, "guest-stream-telemetry.json", telemetry());
+  writeJson(dir, "host-stream-telemetry.json", telemetry("host"));
+  writeJson(dir, "guest-stream-telemetry.json", telemetry("guest"));
   fs.writeFileSync(
     path.join(dir, "manual-smoke-notes.md"),
     "- [x] Host passed.\n- [x] Guest passed.\n- Overall: PASS\n",
@@ -95,6 +96,17 @@ test("fails when browser telemetry belongs to a different session", () => {
   assert.match(
     result.markdown,
     /guest telemetry session does not match the engine session/,
+  );
+});
+
+test("fails when direct-capture roles do not match their artifact files", () => {
+  const dir = makeBundle();
+  writeJson(dir, "guest-stream-telemetry.json", telemetry("host"));
+  const result = summarizeSmokeArtifacts(dir);
+  assert.equal(result.verdict, "FAIL");
+  assert.match(
+    result.markdown,
+    /guest telemetry is not identified as a guest snapshot/,
   );
 });
 

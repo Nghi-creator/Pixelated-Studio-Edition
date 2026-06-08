@@ -240,6 +240,11 @@ Streaming/signaling:
 - React forwards the selected stream profile in `start-game`; Node validates bitrate/framerate bounds and passes it to `camera.py` through `PIXELATED_STREAM_PROFILE`; Python applies the profile to GStreamer capture framerate and VP8 target bitrate.
 - React generates the current session id, Node passes it into `camera.py` through `PIXELATED_SESSION_ID`, and both browser/camera sockets join the same room before WebRTC negotiation.
 - React polls browser WebRTC stats once per second for FPS, bitrate, ICE state, packet loss, and jitter. The player hides those metrics by default and exposes them through a persisted developer telemetry toggle.
+- During an active LAN smoke run, the Stream Stats copy action submits the host
+  or guest snapshot through the engine/HTTPS companion. The smoke harness reads
+  the token-protected in-memory capture and writes both snapshots directly into
+  its active artifact bundle; outside a smoke run, the action keeps its
+  clipboard behavior.
 - Engine-side download failures and camera/GStreamer failures emit `engine-error` to the browser session.
 
 Input:

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getCompanionInviteStatus } from "../main/companionServer";
+import { getCompanionInviteStatus, shouldProxy } from "../main/companionServer";
 
 describe("desktop companion preflight", () => {
   it("distinguishes active, expired, and revoked invite states", () => {
@@ -27,5 +27,12 @@ describe("desktop companion preflight", () => {
       ),
       "revoked",
     );
+  });
+});
+
+describe("desktop companion engine proxy", () => {
+  it("proxies smoke telemetry capture routes", () => {
+    assert.equal(shouldProxy("/smoke/telemetry"), true);
+    assert.equal(shouldProxy("/smoke/telemetry/active"), true);
   });
 });

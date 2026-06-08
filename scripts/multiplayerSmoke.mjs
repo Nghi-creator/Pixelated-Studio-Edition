@@ -2,6 +2,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 
 const DEFAULT_ENGINE_URL = "http://127.0.0.1:8080";
 const DEFAULT_OUT_DIR = ".context/smoke-artifacts";
@@ -23,8 +24,6 @@ Options:
   --out-dir <path>          Artifact directory. Default: ${DEFAULT_OUT_DIR}
   --label <name>            Artifact label. Default: lan-multiplayer-smoke
   --notes <path>            Copy completed manual notes into the bundle.
-  --host-telemetry <path>   Copy host stream telemetry JSON into the bundle.
-  --guest-telemetry <path>  Copy guest stream telemetry JSON into the bundle.
   --allow-self-signed       Allow self-signed HTTPS companion certificates.
   --skip-disconnect         Do not wait for guest peer cleanup after join validation.
   --help                    Show this help.
@@ -36,8 +35,8 @@ Flow:
   4. If disconnect validation is enabled, close guest tabs after join passes.
 
 Reports include camera peer counts, session survival checks, input mode, engine
-process CPU/RSS snapshots from /health, copied host/guest telemetry, and a
-manual pass/fail notes template.
+process CPU/RSS snapshots from /health, directly captured host/guest telemetry,
+and a manual pass/fail notes template.
 `);
 }
 
@@ -46,8 +45,6 @@ function parseArgs(argv) {
     engineUrl: DEFAULT_ENGINE_URL,
     expectedGuests: 1,
     label: "lan-multiplayer-smoke",
-    guestTelemetryPath: null,
-    hostTelemetryPath: null,
     notesPath: null,
     outDir: DEFAULT_OUT_DIR,
     pollMs: DEFAULT_POLL_MS,
@@ -86,10 +83,6 @@ function parseArgs(argv) {
       options.label = next();
     } else if (arg === "--notes") {
       options.notesPath = next();
-    } else if (arg === "--host-telemetry") {
-      options.hostTelemetryPath = next();
-    } else if (arg === "--guest-telemetry") {
-      options.guestTelemetryPath = next();
     } else if (arg === "--allow-self-signed") {
       options.allowSelfSigned = true;
     } else if (arg === "--skip-disconnect") {
@@ -214,6 +207,50 @@ async function fetchHealth(engineUrl) {
   return body;
 }
 
+async function requestJson(engineUrl, route, options = {}) {
+  const response = await fetch(`${engineUrl}${route}`, options);
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = body ? JSON.stringify(body) : response.statusText;
+    throw new Error(
+      `${options.method || "GET"} ${route} returned ${response.status}: ${message}`,
+    );
+  }
+
+  return body;
+}
+
+async function activateTelemetryCapture(
+  engineUrl,
+  captureToken,
+  runId,
+  sessionId,
+) {
+  await requestJson(engineUrl, "/smoke/telemetry/active", {
+    body: JSON.stringify({ captureToken, runId, sessionId }),
+    headers: { "Content-Type": "application/json" },
+    method: "PUT",
+  });
+}
+
+async function fetchTelemetryCapture(engineUrl, captureToken) {
+  return requestJson(engineUrl, "/smoke/telemetry", {
+    headers: { "X-Smoke-Capture-Token": captureToken },
+  });
+}
+
+async function deactivateTelemetryCapture(engineUrl, captureToken) {
+  const response = await fetch(`${engineUrl}/smoke/telemetry/active`, {
+    headers: { "X-Smoke-Capture-Token": captureToken },
+    method: "DELETE",
+  });
+
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`DELETE /smoke/telemetry/active returned ${response.status}`);
+  }
+}
+
 function makeLogger(outDir, runId) {
   const runDir = path.join(outDir, runId);
   fs.mkdirSync(runDir, { recursive: true });
@@ -234,18 +271,6 @@ function makeLogger(outDir, runId) {
   };
 }
 
-function readOptionalJsonFile(sourcePath, label) {
-  if (!sourcePath) return null;
-
-  const raw = fs.readFileSync(sourcePath, "utf8");
-  try {
-    return JSON.parse(raw);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    throw new Error(`${label} is not valid JSON: ${message}`);
-  }
-}
-
 function writeJsonArtifact(runDir, fileName, payload) {
   const artifactPath = path.join(runDir, fileName);
   fs.writeFileSync(artifactPath, `${JSON.stringify(payload, null, 2)}\n`);
@@ -258,15 +283,6 @@ function copyTextArtifact(runDir, fileName, sourcePath) {
   const artifactPath = path.join(runDir, fileName);
   fs.copyFileSync(sourcePath, artifactPath);
   return artifactPath;
-}
-
-function writeTelemetryArtifact(runDir, fileName, sourcePath, description) {
-  if (!sourcePath) {
-    return writePlaceholderJson(runDir, fileName, description);
-  }
-
-  const payload = readOptionalJsonFile(sourcePath, fileName);
-  return writeJsonArtifact(runDir, fileName, payload);
 }
 
 function writePlaceholderJson(runDir, fileName, description) {
@@ -326,8 +342,8 @@ function writeNotesTemplate({
     "- [ ] Guest redeemed invite code without receiving the raw host pairing token.",
     "- [ ] Host stream stayed active after guest joined.",
     "- [ ] Guest stream reached LIVE STREAM ACTIVE.",
-    "- [ ] Host telemetry copied to `host-stream-telemetry.json`.",
-    "- [ ] Guest telemetry copied to `guest-stream-telemetry.json`.",
+    "- [ ] Host telemetry saved directly to `host-stream-telemetry.json`.",
+    "- [ ] Guest telemetry saved directly to `guest-stream-telemetry.json`.",
     "- [ ] P2 request/input/release worked.",
     "- [ ] P3/P4 state matched engine input mode.",
     "- [ ] Guest disconnect returned engine peer count to baseline.",
@@ -384,6 +400,52 @@ async function pollUntil({ description, engineUrl, log, predicate, pollMs, timeo
   );
 }
 
+async function captureBrowserTelemetry({
+  artifactPaths,
+  captureToken,
+  engineUrl,
+  log,
+  pollMs,
+  timeoutMs,
+}) {
+  console.log(
+    "[smoke] Join validated. On both host and guest, open Stream Stats and press Copy Stats; the active bundle will save them directly.",
+  );
+
+  const startedAt = Date.now();
+  while (Date.now() - startedAt <= timeoutMs) {
+    const capture = await fetchTelemetryCapture(engineUrl, captureToken);
+    const hostCaptured = Boolean(capture?.host);
+    const guestCaptured = Boolean(capture?.guest);
+    log.write("telemetry-poll", { guestCaptured, hostCaptured });
+
+    if (hostCaptured && guestCaptured) {
+      writeJsonArtifact(
+        artifactPaths.runDir,
+        "host-stream-telemetry.json",
+        capture.host,
+      );
+      writeJsonArtifact(
+        artifactPaths.runDir,
+        "guest-stream-telemetry.json",
+        capture.guest,
+      );
+      log.write("telemetry-captured", {
+        guestTelemetryPath: artifactPaths.guestTelemetryPath,
+        hostTelemetryPath: artifactPaths.hostTelemetryPath,
+      });
+      console.log("[smoke] Host and guest Stream Stats saved into the bundle.");
+      return;
+    }
+
+    await sleep(pollMs);
+  }
+
+  throw new Error(
+    "Timed out waiting for host and guest Stream Stats. Open Stream Stats on both devices and press Copy Stats while the run is active.",
+  );
+}
+
 function assertSessionSurvived({ expectedSessionId, health, phase }) {
   const runtimeActiveSessionId = getRuntimeActiveSessionId(health);
   const cameraSessionId = getCameraPeerState(health).sessionId;
@@ -417,17 +479,15 @@ async function run() {
   const artifactPaths = {
     completedNotesPath: null,
     eventsPath: log.eventsPath,
-    guestTelemetryPath: writeTelemetryArtifact(
+    guestTelemetryPath: writePlaceholderJson(
       log.runDir,
       "guest-stream-telemetry.json",
-      options.guestTelemetryPath,
-      "Paste the guest player Stream Stats > Copy Stats JSON here after the guest reaches LIVE STREAM ACTIVE.",
+      "The active smoke run replaces this after the guest presses Stream Stats > Copy Stats.",
     ),
-    hostTelemetryPath: writeTelemetryArtifact(
+    hostTelemetryPath: writePlaceholderJson(
       log.runDir,
       "host-stream-telemetry.json",
-      options.hostTelemetryPath,
-      "Paste the host player Stream Stats > Copy Stats JSON here after the guest joins.",
+      "The active smoke run replaces this after the host presses Stream Stats > Copy Stats.",
     ),
     notesPath: null,
     reportPath,
@@ -480,6 +540,16 @@ async function run() {
     phase: "baseline",
   });
 
+  const captureToken = crypto.randomBytes(32).toString("hex");
+  activeRun.captureToken = captureToken;
+  await activateTelemetryCapture(
+    options.engineUrl,
+    captureToken,
+    runId,
+    expectedSessionId,
+  );
+  log.write("telemetry-capture-active", { expectedSessionId });
+
   const baselinePeerCount = beforeSummary.cameraPeers.peerCount;
   const targetPeerCount = baselinePeerCount + options.expectedGuests;
   log.write("baseline", {
@@ -516,6 +586,15 @@ async function run() {
   });
   log.write("after-join", {
     summary: afterJoinSummary,
+  });
+
+  await captureBrowserTelemetry({
+    artifactPaths,
+    captureToken,
+    engineUrl: options.engineUrl,
+    log,
+    pollMs: options.pollMs,
+    timeoutMs: options.timeoutMs,
   });
 
   let afterDisconnect = null;
@@ -574,6 +653,8 @@ async function run() {
   };
 
   fs.writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
+  await deactivateTelemetryCapture(options.engineUrl, captureToken);
+  activeRun.captureToken = null;
   log.write("run-pass", {
     artifacts: artifactPaths,
     reportPath,
@@ -584,9 +665,24 @@ async function run() {
   console.log(`[smoke] Events: ${log.eventsPath}`);
 }
 
-run().catch((err) => {
+run().catch(async (err) => {
   const message = err instanceof Error ? err.message : String(err);
   if (activeRun) {
+    if (activeRun.captureToken) {
+      try {
+        await deactivateTelemetryCapture(
+          activeRun.options.engineUrl,
+          activeRun.captureToken,
+        );
+      } catch (deactivateError) {
+        activeRun.log.write("telemetry-capture-deactivate-fail", {
+          message:
+            deactivateError instanceof Error
+              ? deactivateError.message
+              : String(deactivateError),
+        });
+      }
+    }
     const failedReport = {
       artifacts: {
         ...activeRun.artifactPaths,
