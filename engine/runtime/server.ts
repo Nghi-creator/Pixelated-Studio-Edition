@@ -5,6 +5,7 @@ import {
   allowedRomHosts,
   ADVERTISED_URLS,
   CLOUD_ROM_DOWNLOAD_TIMEOUT_MS,
+  COMPANION_URLS,
   corsOptions,
   ENGINE_EXPOSURE_MODE,
   ENGINE_TOKEN,
@@ -63,6 +64,7 @@ const cloudRoms = createCloudRomDownloader({
 });
 const getHealthSnapshot = createHealthSnapshot({
   advertisedUrls: ADVERTISED_URLS,
+  companionUrls: COMPANION_URLS,
   exposureMode: ENGINE_EXPOSURE_MODE,
   engineToken: ENGINE_TOKEN,
   getRuntimeState: runtime.getRuntimeState,

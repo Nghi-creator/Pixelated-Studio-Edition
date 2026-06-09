@@ -13,6 +13,8 @@ type LobbyPanelProps = {
   onKickParticipant: (socketId: string) => void;
   onReleaseSlot: () => void;
   onRequestSlot: (playerIndex: number) => void;
+  shareGuidance: string | null;
+  shareText: string;
   shareUrl: string;
 };
 
@@ -29,6 +31,8 @@ export function LobbyPanel({
   onKickParticipant,
   onReleaseSlot,
   onRequestSlot,
+  shareGuidance,
+  shareText,
   shareUrl,
 }: LobbyPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
@@ -47,7 +51,7 @@ export function LobbyPanel({
   );
 
   const copyShareUrl = () => {
-    void navigator.clipboard?.writeText(shareUrl);
+    void navigator.clipboard?.writeText(shareText);
   };
 
   return (
@@ -103,7 +107,7 @@ export function LobbyPanel({
             <div className="flex-1 overflow-y-auto px-5 py-5">
               <div className="mb-5">
                 <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">
-                  Invite
+                  {shareGuidance ? "LAN Invite" : "Spectator Invite"}
                 </p>
                 <div className="flex items-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-3 py-2">
                   <Link2 className="h-4 w-4 shrink-0 text-synth-primary" />
@@ -114,11 +118,20 @@ export function LobbyPanel({
                     type="button"
                     onClick={copyShareUrl}
                     className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-synth-border text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white"
-                    title="Copy invite link"
+                    title={
+                      shareGuidance
+                        ? "Copy HTTPS join link and invite-code guidance"
+                        : "Copy spectator invite link"
+                    }
                   >
                     <Copy className="h-4 w-4" />
                   </button>
                 </div>
+                {shareGuidance && (
+                  <p className="mt-2 text-xs leading-5 text-gray-400">
+                    {shareGuidance}
+                  </p>
+                )}
               </div>
 
               <div className="mb-5">

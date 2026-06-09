@@ -192,27 +192,52 @@ Tests live under `services/api/tests/`. The current tests use Fastify injection 
 ## Staging Smoke
 
 Before triggering a Render API or Vercel web deploy, run the fail-fast hosted
-access-log schema gate with a real admin or super-admin Supabase access token:
+access-log schema gate from the repository root with a dedicated staging admin
+or super-admin smoke account:
 
 ```bash
-STAGING_BEARER_TOKEN=<admin-supabase-access-token> npm run predeploy:hosted
+STAGING_API_URL=<render-api-url> \
+STAGING_SUPABASE_URL=<supabase-project-url> \
+STAGING_SUPABASE_ANON_KEY=<supabase-anon-key> \
+STAGING_SMOKE_EMAIL=<dedicated-staging-admin-email> \
+STAGING_SMOKE_PASSWORD=<dedicated-staging-admin-password> \
+npm run predeploy:hosted
 ```
 
-`predeploy:hosted` first runs `check:access-log-schema` against the currently
+The root command delegates to `services/api`. `predeploy:hosted` first runs
+`check:access-log-schema` against the currently
 hosted API. It writes and updates one unique `public.access_logs` session and
 calls `public.admin_access_log_summary`; missing access-log migrations stop the
 command before typecheck, lint, or build. Configure `STAGING_API_URL` when
 checking a non-default Render service.
 
-Run the hosted-stack smoke test with a real signed-in Supabase access token:
+GitHub Actions workflow `.github/workflows/hosted-api-deploy-gate.yml` runs:
+
+- `npm run verify:api` on every pull request so its required status check is
+  never skipped by path filtering.
+- `npm run predeploy:hosted` on pushes to `main`, manual dispatches, and calls
+  from future Render/Vercel deploy workflows.
+
+Configure the GitHub `staging` environment with secrets `STAGING_API_URL`,
+`STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_SMOKE_EMAIL`, and
+`STAGING_SMOKE_PASSWORD`. The dedicated smoke account must be an admin or
+super-admin so the access-log summary RPC cannot be skipped. The runner signs
+in at the start of every run and does not store an expiring access token.
+
+Run the hosted-stack smoke test using the same dedicated smoke account:
 
 ```bash
-STAGING_BEARER_TOKEN=<supabase-access-token> npm run smoke:staging
+STAGING_SUPABASE_URL=<supabase-project-url> \
+STAGING_SUPABASE_ANON_KEY=<supabase-anon-key> \
+STAGING_SMOKE_EMAIL=<dedicated-staging-admin-email> \
+STAGING_SMOKE_PASSWORD=<dedicated-staging-admin-password> \
+npm run smoke:staging
 ```
 
 Environment variables:
 
-- `STAGING_BEARER_TOKEN` or `SUPABASE_ACCESS_TOKEN`: required signed-in bearer token.
+- `STAGING_BEARER_TOKEN` or `SUPABASE_ACCESS_TOKEN`: optional signed-in bearer token override for local/manual runs.
+- `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_SMOKE_EMAIL`, and `STAGING_SMOKE_PASSWORD`: automatic smoke-account sign-in credentials used when no bearer-token override is provided.
 - `STAGING_API_URL` or `API_URL`: optional API base URL, defaulting to `https://pixelated-api-services.onrender.com`.
 - `STAGING_GAME_ID`: optional game id for cloud session creation. If omitted, the runner discovers the first catalog game with a ROM target.
 - `STAGING_SMOKE_ENGINE_URL`: optional local pairing URL, defaulting to `http://127.0.0.1:8080`.
