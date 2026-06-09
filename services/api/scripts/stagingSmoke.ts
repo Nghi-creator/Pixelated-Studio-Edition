@@ -22,21 +22,12 @@ const apiUrl = normalizeBaseUrl(
     process.env.API_URL ||
     "https://pixelated-api-services.onrender.com",
 );
-const bearerToken =
+const configuredBearerToken =
   process.env.STAGING_BEARER_TOKEN || process.env.SUPABASE_ACCESS_TOKEN;
 const configuredGameId = process.env.STAGING_GAME_ID;
 const smokeEngineUrl =
   process.env.STAGING_SMOKE_ENGINE_URL || "http://127.0.0.1:8080";
-
-if (!bearerToken) {
-  fail(
-    "Missing STAGING_BEARER_TOKEN. Provide a real signed-in Supabase access token.",
-  );
-}
-
-const authHeaders = {
-  Authorization: `Bearer ${bearerToken}`,
-};
+let authHeaders: Record<string, string> = {};
 
 function parseArgs(args: string[]): SmokeMode {
   if (args.length === 0) return "full";
@@ -60,6 +51,52 @@ function fail(message: string): never {
 
 function logStep(message: string) {
   console.log(`smoke: ${message}`);
+}
+
+async function resolveBearerToken() {
+  if (configuredBearerToken) {
+    logStep("using configured bearer token");
+    return configuredBearerToken;
+  }
+
+  const supabaseUrl =
+    process.env.STAGING_SUPABASE_URL || process.env.SUPABASE_URL;
+  const supabaseAnonKey =
+    process.env.STAGING_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
+  const email = process.env.STAGING_SMOKE_EMAIL;
+  const password = process.env.STAGING_SMOKE_PASSWORD;
+
+  if (!supabaseUrl || !supabaseAnonKey || !email || !password) {
+    fail(
+      "Missing smoke authentication. Provide STAGING_BEARER_TOKEN, or provide " +
+        "STAGING_SUPABASE_URL, STAGING_SUPABASE_ANON_KEY, STAGING_SMOKE_EMAIL, " +
+        "and STAGING_SMOKE_PASSWORD for automatic sign-in.",
+    );
+  }
+
+  logStep("signing in dedicated staging smoke account");
+  const response = await fetch(
+    `${normalizeBaseUrl(supabaseUrl)}/auth/v1/token?grant_type=password`,
+    {
+      body: JSON.stringify({ email, password }),
+      headers: {
+        apikey: supabaseAnonKey,
+        "Content-Type": "application/json",
+      },
+      method: "POST",
+    },
+  );
+  const text = await response.text();
+  const payload = text ? (JSON.parse(text) as { access_token?: string }) : {};
+
+  if (!response.ok || !payload.access_token) {
+    fail(
+      `Staging smoke account sign-in failed with ${response.status}. ` +
+        "Verify the dedicated account credentials and Supabase auth settings.",
+    );
+  }
+
+  return payload.access_token;
 }
 
 function uniqueId(prefix: string) {
@@ -472,6 +509,10 @@ async function smokeSessionAndMetrics(gameId: string) {
 
 async function main() {
   console.log(`staging smoke target: ${apiUrl}`);
+  authHeaders = {
+    Authorization: `Bearer ${await resolveBearerToken()}`,
+  };
+
   if (mode === "access-log-schema") {
     await predeployAccessLogSchemaCheck();
     console.log("hosted access-log schema predeploy check passed");

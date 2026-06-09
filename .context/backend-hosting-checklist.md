@@ -1,6 +1,6 @@
 # Backend Hosting Checklist
 
-Updated: 2026-06-08
+Updated: 2026-06-09
 
 ## Current Recommendation
 
@@ -28,15 +28,49 @@ On 2026-06-04, access logs moved from raw route rows to user session summaries. 
 The hosted staging smoke now detects this access-log drift automatically. It writes the same unique session twice with different `path` values, which exercises `public.access_logs.path`, `session_id`, `last_seen_at`, `access_count`, and the `access_logs_session_id_key` upsert contract. With an admin token it also calls `/admin/access-logs` to verify `public.admin_access_log_summary`. Recognized Supabase schema errors return `access_log_schema_drift` plus the repair migration names.
 
 Before every Render API or Vercel web deploy, run the strict hosted predeploy
-gate from `services/api`:
+gate from the repository root:
 
 ```sh
-STAGING_BEARER_TOKEN=<admin-token> npm run predeploy:hosted
+STAGING_API_URL=<render-api-url> \
+STAGING_SUPABASE_URL=<supabase-project-url> \
+STAGING_SUPABASE_ANON_KEY=<supabase-anon-key> \
+STAGING_SMOKE_EMAIL=<dedicated-staging-admin-email> \
+STAGING_SMOKE_PASSWORD=<dedicated-staging-admin-password> \
+npm run predeploy:hosted
 ```
 
-This runs `check:access-log-schema` first and requires an admin or super-admin
-token, so the summary RPC cannot be skipped. Missing access-log migrations fail
-before local typecheck, lint, or build starts.
+This runs `check:access-log-schema` first and signs in a dedicated staging admin
+or super-admin smoke account, so the summary RPC cannot be skipped. Missing
+access-log migrations fail before local typecheck, lint, or build starts.
+
+The GitHub Actions workflow `.github/workflows/hosted-api-deploy-gate.yml`
+provides the repository deploy gate:
+
+- Every pull request runs the local `npm run verify:api` contract without
+  exposing staging secrets to untrusted code, so the required status check is
+  never skipped by path filtering.
+- Pushes to `main` and manual dispatches run the real `npm run
+  predeploy:hosted` gate against the hosted staging API.
+- Future Render/Vercel deploy workflows should call this reusable workflow with
+  `workflow_call` and depend on the reusable gate completing before triggering
+  provider deployment.
+- Configure a protected GitHub environment named `staging` with:
+  - `STAGING_API_URL`: the Render API origin to validate.
+  - `STAGING_SUPABASE_URL`: the staging Supabase project URL.
+  - `STAGING_SUPABASE_ANON_KEY`: the staging project's publishable anon key.
+  - `STAGING_SMOKE_EMAIL` and `STAGING_SMOKE_PASSWORD`: credentials for a
+    dedicated staging-only admin or super-admin smoke account. The harness
+    signs in on each run and obtains a fresh access token automatically.
+
+Do not use a personal admin account or the Supabase service-role key for the
+smoke account. Protect the `staging` environment, restrict deployment branches,
+and rotate the dedicated account password periodically.
+
+Require the workflow's `API contract` status check before merging. Treat the
+`Hosted schema and predeploy` job as the required green signal before triggering
+Render or Vercel deployment. If a provider auto-deploys every `main` push
+without waiting for GitHub checks, switch that provider to a gated deploy hook
+or manual deploy so a failed access-log schema check can actually stop release.
 
 ## Local `.env`
 
@@ -112,11 +146,11 @@ GET /ready
 
 ## Pre-Deploy Smoke Tests
 
-From `services/api`:
+From the repository root:
 
 ```sh
-STAGING_BEARER_TOKEN=<admin-token> npm run predeploy:hosted
-npm start
+STAGING_API_URL=<render-api-url> STAGING_SUPABASE_URL=<supabase-project-url> STAGING_SUPABASE_ANON_KEY=<anon-key> STAGING_SMOKE_EMAIL=<email> STAGING_SMOKE_PASSWORD=<password> npm run predeploy:hosted
+npm --prefix services/api start
 ```
 
 Use `STAGING_API_URL=<render-api-url>` when deploying against a Render service
@@ -130,10 +164,10 @@ curl http://127.0.0.1:4000/health
 curl http://127.0.0.1:4000/ready
 ```
 
-Optional hosted-stack smoke with a real signed-in Supabase access token:
+Optional hosted-stack smoke using the same automatic smoke-account sign-in:
 
 ```sh
-STAGING_BEARER_TOKEN=<token> npm run smoke:staging
+STAGING_SUPABASE_URL=<supabase-project-url> STAGING_SUPABASE_ANON_KEY=<anon-key> STAGING_SMOKE_EMAIL=<email> STAGING_SMOKE_PASSWORD=<password> npm run smoke:staging
 ```
 
 Run from `services/api`. Optional overrides:
@@ -164,11 +198,11 @@ VITE_API_URL=https://pixelated-api-services.onrender.com
 
 For future API-owned social/profile/admin boundary changes:
 
-1. Run `STAGING_BEARER_TOKEN=<admin-token> npm run predeploy:hosted` from `services/api`. Stop and push the named access-log repair migrations if it fails.
+1. Run `npm run predeploy:hosted` from the repository root with the staging smoke-account environment variables configured, or manually dispatch `Hosted API Deploy Gate`. Stop and push the named access-log repair migrations if it fails.
 2. Deploy the Render API build with catalog, favorites, reactions, comments, profiles, admin users, and admin access-log routes.
 3. Deploy the Vercel web build that calls those routes through `apps/web/src/lib/apiClient.ts`.
 4. Push any migration that removes old direct-browser policies.
-5. Run `STAGING_BEARER_TOKEN=<token> npm run smoke:staging` from `services/api`, then smoke-test signed-in library, favorites, player comments/reactions, profile update, admin user management, admin access logs, and cloud play from the browser as needed.
+5. Run `npm run smoke:staging` from `services/api` with the staging smoke-account environment variables configured, then smoke-test signed-in library, favorites, player comments/reactions, profile update, admin user management, admin access logs, and cloud play from the browser as needed.
 
 ## Remaining Production Gaps
 

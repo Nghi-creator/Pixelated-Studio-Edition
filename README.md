@@ -71,6 +71,25 @@ The PIXELATED Studio web application is the interactive website with community-d
 
 After successfully booting the PIXELATED's desktop application, simply go to PIXELATED's Web application at **[PIXELATED](https://pixelated-studio-edition.vercel.app/)** to enjoy all features that the product has to offer
 
+## Hosted Deploy Gate
+
+Before a Render API or Vercel web deploy, run the repository-level gate:
+
+```sh
+STAGING_API_URL=https://pixelated-api-services.onrender.com \
+STAGING_SUPABASE_URL=<supabase-project-url> \
+STAGING_SUPABASE_ANON_KEY=<supabase-anon-key> \
+STAGING_SMOKE_EMAIL=<dedicated-staging-admin-email> \
+STAGING_SMOKE_PASSWORD=<dedicated-staging-admin-password> \
+npm run predeploy:hosted
+```
+
+GitHub Actions runs local API contract checks on pull requests and the real
+hosted predeploy gate on `main` pushes, manual workflow dispatches, and calls
+from future Render/Vercel deploy workflows. See
+`.context/backend-hosting-checklist.md` for required staging environment secrets
+and access-log migration checks.
+
 ## Pixelated Studio web app's features
 
 Once connected to your local desktop app, the web app acts as a developer sandbox and social platform. Just like the lightweight user edition, The studio version also provides core features of an experimental cloud-gamning and social-media platform, including:

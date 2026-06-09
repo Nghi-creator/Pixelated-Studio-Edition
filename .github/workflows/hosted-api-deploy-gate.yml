@@ -1,0 +1,91 @@
+name: Hosted API Deploy Gate
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: hosted-api-deploy-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  api-contract:
+    name: API contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          cache-dependency-path: services/api/package-lock.json
+          node-version: 22
+
+      - name: Install API dependencies
+        run: npm ci --prefix services/api
+
+      - name: Verify API contract
+        run: npm run verify:api
+
+  hosted-predeploy:
+    name: Hosted schema and predeploy
+    if: github.event_name != 'pull_request'
+    needs: api-contract
+    environment: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
+      STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
+      STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
+      STAGING_SMOKE_EMAIL: ${{ secrets.STAGING_SMOKE_EMAIL }}
+      STAGING_SMOKE_PASSWORD: ${{ secrets.STAGING_SMOKE_PASSWORD }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          cache-dependency-path: services/api/package-lock.json
+          node-version: 22
+
+      - name: Require staging deploy secrets
+        run: |
+          test -n "$STAGING_API_URL" || {
+            echo "::error::Missing staging environment secret STAGING_API_URL."
+            exit 1
+          }
+          test -n "$STAGING_SUPABASE_URL" || {
+            echo "::error::Missing staging environment secret STAGING_SUPABASE_URL."
+            exit 1
+          }
+          test -n "$STAGING_SUPABASE_ANON_KEY" || {
+            echo "::error::Missing staging environment secret STAGING_SUPABASE_ANON_KEY."
+            exit 1
+          }
+          test -n "$STAGING_SMOKE_EMAIL" || {
+            echo "::error::Missing staging environment secret STAGING_SMOKE_EMAIL."
+            exit 1
+          }
+          test -n "$STAGING_SMOKE_PASSWORD" || {
+            echo "::error::Missing staging environment secret STAGING_SMOKE_PASSWORD."
+            exit 1
+          }
+
+      - name: Install API dependencies
+        run: npm ci --prefix services/api
+
+      - name: Run hosted API predeploy gate
+        run: npm run predeploy:hosted
