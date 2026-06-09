@@ -1,8 +1,12 @@
 # LAN Multiplayer Manual Smoke Checklist
 
-Last updated: 2026-06-08
+Last updated: 2026-06-09
 
-Use this checklist for the real two-device LAN validation. The local two-browser smoke has already passed; this checklist is for the host desktop plus a separate guest device.
+Use this checklist for the real two-device LAN validation. The harness now
+automates companion preflight, invite redemption, companion-authenticated guest
+join, peer-count changes, and disconnect cleanup. Accepting the self-signed
+certificate remains the only unavoidable protocol setup step; visual
+playback/input quality still needs human confirmation.
 
 ## Setup
 
@@ -108,14 +112,19 @@ Engine smoke artifact path:
 Run this from the repo after the host stream is already active and before the guest joins:
 
 ```sh
-node scripts/multiplayerSmoke.mjs --engine-url https://<host-lan-ip>:8090 --allow-self-signed --expected-guests 1 --label real-two-device-lan
+node scripts/multiplayerSmoke.mjs --engine-url https://<host-lan-ip>:8090 --allow-self-signed --invite-code <desktop-invite-code> --expected-guests 1 --label real-two-device-lan
 ```
 
-The harness prints `Bundle: .context/smoke-artifacts/<run-id>` as soon as it
-starts. After the guest joins, it waits for both players to press Stream Stats >
-Copy Stats and writes their JSON directly into that folder. Close the guest tab
-only after the harness confirms both snapshots were saved and asks for
-disconnect validation.
+The harness prints the artifact directory as soon as it starts. It verifies
+`/invite/preflight`, redeems the short-lived invite, joins the active lobby as a
+spectator through the companion credential, sends a peer-targeted WebRTC offer,
+verifies the camera peer count increases, then disconnects the automated guest
+and verifies cleanup. It also waits for the active host/guest browser Stream
+Stats capture and writes both JSON snapshots into the bundle.
+
+Console output is phase-oriented: each completed assertion prints `[PASS]`, a
+required human/browser action prints `[WAIT]`, and the first failed assertion
+prints `[FAIL]` plus the artifact report path.
 
 Summarize the completed bundle into one review verdict:
 
@@ -132,12 +141,13 @@ If completed notes are already saved elsewhere before a run, start the harness
 with:
 
 ```sh
-node scripts/multiplayerSmoke.mjs --engine-url https://<host-lan-ip>:8090 --allow-self-signed --expected-guests 1 --label real-two-device-lan --notes /path/to/completed-notes.md
+node scripts/multiplayerSmoke.mjs --engine-url https://<host-lan-ip>:8090 --allow-self-signed --invite-code <desktop-invite-code> --expected-guests 1 --label real-two-device-lan --notes /path/to/completed-notes.md
 ```
 
 ## Failure Notes
 
 - Certificate remains `Trust required` after following the provided link: record the guest browser/OS and certificate warning text; consider local CA packaging or a tunnel strategy.
+- Harness fails before `Companion preflight: PASS`: accept the certificate in a browser, confirm the desktop invite is active, then rerun with `--allow-self-signed --invite-code <code>`.
 - Invite shows `Expired` or `Revoked`: regenerate it in the desktop LAN panel, then press `Check again`.
 - Host engine shows `Unavailable`: initialize or restart the host engine, then press `Check again`.
 - All checks pass but redemption fails: record the response from `POST /invite/redeem`; this is no longer expected invite/certificate/engine troubleshooting.

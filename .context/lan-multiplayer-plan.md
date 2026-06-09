@@ -514,9 +514,18 @@ Repeatable smoke harness:
 
 ```sh
 node scripts/multiplayerSmoke.mjs --engine-url http://127.0.0.1:8080 --expected-guests 1
+node scripts/multiplayerSmoke.mjs --engine-url https://<host-lan-ip>:8090 --allow-self-signed --invite-code <desktop-invite-code> --expected-guests 1
 ```
 
 Run it after the host game is already streaming and before guests open the LAN HTTPS join page. The harness captures a baseline `/health` snapshot, waits for `checks.resources.cameraPeers.peerCount` to increase by the expected guest count, validates `checks.runtime.activeSessionId` and camera peer `sessionId` stay on the host session, then waits for guest disconnect cleanup unless `--skip-disconnect` is passed. It writes a concise JSON report plus NDJSON poll log under `.context/smoke-artifacts/` by default. The harness observes real camera peer state; it does not fake peers with Socket.IO-only clients. The report and every health poll now include engine process CPU/RSS summaries for the camera bridge, RetroArch, and Node runtime, so Track 2 engine-side performance evidence is captured during the same smoke.
+
+For an HTTPS companion URL, the harness requires `--invite-code`. It validates
+the current `/invite/preflight` contract, redeems the invite for a short-lived
+companion credential, joins the active lobby as a spectator through the
+companion Socket.IO proxy, sends a peer-targeted WebRTC offer, verifies the
+camera peer-count increase, and disconnects the guest itself. Certificate trust
+remains browser/OS-owned; `--allow-self-signed` only lets the Node harness use
+the selected self-signed test endpoint.
 
 Manual smoke checklist:
 

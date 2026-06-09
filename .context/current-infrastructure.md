@@ -249,6 +249,11 @@ Streaming/signaling:
   the token-protected in-memory capture and writes both snapshots directly into
   its active artifact bundle; outside a smoke run, the action keeps its
   clipboard behavior.
+- `scripts/multiplayerSmoke.mjs` can automate the HTTPS companion flow with
+  `--invite-code`: it validates preflight state, redeems a short-lived companion
+  credential, joins the lobby as a spectator through the companion Socket.IO
+  proxy, drives a camera peer-count transition, and verifies disconnect
+  cleanup. Browser certificate trust remains the manual boundary.
 - Engine-side download failures and camera/GStreamer failures emit `engine-error` to the browser session.
 
 Input:
