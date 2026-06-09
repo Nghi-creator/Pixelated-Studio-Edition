@@ -32,6 +32,7 @@ type HealthPaths = {
 
 type HealthSnapshotOptions = {
   advertisedUrls?: string[];
+  companionUrls?: string[];
   engineToken?: string;
   exposureMode?: "local" | "lan";
   getRuntimeState: () => RuntimeState;
@@ -61,6 +62,7 @@ function processStarted(processRef: ProcessRef): boolean {
 export function createHealthSnapshot(options: HealthSnapshotOptions) {
   const {
     advertisedUrls = [],
+    companionUrls = [],
     engineToken,
     exposureMode = "local",
     healthPaths,
@@ -128,6 +130,7 @@ export function createHealthSnapshot(options: HealthSnapshotOptions) {
     return {
       ok,
       advertisedUrls,
+      companionUrls,
       exposureMode,
       uptime: process.uptime(),
       engineTokenRequired: Boolean(engineToken),

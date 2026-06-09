@@ -91,7 +91,7 @@ describe("desktop package config", () => {
     assert.match(packageJson.scripts?.dist || "", /npm run smoke:release/);
   });
 
-  it("allows hosted and local development web origins for the engine", () => {
+  it("allows hosted, local development, and companion web origins for the engine", () => {
     const configPath = path.resolve(__dirname, "../main/config.js");
     const controllerPath = path.resolve(__dirname, "../main/engineController.js");
     const config = fs.readFileSync(configPath, "utf8");
@@ -101,5 +101,7 @@ describe("desktop package config", () => {
     assert.match(config, /http:\/\/localhost:5173/);
     assert.match(config, /http:\/\/127\.0\.0\.1:5173/);
     assert.match(controller, /engineAllowedOrigins|engine_allowed_origins/);
+    assert.match(controller, /companionUrls|companion_urls/);
+    assert.match(controller, /PIXELATED_COMPANION_URLS/);
   });
 });

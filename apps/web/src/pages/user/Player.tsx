@@ -76,6 +76,7 @@ export default function Player() {
     requestPlayerSlot,
     retry,
     sessionId,
+    shareContext,
     stream,
     status,
     telemetry,
@@ -202,12 +203,48 @@ export default function Player() {
     typeof backState?.backText === "string"
       ? backState.backText
       : fallbackBackText;
-  const shareUrl = useMemo(() => {
+  const directShareUrl = useMemo(() => {
     const nextSearch = new URLSearchParams(location.search);
     nextSearch.set("session", sessionId);
     nextSearch.set("role", "spectator");
     return `${window.location.origin}${location.pathname}?${nextSearch.toString()}`;
   }, [location.pathname, location.search, sessionId]);
+  const shareInvite = useMemo(() => {
+    const companionUrl = shareContext.companionUrls[0];
+    if (shareContext.exposureMode !== "lan" || !companionUrl) {
+      return {
+        guidance: null,
+        text: directShareUrl,
+        url: directShareUrl,
+      };
+    }
+
+    let url: URL;
+    try {
+      const companionOrigin = new URL(companionUrl);
+      if (companionOrigin.protocol !== "https:") {
+        throw new Error("LAN companion URL must use HTTPS.");
+      }
+      url = new URL(directShareUrl);
+      url.protocol = companionOrigin.protocol;
+      url.host = companionOrigin.host;
+    } catch {
+      return {
+        guidance: null,
+        text: directShareUrl,
+        url: directShareUrl,
+      };
+    }
+
+    const guidance =
+      "Open this HTTPS join link, then enter the short-lived invite code shown in the host's Pixelated Desktop app.";
+
+    return {
+      guidance,
+      text: `${url.toString()}\n\n${guidance}`,
+      url: url.toString(),
+    };
+  }, [directShareUrl, shareContext]);
 
   return (
     <div className="flex flex-col items-center pt-24 pb-24 px-4 min-h-screen">
@@ -243,7 +280,7 @@ export default function Player() {
             onClose={() => setShowStreamTelemetry(false)}
             playerMode={playerMode}
             sessionId={sessionId}
-            shareUrl={shareUrl}
+            shareUrl={shareInvite.url}
             status={status}
             telemetry={telemetry}
           />
@@ -266,7 +303,9 @@ export default function Player() {
           onKickParticipant={kickParticipant}
           onReleaseSlot={releasePlayerSlot}
           onRequestSlot={requestPlayerSlot}
-          shareUrl={shareUrl}
+          shareGuidance={shareInvite.guidance}
+          shareText={shareInvite.text}
+          shareUrl={shareInvite.url}
         />
       </div>
 

@@ -34,6 +34,13 @@ Packaged builds resolve the LAN HTTPS companion player from the bundled
 player from `apps/web/dist`, so run `npm run build` in `apps/web` before testing
 LAN companion mode with `npm start`.
 
+When the engine starts in LAN mode, its health payload advertises the desktop
+HTTPS companion URLs. The player lobby uses the first companion URL for its
+session-specific share link and copies invite-code guidance with it. Local-only
+localhost play continues to share a direct spectator link. Desktop also adds
+the dynamic companion origins to the engine allowlist for proxied browser and
+Socket.IO traffic.
+
 By default the desktop app builds the engine image from the bundled
 `resources/engine-runtime` directory in packaged builds, falling back to the
 workspace source path during local development:

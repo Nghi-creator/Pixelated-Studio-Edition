@@ -59,6 +59,10 @@ export const ADVERTISED_URLS = (process.env.PIXELATED_ADVERTISED_URLS || "")
   .split(",")
   .map((url) => url.trim())
   .filter(Boolean);
+export const COMPANION_URLS = (process.env.PIXELATED_COMPANION_URLS || "")
+  .split(",")
+  .map((url) => url.trim())
+  .filter(Boolean);
 
 export const allowedRomHosts = (process.env.PIXELATED_ALLOWED_ROM_HOSTS || "")
   .split(",")

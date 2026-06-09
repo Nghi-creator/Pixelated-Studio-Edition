@@ -57,6 +57,7 @@ export type EngineInputCapabilities = {
 };
 
 type EngineHealthPayload = {
+  companionUrls?: string[];
   checks?: {
     gamepadBridge?: {
       failed?: boolean;
@@ -65,9 +66,15 @@ type EngineHealthPayload = {
       uinputAvailable?: boolean;
     };
   };
+  exposureMode?: "local" | "lan";
 };
 
 export type WebRTCMode = "host" | "guest";
+
+export type EngineShareContext = {
+  companionUrls: string[];
+  exposureMode: "local" | "lan" | "unknown";
+};
 
 type UseWebRTCOptions = {
   displayName?: string;
@@ -142,6 +149,23 @@ async function loadEngineInputCapabilities(): Promise<EngineInputCapabilities> {
   }
 }
 
+async function loadEngineShareContext(): Promise<EngineShareContext> {
+  try {
+    const response = await fetch(engineEndpoint("/health"));
+    const health = (await response.json()) as EngineHealthPayload;
+    return {
+      companionUrls: health.companionUrls || [],
+      exposureMode: health.exposureMode || "unknown",
+    };
+  } catch (err) {
+    console.warn("[WebRTC] Could not load engine share context:", err);
+    return {
+      companionUrls: [],
+      exposureMode: "unknown",
+    };
+  }
+}
+
 export function useWebRTC(
   gameId: string,
   streamProfile: StreamProfile,
@@ -161,6 +185,10 @@ export function useWebRTC(
       source: "checking",
       supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
     });
+  const [shareContext, setShareContext] = useState<EngineShareContext>({
+    companionUrls: [],
+    exposureMode: "unknown",
+  });
   const [telemetry, setTelemetry] = useState<WebRTCTelemetry>(
     INITIAL_WEBRTC_TELEMETRY,
   );
@@ -258,16 +286,23 @@ export function useWebRTC(
         source: "checking",
         supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
       });
+      setShareContext({
+        companionUrls: [],
+        exposureMode: "unknown",
+      });
       setTelemetry(INITIAL_WEBRTC_TELEMETRY);
       lastMetricSentAtRef.current = 0;
 
-      const [nextIceServers, nextInputCapabilities] = await Promise.all([
-        loadIceServers(),
-        loadEngineInputCapabilities(),
-      ]);
+      const [nextIceServers, nextInputCapabilities, nextShareContext] =
+        await Promise.all([
+          loadIceServers(),
+          loadEngineInputCapabilities(),
+          loadEngineShareContext(),
+        ]);
       if (disposed) return;
       iceServersForSession = nextIceServers;
       setInputCapabilities(nextInputCapabilities);
+      setShareContext(nextShareContext);
 
       pc = createEnginePeerConnection({
         iceServers: iceServersForSession,
@@ -489,6 +524,9 @@ export function useWebRTC(
       loadEngineInputCapabilities().then((nextInputCapabilities) => {
         if (!disposed) setInputCapabilities(nextInputCapabilities);
       });
+      loadEngineShareContext().then((nextShareContext) => {
+        if (!disposed) setShareContext(nextShareContext);
+      });
       if (pc) {
         await createAndSendOffer(pc, socket, sessionId, peerId);
       }
@@ -597,6 +635,7 @@ export function useWebRTC(
     requestPlayerSlot,
     retry,
     sessionId,
+    shareContext,
     stream,
     status,
     telemetry,
