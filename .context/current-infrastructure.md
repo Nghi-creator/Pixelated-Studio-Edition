@@ -102,6 +102,9 @@ Runtime stack:
 - `socket.io-client` connects directly to the local engine at `http://localhost:8080`.
 - The web app centralizes the engine base URL in `apps/web/src/lib/engineConfig.ts`; override with `VITE_ENGINE_URL`.
 - Routes are declared in `apps/web/src/App.tsx`.
+- The Vercel project uses `apps/web` as its Root Directory, and
+  `apps/web/vercel.json` rewrites direct route requests to `/index.html` so
+  React `BrowserRouter` routes survive hosted browser refreshes.
 
 Main user-facing routes:
 
