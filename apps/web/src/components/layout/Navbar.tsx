@@ -10,6 +10,7 @@ import {
   Code,
   Users,
   PlugZap,
+  Loader2,
 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
 import type { User } from "@supabase/supabase-js";
@@ -153,7 +154,16 @@ export default function Navbar() {
           </div>
 
           <div className="flex items-center gap-4 sm:gap-6">
-            {!isIdentityLoading && userRole !== "super_admin" && (
+            {isIdentityLoading ? (
+              <span
+                aria-label="Loading game submission permissions"
+                className="flex h-5 w-5 items-center justify-center text-gray-500"
+                role="status"
+                title="Loading permissions"
+              >
+                <Loader2 className="h-4 w-4 animate-spin" />
+              </span>
+            ) : userRole !== "super_admin" ? (
               <Link
                 to="/publish"
                 title="Submit a Game"
@@ -167,7 +177,7 @@ export default function Navbar() {
                   className={`w-5 h-5 ${isPublishPage ? "fill-synth-primary/20" : ""}`}
                 />
               </Link>
-            )}
+            ) : null}
 
             {/* LOCAL VAULT LINK */}
             <Link
