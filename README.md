@@ -84,11 +84,11 @@ STAGING_SMOKE_PASSWORD=<dedicated-staging-admin-password> \
 npm run predeploy:hosted
 ```
 
-GitHub Actions runs local API contract checks on pull requests and the real
-hosted predeploy gate on `main` pushes, manual workflow dispatches, and calls
-from future Render/Vercel deploy workflows. See
-`.context/backend-hosting-checklist.md` for required staging environment secrets
-and access-log migration checks.
+GitHub Actions runs local API contract checks on pull requests. On `main`
+pushes, `.github/workflows/hosted-deploy.yml` calls the reusable hosted gate and
+only triggers the Render API and Vercel web deploy hooks after the real hosted
+predeploy checks pass. See `.context/backend-hosting-checklist.md` for the
+required staging and production environment secrets and provider setup.
 
 ## Pixelated Studio web app's features
 

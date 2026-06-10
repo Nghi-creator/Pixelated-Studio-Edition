@@ -1,6 +1,6 @@
 # Backend Hosting Checklist
 
-Updated: 2026-06-09
+Updated: 2026-06-10
 
 ## Current Recommendation
 
@@ -49,11 +49,11 @@ provides the repository deploy gate:
 - Every pull request runs the local `npm run verify:api` contract without
   exposing staging secrets to untrusted code, so the required status check is
   never skipped by path filtering.
-- Pushes to `main` and manual dispatches run the real `npm run
-  predeploy:hosted` gate against the hosted staging API.
-- Future Render/Vercel deploy workflows should call this reusable workflow with
-  `workflow_call` and depend on the reusable gate completing before triggering
-  provider deployment.
+- Manual dispatches run the real `npm run predeploy:hosted` gate against the
+  hosted staging API without deploying.
+- `.github/workflows/hosted-deploy.yml` runs on pushes to `main` and manual
+  dispatches selected from `main`. It calls the reusable gate, then triggers
+  the Render API and Vercel web deploy hooks only after the gate succeeds.
 - Configure a protected GitHub environment named `staging` with:
   - `STAGING_API_URL`: the Render API origin to validate.
   - `STAGING_SUPABASE_URL`: the staging Supabase project URL.
@@ -66,11 +66,22 @@ Do not use a personal admin account or the Supabase service-role key for the
 smoke account. Protect the `staging` environment, restrict deployment branches,
 and rotate the dedicated account password periodically.
 
+Configure a protected GitHub environment named `production` with:
+
+- `RENDER_API_DEPLOY_HOOK_URL`: the deploy hook for the existing Render API
+  service.
+- `VERCEL_WEB_DEPLOY_HOOK_URL`: the deploy hook for the existing Vercel web
+  project.
+
+Disable Render's Git-based auto-deploy in the API service dashboard.
+`apps/web/vercel.json` disables Vercel's automatic `main` deploy while leaving
+the branch deploy hook available. A provider that also deploys directly from
+`main` bypasses the GitHub gate; the protected deploy hooks must be the only
+automatic production deploy path.
+
 Require the workflow's `API contract` status check before merging. Treat the
 `Hosted schema and predeploy` job as the required green signal before triggering
-Render or Vercel deployment. If a provider auto-deploys every `main` push
-without waiting for GitHub checks, switch that provider to a gated deploy hook
-or manual deploy so a failed access-log schema check can actually stop release.
+Render or Vercel deployment.
 
 ## Local `.env`
 
@@ -198,9 +209,9 @@ VITE_API_URL=https://pixelated-api-services.onrender.com
 
 For future API-owned social/profile/admin boundary changes:
 
-1. Run `npm run predeploy:hosted` from the repository root with the staging smoke-account environment variables configured, or manually dispatch `Hosted API Deploy Gate`. Stop and push the named access-log repair migrations if it fails.
-2. Deploy the Render API build with catalog, favorites, reactions, comments, profiles, admin users, and admin access-log routes.
-3. Deploy the Vercel web build that calls those routes through `apps/web/src/lib/apiClient.ts`.
+1. Push to `main` or manually dispatch `Hosted Deploy`. The workflow stops before either provider deploy hook if the hosted gate fails.
+2. Confirm the Render API deploy containing catalog, favorites, reactions, comments, profiles, admin users, and admin access-log routes completes.
+3. Confirm the Vercel web deploy that calls those routes through `apps/web/src/lib/apiClient.ts` completes.
 4. Push any migration that removes old direct-browser policies.
 5. Run `npm run smoke:staging` from `services/api` with the staging smoke-account environment variables configured, then smoke-test signed-in library, favorites, player comments/reactions, profile update, admin user management, admin access logs, and cloud play from the browser as needed.
 
