@@ -8,6 +8,7 @@ import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import AdminLayout from "./components/layout/AdminLayout";
 import { useSessionTracker } from "./lib/useSessionTracker";
+import { useEngineConnectionMonitor } from "./lib/useEngineConnectionMonitor";
 
 import Landing from "./pages/user/Landing";
 import Player from "./pages/user/Player";
@@ -47,10 +48,16 @@ const SessionTracker = () => {
   return null;
 };
 
+const EngineConnectionMonitor = () => {
+  useEngineConnectionMonitor();
+  return null;
+};
+
 export default function App() {
   return (
     <Router>
       <SessionTracker />
+      <EngineConnectionMonitor />
       <Routes>
         {/* ADMIN ROUTES */}
         <Route element={<AdminLayout />}>
