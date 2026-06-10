@@ -81,14 +81,6 @@
     <main class="mx-auto w-full max-w-[1600px]">
       <header class="mb-6 flex flex-wrap items-end justify-between gap-5">
         <div>
-          <div
-            class="status-badge mb-4 inline-block rounded-full border border-synth-primary/50 bg-synth-primary/20 px-3 py-1 text-xs font-bold uppercase tracking-wide text-synth-primary shadow-glow-primary-sm"
-          >
-            <span
-              class="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-synth-primary"
-            ></span>
-            Engine Offline
-          </div>
           <h1
             class="text-4xl font-extrabold tracking-tight text-white [text-shadow:0_0_30px_rgba(255,77,143,0.3),0_2px_10px_rgba(0,0,0,0.8)]"
           >
@@ -116,7 +108,7 @@
 
           <button
             id="power-btn"
-            class="flex items-center justify-center gap-2 rounded-lg bg-synth-primary px-6 py-3 text-sm font-bold text-synth-ink shadow-glow-primary transition-all hover:bg-synth-primary-hover active:scale-[0.98]"
+            class="flex items-center justify-center gap-2 rounded-lg bg-synth-primary px-6 py-3 text-sm font-bold text-synth-ink shadow-glow-primary transition-all hover:bg-synth-primary-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
           >
             <svg
               id="power-icon"
@@ -134,8 +126,42 @@
               <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
               <line x1="12" y1="2" x2="12" y2="12" />
             </svg>
+            <svg
+              id="power-spinner"
+              class="hidden h-[19px] w-[19px] animate-spin stroke-synth-ink"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                class="opacity-25"
+                cx="12"
+                cy="12"
+                r="9"
+                stroke="currentColor"
+                stroke-width="3"
+              ></circle>
+              <path
+                class="opacity-90"
+                d="M21 12a9 9 0 0 0-9-9"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-width="3"
+              ></path>
+            </svg>
             <span id="power-text">Initialize Engine</span>
           </button>
+
+          <div
+            class="status-badge flex min-w-0 max-w-full items-center gap-2 rounded-full border border-red-500/50 bg-red-500/10 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-300 sm:max-w-md"
+            title="Engine Offline"
+          >
+            <span
+              id="status-dot"
+              class="h-2.5 w-2.5 shrink-0 rounded-full bg-red-400"
+            ></span>
+            <span id="status-text" class="min-w-0 truncate">Engine Offline</span>
+          </div>
         </div>
 
         <p id="exposure-copy" class="hidden"></p>
