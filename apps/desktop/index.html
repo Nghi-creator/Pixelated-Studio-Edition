@@ -41,6 +41,12 @@
       ::-webkit-scrollbar-thumb:hover {
         background: #ff4d8f;
       }
+      @media (min-width: 1024px) {
+        #runtime-panel,
+        #startup-panel {
+          height: var(--guest-access-height, auto);
+        }
+      }
     </style>
   </head>
   <body
@@ -137,8 +143,8 @@
         <div id="lan-url-panel" class="hidden"><div id="lan-urls"></div></div>
       </section>
 
-      <div class="grid items-stretch gap-5 lg:grid-cols-3">
-        <section class="flex min-h-[560px] flex-col rounded-xl border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
+      <div class="grid items-start gap-5 lg:grid-cols-3">
+        <section id="runtime-panel" class="flex min-h-[560px] min-w-0 flex-col overflow-hidden rounded-xl border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
           <div class="mb-4">
             <p class="text-[10px] uppercase tracking-[0.22em] text-synth-primary">Runtime Output</p>
             <h2 class="mt-1 text-lg font-bold text-white">System logs</h2>
@@ -158,7 +164,7 @@
                 Clear
               </button>
             </div>
-            <div id="log" class="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap p-3 font-mono text-[11px] leading-relaxed text-synth-secondary"></div>
+            <div id="log" class="min-h-0 flex-1 overflow-y-scroll overscroll-contain whitespace-pre-wrap p-3 font-mono text-[11px] leading-relaxed text-synth-secondary"></div>
           </div>
           <div id="token-panel" class="hidden mt-4 rounded-lg border border-synth-border bg-[#050810] p-3">
             <div class="flex items-center justify-between gap-3">
@@ -169,7 +175,7 @@
           </div>
         </section>
 
-        <section class="flex min-h-[560px] flex-col rounded-xl border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
+        <section id="startup-panel" class="flex min-h-[560px] min-w-0 flex-col overflow-hidden rounded-xl border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
           <div class="flex items-start justify-between gap-3">
             <div>
               <p class="text-[10px] uppercase tracking-[0.22em] text-synth-primary">
@@ -187,10 +193,10 @@
               Idle
             </p>
           </div>
-          <div id="phase-list" class="mt-5 grid gap-2"></div>
+          <div id="phase-list" class="mt-5 grid min-h-0 flex-1 auto-rows-fr gap-3"></div>
         </section>
 
-        <section class="flex min-h-[560px] flex-col rounded-xl border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
+        <section id="guest-access-panel" class="flex min-h-[560px] min-w-0 flex-col rounded-xl border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
           <div class="mb-4">
             <p class="text-[10px] uppercase tracking-[0.22em] text-synth-primary">
               Guest Access
