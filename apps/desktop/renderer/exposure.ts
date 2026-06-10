@@ -23,6 +23,7 @@
     companionPanel: HTMLElement;
     companionQr: HTMLElement;
     companionQrImage: HTMLImageElement;
+    companionQrPlaceholder: HTMLElement;
     companionQrStatus: HTMLElement;
     companionUrls: HTMLElement;
     createCompanionQrDataUrl: (url: string) => Promise<string>;
@@ -44,6 +45,7 @@
     companionPanel,
     companionQr,
     companionQrImage,
+    companionQrPlaceholder,
     companionQrStatus,
     companionUrls,
     createCompanionQrDataUrl,
@@ -75,6 +77,7 @@
     async function renderCompanionQr(url?: string) {
       const renderId = ++qrRenderId;
       companionQr.classList.add("hidden");
+      companionQrPlaceholder.classList.remove("hidden");
       companionQrImage.removeAttribute("src");
 
       if (!url) {
@@ -91,6 +94,7 @@
         if (renderId !== qrRenderId) return;
         companionQrImage.src = dataUrl;
         companionQr.classList.remove("hidden");
+        companionQrPlaceholder.classList.add("hidden");
         companionQrStatus.classList.add("hidden");
       } catch (err) {
         if (renderId !== qrRenderId) return;

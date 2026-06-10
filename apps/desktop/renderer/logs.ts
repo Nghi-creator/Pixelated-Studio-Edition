@@ -9,12 +9,17 @@
       logBox.scrollTop = logBox.scrollHeight;
     }
 
+    function clear() {
+      logBox.replaceChildren();
+    }
+
     function sanitize(message: string) {
       return message.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
     }
 
     return {
       append,
+      clear,
       sanitize,
     };
   }

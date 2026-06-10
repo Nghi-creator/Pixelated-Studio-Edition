@@ -30,6 +30,7 @@ type EngineCompanionPayload = {
 
 type LogController = {
   append: (message: string) => void;
+  clear: () => void;
   sanitize: (message: string) => string;
 };
 
@@ -81,6 +82,7 @@ type PixelatedWindow = Window &
         companionPanel: HTMLElement;
         companionQr: HTMLElement;
         companionQrImage: HTMLImageElement;
+        companionQrPlaceholder: HTMLElement;
         companionQrStatus: HTMLElement;
         companionUrls: HTMLElement;
         createCompanionQrDataUrl: (url: string) => Promise<string>;
@@ -142,6 +144,7 @@ const statusBadge = requiredQuery<HTMLElement>(".status-badge");
 const tokenPanel = requiredElement("token-panel");
 const tokenValue = requiredElement("engine-token");
 const copyTokenBtn = requiredElement("copy-token", HTMLButtonElement);
+const clearLogsBtn = requiredElement("clear-logs", HTMLButtonElement);
 const copyCompanionBtn = requiredElement("copy-companion", HTMLButtonElement);
 const regenerateInviteBtn = requiredElement(
   "regenerate-invite",
@@ -150,6 +153,7 @@ const regenerateInviteBtn = requiredElement(
 const revokeInviteBtn = requiredElement("revoke-invite", HTMLButtonElement);
 
 let isRunning = false;
+let pendingCompanionPayload: EngineCompanionPayload | null = null;
 
 function setInviteButtonsPending(isPending: boolean) {
   regenerateInviteBtn.disabled = isPending;
@@ -176,6 +180,7 @@ const exposure = pixelatedWindow.PixelatedExposure.createExposureController({
   companionPanel: requiredElement("companion-panel"),
   companionQr: requiredElement("companion-qr"),
   companionQrImage: requiredElement("companion-qr-image", HTMLImageElement),
+  companionQrPlaceholder: requiredElement("companion-qr-placeholder"),
   companionQrStatus: requiredElement("companion-qr-status"),
   companionUrls: requiredElement("companion-urls"),
   createCompanionQrDataUrl: pixelatedWindow.electronAPI.createCompanionQrDataUrl,
@@ -213,6 +218,15 @@ function setStatusBadge(active: boolean) {
     powerBtn.classList.remove("shadow-glow-primary");
     powerText.innerText = "Shutdown Engine";
     isRunning = true;
+    if (pendingCompanionPayload) {
+      exposure.setCompanionStatus(pendingCompanionPayload);
+      setInviteButtonsPending(false);
+      regenerateInviteBtn.disabled = !pendingCompanionPayload.enabled;
+      revokeInviteBtn.disabled =
+        !pendingCompanionPayload.enabled ||
+        Boolean(pendingCompanionPayload.inviteRevoked);
+      pendingCompanionPayload = null;
+    }
     return;
   }
 
@@ -234,6 +248,7 @@ function setStatusBadge(active: boolean) {
   exposure.renderUrls([]);
   exposure.renderCompanionUrls([]);
   exposure.resetInviteCode();
+  pendingCompanionPayload = null;
   regenerateInviteBtn.disabled = true;
   revokeInviteBtn.disabled = true;
   exposure.setEnabled(true);
@@ -254,6 +269,7 @@ function resetFailedUi() {
   exposure.renderUrls([]);
   exposure.renderCompanionUrls([]);
   exposure.resetInviteCode();
+  pendingCompanionPayload = null;
   regenerateInviteBtn.disabled = true;
   revokeInviteBtn.disabled = true;
   exposure.setEnabled(true);
@@ -262,7 +278,7 @@ function resetFailedUi() {
 }
 
 function setLifecycleState(state: EngineStatePayload) {
-  const detail = state.detail ? ` · ${state.detail}` : "";
+  const detail = state.detail ? ` - ${state.detail}` : "";
   const label = state.label || "Engine";
   statusBadge.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-synth-primary mr-1 animate-pulse shadow-glow-primary"></span> ${label}${detail}`;
   phases.render(state);
@@ -312,6 +328,12 @@ function setLifecycleState(state: EngineStatePayload) {
 
 powerBtn.addEventListener("click", () => {
   if (!isRunning) {
+    tokenPanel.classList.add("hidden");
+    tokenValue.innerText = "";
+    exposure.renderUrls([]);
+    exposure.renderCompanionUrls([]);
+    exposure.resetInviteCode();
+    pendingCompanionPayload = null;
     logs.append(
       '<span class="text-gray-400">>></span> Initializing WebRTC node...',
     );
@@ -329,6 +351,10 @@ powerBtn.addEventListener("click", () => {
   powerBtn.disabled = true;
   powerText.innerText = "Shutting down...";
   pixelatedWindow.electronAPI.stopDocker();
+});
+
+clearLogsBtn.addEventListener("click", () => {
+  logs.clear();
 });
 
 copyTokenBtn.addEventListener("click", async () => {
@@ -385,6 +411,11 @@ pixelatedWindow.electronAPI.onEngineExposure((event, payload) => {
 });
 
 pixelatedWindow.electronAPI.onEngineCompanion((event, payload) => {
+  if (!isRunning) {
+    pendingCompanionPayload = payload;
+    return;
+  }
+
   exposure.setCompanionStatus(payload);
   setInviteButtonsPending(false);
   regenerateInviteBtn.disabled = !payload.enabled;
