@@ -303,12 +303,6 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
   engineToken = crypto.randomBytes(24).toString("base64url");
   stopCompanionServer();
   activeCompanion = null;
-  event.reply("engine-token", engineToken);
-  event.reply("engine-exposure", {
-    advertisedUrls: launchContext.advertisedUrls,
-    companionUrls: launchContext.companionUrls,
-    exposureMode: launchContext.exposureMode,
-  });
 
   exec("docker info", { env: safeEnv }, (err) => {
     if (err) {
@@ -334,13 +328,19 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
       })
       .then(() => startContainer(event, safeEnv, launchContext))
       .then(() => {
-        emitEngineState(event, "WAITING_HEALTH", "30 attempts · 1s interval");
+        emitEngineState(event, "WAITING_HEALTH", "30 attempts / 1s interval");
         event.reply("server-log", "Waiting for engine health check...");
         return waitForEngineHealth();
       })
       .then(() => {
-        emitEngineState(event, "READY", "http://127.0.0.1:8080/health");
         return startLanCompanion(event, launchContext).then(() => {
+          emitEngineState(event, "READY", "http://127.0.0.1:8080/health");
+          event.reply("engine-token", engineToken);
+          event.reply("engine-exposure", {
+            advertisedUrls: launchContext.advertisedUrls,
+            companionUrls: activeCompanion ? launchContext.companionUrls : [],
+            exposureMode: launchContext.exposureMode,
+          });
           event.reply(
             "server-log",
             '<span class="text-green-500">SUCCESS: PIXELATED Engine healthy on Port 8080.</span>',
