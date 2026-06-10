@@ -269,6 +269,10 @@ export function EnginePairingPanel({
   onPaired,
 }: EnginePairingPanelProps) {
   const [engineUrl, setEngineUrlInput] = useState(getEngineUrl);
+  const [inviteJoinRequested, setInviteJoinRequested] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("join") === "invite" && Boolean(params.get("companionUrl"));
+  });
   const [inviteCode, setInviteCode] = useState("");
   const [token, setToken] = useState(getEngineToken);
   const [pairingState, setPairingState] = useState<PairingState>(
@@ -290,10 +294,22 @@ export function EnginePairingPanel({
   const engineUrlScope = getEngineUrlScope(engineUrl);
   const parsedEngineUrl = parseEngineUrl(engineUrl);
   const isCompanionJoin = Boolean(
-    parsedEngineUrl && isLikelyCompanionUrl(parsedEngineUrl),
+    inviteJoinRequested &&
+      parsedEngineUrl &&
+      isLikelyCompanionUrl(parsedEngineUrl),
   );
   const preflightReady =
     lanPreflight.status === "complete" && lanPreflight.payload.ready === true;
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const companionUrl = params.get("companionUrl");
+    if (params.get("join") !== "invite" || !companionUrl) return;
+
+    setEngineUrlInput(companionUrl);
+    setInviteJoinRequested(true);
+    setLanPreflight({ status: "checking" });
+  }, []);
 
   useEffect(() => {
     const refreshPairingState = () => {
@@ -331,7 +347,7 @@ export function EnginePairingPanel({
 
   useEffect(() => {
     const parsedUrl = parseEngineUrl(engineUrl);
-    if (!parsedUrl || !isLikelyCompanionUrl(parsedUrl)) return;
+    if (!isCompanionJoin || !parsedUrl || !isLikelyCompanionUrl(parsedUrl)) return;
 
     let active = true;
     const checkPreflight = () => {
@@ -350,7 +366,7 @@ export function EnginePairingPanel({
       active = false;
       window.clearInterval(interval);
     };
-  }, [engineUrl]);
+  }, [engineUrl, isCompanionJoin]);
 
   const retryLanPreflight = async () => {
     const normalizedUrl = normalizeEngineUrl(engineUrl);
@@ -367,7 +383,7 @@ export function EnginePairingPanel({
     const normalizedUrl = normalizeEngineUrl(engineUrl);
     const parsedUrl = parseEngineUrl(normalizedUrl);
     const joiningWithInvite = Boolean(
-      parsedUrl && isLikelyCompanionUrl(parsedUrl),
+      inviteJoinRequested && parsedUrl && isLikelyCompanionUrl(parsedUrl),
     );
     const normalizedInviteCode = inviteCode
       .toUpperCase()
@@ -535,6 +551,7 @@ export function EnginePairingPanel({
       }
 
       setPairingState("paired");
+      setInviteJoinRequested(false);
       setMessage(successMessage);
       onPaired?.();
     } catch (err) {
@@ -605,6 +622,7 @@ export function EnginePairingPanel({
                   const nextUrl = event.target.value;
                   const parsedNextUrl = parseEngineUrl(nextUrl);
                   setEngineUrlInput(nextUrl);
+                  setInviteJoinRequested(false);
                   setLanPreflight({
                     status:
                       parsedNextUrl && isLikelyCompanionUrl(parsedNextUrl)
