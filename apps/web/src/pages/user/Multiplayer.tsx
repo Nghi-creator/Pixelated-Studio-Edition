@@ -4,7 +4,6 @@ import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
-  Copy,
   Crown,
   Gamepad2,
   LogIn,
@@ -19,7 +18,7 @@ import {
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
 } from "../../lib/engineAuth";
-import { engineEndpoint, getEngineUrl } from "../../lib/engineConfig";
+import { engineEndpoint } from "../../lib/engineConfig";
 import { Skeleton } from "../../components/ui/Skeleton";
 
 type MultiplayerMode = "host" | "join";
@@ -33,20 +32,55 @@ type LocalGame = {
 };
 
 const getInvitePath = (invite: string) => {
-  const trimmedInvite = invite.trim();
+  const trimmedInvite = invite.trim().split(/\s+/)[0];
   if (!trimmedInvite) return null;
 
   try {
-    return new URL(trimmedInvite, window.location.origin);
+    const inviteUrl = new URL(trimmedInvite, window.location.origin);
+    if (!["http:", "https:"].includes(inviteUrl.protocol)) return null;
+    return inviteUrl;
   } catch {
     return null;
   }
 };
 
-const getJoinTarget = (invite: string) => {
+const isPrivateIpv4 = (hostname: string) => {
+  const parts = hostname.split(".").map(Number);
+  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) {
+    return false;
+  }
+
+  const [first, second] = parts;
+  return (
+    first === 10 ||
+    (first === 172 && second >= 16 && second <= 31) ||
+    (first === 192 && second === 168) ||
+    (first === 169 && second === 254)
+  );
+};
+
+const isDesktopCompanionInvite = (inviteUrl: URL) => {
+  const hostname = inviteUrl.hostname.toLowerCase();
+  return (
+    inviteUrl.protocol === "https:" &&
+    (isPrivateIpv4(hostname) ||
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "[::1]" ||
+      hostname.endsWith(".local"))
+  );
+};
+
+const getJoinInvite = (invite: string) => {
   const inviteUrl = getInvitePath(invite);
   if (!inviteUrl || !inviteUrl.pathname.startsWith("/play/")) return null;
-  return `${inviteUrl.pathname}${inviteUrl.search}`;
+
+  return {
+    isCompanion: isDesktopCompanionInvite(inviteUrl),
+    target: `${inviteUrl.pathname}${inviteUrl.search}`,
+    url: inviteUrl.toString(),
+  };
 };
 
 const getSessionFromInvite = (invite: string) => {
@@ -315,7 +349,7 @@ export default function Multiplayer() {
       ),
     [localGames, searchQuery],
   );
-  const joinTarget = getJoinTarget(inviteUrl);
+  const joinInvite = getJoinInvite(inviteUrl);
   const inviteSessionId = getSessionFromInvite(inviteUrl);
   const safeCloudPage = Math.min(cloudPage, cloudTotalPages);
   const cloudPageStart = (safeCloudPage - 1) * CLOUD_GAMES_PER_PAGE;
@@ -330,10 +364,6 @@ export default function Multiplayer() {
       Math.abs(page - safeCloudPage) <= 1
     );
   });
-
-  const copyEngineUrl = async () => {
-    await navigator.clipboard.writeText(getEngineUrl());
-  };
 
   const changeCloudPage = (page: number) => {
     setCloudPage(page);
@@ -391,20 +421,21 @@ export default function Multiplayer() {
                 Join An Existing Lobby
               </h2>
               <p className="mt-1 text-sm leading-6 text-gray-400">
-                Paste the invite from the host. Pair with the host engine first
-                if this browser has not saved the token yet.
+                Paste the link shared by the host. An HTTPS desktop companion
+                link opens the LAN join checks, then asks for the short-lived
+                invite code. You do not need the host&apos;s engine token.
               </p>
             </div>
           </div>
 
           <label className="block">
             <span className="mb-2 block text-xs font-bold uppercase tracking-wide text-gray-500">
-              Invite URL
+              Host invite link
             </span>
             <input
               className="h-12 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-primary"
               onChange={(event) => setInviteUrl(event.target.value)}
-              placeholder="https://pixelated-studio-edition.vercel.app/play/game-id?session=..."
+              placeholder="https://192.168.1.20:8090/play/game-id?session=..."
               value={inviteUrl}
             />
           </label>
@@ -412,37 +443,42 @@ export default function Multiplayer() {
           {inviteUrl && (
             <div
               className={`mt-3 rounded-lg border px-3 py-2 text-sm ${
-                joinTarget
+                joinInvite
                   ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
                   : "border-red-400/30 bg-red-500/10 text-red-200"
               }`}
             >
-              {joinTarget
-                ? `Invite detected${inviteSessionId ? ` for session ${inviteSessionId}` : ""}.`
+              {joinInvite?.isCompanion
+                ? `HTTPS companion invite detected${inviteSessionId ? ` for session ${inviteSessionId}` : ""}. Open it to run the LAN preflight and enter the host's invite code.`
+                : joinInvite
+                  ? `Play invite detected${inviteSessionId ? ` for session ${inviteSessionId}` : ""}.`
                 : "That does not look like a Pixelated play invite."}
             </div>
           )}
 
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="mt-5 flex flex-col gap-3">
             <button
               className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-synth-primary/70 bg-synth-primary/15 px-5 text-sm font-bold text-white transition-colors hover:bg-synth-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!joinTarget}
+              disabled={!joinInvite}
               onClick={() => {
-                if (joinTarget) navigate(joinTarget);
+                if (!joinInvite) return;
+                if (joinInvite.isCompanion) {
+                  window.location.assign(joinInvite.url);
+                  return;
+                }
+                navigate(joinInvite.target);
               }}
               type="button"
             >
               <LogIn className="h-4 w-4" />
-              Join Lobby
+              {joinInvite?.isCompanion ? "Open LAN Join Page" : "Join Lobby"}
             </button>
-            <button
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-bg px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-secondary/60 hover:text-white"
-              onClick={copyEngineUrl}
-              type="button"
-            >
-              <Copy className="h-4 w-4" />
-              Copy Paired Engine URL
-            </button>
+            <p className="inline-flex items-start gap-2 text-xs leading-5 text-gray-400">
+              <Wifi className="mt-0.5 h-4 w-4 shrink-0 text-synth-secondary" />
+              For LAN play, stay on the same network as the host. The companion
+              page checks HTTPS trust, invite status, and host engine
+              availability before enabling Join.
+            </p>
           </div>
         </section>
       ) : (

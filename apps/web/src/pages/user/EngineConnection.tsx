@@ -65,9 +65,9 @@ export default function EngineConnection() {
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         {[
-          "Start Docker Desktop",
-          "Initialize the desktop engine",
-          "Copy and pair its token",
+          "Open the desktop app or host join link",
+          "Confirm the desktop engine is running",
+          "Pair locally or join with an invite code",
         ].map((step, index) => (
           <div
             className="flex items-center gap-3 rounded-lg border border-synth-border bg-synth-surface px-4 py-3"
