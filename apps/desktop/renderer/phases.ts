@@ -188,7 +188,7 @@
         const detailText = getPhaseDetail(phase, phaseStatus, state);
         const isPathLikeDetail =
           detailText.includes("/") || detailText.includes("\\");
-        detail.className = `mt-1 min-w-0 truncate text-xs leading-4 ${classes.meta} ${
+        detail.className = `mt-1 block w-full min-w-0 max-w-full overflow-hidden whitespace-nowrap text-ellipsis text-xs leading-4 ${classes.meta} ${
           isPathLikeDetail ? "font-mono text-[11px]" : ""
         }`;
         detail.innerText = detailText;

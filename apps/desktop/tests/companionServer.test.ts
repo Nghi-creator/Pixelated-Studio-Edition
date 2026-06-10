@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   consumeCompanionLaunchTicket,
   createCompanionLaunchTicket,
+  getCompanionStatusPage,
   getCompanionInviteStatus,
   shouldProxy,
 } from "../main/companionServer";
@@ -52,5 +53,14 @@ describe("desktop companion launch tickets", () => {
 
     const expiredTicket = createCompanionLaunchTicket(now);
     assert.equal(consumeCompanionLaunchTicket(expiredTicket, now + 60_000), false);
+  });
+});
+
+describe("desktop companion status page", () => {
+  it("shows a small companion status page instead of the bundled web app", () => {
+    const page = getCompanionStatusPage();
+
+    assert.match(page, /Companion is running/);
+    assert.doesNotMatch(page, /All Games|pixelated_engine_url/);
   });
 });

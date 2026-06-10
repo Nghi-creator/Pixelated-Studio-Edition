@@ -93,6 +93,11 @@ ticket through the local HTTPS companion. Override the hosted target when needed
 PIXELATED_WEB_URL=https://pixelated-studio-edition.vercel.app
 ```
 
+The companion on port `8090` is a background HTTPS proxy, trust endpoint, and
+invite API. Opening it directly shows a small status page. LAN share links and
+QR codes open the hosted `/engine` invite flow, which uses the companion URL for
+certificate preflight and invite redemption.
+
 Override the companion web asset path for custom layouts with:
 
 ```txt

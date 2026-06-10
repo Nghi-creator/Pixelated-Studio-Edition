@@ -7,7 +7,6 @@ import {
   engineAllowedOrigins,
   engineImage,
   hostedWebUrl,
-  webDistDir,
 } from "./config";
 import {
   createCompanionLaunchTicket,
@@ -68,6 +67,13 @@ const INVITE_CODE_TTL_MS = 10 * 60 * 1000;
 
 function createInviteCode() {
   return crypto.randomBytes(4).toString("hex").toUpperCase();
+}
+
+function createHostedInviteUrl(companionUrl: string) {
+  const url = new URL("/engine", hostedWebUrl);
+  url.searchParams.set("companionUrl", companionUrl);
+  url.searchParams.set("join", "invite");
+  return url.toString();
 }
 
 function buildDockerRunCommand({
@@ -141,12 +147,12 @@ async function startCompanion(
         "http://127.0.0.1:5173",
       ],
       port: companionPort,
-      webDistDir,
     });
+    const hostedInviteUrls = launchContext.companionUrls.map(createHostedInviteUrl);
     activeCompanion = {
       certPath: companion.certPath,
       launchUrl: `https://localhost:${companion.port}`,
-      urls: launchContext.companionUrls,
+      urls: hostedInviteUrls,
     };
     if (launchContext.exposureMode === "lan" && launchContext.inviteExpiresAt) {
       event.reply("engine-companion", {
@@ -156,7 +162,7 @@ async function startCompanion(
         inviteExpiresAt: new Date(launchContext.inviteExpiresAt).toISOString(),
         inviteRevoked: false,
         inviteStatus: "Invite code active.",
-        urls: launchContext.companionUrls,
+        urls: hostedInviteUrls,
       });
     } else {
       event.reply("engine-companion", {
@@ -361,7 +367,7 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
           event.reply("engine-token", engineToken);
           event.reply("engine-exposure", {
             advertisedUrls: launchContext.advertisedUrls,
-            companionUrls: activeCompanion ? launchContext.companionUrls : [],
+            companionUrls: activeCompanion ? activeCompanion.urls : [],
             exposureMode: launchContext.exposureMode,
           });
           event.reply(
