@@ -195,6 +195,16 @@ const phases = pixelatedWindow.PixelatedPhases.createPhaseTracker({
   phaseList: requiredElement("phase-list"),
   phaseSummary: requiredElement("phase-summary"),
 });
+const guestAccessPanel = requiredElement("guest-access-panel");
+const syncPanelHeights = () => {
+  document.documentElement.style.setProperty(
+    "--guest-access-height",
+    `${guestAccessPanel.offsetHeight}px`,
+  );
+};
+new ResizeObserver(syncPanelHeights).observe(guestAccessPanel);
+window.addEventListener("resize", syncPanelHeights);
+syncPanelHeights();
 
 pixelatedWindow.PixelatedModal.bindDocsModal({
   closeButton: requiredElement("close-docs"),
