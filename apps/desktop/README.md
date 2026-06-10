@@ -86,6 +86,13 @@ the explicit comma-separated allowlist when testing another trusted web origin:
 PIXELATED_ALLOWED_ORIGINS=https://pixelated-studio-edition.vercel.app,http://localhost:5173,http://127.0.0.1:5173
 ```
 
+`Launch Web` opens the hosted Vercel app and securely redeems a one-time pairing
+ticket through the local HTTPS companion. Override the hosted target when needed:
+
+```bash
+PIXELATED_WEB_URL=https://pixelated-studio-edition.vercel.app
+```
+
 Override the companion web asset path for custom layouts with:
 
 ```txt

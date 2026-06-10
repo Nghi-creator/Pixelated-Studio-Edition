@@ -41,6 +41,7 @@ type IpcCallback<TArgs extends unknown[] = []> = (
 contextBridge.exposeInMainWorld("electronAPI", {
   createCompanionQrDataUrl: (url: string) =>
     ipcRenderer.invoke("create-companion-qr", url) as Promise<string>,
+  launchWeb: () => ipcRenderer.invoke("launch-web") as Promise<void>,
   startDocker: (options: StartDockerOptions) =>
     ipcRenderer.send("start-docker", options),
   stopDocker: () => ipcRenderer.send("stop-docker"),

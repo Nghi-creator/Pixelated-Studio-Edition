@@ -6,9 +6,11 @@ import {
   companionPort,
   engineAllowedOrigins,
   engineImage,
+  hostedWebUrl,
   webDistDir,
 } from "./config";
 import {
+  createCompanionLaunchTicket,
   revokeCompanionInvite,
   startCompanionServer,
   stopCompanionServer,
@@ -55,6 +57,7 @@ type DockerRunOptions = EngineLaunchContext & {
 
 type ActiveCompanion = {
   certPath: string;
+  launchUrl: string;
   urls: string[];
 };
 
@@ -75,7 +78,11 @@ function buildDockerRunCommand({
   exposureMode,
   publishHost,
 }: DockerRunOptions) {
-  const allowedOrigins = [engineAllowedOrigins, ...companionUrls]
+  const allowedOrigins = [
+    engineAllowedOrigins,
+    `https://localhost:${companionPort}`,
+    ...companionUrls,
+  ]
     .filter(Boolean)
     .join(",");
 
@@ -113,20 +120,12 @@ function createEngineLaunchContext(options: StartEngineOptions = {}): EngineLaun
   };
 }
 
-async function startLanCompanion(
+async function startCompanion(
   event: IpcMainEvent,
   launchContext: EngineLaunchContext,
 ) {
-  if (launchContext.exposureMode !== "lan") {
-    event.reply("engine-companion", {
-      enabled: false,
-      urls: [],
-    });
-    return;
-  }
-
-  if (!engineToken || !launchContext.inviteCode || !launchContext.inviteExpiresAt) {
-    throw new Error("LAN invite code has not been initialized.");
+  if (!engineToken) {
+    throw new Error("Engine token has not been initialized.");
   }
 
   try {
@@ -136,25 +135,38 @@ async function startLanCompanion(
       inviteCode: launchContext.inviteCode,
       inviteExpiresAt: launchContext.inviteExpiresAt,
       lanAddresses: getLanIpv4Addresses(),
+      launchAllowedOrigins: [
+        new URL(hostedWebUrl).origin,
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+      ],
       port: companionPort,
       webDistDir,
     });
     activeCompanion = {
       certPath: companion.certPath,
+      launchUrl: `https://localhost:${companion.port}`,
       urls: launchContext.companionUrls,
     };
-    event.reply("engine-companion", {
-      certPath: companion.certPath,
-      enabled: true,
-      inviteCode: launchContext.inviteCode,
-      inviteExpiresAt: new Date(launchContext.inviteExpiresAt).toISOString(),
-      inviteRevoked: false,
-      inviteStatus: "Invite code active.",
-      urls: launchContext.companionUrls,
-    });
+    if (launchContext.exposureMode === "lan" && launchContext.inviteExpiresAt) {
+      event.reply("engine-companion", {
+        certPath: companion.certPath,
+        enabled: true,
+        inviteCode: launchContext.inviteCode,
+        inviteExpiresAt: new Date(launchContext.inviteExpiresAt).toISOString(),
+        inviteRevoked: false,
+        inviteStatus: "Invite code active.",
+        urls: launchContext.companionUrls,
+      });
+    } else {
+      event.reply("engine-companion", {
+        enabled: false,
+        urls: [],
+      });
+    }
     event.reply(
       "server-log",
-      `LAN companion HTTPS server ready on port ${companion.port}.`,
+      `Desktop companion HTTPS server ready on port ${companion.port}.`,
     );
   } catch (err) {
     const message = getErrorMessage(err);
@@ -166,9 +178,20 @@ async function startLanCompanion(
     });
     event.reply(
       "server-log",
-      `<span class="text-amber-300">Warning: LAN HTTPS companion could not start: ${message}</span>`,
+      `<span class="text-amber-300">Warning: Desktop HTTPS companion could not start: ${message}</span>`,
     );
   }
+}
+
+export function createWebLaunchUrl() {
+  if (!activeCompanion) {
+    throw new Error("Start the engine before launching the web app.");
+  }
+
+  const url = new URL(hostedWebUrl);
+  url.searchParams.set("companionUrl", activeCompanion.launchUrl);
+  url.searchParams.set("launchTicket", createCompanionLaunchTicket());
+  return url.toString();
 }
 
 export function regenerateLanInvite(event: IpcMainEvent) {
@@ -333,7 +356,7 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
         return waitForEngineHealth();
       })
       .then(() => {
-        return startLanCompanion(event, launchContext).then(() => {
+        return startCompanion(event, launchContext).then(() => {
           emitEngineState(event, "READY", "http://127.0.0.1:8080/health");
           event.reply("engine-token", engineToken);
           event.reply("engine-exposure", {
