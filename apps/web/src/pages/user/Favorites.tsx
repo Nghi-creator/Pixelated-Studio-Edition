@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { HeartCrack, Gamepad2, ArrowLeft } from "lucide-react";
 import GameCard from "../../components/user/GameCard";
 import { api, getAuthSession } from "../../lib/apiClient";
-import { GameGridSkeleton } from "../../components/ui/Skeleton";
+import { FavoritesPageSkeleton } from "../../components/ui/Skeleton";
 
 interface SavedGame {
   id: string;
@@ -40,13 +40,7 @@ export default function Favorites() {
   }, [navigate]);
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <div className="mx-auto mt-20 w-full max-w-7xl px-4 sm:px-6 lg:px-8">
-          <GameGridSkeleton count={10} />
-        </div>
-      </div>
-    );
+    return <FavoritesPageSkeleton />;
   }
 
   return (
