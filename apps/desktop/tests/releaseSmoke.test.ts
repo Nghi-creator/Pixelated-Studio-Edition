@@ -30,6 +30,7 @@ describe("desktop packaged release smoke helpers", () => {
   it("rejects preload-local-module imports and accepts the packaged IPC bridge", () => {
     const apiNames = [
       "createCompanionQrDataUrl",
+      "launchWeb",
       "startDocker",
       "stopDocker",
       "regenerateLanInvite",

@@ -98,6 +98,7 @@ describe("desktop package config", () => {
     const controller = fs.readFileSync(controllerPath, "utf8");
 
     assert.match(config, /https:\/\/pixelated-studio-edition\.vercel\.app/);
+    assert.match(config, /PIXELATED_WEB_URL/);
     assert.match(config, /http:\/\/localhost:5173/);
     assert.match(config, /http:\/\/127\.0\.0\.1:5173/);
     assert.match(controller, /engineAllowedOrigins|engine_allowed_origins/);

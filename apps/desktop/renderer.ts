@@ -50,6 +50,7 @@ type PhaseTracker = {
 
 type ElectronApi = {
   createCompanionQrDataUrl: (url: string) => Promise<string>;
+  launchWeb: () => Promise<void>;
   regenerateLanInvite: () => void;
   revokeLanInvite: () => void;
   startDocker: (options: { exposureMode?: ExposureMode }) => void;
@@ -142,6 +143,7 @@ const powerBtn = requiredElement("power-btn", HTMLButtonElement);
 const powerIcon = requiredElement("power-icon");
 const powerSpinner = requiredElement("power-spinner");
 const powerText = requiredElement("power-text");
+const launchWebBtn = requiredElement("launch-web", HTMLButtonElement);
 const statusBadge = requiredQuery<HTMLElement>(".status-badge");
 const statusDot = requiredElement("status-dot");
 const statusText = requiredElement("status-text");
@@ -253,6 +255,11 @@ function setPowerPending(pending: boolean) {
   powerBtn.disabled = pending;
 }
 
+function setLaunchWebVisible(visible: boolean) {
+  launchWebBtn.classList.toggle("hidden", !visible);
+  launchWebBtn.classList.toggle("flex", visible);
+}
+
 function setStatusBadge(active: boolean) {
   if (active) {
     setStatusPresentation("Engine Ready", "ready");
@@ -264,6 +271,7 @@ function setStatusBadge(active: boolean) {
     powerBtn.classList.remove("shadow-glow-primary");
     powerText.innerText = "Shutdown Engine";
     setPowerPending(false);
+    setLaunchWebVisible(true);
     isRunning = true;
     if (pendingCompanionPayload) {
       exposure.setCompanionStatus(pendingCompanionPayload);
@@ -286,6 +294,7 @@ function setStatusBadge(active: boolean) {
   powerBtn.classList.add("shadow-glow-primary");
   powerText.innerText = "Initialize Engine";
   setPowerPending(false);
+  setLaunchWebVisible(false);
   tokenPanel.classList.add("hidden");
   tokenValue.innerText = "";
   exposure.renderUrls([]);
@@ -308,6 +317,7 @@ function resetFailedUi() {
   powerBtn.classList.add("shadow-glow-primary");
   powerText.innerText = "Initialize Engine";
   setPowerPending(false);
+  setLaunchWebVisible(false);
   tokenPanel.classList.add("hidden");
   tokenValue.innerText = "";
   exposure.renderUrls([]);
@@ -347,6 +357,7 @@ function setLifecycleState(state: EngineStatePayload) {
   }
 
   if (state.status === "starting") {
+    setLaunchWebVisible(false);
     setStatusPresentation(statusLabel, "running");
     setPowerPending(true);
     exposure.setEnabled(false);
@@ -354,6 +365,7 @@ function setLifecycleState(state: EngineStatePayload) {
   }
 
   if (state.status === "stopping") {
+    setLaunchWebVisible(false);
     setStatusPresentation(statusLabel, "running");
     setPowerPending(true);
     exposure.setEnabled(false);
@@ -389,6 +401,19 @@ powerBtn.addEventListener("click", () => {
   setPowerPending(true);
   powerText.innerText = "Shutdown Engine";
   pixelatedWindow.electronAPI.stopDocker();
+});
+
+launchWebBtn.addEventListener("click", async () => {
+  launchWebBtn.disabled = true;
+  try {
+    await pixelatedWindow.electronAPI.launchWeb();
+  } catch (err) {
+    logs.append(
+      `<span class="text-red-400">Could not launch the web app: ${logs.sanitize(String(err))}</span>`,
+    );
+  } finally {
+    launchWebBtn.disabled = false;
+  }
 });
 
 clearLogsBtn.addEventListener("click", () => {

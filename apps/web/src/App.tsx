@@ -9,6 +9,7 @@ import Footer from "./components/layout/Footer";
 import AdminLayout from "./components/layout/AdminLayout";
 import { useSessionTracker } from "./lib/useSessionTracker";
 import { useEngineConnectionMonitor } from "./lib/useEngineConnectionMonitor";
+import { useDesktopLaunchPairing } from "./lib/useDesktopLaunchPairing";
 
 import Landing from "./pages/user/Landing";
 import Player from "./pages/user/Player";
@@ -53,10 +54,16 @@ const EngineConnectionMonitor = () => {
   return null;
 };
 
+const DesktopLaunchPairing = () => {
+  useDesktopLaunchPairing();
+  return null;
+};
+
 export default function App() {
   return (
     <Router>
       <SessionTracker />
+      <DesktopLaunchPairing />
       <EngineConnectionMonitor />
       <Routes>
         {/* ADMIN ROUTES */}

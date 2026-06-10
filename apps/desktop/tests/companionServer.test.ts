@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getCompanionInviteStatus, shouldProxy } from "../main/companionServer";
+import {
+  consumeCompanionLaunchTicket,
+  createCompanionLaunchTicket,
+  getCompanionInviteStatus,
+  shouldProxy,
+} from "../main/companionServer";
 
 describe("desktop companion preflight", () => {
   it("distinguishes active, expired, and revoked invite states", () => {
@@ -34,5 +39,18 @@ describe("desktop companion engine proxy", () => {
   it("proxies smoke telemetry capture routes", () => {
     assert.equal(shouldProxy("/smoke/telemetry"), true);
     assert.equal(shouldProxy("/smoke/telemetry/active"), true);
+  });
+});
+
+describe("desktop companion launch tickets", () => {
+  it("consumes launch tickets once and rejects them after expiry", () => {
+    const now = 1_000;
+    const ticket = createCompanionLaunchTicket(now);
+
+    assert.equal(consumeCompanionLaunchTicket(ticket, now + 1), true);
+    assert.equal(consumeCompanionLaunchTicket(ticket, now + 2), false);
+
+    const expiredTicket = createCompanionLaunchTicket(now);
+    assert.equal(consumeCompanionLaunchTicket(expiredTicket, now + 60_000), false);
   });
 });

@@ -37,6 +37,8 @@ export const engineRuntimeDir =
   ]);
 export const backendApiUrl =
   process.env.PIXELATED_API_URL || "https://pixelated-api-services.onrender.com";
+export const hostedWebUrl =
+  process.env.PIXELATED_WEB_URL || "https://pixelated-studio-edition.vercel.app";
 export const engineAllowedOrigins =
   process.env.PIXELATED_ALLOWED_ORIGINS ||
   [

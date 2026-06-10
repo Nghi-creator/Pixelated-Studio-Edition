@@ -1,7 +1,8 @@
-import { app, BrowserWindow, ipcMain, type IpcMainEvent } from "electron";
+import { app, BrowserWindow, ipcMain, shell, type IpcMainEvent } from "electron";
 import path from "path";
 import {
   cleanupEngine,
+  createWebLaunchUrl,
   regenerateLanInvite,
   revokeLanInvite,
   startEngine,
@@ -46,6 +47,11 @@ ipcMain.handle("create-companion-qr", (_event, url: unknown) => {
     throw new Error("A companion join URL is required.");
   }
   return createCompanionQrDataUrl(url);
+});
+
+ipcMain.handle("launch-web", async () => {
+  const url = createWebLaunchUrl();
+  await shell.openExternal(url);
 });
 
 app.whenReady().then(createWindow);

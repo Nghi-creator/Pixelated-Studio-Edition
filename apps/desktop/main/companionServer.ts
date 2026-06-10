@@ -15,6 +15,9 @@ const ENGINE_PORT = 8080;
 const INVITE_PATH = "/invite";
 const PREFLIGHT_INVITE_PATH = "/invite/preflight";
 const REDEEM_INVITE_PATH = "/invite/redeem";
+const REDEEM_LAUNCH_PATH = "/launch/redeem";
+const LAUNCH_TICKET_TTL_MS = 60 * 1000;
+const HOST_ACCESS_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const PROXY_PREFIXES = [
   "/health",
   "/local-games",
@@ -31,9 +34,10 @@ type CertificatePaths = {
 export type CompanionServerOptions = {
   certDir: string;
   engineToken: string;
-  inviteCode: string;
-  inviteExpiresAt: number;
+  inviteCode?: string;
+  inviteExpiresAt?: number;
   lanAddresses: string[];
+  launchAllowedOrigins: string[];
   port: number;
   webDistDir: string;
 };
@@ -46,6 +50,7 @@ let companionServer: https.Server | null = null;
 
 type CompanionAccessToken = {
   expiresAt: number;
+  scope: "guest" | "host";
 };
 
 type CompanionInviteState = {
@@ -57,6 +62,7 @@ type CompanionInviteState = {
 export type CompanionInviteStatus = "active" | "expired" | "revoked";
 
 const companionAccessTokens = new Map<string, CompanionAccessToken>();
+const companionLaunchTickets = new Map<string, number>();
 let companionInviteState: CompanionInviteState = {
   code: null,
   expiresAt: null,
@@ -69,7 +75,7 @@ export function updateCompanionInvite(inviteCode: string, inviteExpiresAt: numbe
     expiresAt: inviteExpiresAt,
     revokedAt: null,
   };
-  companionAccessTokens.clear();
+  clearGuestAccessTokens();
 }
 
 export function revokeCompanionInvite() {
@@ -78,7 +84,20 @@ export function revokeCompanionInvite() {
     expiresAt: null,
     revokedAt: Date.now(),
   };
-  companionAccessTokens.clear();
+  clearGuestAccessTokens();
+}
+
+export function createCompanionLaunchTicket(now = Date.now()) {
+  const ticket = crypto.randomBytes(24).toString("base64url");
+  companionLaunchTickets.clear();
+  companionLaunchTickets.set(ticket, now + LAUNCH_TICKET_TTL_MS);
+  return ticket;
+}
+
+export function consumeCompanionLaunchTicket(ticket: string, now = Date.now()) {
+  const expiresAt = companionLaunchTickets.get(ticket);
+  companionLaunchTickets.delete(ticket);
+  return Boolean(expiresAt && expiresAt > now);
 }
 
 export function getCompanionInviteStatus(
@@ -175,6 +194,24 @@ function sendJson(
   res.end(JSON.stringify(payload));
 }
 
+function setLaunchCorsHeaders(
+  req: IncomingMessage,
+  res: ServerResponse,
+  allowedOrigins: string[],
+) {
+  const origin = serializeHeaderValue(req.headers.origin);
+  if (!origin || !allowedOrigins.includes(origin)) return false;
+
+  res.setHeader("access-control-allow-headers", "content-type");
+  res.setHeader("access-control-allow-methods", "POST, OPTIONS");
+  res.setHeader("access-control-allow-origin", origin);
+  if (req.headers["access-control-request-private-network"] === "true") {
+    res.setHeader("access-control-allow-private-network", "true");
+  }
+  res.setHeader("vary", "Origin");
+  return true;
+}
+
 function isValidCompanionAccessToken(token: string, now = Date.now()) {
   const record = companionAccessTokens.get(token);
   if (!record) return false;
@@ -185,9 +222,18 @@ function isValidCompanionAccessToken(token: string, now = Date.now()) {
   return true;
 }
 
-function createCompanionAccessToken(expiresAt: number) {
+function clearGuestAccessTokens() {
+  companionAccessTokens.forEach((record, token) => {
+    if (record.scope === "guest") companionAccessTokens.delete(token);
+  });
+}
+
+function createCompanionAccessToken(
+  expiresAt: number,
+  scope: CompanionAccessToken["scope"],
+) {
   const token = crypto.randomBytes(24).toString("base64url");
-  companionAccessTokens.set(token, { expiresAt });
+  companionAccessTokens.set(token, { expiresAt, scope });
   return token;
 }
 
@@ -365,9 +411,70 @@ async function handleInviteRequest(
     }
 
     sendJson(res, 200, {
-      companionToken: createCompanionAccessToken(activeInviteExpiresAt),
+      companionToken: createCompanionAccessToken(activeInviteExpiresAt, "guest"),
       engineUrl: "",
       expiresAt: new Date(activeInviteExpiresAt).toISOString(),
+      tokenStoredBy: "browser-local-storage",
+    });
+  } catch (err) {
+    sendJson(res, 400, { error: err instanceof Error ? err.message : String(err) });
+  }
+
+  return true;
+}
+
+async function handleLaunchRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  allowedOrigins: string[],
+) {
+  if (!req.url?.startsWith(REDEEM_LAUNCH_PATH)) {
+    return false;
+  }
+
+  const origin = serializeHeaderValue(req.headers.origin);
+  if (origin && !setLaunchCorsHeaders(req, res, allowedOrigins)) {
+    sendJson(res, 403, {
+      code: "launch_origin_forbidden",
+      error: "Launch origin is not allowed",
+    });
+    return true;
+  }
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
+
+  if (req.method !== "POST") return false;
+
+  try {
+    const body = await readJsonBody(req);
+    const ticket =
+      body && typeof body === "object" && typeof (body as { ticket?: unknown }).ticket === "string"
+        ? (body as { ticket: string }).ticket
+        : "";
+    if (!consumeCompanionLaunchTicket(ticket)) {
+      sendJson(res, 401, {
+        code: "launch_ticket_invalid",
+        error: "Desktop launch ticket is invalid or expired",
+      });
+      return true;
+    }
+
+    if (!(await probeEngineHealth())) {
+      sendJson(res, 503, {
+        code: "host_engine_unavailable",
+        error: "Host engine unavailable",
+      });
+      return true;
+    }
+
+    const accessExpiresAt = Date.now() + HOST_ACCESS_TOKEN_TTL_MS;
+    sendJson(res, 200, {
+      companionToken: createCompanionAccessToken(accessExpiresAt, "host"),
+      expiresAt: new Date(accessExpiresAt).toISOString(),
       tokenStoredBy: "browser-local-storage",
     });
   } catch (err) {
@@ -512,11 +619,16 @@ export function startCompanionServer({
   inviteCode,
   inviteExpiresAt,
   lanAddresses,
+  launchAllowedOrigins,
   port,
   webDistDir,
 }: CompanionServerOptions) {
   stopCompanionServer();
-  updateCompanionInvite(inviteCode, inviteExpiresAt);
+  if (inviteCode && inviteExpiresAt) {
+    updateCompanionInvite(inviteCode, inviteExpiresAt);
+  } else {
+    revokeCompanionInvite();
+  }
 
   const { certPath, keyPath } = createCertificate(certDir, lanAddresses);
   const server = https.createServer(
@@ -526,6 +638,10 @@ export function startCompanionServer({
     },
     async (req, res) => {
       if (await handleInviteRequest(req, res)) {
+        return;
+      }
+
+      if (await handleLaunchRequest(req, res, launchAllowedOrigins)) {
         return;
       }
 
@@ -562,9 +678,11 @@ export function startCompanionServer({
 }
 
 export function stopCompanionServer() {
-  if (!companionServer) return;
-
-  companionServer.close();
-  companionServer = null;
+  if (companionServer) {
+    companionServer.close();
+    companionServer = null;
+  }
+  companionLaunchTickets.clear();
+  companionAccessTokens.clear();
   revokeCompanionInvite();
 }
