@@ -1,0 +1,59 @@
+name: Hosted Deploy
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: hosted-deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-gate:
+    name: Hosted API deploy gate
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/hosted-api-deploy-gate.yml
+    secrets: inherit
+
+  deploy-render-api:
+    name: Deploy Render API
+    needs: deploy-gate
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      RENDER_API_DEPLOY_HOOK_URL: ${{ secrets.RENDER_API_DEPLOY_HOOK_URL }}
+    steps:
+      - name: Require Render deploy hook
+        run: |
+          test -n "$RENDER_API_DEPLOY_HOOK_URL" || {
+            echo "::error::Missing production environment secret RENDER_API_DEPLOY_HOOK_URL."
+            exit 1
+          }
+
+      - name: Trigger Render API deploy
+        run: curl --fail-with-body --request POST "$RENDER_API_DEPLOY_HOOK_URL"
+
+  deploy-vercel-web:
+    name: Deploy Vercel web
+    needs: deploy-gate
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      VERCEL_WEB_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_WEB_DEPLOY_HOOK_URL }}
+    steps:
+      - name: Require Vercel deploy hook
+        run: |
+          test -n "$VERCEL_WEB_DEPLOY_HOOK_URL" || {
+            echo "::error::Missing production environment secret VERCEL_WEB_DEPLOY_HOOK_URL."
+            exit 1
+          }
+
+      - name: Trigger Vercel web deploy
+        run: curl --fail-with-body --request POST "$VERCEL_WEB_DEPLOY_HOOK_URL"
