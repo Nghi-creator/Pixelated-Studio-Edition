@@ -172,21 +172,27 @@
         const phaseStatus = getPhaseStatus(phase.id, activePhase, state.status);
         const classes = getPhaseClasses(phaseStatus);
         const item = document.createElement("div");
-        item.className = `flex items-start gap-3 rounded-md border px-3 py-2 ${classes.item}`;
+        item.className = `flex min-h-0 items-center gap-4 rounded-lg border px-4 py-3 ${classes.item}`;
 
         const dot = document.createElement("span");
-        dot.className = `mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${classes.dot}`;
+        dot.className = `h-3 w-3 shrink-0 rounded-full ${classes.dot}`;
 
         const content = document.createElement("div");
         content.className = "min-w-0 flex-1";
 
         const label = document.createElement("div");
-        label.className = `text-xs font-bold ${classes.label}`;
+        label.className = `text-sm font-bold ${classes.label}`;
         label.innerText = phase.label;
 
         const detail = document.createElement("div");
-        detail.className = `mt-0.5 break-words text-[11px] leading-4 ${classes.meta}`;
-        detail.innerText = getPhaseDetail(phase, phaseStatus, state);
+        const detailText = getPhaseDetail(phase, phaseStatus, state);
+        const isPathLikeDetail =
+          detailText.includes("/") || detailText.includes("\\");
+        detail.className = `mt-1 min-w-0 truncate text-xs leading-4 ${classes.meta} ${
+          isPathLikeDetail ? "font-mono text-[11px]" : ""
+        }`;
+        detail.innerText = detailText;
+        detail.title = detailText;
 
         content.appendChild(label);
         content.appendChild(detail);
