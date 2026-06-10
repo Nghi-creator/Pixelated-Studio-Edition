@@ -139,8 +139,12 @@ function requiredQuery<T extends Element>(selector: string): T {
 }
 
 const powerBtn = requiredElement("power-btn", HTMLButtonElement);
+const powerIcon = requiredElement("power-icon");
+const powerSpinner = requiredElement("power-spinner");
 const powerText = requiredElement("power-text");
 const statusBadge = requiredQuery<HTMLElement>(".status-badge");
+const statusDot = requiredElement("status-dot");
+const statusText = requiredElement("status-text");
 const tokenPanel = requiredElement("token-panel");
 const tokenValue = requiredElement("engine-token");
 const copyTokenBtn = requiredElement("copy-token", HTMLButtonElement);
@@ -212,14 +216,46 @@ pixelatedWindow.PixelatedModal.bindDocsModal({
   openButton: requiredElement("open-docs"),
 });
 
+type StatusTone = "offline" | "ready" | "running";
+
+function setStatusPresentation(text: string, tone: StatusTone) {
+  const toneClasses = {
+    offline: {
+      badge: ["border-red-500/50", "bg-red-500/10", "text-red-300"],
+      dot: "bg-red-400",
+    },
+    ready: {
+      badge: ["border-emerald-500/50", "bg-emerald-500/10", "text-emerald-300"],
+      dot: "bg-emerald-400",
+    },
+    running: {
+      badge: ["border-orange-500/50", "bg-orange-500/10", "text-orange-300"],
+      dot: "bg-orange-400",
+    },
+  } as const;
+  const allBadgeClasses = Object.values(toneClasses).flatMap(
+    ({ badge }) => badge,
+  );
+  const allDotClasses = Object.values(toneClasses).map(({ dot }) => dot);
+
+  statusBadge.classList.remove(...allBadgeClasses);
+  statusDot.classList.remove(...allDotClasses, "animate-pulse");
+  statusBadge.classList.add(...toneClasses[tone].badge);
+  statusDot.classList.add(toneClasses[tone].dot);
+  if (tone === "running") statusDot.classList.add("animate-pulse");
+  statusText.innerText = text;
+  statusBadge.title = text;
+}
+
+function setPowerPending(pending: boolean) {
+  powerIcon.classList.toggle("hidden", pending);
+  powerSpinner.classList.toggle("hidden", !pending);
+  powerBtn.disabled = pending;
+}
+
 function setStatusBadge(active: boolean) {
   if (active) {
-    statusBadge.innerHTML =
-      '<span class="inline-block w-2 h-2 rounded-full bg-synth-primary mr-1 animate-pulse shadow-glow-primary"></span> Engine Active';
-    statusBadge.classList.replace(
-      "bg-synth-primary/20",
-      "bg-synth-primary/30",
-    );
+    setStatusPresentation("Engine Ready", "ready");
     powerBtn.classList.replace("bg-synth-primary", "bg-red-500");
     powerBtn.classList.replace(
       "hover:bg-synth-primary-hover",
@@ -227,6 +263,7 @@ function setStatusBadge(active: boolean) {
     );
     powerBtn.classList.remove("shadow-glow-primary");
     powerText.innerText = "Shutdown Engine";
+    setPowerPending(false);
     isRunning = true;
     if (pendingCompanionPayload) {
       exposure.setCompanionStatus(pendingCompanionPayload);
@@ -240,12 +277,7 @@ function setStatusBadge(active: boolean) {
     return;
   }
 
-  statusBadge.innerHTML =
-    '<span class="inline-block w-2 h-2 rounded-full bg-synth-primary mr-1 animate-pulse"></span> Engine Offline';
-  statusBadge.classList.replace(
-    "bg-synth-primary/30",
-    "bg-synth-primary/20",
-  );
+  setStatusPresentation("Engine Offline", "offline");
   powerBtn.classList.replace("bg-red-500", "bg-synth-primary");
   powerBtn.classList.replace(
     "hover:bg-red-600",
@@ -253,6 +285,7 @@ function setStatusBadge(active: boolean) {
   );
   powerBtn.classList.add("shadow-glow-primary");
   powerText.innerText = "Initialize Engine";
+  setPowerPending(false);
   tokenPanel.classList.add("hidden");
   tokenValue.innerText = "";
   exposure.renderUrls([]);
@@ -274,6 +307,7 @@ function resetFailedUi() {
   );
   powerBtn.classList.add("shadow-glow-primary");
   powerText.innerText = "Initialize Engine";
+  setPowerPending(false);
   tokenPanel.classList.add("hidden");
   tokenValue.innerText = "";
   exposure.renderUrls([]);
@@ -284,25 +318,13 @@ function resetFailedUi() {
   revokeInviteBtn.disabled = true;
   exposure.setEnabled(true);
   isRunning = false;
-  powerBtn.disabled = false;
 }
 
 function setLifecycleState(state: EngineStatePayload) {
   const detail = state.detail ? ` - ${state.detail}` : "";
   const label = state.label || "Engine";
-  statusBadge.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-synth-primary mr-1 animate-pulse shadow-glow-primary"></span> ${label}${detail}`;
+  const statusLabel = `${label}${detail}`;
   phases.render(state);
-
-  statusBadge.classList.toggle("text-red-400", state.status === "failed");
-  statusBadge.classList.toggle("border-red-500/50", state.status === "failed");
-  statusBadge.classList.toggle(
-    "text-synth-primary",
-    state.status !== "failed",
-  );
-  statusBadge.classList.toggle(
-    "border-synth-primary/50",
-    state.status !== "failed",
-  );
 
   if (state.status === "ready") {
     setStatusBadge(true);
@@ -312,6 +334,7 @@ function setLifecycleState(state: EngineStatePayload) {
   }
 
   if (state.status === "failed") {
+    setStatusPresentation(statusLabel, "offline");
     resetFailedUi();
     return;
   }
@@ -324,15 +347,17 @@ function setLifecycleState(state: EngineStatePayload) {
   }
 
   if (state.status === "starting") {
-    powerBtn.disabled = true;
+    setStatusPresentation(statusLabel, "running");
+    setPowerPending(true);
     exposure.setEnabled(false);
-    powerText.innerText = label;
+    powerText.innerText = "Initialize Engine";
   }
 
   if (state.status === "stopping") {
-    powerBtn.disabled = true;
+    setStatusPresentation(statusLabel, "running");
+    setPowerPending(true);
     exposure.setEnabled(false);
-    powerText.innerText = "Shutting down...";
+    powerText.innerText = "Shutdown Engine";
   }
 }
 
@@ -353,14 +378,16 @@ powerBtn.addEventListener("click", () => {
       phase: "docker",
       status: "starting",
     });
-    powerBtn.disabled = true;
-    powerText.innerText = "Booting...";
+    setStatusPresentation("Initializing Engine - Queued", "running");
+    setPowerPending(true);
+    powerText.innerText = "Initialize Engine";
     pixelatedWindow.electronAPI.startDocker({ exposureMode: exposure.getMode() });
     return;
   }
 
-  powerBtn.disabled = true;
-  powerText.innerText = "Shutting down...";
+  setStatusPresentation("Stopping Engine", "running");
+  setPowerPending(true);
+  powerText.innerText = "Shutdown Engine";
   pixelatedWindow.electronAPI.stopDocker();
 });
 
