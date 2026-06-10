@@ -328,6 +328,7 @@ function setLifecycleState(state: EngineStatePayload) {
 
 powerBtn.addEventListener("click", () => {
   if (!isRunning) {
+    logs.clear();
     tokenPanel.classList.add("hidden");
     tokenValue.innerText = "";
     exposure.renderUrls([]);
