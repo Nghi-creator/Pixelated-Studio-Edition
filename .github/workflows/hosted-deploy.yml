@@ -57,3 +57,63 @@ jobs:
 
       - name: Trigger Vercel web deploy
         run: curl --fail-with-body --request POST "$VERCEL_WEB_DEPLOY_HOOK_URL"
+
+  hosted-pairing-smoke:
+    name: Signed-in hosted pairing smoke
+    needs:
+      - deploy-render-api
+      - deploy-vercel-web
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HOSTED_API_URL: ${{ vars.HOSTED_API_URL }}
+      HOSTED_SMOKE_EMAIL: ${{ secrets.HOSTED_SMOKE_EMAIL }}
+      HOSTED_SMOKE_PASSWORD: ${{ secrets.HOSTED_SMOKE_PASSWORD }}
+      HOSTED_WEB_URL: ${{ vars.HOSTED_WEB_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 22
+
+      - name: Require hosted smoke configuration
+        run: |
+          test -n "$HOSTED_SMOKE_EMAIL" || {
+            echo "::error::Missing production environment secret HOSTED_SMOKE_EMAIL."
+            exit 1
+          }
+          test -n "$HOSTED_SMOKE_PASSWORD" || {
+            echo "::error::Missing production environment secret HOSTED_SMOKE_PASSWORD."
+            exit 1
+          }
+
+      - name: Install smoke and desktop dependencies
+        run: |
+          npm ci
+          npm ci --prefix apps/desktop
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build desktop companion
+        run: npm run build --prefix apps/desktop
+
+      - name: Allow provider deploys to publish
+        run: sleep 180
+
+      - name: Run signed-in hosted pairing smoke
+        run: npm run smoke:hosted-pairing
+
+      - name: Upload hosted pairing smoke bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: warn
+          name: hosted-pairing-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .context/hosted-pairing-smoke/
+          retention-days: 14

@@ -191,6 +191,40 @@ STAGING_SMOKE_ENGINE_URL=http://127.0.0.1:8080
 
 This was not run by Codex because no user access token was provided in the repo context. The command checks `/me`, permissions, hosted access-log write/upsert schema, admin access-log summary schema when authorized, local pairing save/read/delete with restore, multiplayer lobby lifecycle, cloud session create/read/verify/delete, and stream metric write/read against the hosted API.
 
+## Signed-In Hosted Pairing Smoke
+
+The `Hosted Deploy` workflow runs the browser proof after both production deploy
+hooks. Configure these production environment values:
+
+```txt
+HOSTED_SMOKE_EMAIL=<dedicated-password-auth-smoke-account>
+HOSTED_SMOKE_PASSWORD=<smoke-account-password>
+HOSTED_WEB_URL=https://pixelated-studio-edition.vercel.app
+HOSTED_API_URL=https://pixelated-api-services.onrender.com
+```
+
+`HOSTED_WEB_URL` and `HOSTED_API_URL` are optional environment variables and
+fall back to the current production URLs. The credentials must be environment
+secrets. The job compiles and starts the real desktop HTTPS companion beside a
+deterministic local engine probe, signs in through Vercel, launches `/engine`
+with a one-use desktop ticket, registers and restores pairing metadata through
+Render, and creates/verifies a cloud session. It restores the smoke account's
+previous pairing metadata during cleanup.
+
+Every run uploads `.context/hosted-pairing-smoke/` with a JSON report, concise
+Markdown result, sanitized browser URL/status log, browser console capture, and
+screenshots. Credentials, authorization headers, companion credentials, and the
+temporary companion TLS private key are not included. Run the same proof locally
+after building the desktop app:
+
+```sh
+npm ci
+npm ci --prefix apps/desktop
+npx playwright install chromium
+npm run build --prefix apps/desktop
+HOSTED_SMOKE_EMAIL=<email> HOSTED_SMOKE_PASSWORD=<password> npm run smoke:hosted-pairing
+```
+
 ## Vercel Frontend Env
 
 For local frontend development:
