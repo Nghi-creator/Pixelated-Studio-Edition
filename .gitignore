@@ -12,3 +12,4 @@ __pycache__/
 *.py[cod]
 supabase/.temp/
 .vercel
+.context/hosted-pairing-smoke/

@@ -173,12 +173,16 @@
         const classes = getPhaseClasses(phaseStatus);
         const item = document.createElement("div");
         item.className = `flex min-h-0 items-center gap-4 rounded-lg border px-4 py-3 ${classes.item}`;
+        item.style.minWidth = "0";
+        item.style.overflow = "hidden";
 
         const dot = document.createElement("span");
         dot.className = `h-3 w-3 shrink-0 rounded-full ${classes.dot}`;
 
         const content = document.createElement("div");
         content.className = "min-w-0 flex-1";
+        content.style.minWidth = "0";
+        content.style.overflow = "hidden";
 
         const label = document.createElement("div");
         label.className = `text-sm font-bold ${classes.label}`;
@@ -188,9 +192,16 @@
         const detailText = getPhaseDetail(phase, phaseStatus, state);
         const isPathLikeDetail =
           detailText.includes("/") || detailText.includes("\\");
-        detail.className = `mt-1 block w-full min-w-0 max-w-full overflow-hidden whitespace-nowrap text-ellipsis text-xs leading-4 ${classes.meta} ${
+        detail.className = `mt-1 text-xs leading-4 ${classes.meta} ${
           isPathLikeDetail ? "font-mono text-[11px]" : ""
         }`;
+        detail.style.display = "block";
+        detail.style.maxWidth = "100%";
+        detail.style.minWidth = "0";
+        detail.style.overflow = "hidden";
+        detail.style.textOverflow = "ellipsis";
+        detail.style.whiteSpace = "nowrap";
+        detail.style.width = "100%";
         detail.innerText = detailText;
         detail.title = detailText;
 
