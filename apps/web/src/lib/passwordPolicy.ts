@@ -1,6 +1,6 @@
 export const PASSWORD_MIN_LENGTH = 8;
 export const PASSWORD_POLICY_HINT =
-  "Use at least 8 characters with at least one letter and one number.";
+  "Password should contain at least 8 characters, 1 letter and 1 number.";
 
 export function getPasswordPolicyError(password: string) {
   if (password.length < PASSWORD_MIN_LENGTH) {
