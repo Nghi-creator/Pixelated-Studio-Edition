@@ -209,7 +209,9 @@ secrets. The job compiles and starts the real desktop HTTPS companion beside a
 deterministic local engine probe, signs in through Vercel, launches `/engine`
 with a one-use desktop ticket, registers and restores pairing metadata through
 Render, and creates/verifies a cloud session. It restores the smoke account's
-previous pairing metadata during cleanup.
+previous pairing metadata during cleanup. Before opening Chromium, the runner
+waits up to ten minutes for Vercel's live JavaScript bundle to contain the
+one-click `/launch/redeem` flow, avoiding deploy-hook publication races.
 
 Every run uploads `.context/hosted-pairing-smoke/` with a JSON report, concise
 Markdown result, sanitized browser URL/status log, browser console capture, and
