@@ -20,6 +20,17 @@ VITE_ENGINE_URL=http://localhost:8080
 
 Set `VITE_PUBLIC_APP_URL` in Vercel and in Supabase Auth redirect settings so password recovery, email verification, and OAuth callbacks never fall back to localhost.
 
+For hosted auth, set Supabase Authentication URL Configuration to:
+
+```txt
+Site URL: https://pixelated-studio-edition.vercel.app
+Redirect URLs: https://pixelated-studio-edition.vercel.app/**
+```
+
+Signup confirmation and recovery links expire after 5 minutes. Unconfirmed
+accounts older than 72 hours are removed by
+`20260611153000_cleanup_stale_unconfirmed_users.sql`.
+
 Configure the Vercel project's Root Directory as `apps/web`.
 `apps/web/vercel.json` rewrites direct requests such as `/admin` and
 `/play/:id` to the React entry point so browser refreshes work with
