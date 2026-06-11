@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:0;background:#f6f3fa;font-family:Arial,sans-serif;color:#ffffff;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f3fa;padding:40px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#171126;border:1px solid #3c2d59;border-radius:16px;">
+            <tr>
+              <td style="padding:36px;">
+                <h1 style="margin:0;color:#ff4d8f;font-size:28px;">PIXELATED <span style="color:#ff9f43;">Studio</span></h1>
+                <h2 style="margin:28px 0 12px;font-size:22px;color:#ffffff;">Reset your password</h2>
+                <p style="margin:0 0 24px;color:#b9aecb;font-size:15px;line-height:1.6;">
+                  We received a password-reset request for <strong style="color:#ffffff;">{{ .Email }}</strong>. Use this link within 5 minutes to choose a new password.
+                </p>
+                <table role="presentation" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td style="border-radius:8px;background:#ff4d8f;">
+                      <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 24px;color:#160b16;text-decoration:none;font-size:15px;font-weight:bold;">Reset Password</a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:28px 0 8px;color:#81758f;font-size:12px;line-height:1.5;">
+                  If you did not request this reset, ignore this email. Your password will remain unchanged.
+                </p>
+                <p style="margin:0;color:#81758f;font-size:12px;line-height:1.5;word-break:break-all;">
+                  Button not working? <a href="{{ .ConfirmationURL }}" style="color:#ff9f43;">{{ .ConfirmationURL }}</a>
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin:18px 0 0;color:#665c73;font-size:12px;">Pixelated Studio</p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

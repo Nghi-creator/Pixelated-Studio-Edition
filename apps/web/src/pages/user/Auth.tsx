@@ -1,10 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, Gamepad2, Loader2, ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Gamepad2,
+  Loader2,
+  Lock,
+  Mail,
+} from "lucide-react";
 import { FaGithub, FaGoogle } from "react-icons/fa";
 import { supabase } from "../../lib/supabaseClient";
 import { getPublicAppUrl } from "../../lib/appUrl";
 import { api } from "../../lib/apiClient";
+import {
+  getPasswordPolicyError,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_POLICY_HINT,
+} from "../../lib/passwordPolicy";
 
 const providerLabels: Record<string, string> = {
   email: "email and password",
@@ -22,6 +35,14 @@ const formatProviders = (providers: string[]) => {
   return `${labels.slice(0, -1).join(", ")} or ${labels[labels.length - 1]}`;
 };
 
+const getAuthErrorMessage = (error: Error) => {
+  if (error.message.toLowerCase().includes("email rate limit exceeded")) {
+    return "Supabase's email limit has been reached. Wait before requesting another verification email.";
+  }
+
+  return error.message;
+};
+
 export default function Auth() {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
@@ -29,8 +50,24 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [verificationPendingEmail, setVerificationPendingEmail] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resendLoading, setResendLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+
+    const timeout = window.setTimeout(
+      () => setResendCooldown((seconds) => Math.max(0, seconds - 1)),
+      1_000,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [resendCooldown]);
 
   const handleEmailAuth = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -47,6 +84,15 @@ export default function Auth() {
         if (error) throw error;
         navigate("/");
       } else {
+        const passwordPolicyError = getPasswordPolicyError(password);
+        if (passwordPolicyError) {
+          throw new Error(passwordPolicyError);
+        }
+
+        if (password !== confirmPassword) {
+          throw new Error("Passwords do not match.");
+        }
+
         const accountMethods = await api.accountMethods(email);
         if (accountMethods.exists && !accountMethods.hasEmailProvider) {
           throw new Error(
@@ -67,16 +113,48 @@ export default function Auth() {
           },
         });
         if (error) throw error;
-        setMessage("Success! Check your email to verify your account.");
+        setVerificationPendingEmail(email);
+        setResendCooldown(60);
+        setMessage(
+          "Account created. Check your email within 5 minutes to verify it.",
+        );
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message);
+        setError(getAuthErrorMessage(err));
       } else {
         setError("An unexpected error occurred.");
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    if (!verificationPendingEmail || resendCooldown > 0) return;
+
+    setResendLoading(true);
+    setError(null);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: verificationPendingEmail,
+        options: {
+          emailRedirectTo: getPublicAppUrl(),
+        },
+      });
+      if (error) throw error;
+
+      setResendCooldown(60);
+      setMessage("A fresh verification email was sent. It expires in 5 minutes.");
+    } catch (err: unknown) {
+      setError(
+        err instanceof Error
+          ? getAuthErrorMessage(err)
+          : "Failed to resend the verification email.",
+      );
+    } finally {
+      setResendLoading(false);
     }
   };
 
@@ -101,7 +179,7 @@ export default function Auth() {
       setMessage("Password reset link sent! Check your email.");
     } catch (err: unknown) {
       if (err instanceof Error) {
-        setError(err.message);
+        setError(getAuthErrorMessage(err));
       } else {
         setError("Failed to send reset email.");
       }
@@ -122,7 +200,7 @@ export default function Auth() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-synth-surface/85 backdrop-blur-xl border border-synth-border rounded-2xl shadow-glow-card p-8 ring-1 ring-synth-primary/10">
+      <div className="w-full max-w-xl bg-synth-surface/85 backdrop-blur-xl border border-synth-border rounded-2xl shadow-glow-card p-8 ring-1 ring-synth-primary/10">
         <div className="text-center mb-8">
           <Gamepad2 className="w-12 h-12 text-synth-primary mx-auto mb-4 drop-shadow-[0_0_16px_rgba(255,77,143,0.5)]" />
           <h2 className="text-3xl font-bold text-white mb-2">
@@ -148,8 +226,21 @@ export default function Auth() {
         )}
 
         {message && (
-          <div className="bg-green-500/10 border border-green-500/50 text-green-400 px-4 py-3 rounded-lg mb-6 text-sm text-center">
-            {message}
+          <div className="mb-6 rounded-lg border border-green-500/50 bg-green-500/10 px-4 py-3 text-center text-sm text-green-400">
+            <p>{message}</p>
+            {verificationPendingEmail && (
+              <button
+                className="mt-3 inline-flex items-center justify-center gap-2 rounded-md border border-green-400/40 bg-green-400/10 px-3 py-2 font-semibold text-green-200 transition-colors hover:bg-green-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={resendLoading || resendCooldown > 0}
+                onClick={() => void handleResendConfirmation()}
+                type="button"
+              >
+                {resendLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+                {resendCooldown > 0
+                  ? `Resend available in ${resendCooldown}s`
+                  : "Resend verification email"}
+              </button>
+            )}
           </div>
         )}
 
@@ -211,14 +302,75 @@ export default function Auth() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+                  minLength={isLogin ? undefined : PASSWORD_MIN_LENGTH}
+                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-11 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
                   required
                 />
+                <button
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-gray-500 transition-colors hover:text-white"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  type="button"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
+
+              {!isLogin && (
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    minLength={PASSWORD_MIN_LENGTH}
+                    onCopy={(e) => e.preventDefault()}
+                    onCut={(e) => e.preventDefault()}
+                    onPaste={(e) => e.preventDefault()}
+                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-11 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+                    required
+                  />
+                  <button
+                    aria-label={
+                      showConfirmPassword
+                        ? "Hide confirmed password"
+                        : "Show confirmed password"
+                    }
+                    className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-gray-500 transition-colors hover:text-white"
+                    onClick={() =>
+                      setShowConfirmPassword((visible) => !visible)
+                    }
+                    title={
+                      showConfirmPassword
+                        ? "Hide confirmed password"
+                        : "Show confirmed password"
+                    }
+                    type="button"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {!isLogin && (
+                <p className="-mt-2 text-xs leading-5 text-gray-400">
+                  {PASSWORD_POLICY_HINT}
+                </p>
+              )}
 
               {/* Forgot Password Link (Only shows on Login) */}
               {isLogin && (
@@ -283,6 +435,8 @@ export default function Auth() {
                 type="button"
                 onClick={() => {
                   setIsLogin(!isLogin);
+                  setConfirmPassword("");
+                  setShowConfirmPassword(false);
                   setError(null);
                   setMessage(null);
                 }}

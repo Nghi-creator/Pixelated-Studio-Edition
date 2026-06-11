@@ -2,6 +2,11 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock, Gamepad2, Loader2, CheckCircle2 } from "lucide-react";
 import { supabase } from "../../lib/supabaseClient";
+import {
+  getPasswordPolicyError,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_POLICY_HINT,
+} from "../../lib/passwordPolicy";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -58,8 +63,9 @@ export default function ResetPassword() {
       return;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters.");
+    const passwordPolicyError = getPasswordPolicyError(password);
+    if (passwordPolicyError) {
+      setError(passwordPolicyError);
       setLoading(false);
       return;
     }
@@ -128,10 +134,15 @@ export default function ResetPassword() {
               placeholder="New Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              minLength={PASSWORD_MIN_LENGTH}
               className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
               required
             />
           </div>
+
+          <p className="-mt-2 text-xs leading-5 text-gray-400">
+            {PASSWORD_POLICY_HINT}
+          </p>
 
           <div className="relative">
             <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
@@ -140,6 +151,7 @@ export default function ResetPassword() {
               placeholder="Confirm New Password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
+              minLength={PASSWORD_MIN_LENGTH}
               className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
               required
             />
