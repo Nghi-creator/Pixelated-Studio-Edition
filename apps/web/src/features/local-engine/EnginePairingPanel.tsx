@@ -18,6 +18,7 @@ import {
   clearEngineToken,
   createCompanionEngineToken,
   ENGINE_PAIRING_EVENT,
+  getCompanionAccessToken,
   getEngineToken,
   setEngineToken,
 } from "../../lib/engineAuth";
@@ -151,9 +152,6 @@ const getScopeDescription = (scope: EngineUrlScope) => {
 
 const isLikelyCompanionUrl = (url: URL) =>
   url.protocol === "https:" && url.port === "8090";
-
-const getStoredCompanionAccessToken = (token: string) =>
-  token.startsWith("companion:") ? token.slice("companion:".length) : "";
 
 const getInviteFailureMessage = (status: number, code?: string) => {
   if (status === 401) return "That invite code was not accepted by the host.";
@@ -489,9 +487,8 @@ export function EnginePairingPanel({
         engineUrlEndpoint(normalizedUrl, "/local-games"),
         {
           headers: {
-            "X-Engine-Token": joiningWithInvite
-              ? getStoredCompanionAccessToken(normalizedToken)
-              : normalizedToken,
+            "X-Engine-Token":
+              getCompanionAccessToken(normalizedToken) || normalizedToken,
             "X-User-Id": "pairing-check",
           },
         },

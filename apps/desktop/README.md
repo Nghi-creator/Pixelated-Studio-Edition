@@ -87,7 +87,9 @@ PIXELATED_ALLOWED_ORIGINS=https://pixelated-studio-edition.vercel.app,http://loc
 ```
 
 `Launch Web` opens the hosted Vercel app and securely redeems a one-time pairing
-ticket through the local HTTPS companion. Override the hosted target when needed:
+ticket through the local HTTPS companion. Signed-in launches also register the
+non-secret companion URL with the API so a later browser visit can restore the
+pairing target. Override the hosted target when needed:
 
 ```bash
 PIXELATED_WEB_URL=https://pixelated-studio-edition.vercel.app

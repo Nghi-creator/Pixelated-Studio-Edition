@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { api } from "./apiClient";
 import { createCompanionEngineToken, setEngineToken } from "./engineAuth";
 import { setEngineUrl } from "./engineConfig";
 
@@ -33,6 +34,15 @@ export function useDesktopLaunchPairing() {
         url.searchParams.delete("companionUrl");
         url.searchParams.delete("launchTicket");
         window.history.replaceState({}, "", url);
+
+        try {
+          await api.pairLocalEngine(companionUrl);
+        } catch (error) {
+          console.warn(
+            "Desktop launch pairing registration v1 failed after local redemption.",
+            error,
+          );
+        }
       } catch (error) {
         console.error(
           "Desktop launch pairing could not reach the companion.",

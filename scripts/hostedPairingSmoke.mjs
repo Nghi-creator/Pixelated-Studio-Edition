@@ -33,6 +33,8 @@ const password =
   process.env.HOSTED_SMOKE_PASSWORD || process.env.STAGING_SMOKE_PASSWORD;
 const companionUrl = "https://localhost:8090";
 const engineToken = `hosted-smoke-engine-${Date.now()}`;
+const hostedPairingBuildMarker =
+  "Desktop launch pairing registration v1 failed after local redemption.";
 const hostedPublishTimeoutMs = Number(
   process.env.HOSTED_SMOKE_PUBLISH_TIMEOUT_MS || 10 * 60 * 1000,
 );
@@ -100,7 +102,7 @@ async function hostedWebHasLaunchPairing() {
 
   for (const script of scripts) {
     const asset = await fetch(script, { cache: "no-store" });
-    if (asset.ok && (await asset.text()).includes("/launch/redeem")) {
+    if (asset.ok && (await asset.text()).includes(hostedPairingBuildMarker)) {
       return true;
     }
   }
@@ -114,7 +116,7 @@ async function waitForHostedWebPairingBundle() {
   while (Date.now() < deadline) {
     try {
       if (await hostedWebHasLaunchPairing()) return;
-      lastError = "production JavaScript does not contain /launch/redeem yet";
+      lastError = `production JavaScript does not contain ${hostedPairingBuildMarker} yet`;
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
     }
@@ -122,7 +124,7 @@ async function waitForHostedWebPairingBundle() {
   }
 
   throw new Error(
-    `Vercel did not publish the one-click pairing bundle within ${hostedPublishTimeoutMs}ms: ${lastError}`,
+    `Vercel did not publish the signed-in one-click pairing bundle within ${hostedPublishTimeoutMs}ms: ${lastError}`,
   );
 }
 
@@ -242,6 +244,29 @@ async function restorePreviousPairing() {
   });
 }
 
+async function waitForRenderPairingRegistration() {
+  const deadline = Date.now() + 30_000;
+  let lastPayload = null;
+
+  while (Date.now() < deadline) {
+    lastPayload = await apiRequest("/local-pairings/current", {
+      expected: [200, 404],
+    });
+    if (lastPayload?.pairing?.engineUrl === companionUrl) return lastPayload;
+    await delay(1_000);
+  }
+
+  const pairingRequests = browserNetwork.filter((entry) =>
+    entry.url.includes("/local-pairings"),
+  );
+  const pairingFailures = browserRequestFailures.filter((entry) =>
+    entry.url.includes("/local-pairings"),
+  );
+  throw new Error(
+    `Render did not persist the one-click pairing. last=${JSON.stringify(lastPayload)} responses=${JSON.stringify(pairingRequests)} failures=${JSON.stringify(pairingFailures)}`,
+  );
+}
+
 async function cleanup() {
   if (createdSessionId && bearerToken) {
     await apiRequest(`/sessions/${createdSessionId}`, {
@@ -249,8 +274,8 @@ async function cleanup() {
       method: "DELETE",
     }).catch(() => undefined);
   }
-  await restorePreviousPairing().catch(() => undefined);
   await browser?.close().catch(() => undefined);
+  await restorePreviousPairing().catch(() => undefined);
   companion?.stopCompanionServer();
   if (engineServer) {
     await new Promise((resolve) => engineServer.close(resolve));
@@ -367,7 +392,7 @@ async function main() {
     expected: [200, 404],
   }).then((payload) => payload?.pairing || null);
 
-  await step("redeem desktop launch ticket on hosted /engine", async () => {
+  await step("redeem and register desktop launch on hosted /engine", async () => {
     const launchTicket = companion.createCompanionLaunchTicket();
     const launchUrl = new URL("/engine", webUrl);
     launchUrl.searchParams.set("companionUrl", companionUrl);
@@ -420,23 +445,8 @@ async function main() {
     });
   });
 
-  await step("register signed-in local pairing through hosted UI", async () => {
-    const [pairingResponse] = await Promise.all([
-      page.waitForResponse(
-        (response) =>
-          response.request().method() === "POST" &&
-          response.url() === `${apiUrl}/local-pairings`,
-        { timeout: 20_000 },
-      ),
-      page.getByRole("button", { name: /^(Pair|Update)$/ }).click(),
-    ]);
-    if (pairingResponse.status() !== 200) {
-      throw new Error(
-        `Hosted UI pairing registration returned ${pairingResponse.status()}: ${await pairingResponse.text()}`,
-      );
-    }
-    const saved = await apiRequest("/local-pairings/current");
-    assert.equal(saved.pairing?.engineUrl, companionUrl);
+  await step("verify signed-in Render pairing registration", async () => {
+    await waitForRenderPairingRegistration();
     await page.screenshot({
       fullPage: true,
       path: path.join(runDir, "02-render-pairing-registered.png"),
