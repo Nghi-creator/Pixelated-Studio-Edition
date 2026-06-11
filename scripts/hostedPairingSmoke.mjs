@@ -421,12 +421,26 @@ async function main() {
   });
 
   await step("register signed-in local pairing through hosted UI", async () => {
-    await page.getByRole("button", { name: /^(Pair|Update)$/ }).click();
-    await page.getByText("Local engine paired.", { exact: true }).waitFor({
-      timeout: 20_000,
-    });
+    const [pairingResponse] = await Promise.all([
+      page.waitForResponse(
+        (response) =>
+          response.request().method() === "POST" &&
+          response.url() === `${apiUrl}/local-pairings`,
+        { timeout: 20_000 },
+      ),
+      page.getByRole("button", { name: /^(Pair|Update)$/ }).click(),
+    ]);
+    if (pairingResponse.status() !== 200) {
+      throw new Error(
+        `Hosted UI pairing registration returned ${pairingResponse.status()}: ${await pairingResponse.text()}`,
+      );
+    }
     const saved = await apiRequest("/local-pairings/current");
     assert.equal(saved.pairing?.engineUrl, companionUrl);
+    await page.screenshot({
+      fullPage: true,
+      path: path.join(runDir, "02-render-pairing-registered.png"),
+    });
   });
 
   await step("restore paired companion URL from Render metadata", async () => {
@@ -448,7 +462,7 @@ async function main() {
     assert.equal(await engineUrlInput.inputValue(), companionUrl);
     await page.screenshot({
       fullPage: true,
-      path: path.join(runDir, "02-render-pairing-restored.png"),
+      path: path.join(runDir, "03-render-pairing-restored.png"),
     });
   });
 
