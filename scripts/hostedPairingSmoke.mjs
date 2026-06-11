@@ -33,6 +33,9 @@ const password =
   process.env.HOSTED_SMOKE_PASSWORD || process.env.STAGING_SMOKE_PASSWORD;
 const companionUrl = "https://localhost:8090";
 const engineToken = `hosted-smoke-engine-${Date.now()}`;
+const hostedPublishTimeoutMs = Number(
+  process.env.HOSTED_SMOKE_PUBLISH_TIMEOUT_MS || 10 * 60 * 1000,
+);
 const runId = `hosted-pairing-${new Date().toISOString().replaceAll(":", "-")}`;
 const runDir = path.resolve(
   process.env.HOSTED_SMOKE_ARTIFACT_DIR ||
@@ -44,6 +47,7 @@ const certDir = path.join(os.tmpdir(), runId);
 const steps = [];
 const browserConsole = [];
 const browserNetwork = [];
+const browserRequestFailures = [];
 let browser;
 let context;
 let page;
@@ -82,8 +86,68 @@ function writeJson(file, value) {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function hostedWebHasLaunchPairing() {
+  const response = await fetch(`${webUrl}/engine`, { cache: "no-store" });
+  if (!response.ok) return false;
+  const html = await response.text();
+  const scripts = Array.from(html.matchAll(/<script[^>]+src="([^"]+)"/g)).map(
+    ([, source]) => new URL(source, webUrl).toString(),
+  );
+
+  for (const script of scripts) {
+    const asset = await fetch(script, { cache: "no-store" });
+    if (asset.ok && (await asset.text()).includes("/launch/redeem")) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function waitForHostedWebPairingBundle() {
+  const deadline = Date.now() + hostedPublishTimeoutMs;
+  let lastError = "";
+
+  while (Date.now() < deadline) {
+    try {
+      if (await hostedWebHasLaunchPairing()) return;
+      lastError = "production JavaScript does not contain /launch/redeem yet";
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await delay(15_000);
+  }
+
+  throw new Error(
+    `Vercel did not publish the one-click pairing bundle within ${hostedPublishTimeoutMs}ms: ${lastError}`,
+  );
+}
+
 function startEngineProbe() {
   engineServer = http.createServer((request, response) => {
+    const origin = request.headers.origin;
+    if (origin === new URL(webUrl).origin) {
+      response.setHeader("access-control-allow-origin", origin);
+      response.setHeader(
+        "access-control-allow-headers",
+        "content-type,x-engine-token,x-user-id",
+      );
+      response.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
+      if (request.headers["access-control-request-private-network"] === "true") {
+        response.setHeader("access-control-allow-private-network", "true");
+      }
+      response.setHeader("vary", "Origin");
+    }
+
+    if (request.method === "OPTIONS") {
+      response.writeHead(204);
+      response.end();
+      return;
+    }
+
     if (request.url?.startsWith("/health")) {
       response.writeHead(200, { "content-type": "application/json" });
       response.end(
@@ -199,6 +263,8 @@ async function main() {
   required(email, "HOSTED_SMOKE_EMAIL");
   required(password, "HOSTED_SMOKE_PASSWORD");
 
+  await step("wait for Vercel one-click pairing bundle", waitForHostedWebPairingBundle);
+
   await step("load compiled desktop companion", async () => {
     const modulePath = path.join(
       rootDir,
@@ -222,8 +288,6 @@ async function main() {
       port: 8090,
     }),
   );
-  const launchTicket = companion.createCompanionLaunchTicket();
-
   browser = await chromium.launch({ headless: true });
   context = await browser.newContext({
     ignoreHTTPSErrors: true,
@@ -246,6 +310,13 @@ async function main() {
       url: response.url().replace(/[?&]launchTicket=[^&]+/, ""),
     });
   });
+  page.on("requestfailed", (request) => {
+    browserRequestFailures.push({
+      error: request.failure()?.errorText || "unknown request failure",
+      method: request.method(),
+      url: request.url().replace(/[?&]launchTicket=[^&]+/, ""),
+    });
+  });
 
   await step("sign in through hosted Vercel UI", async () => {
     await page.goto(`${webUrl}/login`, { waitUntil: "domcontentloaded" });
@@ -259,22 +330,80 @@ async function main() {
     assert.equal(typeof me.user?.id, "string");
   });
 
+  await step("verify hosted browser can reach desktop companion", async () => {
+    const probeTicket = companion.createCompanionLaunchTicket();
+    const probe = await page.evaluate(
+      async ({ companionUrl: target, ticket }) => {
+        try {
+          const response = await fetch(`${target}/launch/redeem`, {
+            body: JSON.stringify({ ticket }),
+            headers: { "content-type": "application/json" },
+            method: "POST",
+          });
+          return {
+            ok: response.ok,
+            payload: await response.json().catch(() => null),
+            status: response.status,
+          };
+        } catch (error) {
+          return {
+            error: error instanceof Error ? error.message : String(error),
+            ok: false,
+            status: 0,
+          };
+        }
+      },
+      { companionUrl, ticket: probeTicket },
+    );
+    assert.equal(
+      probe.ok,
+      true,
+      `Hosted browser could not redeem a companion probe ticket: ${JSON.stringify(probe)}`,
+    );
+    assert.equal(typeof probe.payload?.companionToken, "string");
+  });
+
   previousPairing = await apiRequest("/local-pairings/current", {
     expected: [200, 404],
   }).then((payload) => payload?.pairing || null);
 
   await step("redeem desktop launch ticket on hosted /engine", async () => {
+    const launchTicket = companion.createCompanionLaunchTicket();
     const launchUrl = new URL("/engine", webUrl);
     launchUrl.searchParams.set("companionUrl", companionUrl);
     launchUrl.searchParams.set("launchTicket", launchTicket);
     await page.goto(launchUrl.toString(), { waitUntil: "domcontentloaded" });
-    await page.waitForFunction(
-      () =>
+    try {
+      await page.waitForFunction(
+        () =>
+          window.localStorage
+            .getItem("pixelated_engine_token")
+            ?.startsWith("companion:"),
+        null,
+        { timeout: 20_000 },
+      );
+    } catch {
+      const launchRequests = browserNetwork.filter((entry) =>
+        entry.url.includes("/launch/redeem"),
+      );
+      const launchFailures = browserRequestFailures.filter((entry) =>
+        entry.url.includes("/launch/redeem"),
+      );
+      throw new Error(
+        launchRequests.length === 0 && launchFailures.length === 0
+          ? "The deployed /engine app did not request /launch/redeem. Vercel may still be serving a frontend bundle from before one-click pairing."
+          : `The deployed /engine launch redemption did not save a companion token. responses=${JSON.stringify(launchRequests)} failures=${JSON.stringify(launchFailures)}`,
+      );
+    }
+    await delay(2_500);
+    assert.equal(
+      await page.evaluate(() =>
         window.localStorage
           .getItem("pixelated_engine_token")
           ?.startsWith("companion:"),
-      null,
-      { timeout: 20_000 },
+      ),
+      true,
+      "The connection monitor cleared the redeemed companion token.",
     );
     await page.waitForFunction(
       () => !window.location.search.includes("launchTicket"),
@@ -361,6 +490,10 @@ try {
   await cleanup();
   writeJson(path.join(runDir, "browser-console.json"), browserConsole);
   writeJson(path.join(runDir, "browser-network.json"), browserNetwork);
+  writeJson(
+    path.join(runDir, "browser-request-failures.json"),
+    browserRequestFailures,
+  );
   writeJson(reportPath, {
     apiUrl,
     failure: failure?.message || null,

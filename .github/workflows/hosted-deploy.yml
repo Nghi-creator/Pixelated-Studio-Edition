@@ -103,9 +103,6 @@ jobs:
       - name: Build desktop companion
         run: npm run build --prefix apps/desktop
 
-      - name: Allow provider deploys to publish
-        run: sleep 180
-
       - name: Run signed-in hosted pairing smoke
         run: npm run smoke:hosted-pairing
 

@@ -14,19 +14,31 @@ export function useDesktopLaunchPairing() {
     if (!launchTicket || !companionUrl) return;
 
     const pairFromDesktop = async () => {
-      const response = await fetch(`${companionUrl}/launch/redeem`, {
-        body: JSON.stringify({ ticket: launchTicket }),
-        headers: { "content-type": "application/json" },
-        method: "POST",
-      });
-      const payload = (await response.json()) as LaunchRedemption;
-      if (!response.ok || !payload.companionToken) return;
+      try {
+        const response = await fetch(`${companionUrl}/launch/redeem`, {
+          body: JSON.stringify({ ticket: launchTicket }),
+          headers: { "content-type": "application/json" },
+          method: "POST",
+        });
+        const payload = (await response.json()) as LaunchRedemption;
+        if (!response.ok || !payload.companionToken) {
+          console.error(
+            `Desktop launch pairing failed with status ${response.status}.`,
+          );
+          return;
+        }
 
-      setEngineUrl(companionUrl);
-      setEngineToken(createCompanionEngineToken(payload.companionToken));
-      url.searchParams.delete("companionUrl");
-      url.searchParams.delete("launchTicket");
-      window.history.replaceState({}, "", url);
+        setEngineUrl(companionUrl);
+        setEngineToken(createCompanionEngineToken(payload.companionToken));
+        url.searchParams.delete("companionUrl");
+        url.searchParams.delete("launchTicket");
+        window.history.replaceState({}, "", url);
+      } catch (error) {
+        console.error(
+          "Desktop launch pairing could not reach the companion.",
+          error,
+        );
+      }
     };
 
     void pairFromDesktop();
