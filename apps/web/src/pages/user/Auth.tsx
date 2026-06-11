@@ -13,6 +13,11 @@ import { FaGithub, FaGoogle } from "react-icons/fa";
 import { supabase } from "../../lib/supabaseClient";
 import { getPublicAppUrl } from "../../lib/appUrl";
 import { api } from "../../lib/apiClient";
+import {
+  getPasswordPolicyError,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_POLICY_HINT,
+} from "../../lib/passwordPolicy";
 
 const providerLabels: Record<string, string> = {
   email: "email and password",
@@ -58,6 +63,11 @@ export default function Auth() {
         if (error) throw error;
         navigate("/");
       } else {
+        const passwordPolicyError = getPasswordPolicyError(password);
+        if (passwordPolicyError) {
+          throw new Error(passwordPolicyError);
+        }
+
         if (password !== confirmPassword) {
           throw new Error("Passwords do not match.");
         }
@@ -230,6 +240,7 @@ export default function Auth() {
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  minLength={isLogin ? undefined : PASSWORD_MIN_LENGTH}
                   className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-11 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
                   required
                 />
@@ -249,6 +260,12 @@ export default function Auth() {
               </div>
 
               {!isLogin && (
+                <p className="-mt-2 text-xs leading-5 text-gray-400">
+                  {PASSWORD_POLICY_HINT}
+                </p>
+              )}
+
+              {!isLogin && (
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
                   <input
@@ -256,6 +273,7 @@ export default function Auth() {
                     placeholder="Confirm password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
+                    minLength={PASSWORD_MIN_LENGTH}
                     onCopy={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
