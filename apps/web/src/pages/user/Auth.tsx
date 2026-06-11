@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Mail, Lock, Gamepad2, Loader2, ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  Eye,
+  EyeOff,
+  Gamepad2,
+  Loader2,
+  Lock,
+  Mail,
+} from "lucide-react";
 import { FaGithub, FaGoogle } from "react-icons/fa";
 import { supabase } from "../../lib/supabaseClient";
 import { getPublicAppUrl } from "../../lib/appUrl";
@@ -29,6 +37,9 @@ export default function Auth() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -47,6 +58,10 @@ export default function Auth() {
         if (error) throw error;
         navigate("/");
       } else {
+        if (password !== confirmPassword) {
+          throw new Error("Passwords do not match.");
+        }
+
         const accountMethods = await api.accountMethods(email);
         if (accountMethods.exists && !accountMethods.hasEmailProvider) {
           throw new Error(
@@ -211,14 +226,67 @@ export default function Auth() {
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
                 <input
-                  type="password"
+                  type={showPassword ? "text" : "password"}
                   placeholder="Password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-11 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
                   required
                 />
+                <button
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-gray-500 transition-colors hover:text-white"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  title={showPassword ? "Hide password" : "Show password"}
+                  type="button"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
+
+              {!isLogin && (
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
+                  <input
+                    type={showConfirmPassword ? "text" : "password"}
+                    placeholder="Confirm password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    onCopy={(e) => e.preventDefault()}
+                    onCut={(e) => e.preventDefault()}
+                    onPaste={(e) => e.preventDefault()}
+                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-11 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+                    required
+                  />
+                  <button
+                    aria-label={
+                      showConfirmPassword
+                        ? "Hide confirmed password"
+                        : "Show confirmed password"
+                    }
+                    className="absolute right-2 top-1/2 inline-flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-gray-500 transition-colors hover:text-white"
+                    onClick={() =>
+                      setShowConfirmPassword((visible) => !visible)
+                    }
+                    title={
+                      showConfirmPassword
+                        ? "Hide confirmed password"
+                        : "Show confirmed password"
+                    }
+                    type="button"
+                  >
+                    {showConfirmPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
+              )}
 
               {/* Forgot Password Link (Only shows on Login) */}
               {isLogin && (
@@ -283,6 +351,8 @@ export default function Auth() {
                 type="button"
                 onClick={() => {
                   setIsLogin(!isLogin);
+                  setConfirmPassword("");
+                  setShowConfirmPassword(false);
                   setError(null);
                   setMessage(null);
                 }}
