@@ -8,7 +8,7 @@ if (process.argv.includes("--help")) {
   console.log(`Usage: npm run smoke:hosted-auth
 
 Required:
-  HOSTED_AUTH_SMOKE_EMAIL_DOMAIN
+  HOSTED_AUTH_SMOKE_EMAIL
   HOSTED_SUPABASE_URL
   HOSTED_SUPABASE_SERVICE_ROLE_KEY
 
@@ -25,7 +25,7 @@ const webUrl = normalizeUrl(
 );
 const supabaseUrl = normalizeUrl(process.env.HOSTED_SUPABASE_URL || "");
 const serviceRoleKey = process.env.HOSTED_SUPABASE_SERVICE_ROLE_KEY || "";
-const emailDomain = process.env.HOSTED_AUTH_SMOKE_EMAIL_DOMAIN || "";
+const email = process.env.HOSTED_AUTH_SMOKE_EMAIL || "";
 const expiryWaitMs = Number(
   process.env.HOSTED_AUTH_SMOKE_EXPIRY_WAIT_MS || 305_000,
 );
@@ -75,7 +75,10 @@ function writeJson(file, value) {
 }
 
 function smokeEmail(label) {
-  return `pixelated-auth-${label}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}@${emailDomain}`;
+  const at = email.lastIndexOf("@");
+  const local = email.slice(0, at).split("+", 1)[0];
+  const domain = email.slice(at + 1);
+  return `${local}+pixelated-auth-${label}-${Date.now()}-${crypto.randomBytes(3).toString("hex")}@${domain}`;
 }
 
 function smokePassword(label) {
@@ -359,8 +362,8 @@ async function rejectExpiredRecovery(email) {
 
 async function main() {
   fs.mkdirSync(runDir, { recursive: true });
-  required(emailDomain, "HOSTED_AUTH_SMOKE_EMAIL_DOMAIN");
-  assert.match(emailDomain, /^[A-Za-z0-9.-]+$/, "Invalid smoke email domain.");
+  required(email, "HOSTED_AUTH_SMOKE_EMAIL");
+  assert.match(email, /^[^@\s]+@[^@\s]+$/, "Invalid hosted auth smoke email.");
   required(supabaseUrl, "HOSTED_SUPABASE_URL");
   required(serviceRoleKey, "HOSTED_SUPABASE_SERVICE_ROLE_KEY");
 
@@ -406,7 +409,6 @@ try {
   await deleteSmokeUsers().catch(() => undefined);
   fs.mkdirSync(runDir, { recursive: true });
   writeJson(reportPath, {
-    emailDomain,
     expiryWaitMs,
     failure: failure?.message || null,
     finishedAt: new Date().toISOString(),

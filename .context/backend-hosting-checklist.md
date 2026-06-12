@@ -80,8 +80,6 @@ Configure a protected GitHub environment named `production` with:
   that contains the signed-in pairing bundle.
 - `HOSTED_SUPABASE_URL`: the production Supabase project URL used by the hosted
   auth regression smoke.
-- `HOSTED_AUTH_SMOKE_EMAIL_DOMAIN`: a domain accepted by the production SMTP
-  provider for disposable, unique smoke addresses.
 - `HOSTED_SUPABASE_SERVICE_ROLE_KEY`: a production environment secret used only
   by the hosted auth smoke to generate one-time confirmation/recovery action
   links and delete its throwaway users. Never expose it to Vercel.
@@ -275,7 +273,9 @@ through the public hosted UI and SMTP path. The smoke deletes every throwaway
 user in cleanup and uploads `.context/hosted-auth-smoke/` even on failure.
 Production SMTP and Supabase Auth rate limits must allow at least two messages
 per deploy run, one signup confirmation and one resend, and the configured
-smoke domain must accept those messages without creating a retained mailbox.
+`HOSTED_SMOKE_EMAIL` inbox must support plus addressing. The smoke derives
+unique addresses such as `account+pixelated-auth-pending-...@example.com` from
+that existing secret, so no owned email domain or additional inbox is required.
 
 Run it locally with:
 
@@ -283,7 +283,7 @@ Run it locally with:
 HOSTED_WEB_URL=https://pixelated-studio-edition.vercel.app \
 HOSTED_SUPABASE_URL=<production-supabase-url> \
 HOSTED_SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
-HOSTED_AUTH_SMOKE_EMAIL_DOMAIN=<accepted-disposable-domain> \
+HOSTED_AUTH_SMOKE_EMAIL=<plus-address-capable-inbox> \
 npm run smoke:hosted-auth
 ```
 
