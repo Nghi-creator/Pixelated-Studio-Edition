@@ -215,9 +215,11 @@ async function proveSignupAndResendCooldown(email, password) {
   await signupPage
     .getByRole("button", { name: "Don't have an account? Sign up" })
     .click();
-  await signupPage.getByPlaceholder("Email address").fill(email);
-  await signupPage.getByPlaceholder("Password").fill(password);
-  await signupPage.getByPlaceholder("Confirm password").fill(password);
+  await signupPage.getByPlaceholder("Email address", { exact: true }).fill(email);
+  await signupPage.getByPlaceholder("Password", { exact: true }).fill(password);
+  await signupPage
+    .getByPlaceholder("Confirm password", { exact: true })
+    .fill(password);
   await signupPage.getByRole("button", { name: "Sign Up", exact: true }).click();
   await signupPage
     .getByText("Account created. Check your email within 5 minutes to verify it.")
@@ -294,13 +296,21 @@ async function redeemRecovery(email, newPassword) {
       url.pathname === "/reset-password",
     { timeout: 30_000 },
   );
-  await recoveryPage.getByRole("heading", { name: "Create New Password" }).waitFor();
-  await recoveryPage.getByPlaceholder("New Password").fill(newPassword);
-  await recoveryPage.getByPlaceholder("Confirm New Password").fill(newPassword);
+  await recoveryPage
+    .getByRole("heading", { name: "Create New Password", exact: true })
+    .waitFor();
+  await recoveryPage
+    .getByPlaceholder("New Password", { exact: true })
+    .fill(newPassword);
+  await recoveryPage
+    .getByPlaceholder("Confirm New Password", { exact: true })
+    .fill(newPassword);
   await recoveryPage
     .getByRole("button", { name: "Update Password", exact: true })
     .click();
-  await recoveryPage.getByRole("heading", { name: "Password Updated" }).waitFor();
+  await recoveryPage
+    .getByRole("heading", { name: "Password Updated", exact: true })
+    .waitFor();
   await recoveryPage.screenshot({
     fullPage: true,
     path: path.join(runDir, "03-password-updated.png"),
@@ -308,8 +318,10 @@ async function redeemRecovery(email, newPassword) {
 
   const loginPage = await newPage();
   await loginPage.goto(`${webUrl}/login`, { waitUntil: "domcontentloaded" });
-  await loginPage.getByPlaceholder("Email address").fill(email);
-  await loginPage.getByPlaceholder("Password").fill(newPassword);
+  await loginPage.getByPlaceholder("Email address", { exact: true }).fill(email);
+  await loginPage
+    .getByPlaceholder("Password", { exact: true })
+    .fill(newPassword);
   await loginPage.getByRole("button", { name: "Sign In", exact: true }).click();
   await loginPage.waitForURL(
     (url) => url.origin === new URL(webUrl).origin && url.pathname === "/",
@@ -341,7 +353,7 @@ async function rejectExpiredRecovery(email) {
   await expiredRedirect;
   assert.equal(
     await expiredPage
-      .getByRole("heading", { name: "Create New Password" })
+      .getByRole("heading", { name: "Create New Password", exact: true })
       .isVisible()
       .catch(() => false),
     false,
