@@ -80,9 +80,9 @@ Configure a protected GitHub environment named `production` with:
   that contains the signed-in pairing bundle.
 - `HOSTED_SUPABASE_URL`: the production Supabase project URL used by the hosted
   auth regression smoke.
-- `HOSTED_SUPABASE_SERVICE_ROLE_KEY`: a production environment secret used only
-  by the hosted auth smoke to generate one-time confirmation/recovery action
-  links and delete its throwaway users. Never expose it to Vercel.
+- `SUPABASE_SERVICE_ROLE_KEY`: a production environment secret used only by the
+  hosted auth smoke to generate one-time confirmation/recovery action links and
+  delete its throwaway users. Never expose it to Vercel.
 
 Disable Render's Git-based auto-deploy in the API service dashboard.
 `apps/web/vercel.json` disables Vercel's automatic `main` deploy while leaving
@@ -282,7 +282,7 @@ Run it locally with:
 ```sh
 HOSTED_WEB_URL=https://pixelated-studio-edition.vercel.app \
 HOSTED_SUPABASE_URL=<production-supabase-url> \
-HOSTED_SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+HOSTED_SUPABASE_SERVICE_ROLE_KEY=<value-from-SUPABASE_SERVICE_ROLE_KEY> \
 HOSTED_AUTH_SMOKE_EMAIL=<plus-address-capable-inbox> \
 npm run smoke:hosted-auth
 ```

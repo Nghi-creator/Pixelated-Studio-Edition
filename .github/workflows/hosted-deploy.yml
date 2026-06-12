@@ -160,7 +160,7 @@ jobs:
     timeout-minutes: 20
     env:
       HOSTED_AUTH_SMOKE_EMAIL: ${{ secrets.HOSTED_SMOKE_EMAIL }}
-      HOSTED_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HOSTED_SUPABASE_SERVICE_ROLE_KEY }}
+      HOSTED_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
       HOSTED_SUPABASE_URL: ${{ vars.HOSTED_SUPABASE_URL }}
       HOSTED_WEB_URL: ${{ vars.HOSTED_WEB_URL }}
     steps:
@@ -184,7 +184,7 @@ jobs:
             exit 1
           }
           test -n "$HOSTED_SUPABASE_SERVICE_ROLE_KEY" || {
-            echo "::error::Missing production environment secret HOSTED_SUPABASE_SERVICE_ROLE_KEY."
+            echo "::error::Missing production environment secret SUPABASE_SERVICE_ROLE_KEY."
             exit 1
           }
 
