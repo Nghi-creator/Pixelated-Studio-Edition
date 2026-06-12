@@ -87,11 +87,15 @@ npm run predeploy:hosted
 GitHub Actions runs local API contract checks on pull requests. On `main`
 pushes, `.github/workflows/hosted-deploy.yml` calls the reusable hosted gate and
 only triggers the Render API and Vercel web deploy hooks after the real hosted
-predeploy checks pass. After both hooks run, it signs into the deployed Vercel
-app, redeems a one-use ticket through the real desktop HTTPS companion, checks
-Render pairing restore and cloud-session verification, and uploads the smoke
-artifact bundle. See `.context/backend-hosting-checklist.md` for the required
-staging and production environment secrets and provider setup.
+predeploy checks pass. After both hooks run, it waits for a new ready Render API
+process and a new Vercel production pairing bundle, then signs in, redeems a
+one-use ticket through the real desktop HTTPS companion, checks Render pairing
+restore and cloud-session verification, and uploads the smoke artifact bundle.
+It then runs a focused hosted auth regression against throwaway users to prove
+signup verification, resend cooldown, recovery redirects, password update, and
+the five-minute expired-link rejection. See
+`.context/backend-hosting-checklist.md` for the required staging and production
+environment secrets and provider setup.
 
 ## Pixelated Studio web app's features
 

@@ -26,15 +26,29 @@ jobs:
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      baseline_started_at_seconds: ${{ steps.baseline.outputs.started_at_seconds }}
     env:
+      HOSTED_API_URL: ${{ vars.HOSTED_API_URL }}
       RENDER_API_DEPLOY_HOOK_URL: ${{ secrets.RENDER_API_DEPLOY_HOOK_URL }}
     steps:
-      - name: Require Render deploy hook
+      - name: Require Render deploy configuration
         run: |
           test -n "$RENDER_API_DEPLOY_HOOK_URL" || {
             echo "::error::Missing production environment secret RENDER_API_DEPLOY_HOOK_URL."
             exit 1
           }
+          test -n "$HOSTED_API_URL" || {
+            echo "::error::Missing production environment variable HOSTED_API_URL."
+            exit 1
+          }
+
+      - name: Capture current Render API process
+        id: baseline
+        run: |
+          health="$(curl --fail-with-body --silent --show-error "$HOSTED_API_URL/health")"
+          uptime="$(jq --exit-status '.uptimeSeconds | numbers' <<<"$health")"
+          echo "started_at_seconds=$(($(date +%s) - uptime))" >> "$GITHUB_OUTPUT"
 
       - name: Trigger Render API deploy
         run: curl --fail-with-body --request POST "$RENDER_API_DEPLOY_HOOK_URL"
@@ -45,15 +59,28 @@ jobs:
     environment: production
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      baseline_html_sha256: ${{ steps.baseline.outputs.html_sha256 }}
     env:
+      HOSTED_WEB_URL: ${{ vars.HOSTED_WEB_URL }}
       VERCEL_WEB_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_WEB_DEPLOY_HOOK_URL }}
     steps:
-      - name: Require Vercel deploy hook
+      - name: Require Vercel deploy configuration
         run: |
           test -n "$VERCEL_WEB_DEPLOY_HOOK_URL" || {
             echo "::error::Missing production environment secret VERCEL_WEB_DEPLOY_HOOK_URL."
             exit 1
           }
+          test -n "$HOSTED_WEB_URL" || {
+            echo "::error::Missing production environment variable HOSTED_WEB_URL."
+            exit 1
+          }
+
+      - name: Capture current Vercel production build
+        id: baseline
+        run: |
+          curl --fail-with-body --silent --show-error "$HOSTED_WEB_URL/engine" --output current-engine.html
+          echo "html_sha256=$(sha256sum current-engine.html | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
 
       - name: Trigger Vercel web deploy
         run: curl --fail-with-body --request POST "$VERCEL_WEB_DEPLOY_HOOK_URL"
@@ -68,8 +95,10 @@ jobs:
     timeout-minutes: 20
     env:
       HOSTED_API_URL: ${{ vars.HOSTED_API_URL }}
+      HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS: ${{ needs.deploy-render-api.outputs.baseline_started_at_seconds }}
       HOSTED_SMOKE_EMAIL: ${{ secrets.HOSTED_SMOKE_EMAIL }}
       HOSTED_SMOKE_PASSWORD: ${{ secrets.HOSTED_SMOKE_PASSWORD }}
+      HOSTED_SMOKE_VERCEL_BASELINE_HTML_SHA256: ${{ needs.deploy-vercel-web.outputs.baseline_html_sha256 }}
       HOSTED_WEB_URL: ${{ vars.HOSTED_WEB_URL }}
     steps:
       - name: Check out repository
@@ -89,6 +118,14 @@ jobs:
           }
           test -n "$HOSTED_SMOKE_PASSWORD" || {
             echo "::error::Missing production environment secret HOSTED_SMOKE_PASSWORD."
+            exit 1
+          }
+          test -n "$HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS" || {
+            echo "::error::Missing Render API pre-deploy baseline."
+            exit 1
+          }
+          test -n "$HOSTED_SMOKE_VERCEL_BASELINE_HTML_SHA256" || {
+            echo "::error::Missing Vercel web pre-deploy baseline."
             exit 1
           }
 
@@ -113,4 +150,58 @@ jobs:
           if-no-files-found: warn
           name: hosted-pairing-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           path: .context/hosted-pairing-smoke/
+          retention-days: 14
+
+  hosted-auth-smoke:
+    name: Hosted auth regression smoke
+    needs: hosted-pairing-smoke
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HOSTED_AUTH_SMOKE_EMAIL: ${{ secrets.HOSTED_SMOKE_EMAIL }}
+      HOSTED_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HOSTED_SUPABASE_SERVICE_ROLE_KEY }}
+      HOSTED_SUPABASE_URL: ${{ vars.HOSTED_SUPABASE_URL }}
+      HOSTED_WEB_URL: ${{ vars.HOSTED_WEB_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 22
+
+      - name: Require hosted auth smoke configuration
+        run: |
+          test -n "$HOSTED_AUTH_SMOKE_EMAIL" || {
+            echo "::error::Missing production environment secret HOSTED_SMOKE_EMAIL."
+            exit 1
+          }
+          test -n "$HOSTED_SUPABASE_URL" || {
+            echo "::error::Missing production environment variable HOSTED_SUPABASE_URL."
+            exit 1
+          }
+          test -n "$HOSTED_SUPABASE_SERVICE_ROLE_KEY" || {
+            echo "::error::Missing production environment secret HOSTED_SUPABASE_SERVICE_ROLE_KEY."
+            exit 1
+          }
+
+      - name: Install auth smoke dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run hosted auth regression smoke
+        run: npm run smoke:hosted-auth
+
+      - name: Upload hosted auth smoke bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: warn
+          name: hosted-auth-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .context/hosted-auth-smoke/
           retention-days: 14

@@ -72,6 +72,17 @@ Configure a protected GitHub environment named `production` with:
   service.
 - `VERCEL_WEB_DEPLOY_HOOK_URL`: the deploy hook for the existing Vercel web
   project.
+- `HOSTED_API_URL`: the production Render API origin. The workflow reads
+  `/health` before the deploy and waits for a newer process that also passes
+  `/ready`.
+- `HOSTED_WEB_URL`: the production Vercel origin. The workflow fingerprints
+  `/engine` before the deploy and waits for a different production HTML build
+  that contains the signed-in pairing bundle.
+- `HOSTED_SUPABASE_URL`: the production Supabase project URL used by the hosted
+  auth regression smoke.
+- `HOSTED_SUPABASE_SERVICE_ROLE_KEY`: a production environment secret used only
+  by the hosted auth smoke to generate one-time confirmation/recovery action
+  links and delete its throwaway users. Never expose it to Vercel.
 
 Disable Render's Git-based auto-deploy in the API service dashboard.
 `apps/web/vercel.json` disables Vercel's automatic `main` deploy while leaving
@@ -204,14 +215,26 @@ HOSTED_API_URL=https://pixelated-api-services.onrender.com
 ```
 
 `HOSTED_WEB_URL` and `HOSTED_API_URL` are optional environment variables and
-fall back to the current production URLs. The credentials must be environment
-secrets. The job compiles and starts the real desktop HTTPS companion beside a
-deterministic local engine probe, signs in through Vercel, launches `/engine`
-with a one-use desktop ticket, registers and restores pairing metadata through
-Render, and creates/verifies a cloud session. It restores the smoke account's
-previous pairing metadata during cleanup. Before opening Chromium, the runner
-waits up to ten minutes for Vercel's live JavaScript bundle to contain the
-one-click `/launch/redeem` flow, avoiding deploy-hook publication races.
+fall back to the current production URLs for local smoke runs, but the hosted
+deploy workflow requires both as production environment variables so it can
+capture pre-hook baselines. The credentials must be environment secrets. The
+job compiles and starts the real desktop HTTPS companion beside a deterministic
+local engine probe, signs in through Vercel, launches `/engine` with a one-use
+desktop ticket, registers and restores pairing metadata through Render, and
+creates/verifies a cloud session. It restores the smoke account's previous
+pairing metadata during cleanup. Before opening Chromium, the runner waits up
+to ten minutes for `/health` to identify a newer Render process, for `/ready`
+to pass, and for Vercel's live `/engine` HTML fingerprint to change and its
+JavaScript bundle to contain the one-click `/launch/redeem` flow.
+
+The workflow passes `HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS` and
+`HOSTED_SMOKE_VERCEL_BASELINE_HTML_SHA256` internally to the smoke. Local runs
+may omit them, in which case the smoke checks readiness and pairing support
+without requiring a newly deployed target. `HOSTED_SMOKE_PUBLISH_TIMEOUT_MS`
+optionally overrides the ten-minute wait. The Vercel fingerprint assumes a new
+production build changes the static Vite `/engine` HTML; rerunning the deploy
+hook for an identical build will intentionally time out instead of proving a
+new production promotion.
 
 Every run uploads `.context/hosted-pairing-smoke/` with a JSON report, concise
 Markdown result, sanitized browser URL/status log, browser console capture, and
@@ -226,6 +249,47 @@ npx playwright install chromium
 npm run build --prefix apps/desktop
 HOSTED_SMOKE_EMAIL=<email> HOSTED_SMOKE_PASSWORD=<password> npm run smoke:hosted-pairing
 ```
+
+## Hosted Auth Regression Smoke
+
+After the signed-in pairing smoke passes, the deploy workflow runs
+`npm run smoke:hosted-auth` in a separate job. It verifies the June 11 auth
+contract in `Auth.tsx`, `ResetPassword.tsx`, and `supabase/config.toml`, then:
+
+- creates a throwaway account through the hosted signup UI;
+- proves the resend control is disabled for 60 seconds, then performs a real
+  hosted resend and confirms the cooldown resets;
+- generates and redeems a real Supabase signup confirmation action link and
+  verifies it redirects to `HOSTED_WEB_URL` with a browser session;
+- generates and redeems a real recovery action link, verifies it redirects to
+  `${HOSTED_WEB_URL}/reset-password`, and updates the password through the
+  hosted UI;
+- waits 305 seconds, then proves a second recovery link is rejected as expired.
+
+The service-role key is necessary because CI cannot read the production inbox;
+the admin action-link endpoint exposes the same one-time verification and
+recovery tokens without putting them in artifacts. Signup and resend still run
+through the public hosted UI and SMTP path. The smoke deletes every throwaway
+user in cleanup and uploads `.context/hosted-auth-smoke/` even on failure.
+Production SMTP and Supabase Auth rate limits must allow at least two messages
+per deploy run, one signup confirmation and one resend, and the configured
+`HOSTED_SMOKE_EMAIL` inbox must support plus addressing. The smoke derives
+unique addresses such as `account+pixelated-auth-pending-...@example.com` from
+that existing secret, so no owned email domain or additional inbox is required.
+
+Run it locally with:
+
+```sh
+HOSTED_WEB_URL=https://pixelated-studio-edition.vercel.app \
+HOSTED_SUPABASE_URL=<production-supabase-url> \
+HOSTED_SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+HOSTED_AUTH_SMOKE_EMAIL=<plus-address-capable-inbox> \
+npm run smoke:hosted-auth
+```
+
+`HOSTED_AUTH_SMOKE_EXPIRY_WAIT_MS` is an optional local-only diagnostic
+override. CI intentionally leaves it unset so the negative check waits 305
+seconds and proves the configured 300-second expiry.
 
 ## Vercel Frontend Env
 
