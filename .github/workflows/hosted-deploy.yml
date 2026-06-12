@@ -151,3 +151,57 @@ jobs:
           name: hosted-pairing-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           path: .context/hosted-pairing-smoke/
           retention-days: 14
+
+  hosted-auth-smoke:
+    name: Hosted auth regression smoke
+    needs: hosted-pairing-smoke
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HOSTED_AUTH_SMOKE_EMAIL_DOMAIN: ${{ vars.HOSTED_AUTH_SMOKE_EMAIL_DOMAIN }}
+      HOSTED_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.HOSTED_SUPABASE_SERVICE_ROLE_KEY }}
+      HOSTED_SUPABASE_URL: ${{ vars.HOSTED_SUPABASE_URL }}
+      HOSTED_WEB_URL: ${{ vars.HOSTED_WEB_URL }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          node-version: 22
+
+      - name: Require hosted auth smoke configuration
+        run: |
+          test -n "$HOSTED_AUTH_SMOKE_EMAIL_DOMAIN" || {
+            echo "::error::Missing production environment variable HOSTED_AUTH_SMOKE_EMAIL_DOMAIN."
+            exit 1
+          }
+          test -n "$HOSTED_SUPABASE_URL" || {
+            echo "::error::Missing production environment variable HOSTED_SUPABASE_URL."
+            exit 1
+          }
+          test -n "$HOSTED_SUPABASE_SERVICE_ROLE_KEY" || {
+            echo "::error::Missing production environment secret HOSTED_SUPABASE_SERVICE_ROLE_KEY."
+            exit 1
+          }
+
+      - name: Install auth smoke dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run hosted auth regression smoke
+        run: npm run smoke:hosted-auth
+
+      - name: Upload hosted auth smoke bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: warn
+          name: hosted-auth-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .context/hosted-auth-smoke/
+          retention-days: 14

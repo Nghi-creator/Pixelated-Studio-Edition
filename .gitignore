@@ -13,3 +13,4 @@ __pycache__/
 supabase/.temp/
 .vercel
 .context/hosted-pairing-smoke/
+.context/hosted-auth-smoke/

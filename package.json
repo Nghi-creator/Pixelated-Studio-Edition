@@ -4,6 +4,7 @@
   "scripts": {
     "check:access-log-schema": "npm --prefix services/api run check:access-log-schema",
     "predeploy:hosted": "npm --prefix services/api run predeploy:hosted",
+    "smoke:hosted-auth": "node scripts/hostedAuthSmoke.mjs",
     "smoke:hosted-pairing": "node scripts/hostedPairingSmoke.mjs",
     "verify:api": "npm --prefix services/api run typecheck && npm --prefix services/api run lint && npm --prefix services/api run test && npm --prefix services/api run build"
   },

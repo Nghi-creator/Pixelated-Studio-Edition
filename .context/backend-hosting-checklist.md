@@ -78,6 +78,13 @@ Configure a protected GitHub environment named `production` with:
 - `HOSTED_WEB_URL`: the production Vercel origin. The workflow fingerprints
   `/engine` before the deploy and waits for a different production HTML build
   that contains the signed-in pairing bundle.
+- `HOSTED_SUPABASE_URL`: the production Supabase project URL used by the hosted
+  auth regression smoke.
+- `HOSTED_AUTH_SMOKE_EMAIL_DOMAIN`: a domain accepted by the production SMTP
+  provider for disposable, unique smoke addresses.
+- `HOSTED_SUPABASE_SERVICE_ROLE_KEY`: a production environment secret used only
+  by the hosted auth smoke to generate one-time confirmation/recovery action
+  links and delete its throwaway users. Never expose it to Vercel.
 
 Disable Render's Git-based auto-deploy in the API service dashboard.
 `apps/web/vercel.json` disables Vercel's automatic `main` deploy while leaving
@@ -244,6 +251,45 @@ npx playwright install chromium
 npm run build --prefix apps/desktop
 HOSTED_SMOKE_EMAIL=<email> HOSTED_SMOKE_PASSWORD=<password> npm run smoke:hosted-pairing
 ```
+
+## Hosted Auth Regression Smoke
+
+After the signed-in pairing smoke passes, the deploy workflow runs
+`npm run smoke:hosted-auth` in a separate job. It verifies the June 11 auth
+contract in `Auth.tsx`, `ResetPassword.tsx`, and `supabase/config.toml`, then:
+
+- creates a throwaway account through the hosted signup UI;
+- proves the resend control is disabled for 60 seconds, then performs a real
+  hosted resend and confirms the cooldown resets;
+- generates and redeems a real Supabase signup confirmation action link and
+  verifies it redirects to `HOSTED_WEB_URL` with a browser session;
+- generates and redeems a real recovery action link, verifies it redirects to
+  `${HOSTED_WEB_URL}/reset-password`, and updates the password through the
+  hosted UI;
+- waits 305 seconds, then proves a second recovery link is rejected as expired.
+
+The service-role key is necessary because CI cannot read the production inbox;
+the admin action-link endpoint exposes the same one-time verification and
+recovery tokens without putting them in artifacts. Signup and resend still run
+through the public hosted UI and SMTP path. The smoke deletes every throwaway
+user in cleanup and uploads `.context/hosted-auth-smoke/` even on failure.
+Production SMTP and Supabase Auth rate limits must allow at least two messages
+per deploy run, one signup confirmation and one resend, and the configured
+smoke domain must accept those messages without creating a retained mailbox.
+
+Run it locally with:
+
+```sh
+HOSTED_WEB_URL=https://pixelated-studio-edition.vercel.app \
+HOSTED_SUPABASE_URL=<production-supabase-url> \
+HOSTED_SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+HOSTED_AUTH_SMOKE_EMAIL_DOMAIN=<accepted-disposable-domain> \
+npm run smoke:hosted-auth
+```
+
+`HOSTED_AUTH_SMOKE_EXPIRY_WAIT_MS` is an optional local-only diagnostic
+override. CI intentionally leaves it unset so the negative check waits 305
+seconds and proves the configured 300-second expiry.
 
 ## Vercel Frontend Env
 
