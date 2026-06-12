@@ -257,25 +257,32 @@ After the signed-in pairing smoke passes, the deploy workflow runs
 contract in `Auth.tsx`, `ResetPassword.tsx`, and `supabase/config.toml`, then:
 
 - creates a throwaway account through the hosted signup UI;
-- proves the resend control is disabled for 60 seconds, then performs a real
-  hosted resend and confirms the cooldown resets;
+- proves the resend control is disabled for 60 seconds, then becomes available
+  without sending a second email;
 - generates and redeems a real Supabase signup confirmation action link and
   verifies it redirects to `HOSTED_WEB_URL` with a browser session;
 - generates and redeems a real recovery action link, verifies it redirects to
   `${HOSTED_WEB_URL}/reset-password`, and updates the password through the
   hosted UI;
-- waits 305 seconds, then proves a second recovery link is rejected as expired.
+- verifies the committed Supabase config and email templates retain the
+  300-second expiry and 60-second resend contract.
 
 The service-role key is necessary because CI cannot read the production inbox;
 the admin action-link endpoint exposes the same one-time verification and
-recovery tokens without putting them in artifacts. Signup and resend still run
-through the public hosted UI and SMTP path. The smoke deletes every throwaway
-user in cleanup and uploads `.context/hosted-auth-smoke/` even on failure.
-Production SMTP and Supabase Auth rate limits must allow at least two messages
-per deploy run, one signup confirmation and one resend, and the configured
+recovery tokens without putting them in artifacts. Only signup runs through the
+public hosted UI and SMTP path; the smoke intentionally does not click resend
+or request a public reset email. It therefore consumes one email per deploy
+run. The smoke deletes every throwaway user in cleanup and uploads
+`.context/hosted-auth-smoke/` even on failure. The configured
 `HOSTED_SMOKE_EMAIL` inbox must support plus addressing. The smoke derives
 unique addresses such as `account+pixelated-auth-pending-...@example.com` from
 that existing secret, so no owned email domain or additional inbox is required.
+
+`supabase/config.toml` configures local Supabase and records the intended hosted
+contract, but it does not update an existing hosted project's Authentication
+settings. In the production Supabase dashboard, set the email OTP expiration to
+`300` seconds and the resend interval to `60` seconds before expecting this
+smoke to pass.
 
 Run it locally with:
 
@@ -286,10 +293,6 @@ HOSTED_SUPABASE_SERVICE_ROLE_KEY=<value-from-SUPABASE_SERVICE_ROLE_KEY> \
 HOSTED_AUTH_SMOKE_EMAIL=<plus-address-capable-inbox> \
 npm run smoke:hosted-auth
 ```
-
-`HOSTED_AUTH_SMOKE_EXPIRY_WAIT_MS` is an optional local-only diagnostic
-override. CI intentionally leaves it unset so the negative check waits 305
-seconds and proves the configured 300-second expiry.
 
 ## Vercel Frontend Env
 

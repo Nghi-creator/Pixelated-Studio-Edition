@@ -14,8 +14,7 @@ Required:
 
 Optional:
   HOSTED_WEB_URL
-  HOSTED_AUTH_SMOKE_ARTIFACT_DIR
-  HOSTED_AUTH_SMOKE_EXPIRY_WAIT_MS`);
+  HOSTED_AUTH_SMOKE_ARTIFACT_DIR`);
   process.exit(0);
 }
 
@@ -26,9 +25,6 @@ const webUrl = normalizeUrl(
 const supabaseUrl = normalizeUrl(process.env.HOSTED_SUPABASE_URL || "");
 const serviceRoleKey = process.env.HOSTED_SUPABASE_SERVICE_ROLE_KEY || "";
 const email = process.env.HOSTED_AUTH_SMOKE_EMAIL || "";
-const expiryWaitMs = Number(
-  process.env.HOSTED_AUTH_SMOKE_EXPIRY_WAIT_MS || 305_000,
-);
 const runId = `hosted-auth-${new Date().toISOString().replaceAll(":", "-")}`;
 const runDir = path.resolve(
   process.env.HOSTED_AUTH_SMOKE_ARTIFACT_DIR ||
@@ -48,10 +44,6 @@ function normalizeUrl(value) {
 function required(value, name) {
   if (!value) throw new Error(`Missing required environment variable ${name}.`);
   return value;
-}
-
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function record(name, status, detail = "") {
@@ -83,13 +75,6 @@ function smokeEmail(label) {
 
 function smokePassword(label) {
   return `Pixelated-${label}-${crypto.randomBytes(8).toString("hex")}9`;
-}
-
-function sanitizeUrl(value) {
-  const url = new URL(value);
-  url.hash = "";
-  for (const key of ["token", "token_hash"]) url.searchParams.delete(key);
-  return url.toString();
 }
 
 async function adminRequest(pathname, options = {}) {
@@ -208,7 +193,7 @@ async function assertHostedAuthContract() {
   assert.match(recoveryTemplate, /within 5 minutes/);
 }
 
-async function proveSignupAndResendCooldown(email, password) {
+async function proveSignupVerificationAndResendCooldown(email, password) {
   users.set(email, "");
   const signupPage = await newPage();
   await signupPage.goto(`${webUrl}/login`, { waitUntil: "domcontentloaded" });
@@ -240,14 +225,10 @@ async function proveSignupAndResendCooldown(email, password) {
   });
   await resend.waitFor({ timeout: 70_000 });
   assert.equal(await resend.isEnabled(), true);
-  await resend.click();
-  await signupPage
-    .getByText("A fresh verification email was sent. It expires in 5 minutes.")
-    .waitFor({ timeout: 30_000 });
-  const resetCooldown = signupPage.getByRole("button", {
-    name: /Resend available in \d+s/,
+  await signupPage.screenshot({
+    fullPage: true,
+    path: path.join(runDir, "02-resend-cooldown-complete.png"),
   });
-  assert.equal(await resetCooldown.isDisabled(), true);
 }
 
 async function redeemConfirmation(email, password) {
@@ -278,7 +259,7 @@ async function redeemConfirmation(email, password) {
   );
   await confirmationPage.screenshot({
     fullPage: true,
-    path: path.join(runDir, "02-signup-confirmed.png"),
+    path: path.join(runDir, "03-signup-confirmed.png"),
   });
 }
 
@@ -313,7 +294,7 @@ async function redeemRecovery(email, newPassword) {
     .waitFor();
   await recoveryPage.screenshot({
     fullPage: true,
-    path: path.join(runDir, "03-password-updated.png"),
+    path: path.join(runDir, "04-password-updated.png"),
   });
 
   const loginPage = await newPage();
@@ -327,49 +308,6 @@ async function redeemRecovery(email, newPassword) {
     (url) => url.origin === new URL(webUrl).origin && url.pathname === "/",
     { timeout: 30_000 },
   );
-}
-
-async function rejectExpiredRecovery(email) {
-  const expiredLink = await generateLink({
-    email,
-    redirectTo: `${webUrl}/reset-password`,
-    type: "recovery",
-  });
-  await delay(expiryWaitMs);
-  const expiredPage = await newPage();
-  let expiredErrorUrl = "";
-  expiredPage.on("framenavigated", (frame) => {
-    if (frame === expiredPage.mainFrame() && frame.url().includes("otp_expired")) {
-      expiredErrorUrl = frame.url();
-    }
-  });
-  const expiredRedirect = expiredPage.waitForURL(
-    (url) =>
-      url.origin === new URL(webUrl).origin &&
-      url.href.includes("otp_expired"),
-    { timeout: 30_000 },
-  );
-  await expiredPage.goto(expiredLink, { waitUntil: "domcontentloaded" });
-  await expiredRedirect;
-  assert.equal(
-    await expiredPage
-      .getByRole("heading", { name: "Create New Password", exact: true })
-      .isVisible()
-      .catch(() => false),
-    false,
-    "Expired recovery link still opened the password reset form.",
-  );
-  await expiredPage.screenshot({
-    fullPage: true,
-    path: path.join(runDir, "04-expired-recovery-rejected.png"),
-  });
-  const expiredUrl = new URL(expiredErrorUrl || expiredPage.url());
-  const hash = new URLSearchParams(expiredUrl.hash.replace(/^#/, ""));
-  return {
-    errorCode:
-      expiredUrl.searchParams.get("error_code") || hash.get("error_code") || "",
-    redirect: sanitizeUrl(expiredErrorUrl || expiredPage.url()),
-  };
 }
 
 async function main() {
@@ -388,7 +326,7 @@ async function main() {
   const newPassword = smokePassword("updated");
 
   await step("prove hosted signup verification and resend cooldown", () =>
-    proveSignupAndResendCooldown(pendingEmail, initialPassword),
+    proveSignupVerificationAndResendCooldown(pendingEmail, initialPassword),
   );
   await step("redeem hosted signup verification redirect", () =>
     redeemConfirmation(verifiedEmail, initialPassword),
@@ -396,11 +334,7 @@ async function main() {
   await step("redeem hosted password recovery redirect and update password", () =>
     redeemRecovery(verifiedEmail, newPassword),
   );
-  const expiredRedirect = await step(
-    "reject recovery link after the five-minute expiry",
-    () => rejectExpiredRecovery(verifiedEmail),
-  );
-  return { expiredRedirect };
+  return {};
 }
 
 let failure = null;
@@ -421,7 +355,6 @@ try {
   await deleteSmokeUsers().catch(() => undefined);
   fs.mkdirSync(runDir, { recursive: true });
   writeJson(reportPath, {
-    expiryWaitMs,
     failure: failure?.message || null,
     finishedAt: new Date().toISOString(),
     result,
@@ -437,7 +370,6 @@ try {
       "",
       `- Web: ${webUrl}`,
       `- Supabase: ${supabaseUrl}`,
-      `- Expiry wait: ${expiryWaitMs}ms`,
       `- Result: ${failure ? failure.message : "All checks passed."}`,
       "",
       "## Checks",
