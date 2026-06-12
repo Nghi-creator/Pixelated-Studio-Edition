@@ -72,6 +72,12 @@ Configure a protected GitHub environment named `production` with:
   service.
 - `VERCEL_WEB_DEPLOY_HOOK_URL`: the deploy hook for the existing Vercel web
   project.
+- `HOSTED_API_URL`: the production Render API origin. The workflow reads
+  `/health` before the deploy and waits for a newer process that also passes
+  `/ready`.
+- `HOSTED_WEB_URL`: the production Vercel origin. The workflow fingerprints
+  `/engine` before the deploy and waits for a different production HTML build
+  that contains the signed-in pairing bundle.
 
 Disable Render's Git-based auto-deploy in the API service dashboard.
 `apps/web/vercel.json` disables Vercel's automatic `main` deploy while leaving
@@ -204,14 +210,26 @@ HOSTED_API_URL=https://pixelated-api-services.onrender.com
 ```
 
 `HOSTED_WEB_URL` and `HOSTED_API_URL` are optional environment variables and
-fall back to the current production URLs. The credentials must be environment
-secrets. The job compiles and starts the real desktop HTTPS companion beside a
-deterministic local engine probe, signs in through Vercel, launches `/engine`
-with a one-use desktop ticket, registers and restores pairing metadata through
-Render, and creates/verifies a cloud session. It restores the smoke account's
-previous pairing metadata during cleanup. Before opening Chromium, the runner
-waits up to ten minutes for Vercel's live JavaScript bundle to contain the
-one-click `/launch/redeem` flow, avoiding deploy-hook publication races.
+fall back to the current production URLs for local smoke runs, but the hosted
+deploy workflow requires both as production environment variables so it can
+capture pre-hook baselines. The credentials must be environment secrets. The
+job compiles and starts the real desktop HTTPS companion beside a deterministic
+local engine probe, signs in through Vercel, launches `/engine` with a one-use
+desktop ticket, registers and restores pairing metadata through Render, and
+creates/verifies a cloud session. It restores the smoke account's previous
+pairing metadata during cleanup. Before opening Chromium, the runner waits up
+to ten minutes for `/health` to identify a newer Render process, for `/ready`
+to pass, and for Vercel's live `/engine` HTML fingerprint to change and its
+JavaScript bundle to contain the one-click `/launch/redeem` flow.
+
+The workflow passes `HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS` and
+`HOSTED_SMOKE_VERCEL_BASELINE_HTML_SHA256` internally to the smoke. Local runs
+may omit them, in which case the smoke checks readiness and pairing support
+without requiring a newly deployed target. `HOSTED_SMOKE_PUBLISH_TIMEOUT_MS`
+optionally overrides the ten-minute wait. The Vercel fingerprint assumes a new
+production build changes the static Vite `/engine` HTML; rerunning the deploy
+hook for an identical build will intentionally time out instead of proving a
+new production promotion.
 
 Every run uploads `.context/hosted-pairing-smoke/` with a JSON report, concise
 Markdown result, sanitized browser URL/status log, browser console capture, and

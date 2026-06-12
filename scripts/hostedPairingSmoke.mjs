@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
@@ -17,7 +18,10 @@ Required:
 Optional:
   HOSTED_WEB_URL
   HOSTED_API_URL
-  HOSTED_SMOKE_ARTIFACT_DIR`);
+  HOSTED_SMOKE_ARTIFACT_DIR
+  HOSTED_SMOKE_PUBLISH_TIMEOUT_MS
+  HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS
+  HOSTED_SMOKE_VERCEL_BASELINE_HTML_SHA256`);
   process.exit(0);
 }
 
@@ -38,6 +42,11 @@ const hostedPairingBuildMarker =
 const hostedPublishTimeoutMs = Number(
   process.env.HOSTED_SMOKE_PUBLISH_TIMEOUT_MS || 10 * 60 * 1000,
 );
+const renderBaselineStartedAtSeconds = Number(
+  process.env.HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS || 0,
+);
+const vercelBaselineHtmlSha256 =
+  process.env.HOSTED_SMOKE_VERCEL_BASELINE_HTML_SHA256 || "";
 const runId = `hosted-pairing-${new Date().toISOString().replaceAll(":", "-")}`;
 const runDir = path.resolve(
   process.env.HOSTED_SMOKE_ARTIFACT_DIR ||
@@ -92,10 +101,13 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function hostedWebHasLaunchPairing() {
+async function getHostedWebBuild() {
   const response = await fetch(`${webUrl}/engine`, { cache: "no-store" });
-  if (!response.ok) return false;
+  if (!response.ok) {
+    throw new Error(`GET /engine returned ${response.status}`);
+  }
   const html = await response.text();
+  const htmlSha256 = crypto.createHash("sha256").update(html).digest("hex");
   const scripts = Array.from(html.matchAll(/<script[^>]+src="([^"]+)"/g)).map(
     ([, source]) => new URL(source, webUrl).toString(),
   );
@@ -103,10 +115,49 @@ async function hostedWebHasLaunchPairing() {
   for (const script of scripts) {
     const asset = await fetch(script, { cache: "no-store" });
     if (asset.ok && (await asset.text()).includes(hostedPairingBuildMarker)) {
-      return true;
+      return { hasLaunchPairing: true, htmlSha256 };
     }
   }
-  return false;
+  return { hasLaunchPairing: false, htmlSha256 };
+}
+
+async function waitForRenderApiDeploy() {
+  const deadline = Date.now() + hostedPublishTimeoutMs;
+  let lastError = "";
+
+  while (Date.now() < deadline) {
+    try {
+      const [healthResponse, readyResponse] = await Promise.all([
+        fetch(`${apiUrl}/health`, { cache: "no-store" }),
+        fetch(`${apiUrl}/ready`, { cache: "no-store" }),
+      ]);
+      const health = await healthResponse.json();
+      const ready = await readyResponse.json();
+      const startedAtSeconds =
+        Math.floor(Date.now() / 1000) - Number(health?.uptimeSeconds);
+      const isNewProcess =
+        !renderBaselineStartedAtSeconds ||
+        startedAtSeconds > renderBaselineStartedAtSeconds;
+
+      if (
+        healthResponse.ok &&
+        health?.ok === true &&
+        readyResponse.ok &&
+        ready?.ok === true &&
+        isNewProcess
+      ) {
+        return;
+      }
+      lastError = `health=${healthResponse.status}/${JSON.stringify(health)} ready=${readyResponse.status}/${JSON.stringify(ready)} startedAtSeconds=${startedAtSeconds} baseline=${renderBaselineStartedAtSeconds || "none"}`;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : String(error);
+    }
+    await delay(15_000);
+  }
+
+  throw new Error(
+    `Render did not publish a new ready API process within ${hostedPublishTimeoutMs}ms: ${lastError}`,
+  );
 }
 
 async function waitForHostedWebPairingBundle() {
@@ -115,8 +166,12 @@ async function waitForHostedWebPairingBundle() {
 
   while (Date.now() < deadline) {
     try {
-      if (await hostedWebHasLaunchPairing()) return;
-      lastError = `production JavaScript does not contain ${hostedPairingBuildMarker} yet`;
+      const build = await getHostedWebBuild();
+      const isNewBuild =
+        !vercelBaselineHtmlSha256 ||
+        build.htmlSha256 !== vercelBaselineHtmlSha256;
+      if (build.hasLaunchPairing && isNewBuild) return;
+      lastError = `htmlSha256=${build.htmlSha256} baseline=${vercelBaselineHtmlSha256 || "none"} pairingMarker=${build.hasLaunchPairing}`;
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
     }
@@ -288,7 +343,12 @@ async function main() {
   required(email, "HOSTED_SMOKE_EMAIL");
   required(password, "HOSTED_SMOKE_PASSWORD");
 
-  await step("wait for Vercel one-click pairing bundle", waitForHostedWebPairingBundle);
+  const readiness = await Promise.allSettled([
+    step("wait for new ready Render API process", waitForRenderApiDeploy),
+    step("wait for Vercel one-click pairing bundle", waitForHostedWebPairingBundle),
+  ]);
+  const readinessFailure = readiness.find((result) => result.status === "rejected");
+  if (readinessFailure) throw readinessFailure.reason;
 
   await step("load compiled desktop companion", async () => {
     const modulePath = path.join(
