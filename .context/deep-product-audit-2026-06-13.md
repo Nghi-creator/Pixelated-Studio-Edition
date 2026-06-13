@@ -24,7 +24,7 @@ product and infrastructure; it does not introduce new product features.
 | API backend | Hardened, more work queued | Public account enumeration is closed, reactions are atomic, and write-heavy routes have per-user limits; shared-store limits remain. |
 | Desktop | Healthy | Build, 39 tests, companion security controls, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 28 tests, and live Docker boot smoke pass. |
-| Docker image | Improved | Reproducible Mesen build and smaller image; multi-stage build and pinned Node source remain. |
+| Docker image | Hardened and reduced | Pinned multi-stage build passes live ROM smoke at `1.15GB`; build tools are absent from the runtime image. |
 | Supabase | Deployed | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. |
 
 ## Next Work Queue
@@ -48,25 +48,6 @@ instances.
 
 - Write-heavy routes have documented limits and regression tests.
 - Limits behave consistently across multiple API instances.
-
-### NEXT-05 — P1: Create a Multi-Stage, Fully Pinned Engine Image
-
-**Problem**
-
-The image now pins Mesen, uses `npm ci`, removes unused packages, and cleans apt
-metadata. It still installs Node through a mutable remote setup script and keeps
-compilation tooling in the runtime image.
-
-**Recommended work**
-
-- Pin the Node source or base image.
-- Move Mesen and TypeScript compilation into build stages.
-- Copy only runtime artifacts and required packages into the final image.
-
-**Done when**
-
-- The final runtime image contains no compiler/build dependencies.
-- A clean rebuild uses pinned sources and passes the live engine smoke.
 
 ### NEXT-06 — P1: Replace Shell-Composed Process Calls
 
@@ -272,6 +253,25 @@ do not create additional rows or RPC calls.
 
 **Remaining risk:** Limits are process-local. See `NEXT-04`.
 
+### DONE-14 — Create a Pinned Multi-Stage Engine Image
+
+**Problem:** The engine runtime image retained compilers, Git, `npm`, `pip`,
+TypeScript sources, tests, and other build-only artifacts. Node installation
+also depended on a mutable remote setup script.
+
+**Resolution:** Split Mesen compilation, Python dependency installation, Node
+compilation, and runtime packaging into separate stages. Ubuntu and Node base
+images, Node version, and Mesen source are digest/version pinned. The final image
+contains only runtime packages, compiled application code, production Node
+modules, Python runtime dependencies, scripts, and the Mesen core. Added a
+`.dockerignore` to exclude local build output and caches.
+
+**Verification:** Clean image build and live ROM boot smoke passed. Runtime
+health, token rejection/acceptance, CORS rejection, virtual display, audio,
+RetroArch, Mesen, camera bridge, and storage passed. The image is `1.15GB`, down
+from the previous hardened `1.96GB`; `npm`, `pip`, Git, `make`, `g++`, and
+`curl` are absent from the runtime image.
+
 ## Latest Verification Run
 
 Run on 2026-06-13 after the completed hardening work:
@@ -298,6 +298,8 @@ Run on 2026-06-13 after the completed hardening work:
 - During live engine smoke, `smoke.nes` booted with RetroArch and camera active.
   The container sampled roughly 413 MiB and 67% CPU; RetroArch reported roughly
   70% average CPU.
+- The multi-stage image live smoke sampled roughly 159 MiB and 76% container CPU
+  during ROM boot; RetroArch and the camera bridge were active.
 
 ## Documentation Follow-Up
 
