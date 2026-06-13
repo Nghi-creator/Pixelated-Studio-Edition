@@ -256,7 +256,9 @@ After the signed-in pairing smoke passes, the deploy workflow runs
 `npm run smoke:hosted-auth` in a separate job. It verifies the June 11 auth
 contract in `Auth.tsx`, `ResetPassword.tsx`, and `supabase/config.toml`, then:
 
-- creates a throwaway account through the hosted signup UI;
+- submits the hosted signup UI against an intercepted successful pending-user
+  response, proving the verification message and cooldown without consuming
+  production SMTP quota;
 - proves the resend control is disabled for 60 seconds, then becomes available
   without sending a second email;
 - generates and redeems a real Supabase signup confirmation action link and
@@ -269,11 +271,12 @@ contract in `Auth.tsx`, `ResetPassword.tsx`, and `supabase/config.toml`, then:
 
 The service-role key is necessary because CI cannot read the production inbox;
 the admin action-link endpoint exposes the same one-time verification and
-recovery tokens without putting them in artifacts. Only signup runs through the
-public hosted UI and SMTP path; the smoke intentionally does not click resend
-or request a public reset email. It therefore consumes one email per deploy
-run. The smoke deletes every throwaway user in cleanup and uploads
-`.context/hosted-auth-smoke/` even on failure. The configured
+recovery tokens without putting them in artifacts. The hosted signup UI check
+intercepts only the Supabase signup response, while confirmation and recovery
+action links remain real production Supabase flows. The smoke does not send
+production signup, resend, or reset emails, so repeated deploys do not consume
+the project's outbound-email quota. It deletes every real throwaway user in
+cleanup and uploads `.context/hosted-auth-smoke/` even on failure. The configured
 `HOSTED_SMOKE_EMAIL` inbox must support plus addressing. The smoke derives
 unique addresses such as `account+pixelated-auth-pending-...@example.com` from
 that existing secret, so no owned email domain or additional inbox is required.

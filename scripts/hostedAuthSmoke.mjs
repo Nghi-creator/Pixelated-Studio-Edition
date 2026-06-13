@@ -194,8 +194,37 @@ async function assertHostedAuthContract() {
 }
 
 async function proveSignupVerificationAndResendCooldown(email, password) {
-  users.set(email, "");
   const signupPage = await newPage();
+  let signupRequests = 0;
+  await signupPage.route(`${supabaseUrl}/auth/v1/signup**`, async (route) => {
+    signupRequests += 1;
+    const request = route.request();
+    assert.equal(request.method(), "POST");
+    const requestBody = request.postDataJSON();
+    assert.equal(requestBody?.email, email);
+
+    const now = new Date().toISOString();
+    await route.fulfill({
+      body: JSON.stringify({
+        id: crypto.randomUUID(),
+        aud: "authenticated",
+        role: "authenticated",
+        email,
+        phone: "",
+        confirmation_sent_at: now,
+        app_metadata: {
+          provider: "email",
+          providers: ["email"],
+        },
+        user_metadata: {},
+        identities: [],
+        created_at: now,
+        updated_at: now,
+      }),
+      contentType: "application/json",
+      status: 200,
+    });
+  });
   await signupPage.goto(`${webUrl}/login`, { waitUntil: "domcontentloaded" });
   await signupPage
     .getByRole("button", { name: "Don't have an account? Sign up" })
@@ -209,6 +238,7 @@ async function proveSignupVerificationAndResendCooldown(email, password) {
   await signupPage
     .getByText("Account created. Check your email within 5 minutes to verify it.")
     .waitFor({ timeout: 30_000 });
+  assert.equal(signupRequests, 1);
 
   const initialCooldown = signupPage.getByRole("button", {
     name: /Resend available in \d+s/,
@@ -325,7 +355,7 @@ async function main() {
   const initialPassword = smokePassword("initial");
   const newPassword = smokePassword("updated");
 
-  await step("prove hosted signup verification and resend cooldown", () =>
+  await step("prove hosted signup verification UI and resend cooldown", () =>
     proveSignupVerificationAndResendCooldown(pendingEmail, initialPassword),
   );
   await step("redeem hosted signup verification redirect", () =>
