@@ -235,9 +235,12 @@ export function classifyDockerFailure(
   }
   if (
     text.includes("cannot connect to the docker daemon") ||
+    text.includes("failed to connect to the docker api") ||
     text.includes("is the docker daemon running") ||
     text.includes("open //./pipe/docker") ||
-    text.includes("the system cannot find the file specified")
+    text.includes("the system cannot find the file specified") ||
+    (text.includes("docker.sock") &&
+      text.includes("connect: no such file or directory"))
   ) {
     return "daemon_stopped";
   }

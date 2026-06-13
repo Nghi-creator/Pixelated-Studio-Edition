@@ -34,6 +34,7 @@ import {
   discoverDockerStartPlan,
   executeDockerStartPlan,
   waitForDockerReady,
+  withDockerStartCapability,
 } from "./dockerRecovery";
 import {
   getAdvertisedEngineUrls,
@@ -419,7 +420,7 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
     if (attempt !== activeStartupAttempt) return;
     if (diagnostic.code !== "ready") {
       finishStartupAttempt(attempt);
-      emitDockerDiagnostic(event, diagnostic);
+      emitDockerDiagnostic(event, withDockerStartCapability(diagnostic));
       return;
     }
     continueEngineStartup(event, safeEnv, launchContext, attempt);

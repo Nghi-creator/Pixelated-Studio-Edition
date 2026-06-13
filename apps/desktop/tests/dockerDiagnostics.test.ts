@@ -26,6 +26,13 @@ describe("Docker diagnostic classification", () => {
       }),
       "daemon_stopped",
     );
+    assert.equal(
+      classifyDockerFailure({
+        stderr:
+          "failed to connect to the docker API at unix:///Users/tester/.docker/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /Users/tester/.docker/run/docker.sock: connect: no such file or directory",
+      }),
+      "daemon_stopped",
+    );
   });
 
   it("classifies intervention-required failures", () => {

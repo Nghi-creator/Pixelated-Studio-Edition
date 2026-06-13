@@ -12,6 +12,13 @@ export type DockerStartPlan =
   | { kind: "open-path"; path: string }
   | { args: string[]; command: string; kind: "exec-file" };
 
+const RESTART_RECOVERABLE_CODES = new Set([
+  "daemon_stopped",
+  "permission_denied",
+  "startup_timeout",
+  "unknown",
+]);
+
 type WaitForDockerOptions = {
   diagnose?: (env: NodeJS.ProcessEnv) => Promise<DockerDiagnostic>;
   intervalMs?: number;
@@ -75,6 +82,17 @@ export function discoverDockerStartPlan(
     };
   }
   return null;
+}
+
+export function withDockerStartCapability(
+  diagnostic: DockerDiagnostic,
+  startPlan: DockerStartPlan | null = discoverDockerStartPlan(),
+): DockerDiagnostic {
+  return {
+    ...diagnostic,
+    canStartDocker:
+      Boolean(startPlan) && RESTART_RECOVERABLE_CODES.has(diagnostic.code),
+  };
 }
 
 export function executeDockerStartPlan(

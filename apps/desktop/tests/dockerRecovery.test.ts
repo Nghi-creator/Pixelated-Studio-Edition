@@ -5,6 +5,7 @@ import {
   discoverDockerStartPlan,
   getTrustedDockerDesktopCandidates,
   waitForDockerReady,
+  withDockerStartCapability,
 } from "../main/dockerRecovery";
 
 describe("Docker Desktop trusted startup plans", () => {
@@ -47,6 +48,33 @@ describe("Docker Desktop trusted startup plans", () => {
         command: "/usr/bin/systemctl",
         kind: "exec-file",
       },
+    );
+  });
+
+  it("offers Start Docker for restart-recoverable failures with a trusted plan", () => {
+    const trustedPlan = { kind: "open-path" as const, path: "/Applications/Docker.app" };
+
+    assert.equal(
+      withDockerStartCapability(
+        createDockerDiagnostic("daemon_stopped"),
+        trustedPlan,
+      ).canStartDocker,
+      true,
+    );
+    assert.equal(
+      withDockerStartCapability(createDockerDiagnostic("unknown"), trustedPlan)
+        .canStartDocker,
+      true,
+    );
+    assert.equal(
+      withDockerStartCapability(createDockerDiagnostic("disk_full"), trustedPlan)
+        .canStartDocker,
+      false,
+    );
+    assert.equal(
+      withDockerStartCapability(createDockerDiagnostic("daemon_stopped"), null)
+        .canStartDocker,
+      false,
     );
   });
 });
