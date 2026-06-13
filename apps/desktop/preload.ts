@@ -59,6 +59,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ) as Promise<void>,
   startDocker: (options: StartDockerOptions) =>
     ipcRenderer.send("start-docker", options),
+  startDockerApplication: (options: StartDockerOptions) =>
+    ipcRenderer.send("start-docker-application", options),
+  cancelDockerRecovery: () => ipcRenderer.send("cancel-docker-recovery"),
   stopDocker: () => ipcRenderer.send("stop-docker"),
   regenerateLanInvite: () => ipcRenderer.send("regenerate-lan-invite"),
   revokeLanInvite: () => ipcRenderer.send("revoke-lan-invite"),
@@ -76,4 +79,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("engine-companion", callback),
   onDockerDiagnostic: (callback: IpcCallback<[DockerDiagnosticPayload]>) =>
     ipcRenderer.on("docker-diagnostic", callback),
+  onDockerRecoveryStarted: (callback: IpcCallback) =>
+    ipcRenderer.on("docker-recovery-started", callback),
+  onDockerRecoveryReady: (callback: IpcCallback) =>
+    ipcRenderer.on("docker-recovery-ready", callback),
+  onDockerRecoveryCancelled: (callback: IpcCallback) =>
+    ipcRenderer.on("docker-recovery-cancelled", callback),
 });

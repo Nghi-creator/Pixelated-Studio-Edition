@@ -80,8 +80,11 @@ messages while the original command detail remains available in System Logs.
 The Startup Pipeline recovery callout can retry initialization and open official
 Docker install or diagnosis-specific setup pages. Pixelated Studio selects those
 URLs in the Electron main process and never downloads or executes an installer.
-Starting Docker Desktop automatically remains deferred to a later onboarding
-phase.
+When Docker Desktop is installed in a trusted standard location, **Start Docker**
+launches it, waits up to 90 seconds for readiness, and resumes engine
+initialization automatically. The wait can be cancelled. macOS and Windows use
+known Docker Desktop application paths; Linux uses the known Docker Desktop
+binary or its user-level systemd service and never invokes `sudo`.
 
 The desktop app passes `PIXELATED_API_URL` into the engine so cloud sessions can be verified with the backend before boot. It defaults to the hosted Render API; override it for localhost API testing:
 

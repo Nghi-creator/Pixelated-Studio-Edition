@@ -33,6 +33,8 @@ describe("desktop packaged release smoke helpers", () => {
       "launchWeb",
       "openDockerResource",
       "startDocker",
+      "startDockerApplication",
+      "cancelDockerRecovery",
       "stopDocker",
       "regenerateLanInvite",
       "revokeLanInvite",
@@ -43,6 +45,9 @@ describe("desktop packaged release smoke helpers", () => {
       "onEngineExposure",
       "onEngineCompanion",
       "onDockerDiagnostic",
+      "onDockerRecoveryStarted",
+      "onDockerRecoveryReady",
+      "onDockerRecoveryCancelled",
     ];
     const bridge = `
       const { contextBridge, ipcRenderer } = require("electron");

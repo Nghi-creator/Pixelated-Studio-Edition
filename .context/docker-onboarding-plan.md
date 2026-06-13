@@ -344,6 +344,8 @@ Exit criteria:
 
 ### Phase 3: Start Docker Desktop And Auto-Resume
 
+Status: Implemented on 2026-06-13.
+
 Goal: reduce the common installed-but-stopped case to one click.
 
 Steps:
@@ -451,5 +453,6 @@ Phases 0 through 2 now provide:
 4. Open official Docker install and diagnosis-specific setup pages through
    main-process-owned URL selection.
 
-Phase 3 can add trusted Docker Desktop launching and automatic resume without
-changing the diagnostic contract.
+Phase 3 adds trusted Docker Desktop launching, bounded readiness polling,
+cancellation, duplicate-start prevention, and automatic engine initialization
+resume without changing the diagnostic contract.

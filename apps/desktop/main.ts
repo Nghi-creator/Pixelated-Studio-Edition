@@ -1,11 +1,13 @@
 import { app, BrowserWindow, ipcMain, shell, type IpcMainEvent } from "electron";
 import path from "path";
 import {
+  cancelDockerRecovery,
   cleanupEngine,
   createWebLaunchUrl,
   regenerateLanInvite,
   revokeLanInvite,
   startEngine,
+  startDockerAndResume,
   stopEngine,
 } from "./main/engineController";
 import { createCompanionQrDataUrl } from "./main/companionQr";
@@ -37,6 +39,14 @@ ipcMain.on("start-docker", (event: IpcMainEvent, options = {}) => {
 
 ipcMain.on("stop-docker", (event: IpcMainEvent) => {
   stopEngine(event);
+});
+
+ipcMain.on("start-docker-application", (event: IpcMainEvent, options = {}) => {
+  startDockerAndResume(event, options);
+});
+
+ipcMain.on("cancel-docker-recovery", (event: IpcMainEvent) => {
+  cancelDockerRecovery(event);
 });
 
 ipcMain.on("regenerate-lan-invite", (event: IpcMainEvent) => {

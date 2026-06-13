@@ -66,7 +66,9 @@ type ElectronApi = {
   ) => Promise<void>;
   regenerateLanInvite: () => void;
   revokeLanInvite: () => void;
+  cancelDockerRecovery: () => void;
   startDocker: (options: { exposureMode?: ExposureMode }) => void;
+  startDockerApplication: (options: { exposureMode?: ExposureMode }) => void;
   stopDocker: () => void;
   onServerLog: (callback: (event: unknown, message: string) => void) => void;
   onEngineState: (
@@ -83,6 +85,9 @@ type ElectronApi = {
   onDockerDiagnostic: (
     callback: (event: unknown, payload: DockerDiagnosticPayload) => void,
   ) => void;
+  onDockerRecoveryStarted: (callback: (event: unknown) => void) => void;
+  onDockerRecoveryReady: (callback: (event: unknown) => void) => void;
+  onDockerRecoveryCancelled: (callback: (event: unknown) => void) => void;
 };
 
 type PixelatedWindow = Window &
@@ -176,12 +181,22 @@ const revokeInviteBtn = requiredElement("revoke-invite", HTMLButtonElement);
 const dockerRecovery = requiredElement("docker-recovery");
 const dockerRecoveryTitle = requiredElement("docker-recovery-title");
 const dockerRetryBtn = requiredElement("docker-retry", HTMLButtonElement);
+const dockerStartBtn = requiredElement("docker-start", HTMLButtonElement);
 const dockerDownloadBtn = requiredElement("docker-download", HTMLButtonElement);
 const dockerGuideBtn = requiredElement("docker-guide", HTMLButtonElement);
 
 let isRunning = false;
 let pendingCompanionPayload: EngineCompanionPayload | null = null;
 let dockerDiagnostic: DockerDiagnosticPayload | null = null;
+let dockerRecoveryPending = false;
+
+function setDockerRecoveryPending(pending: boolean) {
+  dockerRecoveryPending = pending;
+  dockerStartBtn.innerText = pending ? "Cancel waiting" : "Start Docker";
+  dockerRetryBtn.disabled = pending;
+  dockerDownloadBtn.disabled = pending;
+  dockerGuideBtn.disabled = pending;
+}
 
 function setDockerRecoveryVisible(
   visible: boolean,
@@ -196,6 +211,8 @@ function setDockerRecoveryVisible(
     "hidden",
     diagnostic.code !== "cli_missing",
   );
+  dockerStartBtn.classList.toggle("hidden", !diagnostic.canStartDocker);
+  setDockerRecoveryPending(false);
 }
 
 function initializeEngine() {
@@ -461,6 +478,18 @@ launchWebBtn.addEventListener("click", async () => {
 
 dockerRetryBtn.addEventListener("click", initializeEngine);
 
+dockerStartBtn.addEventListener("click", () => {
+  if (dockerRecoveryPending) {
+    pixelatedWindow.electronAPI.cancelDockerRecovery();
+    return;
+  }
+
+  setDockerRecoveryPending(true);
+  pixelatedWindow.electronAPI.startDockerApplication({
+    exposureMode: exposure.getMode(),
+  });
+});
+
 async function openDockerResource(resource: "guide" | "install") {
   if (!dockerDiagnostic) return;
 
@@ -477,9 +506,11 @@ async function openDockerResource(resource: "guide" | "install") {
       `<span class="text-red-400">Could not open Docker guidance: ${logs.sanitize(String(err))}</span>`,
     );
   } finally {
-    dockerRetryBtn.disabled = false;
-    dockerDownloadBtn.disabled = false;
-    dockerGuideBtn.disabled = false;
+    if (!dockerRecoveryPending) {
+      dockerRetryBtn.disabled = false;
+      dockerDownloadBtn.disabled = false;
+      dockerGuideBtn.disabled = false;
+    }
   }
 }
 
@@ -568,6 +599,18 @@ pixelatedWindow.electronAPI.onDockerDiagnostic((event, payload) => {
   logs.append(
     `<span class="text-gray-400">Platform: ${logs.sanitize(payload.platform)} | Diagnostic: ${logs.sanitize(payload.code)}</span>`,
   );
+});
+
+pixelatedWindow.electronAPI.onDockerRecoveryStarted(() => {
+  setDockerRecoveryPending(true);
+});
+
+pixelatedWindow.electronAPI.onDockerRecoveryReady(() => {
+  setDockerRecoveryVisible(false);
+});
+
+pixelatedWindow.electronAPI.onDockerRecoveryCancelled(() => {
+  setDockerRecoveryPending(false);
 });
 
 pixelatedWindow.electronAPI.onEngineState((event, state) => {
