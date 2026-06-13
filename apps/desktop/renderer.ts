@@ -168,6 +168,7 @@ const powerIcon = requiredElement("power-icon");
 const powerSpinner = requiredElement("power-spinner");
 const powerText = requiredElement("power-text");
 const launchWebBtn = requiredElement("launch-web", HTMLButtonElement);
+const startupPanel = requiredElement("startup-panel");
 const statusBadge = requiredQuery<HTMLElement>(".status-badge");
 const statusDot = requiredElement("status-dot");
 const statusText = requiredElement("status-text");
@@ -212,6 +213,11 @@ function setDockerRecoveryVisible(
 ) {
   dockerDiagnostic = visible ? diagnostic : null;
   dockerRecovery.classList.toggle("hidden", !visible);
+  startupPanel.classList.toggle("recovery-active", visible);
+  if (!visible) {
+    desktopPanels.style.removeProperty("--startup-recovery-height");
+  }
+  requestAnimationFrame(syncPanelHeights);
   if (!visible || !diagnostic) return;
 
   dockerRecoveryTitle.innerText = diagnostic.title;
@@ -288,13 +294,22 @@ const phases = pixelatedWindow.PixelatedPhases.createPhaseTracker({
   phaseSummary: requiredElement("phase-summary"),
 });
 const guestAccessPanel = requiredElement("guest-access-panel");
+const desktopPanels = requiredElement("desktop-panels");
 const syncPanelHeights = () => {
+  if (startupPanel.classList.contains("recovery-active")) {
+    desktopPanels.style.setProperty(
+      "--startup-recovery-height",
+      `${startupPanel.scrollHeight}px`,
+    );
+    return;
+  }
   document.documentElement.style.setProperty(
     "--guest-access-height",
     `${guestAccessPanel.offsetHeight}px`,
   );
 };
 new ResizeObserver(syncPanelHeights).observe(guestAccessPanel);
+new ResizeObserver(syncPanelHeights).observe(startupPanel);
 window.addEventListener("resize", syncPanelHeights);
 syncPanelHeights();
 
