@@ -44,6 +44,10 @@ function normalizeAssetPath(value: string) {
   return value.split(/[?#]/, 1)[0].replace(/^\.?\//, "");
 }
 
+export function normalizeArchiveEntry(value: string) {
+  return value.replace(/^[\\/]+/, "").replaceAll("\\", "/");
+}
+
 function findFiles(root: string, fileName: string): string[] {
   if (!fs.existsSync(root)) return [];
 
@@ -154,9 +158,7 @@ function assertWebDist(resourcesDir: string) {
 
 function assertPackagedApp(archivePath: string) {
   const archiveEntries = new Set(
-    listPackage(archivePath, { isPack: false }).map((entry) =>
-      entry.replace(/^\//, ""),
-    ),
+    listPackage(archivePath, { isPack: false }).map(normalizeArchiveEntry),
   );
   const requiredEntries = [
     "package.json",

@@ -4,6 +4,7 @@ import {
   assertBrowserScript,
   assertPreloadScript,
   getHtmlScriptSources,
+  normalizeArchiveEntry,
 } from "../scripts/releaseSmoke";
 
 describe("desktop packaged release smoke helpers", () => {
@@ -14,6 +15,14 @@ describe("desktop packaged release smoke helpers", () => {
         <script src="./dist/renderer.js"></script>
       `),
       ["dist/renderer/logs.js", "dist/renderer.js"],
+    );
+  });
+
+  it("normalizes macOS/Linux and Windows asar entry separators", () => {
+    assert.equal(normalizeArchiveEntry("/package.json"), "package.json");
+    assert.equal(
+      normalizeArchiveEntry("\\dist\\main\\dockerRecovery.js"),
+      "dist/main/dockerRecovery.js",
     );
   });
 
