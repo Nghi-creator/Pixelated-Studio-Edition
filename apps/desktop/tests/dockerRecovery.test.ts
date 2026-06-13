@@ -20,8 +20,8 @@ describe("Docker Desktop trusted startup plans", () => {
         LOCALAPPDATA: "C:\\Users\\tester\\AppData\\Local",
       }),
       [
-        "C:\\Program Files/Docker/Docker/Docker Desktop.exe",
-        "C:\\Users\\tester\\AppData\\Local/Docker/Docker Desktop.exe",
+        "C:\\Program Files\\Docker\\Docker\\Docker Desktop.exe",
+        "C:\\Users\\tester\\AppData\\Local\\Docker\\Docker Desktop.exe",
       ],
     );
   });
