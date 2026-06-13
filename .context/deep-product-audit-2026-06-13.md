@@ -20,33 +20,16 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy with gaps | Lint and production build pass; component and hook regression coverage is still missing. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, and 10 lifecycle regression contracts pass; broad visual component coverage remains optional follow-up work. |
 | API backend | Hardened, more work queued | Public account enumeration is closed and reactions are atomic; broader abuse controls remain. |
 | Desktop | Healthy | Build, 39 tests, companion security controls, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 28 tests, and live Docker boot smoke pass. |
 | Docker image | Improved | Reproducible Mesen build and smaller image; multi-stage build and pinned Node source remain. |
-| Supabase | Code ready, deployment pending | Security-definer hardening and atomic-reaction migrations exist but have not been applied to hosted environments. |
+| Supabase | Deployed | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. |
 
 ## Next Work Queue
 
 Work these in order unless a production incident changes priority.
-
-### NEXT-03 — P1: Add Frontend Regression Coverage
-
-**Problem**
-
-The web package has lint/build gates but no component or hook test suite.
-Pairing, auth, pagination, cache invalidation, and WebRTC lifecycle behavior
-depend heavily on hosted or manual smoke tests.
-
-**Recommended work**
-
-- Add focused tests for engine invite initialization, API timeout/abort behavior,
-  comment pagination, auth-state cache clearing, and WebRTC cleanup/retry.
-
-**Done when**
-
-- The highest-risk frontend flows run in CI without requiring a hosted browser.
 
 ### NEXT-04 — P1: Continue API Abuse-Control Coverage
 
@@ -110,22 +93,20 @@ cross-platform behavior.
 - Packaged installer smoke on each native OS.
 - TURN relay behavior where direct/STUN connectivity fails.
 
-## Deployment Actions
+## Deployment History
 
 ### DEPLOY-01 — Apply Supabase Security-Definer Hardening
 
-**Status:** Migration written and locally reviewed; not deployed.
+**Status:** Deployed to the hosted database on 2026-06-13.
 
-Apply `supabase/migrations/20260613150000_harden_security_definer_functions.sql`
-to each target Supabase environment, then verify grants and affected API flows.
+Migration:
+`supabase/migrations/20260613150000_harden_security_definer_functions.sql`
 
 ### DEPLOY-02 — Apply Atomic Reaction Functions Before the API Release
 
-**Status:** Migration written and API integration tested; not deployed.
+**Status:** Deployed to the hosted database on 2026-06-13.
 
-Apply `supabase/migrations/20260613210000_atomic_reaction_writes.sql` before
-deploying the corresponding API build. Verify game and comment reaction writes
-through the hosted API after migration.
+Migration: `supabase/migrations/20260613210000_atomic_reaction_writes.sql`
 
 ## Completed Work Ledger
 
@@ -259,8 +240,24 @@ delete or `INSERT ... ON CONFLICT DO UPDATE` operation.
 **Verification:** API failure-case tests prove failed game and comment reaction
 writes preserve the previous reaction.
 
-**Remaining action:** Apply the migration before deploying the API. See
-`DEPLOY-02`.
+**Deployment:** Atomic reaction functions were applied to the hosted database.
+
+### DONE-12 — Add Focused Frontend Regression Coverage
+
+**Problem:** The web package relied on lint/build and hosted smoke tests without
+local contracts for high-risk lifecycle behavior.
+
+**Resolution:** Added dependency-free Node contracts for companion invite
+initialization and failures, API timeout/abort cleanup, comment pagination,
+auth-state cache clearing, WebRTC retry identity, and WebRTC telemetry cleanup.
+The cross-platform release workflow now runs the web contracts.
+
+**Verification:** Web test suite passes 10 contracts alongside lint and the
+production build.
+
+**Remaining risk:** Visual rendering and full browser interaction still depend
+on hosted smoke tests; add component-level browser tests when their maintenance
+cost is justified.
 
 ## Latest Verification Run
 
@@ -268,7 +265,7 @@ Run on 2026-06-13 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web lint and production build | Passed |
+| Web tests, lint, and production build | Passed — 10 tests |
 | API typecheck, lint, build, and tests | Passed — 40 tests |
 | Desktop build and tests | Passed — 39 tests |
 | Desktop packaged release smoke | Passed |

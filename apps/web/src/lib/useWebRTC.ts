@@ -18,6 +18,7 @@ import {
   resolveGameBootTarget,
   type WebRTCStatus,
 } from "./webrtcSession";
+import { createWebRTCRetryIdentity } from "./webrtcIdentity";
 import {
   INITIAL_WEBRTC_TELEMETRY,
   startWebRTCTelemetry,
@@ -584,10 +585,9 @@ export function useWebRTC(
   ]);
 
   const retry = () => {
-    peerIdRef.current = createWebRTCSessionId();
-    if (!options.sessionId) {
-      setSessionId(createWebRTCSessionId());
-    }
+    const identity = createWebRTCRetryIdentity(Boolean(options.sessionId));
+    peerIdRef.current = identity.peerId;
+    if (identity.sessionId) setSessionId(identity.sessionId);
     metricsDisabledRef.current = false;
     lastMetricSentAtRef.current = 0;
     setRetryVersion((currentVersion) => currentVersion + 1);

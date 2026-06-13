@@ -1,5 +1,10 @@
 import { supabase } from "./supabaseClient";
 import type { Session } from "@supabase/supabase-js";
+import {
+  createRequestAbortController,
+  withTimeout,
+} from "./requestLifecycle";
+import { clearAuthScopedCache } from "./authCache";
 
 const LOCAL_API_URL = "http://127.0.0.1:4000";
 const PRODUCTION_API_URL = "https://pixelated-api-services.onrender.com";
@@ -39,40 +44,40 @@ export class ApiError extends Error {
   }
 }
 
-let sessionPromise: Promise<Session | null> | null = null;
-let permissionsCache:
-  | {
+const authScopedCache = {
+  session: null as Promise<Session | null> | null,
+  permissions: null as
+    | {
       expiresAt: number;
       promise: Promise<ApiPermissionsResponse>;
       value?: ApiPermissionsResponse;
     }
-  | null = null;
-let favoritesCache:
-  | {
+    | null,
+  favorites: null as
+    | {
       expiresAt: number;
       promise: Promise<Set<string>>;
       value?: Set<string>;
     }
-  | null = null;
+    | null,
+};
 
 supabase.auth.onAuthStateChange(() => {
-  sessionPromise = null;
-  permissionsCache = null;
-  favoritesCache = null;
+  clearAuthScopedCache(authScopedCache);
 });
 
 export async function getAuthSession() {
-  if (!sessionPromise) {
-    sessionPromise = supabase.auth
+  if (!authScopedCache.session) {
+    authScopedCache.session = supabase.auth
       .getSession()
       .then(({ data: { session } }) => session ?? null)
       .catch((error) => {
-        sessionPromise = null;
+        authScopedCache.session = null;
         throw error;
       });
   }
 
-  return sessionPromise;
+  return authScopedCache.session;
 }
 
 function isCacheFresh(cache: { expiresAt: number } | null) {
@@ -80,31 +85,11 @@ function isCacheFresh(cache: { expiresAt: number } | null) {
 }
 
 function clearFavoritesCache() {
-  favoritesCache = null;
+  authScopedCache.favorites = null;
 }
 
 function clearPermissionsCache() {
-  permissionsCache = null;
-}
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  message: string,
-) {
-  let timeout: number | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timeout = window.setTimeout(() => {
-          reject(new ApiError(0, { error: message }));
-        }, timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeout !== undefined) window.clearTimeout(timeout);
-  }
+  authScopedCache.permissions = null;
 }
 
 export async function apiRequest<T>(
@@ -127,7 +112,11 @@ export async function apiRequest<T>(
     const session = await withTimeout(
       getAuthSession(),
       timeoutMs,
-      "Authentication did not respond in time. Refresh the page and try again.",
+      () =>
+        new ApiError(0, {
+          error:
+            "Authentication did not respond in time. Refresh the page and try again.",
+        }),
     );
 
     if (session?.access_token) {
@@ -135,19 +124,10 @@ export async function apiRequest<T>(
     }
   }
 
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => {
-    controller.abort();
-  }, timeoutMs);
-  const requestSignal = options.signal;
-
-  if (requestSignal?.aborted) {
-    controller.abort();
-  } else {
-    requestSignal?.addEventListener("abort", () => controller.abort(), {
-      once: true,
-    });
-  }
+  const { controller, cleanup } = createRequestAbortController(
+    timeoutMs,
+    options.signal,
+  );
 
   let response: Response;
   try {
@@ -166,7 +146,7 @@ export async function apiRequest<T>(
 
     throw error;
   } finally {
-    window.clearTimeout(timeout);
+    cleanup();
   }
 
   const payload = await response.json().catch(() => null);
@@ -179,18 +159,18 @@ export async function apiRequest<T>(
 }
 
 async function getCachedPermissions(): Promise<ApiPermissionsResponse> {
-  if (isCacheFresh(permissionsCache) && permissionsCache) {
-    if (permissionsCache.value) return permissionsCache.value;
-    return permissionsCache.promise;
+  if (isCacheFresh(authScopedCache.permissions) && authScopedCache.permissions) {
+    if (authScopedCache.permissions.value) return authScopedCache.permissions.value;
+    return authScopedCache.permissions.promise;
   }
 
   const promise = apiRequest<ApiPermissionsResponse>("/me/permissions").then(
     (value) => {
-      if (permissionsCache) permissionsCache.value = value;
+      if (authScopedCache.permissions) authScopedCache.permissions.value = value;
       return value;
     },
   );
-  permissionsCache = {
+  authScopedCache.permissions = {
     expiresAt: Date.now() + CLIENT_CACHE_TTL_MS,
     promise,
   };
@@ -203,9 +183,9 @@ type FavoriteLike = {
 };
 
 async function getFavoriteIds(): Promise<Set<string>> {
-  if (isCacheFresh(favoritesCache) && favoritesCache) {
-    if (favoritesCache.value) return favoritesCache.value;
-    return favoritesCache.promise;
+  if (isCacheFresh(authScopedCache.favorites) && authScopedCache.favorites) {
+    if (authScopedCache.favorites.value) return authScopedCache.favorites.value;
+    return authScopedCache.favorites.promise;
   }
 
   const promise = apiRequest<{ favorites: FavoriteLike[] }>("/favorites").then(
@@ -215,12 +195,12 @@ async function getFavoriteIds(): Promise<Set<string>> {
           .map((favorite) => favorite.id || favorite.game_id)
           .filter((id): id is string => Boolean(id)),
       );
-      if (favoritesCache) favoritesCache.value = favoriteIds;
+      if (authScopedCache.favorites) authScopedCache.favorites.value = favoriteIds;
       return favoriteIds;
     },
   );
 
-  favoritesCache = {
+  authScopedCache.favorites = {
     expiresAt: Date.now() + CLIENT_CACHE_TTL_MS,
     promise,
   };

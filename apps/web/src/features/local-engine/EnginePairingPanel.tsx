@@ -28,6 +28,11 @@ import {
   getEngineUrl,
   setEngineUrl,
 } from "../../lib/engineConfig";
+import {
+  getInviteCompanionUrl,
+  getInviteFailureMessage,
+  isLikelyCompanionUrl,
+} from "./inviteUtils";
 
 type PairingState = "idle" | "checking" | "paired" | "error";
 type EngineUrlScope = "local" | "lan" | "custom";
@@ -150,35 +155,6 @@ const getScopeDescription = (scope: EngineUrlScope) => {
   return "Connects to an engine running on this computer.";
 };
 
-const isLikelyCompanionUrl = (url: URL) =>
-  url.protocol === "https:" && url.port === "8090";
-
-const getInviteCompanionUrl = () => {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("join") !== "invite") return null;
-  return params.get("companionUrl");
-};
-
-const getInviteFailureMessage = (status: number, code?: string) => {
-  if (status === 401) return "That invite code was not accepted by the host.";
-  if (code === "invite_expired") {
-    return "That invite code expired. Ask the host to regenerate it.";
-  }
-  if (code === "invite_revoked") {
-    return "That invite code was revoked. Ask the host to regenerate it.";
-  }
-  if (status === 410) {
-    return "That invite code expired or was revoked. Ask the host for a fresh code.";
-  }
-  if (code === "host_engine_unavailable" || status === 503) {
-    return "The join page is ready, but the host engine is unavailable. Ask the host to initialize or restart it.";
-  }
-  if (status >= 500) {
-    return "The host join page is reachable, but invite redemption failed. Ask the host to restart LAN mode.";
-  }
-  return "Could not redeem that invite code.";
-};
-
 const getPairingFailureMessage = ({
   error,
   parsedUrl,
@@ -273,10 +249,10 @@ export function EnginePairingPanel({
   onPaired,
 }: EnginePairingPanelProps) {
   const [engineUrl, setEngineUrlInput] = useState(
-    () => getInviteCompanionUrl() || getEngineUrl(),
+    () => getInviteCompanionUrl(window.location.search) || getEngineUrl(),
   );
   const [inviteJoinRequested, setInviteJoinRequested] = useState(
-    () => Boolean(getInviteCompanionUrl()),
+    () => Boolean(getInviteCompanionUrl(window.location.search)),
   );
   const [inviteCode, setInviteCode] = useState("");
   const [token, setToken] = useState(getEngineToken);
@@ -284,7 +260,9 @@ export function EnginePairingPanel({
     token ? "paired" : "idle",
   );
   const [lanPreflight, setLanPreflight] = useState<LanPreflightState>(() => {
-    const initialUrl = parseEngineUrl(getInviteCompanionUrl() || getEngineUrl());
+    const initialUrl = parseEngineUrl(
+      getInviteCompanionUrl(window.location.search) || getEngineUrl(),
+    );
     return {
       status:
         initialUrl && isLikelyCompanionUrl(initialUrl) ? "checking" : "idle",
