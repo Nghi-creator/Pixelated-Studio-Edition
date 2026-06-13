@@ -7,7 +7,7 @@ import {
   ensureEngineToken,
   getCompanionAccessToken,
 } from "../engine/engineAuth";
-import { engineEndpoint, getEngineUrl } from "../engine/engineConfig";
+import { getEngineUrl } from "../engine/engineConfig";
 import { attachEngineInput } from "./webrtcInput";
 import {
   createAndSendOffer,
@@ -25,65 +25,33 @@ import {
   type WebRTCTelemetry,
 } from "./webrtcTelemetry";
 import type { StreamProfile } from "../engine/streamProfiles";
+import {
+  CHECKING_INPUT_CAPABILITIES,
+  loadEngineInputCapabilities,
+  loadEngineShareContext,
+} from "./engineContext";
+import type {
+  EngineInputCapabilities,
+  EngineShareContext,
+  LobbyParticipant,
+  LobbyState,
+  UseWebRTCOptions,
+} from "./types";
+
+export type {
+  EngineInputCapabilities,
+  EngineShareContext,
+  LobbyParticipant,
+  LobbyRole,
+  LobbyState,
+  WebRTCMode,
+} from "./types";
 
 const STREAM_METRIC_SEND_INTERVAL_MS = 5_000;
 const DISCONNECTED_GRACE_MS = 5_000;
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
 ];
-const KEYBOARD_FALLBACK_PLAYER_COUNT = 2;
-const VIRTUAL_GAMEPAD_PLAYER_COUNT = 4;
-
-export type LobbyRole = "host" | "player" | "spectator";
-
-export type LobbyParticipant = {
-  connectedAt: string;
-  displayName: string;
-  playerIndex: number | null;
-  role: LobbyRole;
-  socketId: string;
-};
-
-export type LobbyState = {
-  hostSocketId: string | null;
-  maxPlayers: number;
-  participants: LobbyParticipant[];
-  sessionId: string;
-};
-
-export type EngineInputCapabilities = {
-  limitationReason: string | null;
-  source: "checking" | "health" | "unavailable";
-  supportedPlayerCount: number;
-};
-
-type EngineHealthPayload = {
-  companionUrls?: string[];
-  checks?: {
-    gamepadBridge?: {
-      failed?: boolean;
-      fileExists?: boolean;
-      ready?: boolean;
-      uinputAvailable?: boolean;
-    };
-  };
-  exposureMode?: "local" | "lan";
-};
-
-export type WebRTCMode = "host" | "guest";
-
-export type EngineShareContext = {
-  companionUrls: string[];
-  exposureMode: "local" | "lan" | "unknown";
-};
-
-type UseWebRTCOptions = {
-  displayName?: string;
-  mode?: WebRTCMode;
-  requestedRole?: LobbyRole;
-  sessionId?: string | null;
-};
-
 async function loadIceServers() {
   try {
     const { iceServers } = await api.iceServers();
@@ -91,79 +59,6 @@ async function loadIceServers() {
   } catch (err) {
     console.warn("[WebRTC] Falling back to default STUN config:", err);
     return FALLBACK_ICE_SERVERS;
-  }
-}
-
-function getInputCapabilitiesFromHealth(
-  health: EngineHealthPayload,
-): EngineInputCapabilities {
-  const bridge = health.checks?.gamepadBridge;
-
-  if (!bridge?.fileExists) {
-    return {
-      limitationReason:
-        "P3/P4 are disabled because the virtual gamepad bridge is missing. Spectators can still join and watch.",
-      source: "health",
-      supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
-    };
-  }
-
-  if (!bridge.uinputAvailable) {
-    return {
-      limitationReason:
-        "P3/P4 are disabled because /dev/uinput is not available to the engine. P1/P2 use keyboard fallback; spectators can still join.",
-      source: "health",
-      supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
-    };
-  }
-
-  if (bridge.failed) {
-    return {
-      limitationReason:
-        "P3/P4 are disabled because the virtual gamepad bridge failed to start. P1/P2 remain playable and spectators can still join.",
-      source: "health",
-      supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
-    };
-  }
-
-  return {
-    limitationReason: null,
-    source: "health",
-    supportedPlayerCount: VIRTUAL_GAMEPAD_PLAYER_COUNT,
-  };
-}
-
-async function loadEngineInputCapabilities(): Promise<EngineInputCapabilities> {
-  try {
-    const response = await fetch(engineEndpoint("/health"));
-    if (!response.ok) throw new Error("Engine health check failed.");
-    const health = (await response.json()) as EngineHealthPayload;
-    return getInputCapabilitiesFromHealth(health);
-  } catch (err) {
-    console.warn("[WebRTC] Could not load engine input capabilities:", err);
-    return {
-      limitationReason:
-        "P3/P4 are disabled because engine health is unavailable. P1/P2 remain playable and spectators can still join.",
-      source: "unavailable",
-      supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
-    };
-  }
-}
-
-async function loadEngineShareContext(): Promise<EngineShareContext> {
-  try {
-    const response = await fetch(engineEndpoint("/health"));
-    const health = (await response.json()) as EngineHealthPayload;
-    return {
-      companionUrls: health.companionUrls || [],
-      exposureMode: health.exposureMode || "unknown",
-    };
-  } catch (err) {
-    console.warn("[WebRTC] Could not load engine share context:", err);
-    return {
-      companionUrls: [],
-      exposureMode: "unknown",
-    };
   }
 }
 
@@ -180,12 +75,7 @@ export function useWebRTC(
   const [localParticipant, setLocalParticipant] =
     useState<LobbyParticipant | null>(null);
   const [inputCapabilities, setInputCapabilities] =
-    useState<EngineInputCapabilities>({
-      limitationReason:
-        "Checking engine gamepad support before enabling P3/P4. Spectators can still join.",
-      source: "checking",
-      supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
-    });
+    useState<EngineInputCapabilities>(CHECKING_INPUT_CAPABILITIES);
   const [shareContext, setShareContext] = useState<EngineShareContext>({
     companionUrls: [],
     exposureMode: "unknown",
@@ -281,12 +171,7 @@ export function useWebRTC(
       setLobbyState(null);
       setLocalParticipant(null);
       localParticipantRef.current = null;
-      setInputCapabilities({
-        limitationReason:
-          "Checking engine gamepad support before enabling P3/P4. Spectators can still join.",
-        source: "checking",
-        supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
-      });
+      setInputCapabilities(CHECKING_INPUT_CAPABILITIES);
       setShareContext({
         companionUrls: [],
         exposureMode: "unknown",
