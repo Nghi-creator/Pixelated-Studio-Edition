@@ -1,0 +1,78 @@
+name: Desktop Cross-Platform Release Validation
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/desktop-release-validation.yml"
+      - "apps/desktop/**"
+      - "apps/web/**"
+      - "engine/runtime/**"
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/desktop-release-validation.yml"
+      - "apps/desktop/**"
+      - "apps/web/**"
+      - "engine/runtime/**"
+  workflow_dispatch:
+
+concurrency:
+  group: desktop-release-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  native-release:
+    name: ${{ matrix.label }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS DMG
+            os: macos-14
+            artifact: macos-dmg
+          - label: Windows NSIS
+            os: windows-latest
+            artifact: windows-nsis
+          - label: Ubuntu AppImage
+            os: ubuntu-latest
+            artifact: ubuntu-appimage
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 35
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          cache-dependency-path: |
+            apps/desktop/package-lock.json
+            apps/web/package-lock.json
+          node-version: 22
+
+      - name: Install desktop and web dependencies
+        run: |
+          npm ci --prefix apps/desktop
+          npm ci --prefix apps/web
+
+      - name: Run desktop diagnostic and release contracts
+        run: npm test --prefix apps/desktop
+
+      - name: Build native installer and run packaged smoke
+        run: npm run dist:ci --prefix apps/desktop
+
+      - name: Upload native desktop release
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: pixelated-desktop-${{ matrix.artifact }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.exe
+            apps/desktop/release/*.AppImage
+          retention-days: 14

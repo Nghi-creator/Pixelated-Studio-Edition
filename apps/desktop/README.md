@@ -92,6 +92,13 @@ contexts. **Copy diagnostics** produces a shareable normalized summary without
 raw Docker output, environment values, tokens, or filesystem paths. Full raw
 details remain local in System Logs for troubleshooting.
 
+Cross-platform release validation runs through
+`.github/workflows/desktop-release-validation.yml`. It executes desktop
+diagnostic contracts, builds the native DMG, NSIS installer, or AppImage on its
+matching GitHub runner, runs the packaged `app.asar` smoke, and uploads the
+installer artifact. Real-machine onboarding results are tracked separately in
+`.context/docker-onboarding-validation.md`.
+
 The desktop app passes `PIXELATED_API_URL` into the engine so cloud sessions can be verified with the backend before boot. It defaults to the hosted Render API; override it for localhost API testing:
 
 ```txt

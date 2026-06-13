@@ -19,6 +19,13 @@ type DesktopPackageJson = {
     files?: string[];
     mac?: {
       icon?: string;
+      target?: string;
+    };
+    linux?: {
+      target?: string;
+    };
+    win?: {
+      target?: string;
     };
   };
   dependencies?: Record<string, string>;
@@ -62,6 +69,32 @@ describe("desktop package config", () => {
     const packageJson = readPackageJson();
 
     assert.equal(packageJson.build.mac?.icon, "build/icon.png");
+  });
+
+  it("defines native installer targets for every supported desktop OS", () => {
+    const packageJson = readPackageJson();
+
+    assert.equal(packageJson.build.mac?.target, "dmg");
+    assert.equal(packageJson.build.win?.target, "nsis");
+    assert.equal(packageJson.build.linux?.target, "AppImage");
+    assert.match(packageJson.scripts?.["dist:ci"] || "", /electron-builder/);
+    assert.match(packageJson.scripts?.["dist:ci"] || "", /smoke:release/);
+  });
+
+  it("validates native releases on macOS, Windows, and Ubuntu runners", () => {
+    const workflowPath = path.resolve(
+      __dirname,
+      "../../../../.github/workflows/desktop-release-validation.yml",
+    );
+    const workflow = fs.readFileSync(workflowPath, "utf8");
+
+    assert.match(workflow, /os: macos-14/);
+    assert.match(workflow, /os: windows-latest/);
+    assert.match(workflow, /os: ubuntu-latest/);
+    assert.match(workflow, /npm run dist:ci --prefix apps\/desktop/);
+    assert.match(workflow, /apps\/desktop\/release\/\*\.dmg/);
+    assert.match(workflow, /apps\/desktop\/release\/\*\.exe/);
+    assert.match(workflow, /apps\/desktop\/release\/\*\.AppImage/);
   });
 
   it("ships the QR encoder used by the preload bridge", () => {

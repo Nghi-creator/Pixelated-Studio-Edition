@@ -52,7 +52,9 @@ export function getDockerGuideUrl(
     return getDockerInstallUrl(platform);
   }
   if (code === "permission_denied") {
-    return "https://docs.docker.com/engine/install/linux-postinstall/";
+    return platform === "linux"
+      ? "https://docs.docker.com/engine/install/linux-postinstall/"
+      : "https://docs.docker.com/desktop/troubleshoot-and-support/troubleshoot/";
   }
   if (code === "virtualization_unavailable" && platform === "win32") {
     return "https://docs.docker.com/desktop/setup/install/windows-install/#system-requirements";

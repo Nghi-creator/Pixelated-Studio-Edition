@@ -84,6 +84,10 @@ describe("Docker diagnostic presentation", () => {
       getDockerGuideUrl("permission_denied", "linux"),
       /linux-postinstall/,
     );
+    assert.doesNotMatch(
+      getDockerGuideUrl("permission_denied", "darwin"),
+      /linux-postinstall/,
+    );
     assert.match(
       getDockerGuideUrl("virtualization_unavailable", "win32"),
       /windows-install/,

@@ -383,6 +383,9 @@ Exit criteria:
 
 ### Phase 5: Cross-Platform Release Validation
 
+Status: Automated native release gate implemented on 2026-06-13. GitHub runner
+results and the remaining real-machine manual matrix are pending.
+
 Goal: prove the workflow outside the development Mac.
 
 Required smoke matrix:
@@ -463,3 +466,7 @@ Phase 4 adds targeted recovery instructions and a copyable diagnostic summary
 containing only normalized status, platform, next step, and official guide URL.
 Raw Docker output, environment values, tokens, and filesystem paths are excluded
 from the shareable summary.
+
+Phase 5 adds native DMG, NSIS, and AppImage packaging plus packaged-app smoke
+validation in GitHub Actions. Local Apple Silicon results and pending manual
+real-machine checks are tracked in `.context/docker-onboarding-validation.md`.
