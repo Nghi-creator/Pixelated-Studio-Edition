@@ -781,6 +781,88 @@ test("comment reactions reject self-reactions and replace atomically", async () 
   await selfApp.close();
 });
 
+test("write-heavy social and play routes are rate limited per user", async () => {
+  const commentsDb = new FakeSupabase();
+  const commentsApp = await createDataBoundaryApp(commentsDb, USER_ID);
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const response = await commentsApp.inject({
+      method: "POST",
+      payload: { content: `comment ${attempt}` },
+      url: `/games/${GAME_ID}/comments`,
+    });
+    assert.equal(response.statusCode, 201);
+  }
+  const blockedComment = await commentsApp.inject({
+    method: "POST",
+    payload: { content: "blocked comment" },
+    url: `/games/${GAME_ID}/comments`,
+  });
+  assert.equal(blockedComment.statusCode, 429);
+  assert.equal(commentsDb.rows.comments.length, 10);
+  await commentsApp.close();
+
+  const reportsDb = new FakeSupabase();
+  const reportsApp = await createDataBoundaryApp(reportsDb, USER_ID);
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const response = await reportsApp.inject({
+      method: "POST",
+      payload: { reason: `report ${attempt}` },
+      url: `/moderation/comments/${COMMENT_ID}/report`,
+    });
+    assert.equal(response.statusCode, 200);
+  }
+  const blockedReport = await reportsApp.inject({
+    method: "POST",
+    payload: { reason: "blocked report" },
+    url: `/moderation/comments/${COMMENT_ID}/report`,
+  });
+  assert.equal(blockedReport.statusCode, 429);
+  assert.equal(reportsDb.rows.reported_comments.length, 10);
+  await reportsApp.close();
+
+  const reactionsDb = new FakeSupabase();
+  const reactionsApp = await createDataBoundaryApp(reactionsDb, USER_ID);
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const response = await reactionsApp.inject({
+      method: "PUT",
+      payload: { isLike: attempt % 2 === 0 },
+      url: `/games/${GAME_ID}/reaction`,
+    });
+    assert.equal(response.statusCode, 200);
+  }
+  const blockedReaction = await reactionsApp.inject({
+    method: "PUT",
+    payload: { isLike: true },
+    url: `/games/${GAME_ID}/reaction`,
+  });
+  assert.equal(blockedReaction.statusCode, 429);
+  assert.equal(
+    reactionsDb.rpcCalls.filter((call) => call.fn === "set_game_reaction").length,
+    120,
+  );
+  await reactionsApp.close();
+
+  const playsDb = new FakeSupabase();
+  const playsApp = await createDataBoundaryApp(playsDb, USER_ID);
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const response = await playsApp.inject({
+      method: "POST",
+      url: `/games/${GAME_ID}/play-count`,
+    });
+    assert.equal(response.statusCode, 200);
+  }
+  const blockedPlay = await playsApp.inject({
+    method: "POST",
+    url: `/games/${GAME_ID}/play-count`,
+  });
+  assert.equal(blockedPlay.statusCode, 429);
+  assert.equal(
+    playsDb.rpcCalls.filter((call) => call.fn === "increment_play_count").length,
+    60,
+  );
+  await playsApp.close();
+});
+
 test("profile routes update only the authenticated profile and delete auth user", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);

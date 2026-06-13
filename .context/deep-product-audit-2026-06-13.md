@@ -21,7 +21,7 @@ product and infrastructure; it does not introduce new product features.
 | Area | Status | Summary |
 | --- | --- | --- |
 | Web frontend | Healthy, focused coverage added | Lint, production build, and 10 lifecycle regression contracts pass; broad visual component coverage remains optional follow-up work. |
-| API backend | Hardened, more work queued | Public account enumeration is closed and reactions are atomic; broader abuse controls remain. |
+| API backend | Hardened, more work queued | Public account enumeration is closed, reactions are atomic, and write-heavy routes have per-user limits; shared-store limits remain. |
 | Desktop | Healthy | Build, 39 tests, companion security controls, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 28 tests, and live Docker boot smoke pass. |
 | Docker image | Improved | Reproducible Mesen build and smaller image; multi-stage build and pinned Node source remain. |
@@ -31,18 +31,17 @@ product and infrastructure; it does not introduce new product features.
 
 Work these in order unless a production incident changes priority.
 
-### NEXT-04 — P1: Continue API Abuse-Control Coverage
+### NEXT-04 — P1: Move API Abuse Controls to a Shared Store
 
 **Problem**
 
-Session verification, submissions, metrics, and LAN invite redemption have
-focused throttles. Other write-heavy routes still rely on authentication and
-database constraints. Current API throttles are process-local.
+Session verification, submissions, metrics, LAN invite redemption, reports,
+play-count writes, comments, and reactions have focused throttles. In-memory
+limits reset on process restart and do not coordinate across multiple API
+instances.
 
 **Recommended work**
 
-- Add route-specific limits for reports, play-count writes, comments, and
-  reactions.
 - Use a shared rate-limit store before horizontally scaling the API.
 
 **Done when**
@@ -259,6 +258,20 @@ production build.
 on hosted smoke tests; add component-level browser tests when their maintenance
 cost is justified.
 
+### DONE-13 — Add Write-Heavy API Abuse Controls
+
+**Problem:** Authenticated users could generate unbounded report, comment,
+reaction, and play-count writes.
+
+**Resolution:** Added conservative per-user limits for reports, comments,
+reactions, and play-count writes. Blocked requests return `429` with
+`Retry-After` guidance before any storage or RPC write occurs.
+
+**Verification:** API route tests hit each threshold and prove blocked requests
+do not create additional rows or RPC calls.
+
+**Remaining risk:** Limits are process-local. See `NEXT-04`.
+
 ## Latest Verification Run
 
 Run on 2026-06-13 after the completed hardening work:
@@ -266,7 +279,7 @@ Run on 2026-06-13 after the completed hardening work:
 | Gate | Result |
 | --- | --- |
 | Web tests, lint, and production build | Passed — 10 tests |
-| API typecheck, lint, build, and tests | Passed — 40 tests |
+| API typecheck, lint, build, and tests | Passed — 42 tests |
 | Desktop build and tests | Passed — 39 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 28 tests |

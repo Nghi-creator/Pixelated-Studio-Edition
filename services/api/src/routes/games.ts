@@ -4,6 +4,8 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import { FixedWindowRateLimiter } from "../modules/security/fixedWindowRateLimiter.js";
+import { rejectRateLimitedRequest } from "../modules/security/rateLimitResponse.js";
 
 const gameParamsSchema = z.object({
   gameId: z.string().uuid(),
@@ -22,11 +24,20 @@ export async function registerGameRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const playCountWriteLimiter = new FixedWindowRateLimiter({
+    limit: 60,
+    windowMs: 60_000,
+  });
 
   app.post(
     "/games/:gameId/play-count",
     { preHandler: requireUser },
     async (request, reply) => {
+      const user = request.user;
+      if (!user) {
+        return reply.status(401).send({ error: "Missing authenticated user" });
+      }
+
       if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
@@ -36,6 +47,15 @@ export async function registerGameRoutes(
       const parsedParams = gameParamsSchema.safeParse(request.params);
       if (!parsedParams.success) {
         return reply.status(400).send({ error: "Invalid game id" });
+      }
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          playCountWriteLimiter.consume(user.id),
+          "Play-count limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
       }
 
       const { error } = await service.rpc("increment_play_count", {

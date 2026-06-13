@@ -5,6 +5,8 @@ import {
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
 import { TtlCache } from "../modules/cache/ttlCache.js";
+import { FixedWindowRateLimiter } from "../modules/security/fixedWindowRateLimiter.js";
+import { rejectRateLimitedRequest } from "../modules/security/rateLimitResponse.js";
 import {
   logTiming,
   timed,
@@ -89,6 +91,14 @@ export async function registerCatalogRoutes(
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
   const gamesCatalogCache = new TtlCache<CachedGamesCatalogResponse>(60_000);
+  const commentWriteLimiter = new FixedWindowRateLimiter({
+    limit: 10,
+    windowMs: 60_000,
+  });
+  const reactionWriteLimiter = new FixedWindowRateLimiter({
+    limit: 120,
+    windowMs: 60_000,
+  });
 
   const fetchFeaturedGames = async (timings: TimingFields) => {
     const { data, error } = await timed(
@@ -456,6 +466,15 @@ export async function registerCatalogRoutes(
       if (!params.success || !body.success) {
         return reply.status(400).send({ error: "Invalid reaction" });
       }
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          reactionWriteLimiter.consume(user.id),
+          "Reaction limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
+      }
 
       const { error } = await service.rpc("set_game_reaction", {
         p_game_id: params.data.gameId,
@@ -524,6 +543,15 @@ export async function registerCatalogRoutes(
       const body = commentBodySchema.safeParse(request.body);
       if (!params.success || !body.success) {
         return reply.status(400).send({ error: "Invalid comment" });
+      }
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          commentWriteLimiter.consume(user.id),
+          "Comment limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
       }
 
       const { error } = await service.from("comments").insert({
@@ -609,6 +637,15 @@ export async function registerCatalogRoutes(
       }
       if (!comment || comment.user_id === user.id) {
         return reply.status(403).send({ error: "Cannot react to this comment" });
+      }
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          reactionWriteLimiter.consume(user.id),
+          "Reaction limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
       }
 
       const { error: reactionError } = await service.rpc("set_comment_reaction", {
