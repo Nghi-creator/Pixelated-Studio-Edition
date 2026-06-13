@@ -158,6 +158,30 @@
   function createPhaseTracker({ phaseList, phaseSummary }: PhaseTrackerElements) {
     function render(state: EngineState = { status: "idle", phase: "idle" }) {
       const activePhase = getPhaseForState(state);
+      const summaryToneClasses = {
+        idle: ["border-synth-border", "bg-[#050810]", "text-gray-500"],
+        stopped: ["border-synth-border", "bg-[#050810]", "text-gray-500"],
+        starting: [
+          "border-orange-500/50",
+          "bg-orange-500/10",
+          "text-orange-300",
+        ],
+        stopping: [
+          "border-orange-500/50",
+          "bg-orange-500/10",
+          "text-orange-300",
+        ],
+        ready: [
+          "border-emerald-500/50",
+          "bg-emerald-500/10",
+          "text-emerald-300",
+        ],
+        failed: ["border-red-500/50", "bg-red-500/10", "text-red-300"],
+      } as const;
+      const allSummaryToneClasses = Object.values(summaryToneClasses).flat();
+
+      phaseSummary.classList.remove(...allSummaryToneClasses);
+      phaseSummary.classList.add(...summaryToneClasses[state.status]);
       phaseSummary.innerText =
         state.status === "ready"
           ? "Ready"
