@@ -38,13 +38,13 @@ export function getTrustedDockerDesktopCandidates(
   if (platform === "darwin") {
     return [
       "/Applications/Docker.app",
-      path.join(homeDir, "Applications", "Docker.app"),
+      path.posix.join(homeDir, "Applications", "Docker.app"),
     ];
   }
   if (platform === "win32") {
     return [
       env.ProgramFiles
-        ? path.join(
+        ? path.win32.join(
             env.ProgramFiles,
             "Docker",
             "Docker",
@@ -52,7 +52,7 @@ export function getTrustedDockerDesktopCandidates(
           )
         : "",
       env.LOCALAPPDATA
-        ? path.join(env.LOCALAPPDATA, "Docker", "Docker Desktop.exe")
+        ? path.win32.join(env.LOCALAPPDATA, "Docker", "Docker Desktop.exe")
         : "",
     ].filter(Boolean);
   }
