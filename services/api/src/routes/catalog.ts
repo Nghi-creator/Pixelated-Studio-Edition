@@ -457,26 +457,14 @@ export async function registerCatalogRoutes(
         return reply.status(400).send({ error: "Invalid reaction" });
       }
 
-      const { error: deleteError } = await service
-        .from("likes")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("game_id", params.data.gameId);
-      if (deleteError) {
-        request.log.error({ err: deleteError }, "Failed to replace reaction");
+      const { error } = await service.rpc("set_game_reaction", {
+        p_game_id: params.data.gameId,
+        p_is_like: body.data.isLike,
+        p_user_id: user.id,
+      });
+      if (error) {
+        request.log.error({ err: error }, "Failed to save reaction");
         return reply.status(500).send({ error: "Failed to save reaction" });
-      }
-
-      if (body.data.isLike !== null) {
-        const { error } = await service.from("likes").insert({
-          game_id: params.data.gameId,
-          is_like: body.data.isLike,
-          user_id: user.id,
-        });
-        if (error) {
-          request.log.error({ err: error }, "Failed to save reaction");
-          return reply.status(500).send({ error: "Failed to save reaction" });
-        }
       }
 
       return { success: true };
@@ -623,25 +611,17 @@ export async function registerCatalogRoutes(
         return reply.status(403).send({ error: "Cannot react to this comment" });
       }
 
-      const { error: deleteError } = await service
-        .from("comment_likes")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("comment_id", params.data.commentId);
-      if (deleteError) {
-        request.log.error({ err: deleteError }, "Failed to replace comment reaction");
+      const { error: reactionError } = await service.rpc("set_comment_reaction", {
+        p_comment_id: params.data.commentId,
+        p_is_like: body.data.isLike,
+        p_user_id: user.id,
+      });
+      if (reactionError) {
+        request.log.error(
+          { err: reactionError },
+          "Failed to save comment reaction",
+        );
         return reply.status(500).send({ error: "Failed to save comment reaction" });
-      }
-      if (body.data.isLike !== null) {
-        const { error: insertError } = await service.from("comment_likes").insert({
-          comment_id: params.data.commentId,
-          is_like: body.data.isLike,
-          user_id: user.id,
-        });
-        if (insertError) {
-          request.log.error({ err: insertError }, "Failed to save comment reaction");
-          return reply.status(500).send({ error: "Failed to save comment reaction" });
-        }
       }
 
       const { data, error: loadError } = await service

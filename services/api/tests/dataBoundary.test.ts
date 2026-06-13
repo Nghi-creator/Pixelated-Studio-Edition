@@ -66,6 +66,7 @@ class FakeSupabase {
     profiles: [],
   };
   rpcCalls: { fn: string; params: RecordRow }[] = [];
+  rpcErrors = new Map<string, Error>();
   auth = {
     admin: {
       deleteUser: async (userId: string) => {
@@ -101,6 +102,19 @@ class FakeSupabase {
 
   async rpc(fn: string, params: RecordRow) {
     this.rpcCalls.push({ fn, params });
+    const rpcError = this.rpcErrors.get(fn);
+    if (rpcError) return { data: null, error: rpcError };
+
+    if (fn === "set_game_reaction") {
+      this.setReaction("likes", "game_id", params.p_game_id, params);
+      return { data: null, error: null };
+    }
+
+    if (fn === "set_comment_reaction") {
+      this.setReaction("comment_likes", "comment_id", params.p_comment_id, params);
+      return { data: null, error: null };
+    }
+
     if (fn === "admin_access_log_summary") {
       const page = Math.max(1, Number(params.p_page || 1));
       const pageSize = Math.min(100, Math.max(1, Number(params.p_page_size || 25)));
@@ -159,6 +173,30 @@ class FakeSupabase {
     }
 
     return { data: null, error: null };
+  }
+
+  private setReaction(
+    table: "comment_likes" | "likes",
+    targetField: "comment_id" | "game_id",
+    targetId: unknown,
+    params: RecordRow,
+  ) {
+    const existing = this.rows[table].find(
+      (row) =>
+        row.user_id === params.p_user_id && row[targetField] === targetId,
+    );
+
+    if (params.p_is_like === null) {
+      this.rows[table] = this.rows[table].filter((row) => row !== existing);
+    } else if (existing) {
+      existing.is_like = params.p_is_like;
+    } else {
+      this.rows[table].push({
+        [targetField]: targetId,
+        is_like: params.p_is_like,
+        user_id: params.p_user_id,
+      });
+    }
   }
 }
 
@@ -667,7 +705,37 @@ test("comment delete is scoped to owner unless actor is admin", async () => {
   await adminApp.close();
 });
 
-test("comment reactions reject self-reactions and replace prior reactions", async () => {
+test("game reactions replace atomically and preserve prior state on failure", async () => {
+  const db = new FakeSupabase();
+  db.rows.likes.push({
+    game_id: GAME_ID,
+    is_like: false,
+    user_id: USER_ID,
+  });
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "PUT",
+    payload: { isLike: true },
+    url: `/games/${GAME_ID}/reaction`,
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.likes.length, 1);
+  assert.equal(db.rows.likes[0]?.is_like, true);
+
+  db.rpcErrors.set("set_game_reaction", new Error("atomic write failed"));
+  const failedResponse = await app.inject({
+    method: "PUT",
+    payload: { isLike: false },
+    url: `/games/${GAME_ID}/reaction`,
+  });
+  assert.equal(failedResponse.statusCode, 500);
+  assert.equal(db.rows.likes.length, 1);
+  assert.equal(db.rows.likes[0]?.is_like, true);
+  await app.close();
+});
+
+test("comment reactions reject self-reactions and replace atomically", async () => {
   const db = new FakeSupabase();
   db.rows.comments.push({
     content: "hello",
@@ -690,6 +758,17 @@ test("comment reactions reject self-reactions and replace prior reactions", asyn
   assert.equal(response.statusCode, 200);
   assert.equal(db.rows.comment_likes.length, 1);
   assert.equal(db.rows.comment_likes[0]?.is_like, true);
+
+  db.rpcErrors.set("set_comment_reaction", new Error("atomic write failed"));
+  const failedResponse = await app.inject({
+    method: "PUT",
+    payload: { isLike: false },
+    url: `/comments/${COMMENT_ID}/reaction`,
+  });
+  assert.equal(failedResponse.statusCode, 500);
+  assert.equal(db.rows.comment_likes.length, 1);
+  assert.equal(db.rows.comment_likes[0]?.is_like, true);
+  db.rpcErrors.delete("set_comment_reaction");
 
   const selfApp = await createDataBoundaryApp(db, OTHER_USER_ID);
   const selfResponse = await selfApp.inject({

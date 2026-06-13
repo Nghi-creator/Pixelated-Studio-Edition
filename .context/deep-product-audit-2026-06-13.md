@@ -21,33 +21,15 @@ product and infrastructure; it does not introduce new product features.
 | Area | Status | Summary |
 | --- | --- | --- |
 | Web frontend | Healthy with gaps | Lint and production build pass; component and hook regression coverage is still missing. |
-| API backend | Hardened, more work queued | Public account enumeration is closed; reaction atomicity and broader abuse controls remain. |
+| API backend | Hardened, more work queued | Public account enumeration is closed and reactions are atomic; broader abuse controls remain. |
 | Desktop | Healthy | Build, 39 tests, companion security controls, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 28 tests, and live Docker boot smoke pass. |
 | Docker image | Improved | Reproducible Mesen build and smaller image; multi-stage build and pinned Node source remain. |
-| Supabase | Code ready, deployment pending | Security-definer hardening migration exists but has not been applied to hosted environments. |
+| Supabase | Code ready, deployment pending | Security-definer hardening and atomic-reaction migrations exist but have not been applied to hosted environments. |
 
 ## Next Work Queue
 
 Work these in order unless a production incident changes priority.
-
-### NEXT-02 — P1: Make Replace-Style Reactions Atomic
-
-**Problem**
-
-Game and comment reaction updates delete the old reaction before inserting the
-replacement. Storage errors are now surfaced, but an insert failure can still
-leave the user with no reaction.
-
-**Recommended work**
-
-- Move replacement into a database function/transaction or use a unique-key
-  upsert that represents the desired state atomically.
-
-**Done when**
-
-- Failed replacement preserves the previous reaction.
-- Game and comment reaction paths have failure-case tests.
 
 ### NEXT-03 — P1: Add Frontend Regression Coverage
 
@@ -70,9 +52,9 @@ depend heavily on hosted or manual smoke tests.
 
 **Problem**
 
-Account lookup, session verification, submissions, metrics, and LAN invite
-redemption have focused throttles. Other write-heavy routes still rely on
-authentication and database constraints. Current API throttles are process-local.
+Session verification, submissions, metrics, and LAN invite redemption have
+focused throttles. Other write-heavy routes still rely on authentication and
+database constraints. Current API throttles are process-local.
 
 **Recommended work**
 
@@ -136,6 +118,14 @@ cross-platform behavior.
 
 Apply `supabase/migrations/20260613150000_harden_security_definer_functions.sql`
 to each target Supabase environment, then verify grants and affected API flows.
+
+### DEPLOY-02 — Apply Atomic Reaction Functions Before the API Release
+
+**Status:** Migration written and API integration tested; not deployed.
+
+Apply `supabase/migrations/20260613210000_atomic_reaction_writes.sql` before
+deploying the corresponding API build. Verify game and comment reaction writes
+through the hosted API after migration.
 
 ## Completed Work Ledger
 
@@ -257,6 +247,21 @@ hosted and packaged clients; it performs no account lookup.
 receive the same response without calling `listUsers`; web lint and production
 build pass.
 
+### DONE-11 — Make Reaction Replacement Atomic
+
+**Problem:** Game and comment reaction routes deleted the prior reaction before
+inserting its replacement, so a failed insert could erase valid state.
+
+**Resolution:** Added service-role-only `set_game_reaction` and
+`set_comment_reaction` database functions. Each request now performs one atomic
+delete or `INSERT ... ON CONFLICT DO UPDATE` operation.
+
+**Verification:** API failure-case tests prove failed game and comment reaction
+writes preserve the previous reaction.
+
+**Remaining action:** Apply the migration before deploying the API. See
+`DEPLOY-02`.
+
 ## Latest Verification Run
 
 Run on 2026-06-13 after the completed hardening work:
@@ -264,7 +269,7 @@ Run on 2026-06-13 after the completed hardening work:
 | Gate | Result |
 | --- | --- |
 | Web lint and production build | Passed |
-| API typecheck, lint, build, and tests | Passed — 39 tests |
+| API typecheck, lint, build, and tests | Passed — 40 tests |
 | Desktop build and tests | Passed — 39 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 28 tests |
