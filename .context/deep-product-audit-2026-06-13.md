@@ -1,195 +1,296 @@
-# Deep Product Audit
+# Deep Product Audit and Optimization Tracker
 
-Date: 2026-06-13
+Started: 2026-06-13
 
 Scope: frontend, API backend, Electron desktop, Docker engine runtime, Supabase
-migrations, repository checks, and local smoke harnesses. This pass intentionally
-avoids new product features.
+migrations, repository checks, and smoke tests. This work improves the existing
+product and infrastructure; it does not introduce new product features.
 
-## Fixed In This Pass
+## How To Use This File
 
-### High: Backend sessions could be overwritten by another user
+- **Current Status** is the quick project-health snapshot.
+- **Next Work Queue** is the ordered backlog for future optimization passes.
+- **Completed Work Ledger** records what changed and how it was verified.
+- **Deployment Actions** lists completed code that is not active until deployed.
+- **Known Environment Gaps** records tests that cannot be fully proven locally.
+- Update this file after each optimization pass. Move finished queue items into
+  the completed ledger instead of deleting their history.
 
-`POST /sessions` accepted a browser-supplied `clientSessionId` and used a
-service-role upsert. A signed-in user who learned another active session id
-could replace its owner, token hash, and boot target.
+## Current Status
 
-Resolution:
+| Area | Status | Summary |
+| --- | --- | --- |
+| Web frontend | Healthy with gaps | Lint and production build pass; component and hook regression coverage is still missing. |
+| API backend | Hardened, more work queued | Core security and mutation correctness fixes pass 40 tests; account enumeration and broader abuse controls remain. |
+| Desktop | Healthy | Build, 39 tests, companion security controls, and packaged-app smoke pass. |
+| Engine runtime | Healthy | Build, syntax checks, 28 tests, and live Docker boot smoke pass. |
+| Docker image | Improved | Reproducible Mesen build and smaller image; multi-stage build and pinned Node source remain. |
+| Supabase | Code ready, deployment pending | Security-definer hardening migration exists but has not been applied to hosted environments. |
 
-- Session creation is insert-only.
-- Active duplicate ids return `409`.
-- Database uniqueness races return `409`.
-- A regression test proves another user's active session remains unchanged.
+## Next Work Queue
 
-### High: Desktop logs rendered runtime output as HTML
+Work these in order unless a production incident changes priority.
 
-Docker/runtime log output reached the Electron renderer and was appended through
-`innerHTML`. A crafted log line could become active renderer markup.
+### NEXT-01 — P0: Remove Public Account Enumeration
 
-Resolution:
-
-- Logs are appended as text nodes.
-- Existing presentation-only span wrappers are removed before display.
-- Desktop package tests reject reintroducing `innerHTML` assignment.
-
-### Medium: API mutations reported success after storage failures
-
-Several favorite, reaction, comment, pairing, lobby, and session mutations
-discarded Supabase errors and returned success or `204`.
-
-Resolution:
-
-- Affected routes now log storage failures and return `500`.
-- Idempotent missing-resource behavior remains unchanged.
-
-### High: Admin target authorization could fail open
-
-The super-admin user update route checked the target role but ignored errors from
-that lookup. A partial database failure could bypass the target-role guard and
-continue to the update.
-
-Resolution:
-
-- Target-role lookup failures now stop the request with `500`.
-- Existing self-modification and super-admin target protections remain intact.
-
-### Medium: Invite pairing initialization failed the web lint gate
-
-The companion invite path synchronously changed multiple state values from a
-mount effect, triggering React's cascading-render lint rule.
-
-Resolution:
-
-- Invite URL, invite mode, and preflight state are derived in lazy state
-  initializers.
-- The redundant mount effect was removed.
-
-## Remaining Priorities
-
-### P0: Protect the public account-method lookup
+**Problem**
 
 `POST /auth/account-methods` reveals whether an email exists and which providers
-it uses. It also scans up to 10,000 Supabase Auth users per request. This enables
-account enumeration and creates an expensive unauthenticated endpoint.
+it uses. It also scans up to 10,000 Supabase Auth users per request. Rate
+limiting reduces abuse but does not remove the disclosure or expensive lookup.
 
-Recommended next step:
+**Recommended work**
 
-- Remove provider-specific disclosure from unauthenticated responses, or protect
-  the endpoint with CAPTCHA plus strict IP/email rate limits.
-- Replace paginated full-user scans with a bounded server-side lookup strategy.
+- Remove provider-specific disclosure from unauthenticated responses, or require
+  CAPTCHA plus strict shared-store IP/email limits.
+- Replace paginated full-user scans with a bounded server-side lookup.
 
-### P0: Add API and companion abuse controls
+**Done when**
 
-The API has route-specific submission/metric throttles but no global request
-rate limiting. The LAN companion invite redemption endpoint also has no
-attempt/backoff limit.
+- Unauthenticated callers cannot reliably determine whether an account exists.
+- Lookup cost is bounded and covered by regression tests.
 
-Recommended next step:
+### NEXT-02 — P1: Make Replace-Style Reactions Atomic
 
-- Add Fastify rate limits for auth lookup, session verification, reports,
-  play-count writes, and other public/high-write routes.
-- Add per-source invite redemption backoff and rotate/revoke codes after repeated
-  failures.
+**Problem**
 
-### P0: Harden legacy Supabase `SECURITY DEFINER` functions
+Game and comment reaction updates delete the old reaction before inserting the
+replacement. Storage errors are now surfaced, but an insert failure can still
+leave the user with no reaction.
 
-Several older migrations create `SECURITY DEFINER` functions without a fixed
-`search_path`, including play-count, account-delete, and signup-profile helpers.
-Function execute grants are also not consistently explicit.
-
-Recommended next step:
-
-- Add a forward-only hardening migration that sets `search_path = ''`, fully
-  qualifies referenced objects, revokes default `PUBLIC` execution, and grants
-  only the roles that still require each function.
-- Verify hosted grants before deployment because the API currently calls
-  `increment_play_count` with the service role.
-
-### P1: Make replace-style reactions atomic
-
-Game and comment reaction updates currently delete the old reaction before
-inserting the replacement. Errors are now surfaced correctly, but an insert
-failure can still leave the user with no reaction.
-
-Recommended next step:
+**Recommended work**
 
 - Move replacement into a database function/transaction or use a unique-key
-  upsert that can represent the desired state atomically.
+  upsert that represents the desired state atomically.
 
-### P1: Improve frontend regression coverage
+**Done when**
 
-The web package has lint/build gates but no component or hook test suite. Pairing,
-auth, pagination, cache invalidation, and WebRTC lifecycle behavior therefore
-depend heavily on hosted/manual smoke tests.
+- Failed replacement preserves the previous reaction.
+- Game and comment reaction paths have failure-case tests.
 
-Recommended next step:
+### NEXT-03 — P1: Add Frontend Regression Coverage
+
+**Problem**
+
+The web package has lint/build gates but no component or hook test suite.
+Pairing, auth, pagination, cache invalidation, and WebRTC lifecycle behavior
+depend heavily on hosted or manual smoke tests.
+
+**Recommended work**
 
 - Add focused tests for engine invite initialization, API timeout/abort behavior,
   comment pagination, auth-state cache clearing, and WebRTC cleanup/retry.
 
-### P1: Make the engine image reproducible and smaller
+**Done when**
 
-The Dockerfile clones the latest Mesen branch, installs Node through a remote
-setup script, uses `npm install`, and leaves build tooling in the runtime image.
+- The highest-risk frontend flows run in CI without requiring a hosted browser.
 
-Recommended next step:
+### NEXT-04 — P1: Continue API Abuse-Control Coverage
 
-- Pin the Mesen commit and Node source/image.
-- Use `npm ci`.
-- Consolidate apt layers and clean package lists.
-- Move compilation into a multi-stage build or publish a versioned prebuilt
-  engine image.
+**Problem**
 
-### P1: Replace shell-composed process calls where practical
+Account lookup, session verification, submissions, metrics, and LAN invite
+redemption have focused throttles. Other write-heavy routes still rely on
+authentication and database constraints. Current API throttles are process-local.
+
+**Recommended work**
+
+- Add route-specific limits for reports, play-count writes, comments, and
+  reactions.
+- Use a shared rate-limit store before horizontally scaling the API.
+
+**Done when**
+
+- Write-heavy routes have documented limits and regression tests.
+- Limits behave consistently across multiple API instances.
+
+### NEXT-05 — P1: Create a Multi-Stage, Fully Pinned Engine Image
+
+**Problem**
+
+The image now pins Mesen, uses `npm ci`, removes unused packages, and cleans apt
+metadata. It still installs Node through a mutable remote setup script and keeps
+compilation tooling in the runtime image.
+
+**Recommended work**
+
+- Pin the Node source or base image.
+- Move Mesen and TypeScript compilation into build stages.
+- Copy only runtime artifacts and required packages into the final image.
+
+**Done when**
+
+- The final runtime image contains no compiler/build dependencies.
+- A clean rebuild uses pinned sources and passes the live engine smoke.
+
+### NEXT-06 — P1: Replace Shell-Composed Process Calls
+
+**Problem**
 
 Desktop Docker orchestration and engine keyboard injection still use shell
-commands through `exec`. Current inputs are mostly validated or allowlisted, but
-argument-array `spawn`/`execFile` calls would reduce quoting risk and improve
+commands through `exec`. Inputs are mostly validated or allowlisted, but
+argument-array `spawn`/`execFile` calls reduce quoting risk and improve
 cross-platform behavior.
 
-### P1: Complete real integration proof
+**Done when**
 
-Automated local contracts are strong, but the following remain environment
-dependent:
+- Practical process calls use argument arrays.
+- Existing desktop and engine behavior remains covered by tests.
+
+### NEXT-07 — P1: Complete Real Integration Proof
+
+**Still requires target environments**
 
 - Signed-in hosted browser flows against Render/Supabase.
 - Real two-device LAN stream and certificate UX.
-- P3/P4 `/dev/uinput` behavior on a target host.
+- P3/P4 `/dev/uinput` behavior on a target Linux host.
 - Packaged installer smoke on each native OS.
-- TURN relay behavior on a network where direct/STUN connectivity fails.
+- TURN relay behavior where direct/STUN connectivity fails.
 
-## Documentation Consistency
+## Deployment Actions
 
-`.context/current-infrastructure.md` is the best current source of truth.
-Sections of `.context/project-flows.md`, `.context/suggestions.md`, and older
-plans still describe direct browser Supabase reads/writes or already-completed
-work. Treat those sections as historical until they are reconciled.
+### DEPLOY-01 — Apply Supabase Security-Definer Hardening
 
-The root README also contains older product claims and minor wording/typo issues.
-It should be refreshed after the security and integration priorities above.
+**Status:** Migration written and locally reviewed; not deployed.
 
-## Verification Summary
+Apply `supabase/migrations/20260613150000_harden_security_definer_functions.sql`
+to each target Supabase environment, then verify grants and affected API flows.
 
-Passed during this audit:
+## Completed Work Ledger
 
-- Web lint and production build.
-- API typecheck, lint, build, and focused route/control-plane tests.
-- Desktop TypeScript build and test suite.
-- Engine runtime build, JavaScript syntax checks, and test suite.
-- Root smoke-artifact summarizer and multiplayer smoke helper tests.
-- `git diff --check`.
+### DONE-01 — Prevent Cross-User Session Overwrite
 
-Environment-dependent smoke results and any blockers should be appended here
-after the final audit commands complete.
+**Problem:** `POST /sessions` used a service-role upsert with a browser-supplied
+session ID, allowing a known active ID to be reassigned.
 
-## Environment-Dependent Results
+**Resolution:** Session creation is insert-only. Active duplicates and uniqueness
+races return `409`.
 
-- Docker runtime smoke could not run because Docker Desktop was not running and
-  the local Docker socket did not exist.
-- The existing packaged desktop release smoke initially failed because its
-  bundled `web-dist` was stale relative to the fresh web build.
-- Rebuilding the macOS package refreshed the unpacked app, but DMG creation
-  failed in `hdiutil` after electron-builder retries. The unpacked packaged-app
-  smoke was run separately after that refresh.
-- macOS code signing was skipped because no Developer ID identity is installed
-  in this environment.
+**Verification:** Regression test proves another user's active session remains
+unchanged.
+
+### DONE-02 — Prevent Desktop Log HTML Injection
+
+**Problem:** Docker/runtime output was appended to the Electron renderer through
+`innerHTML`.
+
+**Resolution:** Logs now render as text nodes; presentation wrappers are removed
+before display.
+
+**Verification:** Desktop package tests reject reintroducing `innerHTML`
+assignment.
+
+### DONE-03 — Surface API Mutation Storage Failures
+
+**Problem:** Favorite, reaction, comment, pairing, lobby, and session mutations
+could discard Supabase errors and still report success.
+
+**Resolution:** Affected routes log storage failures and return `500`;
+idempotent missing-resource behavior is preserved.
+
+**Verification:** API route and data-boundary regression tests pass.
+
+### DONE-04 — Close Admin Target-Authorization Fail-Open
+
+**Problem:** The super-admin update route ignored target-role lookup errors and
+could continue after a partial database failure.
+
+**Resolution:** Target-role lookup failures stop the request with `500`.
+
+**Verification:** Existing self-modification and super-admin protections plus
+new failure-path tests pass.
+
+### DONE-05 — Fix Invite Pairing Initialization
+
+**Problem:** Companion invite initialization synchronously changed multiple state
+values from a mount effect and failed the React cascading-render lint rule.
+
+**Resolution:** Invite URL, mode, and preflight state now use lazy state
+initializers; the redundant mount effect was removed.
+
+**Verification:** Web lint and production build pass.
+
+### DONE-06 — Add Focused Abuse Controls
+
+**Problem:** Public account lookup, session-token verification, and desktop LAN
+invite redemption accepted unlimited attempts.
+
+**Resolution:** Added a bounded fixed-window API limiter, IP/email limits for
+account lookup, IP/session limits for verification, and temporary `429`
+responses for repeated invalid LAN invite attempts.
+
+**Verification:** API limiter and route tests plus desktop companion tests pass.
+
+**Remaining risk:** Account enumeration still exists and API limits are
+process-local. See `NEXT-01` and `NEXT-04`.
+
+### DONE-07 — Prepare Supabase Security-Definer Hardening
+
+**Problem:** Legacy play-count, account-delete, and signup-profile functions did
+not fully fix `search_path` or consistently restrict execution grants.
+
+**Resolution:** Added a forward migration using an empty `search_path`, fully
+qualified objects, restricted browser-role execution, and retained service-role
+play-count access.
+
+**Verification:** Migration reviewed against current API boundaries.
+
+**Remaining action:** Apply the migration. See `DEPLOY-01`.
+
+### DONE-08 — Return Correct Engine CORS Errors
+
+**Problem:** Rejected origins correctly failed access control but returned `500`,
+making expected rejection look like a runtime failure.
+
+**Resolution:** Rejected origins now return a generic `403`; unexpected errors
+continue returning generic `500` responses.
+
+**Verification:** Engine HTTP error tests and live allowed/disallowed-origin
+smoke pass.
+
+### DONE-09 — Improve Docker Build Reproducibility and Size
+
+**Problem:** The engine image cloned the latest Mesen source, used `npm install`,
+kept apt metadata, and included unused packages.
+
+**Resolution:** Pinned Mesen to
+`0102910c39ad1a62bc3f784466f3f67ca9eae335`, switched to `npm ci`, cleaned apt
+metadata, and removed unused dependencies.
+
+**Verification:** Exact hardened image built successfully as
+`pixelated-engine:audit-final` at `1.96GB`, down from the existing `2.06GB`
+image. See `NEXT-05` for remaining image work.
+
+## Latest Verification Run
+
+Run on 2026-06-13 after the completed hardening work:
+
+| Gate | Result |
+| --- | --- |
+| Web lint and production build | Passed |
+| API typecheck, lint, build, and tests | Passed — 40 tests |
+| Desktop build and tests | Passed — 39 tests |
+| Desktop packaged release smoke | Passed |
+| Engine build, syntax checks, and tests | Passed — 28 tests |
+| Root smoke tooling tests | Passed — 9 tests |
+| Live Docker engine health and ROM boot | Passed |
+| `git diff --check` | Passed |
+
+## Known Environment Gaps
+
+- Docker Desktop does not expose `/dev/uinput`; the expected two-player keyboard
+  fallback was active. Validate P3/P4 on a target Linux host.
+- The existing packaged desktop release initially had stale bundled web output.
+  Rebuilding refreshed the unpacked app, and its packaged-app smoke passed.
+- DMG creation failed in `hdiutil` after electron-builder retries.
+- macOS code signing was skipped because no Developer ID identity is installed.
+- During live engine smoke, `smoke.nes` booted with RetroArch and camera active.
+  The container sampled roughly 413 MiB and 67% CPU; RetroArch reported roughly
+  70% average CPU.
+
+## Documentation Follow-Up
+
+`.context/current-infrastructure.md` is the best current infrastructure source
+of truth. Parts of `.context/project-flows.md`, `.context/suggestions.md`, older
+plans, and the root README describe historical behavior or completed work.
+Reconcile them after the higher-priority queue items above.

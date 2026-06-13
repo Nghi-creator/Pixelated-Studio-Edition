@@ -5,6 +5,7 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import { FixedWindowRateLimiter } from "../modules/security/fixedWindowRateLimiter.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
 
@@ -92,6 +93,14 @@ export async function registerSessionRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const verificationIpLimiter = new FixedWindowRateLimiter({
+    limit: 1_000,
+    windowMs: 60_000,
+  });
+  const verificationSessionLimiter = new FixedWindowRateLimiter({
+    limit: 30,
+    windowMs: 60_000,
+  });
 
   app.post(
     "/sessions",
@@ -258,6 +267,21 @@ export async function registerSessionRoutes(
 
     if (!body.success) {
       return reply.status(400).send({ error: "Invalid session token" });
+    }
+
+    const rateLimits = [
+      verificationIpLimiter.consume(request.ip),
+      verificationSessionLimiter.consume(`${request.ip}:${params.data.sessionId}`),
+    ];
+    const blockedRateLimit = rateLimits.find((result) => !result.allowed);
+    if (blockedRateLimit) {
+      reply.header(
+        "Retry-After",
+        Math.max(1, Math.ceil((blockedRateLimit.resetAt - Date.now()) / 1000)),
+      );
+      return reply.status(429).send({
+        error: "Too many session verification attempts",
+      });
     }
 
     const session = await getLiveSession(service, params.data.sessionId);

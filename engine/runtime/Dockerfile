@@ -1,13 +1,11 @@
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
+ARG MESEN_REF=0102910c39ad1a62bc3f784466f3f67ca9eae335
 
 # 1. Download Core Tools
 RUN apt-get update && apt-get install -y \
-    software-properties-common \
-    wget \
     curl \
-    unzip \
     xvfb \
     xdotool \
     gstreamer1.0-tools \
@@ -37,10 +35,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     g++ \
     make \
-    ca-certificates
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
-# 3. Forge the Native ARM64 NES Core from Source Code (Mesen)
-RUN git clone --depth 1 https://github.com/libretro/mesen.git /tmp/mesen && \
+# 3. Forge the Native ARM64 NES Core from a pinned source revision
+RUN git init /tmp/mesen && \
+    git -C /tmp/mesen remote add origin https://github.com/libretro/mesen.git && \
+    git -C /tmp/mesen fetch --depth 1 origin "${MESEN_REF}" && \
+    git -C /tmp/mesen checkout --detach FETCH_HEAD && \
     cd /tmp/mesen/Libretro && \
     make -j4 && \
     mkdir -p /cores && \
@@ -49,7 +51,8 @@ RUN git clone --depth 1 https://github.com/libretro/mesen.git /tmp/mesen && \
 
 # 4. Install Node.js 
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
-    apt-get install -y nodejs
+    apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
 # 5. Set up server
 WORKDIR /app
@@ -57,7 +60,7 @@ WORKDIR /app
 RUN mkdir -p /roms
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 COPY . .
 RUN npm run build
 

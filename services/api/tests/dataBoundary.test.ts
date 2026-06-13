@@ -658,6 +658,29 @@ test("auth account methods expose provider metadata for login decisions", async 
   await app.close();
 });
 
+test("auth account method lookups are rate limited", async () => {
+  const db = new FakeSupabase();
+  const app = await createDataBoundaryApp(db);
+
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const response = await app.inject({
+      method: "POST",
+      payload: { email: "target@example.com" },
+      url: "/auth/account-methods",
+    });
+    assert.equal(response.statusCode, 200);
+  }
+
+  const blockedResponse = await app.inject({
+    method: "POST",
+    payload: { email: "target@example.com" },
+    url: "/auth/account-methods",
+  });
+  assert.equal(blockedResponse.statusCode, 429);
+  assert.equal(blockedResponse.headers["retry-after"], "60");
+  await app.close();
+});
+
 test("comment delete is scoped to owner unless actor is admin", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);

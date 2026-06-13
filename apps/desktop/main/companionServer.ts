@@ -18,6 +18,9 @@ const REDEEM_INVITE_PATH = "/invite/redeem";
 const REDEEM_LAUNCH_PATH = "/launch/redeem";
 const LAUNCH_TICKET_TTL_MS = 60 * 1000;
 const HOST_ACCESS_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const INVITE_FAILURE_LIMIT = 8;
+const INVITE_FAILURE_WINDOW_MS = 60 * 1000;
+const INVITE_FAILURE_MAX_ENTRIES = 1024;
 const PROXY_PREFIXES = [
   "/health",
   "/local-games",
@@ -62,6 +65,10 @@ export type CompanionInviteStatus = "active" | "expired" | "revoked";
 
 const companionAccessTokens = new Map<string, CompanionAccessToken>();
 const companionLaunchTickets = new Map<string, number>();
+const companionInviteFailures = new Map<
+  string,
+  { count: number; resetAt: number }
+>();
 let companionInviteState: CompanionInviteState = {
   code: null,
   expiresAt: null,
@@ -75,6 +82,7 @@ export function updateCompanionInvite(inviteCode: string, inviteExpiresAt: numbe
     revokedAt: null,
   };
   clearGuestAccessTokens();
+  companionInviteFailures.clear();
 }
 
 export function revokeCompanionInvite() {
@@ -84,6 +92,34 @@ export function revokeCompanionInvite() {
     revokedAt: Date.now(),
   };
   clearGuestAccessTokens();
+  companionInviteFailures.clear();
+}
+
+export function recordCompanionInviteFailure(key: string, now = Date.now()) {
+  const existing = companionInviteFailures.get(key);
+  if (!existing || existing.resetAt <= now) {
+    if (companionInviteFailures.size >= INVITE_FAILURE_MAX_ENTRIES) {
+      for (const [failureKey, failure] of companionInviteFailures) {
+        if (failure.resetAt <= now) companionInviteFailures.delete(failureKey);
+      }
+    }
+    while (companionInviteFailures.size >= INVITE_FAILURE_MAX_ENTRIES) {
+      const oldestKey = companionInviteFailures.keys().next().value;
+      if (typeof oldestKey !== "string") break;
+      companionInviteFailures.delete(oldestKey);
+    }
+    companionInviteFailures.set(key, {
+      count: 1,
+      resetAt: now + INVITE_FAILURE_WINDOW_MS,
+    });
+    return { blocked: false, retryAfterSeconds: 0 };
+  }
+
+  existing.count += 1;
+  return {
+    blocked: existing.count > INVITE_FAILURE_LIMIT,
+    retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
+  };
 }
 
 export function createCompanionLaunchTicket(now = Date.now()) {
@@ -405,6 +441,17 @@ async function handleInviteRequest(
     );
 
     if (submittedCode !== activeInviteCode) {
+      const failure = recordCompanionInviteFailure(
+        req.socket.remoteAddress || "unknown",
+      );
+      if (failure.blocked) {
+        res.setHeader("retry-after", failure.retryAfterSeconds);
+        sendJson(res, 429, {
+          code: "invite_rate_limited",
+          error: "Too many invalid invite attempts",
+        });
+        return true;
+      }
       sendJson(res, 401, {
         code: "invite_invalid",
         error: "Invalid invite code",
@@ -431,6 +478,7 @@ async function handleInviteRequest(
       return true;
     }
 
+    companionInviteFailures.delete(req.socket.remoteAddress || "unknown");
     sendJson(res, 200, {
       companionToken: createCompanionAccessToken(activeInviteExpiresAt, "guest"),
       engineUrl: "",
@@ -666,5 +714,6 @@ export function stopCompanionServer() {
   }
   companionLaunchTickets.clear();
   companionAccessTokens.clear();
+  companionInviteFailures.clear();
   revokeCompanionInvite();
 }

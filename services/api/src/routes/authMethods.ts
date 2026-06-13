@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { User } from "@supabase/supabase-js";
 import { z } from "zod";
 import { supabaseService } from "../modules/auth/supabaseAuth.js";
+import { FixedWindowRateLimiter } from "../modules/security/fixedWindowRateLimiter.js";
 
 const accountMethodsBodySchema = z.object({
   email: z.string().trim().email().max(254),
@@ -51,6 +52,14 @@ export async function registerAuthMethodsRoutes(
   options: AuthMethodsRouteOptions = {},
 ) {
   const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const accountLookupIpLimiter = new FixedWindowRateLimiter({
+    limit: 300,
+    windowMs: 60_000,
+  });
+  const accountLookupEmailLimiter = new FixedWindowRateLimiter({
+    limit: 10,
+    windowMs: 60_000,
+  });
 
   app.post("/auth/account-methods", async (request, reply) => {
     if (!service) {
@@ -62,6 +71,21 @@ export async function registerAuthMethodsRoutes(
     const parsedBody = accountMethodsBodySchema.safeParse(request.body);
     if (!parsedBody.success) {
       return reply.status(400).send({ error: "Invalid email address" });
+    }
+
+    const rateLimits = [
+      accountLookupIpLimiter.consume(request.ip),
+      accountLookupEmailLimiter.consume(parsedBody.data.email.toLowerCase()),
+    ];
+    const blockedRateLimit = rateLimits.find((result) => !result.allowed);
+    if (blockedRateLimit) {
+      reply.header(
+        "Retry-After",
+        Math.max(1, Math.ceil((blockedRateLimit.resetAt - Date.now()) / 1000)),
+      );
+      return reply.status(429).send({
+        error: "Too many account lookup attempts. Please try again shortly.",
+      });
     }
 
     try {

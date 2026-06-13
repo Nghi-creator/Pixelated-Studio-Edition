@@ -5,6 +5,8 @@ import {
   createCompanionLaunchTicket,
   getCompanionStatusPage,
   getCompanionInviteStatus,
+  recordCompanionInviteFailure,
+  revokeCompanionInvite,
   shouldProxy,
 } from "../main/companionServer";
 
@@ -33,6 +35,24 @@ describe("desktop companion preflight", () => {
       ),
       "revoked",
     );
+  });
+});
+
+describe("desktop companion invite abuse controls", () => {
+  it("temporarily blocks repeated invalid invite attempts", () => {
+    revokeCompanionInvite();
+    const now = 1_000;
+
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      assert.equal(
+        recordCompanionInviteFailure("client", now + attempt).blocked,
+        false,
+      );
+    }
+
+    assert.equal(recordCompanionInviteFailure("client", now + 8).blocked, true);
+    assert.equal(recordCompanionInviteFailure("other", now + 8).blocked, false);
+    assert.equal(recordCompanionInviteFailure("client", now + 60_000).blocked, false);
   });
 });
 

@@ -31,7 +31,11 @@ export const corsOptions = {
       return;
     }
 
-    callback(new Error(`Origin not allowed by CORS: ${origin}`));
+    const error = new Error(`Origin not allowed by CORS: ${origin}`) as Error & {
+      statusCode: number;
+    };
+    error.statusCode = 403;
+    callback(error);
   },
   methods: ["GET", "POST", "DELETE"],
 };
