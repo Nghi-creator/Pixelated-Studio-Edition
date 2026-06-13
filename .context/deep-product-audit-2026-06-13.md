@@ -22,8 +22,8 @@ product and infrastructure; it does not introduce new product features.
 | --- | --- | --- |
 | Web frontend | Healthy, focused coverage added | Lint, production build, and 10 lifecycle regression contracts pass; broad visual component coverage remains optional follow-up work. |
 | API backend | Hardened, more work queued | Public account enumeration is closed, reactions are atomic, and write-heavy routes have per-user limits; shared-store limits remain. |
-| Desktop | Healthy | Build, 39 tests, companion security controls, and packaged-app smoke pass. |
-| Engine runtime | Healthy | Build, syntax checks, 28 tests, and live Docker boot smoke pass. |
+| Desktop | Healthy | Build, 42 tests, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
+| Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
 | Docker image | Hardened and reduced | Pinned multi-stage build passes live ROM smoke at `1.15GB`; build tools are absent from the runtime image. |
 | Supabase | Deployed | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. |
 
@@ -48,20 +48,6 @@ instances.
 
 - Write-heavy routes have documented limits and regression tests.
 - Limits behave consistently across multiple API instances.
-
-### NEXT-06 — P1: Replace Shell-Composed Process Calls
-
-**Problem**
-
-Desktop Docker orchestration and engine keyboard injection still use shell
-commands through `exec`. Inputs are mostly validated or allowlisted, but
-argument-array `spawn`/`execFile` calls reduce quoting risk and improve
-cross-platform behavior.
-
-**Done when**
-
-- Practical process calls use argument arrays.
-- Existing desktop and engine behavior remains covered by tests.
 
 ### NEXT-07 — P1: Complete Real Integration Proof
 
@@ -272,17 +258,36 @@ RetroArch, Mesen, camera bridge, and storage passed. The image is `1.15GB`, down
 from the previous hardened `1.96GB`; `npm`, `pip`, Git, `make`, `g++`, and
 `curl` are absent from the runtime image.
 
+### DONE-15 — Replace Shell-Composed Process Calls
+
+**Problem:** Desktop Docker orchestration, engine keyboard injection, and
+PulseAudio startup composed commands for a shell. Even with validated inputs,
+this left unnecessary quoting, shell-metacharacter, and cross-platform risks.
+
+**Resolution:** Docker pull/build streams now use `spawn`; collected Docker
+commands use `execFile`; Docker run/remove arguments are assembled as arrays.
+Engine keyboard injection uses `execFile` with an explicit `DISPLAY`
+environment, and PulseAudio starts through `spawn`. Startup-failure cleanup
+continues even when the best-effort container removal fails.
+
+**Verification:** Desktop tests pass 42 contracts, including literal handling of
+environment values containing shell metacharacters and a structural rejection
+of shell `exec` in Docker paths. Engine tests pass 29 contracts, including
+xdotool and PulseAudio argument construction. A freshly rebuilt unpacked
+desktop app passes packaged release smoke. A freshly rebuilt engine image passes
+live Docker health smoke with Xvfb and PulseAudio running.
+
 ## Latest Verification Run
 
-Run on 2026-06-13 after the completed hardening work:
+Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
 | Web tests, lint, and production build | Passed — 10 tests |
 | API typecheck, lint, build, and tests | Passed — 42 tests |
-| Desktop build and tests | Passed — 39 tests |
+| Desktop build and tests | Passed — 42 tests |
 | Desktop packaged release smoke | Passed |
-| Engine build, syntax checks, and tests | Passed — 28 tests |
+| Engine build, syntax checks, and tests | Passed — 29 tests |
 | Root smoke tooling tests | Passed — 9 tests |
 | Live Docker engine health and ROM boot | Passed |
 | `git diff --check` | Passed |

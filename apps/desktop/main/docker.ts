@@ -1,4 +1,9 @@
-import { exec, type ExecOptions } from "child_process";
+import {
+  execFile,
+  spawn,
+  type ExecFileOptions,
+  type SpawnOptions,
+} from "child_process";
 import type { IpcMainEvent } from "electron";
 import fs from "fs";
 import {
@@ -25,21 +30,18 @@ export function getSafeEnv() {
   };
 }
 
-export function quoteDockerEnvValue(value: unknown) {
-  return String(value)
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\$/g, "\\$")
-    .replace(/`/g, "\\`");
-}
-
 export function isSafeDockerImageRef(value: string) {
   return /^[a-zA-Z0-9][a-zA-Z0-9._/-]*(?::[a-zA-Z0-9._-]+)?$/.test(value);
 }
 
-function streamCommand(event: IpcMainEvent, command: string, options: ExecOptions) {
+function streamFile(
+  event: IpcMainEvent,
+  command: string,
+  args: string[],
+  options: SpawnOptions,
+) {
   return new Promise<void>((resolve, reject) => {
-    const child = exec(command, options);
+    const child = spawn(command, args, options);
 
     child.stdout?.on("data", (data) =>
       event.reply("server-log", data.toString().trim()),
@@ -58,9 +60,13 @@ function streamCommand(event: IpcMainEvent, command: string, options: ExecOption
   });
 }
 
-export function execCommand(command: string, options: ExecOptions) {
+export function execFileCommand(
+  command: string,
+  args: string[],
+  options: ExecFileOptions,
+) {
   return new Promise<ExecCommandResult>((resolve, reject) => {
-    exec(command, options, (err, stdout, stderr) => {
+    execFile(command, args, options, (err, stdout, stderr) => {
       if (err) {
         reject(err);
         return;
@@ -82,7 +88,7 @@ export async function prepareEngineImage(
     emitEngineState(event, "PULLING_IMAGE", engineImage);
     event.reply("server-log", `Pulling engine image: ${engineImage}`);
     try {
-      await streamCommand(event, `docker pull ${engineImage}`, { env: safeEnv });
+      await streamFile(event, "docker", ["pull", engineImage], { env: safeEnv });
       return;
     } catch (err) {
       if (!buildFallback) throw err;
@@ -95,14 +101,10 @@ export async function prepareEngineImage(
 
   emitEngineState(event, "BUILDING_IMAGE", engineRuntimeDir);
   event.reply("server-log", "Building local engine image...");
-  await streamCommand(event, `docker build -t ${engineImage} .`, {
+  await streamFile(event, "docker", ["build", "-t", engineImage, "."], {
     cwd: engineRuntimeDir,
     env: safeEnv,
   });
 }
-
-export {
-  exec,
-};
 
 export const hasHostUinput = () => fs.existsSync("/dev/uinput");

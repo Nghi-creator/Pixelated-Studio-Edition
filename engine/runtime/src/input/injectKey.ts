@@ -1,7 +1,10 @@
-import { exec } from "child_process";
+import { execFile } from "child_process";
+import { xdotoolArgs } from "../runtime/processCommands";
 
 export type KeyAction = "keydown" | "keyup";
 
 export function injectKey(action: KeyAction, linuxKey: string): void {
-  exec(`DISPLAY=:99 xdotool ${action} ${linuxKey}`);
+  execFile("xdotool", xdotoolArgs(action, linuxKey), {
+    env: { ...process.env, DISPLAY: ":99" },
+  }, () => undefined);
 }

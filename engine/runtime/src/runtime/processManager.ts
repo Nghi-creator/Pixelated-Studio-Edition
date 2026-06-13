@@ -1,10 +1,11 @@
-import { exec, spawn, type ChildProcess } from "child_process";
+import { spawn, type ChildProcess } from "child_process";
 import fs from "fs";
 import { createGamepadBridge } from "../input/gamepadBridge";
 import { injectKey, type KeyAction } from "../input/injectKey";
 import { translateKey } from "../input/translateKey";
 import { removeFileIfExists } from "../roms/cloudRomDownloader";
 import type { StreamProfile } from "../signaling/startGameHandlers";
+import { pulseAudioArgs } from "./processCommands";
 
 type IceServer = {
   credential?: string;
@@ -63,9 +64,10 @@ export function createProcessManager(options: ProcessManagerOptions) {
       "0",
       "640x480x24",
     ]);
-    pulseAudioProcess = exec(
-      "pulseaudio -D --system --disallow-exit --disable-shm=yes --load='module-native-protocol-tcp auth-anonymous=1'",
-    );
+    pulseAudioProcess = spawn("pulseaudio", pulseAudioArgs);
+    pulseAudioProcess.on("error", (err) => {
+      console.error(`[Engine] PulseAudio failed to start: ${err.message}`);
+    });
 
     fs.writeFileSync(
       "/app/retroarch.cfg",

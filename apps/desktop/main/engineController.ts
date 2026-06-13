@@ -17,14 +17,16 @@ import {
   type CompanionServerResult,
 } from "./companionServer";
 import {
-  exec,
-  execCommand,
+  execFileCommand,
   getSafeEnv,
   hasHostUinput,
   isSafeDockerImageRef,
   prepareEngineImage,
-  quoteDockerEnvValue,
 } from "./docker";
+import {
+  buildDockerRunArgs,
+  removeEngineContainerArgs,
+} from "./dockerCommands";
 import {
   createDockerDiagnostic,
   diagnoseDocker,
@@ -54,7 +56,7 @@ type StartEngineOptions = {
 type EngineLaunchContext = {
   advertisedUrls: string[];
   companionUrls: string[];
-  deviceArgs: string;
+  includeUinputDevice: boolean;
   exposureMode: ExposureMode;
   inviteCode?: string;
   inviteExpiresAt?: number;
@@ -90,10 +92,10 @@ function createHostedInviteUrl(companionUrl: string) {
   return url.toString();
 }
 
-function buildDockerRunCommand({
+function getDockerRunArgs({
   advertisedUrls,
   companionUrls,
-  deviceArgs = "",
+  includeUinputDevice,
   engineToken,
   exposureMode,
   publishHost,
@@ -106,7 +108,17 @@ function buildDockerRunCommand({
     .filter(Boolean)
     .join(",");
 
-  return `docker run -d --name pixelated-node -p ${publishHost}:8080:8080 ${deviceArgs} -v pixelated-roms:/roms -e PIXELATED_ALLOWED_ORIGINS="${quoteDockerEnvValue(allowedOrigins)}" -e PIXELATED_ALLOWED_ROM_HOSTS="pxksbsloksyfwiqyfkrz.supabase.co" -e PIXELATED_API_URL="${quoteDockerEnvValue(backendApiUrl)}" -e PIXELATED_ENGINE_TOKEN="${quoteDockerEnvValue(engineToken)}" -e PIXELATED_ENGINE_EXPOSURE_MODE="${exposureMode}" -e PIXELATED_ADVERTISED_URLS="${quoteDockerEnvValue(advertisedUrls.join(","))}" -e PIXELATED_COMPANION_URLS="${quoteDockerEnvValue(companionUrls.join(","))}" ${engineImage}`;
+  return buildDockerRunArgs({
+    advertisedUrls,
+    allowedOrigins,
+    apiUrl: backendApiUrl,
+    companionUrls,
+    engineImage,
+    engineToken,
+    exposureMode,
+    includeUinputDevice,
+    publishHost,
+  });
 }
 
 function rejectInvalidImage(event: IpcMainEvent) {
@@ -124,7 +136,7 @@ function createEngineLaunchContext(options: StartEngineOptions = {}): EngineLaun
   const publishHost = getDockerPublishHost(exposureMode);
   const advertisedUrls = getAdvertisedEngineUrls(exposureMode);
   const companionUrls = getAdvertisedCompanionUrls(exposureMode, companionPort);
-  const deviceArgs = hasHostUinput() ? "--device /dev/uinput" : "";
+  const includeUinputDevice = hasHostUinput();
   const inviteCode = exposureMode === "lan" ? createInviteCode() : undefined;
   const inviteExpiresAt =
     exposureMode === "lan" ? Date.now() + INVITE_CODE_TTL_MS : undefined;
@@ -132,7 +144,7 @@ function createEngineLaunchContext(options: StartEngineOptions = {}): EngineLaun
   return {
     advertisedUrls,
     companionUrls,
-    deviceArgs,
+    includeUinputDevice,
     exposureMode,
     inviteCode,
     inviteExpiresAt,
@@ -305,8 +317,9 @@ function startContainer(
     `Starting WebRTC Node in ${launchContext.exposureMode.toUpperCase()} mode...`,
   );
 
-  return execCommand(
-    buildDockerRunCommand({
+  return execFileCommand(
+    "docker",
+    getDockerRunArgs({
       ...launchContext,
       engineToken,
     }),
@@ -327,9 +340,11 @@ function handleStartupFailure(
     "server-log",
     `<span class="text-red-500">ERROR: ${message}</span>`,
   );
-  exec("docker rm -f pixelated-node", { env: safeEnv }, () => {
-    event.reply("engine-stopped");
-  });
+  void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+    .catch(() => undefined)
+    .finally(() => {
+      event.reply("engine-stopped");
+    });
 }
 
 function emitDockerDiagnostic(event: IpcMainEvent, diagnostic: DockerDiagnostic) {
@@ -363,7 +378,7 @@ function continueEngineStartup(
       event.reply("server-log", "Image ready. Preparing WebRTC Node...");
       emitEngineState(event, "REMOVING_STALE", "pixelated-node");
 
-      return execCommand("docker rm -f pixelated-node", { env: safeEnv }).catch(
+      return execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv }).catch(
         () => undefined,
       );
     })
@@ -505,18 +520,20 @@ export function stopEngine(event: IpcMainEvent) {
   stopCompanionServer();
   activeCompanion = null;
 
-  exec("docker rm -f pixelated-node", { env: safeEnv }, (err) => {
-    if (err) {
+  void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+    .then(() => {
+      event.reply("server-log", "Engine successfully terminated.");
+    })
+    .catch(() => {
       event.reply(
         "server-log",
         '<span class="text-red-500">Warning: Could not gracefully stop node.</span>',
       );
-    } else {
-      event.reply("server-log", "Engine successfully terminated.");
-    }
-    emitEngineState(event, "STOPPED");
-    event.reply("engine-stopped");
-  });
+    })
+    .finally(() => {
+      emitEngineState(event, "STOPPED");
+      event.reply("engine-stopped");
+    });
 }
 
 export function cleanupEngine() {
@@ -526,5 +543,7 @@ export function cleanupEngine() {
   const safeEnv = getSafeEnv();
   stopCompanionServer();
   activeCompanion = null;
-  exec("docker rm -f pixelated-node", { env: safeEnv });
+  void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv }).catch(
+    () => undefined,
+  );
 }
