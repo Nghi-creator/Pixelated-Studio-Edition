@@ -3,7 +3,10 @@ import { describe, it } from "node:test";
 import {
   classifyDockerFailure,
   createDockerDiagnostic,
+  getDockerGuideUrl,
   getDockerInstallUrl,
+  getDockerResourceUrl,
+  isDockerDiagnosticCode,
 } from "../main/dockerDiagnostics";
 
 describe("Docker diagnostic classification", () => {
@@ -72,5 +75,27 @@ describe("Docker diagnostic presentation", () => {
       createDockerDiagnostic("cli_missing", "", "darwin").canStartDocker,
       false,
     );
+  });
+
+  it("selects targeted official Docker guidance", () => {
+    assert.match(
+      getDockerGuideUrl("permission_denied", "linux"),
+      /linux-postinstall/,
+    );
+    assert.match(
+      getDockerGuideUrl("virtualization_unavailable", "win32"),
+      /windows-install/,
+    );
+    assert.match(getDockerGuideUrl("disk_full", "darwin"), /disk-space/);
+    assert.match(getDockerGuideUrl("context_invalid", "linux"), /context/);
+    assert.equal(
+      getDockerResourceUrl("install", "unknown", "darwin"),
+      getDockerInstallUrl("darwin"),
+    );
+  });
+
+  it("accepts only known diagnostic codes", () => {
+    assert.equal(isDockerDiagnosticCode("daemon_stopped"), true);
+    assert.equal(isDockerDiagnosticCode("arbitrary_url"), false);
   });
 });

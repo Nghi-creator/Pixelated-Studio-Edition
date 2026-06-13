@@ -9,6 +9,11 @@ import {
   stopEngine,
 } from "./main/engineController";
 import { createCompanionQrDataUrl } from "./main/companionQr";
+import {
+  getDockerResourceUrl,
+  isDockerDiagnosticCode,
+  type DockerResource,
+} from "./main/dockerDiagnostics";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -53,6 +58,24 @@ ipcMain.handle("launch-web", async () => {
   const url = createWebLaunchUrl();
   await shell.openExternal(url);
 });
+
+ipcMain.handle(
+  "open-docker-resource",
+  async (_event, resource: unknown, diagnosticCode: unknown) => {
+    if (resource !== "guide" && resource !== "install") {
+      throw new Error("Unknown Docker resource.");
+    }
+    if (!isDockerDiagnosticCode(diagnosticCode)) {
+      throw new Error("Unknown Docker diagnostic.");
+    }
+
+    const url = getDockerResourceUrl(
+      resource as DockerResource,
+      diagnosticCode,
+    );
+    await shell.openExternal(url);
+  },
+);
 
 app.whenReady().then(createWindow);
 

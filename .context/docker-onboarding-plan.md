@@ -325,6 +325,8 @@ Exit criteria:
 
 ### Phase 2: Guided Install And Retry
 
+Status: Implemented on 2026-06-13.
+
 Goal: help users install Docker safely.
 
 Steps:
@@ -438,13 +440,16 @@ Exit criteria:
 - Do not block experienced users from starting Docker manually and pressing
   **Retry**.
 
-## Recommended First Deployment Step
+## Completed Deployment Steps
 
-Start with **Phase 0 and Phase 1 only**:
+Phases 0 through 2 now provide:
 
 1. Add structured Docker diagnosis.
 2. Distinguish missing, stopped, permission, and unknown failures.
-3. Show targeted messages and allow retry through Initialize Engine.
+3. Show targeted messages and allow retry through Initialize Engine or the
+   recovery callout.
+4. Open official Docker install and diagnosis-specific setup pages through
+   main-process-owned URL selection.
 
-This creates the foundation for safe install/start buttons without introducing
-platform-launching behavior in the first deployment.
+Phase 3 can add trusted Docker Desktop launching and automatic resume without
+changing the diagnostic contract.

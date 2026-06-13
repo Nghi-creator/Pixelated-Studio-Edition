@@ -13,6 +13,7 @@ const EXPECTED_RENDERER_SCRIPTS = [
 const EXPECTED_PRELOAD_API = [
   "createCompanionQrDataUrl",
   "launchWeb",
+  "openDockerResource",
   "startDocker",
   "stopDocker",
   "regenerateLanInvite",

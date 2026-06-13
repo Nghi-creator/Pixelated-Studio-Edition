@@ -51,6 +51,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   createCompanionQrDataUrl: (url: string) =>
     ipcRenderer.invoke("create-companion-qr", url) as Promise<string>,
   launchWeb: () => ipcRenderer.invoke("launch-web") as Promise<void>,
+  openDockerResource: (resource: "guide" | "install", diagnosticCode: string) =>
+    ipcRenderer.invoke(
+      "open-docker-resource",
+      resource,
+      diagnosticCode,
+    ) as Promise<void>,
   startDocker: (options: StartDockerOptions) =>
     ipcRenderer.send("start-docker", options),
   stopDocker: () => ipcRenderer.send("stop-docker"),

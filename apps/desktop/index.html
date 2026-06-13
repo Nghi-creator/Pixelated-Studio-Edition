@@ -227,6 +227,42 @@
               Idle
             </p>
           </div>
+          <div
+            id="docker-recovery"
+            class="mt-5 hidden rounded-lg border border-orange-500/40 bg-orange-500/10 p-4"
+          >
+            <p
+              id="docker-recovery-title"
+              class="font-bold text-orange-200"
+            ></p>
+            <p class="mt-1 text-xs leading-5 text-gray-300">
+              Pixelated Studio could not continue until Docker is ready. Retry
+              after resolving the issue, or open the official Docker guidance.
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2">
+              <button
+                id="docker-retry"
+                class="rounded-md bg-synth-primary px-3 py-2 text-xs font-bold text-synth-ink transition-colors hover:bg-synth-primary-hover disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+              >
+                Retry
+              </button>
+              <button
+                id="docker-download"
+                class="hidden rounded-md border border-synth-primary/60 bg-synth-primary/10 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-synth-primary/20 disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+              >
+                Download Docker
+              </button>
+              <button
+                id="docker-guide"
+                class="rounded-md border border-orange-400/50 bg-orange-500/10 px-3 py-2 text-xs font-bold text-orange-100 transition-colors hover:bg-orange-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                type="button"
+              >
+                View setup guide
+              </button>
+            </div>
+          </div>
           <div id="phase-list" class="mt-5 grid min-h-0 flex-1 auto-rows-fr gap-3"></div>
         </section>
 
@@ -397,6 +433,14 @@
               <li>
                 Windows users must have <strong>WSL2</strong> or Hyper-V
                 enabled.
+              </li>
+              <li>
+                macOS users can install and start Docker Desktop from the
+                Applications folder.
+              </li>
+              <li>
+                Linux users may need to start the Docker service or grant their
+                account permission to access the Docker socket.
               </li>
             </ul>
           </div>

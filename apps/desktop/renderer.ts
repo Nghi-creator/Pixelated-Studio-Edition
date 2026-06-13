@@ -60,6 +60,10 @@ type PhaseTracker = {
 type ElectronApi = {
   createCompanionQrDataUrl: (url: string) => Promise<string>;
   launchWeb: () => Promise<void>;
+  openDockerResource: (
+    resource: "guide" | "install",
+    diagnosticCode: string,
+  ) => Promise<void>;
   regenerateLanInvite: () => void;
   revokeLanInvite: () => void;
   startDocker: (options: { exposureMode?: ExposureMode }) => void;
@@ -169,9 +173,53 @@ const regenerateInviteBtn = requiredElement(
   HTMLButtonElement,
 );
 const revokeInviteBtn = requiredElement("revoke-invite", HTMLButtonElement);
+const dockerRecovery = requiredElement("docker-recovery");
+const dockerRecoveryTitle = requiredElement("docker-recovery-title");
+const dockerRetryBtn = requiredElement("docker-retry", HTMLButtonElement);
+const dockerDownloadBtn = requiredElement("docker-download", HTMLButtonElement);
+const dockerGuideBtn = requiredElement("docker-guide", HTMLButtonElement);
 
 let isRunning = false;
 let pendingCompanionPayload: EngineCompanionPayload | null = null;
+let dockerDiagnostic: DockerDiagnosticPayload | null = null;
+
+function setDockerRecoveryVisible(
+  visible: boolean,
+  diagnostic: DockerDiagnosticPayload | null = null,
+) {
+  dockerDiagnostic = visible ? diagnostic : null;
+  dockerRecovery.classList.toggle("hidden", !visible);
+  if (!visible || !diagnostic) return;
+
+  dockerRecoveryTitle.innerText = diagnostic.title;
+  dockerDownloadBtn.classList.toggle(
+    "hidden",
+    diagnostic.code !== "cli_missing",
+  );
+}
+
+function initializeEngine() {
+  setDockerRecoveryVisible(false);
+  logs.clear();
+  tokenPanel.classList.add("hidden");
+  tokenValue.innerText = "";
+  exposure.renderUrls([]);
+  exposure.renderCompanionUrls([]);
+  exposure.resetInviteCode();
+  pendingCompanionPayload = null;
+  logs.append(
+    '<span class="text-gray-400">>></span> Initializing WebRTC node...',
+  );
+  phases.render({
+    detail: "Queued",
+    phase: "docker",
+    status: "starting",
+  });
+  setStatusPresentation("Initializing Engine - Queued", "running");
+  setPowerPending(true);
+  powerText.innerText = "Initialize Engine";
+  pixelatedWindow.electronAPI.startDocker({ exposureMode: exposure.getMode() });
+}
 
 function setInviteButtonsPending(isPending: boolean) {
   regenerateInviteBtn.disabled = isPending;
@@ -349,6 +397,7 @@ function setLifecycleState(state: EngineStatePayload) {
   phases.render(state);
 
   if (state.status === "ready") {
+    setDockerRecoveryVisible(false);
     setStatusBadge(true);
     powerBtn.disabled = false;
     exposure.setEnabled(false);
@@ -387,25 +436,7 @@ function setLifecycleState(state: EngineStatePayload) {
 
 powerBtn.addEventListener("click", () => {
   if (!isRunning) {
-    logs.clear();
-    tokenPanel.classList.add("hidden");
-    tokenValue.innerText = "";
-    exposure.renderUrls([]);
-    exposure.renderCompanionUrls([]);
-    exposure.resetInviteCode();
-    pendingCompanionPayload = null;
-    logs.append(
-      '<span class="text-gray-400">>></span> Initializing WebRTC node...',
-    );
-    phases.render({
-      detail: "Queued",
-      phase: "docker",
-      status: "starting",
-    });
-    setStatusPresentation("Initializing Engine - Queued", "running");
-    setPowerPending(true);
-    powerText.innerText = "Initialize Engine";
-    pixelatedWindow.electronAPI.startDocker({ exposureMode: exposure.getMode() });
+    initializeEngine();
     return;
   }
 
@@ -426,6 +457,38 @@ launchWebBtn.addEventListener("click", async () => {
   } finally {
     launchWebBtn.disabled = false;
   }
+});
+
+dockerRetryBtn.addEventListener("click", initializeEngine);
+
+async function openDockerResource(resource: "guide" | "install") {
+  if (!dockerDiagnostic) return;
+
+  dockerRetryBtn.disabled = true;
+  dockerDownloadBtn.disabled = true;
+  dockerGuideBtn.disabled = true;
+  try {
+    await pixelatedWindow.electronAPI.openDockerResource(
+      resource,
+      dockerDiagnostic.code,
+    );
+  } catch (err) {
+    logs.append(
+      `<span class="text-red-400">Could not open Docker guidance: ${logs.sanitize(String(err))}</span>`,
+    );
+  } finally {
+    dockerRetryBtn.disabled = false;
+    dockerDownloadBtn.disabled = false;
+    dockerGuideBtn.disabled = false;
+  }
+}
+
+dockerDownloadBtn.addEventListener("click", () => {
+  void openDockerResource("install");
+});
+
+dockerGuideBtn.addEventListener("click", () => {
+  void openDockerResource("guide");
 });
 
 clearLogsBtn.addEventListener("click", () => {
@@ -498,6 +561,7 @@ pixelatedWindow.electronAPI.onEngineCompanion((event, payload) => {
 });
 
 pixelatedWindow.electronAPI.onDockerDiagnostic((event, payload) => {
+  setDockerRecoveryVisible(true, payload);
   logs.append(
     `<span class="text-red-400">${logs.sanitize(payload.title)}</span>`,
   );

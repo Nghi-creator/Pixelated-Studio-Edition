@@ -20,6 +20,8 @@ export type DockerDiagnostic = {
   title: string;
 };
 
+export type DockerResource = "guide" | "install";
+
 type DockerCommandFailure = {
   code?: unknown;
   message?: string;
@@ -37,6 +39,57 @@ export function getDockerInstallUrl(platform: NodeJS.Platform) {
     return "https://docs.docker.com/desktop/setup/install/windows-install/";
   }
   return "https://docs.docker.com/engine/install/";
+}
+
+export function getDockerGuideUrl(
+  code: DockerDiagnosticCode,
+  platform: NodeJS.Platform,
+) {
+  if (code === "cli_missing") {
+    return getDockerInstallUrl(platform);
+  }
+  if (code === "permission_denied") {
+    return "https://docs.docker.com/engine/install/linux-postinstall/";
+  }
+  if (code === "virtualization_unavailable" && platform === "win32") {
+    return "https://docs.docker.com/desktop/setup/install/windows-install/#system-requirements";
+  }
+  if (code === "disk_full") {
+    return "https://docs.docker.com/desktop/use-desktop/disk-space/";
+  }
+  if (code === "context_invalid") {
+    return "https://docs.docker.com/reference/cli/docker/context/";
+  }
+  if (code === "daemon_stopped") {
+    return getDockerInstallUrl(platform);
+  }
+  return "https://docs.docker.com/desktop/troubleshoot-and-support/troubleshoot/";
+}
+
+export function getDockerResourceUrl(
+  resource: DockerResource,
+  code: DockerDiagnosticCode,
+  platform: NodeJS.Platform = process.platform,
+) {
+  return resource === "install"
+    ? getDockerInstallUrl(platform)
+    : getDockerGuideUrl(code, platform);
+}
+
+export function isDockerDiagnosticCode(
+  value: unknown,
+): value is DockerDiagnosticCode {
+  return [
+    "ready",
+    "cli_missing",
+    "daemon_stopped",
+    "permission_denied",
+    "virtualization_unavailable",
+    "disk_full",
+    "context_invalid",
+    "startup_timeout",
+    "unknown",
+  ].includes(String(value));
 }
 
 function getDiagnosticPresentation(code: DockerDiagnosticCode) {

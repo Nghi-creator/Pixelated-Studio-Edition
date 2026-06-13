@@ -31,6 +31,7 @@ describe("desktop packaged release smoke helpers", () => {
     const apiNames = [
       "createCompanionQrDataUrl",
       "launchWeb",
+      "openDockerResource",
       "startDocker",
       "stopDocker",
       "regenerateLanInvite",
