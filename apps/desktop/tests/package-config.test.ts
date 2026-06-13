@@ -115,6 +115,8 @@ describe("desktop package config", () => {
     assert.match(preload, /ipcRenderer\.invoke|electron_1\.ipcRenderer\.invoke/);
     assert.doesNotMatch(renderer, /\bexports\b/);
     assert.doesNotMatch(rendererHelper, /\bexports\b/);
+    assert.doesNotMatch(rendererHelper, /\.innerHTML\s*[+]?=/);
+    assert.match(rendererHelper, /createTextNode/);
   });
 
   it("runs the packaged release smoke as part of npm run dist", () => {

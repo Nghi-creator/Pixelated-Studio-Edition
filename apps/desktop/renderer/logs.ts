@@ -5,7 +5,14 @@
 
   function createLogController({ logBox }: LogControllerElements) {
     function append(message: string) {
-      logBox.innerHTML += `${message}<br>`;
+      const plainMessage = message.replace(
+        /<span(?: class="[^"]*")?>|<\/span>/g,
+        "",
+      );
+      logBox.append(
+        document.createTextNode(plainMessage),
+        document.createElement("br"),
+      );
       logBox.scrollTop = logBox.scrollHeight;
     }
 

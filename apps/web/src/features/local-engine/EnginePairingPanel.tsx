@@ -153,6 +153,12 @@ const getScopeDescription = (scope: EngineUrlScope) => {
 const isLikelyCompanionUrl = (url: URL) =>
   url.protocol === "https:" && url.port === "8090";
 
+const getInviteCompanionUrl = () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("join") !== "invite") return null;
+  return params.get("companionUrl");
+};
+
 const getInviteFailureMessage = (status: number, code?: string) => {
   if (status === 401) return "That invite code was not accepted by the host.";
   if (code === "invite_expired") {
@@ -266,18 +272,19 @@ export function EnginePairingPanel({
   compact = false,
   onPaired,
 }: EnginePairingPanelProps) {
-  const [engineUrl, setEngineUrlInput] = useState(getEngineUrl);
-  const [inviteJoinRequested, setInviteJoinRequested] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("join") === "invite" && Boolean(params.get("companionUrl"));
-  });
+  const [engineUrl, setEngineUrlInput] = useState(
+    () => getInviteCompanionUrl() || getEngineUrl(),
+  );
+  const [inviteJoinRequested, setInviteJoinRequested] = useState(
+    () => Boolean(getInviteCompanionUrl()),
+  );
   const [inviteCode, setInviteCode] = useState("");
   const [token, setToken] = useState(getEngineToken);
   const [pairingState, setPairingState] = useState<PairingState>(
     token ? "paired" : "idle",
   );
   const [lanPreflight, setLanPreflight] = useState<LanPreflightState>(() => {
-    const initialUrl = parseEngineUrl(getEngineUrl());
+    const initialUrl = parseEngineUrl(getInviteCompanionUrl() || getEngineUrl());
     return {
       status:
         initialUrl && isLikelyCompanionUrl(initialUrl) ? "checking" : "idle",
@@ -298,16 +305,6 @@ export function EnginePairingPanel({
   );
   const preflightReady =
     lanPreflight.status === "complete" && lanPreflight.payload.ready === true;
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const companionUrl = params.get("companionUrl");
-    if (params.get("join") !== "invite" || !companionUrl) return;
-
-    setEngineUrlInput(companionUrl);
-    setInviteJoinRequested(true);
-    setLanPreflight({ status: "checking" });
-  }, []);
 
   useEffect(() => {
     const refreshPairingState = () => {

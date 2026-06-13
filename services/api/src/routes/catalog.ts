@@ -397,11 +397,16 @@ export async function registerCatalogRoutes(
         return reply.status(400).send({ error: "Invalid game id" });
       }
 
-      await service
+      const { error } = await service
         .from("favorites")
         .delete()
         .eq("user_id", user.id)
         .eq("game_id", params.data.gameId);
+
+      if (error) {
+        request.log.error({ err: error }, "Failed to delete favorite");
+        return reply.status(500).send({ error: "Failed to delete favorite" });
+      }
 
       return reply.status(204).send();
     },
@@ -452,11 +457,15 @@ export async function registerCatalogRoutes(
         return reply.status(400).send({ error: "Invalid reaction" });
       }
 
-      await service
+      const { error: deleteError } = await service
         .from("likes")
         .delete()
         .eq("user_id", user.id)
         .eq("game_id", params.data.gameId);
+      if (deleteError) {
+        request.log.error({ err: deleteError }, "Failed to replace reaction");
+        return reply.status(500).send({ error: "Failed to save reaction" });
+      }
 
       if (body.data.isLike !== null) {
         const { error } = await service.from("likes").insert({
@@ -571,7 +580,11 @@ export async function registerCatalogRoutes(
       if (!isAdminRole(role)) {
         query = query.eq("user_id", user.id);
       }
-      await query;
+      const { error } = await query;
+      if (error) {
+        request.log.error({ err: error }, "Failed to delete comment");
+        return reply.status(500).send({ error: "Failed to delete comment" });
+      }
 
       return reply.status(204).send();
     },
@@ -597,32 +610,48 @@ export async function registerCatalogRoutes(
         return reply.status(400).send({ error: "Invalid comment reaction" });
       }
 
-      const { data: comment } = await service
+      const { data: comment, error: commentError } = await service
         .from("comments")
         .select("user_id")
         .eq("id", params.data.commentId)
         .maybeSingle<{ user_id: string | null }>();
+      if (commentError) {
+        request.log.error({ err: commentError }, "Failed to load comment");
+        return reply.status(500).send({ error: "Failed to save comment reaction" });
+      }
       if (!comment || comment.user_id === user.id) {
         return reply.status(403).send({ error: "Cannot react to this comment" });
       }
 
-      await service
+      const { error: deleteError } = await service
         .from("comment_likes")
         .delete()
         .eq("user_id", user.id)
         .eq("comment_id", params.data.commentId);
+      if (deleteError) {
+        request.log.error({ err: deleteError }, "Failed to replace comment reaction");
+        return reply.status(500).send({ error: "Failed to save comment reaction" });
+      }
       if (body.data.isLike !== null) {
-        await service.from("comment_likes").insert({
+        const { error: insertError } = await service.from("comment_likes").insert({
           comment_id: params.data.commentId,
           is_like: body.data.isLike,
           user_id: user.id,
         });
+        if (insertError) {
+          request.log.error({ err: insertError }, "Failed to save comment reaction");
+          return reply.status(500).send({ error: "Failed to save comment reaction" });
+        }
       }
 
-      const { data } = await service
+      const { data, error: loadError } = await service
         .from("comment_likes")
         .select("user_id,is_like")
         .eq("comment_id", params.data.commentId);
+      if (loadError) {
+        request.log.error({ err: loadError }, "Failed to load comment reactions");
+        return reply.status(500).send({ error: "Failed to load comment reactions" });
+      }
 
       return { reactions: data || [] };
     },
