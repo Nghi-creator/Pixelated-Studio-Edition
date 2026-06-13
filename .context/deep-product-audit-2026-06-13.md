@@ -21,7 +21,7 @@ product and infrastructure; it does not introduce new product features.
 | Area | Status | Summary |
 | --- | --- | --- |
 | Web frontend | Healthy with gaps | Lint and production build pass; component and hook regression coverage is still missing. |
-| API backend | Hardened, more work queued | Core security and mutation correctness fixes pass 40 tests; account enumeration and broader abuse controls remain. |
+| API backend | Hardened, more work queued | Public account enumeration is closed; reaction atomicity and broader abuse controls remain. |
 | Desktop | Healthy | Build, 39 tests, companion security controls, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 28 tests, and live Docker boot smoke pass. |
 | Docker image | Improved | Reproducible Mesen build and smaller image; multi-stage build and pinned Node source remain. |
@@ -30,25 +30,6 @@ product and infrastructure; it does not introduce new product features.
 ## Next Work Queue
 
 Work these in order unless a production incident changes priority.
-
-### NEXT-01 — P0: Remove Public Account Enumeration
-
-**Problem**
-
-`POST /auth/account-methods` reveals whether an email exists and which providers
-it uses. It also scans up to 10,000 Supabase Auth users per request. Rate
-limiting reduces abuse but does not remove the disclosure or expensive lookup.
-
-**Recommended work**
-
-- Remove provider-specific disclosure from unauthenticated responses, or require
-  CAPTCHA plus strict shared-store IP/email limits.
-- Replace paginated full-user scans with a bounded server-side lookup.
-
-**Done when**
-
-- Unauthenticated callers cannot reliably determine whether an account exists.
-- Lookup cost is bounded and covered by regression tests.
 
 ### NEXT-02 — P1: Make Replace-Style Reactions Atomic
 
@@ -212,17 +193,17 @@ initializers; the redundant mount effect was removed.
 
 ### DONE-06 — Add Focused Abuse Controls
 
-**Problem:** Public account lookup, session-token verification, and desktop LAN
-invite redemption accepted unlimited attempts.
+**Problem:** Session-token verification and desktop LAN invite redemption
+accepted unlimited attempts. The former account lookup endpoint also lacked
+throttling before it was converted into a constant-response compatibility shim.
 
-**Resolution:** Added a bounded fixed-window API limiter, IP/email limits for
-account lookup, IP/session limits for verification, and temporary `429`
-responses for repeated invalid LAN invite attempts.
+**Resolution:** Added a bounded fixed-window API limiter, IP/session limits for
+verification, and temporary `429` responses for repeated invalid LAN invite
+attempts.
 
 **Verification:** API limiter and route tests plus desktop companion tests pass.
 
-**Remaining risk:** Account enumeration still exists and API limits are
-process-local. See `NEXT-01` and `NEXT-04`.
+**Remaining risk:** API limits are process-local. See `NEXT-04`.
 
 ### DONE-07 — Prepare Supabase Security-Definer Hardening
 
@@ -261,6 +242,21 @@ metadata, and removed unused dependencies.
 `pixelated-engine:audit-final` at `1.96GB`, down from the existing `2.06GB`
 image. See `NEXT-05` for remaining image work.
 
+### DONE-10 — Remove Public Account Enumeration
+
+**Problem:** `POST /auth/account-methods` disclosed account existence and linked
+providers while scanning up to 10,000 Supabase Auth users per request.
+
+**Resolution:** Removed the web client's dependency on account discovery.
+Signup and password-reset flows now call the appropriate Supabase operation
+directly and show uniform responses that do not reveal account state. The API
+route remains temporarily as a constant-response compatibility shim for older
+hosted and packaged clients; it performs no account lookup.
+
+**Verification:** API regression coverage proves existing and missing accounts
+receive the same response without calling `listUsers`; web lint and production
+build pass.
+
 ## Latest Verification Run
 
 Run on 2026-06-13 after the completed hardening work:
@@ -268,7 +264,7 @@ Run on 2026-06-13 after the completed hardening work:
 | Gate | Result |
 | --- | --- |
 | Web lint and production build | Passed |
-| API typecheck, lint, build, and tests | Passed — 40 tests |
+| API typecheck, lint, build, and tests | Passed — 39 tests |
 | Desktop build and tests | Passed — 39 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 28 tests |

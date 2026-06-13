@@ -326,12 +326,6 @@ export type ApiAdminReportActionResponse = {
   targetUserId?: string;
 };
 
-export type ApiAccountMethodsResponse = {
-  exists: boolean;
-  hasEmailProvider: boolean;
-  providers: string[];
-};
-
 export type ApiPaginatedAccessLogsResponse<TLog> = {
   logs: TLog[];
   page: number;
@@ -400,12 +394,6 @@ export type ApiProfile = {
 };
 
 export const api = {
-  accountMethods: (email: string) =>
-    apiRequest<ApiAccountMethodsResponse>("/auth/account-methods", {
-      authenticated: false,
-      body: JSON.stringify({ email }),
-      method: "POST",
-    }),
   accessLogs: <TLog>(page = 1, pageSize = 25) =>
     apiRequest<ApiPaginatedAccessLogsResponse<TLog>>(
       `/admin/access-logs?page=${page}&pageSize=${pageSize}`,

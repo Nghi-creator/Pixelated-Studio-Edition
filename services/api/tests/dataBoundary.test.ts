@@ -49,6 +49,7 @@ type TestRequest = FastifyRequest & {
 };
 
 class FakeSupabase {
+  authListUsersCalls = 0;
   authUsers: User[] = [];
   deletedUsers: string[] = [];
   rows: Record<TableName, RecordRow[]> = {
@@ -78,6 +79,7 @@ class FakeSupabase {
         page?: number;
         perPage?: number;
       } = {}) => {
+        this.authListUsersCalls += 1;
         const start = (page - 1) * perPage;
         return {
           data: { users: this.authUsers.slice(start, start + perPage) },
@@ -400,7 +402,7 @@ async function createDataBoundaryApp(db: FakeSupabase, userId = USER_ID) {
 
   await registerAccessLogRoutes(app, options);
   await registerAdminUserRoutes(app, options);
-  await registerAuthMethodsRoutes(app, options);
+  await registerAuthMethodsRoutes(app);
   await registerCatalogRoutes(app, options);
   await registerGameRoutes(app, options);
   await registerLocalPairingRoutes(app, options);
@@ -422,17 +424,6 @@ function seedProfiles(db: FakeSupabase) {
     { id: ADMIN_ID, role: "admin", username: "admin" },
     { id: SUPER_ADMIN_ID, role: "super_admin", username: "root" },
   );
-}
-
-function makeAuthUser(email: string, providers: string[]): User {
-  return {
-    app_metadata: { providers },
-    aud: "authenticated",
-    created_at: new Date().toISOString(),
-    email,
-    id: `${email}-id`,
-    user_metadata: {},
-  };
 }
 
 test("catalog and favorites are served through backend routes", async () => {
@@ -613,71 +604,37 @@ test("featured games route returns a wider pool while all play counts are zero",
   await app.close();
 });
 
-test("auth account methods expose provider metadata for login decisions", async () => {
+test("public account discovery endpoint returns an enumeration-safe response", async () => {
   const db = new FakeSupabase();
-  db.authUsers.push(
-    makeAuthUser("oauth@example.com", ["google"]),
-    makeAuthUser("email@example.com", ["email"]),
-  );
+  db.authUsers.push({
+    app_metadata: { providers: ["google"] },
+    aud: "authenticated",
+    created_at: new Date().toISOString(),
+    email: "existing@example.com",
+    id: USER_ID,
+    user_metadata: {},
+  });
   const app = await createDataBoundaryApp(db);
 
-  const oauthResponse = await app.inject({
+  const existingResponse = await app.inject({
     method: "POST",
-    payload: { email: "OAUTH@example.com" },
+    payload: { email: "existing@example.com" },
     url: "/auth/account-methods",
   });
-  assert.equal(oauthResponse.statusCode, 200);
-  assert.deepEqual(oauthResponse.json(), {
-    exists: true,
-    hasEmailProvider: false,
-    providers: ["google"],
-  });
-
-  const emailResponse = await app.inject({
-    method: "POST",
-    payload: { email: "email@example.com" },
-    url: "/auth/account-methods",
-  });
-  assert.equal(emailResponse.statusCode, 200);
-  assert.equal(
-    emailResponse.json<{ hasEmailProvider: boolean }>().hasEmailProvider,
-    true,
-  );
-
   const missingResponse = await app.inject({
     method: "POST",
     payload: { email: "missing@example.com" },
     url: "/auth/account-methods",
   });
-  assert.equal(missingResponse.statusCode, 200);
-  assert.deepEqual(missingResponse.json(), {
+
+  assert.equal(existingResponse.statusCode, 200);
+  assert.deepEqual(existingResponse.json(), missingResponse.json());
+  assert.deepEqual(existingResponse.json(), {
     exists: false,
     hasEmailProvider: false,
     providers: [],
   });
-  await app.close();
-});
-
-test("auth account method lookups are rate limited", async () => {
-  const db = new FakeSupabase();
-  const app = await createDataBoundaryApp(db);
-
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    const response = await app.inject({
-      method: "POST",
-      payload: { email: "target@example.com" },
-      url: "/auth/account-methods",
-    });
-    assert.equal(response.statusCode, 200);
-  }
-
-  const blockedResponse = await app.inject({
-    method: "POST",
-    payload: { email: "target@example.com" },
-    url: "/auth/account-methods",
-  });
-  assert.equal(blockedResponse.statusCode, 429);
-  assert.equal(blockedResponse.headers["retry-after"], "60");
+  assert.equal(db.authListUsersCalls, 0);
   await app.close();
 });
 
