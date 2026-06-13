@@ -13,7 +13,10 @@ const EXPECTED_RENDERER_SCRIPTS = [
 const EXPECTED_PRELOAD_API = [
   "createCompanionQrDataUrl",
   "launchWeb",
+  "openDockerResource",
   "startDocker",
+  "startDockerApplication",
+  "cancelDockerRecovery",
   "stopDocker",
   "regenerateLanInvite",
   "revokeLanInvite",
@@ -23,6 +26,10 @@ const EXPECTED_PRELOAD_API = [
   "onEngineToken",
   "onEngineExposure",
   "onEngineCompanion",
+  "onDockerDiagnostic",
+  "onDockerRecoveryStarted",
+  "onDockerRecoveryReady",
+  "onDockerRecoveryCancelled",
 ];
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -155,6 +162,8 @@ function assertPackagedApp(archivePath: string) {
     "package.json",
     "index.html",
     "dist/main.js",
+    "dist/main/dockerDiagnostics.js",
+    "dist/main/dockerRecovery.js",
     "dist/preload.js",
     ...EXPECTED_RENDERER_SCRIPTS,
   ];

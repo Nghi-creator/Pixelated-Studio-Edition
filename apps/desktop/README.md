@@ -73,6 +73,32 @@ The desktop UI reports structured startup states: checking Docker, pulling or
 building the image, removing stale containers, starting the container, waiting
 for health, ready, stopping, stopped, and failed.
 
+Before startup, the desktop app runs a bounded Docker diagnostic. Missing Docker,
+a stopped daemon, permission errors, unavailable virtualization, full storage,
+invalid Docker contexts, timeouts, and unknown failures receive distinct status
+messages while the original command detail remains available in System Logs.
+The Startup Pipeline recovery callout can retry initialization and open official
+Docker install or diagnosis-specific setup pages. Pixelated Studio selects those
+URLs in the Electron main process and never downloads or executes an installer.
+When Docker Desktop is installed in a trusted standard location, **Start Docker**
+launches it, waits up to 90 seconds for readiness, and resumes engine
+initialization automatically. The wait can be cancelled. macOS and Windows use
+known Docker Desktop application paths; Linux uses the known Docker Desktop
+binary or its user-level systemd service and never invokes `sudo`.
+
+Intervention-required failures show targeted recovery guidance for Linux Docker
+socket permissions, Windows virtualization/WSL 2, Docker disk space, and Docker
+contexts. **Copy diagnostics** produces a shareable normalized summary without
+raw Docker output, environment values, tokens, or filesystem paths. Full raw
+details remain local in System Logs for troubleshooting.
+
+Cross-platform release validation runs through
+`.github/workflows/desktop-release-validation.yml`. It executes desktop
+diagnostic contracts, builds the native DMG, NSIS installer, or AppImage on its
+matching GitHub runner, runs the packaged `app.asar` smoke, and uploads the
+installer artifact. Real-machine onboarding results are tracked separately in
+`.context/docker-onboarding-validation.md`.
+
 The desktop app passes `PIXELATED_API_URL` into the engine so cloud sessions can be verified with the backend before boot. It defaults to the hosted Render API; override it for localhost API testing:
 
 ```txt

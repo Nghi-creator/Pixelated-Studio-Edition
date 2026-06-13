@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { app, type IpcMainEvent } from "electron";
+import { app, shell, type IpcMainEvent } from "electron";
 import path from "path";
 import {
   backendApiUrl,
@@ -25,6 +25,17 @@ import {
   prepareEngineImage,
   quoteDockerEnvValue,
 } from "./docker";
+import {
+  createDockerDiagnostic,
+  diagnoseDocker,
+  type DockerDiagnostic,
+} from "./dockerDiagnostics";
+import {
+  discoverDockerStartPlan,
+  executeDockerStartPlan,
+  waitForDockerReady,
+  withDockerStartCapability,
+} from "./dockerRecovery";
 import {
   getAdvertisedEngineUrls,
   getAdvertisedCompanionUrls,
@@ -62,6 +73,9 @@ type ActiveCompanion = {
 
 let engineToken: string | null = null;
 let activeCompanion: ActiveCompanion | null = null;
+let activeStartupAttempt = 0;
+let startupInProgress = false;
+let recoveryInProgress = false;
 
 const INVITE_CODE_TTL_MS = 10 * 60 * 1000;
 
@@ -318,7 +332,74 @@ function handleStartupFailure(
   });
 }
 
+function emitDockerDiagnostic(event: IpcMainEvent, diagnostic: DockerDiagnostic) {
+  emitEngineState(event, "FAILED", diagnostic.title);
+  event.reply("docker-diagnostic", diagnostic);
+  event.reply(
+    "server-log",
+    `<span class="text-red-500">ERROR: ${diagnostic.title}.</span>`,
+  );
+  if (diagnostic.detail) {
+    event.reply("server-log", `Docker diagnostic: ${diagnostic.detail}`);
+  }
+  event.reply("engine-stopped");
+}
+
+function finishStartupAttempt(attempt: number) {
+  if (activeStartupAttempt === attempt) startupInProgress = false;
+}
+
+function continueEngineStartup(
+  event: IpcMainEvent,
+  safeEnv: NodeJS.ProcessEnv,
+  launchContext: EngineLaunchContext,
+  attempt: number,
+) {
+  if (attempt !== activeStartupAttempt) return;
+  event.reply("server-log", "Docker Engine found.");
+
+  prepareEngineImage(event, safeEnv)
+    .then(() => {
+      event.reply("server-log", "Image ready. Preparing WebRTC Node...");
+      emitEngineState(event, "REMOVING_STALE", "pixelated-node");
+
+      return execCommand("docker rm -f pixelated-node", { env: safeEnv }).catch(
+        () => undefined,
+      );
+    })
+    .then(() => startContainer(event, safeEnv, launchContext))
+    .then(() => {
+      emitEngineState(event, "WAITING_HEALTH", "30 attempts / 1s interval");
+      event.reply("server-log", "Waiting for engine health check...");
+      return waitForEngineHealth();
+    })
+    .then(() => {
+      return startCompanion(event, launchContext).then(() => {
+        emitEngineState(event, "READY", "http://127.0.0.1:8080/health");
+        event.reply("engine-token", engineToken);
+        event.reply("engine-exposure", {
+          advertisedUrls: launchContext.advertisedUrls,
+          companionUrls: activeCompanion ? activeCompanion.urls : [],
+          exposureMode: launchContext.exposureMode,
+        });
+        event.reply(
+          "server-log",
+          '<span class="text-green-500">SUCCESS: PIXELATED Engine healthy on Port 8080.</span>',
+        );
+        finishStartupAttempt(attempt);
+      });
+    })
+    .catch((startErr) => {
+      finishStartupAttempt(attempt);
+      handleStartupFailure(event, safeEnv, startErr);
+    });
+}
+
 export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {}) {
+  if (startupInProgress || recoveryInProgress) {
+    event.reply("server-log", "Engine initialization is already in progress.");
+    return;
+  }
   if (!isSafeDockerImageRef(engineImage)) {
     rejectInvalidImage(event);
     return;
@@ -328,59 +409,96 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
   event.reply("server-log", "Checking Docker daemon...");
   const safeEnv = getSafeEnv();
   const launchContext = createEngineLaunchContext(options);
+  const attempt = ++activeStartupAttempt;
+  startupInProgress = true;
 
   engineToken = crypto.randomBytes(24).toString("base64url");
   stopCompanionServer();
   activeCompanion = null;
 
-  exec("docker info", { env: safeEnv }, (err) => {
-    if (err) {
-      emitEngineState(event, "FAILED", "Docker is not running");
-      event.reply(
-        "server-log",
-        '<span class="text-red-500">ERROR: Docker Engine not detected or not running.</span>',
-      );
-      event.reply("engine-stopped");
+  void diagnoseDocker(safeEnv).then((diagnostic) => {
+    if (attempt !== activeStartupAttempt) return;
+    if (diagnostic.code !== "ready") {
+      finishStartupAttempt(attempt);
+      emitDockerDiagnostic(event, withDockerStartCapability(diagnostic));
       return;
     }
-
-    event.reply("server-log", "Docker Engine found.");
-
-    prepareEngineImage(event, safeEnv)
-      .then(() => {
-        event.reply("server-log", "Image ready. Preparing WebRTC Node...");
-        emitEngineState(event, "REMOVING_STALE", "pixelated-node");
-
-        return execCommand("docker rm -f pixelated-node", { env: safeEnv }).catch(
-          () => undefined,
-        );
-      })
-      .then(() => startContainer(event, safeEnv, launchContext))
-      .then(() => {
-        emitEngineState(event, "WAITING_HEALTH", "30 attempts / 1s interval");
-        event.reply("server-log", "Waiting for engine health check...");
-        return waitForEngineHealth();
-      })
-      .then(() => {
-        return startCompanion(event, launchContext).then(() => {
-          emitEngineState(event, "READY", "http://127.0.0.1:8080/health");
-          event.reply("engine-token", engineToken);
-          event.reply("engine-exposure", {
-            advertisedUrls: launchContext.advertisedUrls,
-            companionUrls: activeCompanion ? activeCompanion.urls : [],
-            exposureMode: launchContext.exposureMode,
-          });
-          event.reply(
-            "server-log",
-            '<span class="text-green-500">SUCCESS: PIXELATED Engine healthy on Port 8080.</span>',
-          );
-        });
-      })
-      .catch((startErr) => handleStartupFailure(event, safeEnv, startErr));
+    continueEngineStartup(event, safeEnv, launchContext, attempt);
   });
 }
 
+export function startDockerAndResume(
+  event: IpcMainEvent,
+  options: StartEngineOptions = {},
+) {
+  if (startupInProgress || recoveryInProgress) {
+    event.reply("server-log", "Docker startup is already in progress.");
+    return;
+  }
+
+  const startPlan = discoverDockerStartPlan();
+  if (!startPlan) {
+    const diagnostic = createDockerDiagnostic(
+      "daemon_stopped",
+      "No trusted Docker Desktop application or supported user service was found.",
+    );
+    emitDockerDiagnostic(
+      event,
+      { ...diagnostic, canStartDocker: false },
+    );
+    return;
+  }
+
+  const attempt = ++activeStartupAttempt;
+  recoveryInProgress = true;
+  emitEngineState(event, "CHECKING_DOCKER", "Starting Docker Desktop");
+  event.reply("docker-recovery-started");
+  event.reply("server-log", "Starting Docker from a trusted system location...");
+
+  void executeDockerStartPlan(startPlan, (targetPath) => shell.openPath(targetPath))
+    .then(() => {
+      event.reply("server-log", "Waiting for Docker Desktop to become ready...");
+      return waitForDockerReady(getSafeEnv(), {
+        isCancelled: () => attempt !== activeStartupAttempt,
+      });
+    })
+    .then((diagnostic) => {
+      if (attempt !== activeStartupAttempt) return;
+      recoveryInProgress = false;
+      if (diagnostic.code !== "ready") {
+        emitDockerDiagnostic(event, diagnostic);
+        return;
+      }
+
+      event.reply("server-log", "Docker is ready. Resuming engine initialization.");
+      event.reply("docker-recovery-ready");
+      startEngine(event, options);
+    })
+    .catch((err) => {
+      if (attempt !== activeStartupAttempt) return;
+      recoveryInProgress = false;
+      emitDockerDiagnostic(
+        event,
+        createDockerDiagnostic("unknown", getErrorMessage(err)),
+      );
+    });
+}
+
+export function cancelDockerRecovery(event: IpcMainEvent) {
+  if (!recoveryInProgress) return;
+
+  activeStartupAttempt += 1;
+  recoveryInProgress = false;
+  emitEngineState(event, "STOPPED");
+  event.reply("server-log", "Cancelled waiting for Docker Desktop.");
+  event.reply("docker-recovery-cancelled");
+  event.reply("engine-stopped");
+}
+
 export function stopEngine(event: IpcMainEvent) {
+  activeStartupAttempt += 1;
+  startupInProgress = false;
+  recoveryInProgress = false;
   emitEngineState(event, "STOPPING");
   event.reply("server-log", "Initiating shutdown sequence...");
   const safeEnv = getSafeEnv();
@@ -402,6 +520,9 @@ export function stopEngine(event: IpcMainEvent) {
 }
 
 export function cleanupEngine() {
+  activeStartupAttempt += 1;
+  startupInProgress = false;
+  recoveryInProgress = false;
   const safeEnv = getSafeEnv();
   stopCompanionServer();
   activeCompanion = null;

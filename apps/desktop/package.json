@@ -10,7 +10,8 @@
     "start": "npm run build && electron .",
     "prepare:web": "npm run build && npm --prefix ../web run build && node dist/scripts/prepareWebDist.js",
     "smoke:release": "npm run build && node dist/scripts/releaseSmoke.js",
-    "dist": "npm run prepare:web && electron-builder && npm run smoke:release"
+    "dist": "npm run prepare:web && electron-builder && npm run smoke:release",
+    "dist:ci": "npm run prepare:web && electron-builder --publish never && npm run smoke:release"
   },
   "devDependencies": {
     "@electron/asar": "^3.4.1",

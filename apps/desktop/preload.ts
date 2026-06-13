@@ -33,6 +33,18 @@ type EngineCompanionPayload = {
   urls: string[];
 };
 
+type DockerDiagnosticPayload = {
+  canStartDocker: boolean;
+  code: string;
+  detail: string;
+  guidance: string;
+  guideUrl: string;
+  installUrl: string;
+  platform: NodeJS.Platform;
+  summary: string;
+  title: string;
+};
+
 type IpcCallback<TArgs extends unknown[] = []> = (
   event: IpcRendererEvent,
   ...args: TArgs
@@ -42,8 +54,17 @@ contextBridge.exposeInMainWorld("electronAPI", {
   createCompanionQrDataUrl: (url: string) =>
     ipcRenderer.invoke("create-companion-qr", url) as Promise<string>,
   launchWeb: () => ipcRenderer.invoke("launch-web") as Promise<void>,
+  openDockerResource: (resource: "guide" | "install", diagnosticCode: string) =>
+    ipcRenderer.invoke(
+      "open-docker-resource",
+      resource,
+      diagnosticCode,
+    ) as Promise<void>,
   startDocker: (options: StartDockerOptions) =>
     ipcRenderer.send("start-docker", options),
+  startDockerApplication: (options: StartDockerOptions) =>
+    ipcRenderer.send("start-docker-application", options),
+  cancelDockerRecovery: () => ipcRenderer.send("cancel-docker-recovery"),
   stopDocker: () => ipcRenderer.send("stop-docker"),
   regenerateLanInvite: () => ipcRenderer.send("regenerate-lan-invite"),
   revokeLanInvite: () => ipcRenderer.send("revoke-lan-invite"),
@@ -59,4 +80,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("engine-exposure", callback),
   onEngineCompanion: (callback: IpcCallback<[EngineCompanionPayload]>) =>
     ipcRenderer.on("engine-companion", callback),
+  onDockerDiagnostic: (callback: IpcCallback<[DockerDiagnosticPayload]>) =>
+    ipcRenderer.on("docker-diagnostic", callback),
+  onDockerRecoveryStarted: (callback: IpcCallback) =>
+    ipcRenderer.on("docker-recovery-started", callback),
+  onDockerRecoveryReady: (callback: IpcCallback) =>
+    ipcRenderer.on("docker-recovery-ready", callback),
+  onDockerRecoveryCancelled: (callback: IpcCallback) =>
+    ipcRenderer.on("docker-recovery-cancelled", callback),
 });
