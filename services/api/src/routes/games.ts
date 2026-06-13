@@ -4,8 +4,8 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
-import { FixedWindowRateLimiter } from "../modules/security/fixedWindowRateLimiter.js";
 import { rejectRateLimitedRequest } from "../modules/security/rateLimitResponse.js";
+import { createRateLimiter } from "../modules/security/sharedRateLimiter.js";
 
 const gameParamsSchema = z.object({
   gameId: z.string().uuid(),
@@ -24,8 +24,9 @@ export async function registerGameRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
-  const playCountWriteLimiter = new FixedWindowRateLimiter({
+  const playCountWriteLimiter = createRateLimiter({
     limit: 60,
+    namespace: "play-count-write",
     windowMs: 60_000,
   });
 
@@ -51,7 +52,7 @@ export async function registerGameRoutes(
       if (
         rejectRateLimitedRequest(
           reply,
-          playCountWriteLimiter.consume(user.id),
+          await playCountWriteLimiter.consume(user.id),
           "Play-count limit reached. Please try again shortly.",
         )
       ) {

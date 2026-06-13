@@ -21,7 +21,7 @@ product and infrastructure; it does not introduce new product features.
 | Area | Status | Summary |
 | --- | --- | --- |
 | Web frontend | Healthy, focused coverage added | Lint, production build, and 10 lifecycle regression contracts pass; broad visual component coverage remains optional follow-up work. |
-| API backend | Hardened, more work queued | Public account enumeration is closed, reactions are atomic, and write-heavy routes have per-user limits; shared-store limits remain. |
+| API backend | Hardened, deployment action queued | Public account enumeration is closed, reactions are atomic, and API abuse controls support shared Redis counters with bounded local fallback. |
 | Desktop | Healthy | Build, 42 tests, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
 | Docker image | Hardened and reduced | Pinned multi-stage build passes live ROM smoke at `1.15GB`; build tools are absent from the runtime image. |
@@ -30,24 +30,6 @@ product and infrastructure; it does not introduce new product features.
 ## Next Work Queue
 
 Work these in order unless a production incident changes priority.
-
-### NEXT-04 — P1: Move API Abuse Controls to a Shared Store
-
-**Problem**
-
-Session verification, submissions, metrics, LAN invite redemption, reports,
-play-count writes, comments, and reactions have focused throttles. In-memory
-limits reset on process restart and do not coordinate across multiple API
-instances.
-
-**Recommended work**
-
-- Use a shared rate-limit store before horizontally scaling the API.
-
-**Done when**
-
-- Write-heavy routes have documented limits and regression tests.
-- Limits behave consistently across multiple API instances.
 
 ### NEXT-07 — P1: Complete Real Integration Proof
 
@@ -59,7 +41,7 @@ instances.
 - Packaged installer smoke on each native OS.
 - TURN relay behavior where direct/STUN connectivity fails.
 
-## Deployment History
+## Deployment Actions
 
 ### DEPLOY-01 — Apply Supabase Security-Definer Hardening
 
@@ -73,6 +55,15 @@ Migration:
 **Status:** Deployed to the hosted database on 2026-06-13.
 
 Migration: `supabase/migrations/20260613210000_atomic_reaction_writes.sql`
+
+### DEPLOY-03 — Configure the Hosted Shared Rate-Limit Store
+
+**Status:** Required before the next production API deployment.
+
+Create an Upstash-compatible Redis REST database and configure
+`RATE_LIMIT_REDIS_REST_URL`, `RATE_LIMIT_REDIS_REST_TOKEN`, and optionally
+`RATE_LIMIT_REDIS_TIMEOUT_MS` on the hosted API. Production `/ready` intentionally
+returns `503` until both required Redis values are present.
 
 ## Completed Work Ledger
 
@@ -140,7 +131,7 @@ attempts.
 
 **Verification:** API limiter and route tests plus desktop companion tests pass.
 
-**Remaining risk:** API limits are process-local. See `NEXT-04`.
+**Remaining action:** Configure the hosted shared store. See `DEPLOY-03`.
 
 ### DONE-07 — Prepare Supabase Security-Definer Hardening
 
@@ -153,7 +144,7 @@ play-count access.
 
 **Verification:** Migration reviewed against current API boundaries.
 
-**Remaining action:** Apply the migration. See `DEPLOY-01`.
+**Deployment:** The hardening migration was applied to the hosted database.
 
 ### DONE-08 — Return Correct Engine CORS Errors
 
@@ -177,7 +168,7 @@ metadata, and removed unused dependencies.
 
 **Verification:** Exact hardened image built successfully as
 `pixelated-engine:audit-final` at `1.96GB`, down from the existing `2.06GB`
-image. See `NEXT-05` for remaining image work.
+image. The remaining image work was completed in `DONE-14`.
 
 ### DONE-10 — Remove Public Account Enumeration
 
@@ -237,7 +228,7 @@ reactions, and play-count writes. Blocked requests return `429` with
 **Verification:** API route tests hit each threshold and prove blocked requests
 do not create additional rows or RPC calls.
 
-**Remaining risk:** Limits are process-local. See `NEXT-04`.
+**Remaining action:** Configure the hosted shared store. See `DEPLOY-03`.
 
 ### DONE-14 — Create a Pinned Multi-Stage Engine Image
 
@@ -277,6 +268,23 @@ xdotool and PulseAudio argument construction. A freshly rebuilt unpacked
 desktop app passes packaged release smoke. A freshly rebuilt engine image passes
 live Docker health smoke with Xvfb and PulseAudio running.
 
+### DONE-16 — Coordinate API Abuse Controls Across Instances
+
+**Problem:** Session-verification, report, comment, reaction, and play-count
+limits used process-local counters that reset on restart and did not coordinate
+across horizontally scaled API instances.
+
+**Resolution:** Added namespaced, atomic fixed-window counters through an
+Upstash-compatible Redis REST store. Counter keys hash user/session/IP
+identifiers. Redis calls have a strict timeout and degrade to the existing
+bounded in-memory limiter during local development or a store outage.
+Submission and stream-metric limits remain coordinated through existing
+Supabase rows. Production readiness now requires the shared store configuration.
+
+**Verification:** API tests pass 44 contracts, including cross-instance counter
+coordination, hashed Redis keys, and bounded local fallback during Redis
+failures. Typecheck, lint, and build pass.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
@@ -284,7 +292,7 @@ Run on 2026-06-14 after the completed hardening work:
 | Gate | Result |
 | --- | --- |
 | Web tests, lint, and production build | Passed — 10 tests |
-| API typecheck, lint, build, and tests | Passed — 42 tests |
+| API typecheck, lint, build, and tests | Passed — 44 tests |
 | Desktop build and tests | Passed — 42 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 29 tests |

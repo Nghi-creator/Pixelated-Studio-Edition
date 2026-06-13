@@ -5,8 +5,8 @@ import {
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
 import { TtlCache } from "../modules/cache/ttlCache.js";
-import { FixedWindowRateLimiter } from "../modules/security/fixedWindowRateLimiter.js";
 import { rejectRateLimitedRequest } from "../modules/security/rateLimitResponse.js";
+import { createRateLimiter } from "../modules/security/sharedRateLimiter.js";
 import {
   logTiming,
   timed,
@@ -91,12 +91,14 @@ export async function registerCatalogRoutes(
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
   const gamesCatalogCache = new TtlCache<CachedGamesCatalogResponse>(60_000);
-  const commentWriteLimiter = new FixedWindowRateLimiter({
+  const commentWriteLimiter = createRateLimiter({
     limit: 10,
+    namespace: "comment-write",
     windowMs: 60_000,
   });
-  const reactionWriteLimiter = new FixedWindowRateLimiter({
+  const reactionWriteLimiter = createRateLimiter({
     limit: 120,
+    namespace: "reaction-write",
     windowMs: 60_000,
   });
 
@@ -469,7 +471,7 @@ export async function registerCatalogRoutes(
       if (
         rejectRateLimitedRequest(
           reply,
-          reactionWriteLimiter.consume(user.id),
+          await reactionWriteLimiter.consume(user.id),
           "Reaction limit reached. Please try again shortly.",
         )
       ) {
@@ -547,7 +549,7 @@ export async function registerCatalogRoutes(
       if (
         rejectRateLimitedRequest(
           reply,
-          commentWriteLimiter.consume(user.id),
+          await commentWriteLimiter.consume(user.id),
           "Comment limit reached. Please try again shortly.",
         )
       ) {
@@ -641,7 +643,7 @@ export async function registerCatalogRoutes(
       if (
         rejectRateLimitedRequest(
           reply,
-          reactionWriteLimiter.consume(user.id),
+          await reactionWriteLimiter.consume(user.id),
           "Reaction limit reached. Please try again shortly.",
         )
       ) {

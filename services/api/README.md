@@ -174,10 +174,34 @@ TURN_STATIC_USERNAME=<optional static TURN username>
 TURN_STATIC_CREDENTIAL=<optional static TURN credential>
 TURN_CREDENTIAL_TTL_SECONDS=3600
 FORMSPREE_SUBMISSION_URL=<optional Formspree endpoint for submission notifications>
+RATE_LIMIT_REDIS_REST_URL=<Upstash-compatible Redis REST endpoint>
+RATE_LIMIT_REDIS_REST_TOKEN=<Redis REST bearer token>
+RATE_LIMIT_REDIS_TIMEOUT_MS=1000
 SUPABASE_URL=<your Supabase URL>
 SUPABASE_ANON_KEY=<your Supabase anon key>
 SUPABASE_SERVICE_ROLE_KEY=<your Supabase service role key>
 ```
+
+Production readiness requires both Redis REST values. Session verification,
+report, comment, reaction, and play-count limits use atomic shared counters so
+multiple API instances enforce the same thresholds. Local development may omit
+Redis and uses a bounded in-memory limiter. If the configured Redis endpoint is
+temporarily unavailable, the API falls back to that local limiter so protected
+routes remain available with per-instance abuse protection. Redis requests are
+bounded by `RATE_LIMIT_REDIS_TIMEOUT_MS` before fallback.
+
+### Abuse-Control Limits
+
+| Workflow | Limit | Coordination |
+| --- | --- | --- |
+| Session verification by IP | 1,000 per minute | Redis shared counter |
+| Session verification by IP and session | 30 per minute | Redis shared counter |
+| Comments | 10 per user per minute | Redis shared counter |
+| Game and comment reactions combined | 120 per user per minute | Redis shared counter |
+| Play-count writes | 60 per user per minute | Redis shared counter |
+| Comment reports | 10 per user per hour | Redis shared counter |
+| Game submissions | 3 per user per hour | Supabase submission rows |
+| Stream metrics | 1 per user/session every 5 seconds | Supabase metric rows |
 
 ## Tests
 

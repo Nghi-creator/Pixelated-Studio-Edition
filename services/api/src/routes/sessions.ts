@@ -5,7 +5,7 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
-import { FixedWindowRateLimiter } from "../modules/security/fixedWindowRateLimiter.js";
+import { createRateLimiter } from "../modules/security/sharedRateLimiter.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
 
@@ -93,12 +93,14 @@ export async function registerSessionRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
-  const verificationIpLimiter = new FixedWindowRateLimiter({
+  const verificationIpLimiter = createRateLimiter({
     limit: 1_000,
+    namespace: "session-verification-ip",
     windowMs: 60_000,
   });
-  const verificationSessionLimiter = new FixedWindowRateLimiter({
+  const verificationSessionLimiter = createRateLimiter({
     limit: 30,
+    namespace: "session-verification-session",
     windowMs: 60_000,
   });
 
@@ -269,10 +271,10 @@ export async function registerSessionRoutes(
       return reply.status(400).send({ error: "Invalid session token" });
     }
 
-    const rateLimits = [
+    const rateLimits = await Promise.all([
       verificationIpLimiter.consume(request.ip),
       verificationSessionLimiter.consume(`${request.ip}:${params.data.sessionId}`),
-    ];
+    ]);
     const blockedRateLimit = rateLimits.find((result) => !result.allowed);
     if (blockedRateLimit) {
       reply.header(

@@ -6,8 +6,8 @@ import {
 } from "../modules/auth/supabaseAuth.js";
 import { getCachedUserRole } from "../modules/auth/roleCache.js";
 import { logTiming, timed } from "../modules/observability/timing.js";
-import { FixedWindowRateLimiter } from "../modules/security/fixedWindowRateLimiter.js";
 import { rejectRateLimitedRequest } from "../modules/security/rateLimitResponse.js";
+import { createRateLimiter } from "../modules/security/sharedRateLimiter.js";
 
 const commentParamsSchema = z.object({
   commentId: z.string().uuid(),
@@ -65,8 +65,9 @@ export async function registerModerationRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
-  const reportWriteLimiter = new FixedWindowRateLimiter({
+  const reportWriteLimiter = createRateLimiter({
     limit: 10,
+    namespace: "report-write",
     windowMs: 60 * 60 * 1000,
   });
 
@@ -99,7 +100,7 @@ export async function registerModerationRoutes(
       if (
         rejectRateLimitedRequest(
           reply,
-          reportWriteLimiter.consume(user.id),
+          await reportWriteLimiter.consume(user.id),
           "Report limit reached. Please try again later.",
         )
       ) {

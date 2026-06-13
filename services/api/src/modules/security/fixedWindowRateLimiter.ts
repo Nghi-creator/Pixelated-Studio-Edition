@@ -3,10 +3,16 @@ type RateLimitRecord = {
   resetAt: number;
 };
 
-type FixedWindowRateLimiterOptions = {
+export type FixedWindowRateLimiterOptions = {
   limit: number;
   maxEntries?: number;
   windowMs: number;
+};
+
+export type RateLimitResult = {
+  allowed: boolean;
+  remaining: number;
+  resetAt: number;
 };
 
 export class FixedWindowRateLimiter {
@@ -15,7 +21,7 @@ export class FixedWindowRateLimiter {
 
   constructor(private readonly options: FixedWindowRateLimiterOptions) {}
 
-  consume(key: string, now = Date.now()) {
+  consume(key: string, now = Date.now()): RateLimitResult {
     this.consumeCount += 1;
     if (this.consumeCount % 256 === 0) {
       this.removeExpired(now);

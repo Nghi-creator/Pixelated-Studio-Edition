@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-06-07
+Last reviewed: 2026-06-14
 
 ## Project Shape
 
@@ -30,8 +30,11 @@ Current status:
 - Default local URL is `http://127.0.0.1:4000`.
 - Production API startup defaults to `0.0.0.0` when `NODE_ENV=production` so hosts like Render can detect the open port.
 - `GET /` returns a small liveness response for provider root probes.
-- `GET /health` returns service name, environment, uptime, and `ok: true`.
-- `GET /ready` returns `503` until the required Supabase backend env vars are configured.
+- `GET /health` returns service name, environment, uptime, active rate-limit
+  store mode, and `ok: true`.
+- `GET /ready` returns `503` until the required Supabase backend env vars are
+  configured. Production readiness also requires the shared Redis REST
+  rate-limit store.
 - `GET /me` verifies a Supabase bearer token and returns the authenticated user id/email.
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - `GET /games` and `GET /games/:gameId` read approved game catalog metadata through the API.
@@ -70,6 +73,12 @@ Current status:
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
 - `services/api/.env` exists locally and is ignored; production keys live on the backend host.
 - API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
+- Session verification, comments, reactions, play counts, and reports use
+  atomic shared fixed-window counters when `RATE_LIMIT_REDIS_REST_URL` and
+  `RATE_LIMIT_REDIS_REST_TOKEN` are configured. Redis calls have a bounded
+  timeout and fall back to the bounded per-instance limiter during outages.
+- Submission and stream-metric throttles coordinate through existing Supabase
+  rows rather than Redis.
 - `services/api/tests/` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
 - API tests also cover the backend-owned data boundary for catalog/favorites, comment ownership/reactions, profile update/account deletion, admin user authorization, and admin access-log authorization.
 - `npm run smoke:staging` verifies the hosted catalog cache contract, the uncached featured route, signed-in identity/permissions, access-log write/upsert schema, admin access-log summary RPC schema when authorized, local pairing restore, multiplayer lobby create/update/recent/delete, cloud session verification, and stream metric persistence.
@@ -156,7 +165,8 @@ Runtime stack:
 - Desktop renderer source in `apps/desktop/renderer.ts` and `apps/desktop/renderer/*.ts`, compiled to `apps/desktop/dist/renderer.js` and `apps/desktop/dist/renderer/*.js`. `apps/desktop/index.html` loads the compiled renderer scripts.
 - Desktop main-process helpers under `apps/desktop/main/` are now TypeScript for Docker orchestration, exposure mode, health polling, config, lifecycle state, and the LAN HTTPS companion server.
 - Desktop packaging helper source is `apps/desktop/scripts/prepareWebDist.ts`, compiled to `apps/desktop/dist/scripts/prepareWebDist.js`.
-- Uses local Docker CLI through `child_process.exec`.
+- Uses the local Docker CLI through argument-array `spawn` and `execFile`
+  calls.
 - Packaged releases are built with `cd apps/desktop && npm run dist`; this script runs the React production build first and electron-builder bundles `apps/web/dist` as `resources/web-dist`.
 - `npm run dist` now ends with `npm run smoke:release`, which inspects electron-builder's unpacked packaged `app.asar` plus external resources rather than trusting source or compile output alone.
 - The packaged release smoke requires the packaged main entry, desktop HTML, preload, and every HTML-loaded renderer script; verifies the main process points at the packaged preload/HTML; rejects CommonJS/`require` output in renderer browser scripts; rejects preload imports other than Electron; checks the expected preload IPC API; verifies bundled `resources/web-dist` exactly matches the fresh `apps/web/dist` tree and that its production index references valid assets; and checks the bundled engine runtime Dockerfile.
