@@ -47,3 +47,21 @@ Automated fixtures and packaging do not replace these real-machine checks:
 Record the installer version, OS version, observed diagnostic, recovery action,
 and result when completing a manual row. Do not mark a platform validated from
 classifier fixtures alone.
+
+## Production Readiness Backlog
+
+Before calling Docker onboarding production-ready:
+
+1. Push and confirm the macOS, Windows, and Ubuntu GitHub Actions matrix passes.
+2. Manually test Windows 11 + WSL 2 and Ubuntu with Docker missing, stopped,
+   and ready.
+3. Test the full macOS stopped-Docker flow:
+   **Initialize Engine → Start Docker → automatic resume**.
+4. Add code signing and notarization before public distribution. The current
+   macOS DMG is unsigned.
+5. Consider privacy-safe telemetry for diagnostic categories and recovery
+   success rates, without recording raw logs or paths.
+6. Consider Docker version compatibility checks and warnings for unsupported or
+   outdated versions.
+7. Later, add an in-app release/update mechanism so users receive fixes without
+   reinstalling manually.
