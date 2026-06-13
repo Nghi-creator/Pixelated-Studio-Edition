@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { api, ApiError } from "./apiClient";
+import { api, ApiError } from "../apiClient";
 import {
   clearEngineToken,
   ENGINE_PAIRING_EVENT,
   ensureEngineToken,
   getCompanionAccessToken,
-} from "./engineAuth";
-import { engineEndpoint, getEngineUrl } from "./engineConfig";
+} from "../engine/engineAuth";
+import { engineEndpoint, getEngineUrl } from "../engine/engineConfig";
 import { attachEngineInput } from "./webrtcInput";
 import {
   createAndSendOffer,
@@ -24,7 +24,7 @@ import {
   startWebRTCTelemetry,
   type WebRTCTelemetry,
 } from "./webrtcTelemetry";
-import type { StreamProfile } from "./streamProfiles";
+import type { StreamProfile } from "../engine/streamProfiles";
 
 const STREAM_METRIC_SEND_INTERVAL_MS = 5_000;
 const DISCONNECTED_GRACE_MS = 5_000;

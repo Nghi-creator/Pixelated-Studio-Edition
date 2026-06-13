@@ -10,7 +10,7 @@ import {
   AlertOctagon,
 } from "lucide-react";
 import Cropper from "react-easy-crop";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../../lib/auth/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../../components/ui/Avatar";

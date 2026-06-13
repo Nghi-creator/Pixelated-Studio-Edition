@@ -4,7 +4,7 @@ import type {
   EngineInputCapabilities,
   LobbyParticipant,
   LobbyState,
-} from "../../lib/useWebRTC";
+} from "../../lib/webrtc/useWebRTC";
 
 type LobbyPanelProps = {
   currentParticipant: LobbyParticipant | null;

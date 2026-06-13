@@ -17,8 +17,8 @@ import {
   engineAuthHeaders,
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
-} from "../../lib/engineAuth";
-import { engineEndpoint } from "../../lib/engineConfig";
+} from "../../lib/engine/engineAuth";
+import { engineEndpoint } from "../../lib/engine/engineConfig";
 import { Skeleton } from "../../components/ui/Skeleton";
 
 type MultiplayerMode = "host" | "join";

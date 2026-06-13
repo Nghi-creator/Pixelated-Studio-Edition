@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Activity, Clipboard, X } from "lucide-react";
-import { engineAuthHeaders } from "../../lib/engineAuth";
-import { engineEndpoint } from "../../lib/engineConfig";
-import type { WebRTCTelemetry } from "../../lib/webrtcTelemetry";
+import { engineAuthHeaders } from "../../lib/engine/engineAuth";
+import { engineEndpoint } from "../../lib/engine/engineConfig";
+import type { WebRTCTelemetry } from "../../lib/webrtc/webrtcTelemetry";
 
 type StreamTelemetryPanelProps = {
   gameId: string | undefined;

@@ -12,11 +12,11 @@ import {
   PlugZap,
   Loader2,
 } from "lucide-react";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../../lib/auth/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../ui/Avatar";
-import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engineAuth";
+import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engine/engineAuth";
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);

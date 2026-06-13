@@ -7,7 +7,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
-import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engineAuth";
+import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engine/engineAuth";
 
 type EngineLocationState = {
   returnState?: unknown;

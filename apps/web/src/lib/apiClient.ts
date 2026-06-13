@@ -1,10 +1,10 @@
-import { supabase } from "./supabaseClient";
+import { supabase } from "./auth/supabaseClient";
 import type { Session } from "@supabase/supabase-js";
 import {
   createRequestAbortController,
   withTimeout,
 } from "./requestLifecycle";
-import { clearAuthScopedCache } from "./authCache";
+import { clearAuthScopedCache } from "./auth/authCache";
 
 const LOCAL_API_URL = "http://127.0.0.1:4000";
 const PRODUCTION_API_URL = "https://pixelated-api-services.onrender.com";

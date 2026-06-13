@@ -20,7 +20,7 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, and 10 lifecycle regression contracts pass; broad visual component coverage remains optional follow-up work. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, and 10 lifecycle regression contracts pass; shared auth, engine, and WebRTC infrastructure is grouped by ownership. |
 | API backend | Hardened, deployment action queued | Public account enumeration is closed, reactions are atomic, and API abuse controls support shared Redis counters with bounded local fallback. |
 | Desktop | Healthy | Build, 42 tests, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
@@ -284,6 +284,22 @@ Supabase rows. Production readiness now requires the shared store configuration.
 **Verification:** API tests pass 44 contracts, including cross-instance counter
 coordination, hashed Redis keys, and bounded local fallback during Redis
 failures. Typecheck, lint, and build pass.
+
+### DONE-17 — Clarify Repository And Web Module Ownership
+
+**Problem:** The repository top level was sound, but the web app's flat
+`src/lib/` directory mixed authentication, engine connection, and WebRTC
+infrastructure. The `.context/` folder also lacked a clear documentation entry
+point.
+
+**Resolution:** Grouped reusable web infrastructure under `lib/auth/`,
+`lib/engine/`, and `lib/webrtc/` while preserving feature-owned UI and hooks
+under `features/`. Added a context index and a directory-structure audit that
+records keep-as-is decisions and staged decomposition work for oversized
+modules.
+
+**Verification:** Web lint, production build, and all 10 regression contracts
+pass. No stale imports or old path references remain; `git diff --check` passes.
 
 ## Latest Verification Run
 

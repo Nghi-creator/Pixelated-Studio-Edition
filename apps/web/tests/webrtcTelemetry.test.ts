@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { startWebRTCTelemetry } from "../src/lib/webrtcTelemetry.ts";
+import { startWebRTCTelemetry } from "../src/lib/webrtc/webrtcTelemetry.ts";
 
 test("WebRTC telemetry cleanup removes listeners and polling", () => {
   const added: string[] = [];

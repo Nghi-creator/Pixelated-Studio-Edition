@@ -1,6 +1,6 @@
 import { Activity, ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { WebRTCStatus } from "../../lib/webrtcSession";
+import type { WebRTCStatus } from "../../lib/webrtc/webrtcSession";
 
 type PlayerHeaderProps = {
   backRoute: string;

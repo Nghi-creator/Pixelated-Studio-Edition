@@ -108,8 +108,15 @@ Runtime stack:
 - Vite + React + TypeScript.
 - `@supabase/supabase-js` for auth/session management and direct Storage uploads.
 - `apps/web/src/lib/apiClient.ts` for app data reads/writes through `services/api`.
+- `apps/web/src/lib/auth/` owns browser auth infrastructure,
+  `apps/web/src/lib/engine/` owns reusable engine connection state/hooks, and
+  `apps/web/src/lib/webrtc/` owns shared peer/session/input/telemetry behavior.
+- `apps/web/src/features/` owns feature-specific UI and hooks; `.tsx` modules
+  contain JSX while `.ts` modules contain non-JSX logic in the same feature
+  boundary.
 - `socket.io-client` connects directly to the local engine at `http://localhost:8080`.
-- The web app centralizes the engine base URL in `apps/web/src/lib/engineConfig.ts`; override with `VITE_ENGINE_URL`.
+- The web app centralizes the engine base URL in
+  `apps/web/src/lib/engine/engineConfig.ts`; override with `VITE_ENGINE_URL`.
 - Routes are declared in `apps/web/src/App.tsx`.
 - The Vercel project uses `apps/web` as its Root Directory, and
   `apps/web/vercel.json` rewrites direct route requests to `/index.html` so
@@ -132,7 +139,9 @@ Admin routes:
 
 Current important frontend behaviors:
 
-- `useWebRTC` owns React stream/status lifecycle while helper modules resolve game boot targets, create WebRTC peer connections, and forward keyboard input.
+- `lib/webrtc/useWebRTC.ts` owns React stream/status lifecycle while helper
+  modules resolve game boot targets, create WebRTC peer connections, and
+  forward keyboard input.
 - For cloud/library games, `useWebRTC` asks the backend API to create a session before emitting `start-game` with `mode: "cloud"` and the backend `sessionToken` to the local engine.
 - The prompt-only engine token flow has been replaced by a dedicated `/engine` connection page linked from the navbar.
 - `/play/:id`, `/local`, and `/multiplayer` require a saved engine token. Unpaired visits redirect to `/engine` and return to the requested route after successful pairing.

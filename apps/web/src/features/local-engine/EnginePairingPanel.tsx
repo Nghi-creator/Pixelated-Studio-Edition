@@ -21,13 +21,13 @@ import {
   getCompanionAccessToken,
   getEngineToken,
   setEngineToken,
-} from "../../lib/engineAuth";
+} from "../../lib/engine/engineAuth";
 import {
   clearEngineUrl,
   DEFAULT_ENGINE_URL,
   getEngineUrl,
   setEngineUrl,
-} from "../../lib/engineConfig";
+} from "../../lib/engine/engineConfig";
 import {
   getInviteCompanionUrl,
   getInviteFailureMessage,

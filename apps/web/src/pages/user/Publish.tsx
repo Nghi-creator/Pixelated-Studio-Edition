@@ -8,7 +8,7 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../../lib/auth/supabaseClient";
 import { api, getAuthSession } from "../../lib/apiClient";
 
 export default function Publish() {

@@ -9,7 +9,7 @@ import {
   Activity,
   LoaderCircle,
 } from "lucide-react";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../../lib/auth/supabaseClient";
 import { api, getAuthSession } from "../../lib/apiClient";
 
 export default function AdminLayout() {

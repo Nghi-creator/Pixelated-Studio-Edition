@@ -20,8 +20,8 @@ import {
   STREAM_PROFILES,
   STREAM_PROFILE_STORAGE_KEY,
   type StreamProfileId,
-} from "../../lib/streamProfiles";
-import { useWebRTC } from "../../lib/useWebRTC";
+} from "../../lib/engine/streamProfiles";
+import { useWebRTC } from "../../lib/webrtc/useWebRTC";
 
 const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
 

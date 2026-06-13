@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { clearAuthScopedCache } from "../src/lib/authCache.ts";
+import { clearAuthScopedCache } from "../src/lib/auth/authCache.ts";
 
 test("auth state changes clear every user-scoped cache", () => {
   const state = {

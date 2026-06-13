@@ -8,8 +8,8 @@ import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import AdminLayout from "./components/layout/AdminLayout";
 import { useSessionTracker } from "./lib/useSessionTracker";
-import { useEngineConnectionMonitor } from "./lib/useEngineConnectionMonitor";
-import { useDesktopLaunchPairing } from "./lib/useDesktopLaunchPairing";
+import { useEngineConnectionMonitor } from "./lib/engine/useEngineConnectionMonitor";
+import { useDesktopLaunchPairing } from "./lib/engine/useDesktopLaunchPairing";
 
 import Landing from "./pages/user/Landing";
 import Player from "./pages/user/Player";

@@ -14,8 +14,8 @@ import {
   engineAuthHeaders,
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
-} from "../../lib/engineAuth";
-import { engineEndpoint } from "../../lib/engineConfig";
+} from "../../lib/engine/engineAuth";
+import { engineEndpoint } from "../../lib/engine/engineConfig";
 import { getAuthSession } from "../../lib/apiClient";
 
 export default function LocalVault() {

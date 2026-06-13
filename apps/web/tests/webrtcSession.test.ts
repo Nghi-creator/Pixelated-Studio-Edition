@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createWebRTCRetryIdentity } from "../src/lib/webrtcIdentity.ts";
+import { createWebRTCRetryIdentity } from "../src/lib/webrtc/webrtcIdentity.ts";
 
 test("WebRTC retry rotates peer identity and local session identity", () => {
   const first = createWebRTCRetryIdentity(false);

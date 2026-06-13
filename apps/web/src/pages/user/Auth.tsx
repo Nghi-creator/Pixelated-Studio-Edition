@@ -10,13 +10,13 @@ import {
   Mail,
 } from "lucide-react";
 import { FaGithub, FaGoogle } from "react-icons/fa";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../../lib/auth/supabaseClient";
 import { getPublicAppUrl } from "../../lib/appUrl";
 import {
   getPasswordPolicyError,
   PASSWORD_MIN_LENGTH,
   PASSWORD_POLICY_HINT,
-} from "../../lib/passwordPolicy";
+} from "../../lib/auth/passwordPolicy";
 
 const getAuthErrorMessage = (error: Error) => {
   if (error.message.toLowerCase().includes("email rate limit exceeded")) {
