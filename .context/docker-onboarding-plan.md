@@ -365,6 +365,8 @@ Exit criteria:
 
 ### Phase 4: Targeted Recovery Guidance
 
+Status: Implemented on 2026-06-13.
+
 Goal: make non-happy-path failures actionable.
 
 Steps:
@@ -444,7 +446,7 @@ Exit criteria:
 
 ## Completed Deployment Steps
 
-Phases 0 through 2 now provide:
+Phases 0 through 4 now provide:
 
 1. Add structured Docker diagnosis.
 2. Distinguish missing, stopped, permission, and unknown failures.
@@ -456,3 +458,8 @@ Phases 0 through 2 now provide:
 Phase 3 adds trusted Docker Desktop launching, bounded readiness polling,
 cancellation, duplicate-start prevention, and automatic engine initialization
 resume without changing the diagnostic contract.
+
+Phase 4 adds targeted recovery instructions and a copyable diagnostic summary
+containing only normalized status, platform, next step, and official guide URL.
+Raw Docker output, environment values, tokens, and filesystem paths are excluded
+from the shareable summary.

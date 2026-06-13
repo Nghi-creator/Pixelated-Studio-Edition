@@ -32,8 +32,11 @@ type DockerDiagnosticPayload = {
   canStartDocker: boolean;
   code: string;
   detail: string;
+  guidance: string;
+  guideUrl: string;
   installUrl: string;
   platform: string;
+  summary: string;
   title: string;
 };
 
@@ -180,10 +183,15 @@ const regenerateInviteBtn = requiredElement(
 const revokeInviteBtn = requiredElement("revoke-invite", HTMLButtonElement);
 const dockerRecovery = requiredElement("docker-recovery");
 const dockerRecoveryTitle = requiredElement("docker-recovery-title");
+const dockerRecoveryGuidance = requiredElement("docker-recovery-guidance");
 const dockerRetryBtn = requiredElement("docker-retry", HTMLButtonElement);
 const dockerStartBtn = requiredElement("docker-start", HTMLButtonElement);
 const dockerDownloadBtn = requiredElement("docker-download", HTMLButtonElement);
 const dockerGuideBtn = requiredElement("docker-guide", HTMLButtonElement);
+const dockerCopyDiagnosticsBtn = requiredElement(
+  "docker-copy-diagnostics",
+  HTMLButtonElement,
+);
 
 let isRunning = false;
 let pendingCompanionPayload: EngineCompanionPayload | null = null;
@@ -207,6 +215,7 @@ function setDockerRecoveryVisible(
   if (!visible || !diagnostic) return;
 
   dockerRecoveryTitle.innerText = diagnostic.title;
+  dockerRecoveryGuidance.innerText = diagnostic.guidance;
   dockerDownloadBtn.classList.toggle(
     "hidden",
     diagnostic.code !== "cli_missing",
@@ -520,6 +529,22 @@ dockerDownloadBtn.addEventListener("click", () => {
 
 dockerGuideBtn.addEventListener("click", () => {
   void openDockerResource("guide");
+});
+
+dockerCopyDiagnosticsBtn.addEventListener("click", async () => {
+  if (!dockerDiagnostic) return;
+
+  try {
+    await navigator.clipboard.writeText(dockerDiagnostic.summary);
+    dockerCopyDiagnosticsBtn.innerText = "Copied";
+    setTimeout(() => {
+      dockerCopyDiagnosticsBtn.innerText = "Copy diagnostics";
+    }, 1200);
+  } catch {
+    logs.append(
+      '<span class="text-red-400">Failed to copy the sanitized Docker diagnostic.</span>',
+    );
+  }
 });
 
 clearLogsBtn.addEventListener("click", () => {

@@ -15,8 +15,11 @@ export type DockerDiagnostic = {
   canStartDocker: boolean;
   code: DockerDiagnosticCode;
   detail: string;
+  guidance: string;
+  guideUrl: string;
   installUrl: string;
   platform: NodeJS.Platform;
+  summary: string;
   title: string;
 };
 
@@ -64,6 +67,58 @@ export function getDockerGuideUrl(
     return getDockerInstallUrl(platform);
   }
   return "https://docs.docker.com/desktop/troubleshoot-and-support/troubleshoot/";
+}
+
+export function getDockerGuidance(
+  code: DockerDiagnosticCode,
+  platform: NodeJS.Platform,
+) {
+  if (code === "ready") {
+    return "Docker is ready. Retry engine initialization if it did not continue automatically.";
+  }
+  if (code === "cli_missing") {
+    return "Install Docker from the official Docker guide, start it, then retry engine initialization.";
+  }
+  if (code === "daemon_stopped") {
+    return "Start Docker Desktop or your Docker service, wait until it reports ready, then retry.";
+  }
+  if (code === "permission_denied") {
+    return platform === "linux"
+      ? "Grant your account access to the Docker socket using Docker's Linux post-install guide, then sign out and back in before retrying."
+      : "Check that your account can access Docker Desktop, then restart Docker and retry.";
+  }
+  if (code === "virtualization_unavailable") {
+    return platform === "win32"
+      ? "Enable WSL 2 or Hyper-V virtualization, restart Windows if required, then start Docker Desktop."
+      : "Enable hardware virtualization for this machine, then restart Docker Desktop.";
+  }
+  if (code === "disk_full") {
+    return "Free Docker disk space or remove unused Docker data, then retry engine initialization.";
+  }
+  if (code === "context_invalid") {
+    return "Select a working Docker context or restore Docker Desktop's default context, then retry.";
+  }
+  if (code === "startup_timeout") {
+    return "Open Docker Desktop and check its status or diagnostics, then retry when the engine is ready.";
+  }
+  return "Open Docker's troubleshooting guide, review System Logs locally, then retry.";
+}
+
+export function createDockerDiagnosticSummary(
+  code: DockerDiagnosticCode,
+  platform: NodeJS.Platform,
+) {
+  const title = getDiagnosticPresentation(code).title;
+  const guidance = getDockerGuidance(code, platform);
+  const guideUrl = getDockerGuideUrl(code, platform);
+  return [
+    "Pixelated Studio Docker diagnostic",
+    `Status: ${title}`,
+    `Code: ${code}`,
+    `Platform: ${platform}`,
+    `Next step: ${guidance}`,
+    `Official guide: ${guideUrl}`,
+  ].join("\n");
 }
 
 export function getDockerResourceUrl(
@@ -192,12 +247,17 @@ export function createDockerDiagnostic(
   detail = "",
   platform: NodeJS.Platform = process.platform,
 ): DockerDiagnostic {
+  const guidance = getDockerGuidance(code, platform);
+  const guideUrl = getDockerGuideUrl(code, platform);
   return {
     ...getDiagnosticPresentation(code),
     code,
     detail,
+    guidance,
+    guideUrl,
     installUrl: getDockerInstallUrl(platform),
     platform,
+    summary: createDockerDiagnosticSummary(code, platform),
   };
 }
 

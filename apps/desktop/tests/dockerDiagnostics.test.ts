@@ -3,7 +3,9 @@ import { describe, it } from "node:test";
 import {
   classifyDockerFailure,
   createDockerDiagnostic,
+  createDockerDiagnosticSummary,
   getDockerGuideUrl,
+  getDockerGuidance,
   getDockerInstallUrl,
   getDockerResourceUrl,
   isDockerDiagnosticCode,
@@ -97,5 +99,34 @@ describe("Docker diagnostic presentation", () => {
   it("accepts only known diagnostic codes", () => {
     assert.equal(isDockerDiagnosticCode("daemon_stopped"), true);
     assert.equal(isDockerDiagnosticCode("arbitrary_url"), false);
+  });
+
+  it("provides targeted next steps for intervention-required failures", () => {
+    assert.match(
+      getDockerGuidance("permission_denied", "linux"),
+      /Docker socket/,
+    );
+    assert.match(
+      getDockerGuidance("virtualization_unavailable", "win32"),
+      /WSL 2|Hyper-V/,
+    );
+    assert.match(getDockerGuidance("disk_full", "darwin"), /Free Docker disk/);
+    assert.match(getDockerGuidance("context_invalid", "linux"), /context/);
+  });
+
+  it("builds a shareable summary without raw diagnostic details", () => {
+    const secretDetail =
+      "token=super-secret /Users/tester/private PATH=/private/bin";
+    const diagnostic = createDockerDiagnostic(
+      "permission_denied",
+      secretDetail,
+      "linux",
+    );
+    const summary = createDockerDiagnosticSummary("permission_denied", "linux");
+
+    assert.equal(diagnostic.summary, summary);
+    assert.match(summary, /permission_denied/);
+    assert.match(summary, /Official guide:/);
+    assert.doesNotMatch(summary, /super-secret|Users\/tester|private\/bin/);
   });
 });

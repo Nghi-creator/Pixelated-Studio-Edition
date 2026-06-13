@@ -86,6 +86,12 @@ initialization automatically. The wait can be cancelled. macOS and Windows use
 known Docker Desktop application paths; Linux uses the known Docker Desktop
 binary or its user-level systemd service and never invokes `sudo`.
 
+Intervention-required failures show targeted recovery guidance for Linux Docker
+socket permissions, Windows virtualization/WSL 2, Docker disk space, and Docker
+contexts. **Copy diagnostics** produces a shareable normalized summary without
+raw Docker output, environment values, tokens, or filesystem paths. Full raw
+details remain local in System Logs for troubleshooting.
+
 The desktop app passes `PIXELATED_API_URL` into the engine so cloud sessions can be verified with the backend before boot. It defaults to the hosted Render API; override it for localhost API testing:
 
 ```txt

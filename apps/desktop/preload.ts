@@ -37,8 +37,11 @@ type DockerDiagnosticPayload = {
   canStartDocker: boolean;
   code: string;
   detail: string;
+  guidance: string;
+  guideUrl: string;
   installUrl: string;
   platform: NodeJS.Platform;
+  summary: string;
   title: string;
 };
 
