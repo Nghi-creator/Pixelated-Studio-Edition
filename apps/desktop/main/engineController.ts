@@ -25,6 +25,7 @@ import {
   prepareEngineImage,
   quoteDockerEnvValue,
 } from "./docker";
+import { diagnoseDocker, type DockerDiagnostic } from "./dockerDiagnostics";
 import {
   getAdvertisedEngineUrls,
   getAdvertisedCompanionUrls,
@@ -318,6 +319,59 @@ function handleStartupFailure(
   });
 }
 
+function emitDockerDiagnostic(event: IpcMainEvent, diagnostic: DockerDiagnostic) {
+  emitEngineState(event, "FAILED", diagnostic.title);
+  event.reply("docker-diagnostic", diagnostic);
+  event.reply(
+    "server-log",
+    `<span class="text-red-500">ERROR: ${diagnostic.title}.</span>`,
+  );
+  if (diagnostic.detail) {
+    event.reply("server-log", `Docker diagnostic: ${diagnostic.detail}`);
+  }
+  event.reply("engine-stopped");
+}
+
+function continueEngineStartup(
+  event: IpcMainEvent,
+  safeEnv: NodeJS.ProcessEnv,
+  launchContext: EngineLaunchContext,
+) {
+  event.reply("server-log", "Docker Engine found.");
+
+  prepareEngineImage(event, safeEnv)
+    .then(() => {
+      event.reply("server-log", "Image ready. Preparing WebRTC Node...");
+      emitEngineState(event, "REMOVING_STALE", "pixelated-node");
+
+      return execCommand("docker rm -f pixelated-node", { env: safeEnv }).catch(
+        () => undefined,
+      );
+    })
+    .then(() => startContainer(event, safeEnv, launchContext))
+    .then(() => {
+      emitEngineState(event, "WAITING_HEALTH", "30 attempts / 1s interval");
+      event.reply("server-log", "Waiting for engine health check...");
+      return waitForEngineHealth();
+    })
+    .then(() => {
+      return startCompanion(event, launchContext).then(() => {
+        emitEngineState(event, "READY", "http://127.0.0.1:8080/health");
+        event.reply("engine-token", engineToken);
+        event.reply("engine-exposure", {
+          advertisedUrls: launchContext.advertisedUrls,
+          companionUrls: activeCompanion ? activeCompanion.urls : [],
+          exposureMode: launchContext.exposureMode,
+        });
+        event.reply(
+          "server-log",
+          '<span class="text-green-500">SUCCESS: PIXELATED Engine healthy on Port 8080.</span>',
+        );
+      });
+    })
+    .catch((startErr) => handleStartupFailure(event, safeEnv, startErr));
+}
+
 export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {}) {
   if (!isSafeDockerImageRef(engineImage)) {
     rejectInvalidImage(event);
@@ -333,50 +387,12 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
   stopCompanionServer();
   activeCompanion = null;
 
-  exec("docker info", { env: safeEnv }, (err) => {
-    if (err) {
-      emitEngineState(event, "FAILED", "Docker is not running");
-      event.reply(
-        "server-log",
-        '<span class="text-red-500">ERROR: Docker Engine not detected or not running.</span>',
-      );
-      event.reply("engine-stopped");
+  void diagnoseDocker(safeEnv).then((diagnostic) => {
+    if (diagnostic.code !== "ready") {
+      emitDockerDiagnostic(event, diagnostic);
       return;
     }
-
-    event.reply("server-log", "Docker Engine found.");
-
-    prepareEngineImage(event, safeEnv)
-      .then(() => {
-        event.reply("server-log", "Image ready. Preparing WebRTC Node...");
-        emitEngineState(event, "REMOVING_STALE", "pixelated-node");
-
-        return execCommand("docker rm -f pixelated-node", { env: safeEnv }).catch(
-          () => undefined,
-        );
-      })
-      .then(() => startContainer(event, safeEnv, launchContext))
-      .then(() => {
-        emitEngineState(event, "WAITING_HEALTH", "30 attempts / 1s interval");
-        event.reply("server-log", "Waiting for engine health check...");
-        return waitForEngineHealth();
-      })
-      .then(() => {
-        return startCompanion(event, launchContext).then(() => {
-          emitEngineState(event, "READY", "http://127.0.0.1:8080/health");
-          event.reply("engine-token", engineToken);
-          event.reply("engine-exposure", {
-            advertisedUrls: launchContext.advertisedUrls,
-            companionUrls: activeCompanion ? activeCompanion.urls : [],
-            exposureMode: launchContext.exposureMode,
-          });
-          event.reply(
-            "server-log",
-            '<span class="text-green-500">SUCCESS: PIXELATED Engine healthy on Port 8080.</span>',
-          );
-        });
-      })
-      .catch((startErr) => handleStartupFailure(event, safeEnv, startErr));
+    continueEngineStartup(event, safeEnv, launchContext);
   });
 }
 

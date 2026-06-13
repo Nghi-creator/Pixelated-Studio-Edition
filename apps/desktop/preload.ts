@@ -33,6 +33,15 @@ type EngineCompanionPayload = {
   urls: string[];
 };
 
+type DockerDiagnosticPayload = {
+  canStartDocker: boolean;
+  code: string;
+  detail: string;
+  installUrl: string;
+  platform: NodeJS.Platform;
+  title: string;
+};
+
 type IpcCallback<TArgs extends unknown[] = []> = (
   event: IpcRendererEvent,
   ...args: TArgs
@@ -59,4 +68,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("engine-exposure", callback),
   onEngineCompanion: (callback: IpcCallback<[EngineCompanionPayload]>) =>
     ipcRenderer.on("engine-companion", callback),
+  onDockerDiagnostic: (callback: IpcCallback<[DockerDiagnosticPayload]>) =>
+    ipcRenderer.on("docker-diagnostic", callback),
 });

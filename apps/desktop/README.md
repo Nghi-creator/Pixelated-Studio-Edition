@@ -73,6 +73,13 @@ The desktop UI reports structured startup states: checking Docker, pulling or
 building the image, removing stale containers, starting the container, waiting
 for health, ready, stopping, stopped, and failed.
 
+Before startup, the desktop app runs a bounded Docker diagnostic. Missing Docker,
+a stopped daemon, permission errors, unavailable virtualization, full storage,
+invalid Docker contexts, timeouts, and unknown failures receive distinct status
+messages while the original command detail remains available in System Logs.
+Recovery actions such as opening or installing Docker are intentionally deferred
+to a later onboarding phase.
+
 The desktop app passes `PIXELATED_API_URL` into the engine so cloud sessions can be verified with the backend before boot. It defaults to the hosted Render API; override it for localhost API testing:
 
 ```txt

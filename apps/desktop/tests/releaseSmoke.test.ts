@@ -41,6 +41,7 @@ describe("desktop packaged release smoke helpers", () => {
       "onEngineToken",
       "onEngineExposure",
       "onEngineCompanion",
+      "onDockerDiagnostic",
     ];
     const bridge = `
       const { contextBridge, ipcRenderer } = require("electron");

@@ -23,6 +23,7 @@ const EXPECTED_PRELOAD_API = [
   "onEngineToken",
   "onEngineExposure",
   "onEngineCompanion",
+  "onDockerDiagnostic",
 ];
 
 function assert(condition: unknown, message: string): asserts condition {

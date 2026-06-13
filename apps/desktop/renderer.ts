@@ -28,6 +28,15 @@ type EngineCompanionPayload = {
   urls?: string[];
 };
 
+type DockerDiagnosticPayload = {
+  canStartDocker: boolean;
+  code: string;
+  detail: string;
+  installUrl: string;
+  platform: string;
+  title: string;
+};
+
 type LogController = {
   append: (message: string) => void;
   clear: () => void;
@@ -66,6 +75,9 @@ type ElectronApi = {
   ) => void;
   onEngineCompanion: (
     callback: (event: unknown, payload: EngineCompanionPayload) => void,
+  ) => void;
+  onDockerDiagnostic: (
+    callback: (event: unknown, payload: DockerDiagnosticPayload) => void,
   ) => void;
 };
 
@@ -483,6 +495,15 @@ pixelatedWindow.electronAPI.onEngineCompanion((event, payload) => {
   setInviteButtonsPending(false);
   regenerateInviteBtn.disabled = !payload.enabled;
   revokeInviteBtn.disabled = !payload.enabled || Boolean(payload.inviteRevoked);
+});
+
+pixelatedWindow.electronAPI.onDockerDiagnostic((event, payload) => {
+  logs.append(
+    `<span class="text-red-400">${logs.sanitize(payload.title)}</span>`,
+  );
+  logs.append(
+    `<span class="text-gray-400">Platform: ${logs.sanitize(payload.platform)} | Diagnostic: ${logs.sanitize(payload.code)}</span>`,
+  );
 });
 
 pixelatedWindow.electronAPI.onEngineState((event, state) => {
