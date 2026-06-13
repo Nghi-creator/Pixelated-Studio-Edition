@@ -3,8 +3,10 @@ import { describe, it } from "node:test";
 import {
   assertBrowserScript,
   assertPreloadScript,
+  createArchiveEntryMap,
   getHtmlScriptSources,
   normalizeArchiveEntry,
+  normalizeArchiveExtractionPath,
 } from "../scripts/releaseSmoke";
 
 describe("desktop packaged release smoke helpers", () => {
@@ -23,6 +25,24 @@ describe("desktop packaged release smoke helpers", () => {
     assert.equal(
       normalizeArchiveEntry("\\dist\\main\\dockerRecovery.js"),
       "dist/main/dockerRecovery.js",
+    );
+    assert.equal(normalizeArchiveExtractionPath("/package.json"), "package.json");
+    assert.equal(
+      normalizeArchiveExtractionPath("\\dist\\renderer\\logs.js"),
+      "dist\\renderer\\logs.js",
+    );
+  });
+
+  it("preserves native Windows asar paths while indexing normalized names", () => {
+    const entries = createArchiveEntryMap([
+      "\\package.json",
+      "\\dist\\renderer\\logs.js",
+    ]);
+
+    assert.equal(entries.get("package.json"), "package.json");
+    assert.equal(
+      entries.get("dist/renderer/logs.js"),
+      "dist\\renderer\\logs.js",
     );
   });
 

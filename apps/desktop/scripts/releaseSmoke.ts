@@ -36,8 +36,13 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
-function readArchiveText(archivePath: string, filePath: string) {
-  return extractFile(archivePath, filePath).toString("utf8");
+function readArchiveText(
+  archivePath: string,
+  filePath: string,
+  archiveEntryMap?: Map<string, string>,
+) {
+  const archiveEntry = archiveEntryMap?.get(filePath) || filePath;
+  return extractFile(archivePath, archiveEntry).toString("utf8");
 }
 
 function normalizeAssetPath(value: string) {
@@ -46,6 +51,19 @@ function normalizeAssetPath(value: string) {
 
 export function normalizeArchiveEntry(value: string) {
   return value.replace(/^[\\/]+/, "").replaceAll("\\", "/");
+}
+
+export function normalizeArchiveExtractionPath(value: string) {
+  return value.replace(/^[\\/]+/, "");
+}
+
+export function createArchiveEntryMap(entries: string[]) {
+  return new Map(
+    entries.map((entry) => [
+      normalizeArchiveEntry(entry),
+      normalizeArchiveExtractionPath(entry),
+    ]),
+  );
 }
 
 function findFiles(root: string, fileName: string): string[] {
@@ -157,9 +175,10 @@ function assertWebDist(resourcesDir: string) {
 }
 
 function assertPackagedApp(archivePath: string) {
-  const archiveEntries = new Set(
-    listPackage(archivePath, { isPack: false }).map(normalizeArchiveEntry),
+  const archiveEntryMap = createArchiveEntryMap(
+    listPackage(archivePath, { isPack: false }),
   );
+  const archiveEntries = new Set(archiveEntryMap.keys());
   const requiredEntries = [
     "package.json",
     "index.html",
@@ -180,18 +199,20 @@ function assertPackagedApp(archivePath: string) {
     `${archivePath} ships compiled tests or release helper scripts.`,
   );
 
-  const packageJson = JSON.parse(readArchiveText(archivePath, "package.json")) as {
+  const packageJson = JSON.parse(
+    readArchiveText(archivePath, "package.json", archiveEntryMap),
+  ) as {
     main?: string;
   };
   assert(packageJson.main === "dist/main.js", `${archivePath} has the wrong main entry.`);
 
-  const main = readArchiveText(archivePath, "dist/main.js");
+  const main = readArchiveText(archivePath, "dist/main.js", archiveEntryMap);
   assert(
     /preload\.js/.test(main) && /\.\.\/index\.html/.test(main),
     `${archivePath} main process does not load the packaged preload and desktop HTML.`,
   );
 
-  const html = readArchiveText(archivePath, "index.html");
+  const html = readArchiveText(archivePath, "index.html", archiveEntryMap);
   const scriptSources = getHtmlScriptSources(html);
   assert(
     JSON.stringify(scriptSources) === JSON.stringify(EXPECTED_RENDERER_SCRIPTS),
@@ -199,9 +220,15 @@ function assertPackagedApp(archivePath: string) {
   );
 
   for (const rendererPath of scriptSources) {
-    assertBrowserScript(readArchiveText(archivePath, rendererPath), rendererPath);
+    assertBrowserScript(
+      readArchiveText(archivePath, rendererPath, archiveEntryMap),
+      rendererPath,
+    );
   }
-  assertPreloadScript(readArchiveText(archivePath, "dist/preload.js"), "dist/preload.js");
+  assertPreloadScript(
+    readArchiveText(archivePath, "dist/preload.js", archiveEntryMap),
+    "dist/preload.js",
+  );
 
   const resourcesDir = path.dirname(archivePath);
   assertWebDist(resourcesDir);
