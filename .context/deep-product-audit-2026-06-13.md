@@ -20,7 +20,7 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, and 12 lifecycle regression contracts pass; shared infrastructure and large feature modules are grouped by ownership. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, and 25 lifecycle regression contracts pass; shared infrastructure and large feature modules are grouped by ownership. |
 | API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
@@ -30,24 +30,6 @@ product and infrastructure; it does not introduce new product features.
 ## Next Work Queue
 
 Work these in order unless a production incident changes priority.
-
-### NEXT-10 — P1: Harden Profile And Account Settings Workflows
-
-**Scope:** Profile loading/updating, avatar crop/upload, password changes, and
-the newly hardened account-deletion UI.
-
-**Why this remains:** Account deletion now has strong backend regressions, but
-the rest of the profile UI primarily relies on lint/build. Avatar upload,
-partial update failures, password reauthentication, stale profile state, and
-storage cleanup/replacement behavior lack focused interaction coverage.
-
-**Completion proof:**
-
-- Make each profile mutation expose clear pending, success, failure, and retry
-  states without partial-success confusion.
-- Verify avatar replacement/storage behavior and password-provider paths.
-- Add browser/component coverage for ordinary users and privileged-role
-  deletion blocking.
 
 ### NEXT-11 — P1: Harden Admin Frontend Operations
 
@@ -534,13 +516,39 @@ failure rollback, and in-flight-load reconciliation contracts. Web lint,
 production build, all 20 tests, and `git diff --check` pass. Broader rendered
 interaction coverage remains tracked by `NEXT-12`.
 
+### DONE-28 — Harden Profile And Account Settings Workflows
+
+**Problem:** Profile-load failures disappeared after the loading skeleton,
+OAuth-only users were shown a password form they could not use, rapid submits
+could duplicate mutations, and avatar uploads overwrote the active object
+before the profile update succeeded. Metadata-sync and sign-out failures could
+also make a successful authoritative mutation appear to have failed entirely.
+
+**Resolution:** Added explicit profile load-error/retry state and single-flight
+guards for profile, password, crop, and account-deletion actions. Avatar input
+now validates image type and size, crop failures surface in the page, object
+preview URLs are released, and replacements use versioned storage paths. Failed
+profile API updates remove newly uploaded objects; successful replacements
+clean the previous owned avatar; metadata-sync and cleanup failures surface as
+clear partial-success warnings. Password changes use the shared password policy
+and are shown only for email-password accounts. Account deletion treats local
+sign-out as best effort after the API has authoritatively deleted the account.
+Profile and deletion dialogs now expose dialog semantics and lock dismissal
+while work is pending.
+
+**Verification:** Added avatar validation, owned-path isolation, failed-upload
+and failed-save cleanup, and partial-success regression contracts. Web lint,
+production build, all 25 tests, unauthenticated `/profile` redirect smoke, console-error check,
+and `git diff --check` pass. Authenticated rendered interaction coverage remains
+tracked by `NEXT-12`.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, and production build | Passed — 20 tests |
+| Web tests, lint, and production build | Passed — 25 tests |
 | API typecheck, lint, build, and tests | Passed — 51 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |

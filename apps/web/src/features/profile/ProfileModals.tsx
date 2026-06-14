@@ -5,6 +5,7 @@ import type { CropArea } from "./avatarCrop";
 export function AvatarCropModal({
   crop,
   imageSrc,
+  isCropping,
   onCancel,
   onConfirm,
   onCropChange,
@@ -14,6 +15,7 @@ export function AvatarCropModal({
 }: {
   crop: { x: number; y: number };
   imageSrc: string;
+  isCropping: boolean;
   onCancel: () => void;
   onConfirm: () => void;
   onCropChange: (crop: { x: number; y: number }) => void;
@@ -22,12 +24,22 @@ export function AvatarCropModal({
   zoom: number;
 }) {
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4">
+    <div
+      aria-labelledby="avatar-crop-title"
+      aria-modal="true"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+      role="dialog"
+    >
       <div className="bg-synth-surface border border-synth-border rounded-2xl w-full max-w-lg overflow-hidden shadow-glow-card flex flex-col">
         <div className="p-4 border-b border-synth-border flex justify-between items-center">
-          <h3 className="text-white font-bold">Crop your image</h3>
+          <h3 id="avatar-crop-title" className="text-white font-bold">
+            Crop your image
+          </h3>
           <button
+            aria-label="Close avatar crop dialog"
+            disabled={isCropping}
             onClick={onCancel}
+            type="button"
             className="text-gray-400 hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
@@ -62,16 +74,24 @@ export function AvatarCropModal({
           />
           <div className="flex justify-end gap-3">
             <button
+              disabled={isCropping}
               onClick={onCancel}
+              type="button"
               className="px-5 py-2.5 rounded-lg text-gray-300 hover:bg-synth-elevated transition-colors font-medium"
             >
               Cancel
             </button>
             <button
+              disabled={isCropping}
               onClick={onConfirm}
+              type="button"
               className="px-5 py-2.5 bg-synth-primary hover:bg-synth-primary-hover text-synth-ink rounded-lg transition-colors font-bold shadow-glow-primary-sm"
             >
-              Confirm Crop
+              {isCropping ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                "Confirm Crop"
+              )}
             </button>
           </div>
         </div>
@@ -98,14 +118,25 @@ export function DeleteAccountModal({
   onSubmit: React.SubmitEventHandler<HTMLFormElement>;
 }) {
   return (
-    <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div
+      aria-labelledby="delete-account-title"
+      aria-modal="true"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+      role="dialog"
+    >
       <div className="bg-synth-surface border border-red-500/30 rounded-2xl w-full max-w-md overflow-hidden shadow-glow-card flex flex-col">
         <div className="p-6 border-b border-synth-border flex justify-between items-center bg-red-500/10">
-          <h3 className="text-red-400 font-bold flex items-center gap-2">
+          <h3
+            id="delete-account-title"
+            className="text-red-400 font-bold flex items-center gap-2"
+          >
             <AlertOctagon className="w-5 h-5" /> Delete Account
           </h3>
           <button
+            aria-label="Close delete account dialog"
+            disabled={isDeleting}
             onClick={onCancel}
+            type="button"
             className="text-gray-400 hover:text-white transition-colors"
           >
             <X className="w-5 h-5" />
@@ -149,6 +180,7 @@ export function DeleteAccountModal({
             <div className="flex justify-end gap-3 mt-6">
               <button
                 type="button"
+                disabled={isDeleting}
                 onClick={onCancel}
                 className="px-5 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-synth-elevated transition-colors font-medium"
               >

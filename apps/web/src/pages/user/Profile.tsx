@@ -7,6 +7,7 @@ import {
   Save,
   Camera,
   AlertOctagon,
+  RefreshCw,
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
@@ -21,19 +22,33 @@ import {
   AvatarCropModal,
   DeleteAccountModal,
 } from "../../features/profile/ProfileModals";
+import {
+  saveProfile,
+  validateAvatarFile,
+} from "../../features/profile/profileMutations";
+import {
+  getPasswordPolicyError,
+  PASSWORD_MIN_LENGTH,
+  PASSWORD_POLICY_HINT,
+} from "../../lib/auth/passwordPolicy";
 export default function Profile() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const profileMutationRef = useRef(false);
+  const passwordMutationRef = useRef(false);
+  const deleteMutationRef = useRef(false);
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userRole, setUserRole] = useState<string>("user");
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
 
   // Split messages
   const [profileMessage, setProfileMessage] = useState<{
-    type: "success" | "error";
+    type: "success" | "warning" | "error";
     text: string;
   } | null>(null);
   const [passwordMessage, setPasswordMessage] = useState<{
@@ -54,6 +69,7 @@ export default function Profile() {
   const [zoom, setZoom] = useState(1);
   const [croppedAreaPixels, setCroppedAreaPixels] =
     useState<CropArea | null>(null);
+  const [isCropping, setIsCropping] = useState(false);
 
   // Password Form State
   const [currentPassword, setCurrentPassword] = useState("");
@@ -68,9 +84,13 @@ export default function Profile() {
   const hasPassword = user?.app_metadata?.providers?.includes("email");
 
   useEffect(() => {
+    let isMounted = true;
     const fetchProfile = async () => {
+      setLoading(true);
+      setLoadError(null);
       try {
         const session = await getAuthSession();
+        if (!isMounted) return;
         if (!session) {
           navigate("/login");
           return;
@@ -78,6 +98,7 @@ export default function Profile() {
         setUser(session.user);
 
         const { profile } = await api.profile();
+        if (!isMounted) return;
 
         if (profile) {
           setUsername(profile.username || "");
@@ -86,21 +107,54 @@ export default function Profile() {
         }
       } catch (error) {
         console.error("Error loading profile", error);
+        if (isMounted) {
+          setLoadError(
+            error instanceof Error
+              ? error.message
+              : "Failed to load account settings.",
+          );
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    fetchProfile();
-  }, [navigate]);
+    void fetchProfile();
+    return () => {
+      isMounted = false;
+    };
+  }, [loadAttempt, navigate]);
+
+  useEffect(
+    () => () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    },
+    [previewUrl],
+  );
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
+      const validationError = validateAvatarFile(file);
+      if (validationError) {
+        setProfileMessage({ type: "error", text: validationError });
+        e.target.value = "";
+        return;
+      }
+
       const reader = new FileReader();
       reader.onload = () => {
         setImageSrc(reader.result as string);
+        setCroppedAreaPixels(null);
+        setCrop({ x: 0, y: 0 });
+        setZoom(1);
         setShowCropper(true);
+      };
+      reader.onerror = () => {
+        setProfileMessage({
+          type: "error",
+          text: "The selected image could not be read.",
+        });
       };
       reader.readAsDataURL(file);
 
@@ -116,59 +170,79 @@ export default function Profile() {
   );
 
   const handleCropConfirm = async () => {
+    if (isCropping) return;
+    setIsCropping(true);
     try {
       if (!imageSrc || !croppedAreaPixels) return;
       const croppedFile = await createCroppedAvatar(imageSrc, croppedAreaPixels);
 
       setAvatarFile(croppedFile);
-      setPreviewUrl(URL.createObjectURL(croppedFile));
+      setPreviewUrl((current) => {
+        if (current) URL.revokeObjectURL(current);
+        return URL.createObjectURL(croppedFile);
+      });
       setShowCropper(false);
-    } catch (e) {
-      console.error(e);
-      alert("Failed to crop image.");
+    } catch (error) {
+      console.error(error);
+      setProfileMessage({
+        type: "error",
+        text: "Failed to crop the selected image.",
+      });
+    } finally {
+      setIsCropping(false);
     }
   };
 
   const updateProfile = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || profileMutationRef.current) return;
+    profileMutationRef.current = true;
     setSavingProfile(true);
     setProfileMessage(null);
 
     try {
-      let finalAvatarUrl = avatarUrl;
+      const result = await saveProfile({
+        avatarFile,
+        currentAvatarUrl: avatarUrl,
+        removeAvatar: async (path) => {
+          const { error } = await supabase.storage.from("avatars").remove([path]);
+          if (error) throw error;
+        },
+        updateAuthMetadata: async (finalAvatarUrl, finalUsername) => {
+          const { error } = await supabase.auth.updateUser({
+            data: { avatar_url: finalAvatarUrl, username: finalUsername },
+          });
+          if (error) throw error;
+        },
+        updateProfile: async (finalAvatarUrl, finalUsername) => {
+          await api.updateProfile({
+            avatarUrl: finalAvatarUrl,
+            username: finalUsername,
+          });
+        },
+        uploadAvatar: async (file, path) => {
+          const { error } = await supabase.storage
+            .from("avatars")
+            .upload(path, file, { contentType: "image/jpeg" });
+          if (error) throw error;
 
-      if (avatarFile) {
-        const fileExt = avatarFile.name.split(".").pop();
-        const filePath = `${user.id}/avatar.${fileExt}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("avatars")
-          .upload(filePath, avatarFile, { upsert: true });
-
-        if (uploadError) throw uploadError;
-
-        const {
-          data: { publicUrl },
-        } = supabase.storage.from("avatars").getPublicUrl(filePath);
-
-        finalAvatarUrl = `${publicUrl}?t=${new Date().getTime()}`;
-      }
-
-      await api.updateProfile({ avatarUrl: finalAvatarUrl, username });
-
-      const { error: authError } = await supabase.auth.updateUser({
-        data: { avatar_url: finalAvatarUrl, username: username },
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("avatars").getPublicUrl(path);
+          return publicUrl;
+        },
+        userId: user.id,
+        username,
       });
-
-      if (authError) throw authError;
-
-      setAvatarUrl(finalAvatarUrl);
+      setUsername(username.trim());
+      setAvatarUrl(result.avatarUrl);
       setAvatarFile(null);
       setPreviewUrl(null);
       setProfileMessage({
-        type: "success",
-        text: "Profile updated successfully!",
+        type: result.warnings.length ? "warning" : "success",
+        text: result.warnings.length
+          ? result.warnings.join(" ")
+          : "Profile updated successfully.",
       });
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -177,17 +251,22 @@ export default function Profile() {
         setProfileMessage({ type: "error", text: "Failed to update profile." });
       }
     } finally {
+      profileMutationRef.current = false;
       setSavingProfile(false);
     }
   };
 
   const updatePassword = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user?.email) return;
+    if (!user?.email || passwordMutationRef.current) return;
+    passwordMutationRef.current = true;
     setSavingPassword(true);
     setPasswordMessage(null);
 
     try {
+      const policyError = getPasswordPolicyError(newPassword);
+      if (policyError) throw new Error(policyError);
+
       const { error: verifyError } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: currentPassword,
@@ -201,7 +280,7 @@ export default function Profile() {
 
       setPasswordMessage({
         type: "success",
-        text: "Password updated successfully!",
+        text: "Password updated successfully.",
       });
       setCurrentPassword("");
       setNewPassword("");
@@ -215,13 +294,15 @@ export default function Profile() {
         });
       }
     } finally {
+      passwordMutationRef.current = false;
       setSavingPassword(false);
     }
   };
 
   const handleDeleteAccount = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || deleteMutationRef.current) return;
+    deleteMutationRef.current = true;
     setIsDeleting(true);
     setDeleteError(null);
 
@@ -242,9 +323,14 @@ export default function Profile() {
 
       await api.deleteAccount();
 
-      // 3. Sign out and redirect
-      await supabase.auth.signOut();
-      navigate("/");
+      // The account is already gone at this point; local sign-out is best effort.
+      try {
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) console.warn("Failed to clear deleted account session");
+      } catch {
+        console.warn("Failed to clear deleted account session");
+      }
+      navigate("/", { replace: true });
     } catch (error: unknown) {
       if (
         error instanceof ApiError &&
@@ -261,6 +347,7 @@ export default function Profile() {
           "An unexpected error occurred while deleting your account.",
         );
       }
+      deleteMutationRef.current = false;
       setIsDeleting(false);
     }
   };
@@ -273,6 +360,27 @@ export default function Profile() {
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="flex min-h-[70vh] items-center justify-center px-4">
+        <div className="max-w-md rounded-2xl border border-red-500/30 bg-synth-surface p-8 text-center shadow-glow-card">
+          <AlertOctagon className="mx-auto mb-4 h-10 w-10 text-red-400" />
+          <h1 className="mb-2 text-xl font-bold text-white">
+            Account settings unavailable
+          </h1>
+          <p className="mb-6 text-sm text-gray-400">{loadError}</p>
+          <button
+            className="mx-auto flex items-center gap-2 rounded-lg bg-synth-primary px-5 py-2.5 font-bold text-synth-ink"
+            onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+            type="button"
+          >
+            <RefreshCw className="h-4 w-4" /> Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const displayAvatar = previewUrl || avatarUrl;
 
   return (
@@ -281,6 +389,7 @@ export default function Profile() {
         <AvatarCropModal
           crop={crop}
           imageSrc={imageSrc}
+          isCropping={isCropping}
           onCancel={() => setShowCropper(false)}
           onConfirm={() => void handleCropConfirm()}
           onCropChange={setCrop}
@@ -329,7 +438,14 @@ export default function Profile() {
             {/* Profile Message Block */}
             {profileMessage && (
               <div
-                className={`p-4 rounded-lg mb-6 border ${profileMessage.type === "success" ? "bg-green-500/10 border-green-500/50 text-green-400" : "bg-red-500/10 border-red-500/50 text-red-400"}`}
+                className={`p-4 rounded-lg mb-6 border ${
+                  profileMessage.type === "success"
+                    ? "bg-green-500/10 border-green-500/50 text-green-400"
+                    : profileMessage.type === "warning"
+                      ? "bg-amber-500/10 border-amber-500/50 text-amber-300"
+                      : "bg-red-500/10 border-red-500/50 text-red-400"
+                }`}
+                role={profileMessage.type === "error" ? "alert" : "status"}
               >
                 {profileMessage.text}
               </div>
@@ -337,9 +453,12 @@ export default function Profile() {
 
             <form onSubmit={updateProfile} className="space-y-8">
               <div className="flex flex-col items-center gap-6">
-                <div
+                <button
+                  aria-label="Choose a new avatar"
+                  disabled={savingProfile}
                   onClick={() => fileInputRef.current?.click()}
                   className="relative w-24 h-24 rounded-full overflow-hidden group cursor-pointer border-2 border-transparent hover:border-synth-primary transition-all shadow-lg ring-0 hover:shadow-glow-primary-sm"
+                  type="button"
                 >
                   <Avatar
                     alt="Avatar"
@@ -355,7 +474,7 @@ export default function Profile() {
                       Change
                     </span>
                   </div>
-                </div>
+                </button>
 
                 <div className="text-center">
                   <input
@@ -389,13 +508,16 @@ export default function Profile() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="Enter a cool username"
+                  disabled={savingProfile}
+                  maxLength={80}
+                  required
                   className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
                 />
               </div>
 
               <button
                 type="submit"
-                disabled={savingProfile}
+                disabled={savingProfile || !username.trim()}
                 className="bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2 shadow-glow-primary-sm"
               >
                 {savingProfile ? (
@@ -423,47 +545,59 @@ export default function Profile() {
               </div>
             )}
 
-            <form onSubmit={updatePassword} className="space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Current Password
-                </label>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  placeholder="Enter current password"
-                  required
-                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  New Password
-                </label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
-                  required
-                  minLength={6}
-                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-all"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={savingPassword}
-                className="bg-synth-elevated hover:bg-synth-border border border-synth-border text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2"
-              >
-                {savingPassword ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Lock className="w-4 h-4" />
-                )}
-                Update Password
-              </button>
-            </form>
+            {hasPassword ? (
+              <form onSubmit={updatePassword} className="space-y-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Current Password
+                  </label>
+                  <input
+                    type="password"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    placeholder="Enter current password"
+                    required
+                    disabled={savingPassword}
+                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    New Password
+                  </label>
+                  <input
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Enter new password"
+                    required
+                    minLength={PASSWORD_MIN_LENGTH}
+                    disabled={savingPassword}
+                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-all"
+                  />
+                </div>
+                <p className="text-xs leading-5 text-gray-400">
+                  {PASSWORD_POLICY_HINT}
+                </p>
+                <button
+                  type="submit"
+                  disabled={savingPassword}
+                  className="bg-synth-elevated hover:bg-synth-border border border-synth-border text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2"
+                >
+                  {savingPassword ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Lock className="w-4 h-4" />
+                  )}
+                  Update Password
+                </button>
+              </form>
+            ) : (
+              <p className="rounded-lg border border-synth-border bg-synth-bg/40 p-4 text-sm text-gray-400">
+                This account signs in through an external provider. Manage its
+                password with that provider.
+              </p>
+            )}
 
             {/* MERGED DANGER ZONE (HIDDEN FROM ADMINS/SUPER_ADMINS) */}
             {userRole !== "admin" && userRole !== "super_admin" && (
@@ -477,6 +611,7 @@ export default function Profile() {
                 </p>
                 <button
                   onClick={() => setShowDeleteModal(true)}
+                  type="button"
                   className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 font-bold py-2.5 px-6 rounded-lg transition-all"
                 >
                   Delete Account
