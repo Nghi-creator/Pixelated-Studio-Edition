@@ -12,11 +12,17 @@ import {
 } from "lucide-react";
 import { api, getAuthSession, type ApiGame } from "../../lib/apiClient";
 import {
+  clearEngineToken,
   engineAuthHeaders,
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
 } from "../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../lib/engine/engineConfig";
+import {
+  INVALID_ENGINE_TOKEN_MESSAGE,
+  normalizeLocalGameFilenames,
+  toLocalVaultGames,
+} from "../../features/local-vault/localVaultClient";
 import {
   CloudGameCard,
   LocalGameCard,
@@ -169,20 +175,21 @@ export default function Multiplayer() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          clearEngineToken();
+          setIsEnginePaired(false);
+          throw new Error(INVALID_ENGINE_TOKEN_MESSAGE);
+        }
         throw new Error("Local engine did not return games.");
       }
 
-      const filenames = (await response.json()) as string[];
-      setLocalGames(
-        filenames.map((filename) => ({
-          id: filename,
-          title: filename.replace(/\.nes$/i, ""),
-        })),
-      );
+      setLocalGames(toLocalVaultGames(normalizeLocalGameFilenames(await response.json())));
     } catch (error) {
       console.error("Failed to load local multiplayer games:", error);
       setLocalMessage(
-        "Could not load Local Vault games. Confirm the desktop engine is running and paired.",
+        error instanceof Error && error.message
+          ? error.message
+          : "Could not load Local Vault games. Confirm the desktop engine is running and paired.",
       );
     } finally {
       setLocalLoading(false);

@@ -160,6 +160,21 @@ async function run() {
     await page.getByRole("button", { name: "Harness Submit" }).click();
     await page.getByText("publish-submit-ready").waitFor();
 
+    await page.getByLabel("Harness Local ROM").setInputFiles({
+      buffer: Buffer.from("not a rom"),
+      mimeType: "application/zip",
+      name: "local.zip",
+    });
+    await page.getByText("Only .nes files are supported.").waitFor();
+    await page.getByRole("button", { name: "Open local delete" }).click();
+    await page.getByRole("dialog", { name: "Delete local ROM?" }).waitFor();
+    await page.getByRole("button", { name: "Delete ROM" }).click();
+    await page.getByText("local-delete:demo.nes").waitFor();
+    await page.getByRole("button", { name: "Simulate pairing loss" }).click();
+    await page
+      .getByText("The saved pairing token was rejected. Enter the current desktop token to reconnect.")
+      .waitFor();
+
     assert.deepEqual(errors, []);
   } finally {
     if (browser) await browser.close();

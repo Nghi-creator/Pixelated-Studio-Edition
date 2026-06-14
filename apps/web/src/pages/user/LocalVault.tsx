@@ -10,20 +10,38 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
-  clearEngineToken,
-  engineAuthHeaders,
+  AdminConfirmDialog,
+  type AdminConfirmation,
+} from "../../components/admin/AdminConfirmDialog";
+import {
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
 } from "../../lib/engine/engineAuth";
-import { engineEndpoint } from "../../lib/engine/engineConfig";
-import { getAuthSession } from "../../lib/apiClient";
+import {
+  deleteLocalVaultGame,
+  fetchLocalVaultFilenames,
+  getLocalGameTitle,
+  getLocalVaultErrorMessage,
+  getLocalVaultUserId,
+  isInvalidEngineTokenError,
+  LOCAL_ENGINE_UNREACHABLE_MESSAGE,
+  uploadLocalVaultRom,
+  validateLocalRomFile,
+} from "../../features/local-vault/localVaultClient";
 
 export default function LocalVault() {
   const [localGames, setLocalGames] = useState<string[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoadingGames, setIsLoadingGames] = useState(false);
   const [userId, setUserId] = useState<string>("anonymous");
   const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
+  const [pendingDeleteFilename, setPendingDeleteFilename] = useState<
+    string | null
+  >(null);
+  const [deleteConfirmation, setDeleteConfirmation] =
+    useState<AdminConfirmation | null>(null);
+  const [fileInputVersion, setFileInputVersion] = useState(0);
   const [vaultMessage, setVaultMessage] = useState<{
     tone: "error" | "success";
     text: string;
@@ -31,8 +49,7 @@ export default function LocalVault() {
 
   useEffect(() => {
     const initVault = async () => {
-      const session = await getAuthSession();
-      const currentUserId = session?.user?.id || "anonymous";
+      const currentUserId = await getLocalVaultUserId();
       setUserId(currentUserId);
       if (hasEngineToken()) {
         fetchLocalGames(currentUserId);
@@ -64,30 +81,28 @@ export default function LocalVault() {
       return;
     }
 
+    setIsLoadingGames(true);
     try {
-      const res = await fetch(engineEndpoint("/local-games"), {
-        headers: { "X-User-Id": uid, ...engineAuthHeaders() },
-      });
-      if (res.status === 401) {
-        clearEngineToken();
-        setVaultMessage({
-          tone: "error",
-          text: "The saved pairing token was rejected. Enter the current desktop token to reconnect.",
-        });
-        throw new Error("Invalid engine pairing token");
-      }
-      if (!res.ok) throw new Error("Local engine offline");
-      const data = await res.json();
-      setLocalGames(data);
+      setLocalGames(await fetchLocalVaultFilenames(uid));
+      setVaultMessage(null);
     } catch (err) {
       console.error("Could not connect to local Docker engine:", err);
+      if (isInvalidEngineTokenError(err)) {
+        setIsEnginePaired(false);
+        setLocalGames([]);
+      }
       setVaultMessage(
         (currentMessage) =>
           currentMessage || {
             tone: "error",
-            text: "Local engine is unreachable. Check the desktop app and engine URL.",
+            text: getLocalVaultErrorMessage(
+              err,
+              LOCAL_ENGINE_UNREACHABLE_MESSAGE,
+            ),
           },
       );
+    } finally {
+      setIsLoadingGames(false);
     }
   };
 
@@ -123,96 +138,78 @@ export default function LocalVault() {
       return;
     }
 
-    if (!file.name.toLowerCase().endsWith(".nes")) {
+    const validationError = validateLocalRomFile(file);
+    if (validationError) {
       setVaultMessage({
         tone: "error",
-        text: "Only .nes files are supported.",
+        text: validationError,
       });
+      setFileInputVersion((version) => version + 1);
       return;
     }
 
     setVaultMessage(null);
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append("romFile", file);
 
     try {
-      const res = await fetch(engineEndpoint("/upload"), {
-        method: "POST",
-        headers: { "X-User-Id": userId, ...engineAuthHeaders() },
-        body: formData,
+      await uploadLocalVaultRom(file, userId);
+      await fetchLocalGames(userId);
+      setVaultMessage({
+        tone: "success",
+        text: "ROM uploaded to your Local Vault.",
       });
-
-      if (res.ok) {
-        await fetchLocalGames(userId);
-        setVaultMessage({
-          tone: "success",
-          text: "ROM uploaded to your Local Vault.",
-        });
-      } else if (res.status === 401) {
-        clearEngineToken();
-        setVaultMessage({
-          tone: "error",
-          text: "The saved pairing token was rejected. Enter the current desktop token to reconnect.",
-        });
-      } else {
-        const payload = await res.json().catch(() => null);
-        setVaultMessage({
-          tone: "error",
-          text:
-            payload?.error ||
-            "Upload failed. Check the ROM file and try again.",
-        });
-      }
+      setFileInputVersion((version) => version + 1);
     } catch (err) {
       console.error("Upload error:", err);
+      if (isInvalidEngineTokenError(err)) {
+        setIsEnginePaired(false);
+        setLocalGames([]);
+      }
       setVaultMessage({
         tone: "error",
-        text: "Local engine is unreachable. Check the desktop app and engine URL.",
+        text: getLocalVaultErrorMessage(err, LOCAL_ENGINE_UNREACHABLE_MESSAGE),
       });
     } finally {
       setIsUploading(false);
     }
   };
 
-  const deleteLocalGame = async (e: React.MouseEvent, filename: string) => {
+  const requestDeleteLocalGame = (e: React.MouseEvent, filename: string) => {
     e.preventDefault();
+    setDeleteConfirmation({
+      body: `Delete ${filename} from your Local Vault? This removes the ROM from the paired desktop engine.`,
+      confirmLabel: "Delete ROM",
+      id: filename,
+      intent: "danger",
+      title: "Delete local ROM?",
+    });
+  };
 
-    if (!window.confirm(`Are you sure you want to delete ${filename}?`)) return;
-
+  const confirmDeleteLocalGame = async () => {
+    if (!deleteConfirmation) return;
+    const filename = deleteConfirmation.id;
+    setPendingDeleteFilename(filename);
+    setVaultMessage(null);
     try {
-      const res = await fetch(
-        engineEndpoint(`/local-games/${encodeURIComponent(filename)}`),
-        {
-          method: "DELETE",
-          headers: { "X-User-Id": userId, ...engineAuthHeaders() },
-        },
-      );
-
-      if (res.ok) {
-        await fetchLocalGames(userId);
-        setVaultMessage({
-          tone: "success",
-          text: "Local Vault game deleted.",
-        });
-      } else if (res.status === 401) {
-        clearEngineToken();
-        setVaultMessage({
-          tone: "error",
-          text: "The saved pairing token was rejected. Enter the current desktop token to reconnect.",
-        });
-      } else {
-        setVaultMessage({
-          tone: "error",
-          text: "Failed to delete that game.",
-        });
-      }
+      await deleteLocalVaultGame(filename, userId);
+      await fetchLocalGames(userId);
+      setVaultMessage({
+        tone: "success",
+        text: "Local Vault game deleted.",
+      });
+      setDeleteConfirmation(null);
     } catch (err) {
       console.error("Delete error:", err);
+      if (isInvalidEngineTokenError(err)) {
+        setIsEnginePaired(false);
+        setLocalGames([]);
+      }
       setVaultMessage({
         tone: "error",
-        text: "Local engine is unreachable. Check the desktop app and engine URL.",
+        text: getLocalVaultErrorMessage(err, LOCAL_ENGINE_UNREACHABLE_MESSAGE),
       });
+    } finally {
+      setPendingDeleteFilename(null);
     }
   };
 
@@ -254,6 +251,15 @@ export default function LocalVault() {
         </div>
       )}
 
+      {deleteConfirmation && (
+        <AdminConfirmDialog
+          confirmation={deleteConfirmation}
+          isPending={pendingDeleteFilename === deleteConfirmation.id}
+          onCancel={() => setDeleteConfirmation(null)}
+          onConfirm={confirmDeleteLocalGame}
+        />
+      )}
+
       {/* THE DROPZONE */}
       <div
         onDragOver={handleDragOver}
@@ -268,9 +274,10 @@ export default function LocalVault() {
         }`}
       >
         <input
+          key={fileInputVersion}
           type="file"
           accept=".nes"
-          disabled={!isEnginePaired}
+          disabled={!isEnginePaired || isUploading}
           onChange={handleFileInput}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
         />
@@ -294,10 +301,28 @@ export default function LocalVault() {
       </div>
 
       {/* THE LOCAL GAME GRID */}
-      {localGames.length === 0 ? (
+      {isLoadingGames ? (
+        <div className="text-center py-20 text-gray-500 bg-synth-surface rounded-xl border border-synth-border">
+          <Loader2 className="w-10 h-10 mx-auto mb-4 animate-spin text-synth-primary" />
+          <p className="text-xl">Loading Local Vault...</p>
+        </div>
+      ) : localGames.length === 0 ? (
         <div className="text-center py-20 text-gray-500 bg-synth-surface rounded-xl border border-synth-border">
           <Gamepad2 className="w-12 h-12 mx-auto mb-4 opacity-20" />
-          <p className="text-xl">Your local vault is empty.</p>
+          <p className="text-xl">
+            {isEnginePaired
+              ? "Your local vault is empty."
+              : "Pair the local engine to view your vault."}
+          </p>
+          {vaultMessage?.tone === "error" && (
+            <button
+              className="mt-4 rounded-lg border border-synth-primary/60 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-synth-primary/15"
+              onClick={() => fetchLocalGames(userId)}
+              type="button"
+            >
+              Retry Local Vault
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
@@ -312,16 +337,22 @@ export default function LocalVault() {
               </div>
 
               <button
-                onClick={(e) => deleteLocalGame(e, filename)}
+                disabled={pendingDeleteFilename === filename}
+                onClick={(e) => requestDeleteLocalGame(e, filename)}
                 className="absolute top-2 right-2 bg-synth-bg/85 border border-synth-border p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:border-red-500 hover:bg-red-500/20 focus:outline-none z-10 backdrop-blur-sm"
-                title="Delete from Hard Drive"
+                title="Delete from Local Vault"
+                type="button"
               >
-                <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-400 transition-colors" />
+                {pendingDeleteFilename === filename ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-red-300" />
+                ) : (
+                  <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-400 transition-colors" />
+                )}
               </button>
 
               <div className="absolute bottom-0 w-full p-4 bg-gradient-to-t from-synth-bg via-synth-bg/92 to-transparent">
                 <h3 className="font-bold text-sm md:text-md truncate text-white">
-                  {filename.replace(".nes", "")}
+                  {getLocalGameTitle(filename)}
                 </h3>
               </div>
             </Link>

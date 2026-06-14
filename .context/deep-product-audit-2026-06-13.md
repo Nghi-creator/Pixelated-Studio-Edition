@@ -20,7 +20,7 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, 38 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, 41 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
 | API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
@@ -99,22 +99,24 @@ submits.
 confirmation, per-file pending state, local pagination/search if needed, and
 multiplayer local-game selection reuse.
 
-**Why this remains:** Local Vault is functional and engine-token gated, but the
-UI still uses native `confirm`, upload/delete operations are not fully
-single-flight, failed list loads collapse into an empty-state style, and local
-game names are passed directly through route params in multiple places. Engine
-routes have server-side filename/path hardening, but frontend recovery and
-interaction coverage need the same treatment as admin/profile flows.
+**Status:** Completed in `DONE-35`.
+
+**Why this was needed:** Local Vault was functional and engine-token gated, but
+the UI still used native `confirm`, upload/delete operations were not fully
+single-flight, failed list loads collapsed into an empty-state style, and local
+game names were normalized in multiple places. Engine routes had server-side
+filename/path hardening, but frontend recovery and interaction coverage needed
+the same treatment as admin/profile flows.
 
 **Completion proof:**
 
-- Replace native delete confirmation with the shared in-app confirmation
+- [x] Replace native delete confirmation with the shared in-app confirmation
   pattern.
-- Add per-file pending locks, retryable load state, input reset after
+- [x] Add per-file pending locks, retryable load state, input reset after
   validation/upload, and clear invalid-token recovery.
-- Share local-vault listing/normalization helpers with Multiplayer local-game
+- [x] Share local-vault listing/normalization helpers with Multiplayer local-game
   selection.
-- Add contracts and rendered harness coverage for upload validation, delete
+- [x] Add contracts and rendered harness coverage for upload validation, delete
   confirmation, and pairing loss.
 
 ## Core Gameplay Audit Notes
@@ -136,10 +138,10 @@ submission, and local-vault flows.
   validation/errors, duplicate-submit protection, and failed-metadata cleanup
   are covered. `DEPLOY-04` must be applied before cleanup works in production
   browsers.
-- **Local Vault:** Engine routes enforce token and filename/path hardening, but
-  frontend vault upload/delete/list behavior still needs in-app confirmation,
-  per-file pending state, retryable list errors, and reusable local game
-  normalization shared with Multiplayer.
+- **Local Vault:** Engine routes enforce token and filename/path hardening, and
+  `DONE-35` added frontend validation, in-app delete confirmation, per-file
+  pending state, retryable load errors, invalid-token recovery, and reusable
+  local-game normalization shared with Multiplayer.
 
 ## Deployment Actions
 
@@ -748,13 +750,38 @@ error messaging. The rendered interaction harness now covers publish-form file
 validation and submit readiness. Web tests pass with 38 contracts; lint,
 production build, rendered interaction harness, and `git diff --check` pass.
 
+### DONE-35 — Harden Local Vault Workflow
+
+**Problem:** Local Vault still used a native browser confirmation for deletes,
+had only global upload pending state, did not expose a clear retry path for
+failed list loads, kept stale file input state after validation/upload, and
+duplicated local game filename normalization in Multiplayer. Invalid engine
+tokens were handled inconsistently across Local Vault and multiplayer local
+selection.
+
+**Resolution:** Added shared Local Vault helpers for ROM validation, filename
+normalization, title derivation, local game card mapping, invalid-token errors,
+and engine error messaging. Local Vault now uses the in-app confirmation
+dialog, tracks per-file delete pending state, resets file input after rejected
+or successful uploads, shows a loading state and retry action for vault loads,
+and clears stale pairing state when the engine rejects the saved token.
+Multiplayer local-game selection now reuses the same normalization helpers and
+invalid-token message.
+
+**Verification:** Added contracts for local ROM validation, filename
+normalization/card mapping, and invalid-token recovery messaging. The rendered
+interaction harness now covers Local Vault upload validation, delete
+confirmation, and pairing-loss guidance. Web tests pass with 41 contracts;
+lint, production build, rendered interaction harness, no Local Vault native
+`alert`/`confirm` usage, and `git diff --check` pass.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, production build, and rendered interaction harness | Passed — 38 Node tests plus Playwright harness |
+| Web tests, lint, production build, and rendered interaction harness | Passed — 41 Node tests plus Playwright harness |
 | API typecheck, lint, build, and tests | Passed — 52 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |

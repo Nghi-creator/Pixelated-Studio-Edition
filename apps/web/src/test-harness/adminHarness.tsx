@@ -7,6 +7,10 @@ import {
   type AdminConfirmation,
 } from "../components/admin/AdminConfirmDialog";
 import ReportCard, { type Report } from "../components/admin/ReportCard";
+import {
+  INVALID_ENGINE_TOKEN_MESSAGE,
+  validateLocalRomFile,
+} from "../features/local-vault/localVaultClient";
 import { LobbyPanel } from "../features/player/LobbyPanel";
 import { PlayerHeader } from "../features/player/PlayerHeader";
 import { StreamStage } from "../features/player/StreamStage";
@@ -67,6 +71,11 @@ const adminReport: Report = {
 
 export function AdminHarness() {
   const [confirmation, setConfirmation] = useState<AdminConfirmation | null>(
+    null,
+  );
+  const [localVaultConfirmation, setLocalVaultConfirmation] =
+    useState<AdminConfirmation | null>(null);
+  const [localVaultMessage, setLocalVaultMessage] = useState<string | null>(
     null,
   );
   const [pending, setPending] = useState(false);
@@ -298,6 +307,63 @@ export function AdminHarness() {
             Harness Submit
           </button>
         </form>
+      </section>
+
+      <section aria-label="Local vault harness" className="max-w-2xl">
+        <div className="space-y-3 rounded-xl border border-synth-border bg-synth-surface p-4">
+          {localVaultMessage && (
+            <p className="text-sm text-red-300" role="alert">
+              {localVaultMessage}
+            </p>
+          )}
+          <label
+            className="block text-sm font-semibold text-gray-300"
+            htmlFor="harness-local-rom"
+          >
+            Harness Local ROM
+          </label>
+          <input
+            id="harness-local-rom"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0] || null;
+              setLocalVaultMessage(validateLocalRomFile(file));
+            }}
+            type="file"
+          />
+          <button
+            className="rounded-lg border border-red-400/60 px-4 py-2 text-sm font-semibold text-red-200"
+            onClick={() =>
+              setLocalVaultConfirmation({
+                body: "Delete demo.nes from the local vault harness?",
+                confirmLabel: "Delete ROM",
+                id: "demo.nes",
+                intent: "danger",
+                title: "Delete local ROM?",
+              })
+            }
+            type="button"
+          >
+            Open local delete
+          </button>
+          <button
+            className="rounded-lg border border-amber-400/60 px-4 py-2 text-sm font-semibold text-amber-100"
+            onClick={() => setLocalVaultMessage(INVALID_ENGINE_TOKEN_MESSAGE)}
+            type="button"
+          >
+            Simulate pairing loss
+          </button>
+        </div>
+        {localVaultConfirmation && (
+          <AdminConfirmDialog
+            confirmation={localVaultConfirmation}
+            isPending={false}
+            onCancel={() => setLocalVaultConfirmation(null)}
+            onConfirm={() => {
+              record(`local-delete:${localVaultConfirmation.id}`);
+              setLocalVaultConfirmation(null);
+            }}
+          />
+        )}
       </section>
 
       <output aria-label="Harness events">{events.join("|")}</output>
