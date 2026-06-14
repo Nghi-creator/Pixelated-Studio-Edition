@@ -10,8 +10,8 @@ may describe behavior that has since changed.
   boundaries, and operational behavior.
 - `deep-product-audit-2026-06-13.md`: completed optimization ledger, deployment
   actions, verification status, and remaining environment-dependent work.
-- `directory-structure-audit-2026-06-14.md`: repository organization decisions
-  and staged cleanup recommendations.
+- `directory-structure-audit-2026-06-14.md`: completed repository organization
+  decisions and structural guardrails.
 - `project-flows.md`: detailed product flows; verify older sections against the
   infrastructure snapshot before implementation.
 
@@ -35,4 +35,3 @@ may describe behavior that has since changed.
   backlog.
 - `smoke-artifacts/`: checked-in smoke evidence.
 - `hosted-auth-smoke/` and `hosted-pairing-smoke/`: ignored local smoke output.
-

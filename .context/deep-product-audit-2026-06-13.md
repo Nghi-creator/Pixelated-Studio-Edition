@@ -350,6 +350,22 @@ LAN smoke, and LAN summary CLI help commands pass. All moved scripts pass
 `node --check`; no stale script-path references remain; `git diff --check`
 passes.
 
+### DONE-21 — Close Remaining Source Structure Anomalies
+
+**Problem:** The engine runtime retained one CommonJS JavaScript signaling test
+inside an otherwise TypeScript source tree, and `allowJs` allowed future source
+anomalies to bypass strict TypeScript checks.
+
+**Resolution:** Converted the final JavaScript signaling test to strict
+TypeScript, removed `allowJs`, and added an engine source-shape check that
+rejects future `.js` files under `engine/runtime/src/`. Audited generated
+directories and confirmed they remain ignored and untracked without deleting
+useful local build output.
+
+**Verification:** Engine build, source/syntax checks, and all 29 tests pass.
+No JavaScript files remain under `engine/runtime/src/`; generated artifact
+directories are ignored and untracked; `git diff --check` passes.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:

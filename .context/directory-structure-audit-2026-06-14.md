@@ -122,6 +122,19 @@ Root package commands provide the stable execution surface:
 `smoke:hosted-auth`, `smoke:hosted-pairing`, `smoke:lan`,
 `smoke:lan-summary`, and `test:smoke`.
 
+### Remaining Source Anomalies
+
+Completed `STRUCTURE-05`. Converted the final JavaScript file under
+`engine/runtime/src/`, `signaling/startGameHandlers.test.js`, to strict
+TypeScript and removed the runtime TypeScript configuration's `allowJs`
+exception. The engine `check` gate now rejects future JavaScript files under
+`src/`.
+
+Generated directories were audited and remain ignored and untracked:
+`dist/`, `release/`, `.vercel/`, `__pycache__/`, `supabase/.temp/`, and local
+hosted-smoke output. Existing local generated output was left intact because it
+does not affect reviews or source ownership.
+
 ## Keep As-Is
 
 ### Engine Runtime
@@ -137,16 +150,9 @@ break the primary ordering model and make deployment history harder to inspect.
 
 ## Staged Cleanup Plan
 
-Work these as focused refactors with behavior-preserving tests, not bulk moves.
-
-### STRUCTURE-05 — Normalize Remaining Source Anomalies
-
-- Convert `engine/runtime/src/signaling/startGameHandlers.test.js` to TypeScript
-  when that signaling suite is next modified.
-- Keep generated directories ignored and out of reviews: `dist/`, `release/`,
-  `.vercel/`, `__pycache__/`, `supabase/.temp/`, and local hosted-smoke output.
-- Periodically remove local generated directories if editor navigation becomes
-  noisy; do not commit them.
+All planned structure phases are complete. Future restructuring should be
+driven by concrete ownership or maintenance problems rather than directory-tree
+symmetry.
 
 ## Guardrails
 
