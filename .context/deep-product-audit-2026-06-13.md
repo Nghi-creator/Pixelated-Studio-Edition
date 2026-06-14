@@ -20,7 +20,7 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, 28 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, 31 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
 | API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
@@ -40,6 +40,96 @@ Work these in order unless a production incident changes priority.
 - P3/P4 `/dev/uinput` behavior on a target Linux host.
 - Packaged installer smoke on each native OS.
 - TURN relay behavior where direct/STUN connectivity fails.
+
+### NEXT-13 — P1: Harden Gameplay Boot And Stream UX
+
+**Scope:** Single-player cloud/local game boot, WebRTC connection lifecycle,
+stream retry behavior, lobby share metadata, and gameplay-focused rendered
+interaction coverage.
+
+**Why this remains:** The core stream path has useful unit contracts and smoke
+tooling, but the active player screen still needs a focused pass around
+user-facing error states, repeated engine events, share-context accuracy,
+keyboard focus behavior across overlays, and cloud/local boot failure recovery.
+`DONE-31` fixed the highest-risk keyboard input leak found during this audit,
+but the full gameplay path still needs a deeper interaction pass.
+
+**Completion proof:**
+
+- Add rendered player harness coverage for stream error/retry, telemetry
+  toggling, lobby controls, and focused form fields.
+- Ensure lobby metadata uses the actual engine exposure/share context.
+- Prove single-player cloud and local-vault boot failures surface actionable
+  recovery without stale state.
+- Run local Docker/engine smoke with a real playable ROM when available.
+
+### NEXT-14 — P1: Harden Game Submission Workflow
+
+**Scope:** Developer submission form, browser storage uploads, API metadata
+creation, partial upload cleanup, validation, and user-facing retry states.
+
+**Why this remains:** The backend submission boundary is protected, but the web
+form still uses native alerts, has limited pending/error detail, and uploads
+files before metadata creation without cleaning uploaded objects if the API
+write fails. It also lacks focused frontend coverage for rejected file types,
+auth loss, storage failure, metadata failure, and duplicate submits.
+
+**Completion proof:**
+
+- Replace native alerts with visible validation, pending, success, and retry
+  states.
+- Add single-flight submission locking and explicit file-size/type guidance.
+- Clean up newly uploaded submission objects when the backend metadata write
+  fails.
+- Add Node contracts for submission mutation cleanup and rendered harness
+  coverage for the form.
+
+### NEXT-15 — P1: Harden Local Vault Workflow
+
+**Scope:** Local Vault upload/list/delete, engine pairing recovery, delete
+confirmation, per-file pending state, local pagination/search if needed, and
+multiplayer local-game selection reuse.
+
+**Why this remains:** Local Vault is functional and engine-token gated, but the
+UI still uses native `confirm`, upload/delete operations are not fully
+single-flight, failed list loads collapse into an empty-state style, and local
+game names are passed directly through route params in multiple places. Engine
+routes have server-side filename/path hardening, but frontend recovery and
+interaction coverage need the same treatment as admin/profile flows.
+
+**Completion proof:**
+
+- Replace native delete confirmation with the shared in-app confirmation
+  pattern.
+- Add per-file pending locks, retryable load state, input reset after
+  validation/upload, and clear invalid-token recovery.
+- Share local-vault listing/normalization helpers with Multiplayer local-game
+  selection.
+- Add contracts and rendered harness coverage for upload validation, delete
+  confirmation, and pairing loss.
+
+## Core Gameplay Audit Notes
+
+Added on 2026-06-14 after reviewing the active player, multiplayer setup,
+submission, and local-vault flows.
+
+- **Single-player gameplay:** Cloud/local boot and WebRTC streaming have solid
+  helper coverage and smoke tooling, but the rendered player screen still needs
+  a pass around retry/error UX, telemetry toggling, lobby controls, and real ROM
+  playability. `DONE-31` fixed the most immediate input correctness issue found
+  during this review.
+- **Multiplayer gameplay:** Lobby roles, slots, backend metadata, LAN invite
+  parsing, and smoke tooling exist. Remaining confidence depends on real
+  two-device LAN proof, Linux `/dev/uinput` P3/P4 behavior, TURN fallback, and
+  ensuring lobby metadata reflects the active engine share context.
+- **Game submission:** Backend validation and submitter ownership are strong,
+  but frontend submission still needs visible validation/errors, duplicate
+  submit protection, and cleanup of files uploaded before a failed metadata
+  write.
+- **Local Vault:** Engine routes enforce token and filename/path hardening, but
+  frontend vault upload/delete/list behavior still needs in-app confirmation,
+  per-file pending state, retryable list errors, and reusable local game
+  normalization shared with Multiplayer.
 
 ## Deployment Actions
 
@@ -555,13 +645,32 @@ the hosted web contract.
 interaction surface; broader profile/favorites rendered flows can now be added
 incrementally on the same foundation.
 
+### DONE-31 — Prevent Gameplay Input Leaking From Form Fields
+
+**Problem:** The WebRTC gameplay input bridge listened globally for keydown and
+keyup events once a participant owned a player slot. It ignored repeated keys
+but did not ignore focused text-entry controls, so typing in comments, report
+dialogs, search fields, or other focused form elements while a stream was active
+could also emit gameplay input to the local engine.
+
+**Resolution:** Added a shared input-filter guard for the WebRTC input bridge.
+Gameplay input now ignores already-prevented events, `input`, `textarea`,
+`select`, content-editable targets, and containers explicitly marked with
+`data-ignore-game-input`, while ordinary gameplay targets still forward keys to
+the engine.
+
+**Verification:** Added regression contracts for ignored text-entry/editable
+targets, explicit ignore containers, prevented events, and ordinary gameplay
+targets. Web tests now pass with 31 contracts; lint, production build, and
+`git diff --check` pass.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, production build, and rendered interaction harness | Passed — 28 Node tests plus Playwright harness |
+| Web tests, lint, production build, and rendered interaction harness | Passed — 31 Node tests plus Playwright harness |
 | API typecheck, lint, build, and tests | Passed — 52 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |
