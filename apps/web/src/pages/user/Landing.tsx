@@ -4,6 +4,7 @@ import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
 import { api } from "../../lib/apiClient";
 import { GamesCatalogSkeleton, HeroSkeleton } from "../../components/ui/Skeleton";
+import { Pagination } from "../../components/ui/Pagination";
 
 const GAMES_PER_PAGE = 15;
 const ZERO_PLAY_FEATURED_REFRESH_MS = 30_000;
@@ -115,16 +116,6 @@ export default function Landing() {
     }
   }, [currentPage, totalPages]);
 
-  const visiblePageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1)
-    .filter((page) => {
-      if (totalPages <= 5) return true;
-      return (
-        page === 1 ||
-        page === totalPages ||
-        Math.abs(page - safeCurrentPage) <= 1
-      );
-    });
-
   const changePage = (page: number) => {
     setCurrentPage(page);
     document
@@ -200,51 +191,11 @@ export default function Landing() {
                   {totalGames}
                 </p>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => changePage(Math.max(1, safeCurrentPage - 1))}
-                    disabled={safeCurrentPage === 1}
-                    className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Previous
-                  </button>
-
-                  {visiblePageNumbers.map((page, index) => {
-                    const previousPage = visiblePageNumbers[index - 1];
-                    const needsGap = previousPage && page - previousPage > 1;
-
-                    return (
-                      <span key={page} className="inline-flex items-center gap-2">
-                        {needsGap && (
-                          <span className="px-1 text-sm text-gray-600">...</span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => changePage(page)}
-                          className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-bold transition-colors ${
-                            page === safeCurrentPage
-                              ? "border-synth-primary bg-synth-primary/15 text-white"
-                              : "border-synth-border bg-synth-surface text-gray-400 hover:border-synth-primary/70 hover:text-white"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      </span>
-                    );
-                  })}
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      changePage(Math.min(totalPages, safeCurrentPage + 1))
-                    }
-                    disabled={safeCurrentPage === totalPages}
-                    className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Next
-                  </button>
-                </div>
+                <Pagination
+                  currentPage={safeCurrentPage}
+                  onPageChange={changePage}
+                  totalPages={totalPages}
+                />
               </div>
             )}
           </>

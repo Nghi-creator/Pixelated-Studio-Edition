@@ -8,6 +8,7 @@ import {
   type ApiAdminReportAction,
 } from "../../lib/apiClient";
 import { ModerationQueueSkeleton } from "../../components/ui/Skeleton";
+import { Pagination } from "../../components/ui/Pagination";
 
 const REPORTS_PER_PAGE = 25;
 
@@ -195,29 +196,12 @@ export default function Dashboard() {
           Showing {pageStart}-{pageEnd} of {totalReports}
           {filter !== "all" && " before filter"}
         </p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-            disabled={page === 1 || loading}
-            className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Previous
-          </button>
-          <span className="rounded-lg border border-synth-border bg-synth-bg px-4 py-2 text-sm font-semibold text-gray-300">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              setPage((currentPage) => Math.min(totalPages, currentPage + 1))
-            }
-            disabled={page >= totalPages || loading}
-            className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
+        <Pagination
+          currentPage={page}
+          disabled={loading}
+          onPageChange={setPage}
+          totalPages={totalPages}
+        />
       </div>
     </div>
   );
