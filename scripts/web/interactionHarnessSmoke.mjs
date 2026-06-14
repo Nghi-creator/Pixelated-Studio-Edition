@@ -110,6 +110,10 @@ async function run() {
     await page.getByRole("button", { name: "Next page" }).click();
     await page.getByText("Current page: 3").waitFor();
 
+    await page.getByText("Engine could not open the selected game file.").waitFor();
+    await page.getByRole("button", { name: "Retry Stream" }).click();
+    await page.getByText("stream-retry").waitFor();
+
     assert.deepEqual(errors, []);
   } finally {
     if (browser) await browser.close();

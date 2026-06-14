@@ -20,7 +20,7 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, 31 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, 33 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
 | API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
@@ -52,16 +52,21 @@ tooling, but the active player screen still needs a focused pass around
 user-facing error states, repeated engine events, share-context accuracy,
 keyboard focus behavior across overlays, and cloud/local boot failure recovery.
 `DONE-31` fixed the highest-risk keyboard input leak found during this audit,
-but the full gameplay path still needs a deeper interaction pass.
+and `DONE-32` hardened stream error/retry feedback plus lobby share metadata.
+The full gameplay path still needs real boot/LAN/TURN proof and broader player
+interaction coverage.
 
 **Completion proof:**
 
-- Add rendered player harness coverage for stream error/retry, telemetry
-  toggling, lobby controls, and focused form fields.
-- Ensure lobby metadata uses the actual engine exposure/share context.
-- Prove single-player cloud and local-vault boot failures surface actionable
-  recovery without stale state.
-- Run local Docker/engine smoke with a real playable ROM when available.
+- [x] Add rendered player harness coverage for stream error/retry.
+- [x] Ensure lobby metadata uses the actual engine exposure/share context.
+- [x] Ensure stream boot, offer, and answer failures surface actionable
+  recovery messages instead of silent/generic failure.
+- [ ] Add rendered player harness coverage for telemetry toggling, lobby
+  controls, and focused form fields.
+- [ ] Prove single-player cloud and local-vault boot failures surface
+  actionable recovery without stale state against real game sources.
+- [ ] Run local Docker/engine smoke with a real playable ROM when available.
 
 ### NEXT-14 — P1: Harden Game Submission Workflow
 
@@ -115,13 +120,14 @@ submission, and local-vault flows.
 
 - **Single-player gameplay:** Cloud/local boot and WebRTC streaming have solid
   helper coverage and smoke tooling, but the rendered player screen still needs
-  a pass around retry/error UX, telemetry toggling, lobby controls, and real ROM
-  playability. `DONE-31` fixed the most immediate input correctness issue found
-  during this review.
+  a pass around telemetry toggling, lobby controls, and real ROM playability.
+  `DONE-31` fixed the most immediate input correctness issue found during this
+  review, and `DONE-32` added stream error/retry regression coverage.
 - **Multiplayer gameplay:** Lobby roles, slots, backend metadata, LAN invite
   parsing, and smoke tooling exist. Remaining confidence depends on real
   two-device LAN proof, Linux `/dev/uinput` P3/P4 behavior, TURN fallback, and
-  ensuring lobby metadata reflects the active engine share context.
+  broader rendered lobby-control coverage. `DONE-32` now ensures lobby metadata
+  reflects the active engine share context.
 - **Game submission:** Backend validation and submitter ownership are strong,
   but frontend submission still needs visible validation/errors, duplicate
   submit protection, and cleanup of files uploaded before a failed metadata
@@ -664,13 +670,33 @@ targets, explicit ignore containers, prevented events, and ordinary gameplay
 targets. Web tests now pass with 31 contracts; lint, production build, and
 `git diff --check` pass.
 
+### DONE-32 — Harden Gameplay Stream Errors And Lobby Metadata
+
+**Problem:** The active WebRTC stream path could drop useful user-facing error
+detail during boot failures by only switching to generic error status. Offer
+creation and remote-answer failures were also not handled consistently, and
+host lobby metadata always published `exposureMode: "unknown"` even when engine
+health had already returned the real local/LAN share context.
+
+**Resolution:** Added testable WebRTC gameplay helpers for lobby metadata and
+stream error formatting. Host lobby publishing now uses the current engine share
+context and clamps advertised player count through the latest input capability
+snapshot. Stream boot, offer creation, and remote-answer failures now update
+telemetry with actionable retry guidance; ICE candidate failures are logged
+without throwing unhandled promise errors. The rendered interaction harness now
+also exercises the player stream error overlay and retry callback.
+
+**Verification:** Added contracts for lobby exposure/player-slot metadata and
+stream error fallback handling. Web tests now pass with 33 contracts; lint,
+production build, rendered interaction harness, and `git diff --check` pass.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, production build, and rendered interaction harness | Passed — 31 Node tests plus Playwright harness |
+| Web tests, lint, production build, and rendered interaction harness | Passed — 33 Node tests plus Playwright harness |
 | API typecheck, lint, build, and tests | Passed — 52 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |

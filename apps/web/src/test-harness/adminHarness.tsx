@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "../index.css";
 import {
@@ -6,6 +6,8 @@ import {
   type AdminConfirmation,
 } from "../components/admin/AdminConfirmDialog";
 import ReportCard, { type Report } from "../components/admin/ReportCard";
+import { StreamStage } from "../features/player/StreamStage";
+import { INITIAL_WEBRTC_TELEMETRY } from "../lib/webrtc/webrtcTelemetry";
 import { Pagination } from "../components/ui/Pagination";
 
 declare global {
@@ -59,6 +61,7 @@ export function AdminHarness() {
   const [pending, setPending] = useState(false);
   const [events, setEvents] = useState<string[]>([]);
   const [page, setPage] = useState(2);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const record = (event: string) => {
     setEvents((current) => [...current, event]);
@@ -131,6 +134,19 @@ export function AdminHarness() {
           currentPage={page}
           onPageChange={setPage}
           totalPages={4}
+        />
+      </section>
+
+      <section aria-label="Stream stage harness" className="max-w-2xl">
+        <StreamStage
+          onRetry={() => record("stream-retry")}
+          showStreamTelemetry
+          status="error"
+          telemetry={{
+            ...INITIAL_WEBRTC_TELEMETRY,
+            lastEngineError: "Engine could not open the selected game file.",
+          }}
+          videoRef={videoRef}
         />
       </section>
 
