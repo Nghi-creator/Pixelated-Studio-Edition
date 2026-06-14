@@ -27,6 +27,10 @@ violate the desktop runtime contract.
 Current status:
 
 - Phase 3 localhost skeleton exists in `services/api/`.
+- `services/api/src/routes/` remains the stable flat registration surface.
+  Catalog and moderation route composition, validation contracts, and
+  service/policy helpers live under `services/api/src/modules/catalog/` and
+  `services/api/src/modules/moderation/`.
 - Default local URL is `http://127.0.0.1:4000`.
 - Production API startup defaults to `0.0.0.0` when `NODE_ENV=production` so hosts like Render can detect the open port.
 - `GET /` returns a small liveness response for provider root probes.

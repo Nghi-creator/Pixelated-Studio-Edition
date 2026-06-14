@@ -79,13 +79,29 @@ apps/desktop/main/
   engineController.ts engine lifecycle composition
 ```
 
+### API Domain Ownership
+
+Completed `STRUCTURE-03`. The flat API route files remain stable compatibility
+entry points, while catalog and moderation implementation details now live
+under domain-owned modules:
+
+```text
+services/api/src/
+  routes/
+    catalog.ts          catalog registration export
+    moderation.ts       moderation registration export
+  modules/
+    catalog/
+      catalogRoutes.ts  route registration and request composition
+      catalogService.ts featured selection, paging, cache keys, role lookup
+      contracts.ts      request validation and response contracts
+    moderation/
+      moderationRoutes.ts  route registration and request composition
+      moderationPolicy.ts  privilege and paging rules
+      contracts.ts         request validation contracts
+```
+
 ## Keep As-Is
-
-### API Route Registry
-
-`services/api/src/routes/` is flat but still readable at 15 route modules.
-Moving each route into a folder without first separating schemas, services, and
-storage logic would add nesting without reducing complexity.
 
 ### Engine Runtime
 
@@ -101,12 +117,6 @@ break the primary ordering model and make deployment history harder to inspect.
 ## Staged Cleanup Plan
 
 Work these as focused refactors with behavior-preserving tests, not bulk moves.
-
-### STRUCTURE-03 — Decompose API Domains Before Nesting Routes
-
-Start with `routes/catalog.ts` and `routes/moderation.ts`. Extract validation,
-query/service logic, and route registration into domain-owned modules. Preserve
-the flat route registration surface in `server.ts`.
 
 ### STRUCTURE-04 — Group Root Smoke Tooling
 

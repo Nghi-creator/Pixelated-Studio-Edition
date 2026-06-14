@@ -21,7 +21,7 @@ product and infrastructure; it does not introduce new product features.
 | Area | Status | Summary |
 | --- | --- | --- |
 | Web frontend | Healthy, focused coverage added | Lint, production build, and 12 lifecycle regression contracts pass; shared infrastructure and large feature modules are grouped by ownership. |
-| API backend | Hardened, deployment action queued | Public account enumeration is closed, reactions are atomic, and API abuse controls support shared Redis counters with bounded local fallback. |
+| API backend | Hardened, deployment action queued | Public account enumeration is closed, reactions are atomic, abuse controls support shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
 | Docker image | Hardened and reduced | Pinned multi-stage build passes live ROM smoke at `1.15GB`; build tools are absent from the runtime image. |
@@ -317,6 +317,22 @@ Docker run arguments from lifecycle composition.
 build and all 45 tests pass, including focused certificate and engine-launch
 contracts. Desktop packaged release smoke and `git diff --check` pass.
 
+### DONE-19 — Establish Catalog And Moderation API Domains
+
+**Problem:** Catalog and moderation route files mixed request validation,
+privilege rules, query helpers, and route registration in the flat route
+registry.
+
+**Resolution:** Preserved the stable `routes/catalog.ts` and
+`routes/moderation.ts` registration imports as compatibility entry points.
+Moved their implementations into domain-owned modules and extracted catalog
+contracts/services plus moderation contracts/policies. Added focused pure
+contract tests for cache-key normalization, pagination, featured selection, and
+moderation privilege rules.
+
+**Verification:** API typecheck, lint, build, and all 47 tests pass.
+`git diff --check` passes.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
@@ -324,7 +340,7 @@ Run on 2026-06-14 after the completed hardening work:
 | Gate | Result |
 | --- | --- |
 | Web tests, lint, and production build | Passed — 12 tests |
-| API typecheck, lint, build, and tests | Passed — 44 tests |
+| API typecheck, lint, build, and tests | Passed — 47 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 29 tests |
