@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { api } from "./apiClient";
+import { api } from "../apiClient";
 import { createCompanionEngineToken, setEngineToken } from "./engineAuth";
 import { setEngineUrl } from "./engineConfig";
 

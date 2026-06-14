@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Lock, Gamepad2, Loader2, CheckCircle2 } from "lucide-react";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../../lib/auth/supabaseClient";
 import {
   getPasswordPolicyError,
   PASSWORD_MIN_LENGTH,
   PASSWORD_POLICY_HINT,
-} from "../../lib/passwordPolicy";
+} from "../../lib/auth/passwordPolicy";
 
 export default function ResetPassword() {
   const navigate = useNavigate();

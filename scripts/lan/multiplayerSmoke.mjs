@@ -10,13 +10,16 @@ const DEFAULT_ENGINE_URL = "http://127.0.0.1:8080";
 const DEFAULT_OUT_DIR = ".context/smoke-artifacts";
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_POLL_MS = 2_000;
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const REPO_ROOT = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
 
 let activeRun = null;
 
 function printUsage() {
   console.log(`Usage:
-  node scripts/multiplayerSmoke.mjs [options]
+  node scripts/lan/multiplayerSmoke.mjs [options]
 
 Options:
   --engine-url <url>        Engine or HTTPS companion origin. Default: ${DEFAULT_ENGINE_URL}

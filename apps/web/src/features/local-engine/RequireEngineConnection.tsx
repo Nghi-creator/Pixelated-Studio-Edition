@@ -3,7 +3,7 @@ import { Navigate, Outlet, useLocation } from "react-router-dom";
 import {
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
-} from "../../lib/engineAuth";
+} from "../../lib/engine/engineAuth";
 
 export function RequireEngineConnection() {
   const location = useLocation();

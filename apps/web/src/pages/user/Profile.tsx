@@ -6,68 +6,21 @@ import {
   Lock,
   Save,
   Camera,
-  X,
   AlertOctagon,
 } from "lucide-react";
-import Cropper from "react-easy-crop";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../../lib/auth/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
 import { ProfileSkeleton } from "../../components/ui/Skeleton";
-
-// ==========================================
-// UTILITY: Crop the image
-// ==========================================
-
-interface Area {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
-const getCroppedImg = async (
-  imageSrc: string,
-  pixelCrop: Area,
-): Promise<File> => {
-  const image = new Image();
-  image.src = imageSrc;
-  await new Promise((resolve) => (image.onload = resolve));
-
-  const canvas = document.createElement("canvas");
-  const ctx = canvas.getContext("2d");
-  if (!ctx) throw new Error("No 2d context");
-
-  canvas.width = pixelCrop.width;
-  canvas.height = pixelCrop.height;
-
-  ctx.drawImage(
-    image,
-    pixelCrop.x,
-    pixelCrop.y,
-    pixelCrop.width,
-    pixelCrop.height,
-    0,
-    0,
-    pixelCrop.width,
-    pixelCrop.height,
-  );
-
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) {
-        reject(new Error("Canvas is empty"));
-        return;
-      }
-      resolve(new File([blob], "avatar.jpg", { type: "image/jpeg" }));
-    }, "image/jpeg");
-  });
-};
-
-// ==========================================
-// MAIN COMPONENT
-// ==========================================
+import {
+  createCroppedAvatar,
+  type CropArea,
+} from "../../features/profile/avatarCrop";
+import {
+  AvatarCropModal,
+  DeleteAccountModal,
+} from "../../features/profile/ProfileModals";
 export default function Profile() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -99,7 +52,8 @@ export default function Profile() {
   const [imageSrc, setImageSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [croppedAreaPixels, setCroppedAreaPixels] =
+    useState<CropArea | null>(null);
 
   // Password Form State
   const [currentPassword, setCurrentPassword] = useState("");
@@ -155,7 +109,7 @@ export default function Profile() {
   };
 
   const onCropComplete = useCallback(
-    (_croppedArea: Area, croppedAreaPixels: Area) => {
+    (_croppedArea: CropArea, croppedAreaPixels: CropArea) => {
       setCroppedAreaPixels(croppedAreaPixels);
     },
     [],
@@ -164,7 +118,7 @@ export default function Profile() {
   const handleCropConfirm = async () => {
     try {
       if (!imageSrc || !croppedAreaPixels) return;
-      const croppedFile = await getCroppedImg(imageSrc, croppedAreaPixels);
+      const croppedFile = await createCroppedAvatar(imageSrc, croppedAreaPixels);
 
       setAvatarFile(croppedFile);
       setPreviewUrl(URL.createObjectURL(croppedFile));
@@ -315,139 +269,33 @@ export default function Profile() {
 
   return (
     <div className="flex flex-col min-h-screen">
-      {/* CROPPER MODAL */}
       {showCropper && imageSrc && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4">
-          <div className="bg-synth-surface border border-synth-border rounded-2xl w-full max-w-lg overflow-hidden shadow-glow-card flex flex-col">
-            <div className="p-4 border-b border-synth-border flex justify-between items-center">
-              <h3 className="text-white font-bold">Crop your image</h3>
-              <button
-                onClick={() => setShowCropper(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="relative w-full h-80 bg-black">
-              <Cropper
-                image={imageSrc}
-                crop={crop}
-                zoom={zoom}
-                aspect={1}
-                cropShape="round"
-                showGrid={false}
-                onCropChange={setCrop}
-                onCropComplete={onCropComplete}
-                onZoomChange={setZoom}
-              />
-            </div>
-
-            <div className="p-6 bg-synth-surface">
-              <label className="text-sm text-gray-400 mb-2 block">Zoom</label>
-              <input
-                type="range"
-                value={zoom}
-                min={1}
-                max={3}
-                step={0.1}
-                aria-labelledby="Zoom"
-                onChange={(e) => setZoom(Number(e.target.value))}
-                className="w-full h-2 bg-synth-elevated rounded-lg appearance-none cursor-pointer accent-synth-primary mb-6"
-              />
-              <div className="flex justify-end gap-3">
-                <button
-                  onClick={() => setShowCropper(false)}
-                  className="px-5 py-2.5 rounded-lg text-gray-300 hover:bg-synth-elevated transition-colors font-medium"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleCropConfirm}
-                  className="px-5 py-2.5 bg-synth-primary hover:bg-synth-primary-hover text-synth-ink rounded-lg transition-colors font-bold shadow-glow-primary-sm"
-                >
-                  Confirm Crop
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <AvatarCropModal
+          crop={crop}
+          imageSrc={imageSrc}
+          onCancel={() => setShowCropper(false)}
+          onConfirm={() => void handleCropConfirm()}
+          onCropChange={setCrop}
+          onCropComplete={onCropComplete}
+          onZoomChange={setZoom}
+          zoom={zoom}
+        />
       )}
 
-      {/* --- NEW: DELETE CONFIRMATION MODAL --- */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-synth-surface border border-red-500/30 rounded-2xl w-full max-w-md overflow-hidden shadow-glow-card flex flex-col">
-            <div className="p-6 border-b border-synth-border flex justify-between items-center bg-red-500/10">
-              <h3 className="text-red-400 font-bold flex items-center gap-2">
-                <AlertOctagon className="w-5 h-5" /> Delete Account
-              </h3>
-              <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setDeleteError(null);
-                  setDeleteInput("");
-                }}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="p-6">
-              <p className="text-gray-300 text-sm mb-6 leading-relaxed">
-                This action is{" "}
-                <span className="text-red-400 font-bold">
-                  permanent and irreversible
-                </span>
-                . All your comments, likes, and profile data will be immediately
-                wiped from our servers.
-              </p>
-
-              {deleteError && (
-                <div className="bg-red-500/10 border border-red-500/50 text-red-400 text-sm px-4 py-3 rounded-lg mb-4">
-                  {deleteError}
-                </div>
-              )}
-
-              <form onSubmit={handleDeleteAccount} className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">
-                    {hasPassword
-                      ? "Enter Password to confirm"
-                      : "Type 'DELETE' to confirm"}
-                  </label>
-                  <input
-                    type={hasPassword ? "password" : "text"}
-                    value={deleteInput}
-                    onChange={(e) => setDeleteInput(e.target.value)}
-                    placeholder={hasPassword ? "Your password" : "DELETE"}
-                    required
-                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
-                  />
-                </div>
-
-                <div className="flex justify-end gap-3 mt-6">
-                  <button
-                    type="button"
-                    onClick={() => setShowDeleteModal(false)}
-                    className="px-5 py-2.5 rounded-lg text-gray-400 hover:text-white hover:bg-synth-elevated transition-colors font-medium"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={isDeleting || !deleteInput}
-                    className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg transition-colors font-bold flex items-center gap-2"
-                  >
-                    {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}
-                    Delete Forever
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
+        <DeleteAccountModal
+          deleteError={deleteError}
+          deleteInput={deleteInput}
+          hasPassword={Boolean(hasPassword)}
+          isDeleting={isDeleting}
+          onCancel={() => {
+            setShowDeleteModal(false);
+            setDeleteError(null);
+            setDeleteInput("");
+          }}
+          onDeleteInputChange={setDeleteInput}
+          onSubmit={handleDeleteAccount}
+        />
       )}
 
       {/* MAIN PROFILE PAGE */}

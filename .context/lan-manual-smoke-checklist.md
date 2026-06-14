@@ -112,7 +112,7 @@ Engine smoke artifact path:
 Run this from the repo after the host stream is already active and before the guest joins:
 
 ```sh
-node scripts/multiplayerSmoke.mjs --engine-url https://<host-lan-ip>:8090 --allow-self-signed --invite-code <desktop-invite-code> --expected-guests 1 --label real-two-device-lan
+node scripts/lan/multiplayerSmoke.mjs --engine-url https://<host-lan-ip>:8090 --allow-self-signed --invite-code <desktop-invite-code> --expected-guests 1 --label real-two-device-lan
 ```
 
 The harness prints the artifact directory as soon as it starts. It verifies
@@ -129,7 +129,7 @@ prints `[FAIL]` plus the artifact report path.
 Summarize the completed bundle into one review verdict:
 
 ```sh
-node scripts/summarizeSmokeArtifacts.mjs .context/smoke-artifacts/<run-id>
+node scripts/lan/summarizeSmokeArtifacts.mjs .context/smoke-artifacts/<run-id>
 ```
 
 This writes `smoke-verdict.md` into the bundle, prints the same markdown, and
@@ -141,7 +141,7 @@ If completed notes are already saved elsewhere before a run, start the harness
 with:
 
 ```sh
-node scripts/multiplayerSmoke.mjs --engine-url https://<host-lan-ip>:8090 --allow-self-signed --invite-code <desktop-invite-code> --expected-guests 1 --label real-two-device-lan --notes /path/to/completed-notes.md
+node scripts/lan/multiplayerSmoke.mjs --engine-url https://<host-lan-ip>:8090 --allow-self-signed --invite-code <desktop-invite-code> --expected-guests 1 --label real-two-device-lan --notes /path/to/completed-notes.md
 ```
 
 ## Failure Notes

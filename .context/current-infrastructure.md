@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-06-07
+Last reviewed: 2026-06-14
 
 ## Project Shape
 
@@ -14,6 +14,9 @@ Top-level areas:
 - `services/api/`: localhost-first Fastify + TypeScript backend control-plane skeleton.
 - `supabase/`: database, storage, RLS, RPC, and realtime migrations.
 - `assets/`: README/banner architecture imagery.
+- `scripts/hosted/`: hosted auth and signed-in pairing browser smoke checks.
+- `scripts/lan/`: LAN multiplayer smoke, artifact summarization, and their
+  colocated tests.
 
 Release packaging note: desktop artifacts are produced from `apps/desktop` with
 `npm run dist`. That script builds `apps/web/dist` first, and electron-builder
@@ -27,11 +30,18 @@ violate the desktop runtime contract.
 Current status:
 
 - Phase 3 localhost skeleton exists in `services/api/`.
+- `services/api/src/routes/` remains the stable flat registration surface.
+  Catalog and moderation route composition, validation contracts, and
+  service/policy helpers live under `services/api/src/modules/catalog/` and
+  `services/api/src/modules/moderation/`.
 - Default local URL is `http://127.0.0.1:4000`.
 - Production API startup defaults to `0.0.0.0` when `NODE_ENV=production` so hosts like Render can detect the open port.
 - `GET /` returns a small liveness response for provider root probes.
-- `GET /health` returns service name, environment, uptime, and `ok: true`.
-- `GET /ready` returns `503` until the required Supabase backend env vars are configured.
+- `GET /health` returns service name, environment, uptime, active rate-limit
+  store mode, and `ok: true`.
+- `GET /ready` returns `503` until the required Supabase backend env vars are
+  configured. Production readiness also requires the shared Redis REST
+  rate-limit store.
 - `GET /me` verifies a Supabase bearer token and returns the authenticated user id/email.
 - `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
 - `GET /games` and `GET /games/:gameId` read approved game catalog metadata through the API.
@@ -70,6 +80,12 @@ Current status:
 - Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
 - `services/api/.env` exists locally and is ignored; production keys live on the backend host.
 - API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
+- Session verification, comments, reactions, play counts, and reports use
+  atomic shared fixed-window counters when `RATE_LIMIT_REDIS_REST_URL` and
+  `RATE_LIMIT_REDIS_REST_TOKEN` are configured. Redis calls have a bounded
+  timeout and fall back to the bounded per-instance limiter during outages.
+- Submission and stream-metric throttles coordinate through existing Supabase
+  rows rather than Redis.
 - `services/api/tests/` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
 - API tests also cover the backend-owned data boundary for catalog/favorites, comment ownership/reactions, profile update/account deletion, admin user authorization, and admin access-log authorization.
 - `npm run smoke:staging` verifies the hosted catalog cache contract, the uncached featured route, signed-in identity/permissions, access-log write/upsert schema, admin access-log summary RPC schema when authorized, local pairing restore, multiplayer lobby create/update/recent/delete, cloud session verification, and stream metric persistence.
@@ -99,8 +115,15 @@ Runtime stack:
 - Vite + React + TypeScript.
 - `@supabase/supabase-js` for auth/session management and direct Storage uploads.
 - `apps/web/src/lib/apiClient.ts` for app data reads/writes through `services/api`.
+- `apps/web/src/lib/auth/` owns browser auth infrastructure,
+  `apps/web/src/lib/engine/` owns reusable engine connection state/hooks, and
+  `apps/web/src/lib/webrtc/` owns shared peer/session/input/telemetry behavior.
+- `apps/web/src/features/` owns feature-specific UI and hooks; `.tsx` modules
+  contain JSX while `.ts` modules contain non-JSX logic in the same feature
+  boundary.
 - `socket.io-client` connects directly to the local engine at `http://localhost:8080`.
-- The web app centralizes the engine base URL in `apps/web/src/lib/engineConfig.ts`; override with `VITE_ENGINE_URL`.
+- The web app centralizes the engine base URL in
+  `apps/web/src/lib/engine/engineConfig.ts`; override with `VITE_ENGINE_URL`.
 - Routes are declared in `apps/web/src/App.tsx`.
 - The Vercel project uses `apps/web` as its Root Directory, and
   `apps/web/vercel.json` rewrites direct route requests to `/index.html` so
@@ -123,7 +146,9 @@ Admin routes:
 
 Current important frontend behaviors:
 
-- `useWebRTC` owns React stream/status lifecycle while helper modules resolve game boot targets, create WebRTC peer connections, and forward keyboard input.
+- `lib/webrtc/useWebRTC.ts` owns React stream/status lifecycle while helper
+  modules resolve game boot targets, create WebRTC peer connections, and
+  forward keyboard input.
 - For cloud/library games, `useWebRTC` asks the backend API to create a session before emitting `start-game` with `mode: "cloud"` and the backend `sessionToken` to the local engine.
 - The prompt-only engine token flow has been replaced by a dedicated `/engine` connection page linked from the navbar.
 - `/play/:id`, `/local`, and `/multiplayer` require a saved engine token. Unpaired visits redirect to `/engine` and return to the requested route after successful pairing.
@@ -155,8 +180,15 @@ Runtime stack:
 - Preload bridge source in `apps/desktop/preload.ts`, compiled to `apps/desktop/dist/preload.js`.
 - Desktop renderer source in `apps/desktop/renderer.ts` and `apps/desktop/renderer/*.ts`, compiled to `apps/desktop/dist/renderer.js` and `apps/desktop/dist/renderer/*.js`. `apps/desktop/index.html` loads the compiled renderer scripts.
 - Desktop main-process helpers under `apps/desktop/main/` are now TypeScript for Docker orchestration, exposure mode, health polling, config, lifecycle state, and the LAN HTTPS companion server.
+- `apps/desktop/main/companionServer.ts` composes the HTTPS companion while
+  `apps/desktop/main/companion/` owns certificate, invite-state, status-page,
+  and authenticated proxy behavior.
+- `apps/desktop/main/engineController.ts` owns engine lifecycle composition
+  while `apps/desktop/main/engine/launch.ts` owns launch context, LAN invites,
+  and Docker run arguments.
 - Desktop packaging helper source is `apps/desktop/scripts/prepareWebDist.ts`, compiled to `apps/desktop/dist/scripts/prepareWebDist.js`.
-- Uses local Docker CLI through `child_process.exec`.
+- Uses the local Docker CLI through argument-array `spawn` and `execFile`
+  calls.
 - Packaged releases are built with `cd apps/desktop && npm run dist`; this script runs the React production build first and electron-builder bundles `apps/web/dist` as `resources/web-dist`.
 - `npm run dist` now ends with `npm run smoke:release`, which inspects electron-builder's unpacked packaged `app.asar` plus external resources rather than trusting source or compile output alone.
 - The packaged release smoke requires the packaged main entry, desktop HTML, preload, and every HTML-loaded renderer script; verifies the main process points at the packaged preload/HTML; rejects CommonJS/`require` output in renderer browser scripts; rejects preload imports other than Electron; checks the expected preload IPC API; verifies bundled `resources/web-dist` exactly matches the fresh `apps/web/dist` tree and that its production index references valid assets; and checks the bundled engine runtime Dockerfile.
@@ -222,6 +254,8 @@ Runtime processes:
 
 - `server.ts`: Express + Socket.IO composition root, compiled to `dist/server.js` for runtime start.
 - `engine/runtime/src/`: local engine modules for config, health/local vault HTTP routes, Socket.IO signaling, ROM download/storage, runtime process control, input injection, and health telemetry. Config, HTTP routes, signaling/session contracts, runtime process control, ROM/session helpers, input helpers, and health/resource telemetry helpers are now TypeScript.
+- Engine runtime source is TypeScript-only. `npm run check` rejects `.js` files
+  under `engine/runtime/src/` before building and validating compiled syntax.
 - `Xvfb :99`: virtual screen.
 - PulseAudio system daemon.
 - RetroArch process per game.
@@ -258,11 +292,14 @@ Streaming/signaling:
   the token-protected in-memory capture and writes both snapshots directly into
   its active artifact bundle; outside a smoke run, the action keeps its
   clipboard behavior.
-- `scripts/multiplayerSmoke.mjs` can automate the HTTPS companion flow with
+- `scripts/lan/multiplayerSmoke.mjs` can automate the HTTPS companion flow with
   `--invite-code`: it validates preflight state, redeems a short-lived companion
   credential, joins the lobby as a spectator through the companion Socket.IO
   proxy, drives a camera peer-count transition, and verifies disconnect
   cleanup. Browser certificate trust remains the manual boundary.
+- Root commands expose `npm run smoke:lan`, `npm run smoke:lan-summary`, and
+  `npm run test:smoke`; hosted workflows retain `npm run smoke:hosted-auth` and
+  `npm run smoke:hosted-pairing`.
 - Engine-side download failures and camera/GStreamer failures emit `engine-error` to the browser session.
 
 Input:

@@ -1,5 +1,31 @@
-import { supabase } from "./supabaseClient";
+import { supabase } from "./auth/supabaseClient";
 import type { Session } from "@supabase/supabase-js";
+import {
+  createRequestAbortController,
+  withTimeout,
+} from "./requestLifecycle";
+import { clearAuthScopedCache } from "./auth/authCache";
+import type {
+  ApiAdminReportAction,
+  ApiAdminReportActionResponse,
+  ApiFeaturedGamesResponse,
+  ApiGame,
+  ApiGameSubmissionPayload,
+  ApiIceServersResponse,
+  ApiLocalPairingResponse,
+  ApiMeResponse,
+  ApiMultiplayerLobbyPayload,
+  ApiPaginatedAccessLogsResponse,
+  ApiPaginatedGamesResponse,
+  ApiPaginatedReportsResponse,
+  ApiPaginatedUsersResponse,
+  ApiPermissionsResponse,
+  ApiProfile,
+  ApiSessionResponse,
+  ApiStreamMetricPayload,
+} from "./apiTypes";
+
+export type * from "./apiTypes";
 
 const LOCAL_API_URL = "http://127.0.0.1:4000";
 const PRODUCTION_API_URL = "https://pixelated-api-services.onrender.com";
@@ -39,40 +65,40 @@ export class ApiError extends Error {
   }
 }
 
-let sessionPromise: Promise<Session | null> | null = null;
-let permissionsCache:
-  | {
+const authScopedCache = {
+  session: null as Promise<Session | null> | null,
+  permissions: null as
+    | {
       expiresAt: number;
       promise: Promise<ApiPermissionsResponse>;
       value?: ApiPermissionsResponse;
     }
-  | null = null;
-let favoritesCache:
-  | {
+    | null,
+  favorites: null as
+    | {
       expiresAt: number;
       promise: Promise<Set<string>>;
       value?: Set<string>;
     }
-  | null = null;
+    | null,
+};
 
 supabase.auth.onAuthStateChange(() => {
-  sessionPromise = null;
-  permissionsCache = null;
-  favoritesCache = null;
+  clearAuthScopedCache(authScopedCache);
 });
 
 export async function getAuthSession() {
-  if (!sessionPromise) {
-    sessionPromise = supabase.auth
+  if (!authScopedCache.session) {
+    authScopedCache.session = supabase.auth
       .getSession()
       .then(({ data: { session } }) => session ?? null)
       .catch((error) => {
-        sessionPromise = null;
+        authScopedCache.session = null;
         throw error;
       });
   }
 
-  return sessionPromise;
+  return authScopedCache.session;
 }
 
 function isCacheFresh(cache: { expiresAt: number } | null) {
@@ -80,31 +106,11 @@ function isCacheFresh(cache: { expiresAt: number } | null) {
 }
 
 function clearFavoritesCache() {
-  favoritesCache = null;
+  authScopedCache.favorites = null;
 }
 
 function clearPermissionsCache() {
-  permissionsCache = null;
-}
-
-async function withTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  message: string,
-) {
-  let timeout: number | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<T>((_, reject) => {
-        timeout = window.setTimeout(() => {
-          reject(new ApiError(0, { error: message }));
-        }, timeoutMs);
-      }),
-    ]);
-  } finally {
-    if (timeout !== undefined) window.clearTimeout(timeout);
-  }
+  authScopedCache.permissions = null;
 }
 
 export async function apiRequest<T>(
@@ -127,7 +133,11 @@ export async function apiRequest<T>(
     const session = await withTimeout(
       getAuthSession(),
       timeoutMs,
-      "Authentication did not respond in time. Refresh the page and try again.",
+      () =>
+        new ApiError(0, {
+          error:
+            "Authentication did not respond in time. Refresh the page and try again.",
+        }),
     );
 
     if (session?.access_token) {
@@ -135,19 +145,10 @@ export async function apiRequest<T>(
     }
   }
 
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => {
-    controller.abort();
-  }, timeoutMs);
-  const requestSignal = options.signal;
-
-  if (requestSignal?.aborted) {
-    controller.abort();
-  } else {
-    requestSignal?.addEventListener("abort", () => controller.abort(), {
-      once: true,
-    });
-  }
+  const { controller, cleanup } = createRequestAbortController(
+    timeoutMs,
+    options.signal,
+  );
 
   let response: Response;
   try {
@@ -166,7 +167,7 @@ export async function apiRequest<T>(
 
     throw error;
   } finally {
-    window.clearTimeout(timeout);
+    cleanup();
   }
 
   const payload = await response.json().catch(() => null);
@@ -179,18 +180,18 @@ export async function apiRequest<T>(
 }
 
 async function getCachedPermissions(): Promise<ApiPermissionsResponse> {
-  if (isCacheFresh(permissionsCache) && permissionsCache) {
-    if (permissionsCache.value) return permissionsCache.value;
-    return permissionsCache.promise;
+  if (isCacheFresh(authScopedCache.permissions) && authScopedCache.permissions) {
+    if (authScopedCache.permissions.value) return authScopedCache.permissions.value;
+    return authScopedCache.permissions.promise;
   }
 
   const promise = apiRequest<ApiPermissionsResponse>("/me/permissions").then(
     (value) => {
-      if (permissionsCache) permissionsCache.value = value;
+      if (authScopedCache.permissions) authScopedCache.permissions.value = value;
       return value;
     },
   );
-  permissionsCache = {
+  authScopedCache.permissions = {
     expiresAt: Date.now() + CLIENT_CACHE_TTL_MS,
     promise,
   };
@@ -203,9 +204,9 @@ type FavoriteLike = {
 };
 
 async function getFavoriteIds(): Promise<Set<string>> {
-  if (isCacheFresh(favoritesCache) && favoritesCache) {
-    if (favoritesCache.value) return favoritesCache.value;
-    return favoritesCache.promise;
+  if (isCacheFresh(authScopedCache.favorites) && authScopedCache.favorites) {
+    if (authScopedCache.favorites.value) return authScopedCache.favorites.value;
+    return authScopedCache.favorites.promise;
   }
 
   const promise = apiRequest<{ favorites: FavoriteLike[] }>("/favorites").then(
@@ -215,197 +216,19 @@ async function getFavoriteIds(): Promise<Set<string>> {
           .map((favorite) => favorite.id || favorite.game_id)
           .filter((id): id is string => Boolean(id)),
       );
-      if (favoritesCache) favoritesCache.value = favoriteIds;
+      if (authScopedCache.favorites) authScopedCache.favorites.value = favoriteIds;
       return favoriteIds;
     },
   );
 
-  favoritesCache = {
+  authScopedCache.favorites = {
     expiresAt: Date.now() + CLIENT_CACHE_TTL_MS,
     promise,
   };
   return promise;
 }
 
-export type ApiMeResponse = {
-  user: {
-    email: string | null;
-    id: string;
-  };
-};
-
-export type ApiPermissionsResponse = {
-  abilities: {
-    canAccessAdmin: boolean;
-    canManageReports: boolean;
-    canManageUsers: boolean;
-    canPublishGames: boolean;
-    isBanned: boolean;
-  };
-  profile: {
-    avatar_url: string | null;
-    email: string | null;
-    is_banned: boolean;
-    is_developer: boolean;
-    role: string;
-    username: string | null;
-  };
-  user: {
-    email: string | null;
-    id: string;
-  };
-};
-
-export type ApiSessionResponse = {
-  boot: {
-    romFilename: string | null;
-    romUrl: string | null;
-  };
-  engineUrl: string;
-  expiresAt: string;
-  sessionId: string;
-  sessionToken: string;
-  user: {
-    id: string;
-  };
-};
-
-export type ApiLocalPairingResponse = {
-  pairing: {
-    createdAt: string;
-    engineUrl: string;
-    pairingId: string;
-    tokenStoredBy: "browser-local-storage";
-    updatedAt: string;
-  };
-  status?: "paired";
-};
-
-export type ApiStreamMetricPayload = {
-  bitrateKbps: number | null;
-  connectionState: RTCPeerConnectionState;
-  fps: number | null;
-  iceConnectionState: RTCIceConnectionState;
-  jitterMs: number | null;
-  packetsLost: number;
-  sessionId: string;
-  timestamp: string;
-};
-
-export type ApiIceServer = {
-  credential?: string;
-  urls: string | string[];
-  username?: string;
-};
-
-export type ApiIceServersResponse = {
-  expiresAt: string | null;
-  iceServers: ApiIceServer[];
-  ttlSeconds: number;
-};
-
-export type ApiMultiplayerLobbyPayload = {
-  engineUrl: string | null;
-  exposureMode: "lan" | "local" | "unknown";
-  gameId: string;
-  maxPlayers: number;
-  participants: {
-    displayName: string;
-    playerIndex: number | null;
-    role: "host" | "player" | "spectator";
-  }[];
-};
-
-export type ApiAdminReportAction = "ban_user" | "delete_comment" | "ignore";
-
-export type ApiAdminReportActionResponse = {
-  action: ApiAdminReportAction;
-  commentId: string;
-  reportId: string;
-  success: true;
-  targetUserId?: string;
-};
-
-export type ApiAccountMethodsResponse = {
-  exists: boolean;
-  hasEmailProvider: boolean;
-  providers: string[];
-};
-
-export type ApiPaginatedAccessLogsResponse<TLog> = {
-  logs: TLog[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-};
-
-export type ApiPaginatedGamesResponse = {
-  featuredGames: ApiGame[];
-  games: ApiGame[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-};
-
-export type ApiFeaturedGamesResponse = {
-  featuredGames: ApiGame[];
-};
-
-export type ApiPaginatedUsersResponse<TUser> = {
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-  users: TUser[];
-};
-
-export type ApiPaginatedReportsResponse<TReport> = {
-  page: number;
-  pageSize: number;
-  reports: TReport[];
-  total: number;
-  totalPages: number;
-};
-
-export type ApiGameSubmissionPayload = {
-  authorName: string;
-  bannerUrl: string | null;
-  coverUrl: string | null;
-  description: string | null;
-  email: string;
-  gameTitle: string;
-  romUrl: string;
-};
-
-export type ApiGame = {
-  author_name?: string | null;
-  backdrop_url?: string | null;
-  cover_url: string;
-  id: string;
-  play_count?: number | null;
-  rom_filename?: string | null;
-  rom_url?: string | null;
-  title: string;
-};
-
-export type ApiProfile = {
-  avatar_url: string | null;
-  created_at?: string;
-  id?: string;
-  is_banned?: boolean;
-  role: string;
-  username: string | null;
-};
-
 export const api = {
-  accountMethods: (email: string) =>
-    apiRequest<ApiAccountMethodsResponse>("/auth/account-methods", {
-      authenticated: false,
-      body: JSON.stringify({ email }),
-      method: "POST",
-    }),
   accessLogs: <TLog>(page = 1, pageSize = 25) =>
     apiRequest<ApiPaginatedAccessLogsResponse<TLog>>(
       `/admin/access-logs?page=${page}&pageSize=${pageSize}`,

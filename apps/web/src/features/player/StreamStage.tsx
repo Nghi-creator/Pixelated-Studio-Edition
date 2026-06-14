@@ -1,7 +1,7 @@
 import { AlertTriangle, LoaderCircle, RotateCcw } from "lucide-react";
 import type { RefObject } from "react";
-import type { WebRTCStatus } from "../../lib/webrtcSession";
-import type { WebRTCTelemetry } from "../../lib/webrtcTelemetry";
+import type { WebRTCStatus } from "../../lib/webrtc/webrtcSession";
+import type { WebRTCTelemetry } from "../../lib/webrtc/webrtcTelemetry";
 
 type StreamStageProps = {
   onRetry?: () => void;

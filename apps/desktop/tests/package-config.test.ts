@@ -115,6 +115,8 @@ describe("desktop package config", () => {
     assert.match(preload, /ipcRenderer\.invoke|electron_1\.ipcRenderer\.invoke/);
     assert.doesNotMatch(renderer, /\bexports\b/);
     assert.doesNotMatch(rendererHelper, /\bexports\b/);
+    assert.doesNotMatch(rendererHelper, /\.innerHTML\s*[+]?=/);
+    assert.match(rendererHelper, /createTextNode/);
   });
 
   it("runs the packaged release smoke as part of npm run dist", () => {
@@ -127,15 +129,31 @@ describe("desktop package config", () => {
   it("allows hosted, local development, and companion web origins for the engine", () => {
     const configPath = path.resolve(__dirname, "../main/config.js");
     const controllerPath = path.resolve(__dirname, "../main/engineController.js");
+    const dockerCommandsPath = path.resolve(__dirname, "../main/dockerCommands.js");
+    const engineLaunchPath = path.resolve(__dirname, "../main/engine/launch.js");
     const config = fs.readFileSync(configPath, "utf8");
     const controller = fs.readFileSync(controllerPath, "utf8");
+    const dockerCommands = fs.readFileSync(dockerCommandsPath, "utf8");
+    const engineLaunch = fs.readFileSync(engineLaunchPath, "utf8");
 
     assert.match(config, /https:\/\/pixelated-studio-edition\.vercel\.app/);
     assert.match(config, /PIXELATED_WEB_URL/);
     assert.match(config, /http:\/\/localhost:5173/);
     assert.match(config, /http:\/\/127\.0\.0\.1:5173/);
-    assert.match(controller, /engineAllowedOrigins|engine_allowed_origins/);
+    assert.match(engineLaunch, /engineAllowedOrigins|engine_allowed_origins/);
     assert.match(controller, /companionUrls|companion_urls/);
-    assert.match(controller, /PIXELATED_COMPANION_URLS/);
+    assert.match(dockerCommands, /PIXELATED_COMPANION_URLS/);
+    assert.match(dockerCommands, /PIXELATED_ALLOWED_ORIGINS/);
+  });
+
+  it("runs Docker through argument arrays instead of shell command strings", () => {
+    const dockerPath = path.resolve(__dirname, "../main/docker.js");
+    const controllerPath = path.resolve(__dirname, "../main/engineController.js");
+    const docker = fs.readFileSync(dockerPath, "utf8");
+    const controller = fs.readFileSync(controllerPath, "utf8");
+
+    assert.doesNotMatch(docker, /\bexec\(/);
+    assert.doesNotMatch(controller, /\bexec\(/);
+    assert.match(docker, /execFile|spawn/);
   });
 });

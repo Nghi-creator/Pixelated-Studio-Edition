@@ -1,42 +1,59 @@
-const assert = require("node:assert/strict");
-const { EventEmitter } = require("node:events");
-const test = require("node:test");
-const {
+import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
+import test from "node:test";
+import {
   normalizeStreamProfile,
   registerStartGameHandler,
-} = require("./startGameHandlers");
+  type StreamProfile,
+} from "./startGameHandlers";
+
+type RuntimeBootOptions = {
+  isCloudRom?: boolean;
+  streamProfile: StreamProfile;
+};
+
+type HarnessOverrides = {
+  downloadCloudRom?: (romUrl: string, destinationPath: string) => Promise<void>;
+  verifyBackendSession?: (options: {
+    apiUrl: string;
+    sessionId: string;
+    sessionToken: string;
+  }) => Promise<{
+    mode: string;
+    romTarget: string;
+    userId?: string | null;
+  }>;
+};
 
 class FakeSocket extends EventEmitter {
-  constructor() {
-    super();
-    this.data = {};
-    this.outbound = [];
-    this.rooms = [];
-  }
+  data: Record<string, unknown> = {};
+  outbound: Array<{ event: string; payload: unknown }> = [];
+  rooms: string[] = [];
 
-  emit(event, ...args) {
+  emit(event: string, ...args: unknown[]) {
     if (event === "engine-error") {
       this.outbound.push({ event, payload: args[0] });
       return true;
     }
-
     return super.emit(event, ...args);
   }
 
-  join(room) {
+  join(room: string) {
     this.rooms.push(room);
   }
 }
 
-function createHarness(overrides = {}) {
+function createHarness(overrides: HarnessOverrides = {}) {
   const socket = new FakeSocket();
-  const booted = [];
-  const downloads = [];
-  const calls = {
-    verify: 0,
-  };
+  const booted: Array<{
+    options: RuntimeBootOptions;
+    romPath: string;
+    sessionId: string;
+  }> = [];
+  const downloads: Array<{ destinationPath: string; romUrl: string }> = [];
+  const calls = { verify: 0 };
 
-  registerStartGameHandler(socket, {
+  registerStartGameHandler(socket as never, {
     apiUrl: "http://api.test",
     downloadCloudRom:
       overrides.downloadCloudRom ||
@@ -66,7 +83,11 @@ function createHarness(overrides = {}) {
 }
 
 function flushStartGame() {
-  return new Promise((resolve) => setImmediate(resolve));
+  return new Promise<void>((resolve) => setImmediate(resolve));
+}
+
+function getErrorMessage(socket: FakeSocket) {
+  return (socket.outbound[0]?.payload as { message?: string })?.message;
 }
 
 test("cloud session intent requires a backend session token", async () => {
@@ -82,7 +103,7 @@ test("cloud session intent requires a backend session token", async () => {
   assert.equal(calls.verify, 0);
   assert.deepEqual(booted, []);
   assert.equal(
-    socket.outbound[0].payload.message,
+    getErrorMessage(socket),
     "Cloud games require a backend session token.",
   );
 });
@@ -99,9 +120,9 @@ test("verified cloud sessions replace browser supplied boot targets", async () =
   await flushStartGame();
 
   assert.equal(calls.verify, 1);
-  assert.equal(downloads[0].romUrl, "https://cdn.example.test/game.nes");
-  assert.equal(booted[0].sessionId, "session-2");
-  assert.deepEqual(booted[0].options, {
+  assert.equal(downloads[0]?.romUrl, "https://cdn.example.test/game.nes");
+  assert.equal(booted[0]?.sessionId, "session-2");
+  assert.deepEqual(booted[0]?.options, {
     isCloudRom: true,
     streamProfile: { bitrateKbps: 1000, fps: 60, id: "balanced" },
   });
@@ -127,7 +148,7 @@ test("non-cloud backend sessions cannot boot through cloud intent", async () => 
 
   assert.deepEqual(booted, []);
   assert.equal(
-    socket.outbound[0].payload.message,
+    getErrorMessage(socket),
     "Backend session is not approved for cloud boot.",
   );
 });
@@ -144,9 +165,9 @@ test("local vault starts still use local rom paths without backend verification"
   await flushStartGame();
 
   assert.equal(calls.verify, 0);
-  assert.equal(booted[0].romPath, "/roms/local-user/game.nes");
-  assert.equal(booted[0].sessionId, "session-4");
-  assert.deepEqual(booted[0].options, {
+  assert.equal(booted[0]?.romPath, "/roms/local-user/game.nes");
+  assert.equal(booted[0]?.sessionId, "session-4");
+  assert.deepEqual(booted[0]?.options, {
     streamProfile: { bitrateKbps: 1000, fps: 60, id: "balanced" },
   });
 });

@@ -4,8 +4,11 @@
   "scripts": {
     "check:access-log-schema": "npm --prefix services/api run check:access-log-schema",
     "predeploy:hosted": "npm --prefix services/api run predeploy:hosted",
-    "smoke:hosted-auth": "node scripts/hostedAuthSmoke.mjs",
-    "smoke:hosted-pairing": "node scripts/hostedPairingSmoke.mjs",
+    "smoke:hosted-auth": "node scripts/hosted/hostedAuthSmoke.mjs",
+    "smoke:hosted-pairing": "node scripts/hosted/hostedPairingSmoke.mjs",
+    "smoke:lan": "node scripts/lan/multiplayerSmoke.mjs",
+    "smoke:lan-summary": "node scripts/lan/summarizeSmokeArtifacts.mjs",
+    "test:smoke": "node --test scripts/lan/*.test.mjs",
     "verify:api": "npm --prefix services/api run typecheck && npm --prefix services/api run lint && npm --prefix services/api run test && npm --prefix services/api run build"
   },
   "devDependencies": {

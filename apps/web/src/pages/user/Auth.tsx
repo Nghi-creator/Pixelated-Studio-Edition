@@ -10,30 +10,13 @@ import {
   Mail,
 } from "lucide-react";
 import { FaGithub, FaGoogle } from "react-icons/fa";
-import { supabase } from "../../lib/supabaseClient";
+import { supabase } from "../../lib/auth/supabaseClient";
 import { getPublicAppUrl } from "../../lib/appUrl";
-import { api } from "../../lib/apiClient";
 import {
   getPasswordPolicyError,
   PASSWORD_MIN_LENGTH,
   PASSWORD_POLICY_HINT,
-} from "../../lib/passwordPolicy";
-
-const providerLabels: Record<string, string> = {
-  email: "email and password",
-  github: "GitHub",
-  google: "Google",
-};
-
-const formatProviders = (providers: string[]) => {
-  const labels = providers
-    .filter((provider) => provider !== "email")
-    .map((provider) => providerLabels[provider] || provider);
-
-  if (labels.length === 0) return "your connected provider";
-  if (labels.length === 1) return labels[0];
-  return `${labels.slice(0, -1).join(", ")} or ${labels[labels.length - 1]}`;
-};
+} from "../../lib/auth/passwordPolicy";
 
 const getAuthErrorMessage = (error: Error) => {
   if (error.message.toLowerCase().includes("email rate limit exceeded")) {
@@ -93,18 +76,6 @@ export default function Auth() {
           throw new Error("Passwords do not match.");
         }
 
-        const accountMethods = await api.accountMethods(email);
-        if (accountMethods.exists && !accountMethods.hasEmailProvider) {
-          throw new Error(
-            `This email is already connected with ${formatProviders(accountMethods.providers)}. Continue with that sign-in option instead.`,
-          );
-        }
-        if (accountMethods.exists && accountMethods.hasEmailProvider) {
-          throw new Error(
-            "An account already exists for this email. Sign in or use password reset instead.",
-          );
-        }
-
         const { error } = await supabase.auth.signUp({
           email,
           password,
@@ -116,7 +87,7 @@ export default function Auth() {
         setVerificationPendingEmail(email);
         setResendCooldown(60);
         setMessage(
-          "Account created. Check your email within 5 minutes to verify it.",
+          "Check your email for the next step. Existing accounts were not changed.",
         );
       }
     } catch (err: unknown) {
@@ -165,18 +136,13 @@ export default function Auth() {
     setMessage(null);
 
     try {
-      const accountMethods = await api.accountMethods(email);
-      if (accountMethods.exists && !accountMethods.hasEmailProvider) {
-        throw new Error(
-          `This account uses ${formatProviders(accountMethods.providers)} sign-in. Use that provider instead of password reset.`,
-        );
-      }
-
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${getPublicAppUrl()}/reset-password`,
       });
       if (error) throw error;
-      setMessage("Password reset link sent! Check your email.");
+      setMessage(
+        "If this account supports password reset, a link will arrive shortly.",
+      );
     } catch (err: unknown) {
       if (err instanceof Error) {
         setError(getAuthErrorMessage(err));

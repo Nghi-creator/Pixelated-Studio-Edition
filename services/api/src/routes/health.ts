@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { env } from "../config/env.js";
+import { env, sharedRateLimitStoreConfigured } from "../config/env.js";
 
 const startedAt = Date.now();
 
@@ -12,6 +12,7 @@ export async function registerHealthRoutes(app: FastifyInstance) {
     ok: true,
     service: "pixelated-api",
     environment: env.NODE_ENV,
+    rateLimitStore: sharedRateLimitStoreConfigured ? "redis" : "memory",
     uptimeSeconds: Math.round((Date.now() - startedAt) / 1000),
   }));
 
@@ -20,6 +21,8 @@ export async function registerHealthRoutes(app: FastifyInstance) {
       supabaseUrl: Boolean(env.SUPABASE_URL),
       supabaseAnonKey: Boolean(env.SUPABASE_ANON_KEY),
       supabaseServiceRoleKey: Boolean(env.SUPABASE_SERVICE_ROLE_KEY),
+      sharedRateLimitStore:
+        env.NODE_ENV !== "production" || sharedRateLimitStoreConfigured,
       webOrigins: env.allowedOrigins.length > 0,
     };
     const ok = Object.values(checks).every(Boolean);

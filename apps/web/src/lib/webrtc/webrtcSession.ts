@@ -1,14 +1,7 @@
-import { api, getAuthSession } from "./apiClient";
+import { api, getAuthSession } from "../apiClient";
+export { createWebRTCSessionId } from "./webrtcIdentity";
 
 export type WebRTCStatus = "idle" | "connecting" | "playing" | "error";
-
-export const createWebRTCSessionId = () => {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-
-  return `session-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-};
 
 export const resolveGameBootTarget = async (
   gameId: string,

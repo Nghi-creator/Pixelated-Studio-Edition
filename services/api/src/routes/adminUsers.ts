@@ -162,11 +162,15 @@ export async function registerAdminUserRoutes(
         return reply.status(403).send({ error: "Cannot modify yourself" });
       }
 
-      const { data: target } = await service
+      const { data: target, error: targetError } = await service
         .from("profiles")
         .select("role")
         .eq("id", params.data.userId)
         .maybeSingle<ProfileRole>();
+      if (targetError) {
+        request.log.error({ err: targetError }, "Failed to load target user role");
+        return reply.status(500).send({ error: "Failed to authorize user update" });
+      }
       if (target?.role === "super_admin") {
         return reply.status(403).send({ error: "Cannot modify super admins" });
       }

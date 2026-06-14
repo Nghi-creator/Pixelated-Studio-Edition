@@ -1,0 +1,4 @@
+__pycache__/
+dist/
+node_modules/
+npm-debug.log*

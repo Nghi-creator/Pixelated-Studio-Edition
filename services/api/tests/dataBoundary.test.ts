@@ -49,6 +49,7 @@ type TestRequest = FastifyRequest & {
 };
 
 class FakeSupabase {
+  authListUsersCalls = 0;
   authUsers: User[] = [];
   deletedUsers: string[] = [];
   rows: Record<TableName, RecordRow[]> = {
@@ -65,6 +66,7 @@ class FakeSupabase {
     profiles: [],
   };
   rpcCalls: { fn: string; params: RecordRow }[] = [];
+  rpcErrors = new Map<string, Error>();
   auth = {
     admin: {
       deleteUser: async (userId: string) => {
@@ -78,6 +80,7 @@ class FakeSupabase {
         page?: number;
         perPage?: number;
       } = {}) => {
+        this.authListUsersCalls += 1;
         const start = (page - 1) * perPage;
         return {
           data: { users: this.authUsers.slice(start, start + perPage) },
@@ -99,6 +102,19 @@ class FakeSupabase {
 
   async rpc(fn: string, params: RecordRow) {
     this.rpcCalls.push({ fn, params });
+    const rpcError = this.rpcErrors.get(fn);
+    if (rpcError) return { data: null, error: rpcError };
+
+    if (fn === "set_game_reaction") {
+      this.setReaction("likes", "game_id", params.p_game_id, params);
+      return { data: null, error: null };
+    }
+
+    if (fn === "set_comment_reaction") {
+      this.setReaction("comment_likes", "comment_id", params.p_comment_id, params);
+      return { data: null, error: null };
+    }
+
     if (fn === "admin_access_log_summary") {
       const page = Math.max(1, Number(params.p_page || 1));
       const pageSize = Math.min(100, Math.max(1, Number(params.p_page_size || 25)));
@@ -157,6 +173,30 @@ class FakeSupabase {
     }
 
     return { data: null, error: null };
+  }
+
+  private setReaction(
+    table: "comment_likes" | "likes",
+    targetField: "comment_id" | "game_id",
+    targetId: unknown,
+    params: RecordRow,
+  ) {
+    const existing = this.rows[table].find(
+      (row) =>
+        row.user_id === params.p_user_id && row[targetField] === targetId,
+    );
+
+    if (params.p_is_like === null) {
+      this.rows[table] = this.rows[table].filter((row) => row !== existing);
+    } else if (existing) {
+      existing.is_like = params.p_is_like;
+    } else {
+      this.rows[table].push({
+        [targetField]: targetId,
+        is_like: params.p_is_like,
+        user_id: params.p_user_id,
+      });
+    }
   }
 }
 
@@ -400,7 +440,7 @@ async function createDataBoundaryApp(db: FakeSupabase, userId = USER_ID) {
 
   await registerAccessLogRoutes(app, options);
   await registerAdminUserRoutes(app, options);
-  await registerAuthMethodsRoutes(app, options);
+  await registerAuthMethodsRoutes(app);
   await registerCatalogRoutes(app, options);
   await registerGameRoutes(app, options);
   await registerLocalPairingRoutes(app, options);
@@ -422,17 +462,6 @@ function seedProfiles(db: FakeSupabase) {
     { id: ADMIN_ID, role: "admin", username: "admin" },
     { id: SUPER_ADMIN_ID, role: "super_admin", username: "root" },
   );
-}
-
-function makeAuthUser(email: string, providers: string[]): User {
-  return {
-    app_metadata: { providers },
-    aud: "authenticated",
-    created_at: new Date().toISOString(),
-    email,
-    id: `${email}-id`,
-    user_metadata: {},
-  };
 }
 
 test("catalog and favorites are served through backend routes", async () => {
@@ -613,48 +642,37 @@ test("featured games route returns a wider pool while all play counts are zero",
   await app.close();
 });
 
-test("auth account methods expose provider metadata for login decisions", async () => {
+test("public account discovery endpoint returns an enumeration-safe response", async () => {
   const db = new FakeSupabase();
-  db.authUsers.push(
-    makeAuthUser("oauth@example.com", ["google"]),
-    makeAuthUser("email@example.com", ["email"]),
-  );
+  db.authUsers.push({
+    app_metadata: { providers: ["google"] },
+    aud: "authenticated",
+    created_at: new Date().toISOString(),
+    email: "existing@example.com",
+    id: USER_ID,
+    user_metadata: {},
+  });
   const app = await createDataBoundaryApp(db);
 
-  const oauthResponse = await app.inject({
+  const existingResponse = await app.inject({
     method: "POST",
-    payload: { email: "OAUTH@example.com" },
+    payload: { email: "existing@example.com" },
     url: "/auth/account-methods",
   });
-  assert.equal(oauthResponse.statusCode, 200);
-  assert.deepEqual(oauthResponse.json(), {
-    exists: true,
-    hasEmailProvider: false,
-    providers: ["google"],
-  });
-
-  const emailResponse = await app.inject({
-    method: "POST",
-    payload: { email: "email@example.com" },
-    url: "/auth/account-methods",
-  });
-  assert.equal(emailResponse.statusCode, 200);
-  assert.equal(
-    emailResponse.json<{ hasEmailProvider: boolean }>().hasEmailProvider,
-    true,
-  );
-
   const missingResponse = await app.inject({
     method: "POST",
     payload: { email: "missing@example.com" },
     url: "/auth/account-methods",
   });
-  assert.equal(missingResponse.statusCode, 200);
-  assert.deepEqual(missingResponse.json(), {
+
+  assert.equal(existingResponse.statusCode, 200);
+  assert.deepEqual(existingResponse.json(), missingResponse.json());
+  assert.deepEqual(existingResponse.json(), {
     exists: false,
     hasEmailProvider: false,
     providers: [],
   });
+  assert.equal(db.authListUsersCalls, 0);
   await app.close();
 });
 
@@ -687,7 +705,37 @@ test("comment delete is scoped to owner unless actor is admin", async () => {
   await adminApp.close();
 });
 
-test("comment reactions reject self-reactions and replace prior reactions", async () => {
+test("game reactions replace atomically and preserve prior state on failure", async () => {
+  const db = new FakeSupabase();
+  db.rows.likes.push({
+    game_id: GAME_ID,
+    is_like: false,
+    user_id: USER_ID,
+  });
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "PUT",
+    payload: { isLike: true },
+    url: `/games/${GAME_ID}/reaction`,
+  });
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.likes.length, 1);
+  assert.equal(db.rows.likes[0]?.is_like, true);
+
+  db.rpcErrors.set("set_game_reaction", new Error("atomic write failed"));
+  const failedResponse = await app.inject({
+    method: "PUT",
+    payload: { isLike: false },
+    url: `/games/${GAME_ID}/reaction`,
+  });
+  assert.equal(failedResponse.statusCode, 500);
+  assert.equal(db.rows.likes.length, 1);
+  assert.equal(db.rows.likes[0]?.is_like, true);
+  await app.close();
+});
+
+test("comment reactions reject self-reactions and replace atomically", async () => {
   const db = new FakeSupabase();
   db.rows.comments.push({
     content: "hello",
@@ -711,6 +759,17 @@ test("comment reactions reject self-reactions and replace prior reactions", asyn
   assert.equal(db.rows.comment_likes.length, 1);
   assert.equal(db.rows.comment_likes[0]?.is_like, true);
 
+  db.rpcErrors.set("set_comment_reaction", new Error("atomic write failed"));
+  const failedResponse = await app.inject({
+    method: "PUT",
+    payload: { isLike: false },
+    url: `/comments/${COMMENT_ID}/reaction`,
+  });
+  assert.equal(failedResponse.statusCode, 500);
+  assert.equal(db.rows.comment_likes.length, 1);
+  assert.equal(db.rows.comment_likes[0]?.is_like, true);
+  db.rpcErrors.delete("set_comment_reaction");
+
   const selfApp = await createDataBoundaryApp(db, OTHER_USER_ID);
   const selfResponse = await selfApp.inject({
     method: "PUT",
@@ -720,6 +779,88 @@ test("comment reactions reject self-reactions and replace prior reactions", asyn
   assert.equal(selfResponse.statusCode, 403);
   await app.close();
   await selfApp.close();
+});
+
+test("write-heavy social and play routes are rate limited per user", async () => {
+  const commentsDb = new FakeSupabase();
+  const commentsApp = await createDataBoundaryApp(commentsDb, USER_ID);
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const response = await commentsApp.inject({
+      method: "POST",
+      payload: { content: `comment ${attempt}` },
+      url: `/games/${GAME_ID}/comments`,
+    });
+    assert.equal(response.statusCode, 201);
+  }
+  const blockedComment = await commentsApp.inject({
+    method: "POST",
+    payload: { content: "blocked comment" },
+    url: `/games/${GAME_ID}/comments`,
+  });
+  assert.equal(blockedComment.statusCode, 429);
+  assert.equal(commentsDb.rows.comments.length, 10);
+  await commentsApp.close();
+
+  const reportsDb = new FakeSupabase();
+  const reportsApp = await createDataBoundaryApp(reportsDb, USER_ID);
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const response = await reportsApp.inject({
+      method: "POST",
+      payload: { reason: `report ${attempt}` },
+      url: `/moderation/comments/${COMMENT_ID}/report`,
+    });
+    assert.equal(response.statusCode, 200);
+  }
+  const blockedReport = await reportsApp.inject({
+    method: "POST",
+    payload: { reason: "blocked report" },
+    url: `/moderation/comments/${COMMENT_ID}/report`,
+  });
+  assert.equal(blockedReport.statusCode, 429);
+  assert.equal(reportsDb.rows.reported_comments.length, 10);
+  await reportsApp.close();
+
+  const reactionsDb = new FakeSupabase();
+  const reactionsApp = await createDataBoundaryApp(reactionsDb, USER_ID);
+  for (let attempt = 0; attempt < 120; attempt += 1) {
+    const response = await reactionsApp.inject({
+      method: "PUT",
+      payload: { isLike: attempt % 2 === 0 },
+      url: `/games/${GAME_ID}/reaction`,
+    });
+    assert.equal(response.statusCode, 200);
+  }
+  const blockedReaction = await reactionsApp.inject({
+    method: "PUT",
+    payload: { isLike: true },
+    url: `/games/${GAME_ID}/reaction`,
+  });
+  assert.equal(blockedReaction.statusCode, 429);
+  assert.equal(
+    reactionsDb.rpcCalls.filter((call) => call.fn === "set_game_reaction").length,
+    120,
+  );
+  await reactionsApp.close();
+
+  const playsDb = new FakeSupabase();
+  const playsApp = await createDataBoundaryApp(playsDb, USER_ID);
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    const response = await playsApp.inject({
+      method: "POST",
+      url: `/games/${GAME_ID}/play-count`,
+    });
+    assert.equal(response.statusCode, 200);
+  }
+  const blockedPlay = await playsApp.inject({
+    method: "POST",
+    url: `/games/${GAME_ID}/play-count`,
+  });
+  assert.equal(blockedPlay.statusCode, 429);
+  assert.equal(
+    playsDb.rpcCalls.filter((call) => call.fn === "increment_play_count").length,
+    60,
+  );
+  await playsApp.close();
 });
 
 test("profile routes update only the authenticated profile and delete auth user", async () => {

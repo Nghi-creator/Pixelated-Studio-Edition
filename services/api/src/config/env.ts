@@ -28,6 +28,17 @@ const envSchema = z.object({
     blankToUndefined,
     z.string().url().optional(),
   ),
+  RATE_LIMIT_REDIS_REST_TOKEN: z.preprocess(blankToUndefined, z.string().optional()),
+  RATE_LIMIT_REDIS_REST_URL: z.preprocess(
+    blankToUndefined,
+    z.string().url().optional(),
+  ),
+  RATE_LIMIT_REDIS_TIMEOUT_MS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(10_000)
+    .default(1_000),
   SUPABASE_ANON_KEY: z.preprocess(blankToUndefined, z.string().optional()),
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(blankToUndefined, z.string().optional()),
   SUPABASE_URL: z.preprocess(blankToUndefined, z.string().url().optional()),
@@ -72,3 +83,7 @@ export const env = {
     ]),
   ),
 };
+
+export const sharedRateLimitStoreConfigured = Boolean(
+  env.RATE_LIMIT_REDIS_REST_URL && env.RATE_LIMIT_REDIS_REST_TOKEN,
+);

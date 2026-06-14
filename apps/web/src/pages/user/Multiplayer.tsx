@@ -5,9 +5,7 @@ import {
   ArrowLeft,
   CheckCircle2,
   Crown,
-  Gamepad2,
   LogIn,
-  Play,
   Search,
   Users,
   Wifi,
@@ -17,81 +15,23 @@ import {
   engineAuthHeaders,
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
-} from "../../lib/engineAuth";
-import { engineEndpoint } from "../../lib/engineConfig";
-import { Skeleton } from "../../components/ui/Skeleton";
+} from "../../lib/engine/engineAuth";
+import { engineEndpoint } from "../../lib/engine/engineConfig";
+import {
+  CloudGameCard,
+  LocalGameCard,
+  MultiplayerGameGridSkeleton,
+  type GameSource,
+  type LocalGame,
+} from "../../features/multiplayer/MultiplayerGameCards";
+import {
+  getJoinInvite,
+  getSessionFromInvite,
+} from "../../features/multiplayer/inviteUtils";
 
 type MultiplayerMode = "host" | "join";
-type GameSource = "cloud" | "local";
 
 const CLOUD_GAMES_PER_PAGE = 15;
-
-type LocalGame = {
-  id: string;
-  title: string;
-};
-
-const getInvitePath = (invite: string) => {
-  const trimmedInvite = invite.trim().split(/\s+/)[0];
-  if (!trimmedInvite) return null;
-
-  try {
-    const inviteUrl = new URL(trimmedInvite, window.location.origin);
-    if (!["http:", "https:"].includes(inviteUrl.protocol)) return null;
-    return inviteUrl;
-  } catch {
-    return null;
-  }
-};
-
-const isPrivateIpv4 = (hostname: string) => {
-  const parts = hostname.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) {
-    return false;
-  }
-
-  const [first, second] = parts;
-  return (
-    first === 10 ||
-    (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && second === 168) ||
-    (first === 169 && second === 254)
-  );
-};
-
-const isDesktopCompanionInvite = (inviteUrl: URL) => {
-  const hostname = inviteUrl.hostname.toLowerCase();
-  return (
-    inviteUrl.protocol === "https:" &&
-    (isPrivateIpv4(hostname) ||
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1" ||
-      hostname === "[::1]" ||
-      hostname.endsWith(".local"))
-  );
-};
-
-const getJoinInvite = (invite: string) => {
-  const inviteUrl = getInvitePath(invite);
-  if (!inviteUrl || !inviteUrl.pathname.startsWith("/play/")) return null;
-
-  return {
-    isCompanion: isDesktopCompanionInvite(inviteUrl),
-    target: `${inviteUrl.pathname}${inviteUrl.search}`,
-    url: inviteUrl.toString(),
-  };
-};
-
-const getSessionFromInvite = (invite: string) => {
-  const inviteUrl = getInvitePath(invite);
-  return inviteUrl?.searchParams.get("session") || "";
-};
-
-const multiplayerBackState = {
-  backRoute: "/multiplayer",
-  backText: "Back to Multiplayer",
-};
 
 function ModeButton({
   active,
@@ -135,91 +75,6 @@ function StatusPill({ paired }: { paired: boolean }) {
         <AlertCircle className="h-4 w-4" />
       )}
       {paired ? "Engine paired" : "Pairing needed"}
-    </div>
-  );
-}
-
-function CloudGameCard({ game }: { game: ApiGame }) {
-  return (
-    <Link
-      className="group overflow-hidden rounded-lg border border-synth-border bg-synth-surface transition-all hover:border-synth-primary/60 hover:shadow-glow-primary-sm"
-      state={multiplayerBackState}
-      to={`/play/${game.id}`}
-    >
-      <div className="aspect-[4/5] overflow-hidden bg-synth-bg">
-        <img
-          alt={game.title}
-          className="h-full w-full object-cover opacity-80 transition-all duration-300 group-hover:scale-105 group-hover:opacity-100"
-          src={game.cover_url}
-        />
-      </div>
-      <div className="flex min-h-20 flex-col justify-between gap-3 p-3">
-        <p className="line-clamp-2 text-sm font-bold text-white">
-          {game.title}
-        </p>
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-synth-primary">
-          <Play className="h-3.5 w-3.5" />
-          Host lobby
-        </span>
-      </div>
-    </Link>
-  );
-}
-
-function LocalGameCard({ game }: { game: LocalGame }) {
-  return (
-    <Link
-      className="group flex min-h-44 flex-col justify-between rounded-lg border border-synth-border bg-synth-surface p-4 transition-all hover:border-synth-secondary/70 hover:shadow-glow-primary-sm"
-      state={multiplayerBackState}
-      to={`/play/${encodeURIComponent(game.id)}`}
-    >
-      <div>
-        <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg border border-synth-border bg-synth-bg text-synth-secondary">
-          <Gamepad2 className="h-6 w-6" />
-        </div>
-        <p className="line-clamp-3 text-sm font-bold text-white">
-          {game.title}
-        </p>
-      </div>
-      <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-synth-secondary">
-        <Play className="h-3.5 w-3.5" />
-        Host lobby
-      </span>
-    </Link>
-  );
-}
-
-function MultiplayerGameGridSkeleton({ source }: { source: GameSource }) {
-  return (
-    <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
-      {Array.from({ length: 10 }, (_, index) =>
-        source === "cloud" ? (
-          <div
-            className="overflow-hidden rounded-lg border border-synth-border bg-synth-surface"
-            key={index}
-          >
-            <Skeleton className="aspect-[4/5] w-full rounded-none" />
-            <div className="flex min-h-20 flex-col justify-between gap-3 p-3">
-              <Skeleton className="h-4 w-4/5" />
-              <Skeleton className="h-3 w-20" />
-            </div>
-          </div>
-        ) : (
-          <div
-            className="flex min-h-44 flex-col justify-between rounded-lg border border-synth-border bg-synth-surface p-4"
-            key={index}
-          >
-            <div>
-              <Skeleton className="mb-4 h-12 w-12 rounded-lg" />
-              <div className="space-y-2">
-                <Skeleton className="h-4 w-4/5" />
-                <Skeleton className="h-3 w-2/3" />
-              </div>
-            </div>
-            <Skeleton className="h-3 w-20" />
-          </div>
-        ),
-      )}
     </div>
   );
 }

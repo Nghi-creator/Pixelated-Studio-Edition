@@ -372,6 +372,79 @@ test("session ownership protects authenticated lookup", async () => {
   await app.close();
 });
 
+test("session creation cannot overwrite another user's active session", async () => {
+  const db = new FakeSupabase();
+  db.games.set(GAME_ID, {
+    id: GAME_ID,
+    rom_filename: "game.nes",
+    rom_url: null,
+  });
+  db.sessions.set("shared-session", {
+    boot_rom_filename: "original.nes",
+    boot_rom_url: null,
+    deleted_at: null,
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
+    game_id: GAME_ID,
+    id: "shared-session",
+    mode: "cloud",
+    session_token_hash: "original-hash",
+    user_id: OTHER_USER_ID,
+  });
+  const app = await createTestApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      clientSessionId: "shared-session",
+      gameId: GAME_ID,
+      mode: "cloud",
+    },
+    url: "/sessions",
+  });
+
+  assert.equal(response.statusCode, 409);
+  assert.equal(db.sessions.get("shared-session")?.user_id, OTHER_USER_ID);
+  assert.equal(
+    db.sessions.get("shared-session")?.session_token_hash,
+    "original-hash",
+  );
+  await app.close();
+});
+
+test("session token verification is rate limited", async () => {
+  const db = new FakeSupabase();
+  db.sessions.set("rate-limited-session", {
+    boot_rom_filename: "game.nes",
+    boot_rom_url: null,
+    deleted_at: null,
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
+    game_id: GAME_ID,
+    id: "rate-limited-session",
+    mode: "cloud",
+    session_token_hash: "not-a-valid-sha256-hash",
+    user_id: USER_ID,
+  });
+  const app = await createTestApp(db);
+
+  for (let attempt = 0; attempt < 30; attempt += 1) {
+    const response = await app.inject({
+      method: "POST",
+      payload: { sessionToken: "definitely-not-the-token" },
+      url: "/sessions/rate-limited-session/verify",
+    });
+    assert.equal(response.statusCode, 401);
+  }
+
+  const blockedResponse = await app.inject({
+    method: "POST",
+    payload: { sessionToken: "definitely-not-the-token" },
+    url: "/sessions/rate-limited-session/verify",
+  });
+  assert.equal(blockedResponse.statusCode, 429);
+  assert.equal(blockedResponse.headers["retry-after"], "60");
+  await app.close();
+});
+
 test("local pairings are persisted, readable, and deletable", async () => {
   const db = new FakeSupabase();
   const app = await createTestApp(db);

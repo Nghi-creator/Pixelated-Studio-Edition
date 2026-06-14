@@ -140,10 +140,14 @@ export async function registerLocalPairingRoutes(
         });
       }
 
-      await service
+      const { error } = await service
         .from("local_engine_pairings")
         .delete()
         .eq("user_id", user.id);
+      if (error) {
+        request.log.error({ err: error }, "Failed to clear local pairing");
+        return reply.status(500).send({ error: "Failed to clear local pairing" });
+      }
       return reply.status(204).send();
     },
   );

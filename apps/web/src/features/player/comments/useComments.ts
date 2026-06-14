@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { api } from "../../../lib/apiClient";
 import type { GameComment } from "../types";
+import { mergeCommentPage } from "./commentPages";
 
 export function useComments(gameId: string | undefined, currentUser: User | null) {
   const [comments, setComments] = useState<GameComment[]>([]);
@@ -17,11 +18,9 @@ export function useComments(gameId: string | undefined, currentUser: User | null
       const data = await api.gameComments<GameComment>(gameId, pageNum);
       setHasMoreComments(data.hasMore);
 
-      if (isInitial) {
-        setComments(data.comments);
-      } else {
-        setComments((prev) => [...prev, ...data.comments]);
-      }
+      setComments((current) =>
+        mergeCommentPage(current, data.comments, isInitial),
+      );
     },
     [gameId],
   );

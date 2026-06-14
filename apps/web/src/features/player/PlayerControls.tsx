@@ -1,7 +1,7 @@
 import type {
   StreamProfile,
   StreamProfileId,
-} from "../../lib/streamProfiles";
+} from "../../lib/engine/streamProfiles";
 
 type PlayerControlsProps = {
   onStreamProfileChange: (profileId: StreamProfileId) => void;

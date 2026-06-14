@@ -186,11 +186,15 @@ export async function registerMultiplayerRoutes(
         return reply.status(400).send({ error: "Invalid session id" });
       }
 
-      await service
+      const { error } = await service
         .from("multiplayer_lobbies")
         .update({ status: "ended", updated_at: new Date().toISOString() })
         .eq("host_user_id", user.id)
         .eq("session_id", params.data.sessionId);
+      if (error) {
+        request.log.error({ err: error }, "Failed to end multiplayer lobby");
+        return reply.status(500).send({ error: "Failed to end multiplayer lobby" });
+      }
 
       return reply.status(204).send();
     },

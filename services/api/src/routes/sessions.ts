@@ -5,6 +5,7 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../modules/auth/supabaseAuth.js";
+import { createRateLimiter } from "../modules/security/sharedRateLimiter.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
 
@@ -92,6 +93,16 @@ export async function registerSessionRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const verificationIpLimiter = createRateLimiter({
+    limit: 1_000,
+    namespace: "session-verification-ip",
+    windowMs: 60_000,
+  });
+  const verificationSessionLimiter = createRateLimiter({
+    limit: 30,
+    namespace: "session-verification-session",
+    windowMs: 60_000,
+  });
 
   app.post(
     "/sessions",
@@ -129,6 +140,13 @@ export async function registerSessionRoutes(
       }
 
       const sessionId = createSessionId(parsedBody.data.clientSessionId);
+      const existingSession = await getLiveSession(service, sessionId);
+      if (existingSession) {
+        return reply.status(409).send({
+          error: "Session id is already active",
+        });
+      }
+
       const sessionToken = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
       const boot = {
@@ -138,7 +156,7 @@ export async function registerSessionRoutes(
 
       const { error: sessionError } = await service
         .from("backend_sessions")
-        .upsert({
+        .insert({
           boot_rom_filename: boot.romFilename,
           boot_rom_url: boot.romUrl,
           deleted_at: null,
@@ -151,6 +169,11 @@ export async function registerSessionRoutes(
         });
 
       if (sessionError) {
+        if (sessionError.code === "23505") {
+          return reply.status(409).send({
+            error: "Session id is already in use",
+          });
+        }
         request.log.error({ err: sessionError }, "Failed to create session");
         return reply.status(500).send({ error: "Failed to create session" });
       }
@@ -217,11 +240,15 @@ export async function registerSessionRoutes(
 
       const session = await getLiveSession(service, params.data.sessionId);
       if (session && session.user_id === request.user?.id) {
-        await service
+        const { error } = await service
           .from("backend_sessions")
           .update({ deleted_at: new Date().toISOString() })
           .eq("id", params.data.sessionId)
           .eq("user_id", request.user.id);
+        if (error) {
+          request.log.error({ err: error }, "Failed to stop session");
+          return reply.status(500).send({ error: "Failed to stop session" });
+        }
       }
       return reply.status(204).send();
     },
@@ -242,6 +269,21 @@ export async function registerSessionRoutes(
 
     if (!body.success) {
       return reply.status(400).send({ error: "Invalid session token" });
+    }
+
+    const rateLimits = await Promise.all([
+      verificationIpLimiter.consume(request.ip),
+      verificationSessionLimiter.consume(`${request.ip}:${params.data.sessionId}`),
+    ]);
+    const blockedRateLimit = rateLimits.find((result) => !result.allowed);
+    if (blockedRateLimit) {
+      reply.header(
+        "Retry-After",
+        Math.max(1, Math.ceil((blockedRateLimit.resetAt - Date.now()) / 1000)),
+      );
+      return reply.status(429).send({
+        error: "Too many session verification attempts",
+      });
     }
 
     const session = await getLiveSession(service, params.data.sessionId);
