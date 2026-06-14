@@ -2,9 +2,7 @@ import crypto from "crypto";
 import { app, shell, type IpcMainEvent } from "electron";
 import path from "path";
 import {
-  backendApiUrl,
   companionPort,
-  engineAllowedOrigins,
   engineImage,
   hostedWebUrl,
 } from "./config";
@@ -19,14 +17,10 @@ import {
 import {
   execFileCommand,
   getSafeEnv,
-  hasHostUinput,
   isSafeDockerImageRef,
   prepareEngineImage,
 } from "./docker";
-import {
-  buildDockerRunArgs,
-  removeEngineContainerArgs,
-} from "./dockerCommands";
+import { removeEngineContainerArgs } from "./dockerCommands";
 import {
   createDockerDiagnostic,
   diagnoseDocker,
@@ -38,34 +32,17 @@ import {
   waitForDockerReady,
   withDockerStartCapability,
 } from "./dockerRecovery";
-import {
-  getAdvertisedEngineUrls,
-  getAdvertisedCompanionUrls,
-  getDockerPublishHost,
-  getLanIpv4Addresses,
-  normalizeExposureMode,
-  type ExposureMode,
-} from "./exposure";
+import { getLanIpv4Addresses } from "./exposure";
 import { waitForEngineHealth } from "./health";
 import { emitEngineState, setCurrentEnginePhase } from "./state";
-
-type StartEngineOptions = {
-  exposureMode?: unknown;
-};
-
-type EngineLaunchContext = {
-  advertisedUrls: string[];
-  companionUrls: string[];
-  includeUinputDevice: boolean;
-  exposureMode: ExposureMode;
-  inviteCode?: string;
-  inviteExpiresAt?: number;
-  publishHost: string;
-};
-
-type DockerRunOptions = EngineLaunchContext & {
-  engineToken: string;
-};
+import {
+  createEngineLaunchContext,
+  createHostedInviteUrl,
+  createLanInvite,
+  getDockerRunArgs,
+  type EngineLaunchContext,
+  type StartEngineOptions,
+} from "./engine/launch";
 
 type ActiveCompanion = {
   certPath: string;
@@ -79,48 +56,6 @@ let activeStartupAttempt = 0;
 let startupInProgress = false;
 let recoveryInProgress = false;
 
-const INVITE_CODE_TTL_MS = 10 * 60 * 1000;
-
-function createInviteCode() {
-  return crypto.randomBytes(4).toString("hex").toUpperCase();
-}
-
-function createHostedInviteUrl(companionUrl: string) {
-  const url = new URL("/engine", hostedWebUrl);
-  url.searchParams.set("companionUrl", companionUrl);
-  url.searchParams.set("join", "invite");
-  return url.toString();
-}
-
-function getDockerRunArgs({
-  advertisedUrls,
-  companionUrls,
-  includeUinputDevice,
-  engineToken,
-  exposureMode,
-  publishHost,
-}: DockerRunOptions) {
-  const allowedOrigins = [
-    engineAllowedOrigins,
-    `https://localhost:${companionPort}`,
-    ...companionUrls,
-  ]
-    .filter(Boolean)
-    .join(",");
-
-  return buildDockerRunArgs({
-    advertisedUrls,
-    allowedOrigins,
-    apiUrl: backendApiUrl,
-    companionUrls,
-    engineImage,
-    engineToken,
-    exposureMode,
-    includeUinputDevice,
-    publishHost,
-  });
-}
-
 function rejectInvalidImage(event: IpcMainEvent) {
   setCurrentEnginePhase("image");
   emitEngineState(event, "FAILED", "Invalid image reference");
@@ -129,27 +64,6 @@ function rejectInvalidImage(event: IpcMainEvent) {
     '<span class="text-red-500">ERROR: Invalid PIXELATED_ENGINE_IMAGE value.</span>',
   );
   event.reply("engine-stopped");
-}
-
-function createEngineLaunchContext(options: StartEngineOptions = {}): EngineLaunchContext {
-  const exposureMode = normalizeExposureMode(options.exposureMode);
-  const publishHost = getDockerPublishHost(exposureMode);
-  const advertisedUrls = getAdvertisedEngineUrls(exposureMode);
-  const companionUrls = getAdvertisedCompanionUrls(exposureMode, companionPort);
-  const includeUinputDevice = hasHostUinput();
-  const inviteCode = exposureMode === "lan" ? createInviteCode() : undefined;
-  const inviteExpiresAt =
-    exposureMode === "lan" ? Date.now() + INVITE_CODE_TTL_MS : undefined;
-
-  return {
-    advertisedUrls,
-    companionUrls,
-    includeUinputDevice,
-    exposureMode,
-    inviteCode,
-    inviteExpiresAt,
-    publishHost,
-  };
 }
 
 async function startCompanion(
@@ -236,8 +150,7 @@ export function regenerateLanInvite(event: IpcMainEvent) {
     return;
   }
 
-  const inviteCode = createInviteCode();
-  const inviteExpiresAt = Date.now() + INVITE_CODE_TTL_MS;
+  const { inviteCode, inviteExpiresAt } = createLanInvite();
   updateCompanionInvite(inviteCode, inviteExpiresAt);
   emitCompanionInvite(event, {
     inviteCode,

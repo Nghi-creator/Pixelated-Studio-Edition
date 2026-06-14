@@ -173,6 +173,12 @@ Runtime stack:
 - Preload bridge source in `apps/desktop/preload.ts`, compiled to `apps/desktop/dist/preload.js`.
 - Desktop renderer source in `apps/desktop/renderer.ts` and `apps/desktop/renderer/*.ts`, compiled to `apps/desktop/dist/renderer.js` and `apps/desktop/dist/renderer/*.js`. `apps/desktop/index.html` loads the compiled renderer scripts.
 - Desktop main-process helpers under `apps/desktop/main/` are now TypeScript for Docker orchestration, exposure mode, health polling, config, lifecycle state, and the LAN HTTPS companion server.
+- `apps/desktop/main/companionServer.ts` composes the HTTPS companion while
+  `apps/desktop/main/companion/` owns certificate, invite-state, status-page,
+  and authenticated proxy behavior.
+- `apps/desktop/main/engineController.ts` owns engine lifecycle composition
+  while `apps/desktop/main/engine/launch.ts` owns launch context, LAN invites,
+  and Docker run arguments.
 - Desktop packaging helper source is `apps/desktop/scripts/prepareWebDist.ts`, compiled to `apps/desktop/dist/scripts/prepareWebDist.js`.
 - Uses the local Docker CLI through argument-array `spawn` and `execFile`
   calls.

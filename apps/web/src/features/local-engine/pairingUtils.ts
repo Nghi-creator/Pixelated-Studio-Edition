@@ -1,4 +1,4 @@
-import { isLikelyCompanionUrl } from "./inviteUtils";
+import { isLikelyCompanionUrl } from "./inviteUtils.ts";
 import type {
   EngineUrlScope,
   LanPreflightPayload,
@@ -141,4 +141,3 @@ export const fetchLanPreflight = async (engineUrl: string) => {
     window.clearTimeout(timeout);
   }
 };
-

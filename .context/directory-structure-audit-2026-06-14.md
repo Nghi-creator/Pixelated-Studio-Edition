@@ -50,6 +50,35 @@ Added `.context/README.md` as the documentation entry point. It distinguishes
 current sources of truth, active checklists, planning references, and historical
 evidence.
 
+### Oversized Web Modules
+
+Completed `STRUCTURE-01`. Large web modules now delegate stable responsibilities
+to feature-owned components, hooks, contracts, and pure helpers:
+
+- Local-engine pairing separates LAN preflight UI, pairing contracts, and URL
+  classification helpers.
+- Multiplayer separates invite parsing and game-card presentation.
+- Profile separates avatar-crop logic and modal presentation.
+- The shared WebRTC and API layers expose contracts from focused modules.
+
+### Desktop Controller Ownership
+
+Completed `STRUCTURE-02`. The desktop composition roots retain lifecycle and
+request orchestration while focused modules own their domain logic:
+
+```text
+apps/desktop/main/
+  companion/
+    certificate.ts   certificate creation and reuse
+    inviteState.ts   invite, launch-ticket, and guest-token state
+    proxy.ts         authenticated HTTP and WebSocket engine proxying
+    statusPage.ts    companion status-page response
+  engine/
+    launch.ts        launch context, invites, and Docker run arguments
+  companionServer.ts HTTPS server and request composition
+  engineController.ts engine lifecycle composition
+```
+
 ## Keep As-Is
 
 ### API Route Registry
@@ -57,12 +86,6 @@ evidence.
 `services/api/src/routes/` is flat but still readable at 15 route modules.
 Moving each route into a folder without first separating schemas, services, and
 storage logic would add nesting without reducing complexity.
-
-### Desktop Main Process
-
-`apps/desktop/main/` has clear file names and one ownership boundary. Separate
-`docker/` and `companion/` folders become worthwhile only when the large
-controllers are decomposed.
 
 ### Engine Runtime
 
@@ -78,29 +101,6 @@ break the primary ordering model and make deployment history harder to inspect.
 ## Staged Cleanup Plan
 
 Work these as focused refactors with behavior-preserving tests, not bulk moves.
-
-### STRUCTURE-01 — Split Oversized Web Modules
-
-Highest-value candidates:
-
-- `features/local-engine/EnginePairingPanel.tsx`
-- `pages/user/Multiplayer.tsx`
-- `pages/user/Profile.tsx`
-- `lib/webrtc/useWebRTC.ts`
-- `lib/apiClient.ts`
-
-Split by existing responsibilities only after extracting stable contracts.
-Prefer feature-local components/hooks and API domain clients over generic
-`utils` folders.
-
-### STRUCTURE-02 — Decompose Large Desktop Controllers
-
-- Split `main/companionServer.ts` into invite, proxy, certificate, and server
-  composition modules.
-- Split `main/engineController.ts` into launch, lifecycle, and IPC composition
-  modules.
-- Create `main/companion/` and `main/engine/` only as those modules are
-  extracted.
 
 ### STRUCTURE-03 — Decompose API Domains Before Nesting Routes
 
@@ -140,4 +140,3 @@ operational checklists and command examples.
   `helpers`, `common`, or `utils`.
 - Perform large-file decomposition separately from folder moves so regressions
   remain easy to review.
-

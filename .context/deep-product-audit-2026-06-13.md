@@ -20,9 +20,9 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, and 10 lifecycle regression contracts pass; shared auth, engine, and WebRTC infrastructure is grouped by ownership. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, and 12 lifecycle regression contracts pass; shared infrastructure and large feature modules are grouped by ownership. |
 | API backend | Hardened, deployment action queued | Public account enumeration is closed, reactions are atomic, and API abuse controls support shared Redis counters with bounded local fallback. |
-| Desktop | Healthy | Build, 42 tests, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
+| Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
 | Docker image | Hardened and reduced | Pinned multi-stage build passes live ROM smoke at `1.15GB`; build tools are absent from the runtime image. |
 | Supabase | Deployed | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. |
@@ -301,15 +301,31 @@ modules.
 **Verification:** Web lint, production build, and all 10 regression contracts
 pass. No stale imports or old path references remain; `git diff --check` passes.
 
+### DONE-18 — Decompose Oversized Web And Desktop Modules
+
+**Problem:** Several web screens and desktop controllers owned unrelated
+responsibilities, making behavior changes harder to review and focused logic
+harder to test.
+
+**Resolution:** Extracted stable web contracts, pure helpers, and feature-owned
+presentation from pairing, multiplayer, profile, WebRTC, and API modules.
+Split desktop companion certificate, invite-state, status-page, and proxy logic
+from server composition. Split engine launch context, invite creation, and
+Docker run arguments from lifecycle composition.
+
+**Verification:** Web lint, production build, and all 12 tests pass. Desktop
+build and all 45 tests pass, including focused certificate and engine-launch
+contracts. Desktop packaged release smoke and `git diff --check` pass.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, and production build | Passed — 10 tests |
+| Web tests, lint, and production build | Passed — 12 tests |
 | API typecheck, lint, build, and tests | Passed — 44 tests |
-| Desktop build and tests | Passed — 42 tests |
+| Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 29 tests |
 | Root smoke tooling tests | Passed — 9 tests |
