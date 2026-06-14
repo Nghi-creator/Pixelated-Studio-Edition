@@ -109,3 +109,20 @@ test("shared limiter falls back to bounded local protection during Redis outages
   assert.equal((await limiter.consume("client", 1_001)).allowed, false);
   assert.equal((await limiter.consume("client", 2_000)).allowed, true);
 });
+
+test("test runner ignores ambient Redis credentials unless explicitly injected", async () => {
+  let redisRequests = 0;
+  const limiter = createRateLimiter({
+    fetch: async () => {
+      redisRequests += 1;
+      return Response.json({ result: [1, 1_000] });
+    },
+    limit: 1,
+    namespace: "test-isolation",
+    windowMs: 1_000,
+  });
+
+  assert.equal((await limiter.consume("client", 1_000)).allowed, true);
+  assert.equal((await limiter.consume("client", 1_001)).allowed, false);
+  assert.equal(redisRequests, 0);
+});

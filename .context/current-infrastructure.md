@@ -84,6 +84,8 @@ Current status:
   atomic shared fixed-window counters when `RATE_LIMIT_REDIS_REST_URL` and
   `RATE_LIMIT_REDIS_REST_TOKEN` are configured. Redis calls have a bounded
   timeout and fall back to the bounded per-instance limiter during outages.
+- The production Render API currently reports the Upstash-compatible Redis
+  rate-limit store active and passes the shared-store readiness check.
 - Submission and stream-metric throttles coordinate through existing Supabase
   rows rather than Redis.
 - `services/api/tests/` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
