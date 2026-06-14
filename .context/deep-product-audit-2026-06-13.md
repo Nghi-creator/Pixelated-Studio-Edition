@@ -333,6 +333,23 @@ moderation privilege rules.
 **Verification:** API typecheck, lint, build, and all 47 tests pass.
 `git diff --check` passes.
 
+### DONE-20 — Group Root Smoke Tooling By Environment
+
+**Problem:** Hosted browser checks, LAN multiplayer evidence tooling, and LAN
+tool tests shared one flat root `scripts/` directory. This obscured ownership
+and made the available smoke command surface harder to discover.
+
+**Resolution:** Grouped hosted checks under `scripts/hosted/` and LAN scripts
+plus their tests under `scripts/lan/`. Preserved existing hosted npm command
+names, added discoverable LAN and root smoke-test commands, corrected
+repository-root resolution after the moves, and updated all operational command
+examples.
+
+**Verification:** All 9 root smoke-tool tests pass. Hosted auth, hosted pairing,
+LAN smoke, and LAN summary CLI help commands pass. All moved scripts pass
+`node --check`; no stale script-path references remain; `git diff --check`
+passes.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:

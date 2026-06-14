@@ -114,7 +114,7 @@ test("CLI writes smoke-verdict.md into a passing bundle", () => {
   const dir = makeBundle();
   const result = spawnSync(
     process.execPath,
-    [path.resolve("scripts/summarizeSmokeArtifacts.mjs"), dir],
+    [path.resolve("scripts/lan/summarizeSmokeArtifacts.mjs"), dir],
     { encoding: "utf8" },
   );
   assert.equal(result.status, 0, result.stderr);

@@ -322,7 +322,7 @@ function resolveRunDir(input) {
 
 function printUsage() {
   console.log(`Usage:
-  node scripts/summarizeSmokeArtifacts.mjs <run-id-or-directory> [--out <path|->]
+  node scripts/lan/summarizeSmokeArtifacts.mjs <run-id-or-directory> [--out <path|->]
 
 By default, writes <run-directory>/smoke-verdict.md and prints the verdict.
 Use --out - to print without writing a file.`);

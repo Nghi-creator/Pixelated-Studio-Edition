@@ -101,6 +101,27 @@ services/api/src/
       contracts.ts         request validation contracts
 ```
 
+### Root Smoke Tooling
+
+Completed `STRUCTURE-04`. Root smoke tooling is grouped by the environment it
+validates, with LAN tests beside the scripts they exercise:
+
+```text
+scripts/
+  hosted/
+    hostedAuthSmoke.mjs
+    hostedPairingSmoke.mjs
+  lan/
+    multiplayerSmoke.mjs
+    multiplayerSmoke.test.mjs
+    summarizeSmokeArtifacts.mjs
+    summarizeSmokeArtifacts.test.mjs
+```
+
+Root package commands provide the stable execution surface:
+`smoke:hosted-auth`, `smoke:hosted-pairing`, `smoke:lan`,
+`smoke:lan-summary`, and `test:smoke`.
+
 ## Keep As-Is
 
 ### Engine Runtime
@@ -117,19 +138,6 @@ break the primary ordering model and make deployment history harder to inspect.
 ## Staged Cleanup Plan
 
 Work these as focused refactors with behavior-preserving tests, not bulk moves.
-
-### STRUCTURE-04 — Group Root Smoke Tooling
-
-When the next smoke-tool change is needed, group:
-
-```text
-scripts/hosted/
-scripts/lan/
-```
-
-Move tests beside their scripts and update package commands and documentation in
-the same change. Avoid a standalone move because these scripts are referenced by
-operational checklists and command examples.
 
 ### STRUCTURE-05 — Normalize Remaining Source Anomalies
 

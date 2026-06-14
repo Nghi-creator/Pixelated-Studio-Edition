@@ -25,7 +25,7 @@ Optional:
   process.exit(0);
 }
 
-const rootDir = path.resolve(import.meta.dirname, "..");
+const rootDir = path.resolve(import.meta.dirname, "../..");
 const webUrl = normalizeUrl(
   process.env.HOSTED_WEB_URL || "https://pixelated-studio-edition.vercel.app",
 );

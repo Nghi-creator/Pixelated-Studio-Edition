@@ -14,6 +14,9 @@ Top-level areas:
 - `services/api/`: localhost-first Fastify + TypeScript backend control-plane skeleton.
 - `supabase/`: database, storage, RLS, RPC, and realtime migrations.
 - `assets/`: README/banner architecture imagery.
+- `scripts/hosted/`: hosted auth and signed-in pairing browser smoke checks.
+- `scripts/lan/`: LAN multiplayer smoke, artifact summarization, and their
+  colocated tests.
 
 Release packaging note: desktop artifacts are produced from `apps/desktop` with
 `npm run dist`. That script builds `apps/web/dist` first, and electron-builder
@@ -287,11 +290,14 @@ Streaming/signaling:
   the token-protected in-memory capture and writes both snapshots directly into
   its active artifact bundle; outside a smoke run, the action keeps its
   clipboard behavior.
-- `scripts/multiplayerSmoke.mjs` can automate the HTTPS companion flow with
+- `scripts/lan/multiplayerSmoke.mjs` can automate the HTTPS companion flow with
   `--invite-code`: it validates preflight state, redeems a short-lived companion
   credential, joins the lobby as a spectator through the companion Socket.IO
   proxy, drives a camera peer-count transition, and verifies disconnect
   cleanup. Browser certificate trust remains the manual boundary.
+- Root commands expose `npm run smoke:lan`, `npm run smoke:lan-summary`, and
+  `npm run test:smoke`; hosted workflows retain `npm run smoke:hosted-auth` and
+  `npm run smoke:hosted-pairing`.
 - Engine-side download failures and camera/GStreamer failures emit `engine-error` to the browser session.
 
 Input:
