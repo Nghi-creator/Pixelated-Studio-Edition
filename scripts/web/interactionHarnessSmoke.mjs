@@ -114,6 +114,26 @@ async function run() {
     await page.getByRole("button", { name: "Retry Stream" }).click();
     await page.getByText("stream-retry").waitFor();
 
+    await page.getByRole("button", { name: "Hide stream stats" }).click();
+    await page.getByText("telemetry-hidden").waitFor();
+    await page.getByRole("button", { name: "Toggle stream telemetry" }).click();
+    await page.getByText("telemetry-toggle-on").waitFor();
+    await page.getByText("Stream Stats").waitFor();
+
+    await page.getByRole("button", { name: /Lobby/ }).click();
+    await page.getByText("LAN Invite").waitFor();
+    await page
+      .getByTitle("Copy HTTPS join link and invite-code guidance")
+      .click();
+    await page.getByRole("button", { exact: true, name: "P1" }).click();
+    await page.getByText("request-slot:1").waitFor();
+    assert.equal(
+      await page.getByRole("button", { exact: true, name: "P3" }).isDisabled(),
+      true,
+    );
+    await page.getByTitle("Remove Guest").click();
+    await page.getByText("kick:guest-socket").waitFor();
+
     assert.deepEqual(errors, []);
   } finally {
     if (browser) await browser.close();

@@ -21,6 +21,7 @@ import {
   STREAM_PROFILE_STORAGE_KEY,
   type StreamProfileId,
 } from "../../lib/engine/streamProfiles";
+import { shouldIgnoreGameInput } from "../../lib/webrtc/webrtcInput";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
 
 const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
@@ -182,12 +183,7 @@ export default function Player() {
     const gameKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "];
 
     const preventScroll = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
-        return;
-      }
-
-      if (gameKeys.includes(event.key)) {
+      if (!shouldIgnoreGameInput(event) && gameKeys.includes(event.key)) {
         event.preventDefault();
       }
     };

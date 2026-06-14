@@ -52,9 +52,9 @@ tooling, but the active player screen still needs a focused pass around
 user-facing error states, repeated engine events, share-context accuracy,
 keyboard focus behavior across overlays, and cloud/local boot failure recovery.
 `DONE-31` fixed the highest-risk keyboard input leak found during this audit,
-and `DONE-32` hardened stream error/retry feedback plus lobby share metadata.
-The full gameplay path still needs real boot/LAN/TURN proof and broader player
-interaction coverage.
+`DONE-32` hardened stream error/retry feedback plus lobby share metadata, and
+`DONE-33` expanded rendered player interaction coverage. The remaining proof
+requires real boot/LAN/TURN target environments.
 
 **Completion proof:**
 
@@ -62,7 +62,7 @@ interaction coverage.
 - [x] Ensure lobby metadata uses the actual engine exposure/share context.
 - [x] Ensure stream boot, offer, and answer failures surface actionable
   recovery messages instead of silent/generic failure.
-- [ ] Add rendered player harness coverage for telemetry toggling, lobby
+- [x] Add rendered player harness coverage for telemetry toggling, lobby
   controls, and focused form fields.
 - [ ] Prove single-player cloud and local-vault boot failures surface
   actionable recovery without stale state against real game sources.
@@ -689,6 +689,27 @@ also exercises the player stream error overlay and retry callback.
 **Verification:** Added contracts for lobby exposure/player-slot metadata and
 stream error fallback handling. Web tests now pass with 33 contracts; lint,
 production build, rendered interaction harness, and `git diff --check` pass.
+
+### DONE-33 — Expand Rendered Gameplay Interaction Coverage
+
+**Problem:** The interaction harness covered admin UI and the stream error
+overlay, but it still did not exercise the active player controls that are most
+likely to regress during frontend changes: telemetry toggling, telemetry close,
+lobby slot controls, disabled unsupported slots, invite copy controls, and host
+kick actions. The player page scroll-prevention handler also used narrower
+focus rules than the WebRTC input bridge, so focused `select`, content-editable,
+or explicitly ignored controls could still have arrow/space behavior blocked.
+
+**Resolution:** Reused the shared gameplay input-ignore helper in the player
+scroll-prevention handler so page scroll blocking and engine input forwarding
+respect the same focused-control rules. Expanded the rendered interaction
+harness with real `PlayerHeader`, `StreamTelemetryPanel`, and `LobbyPanel`
+instances. The Playwright harness now proves telemetry hide/toggle behavior,
+stream retry, lobby invite copy access, slot request, disabled unsupported
+slots, and host kick event wiring.
+
+**Verification:** Web tests pass with 33 contracts; lint, production build,
+rendered interaction harness, and `git diff --check` pass.
 
 ## Latest Verification Run
 

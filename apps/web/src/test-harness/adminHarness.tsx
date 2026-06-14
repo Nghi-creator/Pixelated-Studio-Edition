@@ -1,13 +1,20 @@
 import React, { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
+import { MemoryRouter } from "react-router-dom";
 import "../index.css";
 import {
   AdminConfirmDialog,
   type AdminConfirmation,
 } from "../components/admin/AdminConfirmDialog";
 import ReportCard, { type Report } from "../components/admin/ReportCard";
+import { LobbyPanel } from "../features/player/LobbyPanel";
+import { PlayerHeader } from "../features/player/PlayerHeader";
 import { StreamStage } from "../features/player/StreamStage";
-import { INITIAL_WEBRTC_TELEMETRY } from "../lib/webrtc/webrtcTelemetry";
+import { StreamTelemetryPanel } from "../features/player/StreamTelemetryPanel";
+import {
+  INITIAL_WEBRTC_TELEMETRY,
+  type WebRTCTelemetry,
+} from "../lib/webrtc/webrtcTelemetry";
 import { Pagination } from "../components/ui/Pagination";
 
 declare global {
@@ -61,10 +68,22 @@ export function AdminHarness() {
   const [pending, setPending] = useState(false);
   const [events, setEvents] = useState<string[]>([]);
   const [page, setPage] = useState(2);
+  const [showTelemetry, setShowTelemetry] = useState(true);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const record = (event: string) => {
     setEvents((current) => [...current, event]);
+  };
+  const streamTelemetry: WebRTCTelemetry = {
+    ...INITIAL_WEBRTC_TELEMETRY,
+    bitrateKbps: 1200,
+    connectionState: "connected",
+    fps: 60,
+    iceConnectionState: "connected",
+    jitterMs: 3.5,
+    lastEngineError: "Engine could not open the selected game file.",
+    lastUpdatedAt: 1_781_500_000_000,
+    packetsLost: 0,
   };
 
   const confirmDestructiveAction = () => {
@@ -138,15 +157,82 @@ export function AdminHarness() {
       </section>
 
       <section aria-label="Stream stage harness" className="max-w-2xl">
+        <PlayerHeader
+          backRoute="/"
+          backText="Back to Cloud Library"
+          gameTitle="Harness Game"
+          onToggleTelemetry={() => {
+            record(showTelemetry ? "telemetry-toggle-off" : "telemetry-toggle-on");
+            setShowTelemetry((isVisible) => !isVisible);
+          }}
+          showStreamTelemetry={showTelemetry}
+          status="error"
+        />
         <StreamStage
           onRetry={() => record("stream-retry")}
-          showStreamTelemetry
+          showStreamTelemetry={showTelemetry}
           status="error"
-          telemetry={{
-            ...INITIAL_WEBRTC_TELEMETRY,
-            lastEngineError: "Engine could not open the selected game file.",
-          }}
+          telemetry={streamTelemetry}
           videoRef={videoRef}
+        />
+        {showTelemetry && (
+          <StreamTelemetryPanel
+            gameId="harness-game"
+            onClose={() => {
+              record("telemetry-hidden");
+              setShowTelemetry(false);
+            }}
+            playerMode="host"
+            sessionId="session-1"
+            shareUrl="https://engine.local/play/demo?session=session-1"
+            status="error"
+            telemetry={streamTelemetry}
+          />
+        )}
+      </section>
+
+      <section aria-label="Lobby harness" className="space-y-3">
+        <LobbyPanel
+          currentParticipant={{
+            connectedAt: "2026-06-14T00:00:00.000Z",
+            displayName: "Host",
+            playerIndex: 1,
+            role: "host",
+            socketId: "host-socket",
+          }}
+          inputCapabilities={{
+            limitationReason:
+              "P3/P4 are disabled in this harness to exercise disabled slots.",
+            source: "health",
+            supportedPlayerCount: 2,
+          }}
+          lobbyState={{
+            hostSocketId: "host-socket",
+            maxPlayers: 4,
+            participants: [
+              {
+                connectedAt: "2026-06-14T00:00:00.000Z",
+                displayName: "Host",
+                playerIndex: 1,
+                role: "host",
+                socketId: "host-socket",
+              },
+              {
+                connectedAt: "2026-06-14T00:01:00.000Z",
+                displayName: "Guest",
+                playerIndex: 2,
+                role: "player",
+                socketId: "guest-socket",
+              },
+            ],
+            sessionId: "session-1",
+          }}
+          onKickParticipant={(socketId) => record(`kick:${socketId}`)}
+          onReleaseSlot={() => record("release-slot")}
+          onRequestSlot={(playerIndex) => record(`request-slot:${playerIndex}`)}
+          shareGuidance="Open this HTTPS join link, then enter the invite code."
+          shareText="https://engine.local/play/demo?session=session-1"
+          shareUrl="https://engine.local/play/demo?session=session-1"
         />
       </section>
 
@@ -157,7 +243,9 @@ export function AdminHarness() {
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <AdminHarness />
+    <MemoryRouter>
+      <AdminHarness />
+    </MemoryRouter>
   </React.StrictMode>,
 );
 

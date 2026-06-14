@@ -6,7 +6,7 @@ type InputTargetLike = EventTarget & {
   tagName?: string;
 };
 
-function shouldIgnoreGameInput(event: KeyboardEvent) {
+export function shouldIgnoreGameInput(event: KeyboardEvent) {
   if (event.defaultPrevented) return true;
 
   const target = event.target as InputTargetLike | null;
