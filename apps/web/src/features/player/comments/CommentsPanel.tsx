@@ -5,8 +5,11 @@ import { CommentItem } from "./CommentItem";
 
 type CommentsPanelProps = {
   comments: GameComment[];
+  commentsError: string;
   currentUser: User | null;
   hasMoreComments: boolean;
+  isLoadingComments: boolean;
+  isLoadingMoreComments: boolean;
   isSubmittingComment: boolean;
   newComment: string;
   onCommentReaction: (commentId: string, isLike: boolean) => void;
@@ -14,15 +17,21 @@ type CommentsPanelProps = {
   onLoadMore: () => void;
   onPostComment: (event: React.FormEvent<HTMLFormElement>) => void;
   onReportComment: (commentId: string) => void;
+  onRetryComments: () => void;
   onSignIn: () => void;
+  pendingCommentIds: Set<string>;
+  reportMessage: string;
   reactionButtons: React.ReactNode;
   setNewComment: (comment: string) => void;
 };
 
 export function CommentsPanel({
   comments,
+  commentsError,
   currentUser,
   hasMoreComments,
+  isLoadingComments,
+  isLoadingMoreComments,
   isSubmittingComment,
   newComment,
   onCommentReaction,
@@ -30,7 +39,10 @@ export function CommentsPanel({
   onLoadMore,
   onPostComment,
   onReportComment,
+  onRetryComments,
   onSignIn,
+  pendingCommentIds,
+  reportMessage,
   reactionButtons,
   setNewComment,
 }: CommentsPanelProps) {
@@ -53,8 +65,29 @@ export function CommentsPanel({
         signedIn={Boolean(currentUser)}
       />
 
+      {reportMessage && (
+        <div className="mb-6 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+          {reportMessage}
+        </div>
+      )}
+
+      {commentsError && (
+        <div className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <span>{commentsError}</span>
+          <button
+            className="font-bold text-red-100 hover:text-white"
+            onClick={onRetryComments}
+            type="button"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="space-y-6">
-        {comments.length === 0 ? (
+        {isLoadingComments && comments.length === 0 ? (
+          <p className="py-8 text-center text-gray-500">Loading comments...</p>
+        ) : comments.length === 0 ? (
           <p className="text-gray-500 text-center py-8">
             No comments yet. Be the first to start the discussion!
           </p>
@@ -67,6 +100,7 @@ export function CommentsPanel({
               onCommentReaction={onCommentReaction}
               onDeleteComment={onDeleteComment}
               onReportComment={onReportComment}
+              pending={pendingCommentIds.has(comment.id)}
             />
           ))
         )}
@@ -75,9 +109,10 @@ export function CommentsPanel({
       {hasMoreComments && comments.length > 0 && (
         <button
           onClick={onLoadMore}
-          className="mt-8 w-full py-3 border border-synth-border rounded-xl text-gray-400 hover:text-white hover:bg-synth-elevated transition-all font-medium"
+          disabled={isLoadingMoreComments}
+          className="mt-8 w-full py-3 border border-synth-border rounded-xl text-gray-400 hover:text-white hover:bg-synth-elevated transition-all font-medium disabled:cursor-wait disabled:opacity-50"
         >
-          Load More Comments
+          {isLoadingMoreComments ? "Loading..." : "Load More Comments"}
         </button>
       )}
     </div>

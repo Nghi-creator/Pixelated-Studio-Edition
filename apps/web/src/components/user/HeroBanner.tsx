@@ -1,7 +1,14 @@
-import { Play, Plus, Check, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Play,
+  Plus,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+} from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, getAuthSession } from "../../lib/apiClient";
+import { useFavorite } from "../../features/favorites/useFavorite";
 
 interface Game {
   id: string;
@@ -16,8 +23,18 @@ interface HeroBannerProps {
 
 export default function HeroBanner({ featuredGames }: HeroBannerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isFavorited, setIsFavorited] = useState(false);
+  const [favoriteError, setFavoriteError] = useState("");
   const navigate = useNavigate();
+  const safeCurrentIndex = Math.min(
+    currentIndex,
+    Math.max(0, featuredGames.length - 1),
+  );
+  const currentGame = featuredGames[safeCurrentIndex];
+  const {
+    isFavorited,
+    isPending,
+    toggleFavorite: toggleFavoriteState,
+  } = useFavorite(currentGame?.id || "");
 
   // Automatically rotate the banner every 5 seconds
   useEffect(() => {
@@ -26,42 +43,15 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
       setCurrentIndex((prev) => (prev + 1) % featuredGames.length);
     }, 5000);
     return () => clearInterval(interval);
-  }, [featuredGames, currentIndex]);
-
-  const currentGame = featuredGames[currentIndex];
-
-  useEffect(() => {
-    const checkFavoriteStatus = async () => {
-      if (!currentGame) return;
-
-      const session = await getAuthSession();
-      if (!session) {
-        setIsFavorited(false);
-        return;
-      }
-
-      const data = await api.favoriteStatus(currentGame.id);
-      setIsFavorited(data.favorited);
-    };
-
-    checkFavoriteStatus();
-  }, [currentGame]);
+  }, [featuredGames]);
 
   const toggleFavorite = async () => {
-    const session = await getAuthSession();
-
-    if (!session) {
-      alert("Please sign in to save games to your library!");
-      navigate("/login");
-      return;
-    }
-
-    if (isFavorited) {
-      await api.removeFavorite(currentGame.id);
-      setIsFavorited(false);
-    } else {
-      await api.saveFavorite(currentGame.id);
-      setIsFavorited(true);
+    if (!currentGame || isPending) return;
+    setFavoriteError("");
+    try {
+      await toggleFavoriteState();
+    } catch {
+      setFavoriteError("Could not update your library. Try again.");
     }
   };
 
@@ -92,7 +82,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
       {featuredGames.map((game, index) => (
         <img
           key={game.id}
-          className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-1000 ${index === currentIndex ? "opacity-80" : "opacity-0"}`}
+          className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-1000 ${index === safeCurrentIndex ? "opacity-80" : "opacity-0"}`}
           src={game.backdrop_url || game.cover_url}
           alt={game.title}
         />
@@ -102,13 +92,17 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
       {featuredGames.length > 1 && (
         <>
           <button
+            aria-label="Previous featured game"
             onClick={handlePrev}
+            type="button"
             className="absolute left-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/45 hover:bg-synth-primary/25 border border-white/10 hover:border-synth-primary/50 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 shadow-glow-primary-sm"
           >
             <ChevronLeft className="w-8 h-8" />
           </button>
           <button
+            aria-label="Next featured game"
             onClick={handleNext}
+            type="button"
             className="absolute right-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-black/45 hover:bg-synth-primary/25 border border-white/10 hover:border-synth-primary/50 text-white rounded-full backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 shadow-glow-primary-sm"
           >
             <ChevronRight className="w-8 h-8" />
@@ -131,6 +125,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
             <div className="flex flex-wrap gap-4">
               <button
                 onClick={() => navigate(`/play/${currentGame.id}`)}
+                type="button"
                 className="bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-2.5 px-6 rounded-lg shadow-glow-primary transition-all flex items-center gap-2 active:scale-[0.98]"
               >
                 <Play className="w-5 h-5 fill-synth-ink" /> Play Now
@@ -139,13 +134,20 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
               {/* Dynamic Add/Remove List Button */}
               <button
                 onClick={toggleFavorite}
-                className={`border font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2 ${
+                disabled={isPending}
+                title={favoriteError || undefined}
+                type="button"
+                className={`border font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2 disabled:cursor-wait disabled:opacity-60 ${
                   isFavorited
                     ? "bg-synth-primary/10 border-synth-primary text-synth-primary hover:bg-synth-primary/20 shadow-glow-primary-sm"
                     : "bg-synth-surface/90 hover:bg-synth-elevated border-synth-border text-white hover:border-synth-secondary/50"
                 }`}
               >
-                {isFavorited ? (
+                {isPending ? (
+                  <>
+                    <Loader2 className="h-5 w-5 animate-spin" /> Updating...
+                  </>
+                ) : isFavorited ? (
                   <>
                     <Check className="w-5 h-5" /> Saved to Library
                   </>
@@ -159,11 +161,13 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
 
             {/* Little dot indicators at the bottom */}
             <div className="flex gap-2 mt-6">
-              {featuredGames.map((_, idx) => (
-                <div
-                  key={idx}
+              {featuredGames.map((game, idx) => (
+                <button
+                  aria-label={`Show ${game.title}`}
+                  key={game.id}
                   onClick={() => setCurrentIndex(idx)}
-                  className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${idx === currentIndex ? "w-8 bg-synth-primary shadow-glow-primary-sm" : "w-4 bg-synth-border hover:bg-synth-secondary/80"}`}
+                  type="button"
+                  className={`h-1.5 rounded-full cursor-pointer transition-all duration-300 ${idx === safeCurrentIndex ? "w-8 bg-synth-primary shadow-glow-primary-sm" : "w-4 bg-synth-border hover:bg-synth-secondary/80"}`}
                 />
               ))}
             </div>

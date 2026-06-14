@@ -30,6 +30,13 @@ import {
   loadEngineInputCapabilities,
   loadEngineShareContext,
 } from "./engineContext";
+import { buildMultiplayerLobbyPayload } from "./lobbyMetadata";
+import {
+  getErrorMessage,
+  STREAM_BOOT_ERROR_MESSAGE,
+  STREAM_OFFER_ERROR_MESSAGE,
+  STREAM_REMOTE_DESCRIPTION_ERROR_MESSAGE,
+} from "./streamErrors";
 import type {
   EngineInputCapabilities,
   EngineShareContext,
@@ -95,6 +102,7 @@ export function useWebRTC(
   const socketRef = useRef<ReturnType<typeof io> | null>(null);
   const localParticipantRef = useRef<LobbyParticipant | null>(null);
   const inputCapabilitiesRef = useRef(inputCapabilities);
+  const shareContextRef = useRef(shareContext);
   const lastMetricSentAtRef = useRef(0);
   const metricsDisabledRef = useRef(false);
 
@@ -105,6 +113,10 @@ export function useWebRTC(
   useEffect(() => {
     inputCapabilitiesRef.current = inputCapabilities;
   }, [inputCapabilities]);
+
+  useEffect(() => {
+    shareContextRef.current = shareContext;
+  }, [shareContext]);
 
   useEffect(() => {
     const handlePairingChange = () =>
@@ -187,6 +199,8 @@ export function useWebRTC(
         ]);
       if (disposed) return;
       iceServersForSession = nextIceServers;
+      inputCapabilitiesRef.current = nextInputCapabilities;
+      shareContextRef.current = nextShareContext;
       setInputCapabilities(nextInputCapabilities);
       setShareContext(nextShareContext);
 
@@ -295,7 +309,14 @@ export function useWebRTC(
       "webrtc-answer",
       (answer: RTCSessionDescriptionInit & { peerId?: string }) => {
         if (answer.peerId && answer.peerId !== peerId) return;
-        pc?.setRemoteDescription(new RTCSessionDescription(answer));
+        pc
+          ?.setRemoteDescription(new RTCSessionDescription(answer))
+          .catch((err) => {
+            console.error("[WebRTC] Failed to apply answer:", err);
+            failStream(
+              getErrorMessage(err, STREAM_REMOTE_DESCRIPTION_ERROR_MESSAGE),
+            );
+          });
       },
     );
 
@@ -303,7 +324,9 @@ export function useWebRTC(
       "webrtc-ice-candidate-backend",
       (candidate: RTCIceCandidateInit & { peerId?: string }) => {
         if (candidate.peerId && candidate.peerId !== peerId) return;
-        pc?.addIceCandidate(new RTCIceCandidate(candidate));
+        pc?.addIceCandidate(new RTCIceCandidate(candidate)).catch((err) => {
+          console.warn("[WebRTC] Failed to add ICE candidate:", err);
+        });
       },
     );
 
@@ -352,7 +375,7 @@ export function useWebRTC(
         });
       } catch (err) {
         console.error("Failed to boot game:", err);
-        setStatus("error");
+        failStream(getErrorMessage(err, STREAM_BOOT_ERROR_MESSAGE));
       }
     });
 
@@ -375,22 +398,17 @@ export function useWebRTC(
       }
 
       if (participant?.role === "host") {
-        const supportedMaxPlayers = Math.min(
-          nextLobbyState.maxPlayers,
-          inputCapabilitiesRef.current.supportedPlayerCount,
-        );
         api
-          .multiplayerLobby(sessionId, {
-            engineUrl: getEngineUrl(),
-            exposureMode: "unknown",
-            gameId,
-            maxPlayers: supportedMaxPlayers,
-            participants: nextLobbyState.participants.map((entry) => ({
-              displayName: entry.displayName,
-              playerIndex: entry.playerIndex,
-              role: entry.role,
-            })),
-          })
+          .multiplayerLobby(
+            sessionId,
+            buildMultiplayerLobbyPayload({
+              engineUrl: getEngineUrl(),
+              gameId,
+              inputCapabilities: inputCapabilitiesRef.current,
+              lobbyState: nextLobbyState,
+              shareContext: shareContextRef.current,
+            }),
+          )
           .catch((err) => {
             if (err instanceof ApiError && [401, 503].includes(err.status)) {
               return;
@@ -408,13 +426,24 @@ export function useWebRTC(
     socket.on("python-ready", async () => {
       console.log("[WebRTC] Python is awake! Generating and sending Offer...");
       loadEngineInputCapabilities().then((nextInputCapabilities) => {
-        if (!disposed) setInputCapabilities(nextInputCapabilities);
+        if (!disposed) {
+          inputCapabilitiesRef.current = nextInputCapabilities;
+          setInputCapabilities(nextInputCapabilities);
+        }
       });
       loadEngineShareContext().then((nextShareContext) => {
-        if (!disposed) setShareContext(nextShareContext);
+        if (!disposed) {
+          shareContextRef.current = nextShareContext;
+          setShareContext(nextShareContext);
+        }
       });
       if (pc) {
-        await createAndSendOffer(pc, socket, sessionId, peerId);
+        try {
+          await createAndSendOffer(pc, socket, sessionId, peerId);
+        } catch (err) {
+          console.error("[WebRTC] Failed to create stream offer:", err);
+          failStream(getErrorMessage(err, STREAM_OFFER_ERROR_MESSAGE));
+        }
       }
     });
 

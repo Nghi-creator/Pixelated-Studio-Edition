@@ -1,17 +1,27 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, LayoutDashboard, Filter } from "lucide-react";
 import ReportCard, { type Report } from "../../components/admin/ReportCard";
 import {
+  AdminConfirmDialog,
+  type AdminConfirmation,
+} from "../../components/admin/AdminConfirmDialog";
+import {
   api,
-  ApiError,
   getAuthSession,
   type ApiAdminReportAction,
 } from "../../lib/apiClient";
 import { ModerationQueueSkeleton } from "../../components/ui/Skeleton";
+import { Pagination } from "../../components/ui/Pagination";
+import {
+  getAdminApiErrorMessage,
+  getPageAfterRemoval,
+  getPageRangeLabel,
+  type AdminTargetRoleFilter,
+} from "../../features/admin/adminState";
 
 const REPORTS_PER_PAGE = 25;
 
-type FilterType = "all" | "users" | "admins";
+type FilterType = AdminTargetRoleFilter;
 
 export default function Dashboard() {
   const [reports, setReports] = useState<Report[]>([]);
@@ -22,6 +32,13 @@ export default function Dashboard() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalReports, setTotalReports] = useState(0);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [pendingReportId, setPendingReportId] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<
+    (AdminConfirmation & { action: ApiAdminReportAction }) | null
+  >(null);
+  const pendingReportIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -31,8 +48,16 @@ export default function Dashboard() {
       if (session?.user) {
         if (isMounted) setCurrentUserId(session.user.id);
 
-        const data = await api.permissions();
-        if (isMounted) setCurrentUserRole(data.profile.role);
+        try {
+          const data = await api.permissions();
+          if (isMounted) setCurrentUserRole(data.profile.role);
+        } catch (error) {
+          console.error("Error checking moderation permissions:", error);
+          if (isMounted) {
+            setLoadError("Could not verify moderation permissions. Try again.");
+            setLoading(false);
+          }
+        }
       } else if (isMounted) {
         setLoading(false);
       }
@@ -54,7 +79,12 @@ export default function Dashboard() {
 
       try {
         setLoading(true);
-        const data = await api.adminReports<Report>(page, REPORTS_PER_PAGE);
+        setLoadError("");
+        const data = await api.adminReports<Report>(
+          page,
+          REPORTS_PER_PAGE,
+          filter,
+        );
         if (!isMounted) return;
 
         setReports(data.reports);
@@ -65,11 +95,12 @@ export default function Dashboard() {
         }
       } catch (error) {
         console.error("Error fetching reports:", error);
+        if (isMounted) setLoadError("Could not load reports. Try again.");
       } finally {
         if (isMounted) setLoading(false);
       }
     },
-    [currentUserRole, page],
+    [currentUserRole, filter, page],
   );
 
   useEffect(() => {
@@ -85,21 +116,38 @@ export default function Dashboard() {
     reportId: string,
     action: ApiAdminReportAction,
   ) => {
+    if (pendingReportIdRef.current) return;
+    pendingReportIdRef.current = reportId;
+    setPendingReportId(reportId);
+    setActionError("");
     try {
       const result = await api.adminReportAction(reportId, action);
+      const nextTotal = Math.max(0, totalReports - 1);
       setReports((prev) =>
         action === "ignore"
           ? prev.filter((report) => report.id !== result.reportId)
           : prev.filter((report) => report.comments?.id !== result.commentId),
       );
-      setTotalReports((currentTotal) => Math.max(0, currentTotal - 1));
+      setTotalReports(nextTotal);
+      setPage(
+        getPageAfterRemoval({
+          currentPage: page,
+          pageSize: REPORTS_PER_PAGE,
+          totalAfterRemoval: nextTotal,
+        }),
+      );
+      await fetchReports(true);
     } catch (err) {
       console.error("Failed to resolve report:", err);
-      const message =
-        err instanceof ApiError && typeof err.payload === "object"
-          ? (err.payload as { error?: string })?.error
-          : null;
-      alert(message || "Failed to resolve report. Please try again.");
+      setActionError(
+        getAdminApiErrorMessage(
+          err,
+          "Failed to resolve report. Please try again.",
+        ),
+      );
+    } finally {
+      pendingReportIdRef.current = null;
+      setPendingReportId(null);
     }
   };
 
@@ -112,31 +160,44 @@ export default function Dashboard() {
   };
 
   const handleBanUser = async (reportId: string) => {
-    if (!window.confirm("Are you sure you want to ban this user permanently?"))
-      return;
-
-    await resolveReport(reportId, "ban_user");
+    setConfirmation({
+      action: "ban_user",
+      body: "This permanently bans the reported user and deletes the reported comment. Continue only if the report clearly warrants removal.",
+      confirmLabel: "Ban User",
+      id: reportId,
+      intent: "danger",
+      title: "Ban reported user?",
+    });
   };
 
-  // Apply the active filter
-  const filteredReports = reports.filter((report) => {
-    if (!report.comments) return false;
-    const isTargetAdmin = report.comments.profiles.role === "admin";
-
-    if (filter === "users") return !isTargetAdmin;
-    if (filter === "admins") return isTargetAdmin;
-    return true;
-  });
+  const handleConfirmAction = async () => {
+    if (!confirmation) return;
+    const { action, id } = confirmation;
+    setConfirmation(null);
+    await resolveReport(id, action);
+  };
 
   if (loading) {
     return <ModerationQueueSkeleton />;
   }
 
-  const pageStart = totalReports === 0 ? 0 : (page - 1) * REPORTS_PER_PAGE + 1;
-  const pageEnd = Math.min(pageStart + reports.length - 1, totalReports);
+  const pageLabel = getPageRangeLabel({
+    currentCount: reports.length,
+    page,
+    pageSize: REPORTS_PER_PAGE,
+    total: totalReports,
+  });
 
   return (
     <div className="space-y-6">
+      {confirmation && (
+        <AdminConfirmDialog
+          confirmation={confirmation}
+          isPending={pendingReportId === confirmation.id}
+          onCancel={() => setConfirmation(null)}
+          onConfirm={() => void handleConfirmAction()}
+        />
+      )}
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -150,7 +211,10 @@ export default function Dashboard() {
             <Filter className="w-4 h-4 text-gray-400 mr-2" />
             <select
               value={filter}
-              onChange={(e) => setFilter(e.target.value as FilterType)}
+              onChange={(e) => {
+                setFilter(e.target.value as FilterType);
+                setPage(1);
+              }}
               className="bg-transparent text-sm text-gray-300 font-medium focus:outline-none cursor-pointer appearance-none pr-4"
             >
               <option value="all">All Reports</option>
@@ -166,17 +230,34 @@ export default function Dashboard() {
       </div>
 
       {/* Reports Feed */}
-      {filteredReports.length === 0 ? (
+      {actionError && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {actionError}
+        </div>
+      )}
+
+      {loadError ? (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-8 text-center text-red-200">
+          <p>{loadError}</p>
+          <button
+            className="mt-4 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
+            onClick={() => void fetchReports()}
+            type="button"
+          >
+            Retry
+          </button>
+        </div>
+      ) : reports.length === 0 ? (
         <div className="bg-synth-surface border border-synth-border rounded-xl p-12 text-center text-gray-400 shadow-glow-card">
           <Check className="w-12 h-12 text-green-500 mx-auto mb-4 opacity-50" />
           <p className="text-xl">Queue is clear.</p>
           <p className="text-sm mt-2">
-            No reports matching this filter right now.
+            No reports matching this server filter right now.
           </p>
         </div>
       ) : (
         <div className="space-y-4">
-          {filteredReports.map((report) => (
+          {reports.map((report) => (
             <ReportCard
               key={report.id}
               report={report}
@@ -185,6 +266,7 @@ export default function Dashboard() {
               onIgnore={handleIgnore}
               onDelete={handleDeleteComment}
               onBan={handleBanUser}
+              pending={pendingReportId === report.id}
             />
           ))}
         </div>
@@ -192,32 +274,15 @@ export default function Dashboard() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-gray-500">
-          Showing {pageStart}-{pageEnd} of {totalReports}
-          {filter !== "all" && " before filter"}
+          {pageLabel}
+          {filter !== "all" && " for this filter"}
         </p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-            disabled={page === 1 || loading}
-            className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Previous
-          </button>
-          <span className="rounded-lg border border-synth-border bg-synth-bg px-4 py-2 text-sm font-semibold text-gray-300">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              setPage((currentPage) => Math.min(totalPages, currentPage + 1))
-            }
-            disabled={page >= totalPages || loading}
-            className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
+        <Pagination
+          currentPage={page}
+          disabled={loading}
+          onPageChange={setPage}
+          totalPages={totalPages}
+        />
       </div>
     </div>
   );

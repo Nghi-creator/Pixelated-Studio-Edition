@@ -40,7 +40,7 @@ type RecordRow = Record<string, unknown>;
 
 type Filter = {
   field: string;
-  op: "eq" | "gte" | "ilike" | "in";
+  op: "eq" | "gte" | "ilike" | "in" | "not_in";
   value: unknown;
 };
 
@@ -52,6 +52,12 @@ class FakeSupabase {
   authListUsersCalls = 0;
   authUsers: User[] = [];
   deletedUsers: string[] = [];
+  storageErrors = new Set<string>();
+  storageObjects: Record<string, string[]> = {
+    avatars: [],
+    submissions: [],
+  };
+  removedStorageObjects: { bucket: string; paths: string[] }[] = [];
   rows: Record<TableName, RecordRow[]> = {
     access_logs: [],
     comment_likes: [],
@@ -93,6 +99,41 @@ class FakeSupabase {
         user: this.authUsers.find((user) => user.id === token) || null,
       },
       error: null,
+    }),
+  };
+  storage = {
+    from: (bucket: string) => ({
+      list: async (prefix: string) => {
+        if (this.storageErrors.has(bucket)) {
+          return { data: null, error: new Error(`${bucket} storage unavailable`) };
+        }
+
+        const childEntries = new Map<string, { id: string | null; name: string }>();
+        for (const path of this.storageObjects[bucket] || []) {
+          if (!path.startsWith(`${prefix}/`)) continue;
+
+          const remainingPath = path.slice(prefix.length + 1);
+          const [name, ...rest] = remainingPath.split("/");
+          childEntries.set(name, {
+            id: rest.length === 0 ? path : null,
+            name,
+          });
+        }
+
+        return { data: [...childEntries.values()], error: null };
+      },
+      remove: async (paths: string[]) => {
+        if (this.storageErrors.has(bucket)) {
+          return { data: null, error: new Error(`${bucket} storage unavailable`) };
+        }
+
+        const pathSet = new Set(paths);
+        this.storageObjects[bucket] = (this.storageObjects[bucket] || []).filter(
+          (path) => !pathSet.has(path),
+        );
+        this.removedStorageObjects.push({ bucket, paths });
+        return { data: paths, error: null };
+      },
     }),
   };
 
@@ -238,6 +279,17 @@ class FakeQueryBuilder {
 
   in(field: string, value: unknown[]) {
     this.filters.push({ field, op: "in", value });
+    return this;
+  }
+
+  not(field: string, operator: "in", value: string) {
+    if (operator === "in") {
+      this.filters.push({
+        field,
+        op: "not_in",
+        value: value.replace(/^\(|\)$/g, "").split(","),
+      });
+    }
     return this;
   }
 
@@ -394,25 +446,41 @@ class FakeQueryBuilder {
   private filteredRows() {
     return this.db.rows[this.table].filter((row) =>
       this.filters.every((filter) => {
+        const rowValue = getNestedValue(row, filter.field);
         if (filter.op === "gte") {
-          return String(row[filter.field]) >= String(filter.value);
+          return String(rowValue) >= String(filter.value);
         }
         if (filter.op === "ilike") {
           const pattern = String(filter.value)
             .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
             .replaceAll("%", ".*");
           return new RegExp(`^${pattern}$`, "i").test(
-            String(row[filter.field] || ""),
+            String(rowValue || ""),
           );
         }
         if (filter.op === "in" && Array.isArray(filter.value)) {
-          return filter.value.includes(row[filter.field]);
+          return filter.value.includes(rowValue);
+        }
+        if (filter.op === "not_in" && Array.isArray(filter.value)) {
+          return !filter.value.includes(rowValue);
         }
 
-        return row[filter.field] === filter.value;
+        return rowValue === filter.value;
       }),
     );
   }
+}
+
+function getNestedValue(row: RecordRow, field: string): unknown {
+  return field
+    .split(".")
+    .reduce<unknown>(
+      (value, key) =>
+        value && typeof value === "object"
+          ? (value as Record<string, unknown>)[key]
+          : undefined,
+      row,
+    );
 }
 
 function requireUser(userId = USER_ID) {
@@ -424,6 +492,7 @@ function requireUser(userId = USER_ID) {
       created_at: new Date().toISOString(),
       email: `${userId}@example.com`,
       id: userId,
+      last_sign_in_at: new Date().toISOString(),
       user_metadata: {},
     };
     return undefined;
@@ -522,7 +591,7 @@ test("catalog route paginates, searches, and returns featured games", async () =
   }>();
   assert.deepEqual(
     body.games.map((game) => game.id),
-    ["game-d"],
+    ["game-a"],
   );
   assert.deepEqual(
     body.featuredGames.map((game) => game.id),
@@ -863,9 +932,15 @@ test("write-heavy social and play routes are rate limited per user", async () =>
   await playsApp.close();
 });
 
-test("profile routes update only the authenticated profile and delete auth user", async () => {
+test("profile routes update only the authenticated profile and safely delete auth user", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
+  db.storageObjects.avatars.push(`${USER_ID}/avatar.png`);
+  db.storageObjects.submissions.push(
+    `${USER_ID}/roms/tiny.nes`,
+    `${USER_ID}/covers/cover.png`,
+    `${OTHER_USER_ID}/roms/other.nes`,
+  );
   const app = await createDataBoundaryApp(db, USER_ID);
 
   const updateResponse = await app.inject({
@@ -880,9 +955,110 @@ test("profile routes update only the authenticated profile and delete auth user"
   assert.equal(db.rows.profiles.find((row) => row.id === USER_ID)?.username, "new-name");
   assert.equal(db.rows.profiles.find((row) => row.id === OTHER_USER_ID)?.username, "other");
 
-  const deleteResponse = await app.inject({ method: "DELETE", url: "/me/account" });
+  const deleteResponse = await app.inject({
+    method: "DELETE",
+    payload: { confirmation: "DELETE" },
+    url: "/me/account",
+  });
   assert.equal(deleteResponse.statusCode, 204);
   assert.deepEqual(db.deletedUsers, [USER_ID]);
+  assert.deepEqual(db.storageObjects.avatars, []);
+  assert.deepEqual(db.storageObjects.submissions, [`${OTHER_USER_ID}/roms/other.nes`]);
+  await app.close();
+});
+
+test("account deletion blocks privileged roles, stale sessions, and invalid confirmation", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+
+  const invalidConfirmationApp = await createDataBoundaryApp(db, USER_ID);
+  const invalidConfirmation = await invalidConfirmationApp.inject({
+    method: "DELETE",
+    payload: { confirmation: "delete" },
+    url: "/me/account",
+  });
+  assert.equal(invalidConfirmation.statusCode, 400);
+  await invalidConfirmationApp.close();
+
+  for (const privilegedUserId of [ADMIN_ID, SUPER_ADMIN_ID]) {
+    const privilegedApp = await createDataBoundaryApp(db, privilegedUserId);
+    const privilegedDelete = await privilegedApp.inject({
+      method: "DELETE",
+      payload: { confirmation: "DELETE" },
+      url: "/me/account",
+    });
+    assert.equal(privilegedDelete.statusCode, 403);
+    assert.deepEqual(db.deletedUsers, []);
+    await privilegedApp.close();
+  }
+
+  const staleApp = Fastify({ logger: false });
+  await registerProfileRoutes(staleApp, {
+    requireUser: async (request) => {
+      (request as TestRequest).user = {
+        app_metadata: {},
+        aud: "authenticated",
+        created_at: new Date().toISOString(),
+        email: "stale@example.com",
+        id: USER_ID,
+        last_sign_in_at: new Date(Date.now() - 11 * 60 * 1000).toISOString(),
+        user_metadata: {},
+      };
+    },
+    supabase: db as never,
+  });
+  const staleDelete = await staleApp.inject({
+    method: "DELETE",
+    payload: { confirmation: "DELETE" },
+    url: "/me/account",
+  });
+  assert.equal(staleDelete.statusCode, 403);
+  assert.equal(
+    staleDelete.json<{ code: string }>().code,
+    "recent_sign_in_required",
+  );
+  assert.deepEqual(db.deletedUsers, []);
+  await staleApp.close();
+});
+
+test("account deletion aborts when owned storage cannot be cleaned", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.storageErrors.add("submissions");
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "DELETE",
+    payload: { confirmation: "DELETE" },
+    url: "/me/account",
+  });
+
+  assert.equal(response.statusCode, 500);
+  assert.deepEqual(db.deletedUsers, []);
+  await app.close();
+});
+
+test("account deletion attempts are rate limited", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await app.inject({
+      method: "DELETE",
+      payload: { confirmation: "not-delete" },
+      url: "/me/account",
+    });
+    assert.equal(response.statusCode, 400);
+  }
+
+  const blockedResponse = await app.inject({
+    method: "DELETE",
+    payload: { confirmation: "DELETE" },
+    url: "/me/account",
+  });
+  assert.equal(blockedResponse.statusCode, 429);
+  assert.deepEqual(db.deletedUsers, []);
   await app.close();
 });
 
@@ -1160,6 +1336,58 @@ test("admin reports are paginated server-side", async () => {
   assert.equal(body.pageSize, 5);
   assert.equal(body.total, 12);
   assert.equal(body.totalPages, 3);
+  await app.close();
+});
+
+test("admin reports filter target roles before pagination", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  for (let index = 1; index <= 8; index += 1) {
+    const isAdminTarget = index % 2 === 0;
+    db.rows.reported_comments.push({
+      comments: {
+        content: `reported comment ${index}`,
+        id: `comment-${index}`,
+        profiles: {
+          id: isAdminTarget ? ADMIN_ID : USER_ID,
+          role: isAdminTarget ? "admin" : "user",
+          username: isAdminTarget ? "admin" : "player",
+        },
+      },
+      created_at: `2026-05-${String(index).padStart(2, "0")}T00:00:00.000Z`,
+      id: `report-${index}`,
+      profiles: { id: OTHER_USER_ID, username: "other" },
+      reason: `reason ${index}`,
+    });
+  }
+  const app = await createDataBoundaryApp(db, SUPER_ADMIN_ID);
+
+  const adminResponse = await app.inject({
+    method: "GET",
+    url: "/admin/reports?page=1&pageSize=2&targetRole=admins",
+  });
+  const userResponse = await app.inject({
+    method: "GET",
+    url: "/admin/reports?page=2&pageSize=2&targetRole=users",
+  });
+
+  assert.equal(adminResponse.statusCode, 200);
+  assert.deepEqual(
+    adminResponse.json<{ reports: { id: string }[]; total: number; totalPages: number }>()
+      .reports.map((report) => report.id),
+    ["report-8", "report-6"],
+  );
+  assert.equal(adminResponse.json<{ total: number }>().total, 4);
+  assert.equal(adminResponse.json<{ totalPages: number }>().totalPages, 2);
+
+  assert.equal(userResponse.statusCode, 200);
+  assert.deepEqual(
+    userResponse.json<{ reports: { id: string }[]; total: number; totalPages: number }>()
+      .reports.map((report) => report.id),
+    ["report-3", "report-1"],
+  );
+  assert.equal(userResponse.json<{ total: number }>().total, 4);
+  assert.equal(userResponse.json<{ totalPages: number }>().totalPages, 2);
   await app.close();
 });
 

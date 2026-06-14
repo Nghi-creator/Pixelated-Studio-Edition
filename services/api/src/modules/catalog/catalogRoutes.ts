@@ -21,6 +21,7 @@ import {
   gamesQuerySchema,
   reactionBodySchema,
 } from "./contracts.js";
+import { searchAndRankGames } from "./catalogSearch.js";
 import { logTiming, timed } from "../observability/timing.js";
 import { rejectRateLimitedRequest } from "../security/rateLimitResponse.js";
 import { createRateLimiter } from "../security/sharedRateLimiter.js";
@@ -29,6 +30,8 @@ type CatalogRouteOptions = {
   requireUser?: typeof requireSupabaseUser;
   supabase?: CatalogService | null;
 };
+
+const MAX_SEARCH_CANDIDATES = 1000;
 
 export async function registerCatalogRoutes(
   app: FastifyInstance,
@@ -96,13 +99,17 @@ export async function registerCatalogRoutes(
       .order("title");
 
     if (search) {
-      gamesQuery = gamesQuery.ilike("title", `%${search}%`);
+      gamesQuery = service
+        .from("games")
+        .select("*")
+        .order("title")
+        .limit(MAX_SEARCH_CANDIDATES);
     }
 
     const { data, count, error } = await timed(
       timings,
       "games_query_ms",
-      () => gamesQuery.range(start, end),
+      () => (search ? gamesQuery : gamesQuery.range(start, end)),
     );
 
     if (error) {
@@ -117,10 +124,14 @@ export async function registerCatalogRoutes(
       request.log.warn({ err }, "Failed to load featured games");
     }
 
-    const total = count || 0;
+    const rankedGames = search
+      ? searchAndRankGames(data || [], search)
+      : data || [];
+    const pagedGames = search ? rankedGames.slice(start, end + 1) : rankedGames;
+    const total = search ? rankedGames.length : count || 0;
     const response = {
       featuredGames,
-      games: data || [],
+      games: pagedGames,
       page,
       pageSize,
       total,
@@ -140,7 +151,7 @@ export async function registerCatalogRoutes(
       cache: "miss",
       page,
       pageSize,
-      resultCount: data?.length || 0,
+      resultCount: pagedGames.length,
       search: Boolean(search),
       total,
     });

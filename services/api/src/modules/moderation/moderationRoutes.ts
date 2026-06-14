@@ -148,17 +148,12 @@ export async function registerModerationRoutes(
         return reply.status(400).send({ error: "Invalid reports query" });
       }
 
-      const { page, pageSize } = parsedQuery.data;
+      const { page, pageSize, targetRole } = parsedQuery.data;
       const { end, start } = getPageRange(page, pageSize);
-
-      const { data, count, error } = await timed(
-        timings,
-        "admin_reports_query_ms",
-        () =>
-          service
-            .from("reported_comments")
-            .select(
-              `
+      let reportsQuery = service
+        .from("reported_comments")
+        .select(
+          `
               id,
               reason,
               created_at,
@@ -169,10 +164,27 @@ export async function registerModerationRoutes(
               ),
               profiles ( id, username )
             `,
-              { count: "exact" },
-            )
-            .order("created_at", { ascending: false })
-            .range(start, end),
+          { count: "exact" },
+        )
+        .order("created_at", { ascending: false });
+
+      if (targetRole === "admins") {
+        reportsQuery = reportsQuery.in("comments.profiles.role", [
+          "admin",
+          "super_admin",
+        ]);
+      } else if (targetRole === "users") {
+        reportsQuery = reportsQuery.not(
+          "comments.profiles.role",
+          "in",
+          "(admin,super_admin)",
+        );
+      }
+
+      const { data, count, error } = await timed(
+        timings,
+        "admin_reports_query_ms",
+        () => reportsQuery.range(start, end),
       );
 
       if (error) {
@@ -186,6 +198,7 @@ export async function registerModerationRoutes(
         pageSize,
         resultCount: data?.length || 0,
         roleCache: roleLookup.cache,
+        targetRole,
         total,
       });
 
@@ -193,6 +206,7 @@ export async function registerModerationRoutes(
         page,
         pageSize,
         reports: data || [],
+        targetRole,
         total,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
       };

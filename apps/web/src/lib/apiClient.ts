@@ -233,10 +233,21 @@ export const api = {
     apiRequest<ApiPaginatedAccessLogsResponse<TLog>>(
       `/admin/access-logs?page=${page}&pageSize=${pageSize}`,
     ),
-  adminReports: <TReport>(page = 1, pageSize = 25) =>
-    apiRequest<ApiPaginatedReportsResponse<TReport>>(
-      `/admin/reports?page=${page}&pageSize=${pageSize}`,
-    ),
+  adminReports: <TReport>(
+    page = 1,
+    pageSize = 25,
+    targetRole: "all" | "users" | "admins" = "all",
+  ) => {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: String(pageSize),
+      targetRole,
+    });
+
+    return apiRequest<ApiPaginatedReportsResponse<TReport>>(
+      `/admin/reports?${params}`,
+    );
+  },
   adminReportAction: (reportId: string, action: ApiAdminReportAction) =>
     apiRequest<ApiAdminReportActionResponse>(
       `/admin/reports/${reportId}/action`,
@@ -264,15 +275,14 @@ export const api = {
     }),
   deleteAccount: () =>
     apiRequest<void>("/me/account", {
+      body: JSON.stringify({ confirmation: "DELETE" }),
       method: "DELETE",
     }),
   deleteComment: (commentId: string) =>
     apiRequest<void>(`/comments/${commentId}`, {
       method: "DELETE",
     }),
-  favoriteStatus: async (gameId: string) => ({
-    favorited: (await getFavoriteIds()).has(gameId),
-  }),
+  favoriteIds: () => getFavoriteIds(),
   games: ({
     page = 1,
     pageSize = 15,

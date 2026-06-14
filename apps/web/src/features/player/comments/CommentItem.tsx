@@ -9,6 +9,7 @@ type CommentItemProps = {
   onCommentReaction: (commentId: string, isLike: boolean) => void;
   onDeleteComment: (commentId: string) => void;
   onReportComment: (commentId: string) => void;
+  pending: boolean;
 };
 
 export function CommentItem({
@@ -17,6 +18,7 @@ export function CommentItem({
   onCommentReaction,
   onDeleteComment,
   onReportComment,
+  pending,
 }: CommentItemProps) {
   const displayName = comment.profiles?.username || "Anonymous Player";
 
@@ -56,7 +58,8 @@ export function CommentItem({
             {currentUser?.id === comment.user_id ? (
               <button
                 onClick={() => onDeleteComment(comment.id)}
-                className="text-gray-500 hover:text-red-400 transition-colors"
+                disabled={pending}
+                className="text-gray-500 hover:text-red-400 transition-colors disabled:cursor-wait disabled:opacity-50"
                 title="Delete Comment"
               >
                 <Trash2 className="w-4 h-4" />
@@ -65,7 +68,8 @@ export function CommentItem({
               currentUser && (
                 <button
                   onClick={() => onReportComment(comment.id)}
-                  className="text-gray-500 hover:text-yellow-500 transition-colors"
+                  disabled={pending}
+                  className="text-gray-500 hover:text-yellow-500 transition-colors disabled:cursor-wait disabled:opacity-50"
                   title="Report Comment"
                 >
                   <Flag className="w-4 h-4" />
@@ -82,7 +86,7 @@ export function CommentItem({
         <div className="flex items-center gap-3">
           <button
             onClick={() => onCommentReaction(comment.id, true)}
-            disabled={currentUser?.id === comment.user_id}
+            disabled={currentUser?.id === comment.user_id || pending}
             className={`flex items-center gap-1.5 text-xs font-medium transition-all ${
               currentUser?.id === comment.user_id
                 ? "text-gray-600 opacity-50 cursor-not-allowed"
@@ -99,7 +103,7 @@ export function CommentItem({
 
           <button
             onClick={() => onCommentReaction(comment.id, false)}
-            disabled={currentUser?.id === comment.user_id}
+            disabled={currentUser?.id === comment.user_id || pending}
             className={`flex items-center gap-1.5 text-xs font-medium transition-all ${
               currentUser?.id === comment.user_id
                 ? "text-gray-600 opacity-50 cursor-not-allowed"

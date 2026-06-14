@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
 import { api } from "../../lib/apiClient";
 import { GamesCatalogSkeleton, HeroSkeleton } from "../../components/ui/Skeleton";
+import { Pagination } from "../../components/ui/Pagination";
 
 const GAMES_PER_PAGE = 15;
 const ZERO_PLAY_FEATURED_REFRESH_MS = 30_000;
@@ -30,11 +31,18 @@ export default function Landing() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalGames, setTotalGames] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const catalogRequestIdRef = useRef(0);
+  const featuredRequestIdRef = useRef(0);
 
   const fetchFeaturedGames = useCallback(async (isMounted = true) => {
+    const requestId = ++featuredRequestIdRef.current;
     try {
       const data = await api.featuredGames();
-      if (isMounted && data.featuredGames.length > 0) {
+      if (
+        isMounted &&
+        requestId === featuredRequestIdRef.current &&
+        data.featuredGames.length > 0
+      ) {
         setFeaturedGames(data.featuredGames);
       }
     } catch (error) {
@@ -43,6 +51,7 @@ export default function Landing() {
   }, []);
 
   const fetchGames = useCallback(async (isMounted = true) => {
+    const requestId = ++catalogRequestIdRef.current;
     try {
       setLoadError("");
       setLoading(true);
@@ -51,7 +60,7 @@ export default function Landing() {
         pageSize: GAMES_PER_PAGE,
         search: searchQuery,
       });
-      if (isMounted) {
+      if (isMounted && requestId === catalogRequestIdRef.current) {
         setGames(data.games);
         setFeaturedGames((currentFeaturedGames) =>
           currentFeaturedGames.length > 0
@@ -63,16 +72,19 @@ export default function Landing() {
       }
     } catch (error) {
       console.error("Error fetching games:", error);
-      if (isMounted) {
+      if (isMounted && requestId === catalogRequestIdRef.current) {
         setLoadError("Could not load the game library. Check the API connection.");
       }
     } finally {
-      if (isMounted) setLoading(false);
+      if (isMounted && requestId === catalogRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [currentPage, searchQuery]);
 
   useEffect(() => {
     let isMounted = true;
+    catalogRequestIdRef.current += 1;
     const timeout = window.setTimeout(() => {
       fetchGames(isMounted);
     }, searchQuery ? 250 : 0);
@@ -114,16 +126,6 @@ export default function Landing() {
       setCurrentPage(totalPages);
     }
   }, [currentPage, totalPages]);
-
-  const visiblePageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1)
-    .filter((page) => {
-      if (totalPages <= 5) return true;
-      return (
-        page === 1 ||
-        page === totalPages ||
-        Math.abs(page - safeCurrentPage) <= 1
-      );
-    });
 
   const changePage = (page: number) => {
     setCurrentPage(page);
@@ -172,7 +174,14 @@ export default function Landing() {
 
             {loadError ? (
               <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-8 text-center text-red-200">
-                {loadError}
+                <p>{loadError}</p>
+                <button
+                  className="mt-4 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
+                  onClick={() => void fetchGames()}
+                  type="button"
+                >
+                  Retry
+                </button>
               </div>
             ) : games.length === 0 ? (
               <div className="text-center py-20 text-gray-500">
@@ -200,51 +209,11 @@ export default function Landing() {
                   {totalGames}
                 </p>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => changePage(Math.max(1, safeCurrentPage - 1))}
-                    disabled={safeCurrentPage === 1}
-                    className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Previous
-                  </button>
-
-                  {visiblePageNumbers.map((page, index) => {
-                    const previousPage = visiblePageNumbers[index - 1];
-                    const needsGap = previousPage && page - previousPage > 1;
-
-                    return (
-                      <span key={page} className="inline-flex items-center gap-2">
-                        {needsGap && (
-                          <span className="px-1 text-sm text-gray-600">...</span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => changePage(page)}
-                          className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-bold transition-colors ${
-                            page === safeCurrentPage
-                              ? "border-synth-primary bg-synth-primary/15 text-white"
-                              : "border-synth-border bg-synth-surface text-gray-400 hover:border-synth-primary/70 hover:text-white"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      </span>
-                    );
-                  })}
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      changePage(Math.min(totalPages, safeCurrentPage + 1))
-                    }
-                    disabled={safeCurrentPage === totalPages}
-                    className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    Next
-                  </button>
-                </div>
+                <Pagination
+                  currentPage={safeCurrentPage}
+                  onPageChange={changePage}
+                  totalPages={totalPages}
+                />
               </div>
             )}
           </>

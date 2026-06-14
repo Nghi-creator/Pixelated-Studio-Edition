@@ -58,6 +58,9 @@ jobs:
           npm ci --prefix apps/web
           npm ci --prefix apps/desktop
 
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
       - name: Verify hosted web and smoke contract
         run: npm run verify:hosted-contract
 

@@ -6,6 +6,10 @@ import {
   selectFeaturedGames,
 } from "../src/modules/catalog/catalogService.js";
 import {
+  getGameSearchScore,
+  searchAndRankGames,
+} from "../src/modules/catalog/catalogSearch.js";
+import {
   canResolveTargetRole,
   canReviewOwnReport,
   getPageRange as getModerationPageRange,
@@ -29,6 +33,27 @@ test("featured selection preserves play-count ranking and limits results", () =>
     selectFeaturedGames(games).map((game) => game.id),
     ["game-0", "game-1", "game-2", "game-3", "game-4"],
   );
+});
+
+test("catalog search ranks deterministic fuzzy matches without semantic guessing", () => {
+  const games = [
+    { id: "contains", title: "Alpha Quest" },
+    { id: "prefix", title: "Quest Drift" },
+    { id: "typo", title: "Pixel Runner" },
+    { id: "unrelated", title: "Space Garden" },
+    { id: "initials", title: "Super Pixel Quest" },
+  ];
+
+  assert.deepEqual(
+    searchAndRankGames(games, "quest").map((game) => game.id),
+    ["prefix", "contains", "initials"],
+  );
+  assert.deepEqual(
+    searchAndRankGames(games, "runer").map((game) => game.id),
+    ["typo"],
+  );
+  assert.equal(getGameSearchScore({ title: "Super Pixel Quest" }, "spq"), 50);
+  assert.equal(getGameSearchScore({ title: "Space Garden" }, "mario"), null);
 });
 
 test("moderation policy centralizes report and target privilege rules", () => {

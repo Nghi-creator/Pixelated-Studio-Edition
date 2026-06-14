@@ -21,6 +21,7 @@ import {
   STREAM_PROFILE_STORAGE_KEY,
   type StreamProfileId,
 } from "../../lib/engine/streamProfiles";
+import { shouldIgnoreGameInput } from "../../lib/webrtc/webrtcInput";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
 
 const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
@@ -122,28 +123,40 @@ export default function Player() {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(STREAM_TELEMETRY_VISIBILITY_KEY) === "1";
   });
-  const { dislikes, handleReaction, likes, userReaction } = useGameReactions(
-    id,
-    currentUser,
-  );
+  const {
+    dislikes,
+    handleReaction,
+    isReactionLoading,
+    likes,
+    reactionError,
+    retryReactions,
+    userReaction,
+  } = useGameReactions(id, currentUser);
   const {
     comments,
+    commentsError,
     handleCommentReaction,
     handleDeleteComment,
     handlePostComment,
     hasMoreComments,
+    isLoadingComments,
+    isLoadingMoreComments,
     isSubmittingComment,
     loadMoreComments,
     newComment,
+    pendingCommentIds,
+    retryComments,
     setNewComment,
   } = useComments(id, currentUser);
   const {
     closeReportModal,
     handleSubmitReport,
     isSubmittingReport,
+    openReportModal,
+    reportError,
+    reportMessage,
     reportReason,
     reportingCommentId,
-    setReportingCommentId,
     setReportReason,
   } = useCommentReporting(currentUser);
 
@@ -170,12 +183,7 @@ export default function Player() {
     const gameKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "];
 
     const preventScroll = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") {
-        return;
-      }
-
-      if (gameKeys.includes(event.key)) {
+      if (!shouldIgnoreGameInput(event) && gameKeys.includes(event.key)) {
         event.preventDefault();
       }
     };
@@ -317,29 +325,39 @@ export default function Player() {
 
       <CommentsPanel
         comments={comments}
+        commentsError={commentsError}
         currentUser={currentUser}
         hasMoreComments={hasMoreComments}
+        isLoadingComments={isLoadingComments}
+        isLoadingMoreComments={isLoadingMoreComments}
         isSubmittingComment={isSubmittingComment}
         newComment={newComment}
         onCommentReaction={handleCommentReaction}
         onDeleteComment={handleDeleteComment}
         onLoadMore={loadMoreComments}
         onPostComment={handlePostComment}
-        onReportComment={setReportingCommentId}
+        onReportComment={openReportModal}
+        onRetryComments={retryComments}
         onSignIn={() => navigate("/login")}
+        pendingCommentIds={pendingCommentIds}
         reactionButtons={
           <ReactionButtons
             dislikes={dislikes}
+            error={reactionError}
+            isLoading={isReactionLoading}
             likes={likes}
             onReaction={handleReaction}
+            onRetry={retryReactions}
             userReaction={userReaction}
           />
         }
+        reportMessage={reportMessage}
         setNewComment={setNewComment}
       />
 
       {reportingCommentId && (
         <ReportModal
+          error={reportError}
           isSubmittingReport={isSubmittingReport}
           onClose={closeReportModal}
           onSubmitReport={handleSubmitReport}

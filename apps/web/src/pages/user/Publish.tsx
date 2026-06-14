@@ -10,10 +10,22 @@ import {
 import { Link } from "react-router-dom";
 import { supabase } from "../../lib/auth/supabaseClient";
 import { api, getAuthSession } from "../../lib/apiClient";
+import {
+  getPublishErrorMessage,
+  submitGameForReview,
+  validateRomFile,
+  validateSubmissionImageFile,
+} from "../../features/publish/publishSubmission";
+
+type FileErrorKey = "banner" | "cover" | "rom";
 
 export default function Publish() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [fileErrors, setFileErrors] = useState<
+    Partial<Record<FileErrorKey, string>>
+  >({});
 
   // Form State
   const [authorName, setAuthorName] = useState("");
@@ -29,102 +41,107 @@ export default function Publish() {
   const handleRomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (!file.name.toLowerCase().endsWith(".nes")) {
-        alert("Only .nes files are allowed!");
+      const error = validateRomFile(file);
+      if (error) {
+        setRomFile(null);
+        setFileErrors((current) => ({ ...current, rom: error }));
         e.target.value = "";
         return;
       }
+      setFileErrors((current) => ({ ...current, rom: undefined }));
+      setFormError(null);
       setRomFile(file);
     }
   };
 
   const handleImageChange = (
     e: React.ChangeEvent<HTMLInputElement>,
+    errorKey: Exclude<FileErrorKey, "rom">,
     setter: React.Dispatch<React.SetStateAction<File | null>>,
   ) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
-      if (!file.type.startsWith("image/")) {
-        alert("Please upload a valid image file (PNG, JPG, etc).");
+      const error = validateSubmissionImageFile(file);
+      if (error) {
+        setter(null);
+        setFileErrors((current) => ({ ...current, [errorKey]: error }));
         e.target.value = "";
         return;
       }
+      setFileErrors((current) => ({ ...current, [errorKey]: undefined }));
+      setFormError(null);
       setter(file);
     }
   };
 
   const uploadToSupabase = async (
     file: File,
-    folder: string,
-    userId: string,
+    path: string,
   ) => {
-    const fileExt = file.name.split(".").pop()?.toLowerCase() || "bin";
-    const fileName = `${userId}/${folder}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-
     const { error } = await supabase.storage
       .from("submissions")
-      .upload(fileName, file);
+      .upload(path, file);
     if (error) throw error;
 
     const { data } = supabase.storage
       .from("submissions")
-      .getPublicUrl(fileName);
+      .getPublicUrl(path);
     return data.publicUrl;
+  };
+
+  const removeSubmissionFiles = async (paths: string[]) => {
+    const { error } = await supabase.storage.from("submissions").remove(paths);
+    if (error) throw error;
   };
 
   const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!romFile) {
-      alert("Please attach your .nes ROM file.");
+    if (isSubmitting) return;
+
+    const romError = validateRomFile(romFile);
+    if (romError) {
+      setFileErrors((current) => ({ ...current, rom: romError }));
       return;
     }
 
     setIsSubmitting(true);
+    setFormError(null);
 
     try {
       const session = await getAuthSession();
 
       if (!session) {
-        alert("Please sign in before submitting a game.");
+        setFormError("Please sign in before submitting a game.");
         return;
       }
 
-      // 1. Upload ROM
-      const romUrl = await uploadToSupabase(
-        romFile,
-        "roms",
-        session.user.id,
-      );
-
-      // 2. Upload Optional Images
-      let coverUrl = null;
-      let bannerUrl = null;
-      if (coverFile) {
-        coverUrl = await uploadToSupabase(coverFile, "covers", session.user.id);
-      }
-      if (bannerFile) {
-        bannerUrl = await uploadToSupabase(
+      await submitGameForReview({
+        createSubmission: api.submitGame,
+        fields: {
+          authorName,
+          description,
+          email,
+          gameTitle,
+        },
+        files: {
           bannerFile,
-          "banners",
-          session.user.id,
-        );
-      }
-
-      // 3. Save submission metadata through the backend
-      await api.submitGame({
-        authorName,
-        bannerUrl,
-        coverUrl,
-        description: description || null,
-        email,
-        gameTitle,
-        romUrl,
+          coverFile,
+          romFile,
+        },
+        removeFiles: removeSubmissionFiles,
+        uploadFile: uploadToSupabase,
+        userId: session.user.id,
       });
 
       setIsSuccess(true);
     } catch (error: unknown) {
       console.error("Submission error:", error);
-      alert("Failed to submit game. Make sure files aren't too large.");
+      setFormError(
+        getPublishErrorMessage(
+          error,
+          "Failed to submit game. Check the highlighted files and try again.",
+        ),
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -187,30 +204,49 @@ export default function Publish() {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {formError && (
+            <div
+              className="rounded-xl border border-red-400/40 bg-red-500/10 px-4 py-3 text-sm text-red-200"
+              role="alert"
+            >
+              {formError}
+            </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">
+              <label
+                className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
+                htmlFor="publish-author"
+              >
                 Developer Name{" "}
                 <span className="text-synth-primary ml-1">*</span>
               </label>
               <input
+                id="publish-author"
                 type="text"
                 value={authorName}
                 onChange={(e) => setAuthorName(e.target.value)}
                 required
+                disabled={isSubmitting}
                 className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-primary transition-colors"
                 placeholder="Studio or Creator Name"
               />
             </div>
             <div>
-              <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">
+              <label
+                className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
+                htmlFor="publish-email"
+              >
                 Contact Email <span className="text-synth-primary ml-1">*</span>
               </label>
               <input
+                id="publish-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                disabled={isSubmitting}
                 className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-primary transition-colors"
                 placeholder="you@domain.com"
               />
@@ -218,31 +254,48 @@ export default function Publish() {
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">
+            <label
+              className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
+              htmlFor="publish-title"
+            >
               Game Title <span className="text-synth-primary ml-1">*</span>
             </label>
             <input
+              id="publish-title"
               type="text"
               value={gameTitle}
               onChange={(e) => setGameTitle(e.target.value)}
               required
+              disabled={isSubmitting}
               className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-primary transition-colors"
               placeholder="Epic Quest 198X"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">
+            <label
+              className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
+              htmlFor="publish-rom"
+            >
               ROM File (.nes) <span className="text-synth-primary ml-1">*</span>
             </label>
             <div
-              className={`relative w-full h-14 bg-synth-bg border-2 border-dashed rounded-xl flex items-center justify-center transition-colors group cursor-pointer overflow-hidden ${romFile ? "border-synth-primary" : "border-synth-border hover:border-synth-primary"}`}
+              className={`relative w-full h-14 bg-synth-bg border-2 border-dashed rounded-xl flex items-center justify-center transition-colors group cursor-pointer overflow-hidden ${
+                fileErrors.rom
+                  ? "border-red-400"
+                  : romFile
+                    ? "border-synth-primary"
+                    : "border-synth-border hover:border-synth-primary"
+              }`}
             >
               <input
+                id="publish-rom"
                 type="file"
                 accept=".nes"
                 onChange={handleRomChange}
                 required
+                disabled={isSubmitting}
+                aria-describedby={fileErrors.rom ? "publish-rom-error" : undefined}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               />
               <div
@@ -258,24 +311,43 @@ export default function Publish() {
                 </span>
               </div>
             </div>
+            {fileErrors.rom && (
+              <p id="publish-rom-error" className="mt-2 text-sm text-red-300">
+                {fileErrors.rom}
+              </p>
+            )}
           </div>
 
           {/* OPTIONAL ART UPLOADS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">
+              <label
+                className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
+                htmlFor="publish-cover"
+              >
                 Cover Art{" "}
                 <span className="text-gray-500 font-normal lowercase">
                   (optional)
                 </span>
               </label>
               <div
-                className={`relative w-full h-14 bg-synth-bg border-2 border-dashed rounded-xl flex items-center justify-center transition-colors group cursor-pointer overflow-hidden ${coverFile ? "border-synth-secondary" : "border-synth-border hover:border-synth-primary"}`}
+                className={`relative w-full h-14 bg-synth-bg border-2 border-dashed rounded-xl flex items-center justify-center transition-colors group cursor-pointer overflow-hidden ${
+                  fileErrors.cover
+                    ? "border-red-400"
+                    : coverFile
+                      ? "border-synth-secondary"
+                      : "border-synth-border hover:border-synth-primary"
+                }`}
               >
                 <input
+                  id="publish-cover"
                   type="file"
                   accept="image/*"
-                  onChange={(e) => handleImageChange(e, setCoverFile)}
+                  onChange={(e) => handleImageChange(e, "cover", setCoverFile)}
+                  disabled={isSubmitting}
+                  aria-describedby={
+                    fileErrors.cover ? "publish-cover-error" : undefined
+                  }
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
                 <div
@@ -291,22 +363,43 @@ export default function Publish() {
                   </span>
                 </div>
               </div>
+              {fileErrors.cover && (
+                <p id="publish-cover-error" className="mt-2 text-sm text-red-300">
+                  {fileErrors.cover}
+                </p>
+              )}
             </div>
 
             <div>
-              <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">
+              <label
+                className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
+                htmlFor="publish-banner"
+              >
                 Banner Art{" "}
                 <span className="text-gray-500 font-normal lowercase">
                   (optional)
                 </span>
               </label>
               <div
-                className={`relative w-full h-14 bg-synth-bg border-2 border-dashed rounded-xl flex items-center justify-center transition-colors group cursor-pointer overflow-hidden ${bannerFile ? "border-synth-secondary" : "border-synth-border hover:border-synth-primary"}`}
+                className={`relative w-full h-14 bg-synth-bg border-2 border-dashed rounded-xl flex items-center justify-center transition-colors group cursor-pointer overflow-hidden ${
+                  fileErrors.banner
+                    ? "border-red-400"
+                    : bannerFile
+                      ? "border-synth-secondary"
+                      : "border-synth-border hover:border-synth-primary"
+                }`}
               >
                 <input
+                  id="publish-banner"
                   type="file"
                   accept="image/*"
-                  onChange={(e) => handleImageChange(e, setBannerFile)}
+                  onChange={(e) =>
+                    handleImageChange(e, "banner", setBannerFile)
+                  }
+                  disabled={isSubmitting}
+                  aria-describedby={
+                    fileErrors.banner ? "publish-banner-error" : undefined
+                  }
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
                 <div
@@ -322,20 +415,33 @@ export default function Publish() {
                   </span>
                 </div>
               </div>
+              {fileErrors.banner && (
+                <p
+                  id="publish-banner-error"
+                  className="mt-2 text-sm text-red-300"
+                >
+                  {fileErrors.banner}
+                </p>
+              )}
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide">
+            <label
+              className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
+              htmlFor="publish-description"
+            >
               Game Description{" "}
               <span className="text-gray-500 font-normal lowercase">
                 (optional)
               </span>
             </label>
             <textarea
+              id="publish-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
+              disabled={isSubmitting}
               className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-primary transition-colors resize-none"
               placeholder="Tell us about your game and controls..."
             ></textarea>

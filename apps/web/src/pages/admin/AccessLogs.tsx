@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Activity } from "lucide-react";
 import { api, ApiError } from "../../lib/apiClient";
 import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
+import { Pagination } from "../../components/ui/Pagination";
+import { getPageRangeLabel } from "../../features/admin/adminState";
 
 const LOGS_PER_PAGE = 25;
 const ACCESS_LOGS_TIMEOUT_MS = 10_000;
@@ -96,8 +98,12 @@ export default function AccessLogs() {
     };
   }, [page, reloadKey]);
 
-  const pageStart = totalLogs === 0 ? 0 : (page - 1) * LOGS_PER_PAGE + 1;
-  const pageEnd = Math.min(page * LOGS_PER_PAGE, totalLogs);
+  const pageLabel = getPageRangeLabel({
+    currentCount: logs.length,
+    page,
+    pageSize: LOGS_PER_PAGE,
+    total: totalLogs,
+  });
 
   if (loading) {
     return <AdminTablePageSkeleton />;
@@ -182,31 +188,14 @@ export default function AccessLogs() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-gray-500">
-          Showing {pageStart}-{pageEnd} of {totalLogs}
+          {pageLabel}
         </p>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setPage((currentPage) => Math.max(1, currentPage - 1))}
-            disabled={page === 1 || loading}
-            className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Previous
-          </button>
-          <span className="rounded-lg border border-synth-border bg-synth-bg px-4 py-2 text-sm font-semibold text-gray-300">
-            Page {page} of {totalPages}
-          </span>
-          <button
-            type="button"
-            onClick={() =>
-              setPage((currentPage) => Math.min(totalPages, currentPage + 1))
-            }
-            disabled={page >= totalPages || loading}
-            className="h-10 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Next
-          </button>
-        </div>
+        <Pagination
+          currentPage={page}
+          disabled={loading}
+          onPageChange={setPage}
+          totalPages={totalPages}
+        />
       </div>
     </div>
   );

@@ -1,34 +1,52 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { api } from "../../lib/apiClient";
+import { getSocialErrorMessage } from "./socialFeedback";
 
 export function useGameReactions(gameId: string | undefined, currentUser: User | null) {
   const [likes, setLikes] = useState(0);
   const [dislikes, setDislikes] = useState(0);
   const [userReaction, setUserReaction] = useState<boolean | null>(null);
   const [isReactionLoading, setIsReactionLoading] = useState(false);
+  const [reactionError, setReactionError] = useState("");
+  const [loadedGameId, setLoadedGameId] = useState<string | undefined>();
+  const activeGameIdRef = useRef(gameId);
+  const reactionPendingRef = useRef(false);
+
+  activeGameIdRef.current = gameId;
 
   const fetchReactions = useCallback(async () => {
     if (!gameId) return;
 
-    const { reactions } = await api.gameReactions(gameId);
+    try {
+      const { reactions } = await api.gameReactions(gameId);
+      if (activeGameIdRef.current !== gameId) return;
 
-    let likeCount = 0;
-    let dislikeCount = 0;
-    let currentUserReaction: boolean | null = null;
+      let likeCount = 0;
+      let dislikeCount = 0;
+      let currentUserReaction: boolean | null = null;
 
-    reactions.forEach((row) => {
-      if (row.is_like) likeCount++;
-      else dislikeCount++;
+      reactions.forEach((row) => {
+        if (row.is_like) likeCount++;
+        else dislikeCount++;
 
-      if (currentUser && row.user_id === currentUser.id) {
-        currentUserReaction = row.is_like;
+        if (currentUser && row.user_id === currentUser.id) {
+          currentUserReaction = row.is_like;
+        }
+      });
+
+      setLikes(likeCount);
+      setDislikes(dislikeCount);
+      setUserReaction(currentUserReaction);
+      setLoadedGameId(gameId);
+      setReactionError("");
+    } catch (error) {
+      if (activeGameIdRef.current === gameId) {
+        setReactionError(
+          getSocialErrorMessage(error, "Could not load reactions. Try again."),
+        );
       }
-    });
-
-    setLikes(likeCount);
-    setDislikes(dislikeCount);
-    setUserReaction(currentUserReaction);
+    }
   }, [gameId, currentUser]);
 
   useEffect(() => {
@@ -37,12 +55,14 @@ export function useGameReactions(gameId: string | undefined, currentUser: User |
 
   const handleReaction = async (isLike: boolean) => {
     if (!currentUser) {
-      alert("Please sign in to react to this game!");
+      setReactionError("Sign in to react to this game.");
       return;
     }
     if (!gameId) return;
-    if (isReactionLoading) return;
+    if (reactionPendingRef.current) return;
+    reactionPendingRef.current = true;
     setIsReactionLoading(true);
+    setReactionError("");
 
     try {
       if (userReaction === isLike) {
@@ -53,15 +73,22 @@ export function useGameReactions(gameId: string | undefined, currentUser: User |
       await fetchReactions();
     } catch (err) {
       console.error(err);
+      setReactionError(
+        getSocialErrorMessage(err, "Failed to update reaction. Try again."),
+      );
     } finally {
+      reactionPendingRef.current = false;
       setIsReactionLoading(false);
     }
   };
 
   return {
-    dislikes,
+    dislikes: loadedGameId === gameId ? dislikes : 0,
     handleReaction,
-    likes,
-    userReaction,
+    isReactionLoading,
+    likes: loadedGameId === gameId ? likes : 0,
+    reactionError,
+    retryReactions: () => void fetchReactions(),
+    userReaction: loadedGameId === gameId ? userReaction : null,
   };
 }

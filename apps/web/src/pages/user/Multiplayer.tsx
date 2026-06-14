@@ -12,11 +12,18 @@ import {
 } from "lucide-react";
 import { api, getAuthSession, type ApiGame } from "../../lib/apiClient";
 import {
+  clearEngineToken,
   engineAuthHeaders,
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
 } from "../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../lib/engine/engineConfig";
+import {
+  INVALID_ENGINE_TOKEN_MESSAGE,
+  normalizeLocalGameFilenames,
+  toLocalVaultGames,
+} from "../../features/local-vault/localVaultClient";
+import { searchAndRankGames } from "../../features/search/gameSearch";
 import {
   CloudGameCard,
   LocalGameCard,
@@ -28,10 +35,13 @@ import {
   getJoinInvite,
   getSessionFromInvite,
 } from "../../features/multiplayer/inviteUtils";
+import { Pagination } from "../../components/ui/Pagination";
+import { getPageSlice } from "../../components/ui/paginationUtils";
 
 type MultiplayerMode = "host" | "join";
 
 const CLOUD_GAMES_PER_PAGE = 15;
+const LOCAL_GAMES_PER_PAGE = 15;
 
 function ModeButton({
   active,
@@ -95,6 +105,7 @@ export default function Multiplayer() {
   const [cloudTotal, setCloudTotal] = useState(0);
   const [cloudTotalPages, setCloudTotalPages] = useState(1);
   const [localLoading, setLocalLoading] = useState(false);
+  const [localPage, setLocalPage] = useState(1);
 
   useEffect(() => {
     if (mode !== "host" || gameSource !== "cloud") return;
@@ -165,20 +176,21 @@ export default function Multiplayer() {
       });
 
       if (!response.ok) {
+        if (response.status === 401) {
+          clearEngineToken();
+          setIsEnginePaired(false);
+          throw new Error(INVALID_ENGINE_TOKEN_MESSAGE);
+        }
         throw new Error("Local engine did not return games.");
       }
 
-      const filenames = (await response.json()) as string[];
-      setLocalGames(
-        filenames.map((filename) => ({
-          id: filename,
-          title: filename.replace(/\.nes$/i, ""),
-        })),
-      );
+      setLocalGames(toLocalVaultGames(normalizeLocalGameFilenames(await response.json())));
     } catch (error) {
       console.error("Failed to load local multiplayer games:", error);
       setLocalMessage(
-        "Could not load Local Vault games. Confirm the desktop engine is running and paired.",
+        error instanceof Error && error.message
+          ? error.message
+          : "Could not load Local Vault games. Confirm the desktop engine is running and paired.",
       );
     } finally {
       setLocalLoading(false);
@@ -198,34 +210,34 @@ export default function Multiplayer() {
   }, [cloudPage, cloudTotalPages]);
 
   const filteredLocalGames = useMemo(
-    () =>
-      localGames.filter((game) =>
-        game.title.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
+    () => searchAndRankGames(localGames, searchQuery),
     [localGames, searchQuery],
+  );
+  const localPageSlice = useMemo(
+    () => getPageSlice(filteredLocalGames, localPage, LOCAL_GAMES_PER_PAGE),
+    [filteredLocalGames, localPage],
   );
   const joinInvite = getJoinInvite(inviteUrl);
   const inviteSessionId = getSessionFromInvite(inviteUrl);
   const safeCloudPage = Math.min(cloudPage, cloudTotalPages);
   const cloudPageStart = (safeCloudPage - 1) * CLOUD_GAMES_PER_PAGE;
-  const visibleCloudPageNumbers = Array.from(
-    { length: cloudTotalPages },
-    (_, index) => index + 1,
-  ).filter((page) => {
-    if (cloudTotalPages <= 5) return true;
-    return (
-      page === 1 ||
-      page === cloudTotalPages ||
-      Math.abs(page - safeCloudPage) <= 1
-    );
-  });
 
-  const changeCloudPage = (page: number) => {
-    setCloudPage(page);
+  const changeCatalogPage = (page: number, source: GameSource) => {
+    if (source === "cloud") {
+      setCloudPage(page);
+    } else {
+      setLocalPage(page);
+    }
     document
       .getElementById("multiplayer-game-catalog")
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
+
+  useEffect(() => {
+    if (localPage !== localPageSlice.safeCurrentPage) {
+      setLocalPage(localPageSlice.safeCurrentPage);
+    }
+  }, [localPage, localPageSlice.safeCurrentPage]);
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
@@ -377,6 +389,7 @@ export default function Multiplayer() {
                   onChange={(event) => {
                     setSearchQuery(event.target.value);
                     setCloudPage(1);
+                    setLocalPage(1);
                   }}
                   placeholder="Search games..."
                   value={searchQuery}
@@ -425,62 +438,11 @@ export default function Multiplayer() {
                       of {cloudTotal}
                     </p>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        className="h-10 rounded-lg border border-synth-border bg-synth-bg px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                        disabled={safeCloudPage === 1}
-                        onClick={() =>
-                          changeCloudPage(Math.max(1, safeCloudPage - 1))
-                        }
-                        type="button"
-                      >
-                        Previous
-                      </button>
-
-                      {visibleCloudPageNumbers.map((page, index) => {
-                        const previousPage =
-                          visibleCloudPageNumbers[index - 1];
-                        const needsGap =
-                          previousPage && page - previousPage > 1;
-
-                        return (
-                          <span
-                            className="inline-flex items-center gap-2"
-                            key={page}
-                          >
-                            {needsGap && (
-                              <span className="px-1 text-sm text-gray-600">
-                                ...
-                              </span>
-                            )}
-                            <button
-                              className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-bold transition-colors ${
-                                page === safeCloudPage
-                                  ? "border-synth-primary bg-synth-primary/15 text-white"
-                                  : "border-synth-border bg-synth-bg text-gray-400 hover:border-synth-primary/70 hover:text-white"
-                              }`}
-                              onClick={() => changeCloudPage(page)}
-                              type="button"
-                            >
-                              {page}
-                            </button>
-                          </span>
-                        );
-                      })}
-
-                      <button
-                        className="h-10 rounded-lg border border-synth-border bg-synth-bg px-4 text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
-                        disabled={safeCloudPage === cloudTotalPages}
-                        onClick={() =>
-                          changeCloudPage(
-                            Math.min(cloudTotalPages, safeCloudPage + 1),
-                          )
-                        }
-                        type="button"
-                      >
-                        Next
-                      </button>
-                    </div>
+                    <Pagination
+                      currentPage={safeCloudPage}
+                      onPageChange={(page) => changeCatalogPage(page, "cloud")}
+                      totalPages={cloudTotalPages}
+                    />
                   </div>
                 )}
               </>
@@ -492,11 +454,31 @@ export default function Multiplayer() {
               </div>
             )
           ) : filteredLocalGames.length > 0 ? (
-            <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
-              {filteredLocalGames.map((game) => (
-                <LocalGameCard game={game} key={game.id} />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-2 gap-4 md:grid-cols-4 lg:grid-cols-5">
+                {localPageSlice.items.map((game) => (
+                  <LocalGameCard game={game} key={game.id} />
+                ))}
+              </div>
+
+              {localPageSlice.totalPages > 1 && (
+                <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-sm text-gray-500">
+                    Showing {localPageSlice.pageStart + 1}-
+                    {Math.min(
+                      localPageSlice.pageStart + localPageSlice.items.length,
+                      filteredLocalGames.length,
+                    )}{" "}
+                    of {filteredLocalGames.length}
+                  </p>
+                  <Pagination
+                    currentPage={localPageSlice.safeCurrentPage}
+                    onPageChange={(page) => changeCatalogPage(page, "local")}
+                    totalPages={localPageSlice.totalPages}
+                  />
+                </div>
+              )}
+            </>
           ) : (
             <div className="rounded-lg border border-synth-border bg-synth-bg px-4 py-16 text-center text-gray-500">
               <Wifi className="mx-auto mb-3 h-8 w-8 opacity-40" />

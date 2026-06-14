@@ -20,12 +20,12 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, and 12 lifecycle regression contracts pass; shared infrastructure and large feature modules are grouped by ownership. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, 41 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
 | API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
 | Docker image | Hardened and reduced | Pinned multi-stage build passes live ROM smoke at `1.15GB`; build tools are absent from the runtime image. |
-| Supabase | Deployed | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. |
+| Supabase | Deployed with one pending policy | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. `DEPLOY-04` must be applied for browser-side submission cleanup in production. |
 
 ## Next Work Queue
 
@@ -40,6 +40,108 @@ Work these in order unless a production incident changes priority.
 - P3/P4 `/dev/uinput` behavior on a target Linux host.
 - Packaged installer smoke on each native OS.
 - TURN relay behavior where direct/STUN connectivity fails.
+
+### NEXT-13 — P1: Harden Gameplay Boot And Stream UX
+
+**Scope:** Single-player cloud/local game boot, WebRTC connection lifecycle,
+stream retry behavior, lobby share metadata, and gameplay-focused rendered
+interaction coverage.
+
+**Why this remains:** The core stream path has useful unit contracts and smoke
+tooling, but the active player screen still needs a focused pass around
+user-facing error states, repeated engine events, share-context accuracy,
+keyboard focus behavior across overlays, and cloud/local boot failure recovery.
+`DONE-31` fixed the highest-risk keyboard input leak found during this audit,
+`DONE-32` hardened stream error/retry feedback plus lobby share metadata, and
+`DONE-33` expanded rendered player interaction coverage. The remaining proof
+requires real boot/LAN/TURN target environments.
+
+**Completion proof:**
+
+- [x] Add rendered player harness coverage for stream error/retry.
+- [x] Ensure lobby metadata uses the actual engine exposure/share context.
+- [x] Ensure stream boot, offer, and answer failures surface actionable
+  recovery messages instead of silent/generic failure.
+- [x] Add rendered player harness coverage for telemetry toggling, lobby
+  controls, and focused form fields.
+- [ ] Prove single-player cloud and local-vault boot failures surface
+  actionable recovery without stale state against real game sources.
+- [ ] Run local Docker/engine smoke with a real playable ROM when available.
+
+### NEXT-14 — P1: Harden Game Submission Workflow
+
+**Scope:** Developer submission form, browser storage uploads, API metadata
+creation, partial upload cleanup, validation, and user-facing retry states.
+
+**Status:** Completed in `DONE-34`. `DEPLOY-04` must be applied to the hosted
+database before production browsers can remove failed submission uploads.
+
+**Why this was needed:** The backend submission boundary was protected, but the
+web form still used native alerts, had limited pending/error detail, and
+uploaded files before metadata creation without cleaning uploaded objects if
+the API write failed. It also lacked focused frontend coverage for rejected
+file types, auth loss, storage failure, metadata failure, and duplicate
+submits.
+
+**Completion proof:**
+
+- [x] Replace native alerts with visible validation, pending, success, and retry
+  states.
+- [x] Add single-flight submission locking and explicit file-size/type guidance.
+- [x] Clean up newly uploaded submission objects when the backend metadata write
+  fails.
+- [x] Add Node contracts for submission mutation cleanup and rendered harness
+  coverage for the form.
+
+### NEXT-15 — P1: Harden Local Vault Workflow
+
+**Scope:** Local Vault upload/list/delete, engine pairing recovery, delete
+confirmation, per-file pending state, local pagination/search if needed, and
+multiplayer local-game selection reuse.
+
+**Status:** Completed in `DONE-35`.
+
+**Why this was needed:** Local Vault was functional and engine-token gated, but
+the UI still used native `confirm`, upload/delete operations were not fully
+single-flight, failed list loads collapsed into an empty-state style, and local
+game names were normalized in multiple places. Engine routes had server-side
+filename/path hardening, but frontend recovery and interaction coverage needed
+the same treatment as admin/profile flows.
+
+**Completion proof:**
+
+- [x] Replace native delete confirmation with the shared in-app confirmation
+  pattern.
+- [x] Add per-file pending locks, retryable load state, input reset after
+  validation/upload, and clear invalid-token recovery.
+- [x] Share local-vault listing/normalization helpers with Multiplayer local-game
+  selection.
+- [x] Add contracts and rendered harness coverage for upload validation, delete
+  confirmation, and pairing loss.
+
+## Core Gameplay Audit Notes
+
+Added on 2026-06-14 after reviewing the active player, multiplayer setup,
+submission, and local-vault flows.
+
+- **Single-player gameplay:** Cloud/local boot and WebRTC streaming have solid
+  helper coverage and smoke tooling, but the rendered player screen still needs
+  a pass around telemetry toggling, lobby controls, and real ROM playability.
+  `DONE-31` fixed the most immediate input correctness issue found during this
+  review, and `DONE-32` added stream error/retry regression coverage.
+- **Multiplayer gameplay:** Lobby roles, slots, backend metadata, LAN invite
+  parsing, and smoke tooling exist. Remaining confidence depends on real
+  two-device LAN proof, Linux `/dev/uinput` P3/P4 behavior, TURN fallback, and
+  broader rendered lobby-control coverage. `DONE-32` now ensures lobby metadata
+  reflects the active engine share context.
+- **Game submission:** Backend validation, submitter ownership, frontend
+  validation/errors, duplicate-submit protection, and failed-metadata cleanup
+  are covered. `DEPLOY-04` must be applied before cleanup works in production
+  browsers.
+- **Local Vault:** Engine routes enforce token and filename/path hardening, and
+  `DONE-35` added frontend validation, in-app delete confirmation, per-file
+  pending state, retryable load errors, invalid-token recovery, and reusable
+  local-game normalization shared with Multiplayer.
 
 ## Deployment Actions
 
@@ -64,6 +166,17 @@ An Upstash-compatible Redis REST database is configured through
 `RATE_LIMIT_REDIS_REST_URL`, `RATE_LIMIT_REDIS_REST_TOKEN`, and optionally
 `RATE_LIMIT_REDIS_TIMEOUT_MS` on the hosted API. Production `/health` reports
 `rateLimitStore: "redis"` and `/ready` confirms the shared store is available.
+
+### DEPLOY-04 — Apply Submission Cleanup Storage Policy
+
+**Status:** Pending.
+
+Migration:
+`supabase/migrations/20260614153000_allow_own_submission_cleanup.sql`
+
+This allows authenticated users to delete only objects under their own
+`submissions/{userId}/...` folder. It is required for the browser to clean up
+uploaded ROM/art objects when backend metadata creation fails.
 
 ## Completed Work Ledger
 
@@ -413,14 +526,263 @@ during tests.
 Redis credentials present locally. The suite completes deterministically
 without touching Upstash.
 
+### DONE-25 — Harden Self-Service Account Deletion
+
+**Problem:** Self-service account deletion existed but relied partly on
+frontend-only safeguards. OAuth users only typed `DELETE`, privileged-role
+blocking existed only in the UI, user-owned storage objects were not removed,
+and the destructive endpoint had no dedicated rate limit or recent-sign-in
+requirement.
+
+**Resolution:** Kept account deletion unavailable to admins and super admins at
+both UI and API layers. The API now requires an exact confirmation payload, a
+sign-in within the previous 10 minutes, and a non-privileged database role.
+Deletion attempts use the shared rate-limit infrastructure. Before deleting the
+Supabase auth user, the API recursively removes owned avatar and submission
+storage objects and aborts if storage cleanup fails. Successful deletion clears
+cached role state and lets existing foreign-key behavior cascade or anonymize
+related database records.
+
+**Verification:** Added backend regressions proving successful owned-file
+cleanup, privileged-role rejection, stale-session rejection, invalid
+confirmation rejection, deletion rate limiting, and fail-closed storage
+cleanup. API typecheck, lint, and all 51 tests pass; web production build
+passes.
+
+### DONE-26 — Harden Social Interaction Workflows
+
+**Problem:** Comments, reactions, reporting, and moderation actions had strong
+backend authorization but weak frontend request lifecycle behavior. Overlapping
+comment pages could duplicate rows, stale requests could update a newly opened
+game, mutations could be submitted repeatedly, report failures closed their
+modal, and most failures were visible only through native alerts or console
+output.
+
+**Resolution:** Added stale-game and overlapping-page protection, comment-page
+deduplication, explicit initial/load-more states, visible error and retry UI,
+and per-comment mutation locks. Game reactions now ignore stale responses,
+prevent duplicate mutations, expose pending state, and display API-safe errors.
+Report failures remain open with actionable feedback while successes surface in
+the comments panel. Moderation actions are single-flight, expose load/action
+errors, and refresh server state after completion.
+
+**Verification:** Added comment-boundary deduplication and API-safe social error
+contracts. Web lint, production build, all 16 tests, and `git diff --check`
+pass. The rendered interaction harness was later established in `DONE-30`.
+
+### DONE-27 — Harden Favorites And Catalog Interaction State
+
+**Problem:** Homepage cards, the featured banner, and the favorites library each
+owned independent favorite state. Rapid clicks could issue conflicting
+mutations, an older favorite load could overwrite a newer mutation, removing a
+favorite from My Library left its card visible, and stale catalog requests
+could replace newer search/page results.
+
+**Resolution:** Added a shared auth-scoped favorite store and hook that
+coordinates one initial load, synchronizes every rendered favorite surface,
+locks per-game mutations, preserves prior state on failure, reconciles older
+in-flight loads with newer mutations, and resets/reloads across auth changes.
+My Library now removes cards after successful unfavorite actions and exposes
+load-error retry UI. Catalog and featured requests use request sequencing so
+stale responses cannot overwrite newer state. Featured navigation now handles
+refreshed game lists safely and uses accessible controls.
+
+**Verification:** Added shared-load, duplicate-mutation, authoritative-response,
+failure rollback, and in-flight-load reconciliation contracts. Web lint,
+production build, all 20 tests, and `git diff --check` pass. The rendered
+interaction harness was later established in `DONE-30`.
+
+### DONE-28 — Harden Profile And Account Settings Workflows
+
+**Problem:** Profile-load failures disappeared after the loading skeleton,
+OAuth-only users were shown a password form they could not use, rapid submits
+could duplicate mutations, and avatar uploads overwrote the active object
+before the profile update succeeded. Metadata-sync and sign-out failures could
+also make a successful authoritative mutation appear to have failed entirely.
+
+**Resolution:** Added explicit profile load-error/retry state and single-flight
+guards for profile, password, crop, and account-deletion actions. Avatar input
+now validates image type and size, crop failures surface in the page, object
+preview URLs are released, and replacements use versioned storage paths. Failed
+profile API updates remove newly uploaded objects; successful replacements
+clean the previous owned avatar; metadata-sync and cleanup failures surface as
+clear partial-success warnings. Password changes use the shared password policy
+and are shown only for email-password accounts. Account deletion treats local
+sign-out as best effort after the API has authoritatively deleted the account.
+Profile and deletion dialogs now expose dialog semantics and lock dismissal
+while work is pending.
+
+**Verification:** Added avatar validation, owned-path isolation, failed-upload
+and failed-save cleanup, and partial-success regression contracts. Web lint,
+production build, all 25 tests, unauthenticated `/profile` redirect smoke, console-error check,
+and `git diff --check` pass. The rendered interaction harness was later
+established in `DONE-30`.
+
+### DONE-29 — Harden Admin Frontend Operations
+
+**Problem:** Admin frontend behavior lagged behind backend authorization
+coverage. Moderation filters were applied only to the currently loaded server
+page, so filtered queues could appear empty while matching reports existed on
+other pages. User-management load failures could leave a permanent skeleton,
+role/ban actions used native confirm/alert dialogs, and destructive mutations
+were not consistently locked or reconciled with pagination.
+
+**Resolution:** Added a server-side `targetRole` filter to the admin reports
+endpoint so moderation pagination and counts are authoritative for all, user,
+or admin-target reports. The moderation queue now requests the active filter
+from the API, resets to page 1 when filters change, clamps pages after action
+removal, exposes safe API error messages, and uses an in-app confirmation dialog
+for user bans. User management now has retryable load-error states,
+stale-response protection for search/page requests, per-user single-flight
+locks, in-app confirmations for role/ban changes, and visible action errors.
+The admin shell now exposes a retryable access-check failure instead of a
+permanent spinner. Access logs share the same tested page-range label behavior.
+
+**Verification:** Added web contracts for admin API-safe error messages,
+post-removal page clamping, and page-range labels. Added API regression coverage
+proving report target filters apply before pagination. Web lint, production
+build, all 28 web tests, API typecheck, lint, build, all 52 API tests, local
+`/admin` dev-server HTTP smoke, no native admin `alert`/`confirm` usage, and
+`git diff --check` pass. Admin component interaction coverage was added in
+`DONE-30`; full authenticated role coverage remains a future expansion.
+
+### DONE-30 — Establish Frontend Interaction Test Harness
+
+**Problem:** The web package had focused Node contracts and hosted smoke tests,
+but no maintainable local browser-level harness for rendered interaction. That
+left modal accessibility, dropdown actions, pending states, and pagination
+behavior dependent on manual QA or production smoke coverage.
+
+**Resolution:** Added a Vite-served React interaction harness under
+`apps/web/interaction-tests/` and a Playwright runner at
+`scripts/web/interactionHarnessSmoke.mjs`. The harness renders real admin UI
+components with fake async boundaries, exercises the admin confirmation dialog,
+report-card dropdown actions, locked-review states, pagination controls, and
+console-error detection. Added `npm run test:web-interactions` and wired it into
+the hosted contract verification gate. CI now installs Chromium before running
+the hosted web contract.
+
+**Verification:** Web lint, production build, all 28 web Node contracts,
+`node --check` for the interaction harness runner, and
+`npm run test:web-interactions` pass. The harness currently covers the admin
+interaction surface; broader profile/favorites rendered flows can now be added
+incrementally on the same foundation.
+
+### DONE-31 — Prevent Gameplay Input Leaking From Form Fields
+
+**Problem:** The WebRTC gameplay input bridge listened globally for keydown and
+keyup events once a participant owned a player slot. It ignored repeated keys
+but did not ignore focused text-entry controls, so typing in comments, report
+dialogs, search fields, or other focused form elements while a stream was active
+could also emit gameplay input to the local engine.
+
+**Resolution:** Added a shared input-filter guard for the WebRTC input bridge.
+Gameplay input now ignores already-prevented events, `input`, `textarea`,
+`select`, content-editable targets, and containers explicitly marked with
+`data-ignore-game-input`, while ordinary gameplay targets still forward keys to
+the engine.
+
+**Verification:** Added regression contracts for ignored text-entry/editable
+targets, explicit ignore containers, prevented events, and ordinary gameplay
+targets. Web tests now pass with 31 contracts; lint, production build, and
+`git diff --check` pass.
+
+### DONE-32 — Harden Gameplay Stream Errors And Lobby Metadata
+
+**Problem:** The active WebRTC stream path could drop useful user-facing error
+detail during boot failures by only switching to generic error status. Offer
+creation and remote-answer failures were also not handled consistently, and
+host lobby metadata always published `exposureMode: "unknown"` even when engine
+health had already returned the real local/LAN share context.
+
+**Resolution:** Added testable WebRTC gameplay helpers for lobby metadata and
+stream error formatting. Host lobby publishing now uses the current engine share
+context and clamps advertised player count through the latest input capability
+snapshot. Stream boot, offer creation, and remote-answer failures now update
+telemetry with actionable retry guidance; ICE candidate failures are logged
+without throwing unhandled promise errors. The rendered interaction harness now
+also exercises the player stream error overlay and retry callback.
+
+**Verification:** Added contracts for lobby exposure/player-slot metadata and
+stream error fallback handling. Web tests now pass with 33 contracts; lint,
+production build, rendered interaction harness, and `git diff --check` pass.
+
+### DONE-33 — Expand Rendered Gameplay Interaction Coverage
+
+**Problem:** The interaction harness covered admin UI and the stream error
+overlay, but it still did not exercise the active player controls that are most
+likely to regress during frontend changes: telemetry toggling, telemetry close,
+lobby slot controls, disabled unsupported slots, invite copy controls, and host
+kick actions. The player page scroll-prevention handler also used narrower
+focus rules than the WebRTC input bridge, so focused `select`, content-editable,
+or explicitly ignored controls could still have arrow/space behavior blocked.
+
+**Resolution:** Reused the shared gameplay input-ignore helper in the player
+scroll-prevention handler so page scroll blocking and engine input forwarding
+respect the same focused-control rules. Expanded the rendered interaction
+harness with real `PlayerHeader`, `StreamTelemetryPanel`, and `LobbyPanel`
+instances. The Playwright harness now proves telemetry hide/toggle behavior,
+stream retry, lobby invite copy access, slot request, disabled unsupported
+slots, and host kick event wiring.
+
+**Verification:** Web tests pass with 33 contracts; lint, production build,
+rendered interaction harness, and `git diff --check` pass.
+
+### DONE-34 — Harden Game Submission Workflow
+
+**Problem:** The developer submission form still depended on native alerts,
+allowed duplicate submit attempts during async work, gave limited file guidance,
+and uploaded ROM/art files before backend metadata creation without a reliable
+cleanup path when metadata creation failed.
+
+**Resolution:** Added a dedicated publish submission helper for file
+validation, user-scoped object paths, upload sequencing, metadata creation, API
+error formatting, and cleanup of newly uploaded objects on metadata failure.
+The publish page now shows inline form/file errors, disables inputs while a
+submission is running, preserves the existing success state, and uses backend
+safe error messages when available. Added a narrow Supabase storage migration
+allowing authenticated users to delete only objects in their own submissions
+folder so failed submissions can be cleaned up from the browser.
+
+**Verification:** Added contracts for ROM/image validation, user-scoped object
+paths, metadata-failure cleanup, successful payload normalization, and backend
+error messaging. The rendered interaction harness now covers publish-form file
+validation and submit readiness. Web tests pass with 38 contracts; lint,
+production build, rendered interaction harness, and `git diff --check` pass.
+
+### DONE-35 — Harden Local Vault Workflow
+
+**Problem:** Local Vault still used a native browser confirmation for deletes,
+had only global upload pending state, did not expose a clear retry path for
+failed list loads, kept stale file input state after validation/upload, and
+duplicated local game filename normalization in Multiplayer. Invalid engine
+tokens were handled inconsistently across Local Vault and multiplayer local
+selection.
+
+**Resolution:** Added shared Local Vault helpers for ROM validation, filename
+normalization, title derivation, local game card mapping, invalid-token errors,
+and engine error messaging. Local Vault now uses the in-app confirmation
+dialog, tracks per-file delete pending state, resets file input after rejected
+or successful uploads, shows a loading state and retry action for vault loads,
+and clears stale pairing state when the engine rejects the saved token.
+Multiplayer local-game selection now reuses the same normalization helpers and
+invalid-token message.
+
+**Verification:** Added contracts for local ROM validation, filename
+normalization/card mapping, and invalid-token recovery messaging. The rendered
+interaction harness now covers Local Vault upload validation, delete
+confirmation, and pairing-loss guidance. Web tests pass with 41 contracts;
+lint, production build, rendered interaction harness, no Local Vault native
+`alert`/`confirm` usage, and `git diff --check` pass.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, and production build | Passed — 12 tests |
-| API typecheck, lint, build, and tests | Passed — 48 tests |
+| Web tests, lint, production build, and rendered interaction harness | Passed — 41 Node tests plus Playwright harness |
+| API typecheck, lint, build, and tests | Passed — 52 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 29 tests |

@@ -10,14 +10,19 @@ export async function createCroppedAvatar(
   pixelCrop: CropArea,
 ): Promise<File> {
   const image = new Image();
-  image.src = imageSrc;
-  await new Promise((resolve) => {
-    image.onload = resolve;
+  await new Promise<void>((resolve, reject) => {
+    image.onload = () => resolve();
+    image.onerror = () =>
+      reject(new Error("The selected image could not be loaded."));
+    image.src = imageSrc;
   });
 
   const canvas = document.createElement("canvas");
   const context = canvas.getContext("2d");
   if (!context) throw new Error("No 2d context");
+  if (pixelCrop.width <= 0 || pixelCrop.height <= 0) {
+    throw new Error("The selected crop area is empty.");
+  }
 
   canvas.width = pixelCrop.width;
   canvas.height = pixelCrop.height;
@@ -43,4 +48,3 @@ export async function createCroppedAvatar(
     }, "image/jpeg");
   });
 }
-
