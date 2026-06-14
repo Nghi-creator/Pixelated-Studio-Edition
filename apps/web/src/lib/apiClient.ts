@@ -271,9 +271,7 @@ export const api = {
     apiRequest<void>(`/comments/${commentId}`, {
       method: "DELETE",
     }),
-  favoriteStatus: async (gameId: string) => ({
-    favorited: (await getFavoriteIds()).has(gameId),
-  }),
+  favoriteIds: () => getFavoriteIds(),
   games: ({
     page = 1,
     pageSize = 15,

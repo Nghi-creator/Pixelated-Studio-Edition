@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Search } from "lucide-react";
 import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
@@ -31,11 +31,18 @@ export default function Landing() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalGames, setTotalGames] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
+  const catalogRequestIdRef = useRef(0);
+  const featuredRequestIdRef = useRef(0);
 
   const fetchFeaturedGames = useCallback(async (isMounted = true) => {
+    const requestId = ++featuredRequestIdRef.current;
     try {
       const data = await api.featuredGames();
-      if (isMounted && data.featuredGames.length > 0) {
+      if (
+        isMounted &&
+        requestId === featuredRequestIdRef.current &&
+        data.featuredGames.length > 0
+      ) {
         setFeaturedGames(data.featuredGames);
       }
     } catch (error) {
@@ -44,6 +51,7 @@ export default function Landing() {
   }, []);
 
   const fetchGames = useCallback(async (isMounted = true) => {
+    const requestId = ++catalogRequestIdRef.current;
     try {
       setLoadError("");
       setLoading(true);
@@ -52,7 +60,7 @@ export default function Landing() {
         pageSize: GAMES_PER_PAGE,
         search: searchQuery,
       });
-      if (isMounted) {
+      if (isMounted && requestId === catalogRequestIdRef.current) {
         setGames(data.games);
         setFeaturedGames((currentFeaturedGames) =>
           currentFeaturedGames.length > 0
@@ -64,16 +72,19 @@ export default function Landing() {
       }
     } catch (error) {
       console.error("Error fetching games:", error);
-      if (isMounted) {
+      if (isMounted && requestId === catalogRequestIdRef.current) {
         setLoadError("Could not load the game library. Check the API connection.");
       }
     } finally {
-      if (isMounted) setLoading(false);
+      if (isMounted && requestId === catalogRequestIdRef.current) {
+        setLoading(false);
+      }
     }
   }, [currentPage, searchQuery]);
 
   useEffect(() => {
     let isMounted = true;
+    catalogRequestIdRef.current += 1;
     const timeout = window.setTimeout(() => {
       fetchGames(isMounted);
     }, searchQuery ? 250 : 0);
@@ -163,7 +174,14 @@ export default function Landing() {
 
             {loadError ? (
               <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-8 text-center text-red-200">
-                {loadError}
+                <p>{loadError}</p>
+                <button
+                  className="mt-4 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
+                  onClick={() => void fetchGames()}
+                  type="button"
+                >
+                  Retry
+                </button>
               </div>
             ) : games.length === 0 ? (
               <div className="text-center py-20 text-gray-500">

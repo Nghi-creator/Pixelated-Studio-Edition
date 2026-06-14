@@ -31,24 +31,6 @@ product and infrastructure; it does not introduce new product features.
 
 Work these in order unless a production incident changes priority.
 
-### NEXT-09 — P1: Harden Favorites And Catalog Interaction State
-
-**Scope:** Homepage cards, featured banner favorites, favorites library, and
-catalog search/pagination interaction.
-
-**Why this remains:** Favorite API boundaries and auth-scoped caching are
-covered, but UI state can drift. Favorite buttons have no pending/error state,
-rapid clicks can issue conflicting mutations, removing a favorite from the
-library does not remove its card, and featured/banner requests can apply stale
-results after the displayed game changes.
-
-**Completion proof:**
-
-- Centralize or synchronize favorite state across cards, banner, and library.
-- Add mutation locking, rollback/error feedback, and stale-request protection.
-- Verify favorites removal, auth redirects, search, and pagination in browser
-  interaction tests.
-
 ### NEXT-10 — P1: Harden Profile And Account Settings Workflows
 
 **Scope:** Profile loading/updating, avatar crop/upload, password changes, and
@@ -530,13 +512,35 @@ contracts. Web lint, production build, all 16 tests, and `git diff --check`
 pass. Broader rendered keyboard/visual interaction coverage remains tracked by
 `NEXT-12`.
 
+### DONE-27 — Harden Favorites And Catalog Interaction State
+
+**Problem:** Homepage cards, the featured banner, and the favorites library each
+owned independent favorite state. Rapid clicks could issue conflicting
+mutations, an older favorite load could overwrite a newer mutation, removing a
+favorite from My Library left its card visible, and stale catalog requests
+could replace newer search/page results.
+
+**Resolution:** Added a shared auth-scoped favorite store and hook that
+coordinates one initial load, synchronizes every rendered favorite surface,
+locks per-game mutations, preserves prior state on failure, reconciles older
+in-flight loads with newer mutations, and resets/reloads across auth changes.
+My Library now removes cards after successful unfavorite actions and exposes
+load-error retry UI. Catalog and featured requests use request sequencing so
+stale responses cannot overwrite newer state. Featured navigation now handles
+refreshed game lists safely and uses accessible controls.
+
+**Verification:** Added shared-load, duplicate-mutation, authoritative-response,
+failure rollback, and in-flight-load reconciliation contracts. Web lint,
+production build, all 20 tests, and `git diff --check` pass. Broader rendered
+interaction coverage remains tracked by `NEXT-12`.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, and production build | Passed — 16 tests |
+| Web tests, lint, and production build | Passed — 20 tests |
 | API typecheck, lint, build, and tests | Passed — 51 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |

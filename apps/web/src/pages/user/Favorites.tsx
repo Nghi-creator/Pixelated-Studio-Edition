@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { HeartCrack, Gamepad2, ArrowLeft } from "lucide-react";
 import GameCard from "../../components/user/GameCard";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { FavoritesPageSkeleton } from "../../components/ui/Skeleton";
+import { replaceFavoriteIds } from "../../features/favorites/favoriteState";
 
 interface SavedGame {
   id: string;
@@ -14,30 +15,45 @@ interface SavedGame {
 export default function Favorites() {
   const [favorites, setFavorites] = useState<SavedGame[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+  const requestIdRef = useRef(0);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchFavoritesAndListen = async () => {
-      try {
-        const session = await getAuthSession();
+  const fetchFavorites = useCallback(async () => {
+    const requestId = ++requestIdRef.current;
+    setLoading(true);
+    setLoadError("");
+    try {
+      const session = await getAuthSession();
 
-        if (!session) {
-          navigate("/login");
-          return;
-        }
+      if (!session) {
+        navigate("/login");
+        return;
+      }
 
-        const data = await api.listFavorites<SavedGame>();
+      const data = await api.listFavorites<SavedGame>();
+      if (requestId === requestIdRef.current) {
         setFavorites(data.favorites);
-
-      } catch (error) {
-        console.error("Error fetching favorites:", error);
-      } finally {
+        replaceFavoriteIds(new Set(data.favorites.map((game) => game.id)));
+      }
+    } catch (error) {
+      console.error("Error fetching favorites:", error);
+      if (requestId === requestIdRef.current) {
+        setLoadError("Could not load your library. Try again.");
+      }
+    } finally {
+      if (requestId === requestIdRef.current) {
         setLoading(false);
       }
-    };
-
-    fetchFavoritesAndListen();
+    }
   }, [navigate]);
+
+  useEffect(() => {
+    void fetchFavorites();
+    return () => {
+      requestIdRef.current += 1;
+    };
+  }, [fetchFavorites]);
 
   if (loading) {
     return <FavoritesPageSkeleton />;
@@ -60,8 +76,18 @@ export default function Favorites() {
           </h1>
         </div>
 
-        {/* Empty State vs Grid */}
-        {favorites.length === 0 ? (
+        {loadError ? (
+          <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-16 text-center text-red-200">
+            <p>{loadError}</p>
+            <button
+              className="mt-4 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
+              onClick={() => void fetchFavorites()}
+              type="button"
+            >
+              Retry
+            </button>
+          </div>
+        ) : favorites.length === 0 ? (
           <div className="text-center py-32 bg-synth-surface/40 rounded-2xl border border-synth-border border-dashed shadow-inner">
             <HeartCrack className="w-16 h-16 mx-auto mb-6 text-synth-border" />
             <h3 className="text-2xl font-bold text-gray-300 mb-2">
@@ -84,6 +110,13 @@ export default function Favorites() {
               <GameCard
                 key={game.id}
                 id={game.id}
+                onFavoriteChange={(favorited) => {
+                  if (!favorited) {
+                    setFavorites((current) =>
+                      current.filter((favorite) => favorite.id !== game.id),
+                    );
+                  }
+                }}
                 title={game.title}
                 coverUrl={game.cover_url}
               />
