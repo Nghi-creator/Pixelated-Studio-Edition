@@ -1,9 +1,17 @@
-import { useCallback, useEffect, useState } from "react";
-import { Search, Users } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, RefreshCw, Search, Users } from "lucide-react";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
 import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
+import {
+  AdminConfirmDialog,
+  type AdminConfirmation,
+} from "../../components/admin/AdminConfirmDialog";
+import {
+  getAdminApiErrorMessage,
+  getPageRangeLabel,
+} from "../../features/admin/adminState";
 
 const USERS_PER_PAGE = 25;
 
@@ -25,6 +33,18 @@ export default function UserManagement() {
   const [searchQuery, setSearchQuery] = useState("");
   const [totalPages, setTotalPages] = useState(1);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<
+    | (AdminConfirmation & {
+        patch: Partial<Pick<Profile, "is_banned" | "role">>;
+      })
+    | null
+  >(null);
+  const pendingUserIdRef = useRef<string | null>(null);
+  const requestIdRef = useRef(0);
 
   useEffect(() => {
     let isMounted = true;
@@ -34,10 +54,18 @@ export default function UserManagement() {
 
       if (session?.user && isMounted) {
         setCurrentUserId(session.user.id);
-        const data = await api.permissions();
-        if (isMounted) {
-          setCurrentUserRole(data.profile.role);
-          if (data.profile.role !== "super_admin") setLoading(false);
+        try {
+          const data = await api.permissions();
+          if (isMounted) {
+            setCurrentUserRole(data.profile.role);
+            if (data.profile.role !== "super_admin") setLoading(false);
+          }
+        } catch (error) {
+          console.error("Error checking admin permissions:", error);
+          if (isMounted) {
+            setLoadError("Could not verify user-management permissions.");
+            setLoading(false);
+          }
         }
       } else if (isMounted) {
         setLoading(false);
@@ -55,21 +83,32 @@ export default function UserManagement() {
     async (isMounted = true) => {
       if (currentUserRole !== "super_admin") return;
 
-      setLoading(true);
-      const data = await api.users<Profile>({
-        page,
-        pageSize: USERS_PER_PAGE,
-        search: searchQuery,
-      });
-      if (!isMounted) return;
+      const requestId = requestIdRef.current + 1;
+      requestIdRef.current = requestId;
 
-      setUsers(data.users);
-      setTotalUsers(data.total);
-      setTotalPages(data.totalPages);
-      if (page > data.totalPages) {
-        setPage(data.totalPages);
+      try {
+        setLoading(true);
+        setLoadError("");
+        const data = await api.users<Profile>({
+          page,
+          pageSize: USERS_PER_PAGE,
+          search: searchQuery,
+        });
+        if (!isMounted || requestId !== requestIdRef.current) return;
+
+        setUsers(data.users);
+        setTotalUsers(data.total);
+        setTotalPages(data.totalPages);
+        if (page > data.totalPages) {
+          setPage(data.totalPages);
+        }
+      } catch (error) {
+        console.error("Error fetching users:", error);
+        if (!isMounted || requestId !== requestIdRef.current) return;
+        setLoadError(getAdminApiErrorMessage(error, "Could not load users."));
+      } finally {
+        if (isMounted && requestId === requestIdRef.current) setLoading(false);
       }
-      setLoading(false);
     },
     [currentUserRole, page, searchQuery],
   );
@@ -84,48 +123,59 @@ export default function UserManagement() {
       isMounted = false;
       window.clearTimeout(timeout);
     };
-  }, [fetchUsers, searchQuery]);
+  }, [fetchUsers, reloadKey, searchQuery]);
 
   // --- TOGGLE ROLE ---
   const handleToggleRole = async (userId: string, currentRole: string) => {
     const newRole = currentRole === "admin" ? "user" : "admin";
-    const confirmMessage =
-      newRole === "admin"
-        ? "Are you sure you want to promote this user to Admin?"
-        : "Are you sure you want to demote this Admin to a regular user?";
-
-    if (!window.confirm(confirmMessage)) return;
-
-    try {
-      await api.updateAdminUser(userId, { role: newRole });
-      setUsers((prev) =>
-        prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)),
-      );
-    } catch (error) {
-      alert("User update failed.");
-      console.error(error);
-    }
+    setConfirmation({
+      body:
+        newRole === "admin"
+          ? "This gives the user moderator access to reports and admin areas."
+          : "This removes moderator access from the selected admin account.",
+      confirmLabel: newRole === "admin" ? "Make Admin" : "Demote Admin",
+      id: userId,
+      intent: newRole === "admin" ? "warning" : "danger",
+      patch: { role: newRole },
+      title: newRole === "admin" ? "Promote user?" : "Demote admin?",
+    });
   };
 
   // --- TOGGLE BAN ---
   const handleToggleBan = async (userId: string, currentBanStatus: boolean) => {
     const newBanStatus = !currentBanStatus;
-    const confirmMessage = newBanStatus
-      ? "Are you sure you want to permanently ban this user?"
-      : "Are you sure you want to UNBAN this user?";
+    setConfirmation({
+      body: newBanStatus
+        ? "This blocks the user from signing in and using the product."
+        : "This restores the user's access to the product.",
+      confirmLabel: newBanStatus ? "Ban User" : "Unban User",
+      id: userId,
+      intent: newBanStatus ? "danger" : "warning",
+      patch: { is_banned: newBanStatus },
+      title: newBanStatus ? "Ban user?" : "Unban user?",
+    });
+  };
 
-    if (!window.confirm(confirmMessage)) return;
-
+  const applyConfirmedAction = async () => {
+    if (!confirmation || pendingUserIdRef.current) return;
+    const { id, patch } = confirmation;
+    pendingUserIdRef.current = id;
+    setPendingUserId(id);
+    setActionError("");
     try {
-      await api.updateAdminUser(userId, { is_banned: newBanStatus });
+      const { user } = await api.updateAdminUser(id, patch);
       setUsers((prev) =>
-        prev.map((u) =>
-          u.id === userId ? { ...u, is_banned: newBanStatus } : u,
+        prev.map((currentUser) =>
+          currentUser.id === id ? { ...currentUser, ...user } : currentUser,
         ),
       );
+      setConfirmation(null);
     } catch (error) {
-      alert("User update failed.");
       console.error(error);
+      setActionError(getAdminApiErrorMessage(error, "User update failed."));
+    } finally {
+      pendingUserIdRef.current = null;
+      setPendingUserId(null);
     }
   };
 
@@ -145,11 +195,23 @@ export default function UserManagement() {
     );
   }
 
-  const pageStart = totalUsers === 0 ? 0 : (page - 1) * USERS_PER_PAGE + 1;
-  const pageEnd = Math.min(pageStart + users.length - 1, totalUsers);
+  const pageLabel = getPageRangeLabel({
+    currentCount: users.length,
+    page,
+    pageSize: USERS_PER_PAGE,
+    total: totalUsers,
+  });
 
   return (
     <div className="space-y-6">
+      {confirmation && (
+        <AdminConfirmDialog
+          confirmation={confirmation}
+          isPending={pendingUserId === confirmation.id}
+          onCancel={() => setConfirmation(null)}
+          onConfirm={() => void applyConfirmedAction()}
+        />
+      )}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
           <Users className="text-synth-primary w-8 h-8 drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
@@ -168,6 +230,7 @@ export default function UserManagement() {
               onChange={(event) => {
                 setSearchQuery(event.target.value);
                 setPage(1);
+                setLoadError("");
               }}
               className="block w-full rounded-lg border border-synth-border bg-synth-surface py-2 pl-10 pr-3 text-sm text-gray-300 placeholder-gray-500 shadow-inner transition-colors focus:border-synth-primary focus:outline-none focus:ring-1 focus:ring-synth-primary"
             />
@@ -178,6 +241,12 @@ export default function UserManagement() {
           </span>
         </div>
       </div>
+
+      {actionError && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {actionError}
+        </div>
+      )}
 
       <div className="bg-synth-surface border border-synth-border rounded-xl overflow-hidden shadow-glow-card">
         <div className="overflow-x-auto">
@@ -191,7 +260,25 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-synth-border/80">
-              {users.length === 0 ? (
+              {loadError ? (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="p-10 text-center text-sm text-red-300"
+                  >
+                    <div className="flex flex-col items-center gap-4">
+                      <span>{loadError}</span>
+                      <button
+                        className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-400/40 bg-red-500/10 px-4 text-sm font-semibold text-red-200 transition-colors hover:border-red-300 hover:bg-red-500/20"
+                        onClick={() => setReloadKey((key) => key + 1)}
+                        type="button"
+                      >
+                        <RefreshCw className="h-4 w-4" /> Retry
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ) : users.length === 0 ? (
                 <tr>
                   <td
                     colSpan={4}
@@ -204,6 +291,7 @@ export default function UserManagement() {
                 users.map((user) => {
                 const isSelf = user.id === currentUserId;
                 const isTargetSuperAdmin = user.role === "super_admin";
+                const isPending = pendingUserId === user.id;
 
                 return (
                   <tr
@@ -275,13 +363,20 @@ export default function UserManagement() {
                               onClick={() =>
                                 handleToggleRole(user.id, user.role)
                               }
+                              disabled={isPending || Boolean(pendingUserId)}
                               className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
                                 user.role === "admin"
                                   ? "bg-synth-elevated text-gray-300 hover:bg-synth-border"
                                   : "bg-synth-secondary/15 text-synth-secondary hover:bg-synth-secondary/25 border border-synth-secondary/25"
                               }`}
                             >
-                              {user.role === "admin" ? "Demote" : "Make Admin"}
+                              {isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : user.role === "admin" ? (
+                                "Demote"
+                              ) : (
+                                "Make Admin"
+                              )}
                             </button>
 
                             {/* Toggle Ban Button */}
@@ -289,13 +384,20 @@ export default function UserManagement() {
                               onClick={() =>
                                 handleToggleBan(user.id, user.is_banned)
                               }
+                              disabled={isPending || Boolean(pendingUserId)}
                               className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
                                 user.is_banned
                                   ? "bg-synth-elevated text-gray-300 hover:bg-synth-border hover:text-white"
                                   : "bg-red-500/10 text-red-500 hover:bg-red-500/20"
                               }`}
                             >
-                              {user.is_banned ? "Unban" : "Ban"}
+                              {isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : user.is_banned ? (
+                                "Unban"
+                              ) : (
+                                "Ban"
+                              )}
                             </button>
                           </>
                         )}
@@ -312,11 +414,11 @@ export default function UserManagement() {
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-gray-500">
-          Showing {pageStart}-{pageEnd} of {totalUsers}
+          {pageLabel}
         </p>
         <Pagination
           currentPage={page}
-          disabled={loading}
+          disabled={loading || Boolean(pendingUserId)}
           onPageChange={setPage}
           totalPages={totalPages}
         />

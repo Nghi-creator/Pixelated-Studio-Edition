@@ -8,6 +8,7 @@ import {
   ShieldAlert,
   Activity,
   LoaderCircle,
+  RefreshCw,
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import { api, getAuthSession } from "../../lib/apiClient";
@@ -16,30 +17,44 @@ export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [roleChecked, setRoleChecked] = useState(false);
+  const [accessError, setAccessError] = useState("");
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    let isMounted = true;
     const checkAccess = async () => {
-      const session = await getAuthSession();
-      
-      if (!session?.user) {
-        navigate("/login");
-        return;
-      }
+      setAccessError("");
+      try {
+        const session = await getAuthSession();
 
-      const data = await api.permissions();
-      if (
-        data.profile.role !== "admin" &&
-        data.profile.role !== "super_admin"
-      ) {
-        navigate("/");
-        return;
-      }
+        if (!session?.user) {
+          navigate("/login");
+          return;
+        }
 
-      setRoleChecked(true);
+        const data = await api.permissions();
+        if (
+          data.profile.role !== "admin" &&
+          data.profile.role !== "super_admin"
+        ) {
+          navigate("/");
+          return;
+        }
+
+        if (isMounted) setRoleChecked(true);
+      } catch (error) {
+        console.error("Error checking admin access:", error);
+        if (isMounted) {
+          setAccessError("Could not verify admin access. Try again.");
+        }
+      }
     };
 
-    checkAccess();
-  }, [navigate]);
+    void checkAccess();
+    return () => {
+      isMounted = false;
+    };
+  }, [navigate, retryKey]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -55,10 +70,24 @@ export default function AdminLayout() {
   if (!roleChecked) {
     return (
       <div className="h-screen bg-synth-bg flex items-center justify-center">
-        <LoaderCircle
-          aria-label="Checking admin access"
-          className="h-10 w-10 animate-spin text-white"
-        />
+        {accessError ? (
+          <div className="max-w-md rounded-2xl border border-red-500/30 bg-synth-surface p-8 text-center text-red-200">
+            <ShieldAlert className="mx-auto mb-4 h-10 w-10 text-red-400" />
+            <p className="mb-5 text-sm">{accessError}</p>
+            <button
+              className="mx-auto flex items-center gap-2 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
+              onClick={() => setRetryKey((key) => key + 1)}
+              type="button"
+            >
+              <RefreshCw className="h-4 w-4" /> Retry
+            </button>
+          </div>
+        ) : (
+          <LoaderCircle
+            aria-label="Checking admin access"
+            className="h-10 w-10 animate-spin text-white"
+          />
+        )}
       </div>
     );
   }

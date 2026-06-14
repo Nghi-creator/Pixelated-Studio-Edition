@@ -40,7 +40,7 @@ type RecordRow = Record<string, unknown>;
 
 type Filter = {
   field: string;
-  op: "eq" | "gte" | "ilike" | "in";
+  op: "eq" | "gte" | "ilike" | "in" | "not_in";
   value: unknown;
 };
 
@@ -282,6 +282,17 @@ class FakeQueryBuilder {
     return this;
   }
 
+  not(field: string, operator: "in", value: string) {
+    if (operator === "in") {
+      this.filters.push({
+        field,
+        op: "not_in",
+        value: value.replace(/^\(|\)$/g, "").split(","),
+      });
+    }
+    return this;
+  }
+
   order(field: string, options: { ascending: boolean } = { ascending: true }) {
     this.orderConfig = { ascending: options.ascending, field };
     return this;
@@ -435,25 +446,41 @@ class FakeQueryBuilder {
   private filteredRows() {
     return this.db.rows[this.table].filter((row) =>
       this.filters.every((filter) => {
+        const rowValue = getNestedValue(row, filter.field);
         if (filter.op === "gte") {
-          return String(row[filter.field]) >= String(filter.value);
+          return String(rowValue) >= String(filter.value);
         }
         if (filter.op === "ilike") {
           const pattern = String(filter.value)
             .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
             .replaceAll("%", ".*");
           return new RegExp(`^${pattern}$`, "i").test(
-            String(row[filter.field] || ""),
+            String(rowValue || ""),
           );
         }
         if (filter.op === "in" && Array.isArray(filter.value)) {
-          return filter.value.includes(row[filter.field]);
+          return filter.value.includes(rowValue);
+        }
+        if (filter.op === "not_in" && Array.isArray(filter.value)) {
+          return !filter.value.includes(rowValue);
         }
 
-        return row[filter.field] === filter.value;
+        return rowValue === filter.value;
       }),
     );
   }
+}
+
+function getNestedValue(row: RecordRow, field: string): unknown {
+  return field
+    .split(".")
+    .reduce<unknown>(
+      (value, key) =>
+        value && typeof value === "object"
+          ? (value as Record<string, unknown>)[key]
+          : undefined,
+      row,
+    );
 }
 
 function requireUser(userId = USER_ID) {
@@ -1309,6 +1336,58 @@ test("admin reports are paginated server-side", async () => {
   assert.equal(body.pageSize, 5);
   assert.equal(body.total, 12);
   assert.equal(body.totalPages, 3);
+  await app.close();
+});
+
+test("admin reports filter target roles before pagination", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  for (let index = 1; index <= 8; index += 1) {
+    const isAdminTarget = index % 2 === 0;
+    db.rows.reported_comments.push({
+      comments: {
+        content: `reported comment ${index}`,
+        id: `comment-${index}`,
+        profiles: {
+          id: isAdminTarget ? ADMIN_ID : USER_ID,
+          role: isAdminTarget ? "admin" : "user",
+          username: isAdminTarget ? "admin" : "player",
+        },
+      },
+      created_at: `2026-05-${String(index).padStart(2, "0")}T00:00:00.000Z`,
+      id: `report-${index}`,
+      profiles: { id: OTHER_USER_ID, username: "other" },
+      reason: `reason ${index}`,
+    });
+  }
+  const app = await createDataBoundaryApp(db, SUPER_ADMIN_ID);
+
+  const adminResponse = await app.inject({
+    method: "GET",
+    url: "/admin/reports?page=1&pageSize=2&targetRole=admins",
+  });
+  const userResponse = await app.inject({
+    method: "GET",
+    url: "/admin/reports?page=2&pageSize=2&targetRole=users",
+  });
+
+  assert.equal(adminResponse.statusCode, 200);
+  assert.deepEqual(
+    adminResponse.json<{ reports: { id: string }[]; total: number; totalPages: number }>()
+      .reports.map((report) => report.id),
+    ["report-8", "report-6"],
+  );
+  assert.equal(adminResponse.json<{ total: number }>().total, 4);
+  assert.equal(adminResponse.json<{ totalPages: number }>().totalPages, 2);
+
+  assert.equal(userResponse.statusCode, 200);
+  assert.deepEqual(
+    userResponse.json<{ reports: { id: string }[]; total: number; totalPages: number }>()
+      .reports.map((report) => report.id),
+    ["report-3", "report-1"],
+  );
+  assert.equal(userResponse.json<{ total: number }>().total, 4);
+  assert.equal(userResponse.json<{ totalPages: number }>().totalPages, 2);
   await app.close();
 });
 

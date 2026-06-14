@@ -20,7 +20,7 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, and 25 lifecycle regression contracts pass; shared infrastructure and large feature modules are grouped by ownership. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, and 28 lifecycle regression contracts pass; shared infrastructure and large feature modules are grouped by ownership. |
 | API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
@@ -30,25 +30,6 @@ product and infrastructure; it does not introduce new product features.
 ## Next Work Queue
 
 Work these in order unless a production incident changes priority.
-
-### NEXT-11 — P1: Harden Admin Frontend Operations
-
-**Scope:** Moderation queue, user management, access logs, permissions, and
-admin navigation.
-
-**Why this remains:** API authorization has deep regression coverage, but admin
-screen behavior does not. User-management fetch failures can leave a permanent
-skeleton, actions are not locked while pending, moderation filters operate only
-on the current server page, and destructive action/error states rely heavily on
-native alerts and confirms.
-
-**Completion proof:**
-
-- Add explicit load-error/retry and pending-action states to every admin screen.
-- Prevent duplicate destructive mutations and reconcile pagination after
-  actions.
-- Make moderation filtering semantics accurate across server pagination.
-- Add role-specific browser coverage for user, admin, and super-admin access.
 
 ### NEXT-12 — P2: Establish Frontend Interaction Test Harness
 
@@ -542,14 +523,42 @@ production build, all 25 tests, unauthenticated `/profile` redirect smoke, conso
 and `git diff --check` pass. Authenticated rendered interaction coverage remains
 tracked by `NEXT-12`.
 
+### DONE-29 — Harden Admin Frontend Operations
+
+**Problem:** Admin frontend behavior lagged behind backend authorization
+coverage. Moderation filters were applied only to the currently loaded server
+page, so filtered queues could appear empty while matching reports existed on
+other pages. User-management load failures could leave a permanent skeleton,
+role/ban actions used native confirm/alert dialogs, and destructive mutations
+were not consistently locked or reconciled with pagination.
+
+**Resolution:** Added a server-side `targetRole` filter to the admin reports
+endpoint so moderation pagination and counts are authoritative for all, user,
+or admin-target reports. The moderation queue now requests the active filter
+from the API, resets to page 1 when filters change, clamps pages after action
+removal, exposes safe API error messages, and uses an in-app confirmation dialog
+for user bans. User management now has retryable load-error states,
+stale-response protection for search/page requests, per-user single-flight
+locks, in-app confirmations for role/ban changes, and visible action errors.
+The admin shell now exposes a retryable access-check failure instead of a
+permanent spinner. Access logs share the same tested page-range label behavior.
+
+**Verification:** Added web contracts for admin API-safe error messages,
+post-removal page clamping, and page-range labels. Added API regression coverage
+proving report target filters apply before pagination. Web lint, production
+build, all 28 web tests, API typecheck, lint, build, all 52 API tests, local
+`/admin` dev-server HTTP smoke, no native admin `alert`/`confirm` usage, and
+`git diff --check` pass. Full authenticated rendered role coverage remains
+tracked by `NEXT-12`.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, and production build | Passed — 25 tests |
-| API typecheck, lint, build, and tests | Passed — 51 tests |
+| Web tests, lint, and production build | Passed — 28 tests |
+| API typecheck, lint, build, and tests | Passed — 52 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 29 tests |

@@ -130,6 +130,7 @@ export type ApiPaginatedReportsResponse<TReport> = {
   page: number;
   pageSize: number;
   reports: TReport[];
+  targetRole?: "all" | "users" | "admins";
   total: number;
   totalPages: number;
 };
@@ -163,4 +164,3 @@ export type ApiProfile = {
   role: string;
   username: string | null;
 };
-
