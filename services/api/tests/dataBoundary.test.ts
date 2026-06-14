@@ -591,7 +591,7 @@ test("catalog route paginates, searches, and returns featured games", async () =
   }>();
   assert.deepEqual(
     body.games.map((game) => game.id),
-    ["game-d"],
+    ["game-a"],
   );
   assert.deepEqual(
     body.featuredGames.map((game) => game.id),

@@ -23,6 +23,7 @@ import {
   normalizeLocalGameFilenames,
   toLocalVaultGames,
 } from "../../features/local-vault/localVaultClient";
+import { searchAndRankGames } from "../../features/search/gameSearch";
 import {
   CloudGameCard,
   LocalGameCard,
@@ -209,10 +210,7 @@ export default function Multiplayer() {
   }, [cloudPage, cloudTotalPages]);
 
   const filteredLocalGames = useMemo(
-    () =>
-      localGames.filter((game) =>
-        game.title.toLowerCase().includes(searchQuery.toLowerCase()),
-      ),
+    () => searchAndRankGames(localGames, searchQuery),
     [localGames, searchQuery],
   );
   const localPageSlice = useMemo(
