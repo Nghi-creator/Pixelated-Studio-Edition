@@ -34,6 +34,7 @@ interface ReportCardProps {
   onIgnore: (id: string) => void;
   onDelete: (id: string) => void;
   onBan: (id: string) => void;
+  pending: boolean;
 }
 
 export default function ReportCard({
@@ -43,6 +44,7 @@ export default function ReportCard({
   onIgnore,
   onDelete,
   onBan,
+  pending,
 }: ReportCardProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -144,7 +146,8 @@ export default function ReportCard({
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="flex items-center gap-2 px-4 py-2 bg-synth-elevated hover:bg-synth-border border border-synth-border text-white text-sm font-bold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-synth-primary/30"
+            disabled={pending}
+            className="flex items-center gap-2 px-4 py-2 bg-synth-elevated hover:bg-synth-border border border-synth-border text-white text-sm font-bold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-synth-primary/30 disabled:cursor-wait disabled:opacity-50"
           >
             Action{" "}
             <ChevronDown
@@ -159,6 +162,7 @@ export default function ReportCard({
                   setIsDropdownOpen(false);
                   onIgnore(report.id);
                 }}
+                disabled={pending}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-synth-elevated hover:text-white transition-colors text-left"
               >
                 <Check className="w-4 h-4" /> Ignore Report
@@ -171,6 +175,7 @@ export default function ReportCard({
                   setIsDropdownOpen(false);
                   onDelete(report.id);
                 }}
+                disabled={pending}
                 className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left"
               >
                 <Trash2 className="w-4 h-4" /> Delete Comment
@@ -181,7 +186,7 @@ export default function ReportCard({
                   setIsDropdownOpen(false);
                   onBan(report.id);
                 }}
-                disabled={!canBan}
+                disabled={!canBan || pending}
                 className={`w-full flex items-center gap-3 px-4 py-2.5 text-sm font-bold text-left transition-colors ${
                   !canBan
                     ? "text-gray-600 cursor-not-allowed"

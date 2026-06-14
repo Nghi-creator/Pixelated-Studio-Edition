@@ -14,3 +14,14 @@ test("later comment pages append in API order", () => {
     [{ id: "first" }, { id: "second" }],
   );
 });
+
+test("later comment pages ignore duplicate rows from overlapping page boundaries", () => {
+  assert.deepEqual(
+    mergeCommentPage(
+      [{ id: "first" }, { id: "boundary" }],
+      [{ id: "boundary" }, { id: "second" }],
+      false,
+    ),
+    [{ id: "first" }, { id: "boundary" }, { id: "second" }],
+  );
+});

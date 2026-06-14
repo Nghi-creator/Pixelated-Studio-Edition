@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, LayoutDashboard, Filter } from "lucide-react";
 import ReportCard, { type Report } from "../../components/admin/ReportCard";
 import {
@@ -23,6 +23,10 @@ export default function Dashboard() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalReports, setTotalReports] = useState(0);
+  const [loadError, setLoadError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [pendingReportId, setPendingReportId] = useState<string | null>(null);
+  const pendingReportIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -55,6 +59,7 @@ export default function Dashboard() {
 
       try {
         setLoading(true);
+        setLoadError("");
         const data = await api.adminReports<Report>(page, REPORTS_PER_PAGE);
         if (!isMounted) return;
 
@@ -66,6 +71,7 @@ export default function Dashboard() {
         }
       } catch (error) {
         console.error("Error fetching reports:", error);
+        if (isMounted) setLoadError("Could not load reports. Try again.");
       } finally {
         if (isMounted) setLoading(false);
       }
@@ -86,6 +92,10 @@ export default function Dashboard() {
     reportId: string,
     action: ApiAdminReportAction,
   ) => {
+    if (pendingReportIdRef.current) return;
+    pendingReportIdRef.current = reportId;
+    setPendingReportId(reportId);
+    setActionError("");
     try {
       const result = await api.adminReportAction(reportId, action);
       setReports((prev) =>
@@ -94,13 +104,17 @@ export default function Dashboard() {
           : prev.filter((report) => report.comments?.id !== result.commentId),
       );
       setTotalReports((currentTotal) => Math.max(0, currentTotal - 1));
+      await fetchReports();
     } catch (err) {
       console.error("Failed to resolve report:", err);
       const message =
         err instanceof ApiError && typeof err.payload === "object"
           ? (err.payload as { error?: string })?.error
           : null;
-      alert(message || "Failed to resolve report. Please try again.");
+      setActionError(message || "Failed to resolve report. Please try again.");
+    } finally {
+      pendingReportIdRef.current = null;
+      setPendingReportId(null);
     }
   };
 
@@ -167,7 +181,24 @@ export default function Dashboard() {
       </div>
 
       {/* Reports Feed */}
-      {filteredReports.length === 0 ? (
+      {actionError && (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          {actionError}
+        </div>
+      )}
+
+      {loadError ? (
+        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-8 text-center text-red-200">
+          <p>{loadError}</p>
+          <button
+            className="mt-4 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
+            onClick={() => void fetchReports()}
+            type="button"
+          >
+            Retry
+          </button>
+        </div>
+      ) : filteredReports.length === 0 ? (
         <div className="bg-synth-surface border border-synth-border rounded-xl p-12 text-center text-gray-400 shadow-glow-card">
           <Check className="w-12 h-12 text-green-500 mx-auto mb-4 opacity-50" />
           <p className="text-xl">Queue is clear.</p>
@@ -186,6 +217,7 @@ export default function Dashboard() {
               onIgnore={handleIgnore}
               onDelete={handleDeleteComment}
               onBan={handleBanUser}
+              pending={pendingReportId === report.id}
             />
           ))}
         </div>

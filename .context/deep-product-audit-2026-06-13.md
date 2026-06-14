@@ -31,6 +31,78 @@ product and infrastructure; it does not introduce new product features.
 
 Work these in order unless a production incident changes priority.
 
+### NEXT-09 — P1: Harden Favorites And Catalog Interaction State
+
+**Scope:** Homepage cards, featured banner favorites, favorites library, and
+catalog search/pagination interaction.
+
+**Why this remains:** Favorite API boundaries and auth-scoped caching are
+covered, but UI state can drift. Favorite buttons have no pending/error state,
+rapid clicks can issue conflicting mutations, removing a favorite from the
+library does not remove its card, and featured/banner requests can apply stale
+results after the displayed game changes.
+
+**Completion proof:**
+
+- Centralize or synchronize favorite state across cards, banner, and library.
+- Add mutation locking, rollback/error feedback, and stale-request protection.
+- Verify favorites removal, auth redirects, search, and pagination in browser
+  interaction tests.
+
+### NEXT-10 — P1: Harden Profile And Account Settings Workflows
+
+**Scope:** Profile loading/updating, avatar crop/upload, password changes, and
+the newly hardened account-deletion UI.
+
+**Why this remains:** Account deletion now has strong backend regressions, but
+the rest of the profile UI primarily relies on lint/build. Avatar upload,
+partial update failures, password reauthentication, stale profile state, and
+storage cleanup/replacement behavior lack focused interaction coverage.
+
+**Completion proof:**
+
+- Make each profile mutation expose clear pending, success, failure, and retry
+  states without partial-success confusion.
+- Verify avatar replacement/storage behavior and password-provider paths.
+- Add browser/component coverage for ordinary users and privileged-role
+  deletion blocking.
+
+### NEXT-11 — P1: Harden Admin Frontend Operations
+
+**Scope:** Moderation queue, user management, access logs, permissions, and
+admin navigation.
+
+**Why this remains:** API authorization has deep regression coverage, but admin
+screen behavior does not. User-management fetch failures can leave a permanent
+skeleton, actions are not locked while pending, moderation filters operate only
+on the current server page, and destructive action/error states rely heavily on
+native alerts and confirms.
+
+**Completion proof:**
+
+- Add explicit load-error/retry and pending-action states to every admin screen.
+- Prevent duplicate destructive mutations and reconcile pagination after
+  actions.
+- Make moderation filtering semantics accurate across server pagination.
+- Add role-specific browser coverage for user, admin, and super-admin access.
+
+### NEXT-12 — P2: Establish Frontend Interaction Test Harness
+
+**Scope:** Shared browser/component test infrastructure for the feature phases
+above.
+
+**Why this remains:** The current 14 web tests cover pure lifecycle and helper
+contracts, not rendered user interaction. Hosted auth/pairing smoke proves only
+two narrow production flows.
+
+**Completion proof:**
+
+- Add a maintainable rendered-interaction harness with mocked API/auth
+  boundaries.
+- Cover keyboard/accessibility behavior, request races, failure states, and
+  responsive layouts.
+- Keep a smaller hosted smoke suite for critical real-environment flows.
+
 ### NEXT-07 — P1: Complete Real Integration Proof
 
 **Still requires target environments**
@@ -436,13 +508,35 @@ confirmation rejection, deletion rate limiting, and fail-closed storage
 cleanup. API typecheck, lint, and all 51 tests pass; web production build
 passes.
 
+### DONE-26 — Harden Social Interaction Workflows
+
+**Problem:** Comments, reactions, reporting, and moderation actions had strong
+backend authorization but weak frontend request lifecycle behavior. Overlapping
+comment pages could duplicate rows, stale requests could update a newly opened
+game, mutations could be submitted repeatedly, report failures closed their
+modal, and most failures were visible only through native alerts or console
+output.
+
+**Resolution:** Added stale-game and overlapping-page protection, comment-page
+deduplication, explicit initial/load-more states, visible error and retry UI,
+and per-comment mutation locks. Game reactions now ignore stale responses,
+prevent duplicate mutations, expose pending state, and display API-safe errors.
+Report failures remain open with actionable feedback while successes surface in
+the comments panel. Moderation actions are single-flight, expose load/action
+errors, and refresh server state after completion.
+
+**Verification:** Added comment-boundary deduplication and API-safe social error
+contracts. Web lint, production build, all 16 tests, and `git diff --check`
+pass. Broader rendered keyboard/visual interaction coverage remains tracked by
+`NEXT-12`.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, and production build | Passed — 14 tests |
+| Web tests, lint, and production build | Passed — 16 tests |
 | API typecheck, lint, build, and tests | Passed — 51 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |

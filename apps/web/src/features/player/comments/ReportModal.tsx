@@ -1,6 +1,7 @@
 import { AlertTriangle, Loader2, X } from "lucide-react";
 
 type ReportModalProps = {
+  error: string;
   isSubmittingReport: boolean;
   onClose: () => void;
   onSubmitReport: (event: React.FormEvent<HTMLFormElement>) => void;
@@ -9,6 +10,7 @@ type ReportModalProps = {
 };
 
 export function ReportModal({
+  error,
   isSubmittingReport,
   onClose,
   onSubmitReport,
@@ -25,7 +27,8 @@ export function ReportModal({
           </h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-white transition-colors"
+            disabled={isSubmittingReport}
+            className="text-gray-400 hover:text-white transition-colors disabled:cursor-wait disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -36,6 +39,12 @@ export function ReportModal({
             Why are you reporting this comment? This will be sent directly to
             our moderators for review.
           </p>
+
+          {error && (
+            <div className="mb-4 rounded-lg border border-red-400/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {error}
+            </div>
+          )}
 
           <textarea
             value={reportReason}
@@ -49,6 +58,7 @@ export function ReportModal({
             <button
               type="button"
               onClick={onClose}
+              disabled={isSubmittingReport}
               className="px-4 py-2 text-gray-400 hover:text-white font-medium transition-colors"
             >
               Cancel
