@@ -9,6 +9,7 @@
     "smoke:lan": "node scripts/lan/multiplayerSmoke.mjs",
     "smoke:lan-summary": "node scripts/lan/summarizeSmokeArtifacts.mjs",
     "test:smoke": "node --test scripts/lan/*.test.mjs",
+    "verify:hosted-contract": "node --check scripts/hosted/hostedAuthSmoke.mjs && node --check scripts/hosted/hostedPairingSmoke.mjs && node scripts/hosted/hostedAuthSmoke.mjs --contract-only && node scripts/hosted/hostedPairingSmoke.mjs --contract-only && npm run test:smoke && npm --prefix apps/web run lint && npm --prefix apps/web run test && npm --prefix apps/web run build && npm --prefix apps/desktop run test",
     "verify:api": "npm --prefix services/api run typecheck && npm --prefix services/api run lint && npm --prefix services/api run test && npm --prefix services/api run build"
   },
   "devDependencies": {

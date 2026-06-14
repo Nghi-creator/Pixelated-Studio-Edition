@@ -21,7 +21,7 @@ product and infrastructure; it does not introduce new product features.
 | Area | Status | Summary |
 | --- | --- | --- |
 | Web frontend | Healthy, focused coverage added | Lint, production build, and 12 lifecycle regression contracts pass; shared infrastructure and large feature modules are grouped by ownership. |
-| API backend | Hardened, deployment action queued | Public account enumeration is closed, reactions are atomic, abuse controls support shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
+| API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
 | Docker image | Hardened and reduced | Pinned multi-stage build passes live ROM smoke at `1.15GB`; build tools are absent from the runtime image. |
@@ -58,12 +58,12 @@ Migration: `supabase/migrations/20260613210000_atomic_reaction_writes.sql`
 
 ### DEPLOY-03 — Configure the Hosted Shared Rate-Limit Store
 
-**Status:** Required before the next production API deployment.
+**Status:** Configured and verified on the hosted API on 2026-06-14.
 
-Create an Upstash-compatible Redis REST database and configure
+An Upstash-compatible Redis REST database is configured through
 `RATE_LIMIT_REDIS_REST_URL`, `RATE_LIMIT_REDIS_REST_TOKEN`, and optionally
-`RATE_LIMIT_REDIS_TIMEOUT_MS` on the hosted API. Production `/ready` intentionally
-returns `503` until both required Redis values are present.
+`RATE_LIMIT_REDIS_TIMEOUT_MS` on the hosted API. Production `/health` reports
+`rateLimitStore: "redis"` and `/ready` confirms the shared store is available.
 
 ## Completed Work Ledger
 
@@ -366,6 +366,53 @@ useful local build output.
 No JavaScript files remain under `engine/runtime/src/`; generated artifact
 directories are ignored and untracked; `git diff --check` passes.
 
+### DONE-22 — Repair Hosted Auth Smoke Contract Drift
+
+**Problem:** The hosted auth CI smoke still waited for the former signup-success
+copy after the UI adopted an account-enumeration-safe pending message. The
+correct hosted UI state was reached, but the stale locator timed out.
+
+**Resolution:** Updated the hosted signup smoke to assert the current
+enumeration-safe pending message and added it to the repository auth contract
+check so future UI/smoke drift fails immediately.
+
+**Verification:** Hosted-auth script syntax/help, all 9 root smoke-tool tests,
+and web lint, production build, and all 12 tests pass. The real hosted flow
+requires CI production secrets and remains the deployment proof.
+
+### DONE-23 — Add Pre-Deploy Hosted Contract Gate
+
+**Problem:** The reusable deploy gate validated the API but did not validate the
+web build or hosted smoke source contracts before triggering Render and Vercel.
+Deterministic UI/smoke drift could therefore fail only after production deploys
+had already started.
+
+**Resolution:** Added secret-free contract-only modes for hosted auth and
+pairing smoke scripts plus a reusable `hosted-contract` CI job. The job validates
+hosted smoke source contracts, root smoke tooling, the web build/lint/tests, and
+desktop companion tests before production deployment hooks can run.
+
+**Verification:** `npm run verify:hosted-contract` and `npm run verify:api` pass
+locally. Workflow YAML structure, package commands, moved paths, and
+environment-variable contracts were traced against current source. Live Render
+`/health` reports Redis and `/ready` passes; the deployed Vercel bundle contains
+the current pairing and safe-signup contract markers.
+
+### DONE-24 — Isolate API Tests From Ambient Redis Credentials
+
+**Problem:** Configuring real Upstash credentials in `services/api/.env` caused
+API tests to consume shared production-like counters. This made local tests
+slow, order-dependent, and capable of failing with unexpected `429` responses.
+
+**Resolution:** Shared rate limiters ignore ambient Redis credentials under the
+Node test runner while preserving explicit mocked-Redis injection. Added a
+regression contract proving ambient credentials cannot trigger Redis requests
+during tests.
+
+**Verification:** API typecheck, lint, build, and all 48 tests pass with real
+Redis credentials present locally. The suite completes deterministically
+without touching Upstash.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
@@ -373,7 +420,7 @@ Run on 2026-06-14 after the completed hardening work:
 | Gate | Result |
 | --- | --- |
 | Web tests, lint, and production build | Passed — 12 tests |
-| API typecheck, lint, build, and tests | Passed — 47 tests |
+| API typecheck, lint, build, and tests | Passed — 48 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 29 tests |

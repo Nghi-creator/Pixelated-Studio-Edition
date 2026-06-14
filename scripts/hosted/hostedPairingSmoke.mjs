@@ -21,7 +21,10 @@ Optional:
   HOSTED_SMOKE_ARTIFACT_DIR
   HOSTED_SMOKE_PUBLISH_TIMEOUT_MS
   HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS
-  HOSTED_SMOKE_VERCEL_BASELINE_HTML_SHA256`);
+  HOSTED_SMOKE_VERCEL_BASELINE_HTML_SHA256
+
+Validation:
+  --contract-only`);
   process.exit(0);
 }
 
@@ -338,8 +341,64 @@ async function cleanup() {
   fs.rmSync(certDir, { force: true, recursive: true });
 }
 
+function assertHostedPairingContract() {
+  const desktopController = fs.readFileSync(
+    path.join(rootDir, "apps", "desktop", "main", "engineController.ts"),
+    "utf8",
+  );
+  const desktopCompanion = fs.readFileSync(
+    path.join(rootDir, "apps", "desktop", "main", "companionServer.ts"),
+    "utf8",
+  );
+  const launchPairing = fs.readFileSync(
+    path.join(
+      rootDir,
+      "apps",
+      "web",
+      "src",
+      "lib",
+      "engine",
+      "useDesktopLaunchPairing.ts",
+    ),
+    "utf8",
+  );
+  const enginePairingPanel = fs.readFileSync(
+    path.join(
+      rootDir,
+      "apps",
+      "web",
+      "src",
+      "features",
+      "local-engine",
+      "EnginePairingPanel.tsx",
+    ),
+    "utf8",
+  );
+  const authSource = fs.readFileSync(
+    path.join(rootDir, "apps", "web", "src", "pages", "user", "Auth.tsx"),
+    "utf8",
+  );
+
+  assert.match(desktopController, /launchTicket/);
+  assert.match(desktopCompanion, /createCompanionLaunchTicket/);
+  assert.match(desktopCompanion, /startCompanionServer/);
+  assert.match(launchPairing, /Desktop launch pairing registration v1 failed/);
+  assert.match(launchPairing, /pairLocalEngine/);
+  assert.match(launchPairing, /launchTicket/);
+  assert.match(enginePairingPanel, /Engine URL/);
+  assert.match(authSource, /Sign In/);
+}
+
 async function main() {
   fs.mkdirSync(runDir, { recursive: true });
+  if (process.argv.includes("--contract-only")) {
+    await step(
+      "verify hosted pairing contract in repository",
+      assertHostedPairingContract,
+    );
+    return;
+  }
+
   required(email, "HOSTED_SMOKE_EMAIL");
   required(password, "HOSTED_SMOKE_PASSWORD");
 

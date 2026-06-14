@@ -14,7 +14,10 @@ Required:
 
 Optional:
   HOSTED_WEB_URL
-  HOSTED_AUTH_SMOKE_ARTIFACT_DIR`);
+  HOSTED_AUTH_SMOKE_ARTIFACT_DIR
+
+Validation:
+  --contract-only`);
   process.exit(0);
 }
 
@@ -25,6 +28,8 @@ const webUrl = normalizeUrl(
 const supabaseUrl = normalizeUrl(process.env.HOSTED_SUPABASE_URL || "");
 const serviceRoleKey = process.env.HOSTED_SUPABASE_SERVICE_ROLE_KEY || "";
 const email = process.env.HOSTED_AUTH_SMOKE_EMAIL || "";
+const signupPendingMessage =
+  "Check your email for the next step. Existing accounts were not changed.";
 const runId = `hosted-auth-${new Date().toISOString().replaceAll(":", "-")}`;
 const runDir = path.resolve(
   process.env.HOSTED_AUTH_SMOKE_ARTIFACT_DIR ||
@@ -184,11 +189,42 @@ async function assertHostedAuthContract() {
   assert.match(config, /max_frequency = "60s"/);
   assert.match(config, /otp_expiry = 300/);
   assert.match(authSource, /emailRedirectTo: getPublicAppUrl\(\)/);
+  assert.ok(
+    authSource.includes(signupPendingMessage),
+    "Signup must retain its account-enumeration-safe pending message.",
+  );
   assert.match(
     authSource,
     /redirectTo: `\$\{getPublicAppUrl\(\)\}\/reset-password`/,
   );
   assert.match(resetSource, /supabase\.auth\.updateUser/);
+  for (const expectedAuthText of [
+    "Don't have an account? Sign up",
+    "Email address",
+    "Password",
+    "Confirm password",
+    "Sign Up",
+    "Resend available in",
+    "Resend verification email",
+    "Sign In",
+  ]) {
+    assert.ok(
+      authSource.includes(expectedAuthText),
+      `Hosted auth smoke depends on Auth.tsx text: ${expectedAuthText}`,
+    );
+  }
+  for (const expectedResetText of [
+    "Create New Password",
+    "New Password",
+    "Confirm New Password",
+    "Update Password",
+    "Password Updated",
+  ]) {
+    assert.ok(
+      resetSource.includes(expectedResetText),
+      `Hosted auth smoke depends on ResetPassword.tsx text: ${expectedResetText}`,
+    );
+  }
   assert.match(confirmationTemplate, /within 5 minutes/);
   assert.match(recoveryTemplate, /within 5 minutes/);
 }
@@ -236,7 +272,7 @@ async function proveSignupVerificationAndResendCooldown(email, password) {
     .fill(password);
   await signupPage.getByRole("button", { name: "Sign Up", exact: true }).click();
   await signupPage
-    .getByText("Account created. Check your email within 5 minutes to verify it.")
+    .getByText(signupPendingMessage, { exact: true })
     .waitFor({ timeout: 30_000 });
   assert.equal(signupRequests, 1);
 
@@ -342,6 +378,11 @@ async function redeemRecovery(email, newPassword) {
 
 async function main() {
   fs.mkdirSync(runDir, { recursive: true });
+  if (process.argv.includes("--contract-only")) {
+    await step("verify hosted auth contract in repository", assertHostedAuthContract);
+    return { contractOnly: true };
+  }
+
   required(email, "HOSTED_AUTH_SMOKE_EMAIL");
   assert.match(email, /^[^@\s]+@[^@\s]+$/, "Invalid hosted auth smoke email.");
   required(supabaseUrl, "HOSTED_SUPABASE_URL");

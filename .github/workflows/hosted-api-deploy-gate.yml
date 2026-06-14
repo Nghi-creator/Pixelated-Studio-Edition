@@ -34,10 +34,39 @@ jobs:
       - name: Verify API contract
         run: npm run verify:api
 
+  hosted-contract:
+    name: Hosted web and smoke contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/web/package-lock.json
+            apps/desktop/package-lock.json
+          node-version: 22
+
+      - name: Install hosted contract dependencies
+        run: |
+          npm ci
+          npm ci --prefix apps/web
+          npm ci --prefix apps/desktop
+
+      - name: Verify hosted web and smoke contract
+        run: npm run verify:hosted-contract
+
   hosted-predeploy:
     name: Hosted schema and predeploy
     if: github.event_name != 'pull_request'
-    needs: api-contract
+    needs:
+      - api-contract
+      - hosted-contract
     environment: staging
     runs-on: ubuntu-latest
     timeout-minutes: 15

@@ -47,6 +47,15 @@ jobs:
         id: baseline
         run: |
           health="$(curl --fail-with-body --silent --show-error "$HOSTED_API_URL/health")"
+          ready="$(curl --fail-with-body --silent --show-error "$HOSTED_API_URL/ready")"
+          jq --exit-status '.ok == true and .rateLimitStore == "redis"' <<<"$health" >/dev/null || {
+            echo "::error::Production API health does not report the required Redis rate-limit store."
+            exit 1
+          }
+          jq --exit-status '.ok == true and .checks.sharedRateLimitStore == true' <<<"$ready" >/dev/null || {
+            echo "::error::Production API is not ready with the required shared rate-limit store."
+            exit 1
+          }
           uptime="$(jq --exit-status '.uptimeSeconds | numbers' <<<"$health")"
           echo "started_at_seconds=$(($(date +%s) - uptime))" >> "$GITHUB_OUTPUT"
 

@@ -67,8 +67,14 @@ function parseRedisResult(
 
 export function createRateLimiter(options: SharedRateLimiterOptions): RateLimiter {
   const localLimiter = new FixedWindowRateLimiter(options);
-  const redisRestUrl = options.redisRestUrl ?? env.RATE_LIMIT_REDIS_REST_URL;
-  const redisRestToken = options.redisRestToken ?? env.RATE_LIMIT_REDIS_REST_TOKEN;
+  const useEnvironmentRedis =
+    env.NODE_ENV !== "test" && !process.env.NODE_TEST_CONTEXT;
+  const redisRestUrl =
+    options.redisRestUrl ||
+    (useEnvironmentRedis ? env.RATE_LIMIT_REDIS_REST_URL : undefined);
+  const redisRestToken =
+    options.redisRestToken ||
+    (useEnvironmentRedis ? env.RATE_LIMIT_REDIS_REST_TOKEN : undefined);
   const fetchImpl = options.fetch ?? fetch;
   const timeoutMs = options.timeoutMs ?? env.RATE_LIMIT_REDIS_TIMEOUT_MS;
 

@@ -49,11 +49,16 @@ provides the repository deploy gate:
 - Every pull request runs the local `npm run verify:api` contract without
   exposing staging secrets to untrusted code, so the required status check is
   never skipped by path filtering.
+- Every pull request also runs `npm run verify:hosted-contract`, covering
+  hosted auth/pairing source contracts, web build/lint/tests, desktop companion
+  tests, and root smoke-tool tests before deployment.
 - Manual dispatches run the real `npm run predeploy:hosted` gate against the
   hosted staging API without deploying.
 - `.github/workflows/hosted-deploy.yml` runs on pushes to `main` and manual
   dispatches selected from `main`. It calls the reusable gate, then triggers
   the Render API and Vercel web deploy hooks only after the gate succeeds.
+- Before triggering Render, the production baseline check requires `/health`
+  to report the Redis rate-limit store and `/ready` to pass.
 - Configure a protected GitHub environment named `staging` with:
   - `STAGING_API_URL`: the Render API origin to validate.
   - `STAGING_SUPABASE_URL`: the staging Supabase project URL.
@@ -257,8 +262,8 @@ After the signed-in pairing smoke passes, the deploy workflow runs
 contract in `Auth.tsx`, `ResetPassword.tsx`, and `supabase/config.toml`, then:
 
 - submits the hosted signup UI against an intercepted successful pending-user
-  response, proving the verification message and cooldown without consuming
-  production SMTP quota;
+  response, proving the account-enumeration-safe pending message and cooldown
+  without consuming production SMTP quota;
 - proves the resend control is disabled for 60 seconds, then becomes available
   without sending a second email;
 - generates and redeems a real Supabase signup confirmation action link and
