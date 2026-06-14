@@ -20,7 +20,7 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, and 28 lifecycle regression contracts pass; shared infrastructure and large feature modules are grouped by ownership. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, 28 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
 | API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
@@ -30,23 +30,6 @@ product and infrastructure; it does not introduce new product features.
 ## Next Work Queue
 
 Work these in order unless a production incident changes priority.
-
-### NEXT-12 — P2: Establish Frontend Interaction Test Harness
-
-**Scope:** Shared browser/component test infrastructure for the feature phases
-above.
-
-**Why this remains:** The current 14 web tests cover pure lifecycle and helper
-contracts, not rendered user interaction. Hosted auth/pairing smoke proves only
-two narrow production flows.
-
-**Completion proof:**
-
-- Add a maintainable rendered-interaction harness with mocked API/auth
-  boundaries.
-- Cover keyboard/accessibility behavior, request races, failure states, and
-  responsive layouts.
-- Keep a smaller hosted smoke suite for critical real-environment flows.
 
 ### NEXT-07 — P1: Complete Real Integration Proof
 
@@ -472,8 +455,7 @@ errors, and refresh server state after completion.
 
 **Verification:** Added comment-boundary deduplication and API-safe social error
 contracts. Web lint, production build, all 16 tests, and `git diff --check`
-pass. Broader rendered keyboard/visual interaction coverage remains tracked by
-`NEXT-12`.
+pass. The rendered interaction harness was later established in `DONE-30`.
 
 ### DONE-27 — Harden Favorites And Catalog Interaction State
 
@@ -494,8 +476,8 @@ refreshed game lists safely and uses accessible controls.
 
 **Verification:** Added shared-load, duplicate-mutation, authoritative-response,
 failure rollback, and in-flight-load reconciliation contracts. Web lint,
-production build, all 20 tests, and `git diff --check` pass. Broader rendered
-interaction coverage remains tracked by `NEXT-12`.
+production build, all 20 tests, and `git diff --check` pass. The rendered
+interaction harness was later established in `DONE-30`.
 
 ### DONE-28 — Harden Profile And Account Settings Workflows
 
@@ -520,8 +502,8 @@ while work is pending.
 **Verification:** Added avatar validation, owned-path isolation, failed-upload
 and failed-save cleanup, and partial-success regression contracts. Web lint,
 production build, all 25 tests, unauthenticated `/profile` redirect smoke, console-error check,
-and `git diff --check` pass. Authenticated rendered interaction coverage remains
-tracked by `NEXT-12`.
+and `git diff --check` pass. The rendered interaction harness was later
+established in `DONE-30`.
 
 ### DONE-29 — Harden Admin Frontend Operations
 
@@ -548,8 +530,30 @@ post-removal page clamping, and page-range labels. Added API regression coverage
 proving report target filters apply before pagination. Web lint, production
 build, all 28 web tests, API typecheck, lint, build, all 52 API tests, local
 `/admin` dev-server HTTP smoke, no native admin `alert`/`confirm` usage, and
-`git diff --check` pass. Full authenticated rendered role coverage remains
-tracked by `NEXT-12`.
+`git diff --check` pass. Admin component interaction coverage was added in
+`DONE-30`; full authenticated role coverage remains a future expansion.
+
+### DONE-30 — Establish Frontend Interaction Test Harness
+
+**Problem:** The web package had focused Node contracts and hosted smoke tests,
+but no maintainable local browser-level harness for rendered interaction. That
+left modal accessibility, dropdown actions, pending states, and pagination
+behavior dependent on manual QA or production smoke coverage.
+
+**Resolution:** Added a Vite-served React interaction harness under
+`apps/web/interaction-tests/` and a Playwright runner at
+`scripts/web/interactionHarnessSmoke.mjs`. The harness renders real admin UI
+components with fake async boundaries, exercises the admin confirmation dialog,
+report-card dropdown actions, locked-review states, pagination controls, and
+console-error detection. Added `npm run test:web-interactions` and wired it into
+the hosted contract verification gate. CI now installs Chromium before running
+the hosted web contract.
+
+**Verification:** Web lint, production build, all 28 web Node contracts,
+`node --check` for the interaction harness runner, and
+`npm run test:web-interactions` pass. The harness currently covers the admin
+interaction surface; broader profile/favorites rendered flows can now be added
+incrementally on the same foundation.
 
 ## Latest Verification Run
 
@@ -557,7 +561,7 @@ Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, and production build | Passed — 28 tests |
+| Web tests, lint, production build, and rendered interaction harness | Passed — 28 Node tests plus Playwright harness |
 | API typecheck, lint, build, and tests | Passed — 52 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |
