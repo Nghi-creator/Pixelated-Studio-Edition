@@ -413,14 +413,37 @@ during tests.
 Redis credentials present locally. The suite completes deterministically
 without touching Upstash.
 
+### DONE-25 — Harden Self-Service Account Deletion
+
+**Problem:** Self-service account deletion existed but relied partly on
+frontend-only safeguards. OAuth users only typed `DELETE`, privileged-role
+blocking existed only in the UI, user-owned storage objects were not removed,
+and the destructive endpoint had no dedicated rate limit or recent-sign-in
+requirement.
+
+**Resolution:** Kept account deletion unavailable to admins and super admins at
+both UI and API layers. The API now requires an exact confirmation payload, a
+sign-in within the previous 10 minutes, and a non-privileged database role.
+Deletion attempts use the shared rate-limit infrastructure. Before deleting the
+Supabase auth user, the API recursively removes owned avatar and submission
+storage objects and aborts if storage cleanup fails. Successful deletion clears
+cached role state and lets existing foreign-key behavior cascade or anonymize
+related database records.
+
+**Verification:** Added backend regressions proving successful owned-file
+cleanup, privileged-role rejection, stale-session rejection, invalid
+confirmation rejection, deletion rate limiting, and fail-closed storage
+cleanup. API typecheck, lint, and all 51 tests pass; web production build
+passes.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, and production build | Passed — 12 tests |
-| API typecheck, lint, build, and tests | Passed — 48 tests |
+| Web tests, lint, and production build | Passed — 14 tests |
+| API typecheck, lint, build, and tests | Passed — 51 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 29 tests |

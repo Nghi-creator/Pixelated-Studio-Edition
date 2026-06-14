@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
-import { api, getAuthSession } from "../../lib/apiClient";
+import { api, ApiError, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
 import { ProfileSkeleton } from "../../components/ui/Skeleton";
 import {
@@ -234,7 +234,7 @@ export default function Profile() {
         });
         if (verifyError) throw new Error("Incorrect password.");
       } else {
-        // 1B. OAuth Users: Verify Text String
+        // OAuth users confirm intent here; the API also requires a recent sign-in.
         if (deleteInput !== "DELETE") {
           throw new Error("You must type exactly 'DELETE' to confirm.");
         }
@@ -246,7 +246,15 @@ export default function Profile() {
       await supabase.auth.signOut();
       navigate("/");
     } catch (error: unknown) {
-      if (error instanceof Error) {
+      if (
+        error instanceof ApiError &&
+        typeof error.payload === "object" &&
+        error.payload &&
+        "error" in error.payload &&
+        typeof error.payload.error === "string"
+      ) {
+        setDeleteError(error.payload.error);
+      } else if (error instanceof Error) {
         setDeleteError(error.message);
       } else {
         setDeleteError(

@@ -264,6 +264,7 @@ export const api = {
     }),
   deleteAccount: () =>
     apiRequest<void>("/me/account", {
+      body: JSON.stringify({ confirmation: "DELETE" }),
       method: "DELETE",
     }),
   deleteComment: (commentId: string) =>

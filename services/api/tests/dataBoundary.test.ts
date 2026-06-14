@@ -52,6 +52,12 @@ class FakeSupabase {
   authListUsersCalls = 0;
   authUsers: User[] = [];
   deletedUsers: string[] = [];
+  storageErrors = new Set<string>();
+  storageObjects: Record<string, string[]> = {
+    avatars: [],
+    submissions: [],
+  };
+  removedStorageObjects: { bucket: string; paths: string[] }[] = [];
   rows: Record<TableName, RecordRow[]> = {
     access_logs: [],
     comment_likes: [],
@@ -93,6 +99,41 @@ class FakeSupabase {
         user: this.authUsers.find((user) => user.id === token) || null,
       },
       error: null,
+    }),
+  };
+  storage = {
+    from: (bucket: string) => ({
+      list: async (prefix: string) => {
+        if (this.storageErrors.has(bucket)) {
+          return { data: null, error: new Error(`${bucket} storage unavailable`) };
+        }
+
+        const childEntries = new Map<string, { id: string | null; name: string }>();
+        for (const path of this.storageObjects[bucket] || []) {
+          if (!path.startsWith(`${prefix}/`)) continue;
+
+          const remainingPath = path.slice(prefix.length + 1);
+          const [name, ...rest] = remainingPath.split("/");
+          childEntries.set(name, {
+            id: rest.length === 0 ? path : null,
+            name,
+          });
+        }
+
+        return { data: [...childEntries.values()], error: null };
+      },
+      remove: async (paths: string[]) => {
+        if (this.storageErrors.has(bucket)) {
+          return { data: null, error: new Error(`${bucket} storage unavailable`) };
+        }
+
+        const pathSet = new Set(paths);
+        this.storageObjects[bucket] = (this.storageObjects[bucket] || []).filter(
+          (path) => !pathSet.has(path),
+        );
+        this.removedStorageObjects.push({ bucket, paths });
+        return { data: paths, error: null };
+      },
     }),
   };
 
@@ -424,6 +465,7 @@ function requireUser(userId = USER_ID) {
       created_at: new Date().toISOString(),
       email: `${userId}@example.com`,
       id: userId,
+      last_sign_in_at: new Date().toISOString(),
       user_metadata: {},
     };
     return undefined;
@@ -863,9 +905,15 @@ test("write-heavy social and play routes are rate limited per user", async () =>
   await playsApp.close();
 });
 
-test("profile routes update only the authenticated profile and delete auth user", async () => {
+test("profile routes update only the authenticated profile and safely delete auth user", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
+  db.storageObjects.avatars.push(`${USER_ID}/avatar.png`);
+  db.storageObjects.submissions.push(
+    `${USER_ID}/roms/tiny.nes`,
+    `${USER_ID}/covers/cover.png`,
+    `${OTHER_USER_ID}/roms/other.nes`,
+  );
   const app = await createDataBoundaryApp(db, USER_ID);
 
   const updateResponse = await app.inject({
@@ -880,9 +928,110 @@ test("profile routes update only the authenticated profile and delete auth user"
   assert.equal(db.rows.profiles.find((row) => row.id === USER_ID)?.username, "new-name");
   assert.equal(db.rows.profiles.find((row) => row.id === OTHER_USER_ID)?.username, "other");
 
-  const deleteResponse = await app.inject({ method: "DELETE", url: "/me/account" });
+  const deleteResponse = await app.inject({
+    method: "DELETE",
+    payload: { confirmation: "DELETE" },
+    url: "/me/account",
+  });
   assert.equal(deleteResponse.statusCode, 204);
   assert.deepEqual(db.deletedUsers, [USER_ID]);
+  assert.deepEqual(db.storageObjects.avatars, []);
+  assert.deepEqual(db.storageObjects.submissions, [`${OTHER_USER_ID}/roms/other.nes`]);
+  await app.close();
+});
+
+test("account deletion blocks privileged roles, stale sessions, and invalid confirmation", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+
+  const invalidConfirmationApp = await createDataBoundaryApp(db, USER_ID);
+  const invalidConfirmation = await invalidConfirmationApp.inject({
+    method: "DELETE",
+    payload: { confirmation: "delete" },
+    url: "/me/account",
+  });
+  assert.equal(invalidConfirmation.statusCode, 400);
+  await invalidConfirmationApp.close();
+
+  for (const privilegedUserId of [ADMIN_ID, SUPER_ADMIN_ID]) {
+    const privilegedApp = await createDataBoundaryApp(db, privilegedUserId);
+    const privilegedDelete = await privilegedApp.inject({
+      method: "DELETE",
+      payload: { confirmation: "DELETE" },
+      url: "/me/account",
+    });
+    assert.equal(privilegedDelete.statusCode, 403);
+    assert.deepEqual(db.deletedUsers, []);
+    await privilegedApp.close();
+  }
+
+  const staleApp = Fastify({ logger: false });
+  await registerProfileRoutes(staleApp, {
+    requireUser: async (request) => {
+      (request as TestRequest).user = {
+        app_metadata: {},
+        aud: "authenticated",
+        created_at: new Date().toISOString(),
+        email: "stale@example.com",
+        id: USER_ID,
+        last_sign_in_at: new Date(Date.now() - 11 * 60 * 1000).toISOString(),
+        user_metadata: {},
+      };
+    },
+    supabase: db as never,
+  });
+  const staleDelete = await staleApp.inject({
+    method: "DELETE",
+    payload: { confirmation: "DELETE" },
+    url: "/me/account",
+  });
+  assert.equal(staleDelete.statusCode, 403);
+  assert.equal(
+    staleDelete.json<{ code: string }>().code,
+    "recent_sign_in_required",
+  );
+  assert.deepEqual(db.deletedUsers, []);
+  await staleApp.close();
+});
+
+test("account deletion aborts when owned storage cannot be cleaned", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.storageErrors.add("submissions");
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "DELETE",
+    payload: { confirmation: "DELETE" },
+    url: "/me/account",
+  });
+
+  assert.equal(response.statusCode, 500);
+  assert.deepEqual(db.deletedUsers, []);
+  await app.close();
+});
+
+test("account deletion attempts are rate limited", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const response = await app.inject({
+      method: "DELETE",
+      payload: { confirmation: "not-delete" },
+      url: "/me/account",
+    });
+    assert.equal(response.statusCode, 400);
+  }
+
+  const blockedResponse = await app.inject({
+    method: "DELETE",
+    payload: { confirmation: "DELETE" },
+    url: "/me/account",
+  });
+  assert.equal(blockedResponse.statusCode, 429);
+  assert.deepEqual(db.deletedUsers, []);
   await app.close();
 });
 

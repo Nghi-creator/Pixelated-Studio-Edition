@@ -118,8 +118,9 @@ export function DeleteAccountModal({
             <span className="text-red-400 font-bold">
               permanent and irreversible
             </span>
-            . All your comments, likes, and profile data will be immediately
-            wiped from our servers.
+            . Your profile, social activity, active sessions, and uploaded
+            account files will be removed. Sign in again first if your session
+            is older than 10 minutes.
           </p>
 
           {deleteError && (
@@ -168,4 +169,3 @@ export function DeleteAccountModal({
     </div>
   );
 }
-
