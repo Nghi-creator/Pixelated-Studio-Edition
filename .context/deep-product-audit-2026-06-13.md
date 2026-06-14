@@ -20,12 +20,12 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, 33 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, 38 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
 | API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
 | Docker image | Hardened and reduced | Pinned multi-stage build passes live ROM smoke at `1.15GB`; build tools are absent from the runtime image. |
-| Supabase | Deployed | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. |
+| Supabase | Deployed with one pending policy | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. `DEPLOY-04` must be applied for browser-side submission cleanup in production. |
 
 ## Next Work Queue
 
@@ -73,20 +73,24 @@ requires real boot/LAN/TURN target environments.
 **Scope:** Developer submission form, browser storage uploads, API metadata
 creation, partial upload cleanup, validation, and user-facing retry states.
 
-**Why this remains:** The backend submission boundary is protected, but the web
-form still uses native alerts, has limited pending/error detail, and uploads
-files before metadata creation without cleaning uploaded objects if the API
-write fails. It also lacks focused frontend coverage for rejected file types,
-auth loss, storage failure, metadata failure, and duplicate submits.
+**Status:** Completed in `DONE-34`. `DEPLOY-04` must be applied to the hosted
+database before production browsers can remove failed submission uploads.
+
+**Why this was needed:** The backend submission boundary was protected, but the
+web form still used native alerts, had limited pending/error detail, and
+uploaded files before metadata creation without cleaning uploaded objects if
+the API write failed. It also lacked focused frontend coverage for rejected
+file types, auth loss, storage failure, metadata failure, and duplicate
+submits.
 
 **Completion proof:**
 
-- Replace native alerts with visible validation, pending, success, and retry
+- [x] Replace native alerts with visible validation, pending, success, and retry
   states.
-- Add single-flight submission locking and explicit file-size/type guidance.
-- Clean up newly uploaded submission objects when the backend metadata write
+- [x] Add single-flight submission locking and explicit file-size/type guidance.
+- [x] Clean up newly uploaded submission objects when the backend metadata write
   fails.
-- Add Node contracts for submission mutation cleanup and rendered harness
+- [x] Add Node contracts for submission mutation cleanup and rendered harness
   coverage for the form.
 
 ### NEXT-15 — P1: Harden Local Vault Workflow
@@ -128,10 +132,10 @@ submission, and local-vault flows.
   two-device LAN proof, Linux `/dev/uinput` P3/P4 behavior, TURN fallback, and
   broader rendered lobby-control coverage. `DONE-32` now ensures lobby metadata
   reflects the active engine share context.
-- **Game submission:** Backend validation and submitter ownership are strong,
-  but frontend submission still needs visible validation/errors, duplicate
-  submit protection, and cleanup of files uploaded before a failed metadata
-  write.
+- **Game submission:** Backend validation, submitter ownership, frontend
+  validation/errors, duplicate-submit protection, and failed-metadata cleanup
+  are covered. `DEPLOY-04` must be applied before cleanup works in production
+  browsers.
 - **Local Vault:** Engine routes enforce token and filename/path hardening, but
   frontend vault upload/delete/list behavior still needs in-app confirmation,
   per-file pending state, retryable list errors, and reusable local game
@@ -160,6 +164,17 @@ An Upstash-compatible Redis REST database is configured through
 `RATE_LIMIT_REDIS_REST_URL`, `RATE_LIMIT_REDIS_REST_TOKEN`, and optionally
 `RATE_LIMIT_REDIS_TIMEOUT_MS` on the hosted API. Production `/health` reports
 `rateLimitStore: "redis"` and `/ready` confirms the shared store is available.
+
+### DEPLOY-04 — Apply Submission Cleanup Storage Policy
+
+**Status:** Pending.
+
+Migration:
+`supabase/migrations/20260614153000_allow_own_submission_cleanup.sql`
+
+This allows authenticated users to delete only objects under their own
+`submissions/{userId}/...` folder. It is required for the browser to clean up
+uploaded ROM/art objects when backend metadata creation fails.
 
 ## Completed Work Ledger
 
@@ -711,13 +726,35 @@ slots, and host kick event wiring.
 **Verification:** Web tests pass with 33 contracts; lint, production build,
 rendered interaction harness, and `git diff --check` pass.
 
+### DONE-34 — Harden Game Submission Workflow
+
+**Problem:** The developer submission form still depended on native alerts,
+allowed duplicate submit attempts during async work, gave limited file guidance,
+and uploaded ROM/art files before backend metadata creation without a reliable
+cleanup path when metadata creation failed.
+
+**Resolution:** Added a dedicated publish submission helper for file
+validation, user-scoped object paths, upload sequencing, metadata creation, API
+error formatting, and cleanup of newly uploaded objects on metadata failure.
+The publish page now shows inline form/file errors, disables inputs while a
+submission is running, preserves the existing success state, and uses backend
+safe error messages when available. Added a narrow Supabase storage migration
+allowing authenticated users to delete only objects in their own submissions
+folder so failed submissions can be cleaned up from the browser.
+
+**Verification:** Added contracts for ROM/image validation, user-scoped object
+paths, metadata-failure cleanup, successful payload normalization, and backend
+error messaging. The rendered interaction harness now covers publish-form file
+validation and submit readiness. Web tests pass with 38 contracts; lint,
+production build, rendered interaction harness, and `git diff --check` pass.
+
 ## Latest Verification Run
 
 Run on 2026-06-14 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, production build, and rendered interaction harness | Passed — 33 Node tests plus Playwright harness |
+| Web tests, lint, production build, and rendered interaction harness | Passed — 38 Node tests plus Playwright harness |
 | API typecheck, lint, build, and tests | Passed — 52 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |

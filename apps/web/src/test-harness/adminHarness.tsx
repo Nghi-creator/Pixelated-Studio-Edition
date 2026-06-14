@@ -12,6 +12,10 @@ import { PlayerHeader } from "../features/player/PlayerHeader";
 import { StreamStage } from "../features/player/StreamStage";
 import { StreamTelemetryPanel } from "../features/player/StreamTelemetryPanel";
 import {
+  validateRomFile,
+  validateSubmissionImageFile,
+} from "../features/publish/publishSubmission";
+import {
   INITIAL_WEBRTC_TELEMETRY,
   type WebRTCTelemetry,
 } from "../lib/webrtc/webrtcTelemetry";
@@ -68,6 +72,8 @@ export function AdminHarness() {
   const [pending, setPending] = useState(false);
   const [events, setEvents] = useState<string[]>([]);
   const [page, setPage] = useState(2);
+  const [publishError, setPublishError] = useState<string | null>(null);
+  const [publishRom, setPublishRom] = useState<File | null>(null);
   const [showTelemetry, setShowTelemetry] = useState(true);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -234,6 +240,64 @@ export function AdminHarness() {
           shareText="https://engine.local/play/demo?session=session-1"
           shareUrl="https://engine.local/play/demo?session=session-1"
         />
+      </section>
+
+      <section aria-label="Publish form harness" className="max-w-2xl">
+        <form
+          className="space-y-3 rounded-xl border border-synth-border bg-synth-surface p-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const error = validateRomFile(publishRom);
+            if (error) {
+              setPublishError(error);
+              return;
+            }
+            record("publish-submit-ready");
+            setPublishError(null);
+          }}
+        >
+          {publishError && (
+            <p className="text-sm text-red-300" role="alert">
+              {publishError}
+            </p>
+          )}
+          <label
+            className="block text-sm font-semibold text-gray-300"
+            htmlFor="harness-publish-rom"
+          >
+            Harness ROM
+          </label>
+          <input
+            id="harness-publish-rom"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0] || null;
+              const error = validateRomFile(file);
+              setPublishRom(error ? null : file);
+              setPublishError(error);
+            }}
+            type="file"
+          />
+          <label
+            className="block text-sm font-semibold text-gray-300"
+            htmlFor="harness-publish-cover"
+          >
+            Harness Cover
+          </label>
+          <input
+            id="harness-publish-cover"
+            onChange={(event) => {
+              const file = event.currentTarget.files?.[0] || null;
+              setPublishError(validateSubmissionImageFile(file));
+            }}
+            type="file"
+          />
+          <button
+            className="rounded-lg border border-synth-primary/60 px-4 py-2 text-sm font-semibold text-white"
+            type="submit"
+          >
+            Harness Submit
+          </button>
+        </form>
       </section>
 
       <output aria-label="Harness events">{events.join("|")}</output>

@@ -133,6 +133,32 @@ async function run() {
     );
     await page.getByTitle("Remove Guest").click();
     await page.getByText("kick:guest-socket").waitFor();
+    await page.getByTitle("Close lobby").click();
+
+    await page.getByLabel("Harness ROM").setInputFiles({
+      buffer: Buffer.from("not a rom"),
+      mimeType: "application/zip",
+      name: "demo.zip",
+    });
+    await page.getByText("ROM uploads must use the .nes file extension.").waitFor();
+    await page.getByLabel("Harness Cover").setInputFiles({
+      buffer: Buffer.from("not an image"),
+      mimeType: "text/plain",
+      name: "cover.txt",
+    });
+    await page.getByText("Use an image file for cover or banner art.").waitFor();
+    await page.getByLabel("Harness Cover").setInputFiles({
+      buffer: Buffer.from("fake image"),
+      mimeType: "image/png",
+      name: "cover.png",
+    });
+    await page.getByLabel("Harness ROM").setInputFiles({
+      buffer: Buffer.from("fake nes"),
+      mimeType: "application/octet-stream",
+      name: "demo.nes",
+    });
+    await page.getByRole("button", { name: "Harness Submit" }).click();
+    await page.getByText("publish-submit-ready").waitFor();
 
     assert.deepEqual(errors, []);
   } finally {
