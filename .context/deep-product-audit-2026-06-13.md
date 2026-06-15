@@ -20,8 +20,8 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, 41 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
-| API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, 42 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
+| API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, smarter bounded catalog search is covered, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
 | Docker image | Hardened and reduced | Pinned multi-stage build passes live ROM smoke at `1.15GB`; build tools are absent from the runtime image. |
@@ -775,14 +775,35 @@ confirmation, and pairing-loss guidance. Web tests pass with 41 contracts;
 lint, production build, rendered interaction harness, no Local Vault native
 `alert`/`confirm` usage, and `git diff --check` pass.
 
+### DONE-36 — Improve Game Search Relevance And Focus Stability
+
+**Problem:** Catalog search was a raw title substring query, so it missed useful
+queries like acronyms, compact titles, and small typos. The homepage catalog
+also unmounted the search input when the results area switched into its loading
+skeleton, which could drop cursor focus while typing.
+
+**Resolution:** Added deterministic bounded search scoring for game titles:
+exact, prefix, substring, compact-title, token-prefix, token-contains,
+initials, conservative subsequence, and same-first-letter typo matches. The API
+catalog route ranks active search results by that score while keeping empty
+searches on the efficient database-paginated path. Multiplayer local-game
+search uses the same matcher. The homepage keeps the search bar mounted and
+only swaps the results area during loading, so requery refreshes no longer
+remove the focused input.
+
+**Verification:** Added web and API contracts for relevance ranking and
+bounded fuzzy behavior. Web tests pass with 42 contracts; API tests pass with
+53 contracts; web/API lint, web production build, API typecheck, rendered
+interaction harness, and `git diff --check` pass.
+
 ## Latest Verification Run
 
-Run on 2026-06-14 after the completed hardening work:
+Run on 2026-06-15 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, production build, and rendered interaction harness | Passed — 41 Node tests plus Playwright harness |
-| API typecheck, lint, build, and tests | Passed — 52 tests |
+| Web tests, lint, production build, and rendered interaction harness | Passed — 42 Node tests plus Playwright harness |
+| API typecheck, lint, build, and tests | Passed — 53 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 29 tests |
