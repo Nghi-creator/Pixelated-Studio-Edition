@@ -501,7 +501,7 @@ export function EnginePairingPanel({
           )}
         </div>
 
-        <div className="flex shrink-0 flex-nowrap gap-2 md:self-start md:pt-8">
+        <div className="flex shrink-0 flex-nowrap gap-2 md:self-start md:pt-14">
           <button
             onClick={pairEngine}
             disabled={
