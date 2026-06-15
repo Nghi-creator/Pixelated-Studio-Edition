@@ -40,8 +40,14 @@ npm run predeploy:hosted
 ```
 
 This runs `check:access-log-schema` first and signs in a dedicated staging admin
-or super-admin smoke account, so the summary RPC cannot be skipped. Missing
-access-log migrations fail before local typecheck, lint, or build starts.
+or super-admin smoke account, so the summary RPC cannot be skipped. It then
+runs `check:submission-cleanup-policy`, which uploads and removes one
+disposable object under the smoke user's `submissions/{userId}/staging-smoke/`
+folder. Missing access-log migrations or the missing submission cleanup storage
+policy fail before local typecheck, lint, or build starts. If deletion is
+denied, apply
+`supabase/migrations/20260614153000_allow_own_submission_cleanup.sql` to the
+hosted Supabase project.
 
 The GitHub Actions workflow `.github/workflows/hosted-api-deploy-gate.yml`
 provides the repository deploy gate:

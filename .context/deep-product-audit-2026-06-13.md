@@ -25,7 +25,7 @@ product and infrastructure; it does not introduce new product features.
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
 | Docker image | Hardened and reduced | Pinned multi-stage build passes live ROM smoke at `1.15GB`; build tools are absent from the runtime image. |
-| Supabase | Deployed with one pending policy | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. `DEPLOY-04` must be applied for browser-side submission cleanup in production. |
+| Supabase | Deployed with one pending policy guarded by predeploy | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. `DEPLOY-04` must be applied for browser-side submission cleanup in production; the hosted predeploy gate now fails if the policy is missing. |
 
 ## Next Work Queue
 
@@ -169,7 +169,7 @@ An Upstash-compatible Redis REST database is configured through
 
 ### DEPLOY-04 — Apply Submission Cleanup Storage Policy
 
-**Status:** Pending.
+**Status:** Pending, with hosted predeploy coverage.
 
 Migration:
 `supabase/migrations/20260614153000_allow_own_submission_cleanup.sql`
@@ -177,6 +177,11 @@ Migration:
 This allows authenticated users to delete only objects under their own
 `submissions/{userId}/...` folder. It is required for the browser to clean up
 uploaded ROM/art objects when backend metadata creation fails.
+
+The hosted predeploy gate runs `check:submission-cleanup-policy`, which uploads
+and removes one disposable object under the staging smoke user's
+`submissions/{userId}/staging-smoke/` folder. If removal is denied, the gate
+fails with an instruction to apply this migration before deployment.
 
 ## Completed Work Ledger
 
@@ -795,6 +800,22 @@ remove the focused input.
 bounded fuzzy behavior. Web tests pass with 42 contracts; API tests pass with
 53 contracts; web/API lint, web production build, API typecheck, rendered
 interaction harness, and `git diff --check` pass.
+
+### DONE-37 — Guard Hosted Submission Cleanup Policy
+
+**Problem:** `DEPLOY-04` was documented as required, but the hosted predeploy
+gate did not prove that browser-authenticated users could delete failed
+submission uploads in their own storage folder.
+
+**Resolution:** Added `check:submission-cleanup-policy` to the hosted predeploy
+chain. The check signs in the staging smoke user, uploads one disposable object
+to `submissions/{userId}/staging-smoke/`, removes it through authenticated
+Supabase Storage, and fails with an instruction to apply
+`supabase/migrations/20260614153000_allow_own_submission_cleanup.sql` if delete
+is denied. The existing submission flow is unchanged.
+
+**Verification:** Added an API regression contract that keeps the cleanup-policy
+check wired into `predeploy:hosted`.
 
 ## Latest Verification Run
 

@@ -3,6 +3,7 @@
   "private": true,
   "scripts": {
     "check:access-log-schema": "npm --prefix services/api run check:access-log-schema",
+    "check:submission-cleanup-policy": "npm --prefix services/api run check:submission-cleanup-policy",
     "predeploy:hosted": "npm --prefix services/api run predeploy:hosted",
     "smoke:hosted-auth": "node scripts/hosted/hostedAuthSmoke.mjs",
     "smoke:hosted-pairing": "node scripts/hosted/hostedPairingSmoke.mjs",

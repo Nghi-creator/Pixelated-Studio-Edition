@@ -229,10 +229,15 @@ npm run predeploy:hosted
 ```
 
 The root command delegates to `services/api`. `predeploy:hosted` first runs
-`check:access-log-schema` against the currently
-hosted API. It writes and updates one unique `public.access_logs` session and
-calls `public.admin_access_log_summary`; missing access-log migrations stop the
-command before typecheck, lint, or build. Configure `STAGING_API_URL` when
+`check:access-log-schema` against the currently hosted API, then runs
+`check:submission-cleanup-policy` against Supabase Storage. The access-log check
+writes and updates one unique `public.access_logs` session and calls
+`public.admin_access_log_summary`; missing access-log migrations stop the
+command before typecheck, lint, or build. The submission-cleanup check uploads
+and removes one disposable object under the smoke user's
+`submissions/{userId}/staging-smoke/` folder; if removal is denied, apply
+`supabase/migrations/20260614153000_allow_own_submission_cleanup.sql` to the
+hosted Supabase project before deploying. Configure `STAGING_API_URL` when
 checking a non-default Render service.
 
 GitHub Actions workflow `.github/workflows/hosted-api-deploy-gate.yml` runs:
@@ -261,12 +266,12 @@ npm run smoke:staging
 Environment variables:
 
 - `STAGING_BEARER_TOKEN` or `SUPABASE_ACCESS_TOKEN`: optional signed-in bearer token override for local/manual runs.
-- `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_SMOKE_EMAIL`, and `STAGING_SMOKE_PASSWORD`: automatic smoke-account sign-in credentials used when no bearer-token override is provided.
+- `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_SMOKE_EMAIL`, and `STAGING_SMOKE_PASSWORD`: automatic smoke-account sign-in credentials used when no bearer-token override is provided. The hosted predeploy cleanup-policy check also uses the Supabase URL and anon key to exercise browser-style Storage upload/delete behavior.
 - `STAGING_API_URL` or `API_URL`: optional API base URL, defaulting to `https://pixelated-api-services.onrender.com`.
 - `STAGING_GAME_ID`: optional game id for cloud session creation. If omitted, the runner discovers the first catalog game with a ROM target.
 - `STAGING_SMOKE_ENGINE_URL`: optional local pairing URL, defaulting to `http://127.0.0.1:8080`.
 
-The runner checks `/games` cache headers and `MISS`-then-`HIT` behavior, verifies `/games/featured` remains `no-store`, checks `/me` and `/me/permissions`, writes and updates one unique access-log session to detect hosted `public.access_logs` column/index drift, exercises local pairing save/read/delete with restore, creates/updates/reads/deletes a multiplayer lobby, creates/reads/verifies/deletes a cloud session, and writes/reads a stream metric. When the token has admin access, it also verifies the hosted `public.admin_access_log_summary` RPC through `/admin/access-logs`.
+The runner checks `/games` cache headers and `MISS`-then-`HIT` behavior, verifies `/games/featured` remains `no-store`, checks `/me` and `/me/permissions`, writes and updates one unique access-log session to detect hosted `public.access_logs` column/index drift, verifies authenticated submission upload cleanup in Supabase Storage, exercises local pairing save/read/delete with restore, creates/updates/reads/deletes a multiplayer lobby, creates/reads/verifies/deletes a cloud session, and writes/reads a stream metric. When the token has admin access, it also verifies the hosted `public.admin_access_log_summary` RPC through `/admin/access-logs`.
 
 Recognized Supabase access-log schema failures return API code `access_log_schema_drift` with the relevant migration names. The smoke also treats generic failures from the access-log routes as possible hosted drift, which keeps the check useful while an older API deployment is still active.
 

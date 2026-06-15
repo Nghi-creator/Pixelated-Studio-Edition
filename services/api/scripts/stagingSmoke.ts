@@ -2,6 +2,7 @@
 
 import "dotenv/config";
 import assert from "node:assert/strict";
+import { createClient } from "@supabase/supabase-js";
 
 type JsonRecord = Record<string, unknown>;
 type AccessLogErrorPayload = {
@@ -14,7 +15,7 @@ type AccessLogErrorPayload = {
   migrations?: string[];
 };
 
-type SmokeMode = "access-log-schema" | "full";
+type SmokeMode = "access-log-schema" | "full" | "submission-cleanup-policy";
 
 const mode = parseArgs(process.argv.slice(2));
 const apiUrl = normalizeBaseUrl(
@@ -24,19 +25,27 @@ const apiUrl = normalizeBaseUrl(
 );
 const configuredBearerToken =
   process.env.STAGING_BEARER_TOKEN || process.env.SUPABASE_ACCESS_TOKEN;
+const stagingSupabaseUrl =
+  process.env.STAGING_SUPABASE_URL || process.env.SUPABASE_URL;
+const stagingSupabaseAnonKey =
+  process.env.STAGING_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 const configuredGameId = process.env.STAGING_GAME_ID;
 const smokeEngineUrl =
   process.env.STAGING_SMOKE_ENGINE_URL || "http://127.0.0.1:8080";
 let authHeaders: Record<string, string> = {};
+let bearerToken = "";
 
 function parseArgs(args: string[]): SmokeMode {
   if (args.length === 0) return "full";
   if (args.length === 1 && args[0] === "--access-log-schema-only") {
     return "access-log-schema";
   }
+  if (args.length === 1 && args[0] === "--submission-cleanup-policy-only") {
+    return "submission-cleanup-policy";
+  }
 
   fail(
-    `Unknown arguments: ${args.join(" ")}. Supported option: --access-log-schema-only`,
+    `Unknown arguments: ${args.join(" ")}. Supported options: --access-log-schema-only, --submission-cleanup-policy-only`,
   );
 }
 
@@ -59,14 +68,10 @@ async function resolveBearerToken() {
     return configuredBearerToken;
   }
 
-  const supabaseUrl =
-    process.env.STAGING_SUPABASE_URL || process.env.SUPABASE_URL;
-  const supabaseAnonKey =
-    process.env.STAGING_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
   const email = process.env.STAGING_SMOKE_EMAIL;
   const password = process.env.STAGING_SMOKE_PASSWORD;
 
-  if (!supabaseUrl || !supabaseAnonKey || !email || !password) {
+  if (!stagingSupabaseUrl || !stagingSupabaseAnonKey || !email || !password) {
     fail(
       "Missing smoke authentication. Provide STAGING_BEARER_TOKEN, or provide " +
         "STAGING_SUPABASE_URL, STAGING_SUPABASE_ANON_KEY, STAGING_SMOKE_EMAIL, " +
@@ -76,11 +81,11 @@ async function resolveBearerToken() {
 
   logStep("signing in dedicated staging smoke account");
   const response = await fetch(
-    `${normalizeBaseUrl(supabaseUrl)}/auth/v1/token?grant_type=password`,
+    `${normalizeBaseUrl(stagingSupabaseUrl)}/auth/v1/token?grant_type=password`,
     {
       body: JSON.stringify({ email, password }),
       headers: {
-        apikey: supabaseAnonKey,
+        apikey: stagingSupabaseAnonKey,
         "Content-Type": "application/json",
       },
       method: "POST",
@@ -290,6 +295,88 @@ async function predeployAccessLogSchemaCheck() {
   }
 
   await smokeAccessLogStorage(true);
+}
+
+function formatStorageError(error: unknown) {
+  if (!error) return "<empty>";
+  if (error instanceof Error) return error.message;
+  if (typeof error !== "object") return String(error);
+
+  const record = error as {
+    error?: unknown;
+    message?: unknown;
+    statusCode?: unknown;
+  };
+  const summary = [
+    typeof record.statusCode === "string" ||
+    typeof record.statusCode === "number"
+      ? `status=${record.statusCode}`
+      : null,
+    typeof record.error === "string" ? `error=${record.error}` : null,
+    typeof record.message === "string" ? `message=${record.message}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return summary || JSON.stringify(record);
+}
+
+async function predeploySubmissionCleanupPolicyCheck() {
+  if (!stagingSupabaseUrl || !stagingSupabaseAnonKey) {
+    fail(
+      "Missing Supabase storage configuration for submission cleanup policy check. " +
+        "Provide STAGING_SUPABASE_URL and STAGING_SUPABASE_ANON_KEY.",
+    );
+  }
+
+  const { payload: me } = await request<{ user?: { id?: string } }>("GET", "/me");
+  const userId = me.user?.id;
+  if (!userId) {
+    throw new Error("Submission cleanup policy check requires /me to return user.id.");
+  }
+
+  const objectPath = `${userId}/staging-smoke/${uniqueId("cleanup-policy")}.txt`;
+  const supabase = createClient(stagingSupabaseUrl, stagingSupabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      persistSession: false,
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+      },
+    },
+  });
+  const storage = supabase.storage.from("submissions");
+
+  logStep("checking hosted submission storage upload policy");
+  const upload = await storage.upload(
+    objectPath,
+    new Blob(["staging smoke cleanup policy\n"], { type: "text/plain" }),
+    {
+      contentType: "text/plain",
+      upsert: false,
+    },
+  );
+  if (upload.error) {
+    throw new Error(
+      "Hosted submission storage upload probe failed before cleanup could be verified. " +
+        "Verify the authenticated submissions upload policy and staging smoke account. " +
+        `details=${formatStorageError(upload.error)}`,
+    );
+  }
+
+  logStep("checking hosted submission cleanup storage policy");
+  const removal = await storage.remove([objectPath]);
+  if (removal.error) {
+    throw new Error(
+      "Hosted submission cleanup storage policy is missing or denying authenticated cleanup. " +
+        "Apply migration supabase/migrations/20260614153000_allow_own_submission_cleanup.sql " +
+        "to the hosted Supabase project before deploying. " +
+        `Delete failed for submissions/${objectPath}; details=${formatStorageError(removal.error)}`,
+    );
+  }
 }
 
 async function smokeLocalPairing() {
@@ -509,8 +596,9 @@ async function smokeSessionAndMetrics(gameId: string) {
 
 async function main() {
   console.log(`staging smoke target: ${apiUrl}`);
+  bearerToken = await resolveBearerToken();
   authHeaders = {
-    Authorization: `Bearer ${await resolveBearerToken()}`,
+    Authorization: `Bearer ${bearerToken}`,
   };
 
   if (mode === "access-log-schema") {
@@ -518,10 +606,16 @@ async function main() {
     console.log("hosted access-log schema predeploy check passed");
     return;
   }
+  if (mode === "submission-cleanup-policy") {
+    await predeploySubmissionCleanupPolicyCheck();
+    console.log("hosted submission cleanup policy predeploy check passed");
+    return;
+  }
 
   await smokeCatalogCaching();
   const permissions = await smokeIdentity();
   await smokeAccessLogStorage(permissions.abilities?.canAccessAdmin === true);
+  await predeploySubmissionCleanupPolicyCheck();
   const gameId = await findSmokeGameId();
   await smokeLocalPairing();
   await smokeMultiplayerLobby(gameId);
