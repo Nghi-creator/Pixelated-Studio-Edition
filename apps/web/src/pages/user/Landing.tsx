@@ -3,7 +3,11 @@ import { Loader2, Search } from "lucide-react";
 import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
 import { api } from "../../lib/apiClient";
-import { GamesCatalogSkeleton, HeroSkeleton } from "../../components/ui/Skeleton";
+import {
+  GameGridSkeleton,
+  GamesCatalogSkeleton,
+  HeroSkeleton,
+} from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
 
 const GAMES_PER_PAGE = 15;
@@ -21,6 +25,18 @@ interface Game {
 const hasOnlyZeroPlayCounts = (games: Game[]) =>
   games.length > 1 &&
   games.every((game) => !game.play_count || game.play_count <= 0);
+
+function CatalogRefreshPanel({ label }: { label: string }) {
+  return (
+    <div className="relative" role="status" aria-label={label}>
+      <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-synth-primary/40 bg-synth-primary/10 px-3 py-1.5 text-sm font-semibold text-synth-primary shadow-glow-card">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        {label}
+      </div>
+      <GameGridSkeleton />
+    </div>
+  );
+}
 
 export default function Landing() {
   const [games, setGames] = useState<Game[]>([]);
@@ -129,6 +145,11 @@ export default function Landing() {
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStart = (safeCurrentPage - 1) * GAMES_PER_PAGE;
   const showInitialCatalogSkeleton = loading && games.length === 0 && !searchQuery;
+  const showCatalogRefreshPanel =
+    (loading || isSearchPending) && (games.length > 0 || Boolean(searchQuery));
+  const catalogRefreshLabel = searchQuery
+    ? "Searching games..."
+    : "Loading games...";
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -174,20 +195,13 @@ export default function Landing() {
               }}
               className="block w-full pl-10 pr-10 py-2 border border-synth-border rounded-lg leading-5 bg-synth-surface text-gray-300 placeholder-gray-500 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-colors shadow-inner"
             />
-            {isSearchPending && (
-              <div
-                aria-label="Searching games"
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-synth-primary"
-                role="status"
-              >
-                <Loader2 className="h-4 w-4 animate-spin" />
-              </div>
-            )}
           </div>
         </div>
 
         {showInitialCatalogSkeleton ? (
           <GamesCatalogSkeleton />
+        ) : showCatalogRefreshPanel ? (
+          <CatalogRefreshPanel label={catalogRefreshLabel} />
         ) : loadError ? (
           <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-8 text-center text-red-200">
             <p>{loadError}</p>
@@ -199,7 +213,7 @@ export default function Landing() {
               Retry
             </button>
           </div>
-        ) : games.length === 0 ? (
+        ) : games.length === 0 && !loading && !isSearchPending ? (
           <div className="text-center py-20 text-gray-500">
             <Search className="w-12 h-12 mx-auto mb-4 opacity-20" />
             <p className="text-xl">No games found matching "{searchQuery}"</p>
