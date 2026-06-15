@@ -4,8 +4,11 @@ import {
   cancelDockerRecovery,
   cleanupEngine,
   createWebLaunchUrl,
+  listEngineClients,
   regenerateLanInvite,
+  revokeEngineClient,
   revokeLanInvite,
+  rotateEngineToken,
   startEngine,
   startDockerAndResume,
   stopEngine,
@@ -56,6 +59,25 @@ ipcMain.on("regenerate-lan-invite", (event: IpcMainEvent) => {
 
 ipcMain.on("revoke-lan-invite", (event: IpcMainEvent) => {
   revokeLanInvite(event);
+});
+
+ipcMain.on("rotate-engine-token", (event: IpcMainEvent, options = {}) => {
+  rotateEngineToken(event, options);
+});
+
+ipcMain.handle("list-engine-clients", () => listEngineClients());
+
+ipcMain.handle("revoke-engine-client", (event, clientId: unknown) => {
+  if (typeof clientId !== "string" || !clientId) {
+    throw new Error("A connected client id is required.");
+  }
+  return revokeEngineClient(clientId).then((result) => {
+    event.sender.send(
+      "server-log",
+      `Revoked browser client ${clientId} and disconnected ${result.disconnected} socket(s).`,
+    );
+    return result;
+  });
 });
 
 ipcMain.handle("create-companion-qr", (_event, url: unknown) => {

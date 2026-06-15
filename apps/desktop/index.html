@@ -427,6 +427,35 @@
           </div>
         </section>
       </div>
+
+      <section id="client-access-panel" class="mt-5 rounded-xl border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <p class="text-[10px] uppercase tracking-[0.22em] text-synth-primary">
+              Client Access
+            </p>
+            <h2 class="mt-1 text-lg font-bold text-white">
+              Connected browsers
+            </h2>
+            <p class="mt-1 max-w-3xl text-xs leading-5 text-gray-400">
+              Same-browser tabs are expected. Revoke disconnects one browser client. Rotate restarts the engine with a new host-local pairing token.
+            </p>
+          </div>
+          <div class="flex flex-wrap gap-2">
+            <button
+              id="rotate-token"
+              class="rounded-lg border border-synth-primary/70 bg-synth-primary/15 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-synth-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+            >
+              Rotate Token
+            </button>
+          </div>
+        </div>
+        <p id="clients-status" class="mt-4 text-xs leading-5 text-gray-400">
+          Start the engine to see connected browser clients.
+        </p>
+        <div id="clients-list" class="mt-3 grid gap-3 lg:grid-cols-2 2xl:grid-cols-3"></div>
+      </section>
     </main>
 
     <div

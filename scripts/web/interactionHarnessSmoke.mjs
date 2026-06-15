@@ -110,15 +110,90 @@ async function run() {
     await page.getByRole("button", { name: "Next page" }).click();
     await page.getByText("Current page: 3").waitFor();
 
-    await page.getByText("Engine could not open the selected game file.").waitFor();
-    await page.getByRole("button", { name: "Retry Stream" }).click();
+    const streamStage = page.getByRole("region", {
+      name: "Stream stage harness",
+    });
+    await streamStage
+      .getByText("Engine could not open the selected game file.")
+      .waitFor();
+    await streamStage.getByRole("button", { name: "Retry Stream" }).click();
     await page.getByText("stream-retry").waitFor();
 
     await page.getByRole("button", { name: "Hide stream stats" }).click();
     await page.getByText("telemetry-hidden").waitFor();
-    await page.getByRole("button", { name: "Toggle stream telemetry" }).click();
+    await streamStage
+      .getByRole("button", { name: "Toggle stream telemetry" })
+      .click();
     await page.getByText("telemetry-toggle-on").waitFor();
     await page.getByText("Stream Stats").waitFor();
+
+    const cloudBoot = page.getByRole("region", {
+      name: "Cloud Boot Recovery harness",
+    });
+    await cloudBoot
+      .getByText(
+        "Cloud boot failed: the hosted API returned a game without a reachable ROM target.",
+      )
+      .waitFor();
+    await cloudBoot.getByText("Cloud game session: cloud-session-failed").waitFor();
+    await cloudBoot.getByRole("button", { name: "Retry Stream" }).click();
+    await cloudBoot.getByText("Connecting to Edge Node...").waitFor();
+    await cloudBoot
+      .getByText("Cloud game session: cloud-session-retrying")
+      .waitFor();
+    await cloudBoot.getByText("Boot attempt: retrying").waitFor();
+    assert.equal(
+      await cloudBoot
+        .getByText(
+          "Cloud boot failed: the hosted API returned a game without a reachable ROM target.",
+        )
+        .count(),
+      0,
+    );
+    await cloudBoot.getByText("Live Stream Active").waitFor();
+    await cloudBoot
+      .getByText("Cloud game session: cloud-session-recovered")
+      .waitFor();
+    await cloudBoot.getByText("Boot attempt: recovered").waitFor();
+    assert.equal(
+      await cloudBoot.getByText("cloud-session-failed").count(),
+      0,
+    );
+    await page.getByText("cloud-boot-recovered").waitFor();
+
+    const localBoot = page.getByRole("region", {
+      name: "Local Vault Boot Recovery harness",
+    });
+    await localBoot
+      .getByText(
+        "Local boot failed: the desktop engine could not open demo-local.nes from Local Vault.",
+      )
+      .waitFor();
+    await localBoot.getByText("Local game session: local-session-failed").waitFor();
+    await localBoot.getByRole("button", { name: "Retry Stream" }).click();
+    await localBoot.getByText("Connecting to Edge Node...").waitFor();
+    await localBoot
+      .getByText("Local game session: local-session-retrying")
+      .waitFor();
+    await localBoot.getByText("Boot attempt: retrying").waitFor();
+    assert.equal(
+      await localBoot
+        .getByText(
+          "Local boot failed: the desktop engine could not open demo-local.nes from Local Vault.",
+        )
+        .count(),
+      0,
+    );
+    await localBoot.getByText("Live Stream Active").waitFor();
+    await localBoot
+      .getByText("Local game session: local-session-recovered")
+      .waitFor();
+    await localBoot.getByText("Boot attempt: recovered").waitFor();
+    assert.equal(
+      await localBoot.getByText("local-session-failed").count(),
+      0,
+    );
+    await page.getByText("local-boot-recovered").waitFor();
 
     await page.getByRole("button", { name: /Lobby/ }).click();
     await page.getByText("LAN Invite").waitFor();

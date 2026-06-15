@@ -501,14 +501,14 @@ export function EnginePairingPanel({
           )}
         </div>
 
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 flex-nowrap gap-2 md:self-start md:pt-14">
           <button
             onClick={pairEngine}
             disabled={
               pairingState === "checking" ||
               (isCompanionJoin && pairingState !== "paired" && !preflightReady)
             }
-            className="inline-flex h-11 items-center gap-2 rounded-lg border border-synth-primary/70 bg-synth-primary/15 px-4 text-sm font-semibold text-white transition-colors hover:bg-synth-primary/25 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-lg border border-synth-primary/70 bg-synth-primary/15 px-4 text-sm font-semibold text-white transition-colors hover:bg-synth-primary/25 disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
           >
             {pairingState === "checking" ? (
@@ -526,7 +526,7 @@ export function EnginePairingPanel({
           {pairingState === "paired" && (
             <button
               onClick={disconnect}
-              className="inline-flex h-11 items-center gap-2 rounded-lg border border-synth-border bg-synth-bg px-3 text-sm font-semibold text-gray-300 transition-colors hover:border-red-400/70 hover:text-red-300"
+              className="inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-lg border border-synth-border bg-synth-bg px-3 text-sm font-semibold text-gray-300 transition-colors hover:border-red-400/70 hover:text-red-300"
               type="button"
             >
               <Trash2 className="h-4 w-4" />

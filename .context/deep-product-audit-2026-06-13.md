@@ -20,12 +20,12 @@ product and infrastructure; it does not introduce new product features.
 
 | Area | Status | Summary |
 | --- | --- | --- |
-| Web frontend | Healthy, focused coverage added | Lint, production build, 41 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
-| API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, and catalog/moderation logic is grouped by domain ownership. |
+| Web frontend | Healthy, focused coverage added | Lint, production build, 42 lifecycle regression contracts, and the rendered interaction harness pass; shared infrastructure and large feature modules are grouped by ownership. |
+| API backend | Hardened and deployed | Public account enumeration is closed, reactions are atomic, production abuse controls use shared Redis counters, smarter bounded catalog search is covered, and catalog/moderation logic is grouped by domain ownership. |
 | Desktop | Healthy | Build, 45 tests, decomposed companion/launch ownership, companion security controls, shell-safe Docker orchestration, and packaged-app smoke pass. |
 | Engine runtime | Healthy | Build, syntax checks, 29 tests, shell-safe process launching, and live Docker boot smoke pass. |
 | Docker image | Hardened and reduced | Pinned multi-stage build passes live ROM smoke at `1.15GB`; build tools are absent from the runtime image. |
-| Supabase | Deployed with one pending policy | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. `DEPLOY-04` must be applied for browser-side submission cleanup in production. |
+| Supabase | Deployed with one pending policy guarded by predeploy | Security-definer hardening and atomic-reaction migrations were applied to the hosted database. `DEPLOY-04` must be applied for browser-side submission cleanup in production; the hosted predeploy gate now fails if the policy is missing. |
 
 ## Next Work Queue
 
@@ -64,8 +64,8 @@ requires real boot/LAN/TURN target environments.
   recovery messages instead of silent/generic failure.
 - [x] Add rendered player harness coverage for telemetry toggling, lobby
   controls, and focused form fields.
-- [ ] Prove single-player cloud and local-vault boot failures surface
-  actionable recovery without stale state against real game sources.
+- [x] Add rendered player harness coverage proving cloud and local-vault boot
+  failures surface actionable retry recovery without stale player state.
 - [ ] Run local Docker/engine smoke with a real playable ROM when available.
 
 ### NEXT-14 — P1: Harden Game Submission Workflow
@@ -169,7 +169,7 @@ An Upstash-compatible Redis REST database is configured through
 
 ### DEPLOY-04 — Apply Submission Cleanup Storage Policy
 
-**Status:** Pending.
+**Status:** Pending, with hosted predeploy coverage.
 
 Migration:
 `supabase/migrations/20260614153000_allow_own_submission_cleanup.sql`
@@ -177,6 +177,11 @@ Migration:
 This allows authenticated users to delete only objects under their own
 `submissions/{userId}/...` folder. It is required for the browser to clean up
 uploaded ROM/art objects when backend metadata creation fails.
+
+The hosted predeploy gate runs `check:submission-cleanup-policy`, which uploads
+and removes one disposable object under the staging smoke user's
+`submissions/{userId}/staging-smoke/` folder. If removal is denied, the gate
+fails with an instruction to apply this migration before deployment.
 
 ## Completed Work Ledger
 
@@ -775,14 +780,66 @@ confirmation, and pairing-loss guidance. Web tests pass with 41 contracts;
 lint, production build, rendered interaction harness, no Local Vault native
 `alert`/`confirm` usage, and `git diff --check` pass.
 
+### DONE-36 — Improve Game Search Relevance And Focus Stability
+
+**Problem:** Catalog search was a raw title substring query, so it missed useful
+queries like acronyms, compact titles, and small typos. The homepage catalog
+also unmounted the search input when the results area switched into its loading
+skeleton, which could drop cursor focus while typing.
+
+**Resolution:** Added deterministic bounded search scoring for game titles:
+exact, prefix, substring, compact-title, token-prefix, token-contains,
+initials, conservative subsequence, and same-first-letter typo matches. The API
+catalog route ranks active search results by that score while keeping empty
+searches on the efficient database-paginated path. Multiplayer local-game
+search uses the same matcher. The homepage keeps the search bar mounted and
+only swaps the results area during loading, so requery refreshes no longer
+remove the focused input.
+
+**Verification:** Added web and API contracts for relevance ranking and
+bounded fuzzy behavior. Web tests pass with 42 contracts; API tests pass with
+53 contracts; web/API lint, web production build, API typecheck, rendered
+interaction harness, and `git diff --check` pass.
+
+### DONE-37 — Guard Hosted Submission Cleanup Policy
+
+**Problem:** `DEPLOY-04` was documented as required, but the hosted predeploy
+gate did not prove that browser-authenticated users could delete failed
+submission uploads in their own storage folder.
+
+**Resolution:** Added `check:submission-cleanup-policy` to the hosted predeploy
+chain. The check signs in the staging smoke user, uploads one disposable object
+to `submissions/{userId}/staging-smoke/`, removes it through authenticated
+Supabase Storage, and fails with an instruction to apply
+`supabase/migrations/20260614153000_allow_own_submission_cleanup.sql` if delete
+is denied. The existing submission flow is unchanged.
+
+**Verification:** Added an API regression contract that keeps the cleanup-policy
+check wired into `predeploy:hosted`.
+
+### DONE-38 — Prove Gameplay Boot Failure Recovery In Rendered Harness
+
+**Problem:** `NEXT-13` still needed rendered proof that single-player cloud and
+Local Vault boot failures recover through retry without stale player state
+remaining on screen.
+
+**Resolution:** Expanded the existing web interaction harness with cloud and
+Local Vault boot-recovery sections using the real `PlayerHeader` and
+`StreamStage` surfaces. Each path starts from a boot error, retries through a
+fresh connecting state with cleared telemetry, then reaches a recovered playing
+state with a new session/share URL and no stale failure copy.
+
+**Verification:** `npm run test:web-interactions`, web lint, web tests, and web
+production build pass.
+
 ## Latest Verification Run
 
-Run on 2026-06-14 after the completed hardening work:
+Run on 2026-06-15 after the completed hardening work:
 
 | Gate | Result |
 | --- | --- |
-| Web tests, lint, production build, and rendered interaction harness | Passed — 41 Node tests plus Playwright harness |
-| API typecheck, lint, build, and tests | Passed — 52 tests |
+| Web tests, lint, production build, and rendered interaction harness | Passed — 42 Node tests plus Playwright harness |
+| API typecheck, lint, build, and tests | Passed — 53 tests |
 | Desktop build and tests | Passed — 45 tests |
 | Desktop packaged release smoke | Passed |
 | Engine build, syntax checks, and tests | Passed — 29 tests |
