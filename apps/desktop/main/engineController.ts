@@ -50,6 +50,18 @@ type ActiveCompanion = {
   urls: string[];
 };
 
+export type EngineClientPayload = {
+  accessScope: "companion-guest" | "companion-host" | "raw";
+  connectedAt: string;
+  id: string;
+  lastSeenAt: string;
+  remoteAddress: string;
+  role: string;
+  sessionId: string | null;
+  socketCount: number;
+  userAgent: string;
+};
+
 let engineToken: string | null = null;
 let activeCompanion: ActiveCompanion | null = null;
 let activeStartupAttempt = 0;
@@ -178,6 +190,40 @@ export function revokeLanInvite(event: IpcMainEvent) {
       "Invite code revoked. Regenerate a code before inviting more guests.",
   });
   event.reply("server-log", "LAN invite code revoked.");
+}
+
+async function requestEngineControl<T>(
+  pathName: string,
+  options: { method?: "GET" | "POST" } = {},
+) {
+  if (!engineToken) {
+    throw new Error("Engine token has not been initialized.");
+  }
+
+  const response = await fetch(`http://127.0.0.1:8080${pathName}`, {
+    headers: {
+      "X-Engine-Token": engineToken,
+    },
+    method: options.method || "GET",
+  });
+  if (!response.ok) {
+    throw new Error(`Engine control request failed with ${response.status}.`);
+  }
+
+  return (await response.json()) as T;
+}
+
+export async function listEngineClients() {
+  if (!engineToken) return { clients: [] as EngineClientPayload[] };
+
+  return requestEngineControl<{ clients: EngineClientPayload[] }>("/clients");
+}
+
+export async function revokeEngineClient(clientId: string) {
+  return requestEngineControl<{ disconnected: number }>(
+    `/clients/${encodeURIComponent(clientId)}/revoke`,
+    { method: "POST" },
+  );
 }
 
 function getErrorMessage(err: unknown) {
@@ -446,6 +492,32 @@ export function stopEngine(event: IpcMainEvent) {
     .finally(() => {
       emitEngineState(event, "STOPPED");
       event.reply("engine-stopped");
+    });
+}
+
+export function rotateEngineToken(
+  event: IpcMainEvent,
+  options: StartEngineOptions = {},
+) {
+  if (!engineToken) {
+    event.reply("server-log", "Start the engine before rotating the token.");
+    return;
+  }
+
+  activeStartupAttempt += 1;
+  startupInProgress = false;
+  recoveryInProgress = false;
+  emitEngineState(event, "STOPPING", "Rotating pairing token");
+  event.reply("server-log", "Rotating host-local pairing token...");
+  const safeEnv = getSafeEnv();
+  stopCompanionServer();
+  activeCompanion = null;
+
+  void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+    .catch(() => undefined)
+    .finally(() => {
+      event.reply("server-log", "Restarting engine with a fresh pairing token.");
+      startEngine(event, options);
     });
 }
 

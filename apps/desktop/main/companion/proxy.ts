@@ -4,12 +4,13 @@ import http, {
   type ServerResponse,
 } from "http";
 import net, { type Socket } from "net";
-import { isValidCompanionAccessToken } from "./inviteState";
+import { getCompanionAccessTokenScope } from "./inviteState";
 
 const ENGINE_HOST = "127.0.0.1";
 const ENGINE_PORT = 8080;
 const PROXY_PREFIXES = [
   "/health",
+  "/clients",
   "/local-games",
   "/smoke/telemetry",
   "/socket.io",
@@ -39,6 +40,20 @@ function getCompanionTokenFromRequest(req: IncomingMessage) {
   }
 }
 
+function getClientIdFromRequest(req: IncomingMessage) {
+  const headerClientId = serializeHeaderValue(
+    req.headers["x-pixelated-client-id"],
+  );
+  if (headerClientId) return headerClientId;
+
+  try {
+    const url = new URL(req.url || "/", "https://pixelated.local");
+    return url.searchParams.get("pixelatedClientId") || "";
+  } catch {
+    return "";
+  }
+}
+
 function getProxiedHeaders(
   req: IncomingMessage,
   engineToken: string,
@@ -48,9 +63,17 @@ function getProxiedHeaders(
     host: `${ENGINE_HOST}:${ENGINE_PORT}`,
   };
   const companionToken = getCompanionTokenFromRequest(req);
+  const companionScope = companionToken
+    ? getCompanionAccessTokenScope(companionToken)
+    : null;
+  const clientId = getClientIdFromRequest(req);
 
-  if (companionToken && isValidCompanionAccessToken(companionToken)) {
+  if (companionScope) {
     headers["x-engine-token"] = engineToken;
+    headers["x-pixelated-access-scope"] = `companion-${companionScope}`;
+  }
+  if (clientId) {
+    headers["x-pixelated-client-id"] = clientId;
   }
 
   return headers;
@@ -108,4 +131,3 @@ export function proxyWebSocket(
 
   upstream.on("error", () => socket.destroy());
 }
-

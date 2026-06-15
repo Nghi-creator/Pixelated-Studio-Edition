@@ -28,6 +28,18 @@ type EngineCompanionPayload = {
   urls?: string[];
 };
 
+type EngineClientPayload = {
+  accessScope: "companion-guest" | "companion-host" | "raw";
+  connectedAt: string;
+  id: string;
+  lastSeenAt: string;
+  remoteAddress: string;
+  role: string;
+  sessionId: string | null;
+  socketCount: number;
+  userAgent: string;
+};
+
 type DockerDiagnosticPayload = {
   canStartDocker: boolean;
   code: string;
@@ -63,12 +75,15 @@ type PhaseTracker = {
 type ElectronApi = {
   createCompanionQrDataUrl: (url: string) => Promise<string>;
   launchWeb: () => Promise<void>;
+  listEngineClients: () => Promise<{ clients: EngineClientPayload[] }>;
   openDockerResource: (
     resource: "guide" | "install",
     diagnosticCode: string,
   ) => Promise<void>;
   regenerateLanInvite: () => void;
+  revokeEngineClient: (clientId: string) => Promise<{ disconnected: number }>;
   revokeLanInvite: () => void;
+  rotateEngineToken: (options: { exposureMode?: ExposureMode }) => void;
   cancelDockerRecovery: () => void;
   startDocker: (options: { exposureMode?: ExposureMode }) => void;
   startDockerApplication: (options: { exposureMode?: ExposureMode }) => void;
@@ -193,11 +208,16 @@ const dockerCopyDiagnosticsBtn = requiredElement(
   "docker-copy-diagnostics",
   HTMLButtonElement,
 );
+const clientsList = requiredElement("clients-list");
+const clientsStatus = requiredElement("clients-status");
+const rotateTokenBtn = requiredElement("rotate-token", HTMLButtonElement);
 
 let isRunning = false;
 let pendingCompanionPayload: EngineCompanionPayload | null = null;
 let dockerDiagnostic: DockerDiagnosticPayload | null = null;
 let dockerRecoveryPending = false;
+let clientsActionPending = false;
+let clientsPollTimer: number | null = null;
 
 function setDockerRecoveryPending(pending: boolean) {
   dockerRecoveryPending = pending;
@@ -263,6 +283,150 @@ function setInviteButtonsPending(isPending: boolean) {
 
   regenerateInviteBtn.innerText = "Regenerate";
   revokeInviteBtn.innerText = "Revoke";
+}
+
+function formatClientScope(scope: EngineClientPayload["accessScope"]) {
+  if (scope === "companion-guest") return "LAN guest";
+  if (scope === "companion-host") return "Host launch";
+  return "Raw token";
+}
+
+function formatClientRole(role: string) {
+  if (role === "host") return "Host";
+  if (role === "spectator") return "Spectator";
+  if (role === "player") return "Player";
+  if (role === "camera") return "Camera";
+  return "Connected";
+}
+
+function formatTimestamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "unknown";
+  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function setClientControlsEnabled(enabled: boolean) {
+  rotateTokenBtn.disabled = !enabled || clientsActionPending;
+}
+
+function renderClients(clients: EngineClientPayload[]) {
+  clientsList.replaceChildren();
+
+  if (!isRunning) {
+    clientsStatus.innerText = "Start the engine to see connected browser clients.";
+    setClientControlsEnabled(false);
+    return;
+  }
+
+  setClientControlsEnabled(true);
+
+  const visibleClients = clients.filter((client) => client.role !== "camera");
+  if (visibleClients.length === 0) {
+    clientsStatus.innerText =
+      "No browser clients are connected yet. Same-browser tabs will appear as separate connections.";
+    return;
+  }
+
+  clientsStatus.innerText = `${visibleClients.length} browser client${
+    visibleClients.length === 1 ? "" : "s"
+  } connected.`;
+
+  for (const client of visibleClients) {
+    const card = document.createElement("article");
+    card.className =
+      "rounded-lg border border-synth-border bg-[#050810] p-3 text-xs shadow-inner";
+
+    const header = document.createElement("div");
+    header.className = "flex items-start justify-between gap-3";
+
+    const title = document.createElement("p");
+    title.className = "font-bold text-white";
+    title.innerText = `${formatClientScope(client.accessScope)} · ${formatClientRole(
+      client.role,
+    )}`;
+
+    const revokeButton = document.createElement("button");
+    revokeButton.className =
+      "shrink-0 rounded-md border border-red-400/50 bg-red-500/10 px-2.5 py-1 text-[11px] font-bold text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50";
+    revokeButton.disabled = clientsActionPending;
+    revokeButton.type = "button";
+    revokeButton.innerText = "Revoke";
+    revokeButton.addEventListener("click", () => {
+      void revokeClient(client.id);
+    });
+
+    const lastSeen = document.createElement("span");
+    lastSeen.className = "text-gray-500";
+    lastSeen.innerText = `Seen ${formatTimestamp(client.lastSeenAt)} · ${
+      client.socketCount
+    } socket${client.socketCount === 1 ? "" : "s"}`;
+
+    const titleGroup = document.createElement("div");
+    titleGroup.append(title, lastSeen);
+
+    header.append(titleGroup, revokeButton);
+
+    const details = document.createElement("p");
+    details.className = "mt-2 break-all font-mono leading-5 text-synth-secondary";
+    details.innerText = `${client.remoteAddress}${
+      client.sessionId ? ` · ${client.sessionId}` : ""
+    }`;
+
+    const userAgent = document.createElement("p");
+    userAgent.className = "mt-1 line-clamp-2 leading-5 text-gray-500";
+    userAgent.innerText = client.userAgent;
+
+    card.append(header, details, userAgent);
+    clientsList.append(card);
+  }
+}
+
+async function revokeClient(clientId: string) {
+  if (!isRunning || clientsActionPending) return;
+  clientsActionPending = true;
+  setClientControlsEnabled(false);
+  clientsStatus.innerText = "Revoking selected browser client...";
+
+  try {
+    await pixelatedWindow.electronAPI.revokeEngineClient(clientId);
+  } catch (err) {
+    clientsStatus.innerText = `Could not revoke client: ${String(err)}`;
+  } finally {
+    clientsActionPending = false;
+    await refreshClients();
+  }
+}
+
+async function refreshClients() {
+  if (!isRunning) {
+    renderClients([]);
+    return;
+  }
+
+  try {
+    const { clients } = await pixelatedWindow.electronAPI.listEngineClients();
+    renderClients(clients);
+  } catch (err) {
+    clientsStatus.innerText = `Could not load connected clients: ${String(err)}`;
+    clientsList.replaceChildren();
+    setClientControlsEnabled(true);
+  }
+}
+
+function startClientsPolling() {
+  if (clientsPollTimer !== null) return;
+  void refreshClients();
+  clientsPollTimer = window.setInterval(() => {
+    void refreshClients();
+  }, 3_000);
+}
+
+function stopClientsPolling() {
+  if (clientsPollTimer !== null) {
+    window.clearInterval(clientsPollTimer);
+    clientsPollTimer = null;
+  }
+  renderClients([]);
 }
 
 const logs = pixelatedWindow.PixelatedLogs.createLogController({
@@ -374,6 +538,7 @@ function setStatusBadge(active: boolean) {
     setPowerPending(false);
     setLaunchWebVisible(true);
     isRunning = true;
+    startClientsPolling();
     if (pendingCompanionPayload) {
       exposure.setCompanionStatus(pendingCompanionPayload);
       setInviteButtonsPending(false);
@@ -407,6 +572,7 @@ function setStatusBadge(active: boolean) {
   exposure.setEnabled(true);
   phases.render({ status: "stopped", phase: "idle" });
   isRunning = false;
+  stopClientsPolling();
 }
 
 function resetFailedUi() {
@@ -429,6 +595,7 @@ function resetFailedUi() {
   revokeInviteBtn.disabled = true;
   exposure.setEnabled(true);
   isRunning = false;
+  stopClientsPolling();
 }
 
 function setLifecycleState(state: EngineStatePayload) {
@@ -609,6 +776,16 @@ revokeInviteBtn.addEventListener("click", () => {
   pixelatedWindow.electronAPI.revokeLanInvite();
 });
 
+rotateTokenBtn.addEventListener("click", () => {
+  if (!isRunning || clientsActionPending) return;
+  clientsActionPending = true;
+  setClientControlsEnabled(false);
+  clientsStatus.innerText = "Rotating token and restarting engine...";
+  pixelatedWindow.electronAPI.rotateEngineToken({
+    exposureMode: exposure.getMode(),
+  });
+});
+
 pixelatedWindow.electronAPI.onEngineToken((event, token) => {
   tokenValue.innerText = token;
   tokenPanel.classList.remove("hidden");
@@ -654,6 +831,9 @@ pixelatedWindow.electronAPI.onDockerRecoveryCancelled(() => {
 });
 
 pixelatedWindow.electronAPI.onEngineState((event, state) => {
+  if (state.status === "ready" || state.status === "failed" || state.status === "stopped") {
+    clientsActionPending = false;
+  }
   setLifecycleState(state);
 });
 
@@ -671,3 +851,4 @@ exposure.render();
 phases.render();
 regenerateInviteBtn.disabled = true;
 revokeInviteBtn.disabled = true;
+setClientControlsEnabled(false);

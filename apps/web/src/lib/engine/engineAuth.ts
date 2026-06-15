@@ -1,3 +1,5 @@
+import { getEngineClientId, resetEngineClientId } from "./engineClient";
+
 export const ENGINE_TOKEN_STORAGE_KEY = "pixelated_engine_token";
 export const ENGINE_PAIRING_EVENT = "pixelated-engine-pairing-changed";
 const COMPANION_TOKEN_PREFIX = "companion:";
@@ -12,6 +14,7 @@ export const setEngineToken = (token: string) => {
 
 export const clearEngineToken = () => {
   window.localStorage.removeItem(ENGINE_TOKEN_STORAGE_KEY);
+  resetEngineClientId();
   window.dispatchEvent(new Event(ENGINE_PAIRING_EVENT));
 };
 
@@ -36,5 +39,6 @@ export const engineAuthHeaders = (): Record<string, string> => {
 
   return {
     "X-Engine-Token": getCompanionAccessToken(token) || token,
+    "X-Pixelated-Client-Id": getEngineClientId(),
   };
 };

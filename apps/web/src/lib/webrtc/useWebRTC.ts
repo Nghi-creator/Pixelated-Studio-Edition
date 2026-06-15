@@ -7,6 +7,7 @@ import {
   ensureEngineToken,
   getCompanionAccessToken,
 } from "../engine/engineAuth";
+import { getEngineClientId } from "../engine/engineClient";
 import { getEngineUrl } from "../engine/engineConfig";
 import { attachEngineInput } from "./webrtcInput";
 import {
@@ -152,14 +153,17 @@ export function useWebRTC(
     }
 
     const companionAccessToken = getCompanionAccessToken(engineToken);
+    const engineClientId = getEngineClientId();
     const socket = io(getEngineUrl(), {
       autoConnect: false,
       query: companionAccessToken
-        ? { companionToken: companionAccessToken }
+        ? { companionToken: companionAccessToken, pixelatedClientId: engineClientId }
         : undefined,
     });
     socketRef.current = socket;
-    socket.auth = companionAccessToken ? {} : { token: engineToken };
+    socket.auth = companionAccessToken
+      ? { clientId: engineClientId }
+      : { clientId: engineClientId, token: engineToken };
     let pc: RTCPeerConnection | null = null;
     let stopTelemetry: () => void = () => undefined;
     let detachEngineInput: () => void = () => undefined;
@@ -344,8 +348,11 @@ export function useWebRTC(
       );
     });
 
-    socket.on("engine-error", (payload: { message?: string }) => {
+    socket.on("engine-error", (payload: { code?: string; message?: string }) => {
       console.error("[WebRTC] Engine error:", payload?.message);
+      if (payload?.code === "engine_access_revoked") {
+        clearEngineToken();
+      }
       failStream(payload?.message || "Engine error");
     });
 

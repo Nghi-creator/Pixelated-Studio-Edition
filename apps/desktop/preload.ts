@@ -33,6 +33,18 @@ type EngineCompanionPayload = {
   urls: string[];
 };
 
+type EngineClientPayload = {
+  accessScope: "companion-guest" | "companion-host" | "raw";
+  connectedAt: string;
+  id: string;
+  lastSeenAt: string;
+  remoteAddress: string;
+  role: string;
+  sessionId: string | null;
+  socketCount: number;
+  userAgent: string;
+};
+
 type DockerDiagnosticPayload = {
   canStartDocker: boolean;
   code: string;
@@ -54,6 +66,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   createCompanionQrDataUrl: (url: string) =>
     ipcRenderer.invoke("create-companion-qr", url) as Promise<string>,
   launchWeb: () => ipcRenderer.invoke("launch-web") as Promise<void>,
+  listEngineClients: () =>
+    ipcRenderer.invoke("list-engine-clients") as Promise<{
+      clients: EngineClientPayload[];
+    }>,
   openDockerResource: (resource: "guide" | "install", diagnosticCode: string) =>
     ipcRenderer.invoke(
       "open-docker-resource",
@@ -68,6 +84,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
   stopDocker: () => ipcRenderer.send("stop-docker"),
   regenerateLanInvite: () => ipcRenderer.send("regenerate-lan-invite"),
   revokeLanInvite: () => ipcRenderer.send("revoke-lan-invite"),
+  revokeEngineClient: (clientId: string) =>
+    ipcRenderer.invoke("revoke-engine-client", clientId) as Promise<{
+      disconnected: number;
+    }>,
+  rotateEngineToken: (options: StartDockerOptions) =>
+    ipcRenderer.send("rotate-engine-token", options),
   onServerLog: (callback: IpcCallback<[string]>) =>
     ipcRenderer.on("server-log", callback),
   onEngineState: (callback: IpcCallback<[EngineStatePayload]>) =>

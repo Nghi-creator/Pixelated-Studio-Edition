@@ -127,6 +127,16 @@ export function isValidCompanionAccessToken(token: string, now = Date.now()) {
   return true;
 }
 
+export function getCompanionAccessTokenScope(token: string, now = Date.now()) {
+  const record = companionAccessTokens.get(token);
+  if (!record) return null;
+  if (record.expiresAt <= now) {
+    companionAccessTokens.delete(token);
+    return null;
+  }
+  return record.scope;
+}
+
 export function createCompanionAccessToken(
   expiresAt: number,
   scope: CompanionAccessToken["scope"],
@@ -142,4 +152,3 @@ export function resetCompanionSecurityState() {
   companionInviteFailures.clear();
   revokeCompanionInvite();
 }
-

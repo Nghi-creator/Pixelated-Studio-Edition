@@ -14,6 +14,15 @@ import {
   MAX_ROM_SIZE_BYTES,
   PIXELATED_API_URL,
 } from "./src/config";
+import {
+  getRequestClientId,
+  getSocketClientId,
+  isEngineClientRevoked,
+  refreshConnectedClient,
+  registerConnectedClientRoutes,
+  trackHttpClient,
+  trackConnectedClient,
+} from "./src/clients/connectedClients";
 import { registerErrorHandlers } from "./src/http/errorHandlers";
 import { registerHealthRoutes } from "./src/http/healthRoutes";
 import { registerLocalVaultRoutes } from "./src/http/localVaultRoutes";
@@ -50,7 +59,12 @@ function normalizeSocketRole(role: unknown): string {
 const app = express();
 app.use(cors(corsOptions));
 
-const auth = createEngineTokenAuth(ENGINE_TOKEN);
+const auth = createEngineTokenAuth(ENGINE_TOKEN, {
+  getRequestClientId,
+  getSocketClientId,
+  isClientRevoked: isEngineClientRevoked,
+  onHttpAuthenticated: trackHttpClient,
+});
 const runtime = createProcessManager({
   cameraPath: HEALTH_PATHS.cameraBridge,
   cameraPeerStatePath: HEALTH_PATHS.cameraPeerState,
@@ -89,14 +103,20 @@ const io = new Server(server, {
 });
 
 io.use(auth.useSocketEngineToken);
+registerConnectedClientRoutes(app, {
+  io,
+  requireEngineToken: auth.requireEngineToken,
+});
 
 io.on("connection", (socket) => {
   console.log(`[Node.js] Client connected! ID: ${socket.id}`);
+  trackConnectedClient(socket);
 
   socket.on("join-session", (rawPayload: unknown = {}) => {
     const payload = normalizeSocketPayload(rawPayload);
     const role = normalizeSocketRole(payload.role);
     const sessionId = joinSession(socket, payload.sessionId, role);
+    refreshConnectedClient(socket);
 
     if (sessionId && role !== "camera") {
       lobby.joinLobby(socket, {
