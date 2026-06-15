@@ -64,8 +64,8 @@ requires real boot/LAN/TURN target environments.
   recovery messages instead of silent/generic failure.
 - [x] Add rendered player harness coverage for telemetry toggling, lobby
   controls, and focused form fields.
-- [ ] Prove single-player cloud and local-vault boot failures surface
-  actionable recovery without stale state against real game sources.
+- [x] Add rendered player harness coverage proving cloud and local-vault boot
+  failures surface actionable retry recovery without stale player state.
 - [ ] Run local Docker/engine smoke with a real playable ROM when available.
 
 ### NEXT-14 — P1: Harden Game Submission Workflow
@@ -816,6 +816,21 @@ is denied. The existing submission flow is unchanged.
 
 **Verification:** Added an API regression contract that keeps the cleanup-policy
 check wired into `predeploy:hosted`.
+
+### DONE-38 — Prove Gameplay Boot Failure Recovery In Rendered Harness
+
+**Problem:** `NEXT-13` still needed rendered proof that single-player cloud and
+Local Vault boot failures recover through retry without stale player state
+remaining on screen.
+
+**Resolution:** Expanded the existing web interaction harness with cloud and
+Local Vault boot-recovery sections using the real `PlayerHeader` and
+`StreamStage` surfaces. Each path starts from a boot error, retries through a
+fresh connecting state with cleared telemetry, then reaches a recovered playing
+state with a new session/share URL and no stale failure copy.
+
+**Verification:** `npm run test:web-interactions`, web lint, web tests, and web
+production build pass.
 
 ## Latest Verification Run
 
