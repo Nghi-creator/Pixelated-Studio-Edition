@@ -46,7 +46,7 @@ export default function EngineConnection() {
   };
 
   return (
-    <div className="mx-auto min-h-screen w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+    <div className="mx-auto min-h-screen w-full max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="mb-6">
         <Link
           className="group inline-flex items-center gap-2 font-medium text-gray-400 transition-colors hover:text-synth-primary"
