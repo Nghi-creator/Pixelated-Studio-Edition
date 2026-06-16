@@ -74,9 +74,12 @@ async function stopWebServer(child) {
 function formatDiagnostics({
   badResponses,
   consoleErrors,
+  documentState,
   failedRequests,
+  recentResponses,
   pageErrors,
-  pageSnippet,
+  rootText,
+  scriptPresent,
   serverOutput,
 }) {
   const sections = [
@@ -84,8 +87,10 @@ function formatDiagnostics({
     ["Console errors", consoleErrors],
     ["HTTP error responses", badResponses],
     ["Failed requests", failedRequests],
+    ["Recent responses", recentResponses],
+    ["Document state", [`readyState=${documentState}`, `harnessScriptPresent=${scriptPresent}`]],
+    ["Root text", [rootText || "(empty)"]],
     ["Vite output", [serverOutput.trim() || "(empty)"]],
-    ["Page snippet", [pageSnippet.trim() || "(empty)"]],
   ];
 
   return sections
@@ -108,6 +113,7 @@ async function run() {
     const badResponses = [];
     const failedRequests = [];
     const pageErrors = [];
+    const recentResponses = [];
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());
     });
@@ -115,6 +121,8 @@ async function run() {
       pageErrors.push(error.stack || error.message);
     });
     page.on("response", (response) => {
+      recentResponses.push(`${response.status()} ${response.url()}`);
+      recentResponses.splice(0, Math.max(0, recentResponses.length - 25));
       if (response.status() < 400) return;
       badResponses.push(`${response.status()} ${response.url()}`);
     });
@@ -132,21 +140,36 @@ async function run() {
     try {
       await page.waitForFunction(
         () => window.__PIXELATED_INTERACTION_HARNESS_READY__,
+        undefined,
         { timeout: readinessTimeoutMs },
       );
     } catch (error) {
-      const pageSnippet = await page
-        .content()
-        .then((content) => content.slice(0, 2_000))
-        .catch((contentError) => `Could not read page content: ${contentError}`);
+      const diagnostics = await page
+        .evaluate(() => ({
+          documentState: document.readyState,
+          rootText: document.getElementById("root")?.textContent?.slice(0, 2_000) || "",
+          scriptPresent: Boolean(
+            document.querySelector(
+              'script[src="/src/test-harness/adminHarness.tsx"]',
+            ),
+          ),
+        }))
+        .catch((contentError) => ({
+          documentState: `unavailable: ${contentError}`,
+          rootText: "",
+          scriptPresent: false,
+        }));
       throw new Error(
         `Interaction harness did not become ready within ${readinessTimeoutMs}ms.${formatDiagnostics(
           {
             badResponses,
             consoleErrors: errors,
+            documentState: diagnostics.documentState,
             failedRequests,
             pageErrors,
-            pageSnippet,
+            recentResponses,
+            rootText: diagnostics.rootText,
+            scriptPresent: diagnostics.scriptPresent,
             serverOutput: server.getOutput(),
           },
         )}`,
