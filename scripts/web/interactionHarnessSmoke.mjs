@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { spawn } from "node:child_process";
-import { once } from "node:events";
+import { createRequire } from "node:module";
+import fs from "node:fs/promises";
+import http from "node:http";
+import os from "node:os";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 
 const repoRoot = path.resolve(
@@ -14,61 +16,93 @@ const repoRoot = path.resolve(
 const webRoot = path.join(repoRoot, "apps", "web");
 const port = Number(process.env.PIXELATED_WEB_INTERACTION_PORT || 5174);
 const baseUrl = `http://127.0.0.1:${port}`;
+const harnessSourcePath = path.join(
+  webRoot,
+  "interaction-tests",
+  "adminHarness.html",
+);
 const harnessPath = "/interaction-tests/adminHarness.html";
 const interactionTimeoutMs = Number(
   process.env.PIXELATED_WEB_INTERACTION_TIMEOUT_MS || 15_000,
 );
 
-function startWebServer() {
-  const child = spawn(
-    process.platform === "win32" ? "npm.cmd" : "npm",
-    ["run", "dev", "--", "--host", "127.0.0.1", "--port", String(port)],
-    {
-      cwd: webRoot,
-      env: { ...process.env, BROWSER: "none" },
-      stdio: ["ignore", "pipe", "pipe"],
-    },
+const webRequire = createRequire(path.join(webRoot, "package.json"));
+
+async function buildHarness() {
+  const outDir = await fs.mkdtemp(
+    path.join(os.tmpdir(), "pixelated-interaction-harness-"),
   );
+  const vitePath = webRequire.resolve("vite");
+  const { build } = await import(pathToFileURL(vitePath).href);
+  const originalCwd = process.cwd();
 
-  let output = "";
-  const append = (chunk) => {
-    output += chunk.toString();
-  };
-  child.stdout.on("data", append);
-  child.stderr.on("data", append);
-
-  return { child, getOutput: () => output };
-}
-
-async function waitForServer(processState) {
-  const deadline = Date.now() + 15_000;
-  while (Date.now() < deadline) {
-    if (processState.child.exitCode !== null) {
-      throw new Error(
-        `Vite dev server exited early:\n${processState.getOutput()}`,
-      );
-    }
-
-    try {
-      const response = await fetch(`${baseUrl}${harnessPath}`);
-      if (response.ok) return;
-    } catch {
-      // Server is still starting.
-    }
-    await new Promise((resolve) => setTimeout(resolve, 150));
+  try {
+    process.chdir(webRoot);
+    await build({
+      build: {
+        emptyOutDir: true,
+        outDir,
+        rollupOptions: {
+          input: {
+            adminHarness: harnessSourcePath,
+          },
+        },
+      },
+      configFile: path.join(webRoot, "vite.config.ts"),
+      root: webRoot,
+    });
+  } finally {
+    process.chdir(originalCwd);
   }
 
-  throw new Error(`Timed out waiting for Vite:\n${processState.getOutput()}`);
+  return outDir;
 }
 
-async function stopWebServer(child) {
-  if (child.exitCode !== null) return;
-  child.kill("SIGTERM");
-  await Promise.race([
-    once(child, "exit"),
-    new Promise((resolve) => setTimeout(resolve, 2_000)),
-  ]);
-  if (child.exitCode === null) child.kill("SIGKILL");
+function getContentType(filePath) {
+  const ext = path.extname(filePath);
+  if (ext === ".css") return "text/css; charset=utf-8";
+  if (ext === ".html") return "text/html; charset=utf-8";
+  if (ext === ".js") return "text/javascript; charset=utf-8";
+  if (ext === ".json") return "application/json; charset=utf-8";
+  if (ext === ".svg") return "image/svg+xml";
+  return "application/octet-stream";
+}
+
+async function startWebServer(rootDir) {
+  const server = http.createServer(async (req, res) => {
+    try {
+      const url = new URL(req.url || "/", baseUrl);
+      const pathname = decodeURIComponent(url.pathname);
+      const relativePath = pathname === "/" ? harnessPath.slice(1) : pathname.slice(1);
+      const filePath = path.resolve(rootDir, relativePath);
+
+      if (!filePath.startsWith(`${rootDir}${path.sep}`)) {
+        res.writeHead(403);
+        res.end("Forbidden");
+        return;
+      }
+
+      const body = await fs.readFile(filePath);
+      res.writeHead(200, {
+        "cache-control": "no-store",
+        "content-type": getContentType(filePath),
+      });
+      res.end(body);
+    } catch (error) {
+      res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+      res.end(`Not found: ${error instanceof Error ? error.message : error}`);
+    }
+  });
+
+  await new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "127.0.0.1", () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+
+  return server;
 }
 
 function formatDiagnostics({
@@ -80,7 +114,6 @@ function formatDiagnostics({
   pageErrors,
   rootText,
   scriptPresent,
-  serverOutput,
 }) {
   const sections = [
     ["Page errors", pageErrors],
@@ -90,7 +123,6 @@ function formatDiagnostics({
     ["Recent responses", recentResponses],
     ["Document state", [`readyState=${documentState}`, `harnessScriptPresent=${scriptPresent}`]],
     ["Root text", [rootText || "(empty)"]],
-    ["Vite output", [serverOutput.trim() || "(empty)"]],
   ];
 
   return sections
@@ -102,11 +134,10 @@ function formatDiagnostics({
 }
 
 async function run() {
-  const server = startWebServer();
+  const outDir = await buildHarness();
+  const server = await startWebServer(outDir);
   let browser;
   try {
-    await waitForServer(server);
-
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     const errors = [];
@@ -150,7 +181,7 @@ async function run() {
               "",
             scriptPresent: Boolean(
               document.querySelector(
-                'script[src="/src/test-harness/adminHarness.tsx"]',
+                'script[type="module"][src*="/assets/"]',
               ),
             ),
           }))
@@ -170,7 +201,6 @@ async function run() {
               recentResponses,
               rootText: diagnostics.rootText,
               scriptPresent: diagnostics.scriptPresent,
-              serverOutput: server.getOutput(),
             },
           )}`,
           { cause: error },
@@ -352,7 +382,8 @@ async function run() {
     assert.deepEqual(errors, []);
   } finally {
     if (browser) await browser.close();
-    await stopWebServer(server.child);
+    await new Promise((resolve) => server.close(resolve));
+    await fs.rm(outDir, { force: true, recursive: true });
   }
 }
 
