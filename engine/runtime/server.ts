@@ -15,8 +15,11 @@ import {
   PIXELATED_API_URL,
 } from "./src/config";
 import {
+  getRequestAccessId,
   getRequestClientId,
+  getSocketAccessId,
   getSocketClientId,
+  isEngineAccessRevoked,
   isEngineClientRevoked,
   refreshConnectedClient,
   registerConnectedClientRoutes,
@@ -60,8 +63,11 @@ const app = express();
 app.use(cors(corsOptions));
 
 const auth = createEngineTokenAuth(ENGINE_TOKEN, {
+  getRequestAccessId,
   getRequestClientId,
+  getSocketAccessId,
   getSocketClientId,
+  isAccessRevoked: isEngineAccessRevoked,
   isClientRevoked: isEngineClientRevoked,
   onHttpAuthenticated: trackHttpClient,
 });
@@ -116,6 +122,7 @@ io.on("connection", (socket) => {
     const payload = normalizeSocketPayload(rawPayload);
     const role = normalizeSocketRole(payload.role);
     const sessionId = joinSession(socket, payload.sessionId, role);
+    socket.data.role = role;
     refreshConnectedClient(socket);
 
     if (sessionId && role !== "camera") {

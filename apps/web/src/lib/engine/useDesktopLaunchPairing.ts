@@ -1,6 +1,10 @@
 import { useEffect } from "react";
 import { api } from "../apiClient";
-import { createCompanionEngineToken, setEngineToken } from "./engineAuth";
+import {
+  createCompanionEngineToken,
+  engineAuthHeaders,
+  setEngineToken,
+} from "./engineAuth";
 import { setEngineUrl } from "./engineConfig";
 
 type LaunchRedemption = {
@@ -31,6 +35,15 @@ export function useDesktopLaunchPairing() {
 
         setEngineUrl(companionUrl);
         setEngineToken(createCompanionEngineToken(payload.companionToken));
+        fetch(`${companionUrl}/local-games`, {
+          cache: "no-store",
+          headers: {
+            "X-User-Id": "connection-monitor",
+            ...engineAuthHeaders(),
+          },
+        }).catch((error) => {
+          console.warn("Desktop launch client presence ping failed.", error);
+        });
         url.searchParams.delete("companionUrl");
         url.searchParams.delete("launchTicket");
         window.history.replaceState({}, "", url);

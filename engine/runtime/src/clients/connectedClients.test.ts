@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  isEngineAccessRevoked,
   listConnectedClients,
   revokeConnectedClient,
   trackHttpClient,
@@ -11,6 +12,7 @@ function requestFor(clientId: string) {
     get(name: string) {
       const headers: Record<string, string> = {
         "user-agent": `Test Browser ${clientId}`,
+        "x-pixelated-access-id": `access-${clientId}`,
         "x-pixelated-access-scope": "companion-host",
         "x-pixelated-client-id": clientId,
       };
@@ -27,6 +29,21 @@ function controlRequestWithoutClientId() {
       return name.toLowerCase() === "user-agent" ? "Desktop control" : "";
     },
     ip: "127.0.0.1",
+    socket: {},
+  };
+}
+
+function requestWithAccessOnly(accessId: string) {
+  return {
+    get(name: string) {
+      const headers: Record<string, string> = {
+        "user-agent": "Older hosted bundle",
+        "x-pixelated-access-id": accessId,
+        "x-pixelated-access-scope": "companion-host",
+      };
+      return headers[name.toLowerCase()] || "";
+    },
+    ip: "127.0.0.3",
     socket: {},
   };
 }
@@ -64,6 +81,8 @@ test("connected client revocation targets one browser client", () => {
   const disconnected = revokeConnectedClient(io as never, "client-one");
 
   assert.equal(disconnected, 1);
+  assert.equal(isEngineAccessRevoked("access-client-one"), true);
+  assert.equal(isEngineAccessRevoked("access-client-two"), false);
   assert.equal(firstSocket.disconnectCalled, true);
   assert.equal(secondSocket.disconnectCalled, false);
   assert.deepEqual(firstSocket.emitted, [
@@ -82,5 +101,11 @@ test("connected client revocation targets one browser client", () => {
   assert.deepEqual(
     listConnectedClients().map((client) => client.id),
     ["client-two"],
+  );
+
+  trackHttpClient(requestWithAccessOnly("access-legacy") as never);
+  assert.deepEqual(
+    listConnectedClients().map((client) => client.id),
+    ["client-two", "access_access-legacy"],
   );
 });

@@ -1,4 +1,4 @@
-import { getEngineClientId, resetEngineClientId } from "./engineClient";
+import { getEngineClientId } from "./engineClient.ts";
 
 export const ENGINE_TOKEN_STORAGE_KEY = "pixelated_engine_token";
 export const ENGINE_PAIRING_EVENT = "pixelated-engine-pairing-changed";
@@ -14,7 +14,6 @@ export const setEngineToken = (token: string) => {
 
 export const clearEngineToken = () => {
   window.localStorage.removeItem(ENGINE_TOKEN_STORAGE_KEY);
-  resetEngineClientId();
   window.dispatchEvent(new Event(ENGINE_PAIRING_EVENT));
 };
 
