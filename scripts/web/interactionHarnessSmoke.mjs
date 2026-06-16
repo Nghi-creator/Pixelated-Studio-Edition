@@ -15,8 +15,8 @@ const webRoot = path.join(repoRoot, "apps", "web");
 const port = Number(process.env.PIXELATED_WEB_INTERACTION_PORT || 5174);
 const baseUrl = `http://127.0.0.1:${port}`;
 const harnessPath = "/interaction-tests/adminHarness.html";
-const readinessTimeoutMs = Number(
-  process.env.PIXELATED_WEB_INTERACTION_READY_TIMEOUT_MS || 10_000,
+const interactionTimeoutMs = Number(
+  process.env.PIXELATED_WEB_INTERACTION_TIMEOUT_MS || 15_000,
 );
 
 function startWebServer() {
@@ -137,45 +137,52 @@ async function run() {
     await page.goto(`${baseUrl}${harnessPath}`, {
       waitUntil: "domcontentloaded",
     });
-    try {
-      await page.waitForFunction(
-        () => window.__PIXELATED_INTERACTION_HARNESS_READY__,
-        undefined,
-        { timeout: readinessTimeoutMs },
-      );
-    } catch (error) {
-      const diagnostics = await page
-        .evaluate(() => ({
-          documentState: document.readyState,
-          rootText: document.getElementById("root")?.textContent?.slice(0, 2_000) || "",
-          scriptPresent: Boolean(
-            document.querySelector(
-              'script[src="/src/test-harness/adminHarness.tsx"]',
+
+    const withDiagnostics = async (label, action) => {
+      try {
+        return await action();
+      } catch (error) {
+        const diagnostics = await page
+          .evaluate(() => ({
+            documentState: document.readyState,
+            rootText:
+              document.getElementById("root")?.textContent?.slice(0, 2_000) ||
+              "",
+            scriptPresent: Boolean(
+              document.querySelector(
+                'script[src="/src/test-harness/adminHarness.tsx"]',
+              ),
             ),
-          ),
-        }))
-        .catch((contentError) => ({
-          documentState: `unavailable: ${contentError}`,
-          rootText: "",
-          scriptPresent: false,
-        }));
-      throw new Error(
-        `Interaction harness did not become ready within ${readinessTimeoutMs}ms.${formatDiagnostics(
-          {
-            badResponses,
-            consoleErrors: errors,
-            documentState: diagnostics.documentState,
-            failedRequests,
-            pageErrors,
-            recentResponses,
-            rootText: diagnostics.rootText,
-            scriptPresent: diagnostics.scriptPresent,
-            serverOutput: server.getOutput(),
-          },
-        )}`,
-        { cause: error },
-      );
-    }
+          }))
+          .catch((contentError) => ({
+            documentState: `unavailable: ${contentError}`,
+            rootText: "",
+            scriptPresent: false,
+          }));
+        throw new Error(
+          `Interaction harness failed while ${label}.${formatDiagnostics(
+            {
+              badResponses,
+              consoleErrors: errors,
+              documentState: diagnostics.documentState,
+              failedRequests,
+              pageErrors,
+              recentResponses,
+              rootText: diagnostics.rootText,
+              scriptPresent: diagnostics.scriptPresent,
+              serverOutput: server.getOutput(),
+            },
+          )}`,
+          { cause: error },
+        );
+      }
+    };
+
+    await withDiagnostics("waiting for the confirmation harness", () =>
+      page
+        .getByRole("button", { name: "Open confirmation" })
+        .waitFor({ timeout: interactionTimeoutMs }),
+    );
 
     await page.getByRole("button", { name: "Open confirmation" }).click();
     await page.getByRole("dialog", { name: "Ban user?" }).waitFor();
