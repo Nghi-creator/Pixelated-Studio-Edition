@@ -130,6 +130,10 @@ io.on("connection", (socket) => {
     }
   });
 
+  socket.on("client-heartbeat", () => {
+    refreshConnectedClient(socket);
+  });
+
   lobby.registerLobbyHandlers(socket);
   registerStartGameHandler(socket, {
     apiUrl: PIXELATED_API_URL,

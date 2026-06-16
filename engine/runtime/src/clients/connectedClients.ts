@@ -15,7 +15,7 @@ export type ConnectedClient = {
   userAgent: string;
 };
 
-const CLIENT_TTL_MS = 30_000;
+const CLIENT_TTL_MS = 120_000;
 const clients = new Map<string, ConnectedClient>();
 const revokedClientIds = new Set<string>();
 let ioRef: Server | null = null;
