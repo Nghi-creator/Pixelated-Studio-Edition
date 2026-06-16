@@ -8,7 +8,3 @@ export const getEngineClientId = () => {
   window.localStorage.setItem(ENGINE_CLIENT_ID_STORAGE_KEY, clientId);
   return clientId;
 };
-
-export const resetEngineClientId = () => {
-  window.localStorage.removeItem(ENGINE_CLIENT_ID_STORAGE_KEY);
-};

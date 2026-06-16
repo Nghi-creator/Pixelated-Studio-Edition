@@ -56,6 +56,7 @@ export type {
 } from "./types";
 
 const STREAM_METRIC_SEND_INTERVAL_MS = 5_000;
+const CLIENT_HEARTBEAT_INTERVAL_MS = 20_000;
 const DISCONNECTED_GRACE_MS = 5_000;
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
@@ -168,6 +169,7 @@ export function useWebRTC(
     let stopTelemetry: () => void = () => undefined;
     let detachEngineInput: () => void = () => undefined;
     let disconnectedTimeoutId: number | null = null;
+    let heartbeatIntervalId: number | null = null;
     let disposed = false;
     let iceServersForSession: RTCIceServer[] = FALLBACK_ICE_SERVERS;
 
@@ -358,6 +360,12 @@ export function useWebRTC(
 
     socket.on("connect", async () => {
       console.log("[WebRTC] Connected. Booting sequence initiated.");
+
+      if (heartbeatIntervalId !== null) window.clearInterval(heartbeatIntervalId);
+      heartbeatIntervalId = window.setInterval(() => {
+        socket.emit("client-heartbeat");
+      }, CLIENT_HEARTBEAT_INTERVAL_MS);
+
       socket.emit("join-session", {
         sessionId,
         displayName,
@@ -462,6 +470,9 @@ export function useWebRTC(
       detachEngineInput();
       if (disconnectedTimeoutId !== null) {
         window.clearTimeout(disconnectedTimeoutId);
+      }
+      if (heartbeatIntervalId !== null) {
+        window.clearInterval(heartbeatIntervalId);
       }
 
       if (pcRef.current) {

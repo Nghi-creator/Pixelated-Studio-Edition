@@ -4,6 +4,7 @@ import type { Server, Socket } from "socket.io";
 export type ClientAccessScope = "companion-guest" | "companion-host" | "raw";
 
 export type ConnectedClient = {
+  accessId: string;
   accessScope: ClientAccessScope;
   connectedAt: string;
   id: string;
@@ -15,8 +16,11 @@ export type ConnectedClient = {
   userAgent: string;
 };
 
-const CLIENT_TTL_MS = 30_000;
+export type PublicConnectedClient = Omit<ConnectedClient, "accessId">;
+
+const CLIENT_TTL_MS = 120_000;
 const clients = new Map<string, ConnectedClient>();
+const revokedAccessIds = new Set<string>();
 const revokedClientIds = new Set<string>();
 let ioRef: Server | null = null;
 
@@ -41,12 +45,24 @@ function fallbackClientId(remoteAddress: string, userAgent: string) {
   return `implicit:${Buffer.from(`${remoteAddress}:${userAgent}`).toString("base64url")}`;
 }
 
+function clientIdFromAccessId(accessId: string) {
+  return accessId ? `access_${accessId}` : "";
+}
+
 export function isEngineClientRevoked(clientId: string) {
   return Boolean(clientId && revokedClientIds.has(clientId));
 }
 
+export function isEngineAccessRevoked(accessId: string) {
+  return Boolean(accessId && revokedAccessIds.has(accessId));
+}
+
 export function getRequestClientId(req: Request) {
   return normalizeClientId(req.get("x-pixelated-client-id"));
+}
+
+export function getRequestAccessId(req: Request) {
+  return normalizeClientId(req.get("x-pixelated-access-id"));
 }
 
 export function getSocketClientId(socket: Socket) {
@@ -57,6 +73,12 @@ export function getSocketClientId(socket: Socket) {
   );
 }
 
+export function getSocketAccessId(socket: Socket) {
+  return normalizeClientId(
+    getHeaderValue(socket.handshake.headers["x-pixelated-access-id"]),
+  );
+}
+
 function upsertClient(
   clientId: string,
   patch: Omit<Partial<ConnectedClient>, "id">,
@@ -64,6 +86,7 @@ function upsertClient(
   const now = new Date().toISOString();
   const existing = clients.get(clientId);
   const next: ConnectedClient = {
+    accessId: patch.accessId || existing?.accessId || "",
     accessScope: patch.accessScope || existing?.accessScope || "raw",
     connectedAt: existing?.connectedAt || now,
     id: clientId,
@@ -80,15 +103,17 @@ function upsertClient(
 }
 
 export function trackHttpClient(req: Request) {
-  const clientId = getRequestClientId(req);
+  const accessId = getRequestAccessId(req);
+  const clientId = getRequestClientId(req) || clientIdFromAccessId(accessId);
   if (!clientId) return;
 
   const userAgent = req.get("user-agent") || "unknown";
   const remoteAddress = req.ip || req.socket.remoteAddress || "unknown";
 
-  if (isEngineClientRevoked(clientId)) return;
+  if (isEngineClientRevoked(clientId) || isEngineAccessRevoked(accessId)) return;
 
   upsertClient(clientId, {
+    accessId,
     accessScope: getAccessScope(req.get("x-pixelated-access-scope")),
     remoteAddress,
     role: "paired",
@@ -99,8 +124,11 @@ export function trackHttpClient(req: Request) {
 export function trackConnectedClient(socket: Socket) {
   const userAgent = getHeaderValue(socket.handshake.headers["user-agent"]) || "unknown";
   const remoteAddress = socket.handshake.address || "unknown";
+  const accessId = getSocketAccessId(socket);
   const clientId =
-    getSocketClientId(socket) || fallbackClientId(remoteAddress, userAgent);
+    getSocketClientId(socket) ||
+    clientIdFromAccessId(accessId) ||
+    fallbackClientId(remoteAddress, userAgent);
 
   socket.data.engineClientId = clientId;
   refreshConnectedClient(socket);
@@ -110,13 +138,21 @@ export function refreshConnectedClient(socket: Socket) {
   const clientId = typeof socket.data.engineClientId === "string"
     ? socket.data.engineClientId
     : getSocketClientId(socket);
-  if (!clientId || isEngineClientRevoked(clientId)) return;
+  const accessId = getSocketAccessId(socket);
+  if (
+    !clientId ||
+    isEngineClientRevoked(clientId) ||
+    isEngineAccessRevoked(accessId)
+  ) {
+    return;
+  }
 
   const socketCount = Array.from(socket.nsp.sockets.values()).filter(
     (entry) => entry.data.engineClientId === clientId,
   ).length;
 
   upsertClient(clientId, {
+    accessId,
     accessScope: getAccessScope(
       getHeaderValue(socket.handshake.headers["x-pixelated-access-scope"]),
     ),
@@ -129,7 +165,7 @@ export function refreshConnectedClient(socket: Socket) {
   });
 }
 
-export function listConnectedClients(now = Date.now()) {
+export function listConnectedClients(now = Date.now()): PublicConnectedClient[] {
   for (const [clientId, client] of clients) {
     if (now - Date.parse(client.lastSeenAt) > CLIENT_TTL_MS) {
       const hasActiveSocket =
@@ -149,15 +185,19 @@ export function listConnectedClients(now = Date.now()) {
     }
   }
 
-  return Array.from(clients.values()).sort((a, b) =>
-    a.connectedAt.localeCompare(b.connectedAt),
-  );
+  return Array.from(clients.values())
+    .sort((a, b) => a.connectedAt.localeCompare(b.connectedAt))
+    .map(({ accessId: _accessId, ...client }) => client);
 }
 
 export function revokeConnectedClient(io: Server, clientId: string) {
   if (!clientId) return 0;
 
   revokedClientIds.add(clientId);
+  const client = clients.get(clientId);
+  if (client?.accessId) {
+    revokedAccessIds.add(client.accessId);
+  }
   clients.delete(clientId);
   let disconnected = 0;
 

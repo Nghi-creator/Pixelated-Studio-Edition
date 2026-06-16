@@ -3,8 +3,11 @@ import type { NextFunction, Request, Response } from "express";
 import type { Socket } from "socket.io";
 
 type EngineTokenAuthOptions = {
+  getRequestAccessId?: (req: Request) => string;
   getRequestClientId?: (req: Request) => string;
+  getSocketAccessId?: (socket: Socket) => string;
   getSocketClientId?: (socket: Socket) => string;
+  isAccessRevoked?: (accessId: string) => boolean;
   isClientRevoked?: (clientId: string) => boolean;
   onHttpAuthenticated?: (req: Request) => void;
 };
@@ -28,8 +31,12 @@ export function createEngineTokenAuth(
 
   function requireEngineToken(req: Request, res: Response, next: NextFunction) {
     if (isValidEngineToken(req.get("x-engine-token"))) {
+      const accessId = options.getRequestAccessId?.(req) || "";
       const clientId = options.getRequestClientId?.(req) || "";
-      if (clientId && options.isClientRevoked?.(clientId)) {
+      if (
+        (clientId && options.isClientRevoked?.(clientId)) ||
+        (accessId && options.isAccessRevoked?.(accessId))
+      ) {
         res.status(401).json({ error: "Engine access revoked" });
         return;
       }
@@ -46,8 +53,12 @@ export function createEngineTokenAuth(
       socket.handshake.auth?.token || socket.handshake.headers["x-engine-token"];
 
     if (isValidEngineToken(token)) {
+      const accessId = options.getSocketAccessId?.(socket) || "";
       const clientId = options.getSocketClientId?.(socket) || "";
-      if (clientId && options.isClientRevoked?.(clientId)) {
+      if (
+        (clientId && options.isClientRevoked?.(clientId)) ||
+        (accessId && options.isAccessRevoked?.(accessId))
+      ) {
         next(new Error("Invalid engine pairing token"));
         return;
       }

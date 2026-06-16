@@ -3,6 +3,7 @@ import http, {
   type OutgoingHttpHeaders,
   type ServerResponse,
 } from "http";
+import crypto from "crypto";
 import net, { type Socket } from "net";
 import { getCompanionAccessTokenScope } from "./inviteState";
 
@@ -54,6 +55,10 @@ function getClientIdFromRequest(req: IncomingMessage) {
   }
 }
 
+function getAccessIdForToken(token: string) {
+  return crypto.createHash("sha256").update(token).digest("base64url");
+}
+
 function getProxiedHeaders(
   req: IncomingMessage,
   engineToken: string,
@@ -70,6 +75,7 @@ function getProxiedHeaders(
 
   if (companionScope) {
     headers["x-engine-token"] = engineToken;
+    headers["x-pixelated-access-id"] = getAccessIdForToken(companionToken);
     headers["x-pixelated-access-scope"] = `companion-${companionScope}`;
   }
   if (clientId) {
