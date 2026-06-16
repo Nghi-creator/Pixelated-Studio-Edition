@@ -24,14 +24,10 @@ may describe behavior that has since changed.
 ## Design And Planning References
 
 - `target-architecture-refurbishment.md`
-- `refurbishment-execution-plan.md`
-- `lan-multiplayer-plan.md`
-- `docker-onboarding-plan.md`
-- `performance-latency-plan.md`
 
 ## Historical Notes And Evidence
 
-- `suggestions.md`: accumulated historical recommendations; not a current
-  backlog.
-- `smoke-artifacts/`: checked-in smoke evidence.
-- `hosted-auth-smoke/` and `hosted-pairing-smoke/`: ignored local smoke output.
+Historical plans, stale recommendation ledgers, checked-in smoke evidence, and
+local hosted smoke bundles have been removed from `.context/`. New smoke output
+should remain transient unless the user explicitly asks to preserve it as
+evidence.
