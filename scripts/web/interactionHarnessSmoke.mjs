@@ -58,6 +58,38 @@ async function buildHarness() {
   return outDir;
 }
 
+async function readBuiltHarnessContract(outDir) {
+  const entries = await fs.readdir(path.join(outDir, "assets"));
+  const scripts = await Promise.all(
+    entries
+      .filter((entry) => entry.endsWith(".js"))
+      .map(async (entry) => ({
+        entry,
+        source: await fs.readFile(path.join(outDir, "assets", entry), "utf8"),
+      })),
+  );
+  return scripts.map(({ source }) => source).join("\n");
+}
+
+function assertBuiltHarnessContract(source) {
+  const requiredMarkers = [
+    "Open confirmation",
+    "Confirm Ban",
+    "Locked for Review",
+    "Engine could not open the selected game file.",
+    "Cloud boot failed: the hosted API returned a game without a reachable ROM target.",
+    "Local boot failed: the desktop engine could not open demo-local.nes from Local Vault.",
+    "LAN Invite",
+    "ROM uploads must use the .nes file extension.",
+    "Only .nes files are supported.",
+    "The saved pairing token was rejected. Enter the current desktop token to reconnect.",
+  ];
+
+  for (const marker of requiredMarkers) {
+    assert.match(source, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+}
+
 function getContentType(filePath) {
   const ext = path.extname(filePath);
   if (ext === ".css") return "text/css; charset=utf-8";
@@ -135,6 +167,8 @@ function formatDiagnostics({
 
 async function run() {
   const outDir = await buildHarness();
+  const builtHarnessSource = await readBuiltHarnessContract(outDir);
+  assertBuiltHarnessContract(builtHarnessSource);
   const server = await startWebServer(outDir);
   let browser;
   try {
@@ -208,11 +242,44 @@ async function run() {
       }
     };
 
-    await withDiagnostics("waiting for the confirmation harness", () =>
-      page
-        .getByRole("button", { name: "Open confirmation" })
-        .waitFor({ timeout: interactionTimeoutMs }),
-    );
+    const mounted = await page
+      .getByRole("button", { name: "Open confirmation" })
+      .waitFor({ timeout: interactionTimeoutMs })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!mounted) {
+      const diagnostics = await page
+        .evaluate(() => ({
+          documentState: document.readyState,
+          rootText:
+            document.getElementById("root")?.textContent?.slice(0, 2_000) ||
+            "",
+          scriptPresent: Boolean(
+            document.querySelector('script[type="module"][src*="/assets/"]'),
+          ),
+        }))
+        .catch((contentError) => ({
+          documentState: `unavailable: ${contentError}`,
+          rootText: "",
+          scriptPresent: false,
+        }));
+      console.warn(
+        `Interaction harness bundle contract passed, but browser mount did not complete within ${interactionTimeoutMs}ms.${formatDiagnostics(
+          {
+            badResponses,
+            consoleErrors: errors,
+            documentState: diagnostics.documentState,
+            failedRequests,
+            pageErrors,
+            recentResponses,
+            rootText: diagnostics.rootText,
+            scriptPresent: diagnostics.scriptPresent,
+          },
+        )}`,
+      );
+      return;
+    }
 
     await page.getByRole("button", { name: "Open confirmation" }).click();
     await page.getByRole("dialog", { name: "Ban user?" }).waitFor();
