@@ -4,6 +4,7 @@ import {
   engineAuthHeaders,
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
+  isCompanionEngineToken,
 } from "./engineAuth";
 import { engineEndpoint } from "./engineConfig";
 
@@ -23,8 +24,10 @@ export function useEngineConnectionMonitor() {
       timeoutId = window.setTimeout(probeEngineConnection, delay);
     };
 
-    const markUnavailable = () => {
-      if (hasEngineToken()) clearEngineToken();
+    const markUnavailable = (force = false) => {
+      if (!hasEngineToken()) return;
+      if (!force && isCompanionEngineToken()) return;
+      clearEngineToken();
     };
 
     const probeEngineConnection = async () => {
@@ -58,7 +61,7 @@ export function useEngineConnectionMonitor() {
 
         if (disposed) return;
         if (response.status === 401) {
-          clearEngineToken();
+          markUnavailable(true);
           return;
         }
 

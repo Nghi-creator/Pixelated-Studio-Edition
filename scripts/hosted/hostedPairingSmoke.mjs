@@ -193,7 +193,7 @@ function startEngineProbe() {
       response.setHeader("access-control-allow-origin", origin);
       response.setHeader(
         "access-control-allow-headers",
-        "content-type,x-engine-token,x-user-id",
+        "content-type,x-engine-token,x-pixelated-client-id,x-user-id",
       );
       response.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
       if (request.headers["access-control-request-private-network"] === "true") {
