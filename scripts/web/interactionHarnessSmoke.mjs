@@ -14,6 +14,10 @@ const repoRoot = path.resolve(
 const webRoot = path.join(repoRoot, "apps", "web");
 const port = Number(process.env.PIXELATED_WEB_INTERACTION_PORT || 5174);
 const baseUrl = `http://127.0.0.1:${port}`;
+const harnessPath = "/interaction-tests/adminHarness.html";
+const readinessTimeoutMs = Number(
+  process.env.PIXELATED_WEB_INTERACTION_READY_TIMEOUT_MS || 10_000,
+);
 
 function startWebServer() {
   const child = spawn(
@@ -46,7 +50,7 @@ async function waitForServer(processState) {
     }
 
     try {
-      const response = await fetch(`${baseUrl}/interaction-tests/adminHarness.html`);
+      const response = await fetch(`${baseUrl}${harnessPath}`);
       if (response.ok) return;
     } catch {
       // Server is still starting.
@@ -67,6 +71,31 @@ async function stopWebServer(child) {
   if (child.exitCode === null) child.kill("SIGKILL");
 }
 
+function formatDiagnostics({
+  badResponses,
+  consoleErrors,
+  failedRequests,
+  pageErrors,
+  pageSnippet,
+  serverOutput,
+}) {
+  const sections = [
+    ["Page errors", pageErrors],
+    ["Console errors", consoleErrors],
+    ["HTTP error responses", badResponses],
+    ["Failed requests", failedRequests],
+    ["Vite output", [serverOutput.trim() || "(empty)"]],
+    ["Page snippet", [pageSnippet.trim() || "(empty)"]],
+  ];
+
+  return sections
+    .map(([title, lines]) => {
+      const body = lines.length ? lines.join("\n") : "(none)";
+      return `\n${title}:\n${body}`;
+    })
+    .join("\n");
+}
+
 async function run() {
   const server = startWebServer();
   let browser;
@@ -76,14 +105,54 @@ async function run() {
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     const errors = [];
+    const badResponses = [];
+    const failedRequests = [];
+    const pageErrors = [];
     page.on("console", (message) => {
       if (message.type() === "error") errors.push(message.text());
     });
+    page.on("pageerror", (error) => {
+      pageErrors.push(error.stack || error.message);
+    });
+    page.on("response", (response) => {
+      if (response.status() < 400) return;
+      badResponses.push(`${response.status()} ${response.url()}`);
+    });
+    page.on("requestfailed", (request) => {
+      failedRequests.push(
+        `${request.method()} ${request.url()} - ${
+          request.failure()?.errorText || "unknown failure"
+        }`,
+      );
+    });
 
-    await page.goto(`${baseUrl}/interaction-tests/adminHarness.html`, {
+    await page.goto(`${baseUrl}${harnessPath}`, {
       waitUntil: "domcontentloaded",
     });
-    await page.waitForFunction(() => window.__PIXELATED_INTERACTION_HARNESS_READY__);
+    try {
+      await page.waitForFunction(
+        () => window.__PIXELATED_INTERACTION_HARNESS_READY__,
+        { timeout: readinessTimeoutMs },
+      );
+    } catch (error) {
+      const pageSnippet = await page
+        .content()
+        .then((content) => content.slice(0, 2_000))
+        .catch((contentError) => `Could not read page content: ${contentError}`);
+      throw new Error(
+        `Interaction harness did not become ready within ${readinessTimeoutMs}ms.${formatDiagnostics(
+          {
+            badResponses,
+            consoleErrors: errors,
+            failedRequests,
+            pageErrors,
+            pageSnippet,
+            serverOutput: server.getOutput(),
+          },
+        )}`,
+        { cause: error },
+      );
+    }
 
     await page.getByRole("button", { name: "Open confirmation" }).click();
     await page.getByRole("dialog", { name: "Ban user?" }).waitFor();
