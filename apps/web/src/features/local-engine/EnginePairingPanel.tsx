@@ -42,6 +42,7 @@ import {
   getScopeDescription,
   getScopeLabel,
   normalizeEngineUrl,
+  normalizePairingEngineUrl,
   parseEngineUrl,
 } from "./pairingUtils";
 import { LanPreflightChecks } from "./LanPreflightChecks";
@@ -160,7 +161,10 @@ export function EnginePairingPanel({
   };
 
   const pairEngine = async () => {
-    const normalizedUrl = normalizeEngineUrl(engineUrl);
+    const normalizedUrl = normalizePairingEngineUrl(engineUrl);
+    if (normalizedUrl !== normalizeEngineUrl(engineUrl)) {
+      setEngineUrlInput(normalizedUrl);
+    }
     const parsedUrl = parseEngineUrl(normalizedUrl);
     const joiningWithInvite = Boolean(
       inviteJoinRequested && parsedUrl && isLikelyCompanionUrl(parsedUrl),

@@ -14,6 +14,25 @@ type PairingFailureContext = {
 export const normalizeEngineUrl = (url: string) =>
   url.trim().replace(/\/+$/, "");
 
+export const normalizePairingEngineUrl = (url: string) => {
+  const normalizedUrl = normalizeEngineUrl(url);
+  const parsedUrl = parseEngineUrl(normalizedUrl);
+
+  if (
+    parsedUrl &&
+    parsedUrl.protocol === "https:" &&
+    parsedUrl.port === "8080" &&
+    ["localhost", "127.0.0.1", "::1", "[::1]"].includes(
+      parsedUrl.hostname.toLowerCase(),
+    )
+  ) {
+    parsedUrl.protocol = "http:";
+    return normalizeEngineUrl(parsedUrl.toString());
+  }
+
+  return normalizedUrl;
+};
+
 export const engineUrlEndpoint = (url: string, path: string) => {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${normalizeEngineUrl(url)}${normalizedPath}`;
