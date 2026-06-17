@@ -366,7 +366,7 @@ export function EnginePairingPanel({
   return (
     <section
       className={`w-full border border-synth-border bg-synth-surface ${
-        compact ? "rounded-lg p-4" : "rounded-xl p-5"
+        compact ? "rounded-lg p-4" : "rounded-lg p-5"
       }`}
     >
       <div className="flex flex-col gap-4 md:flex-row md:items-end">
@@ -377,7 +377,7 @@ export function EnginePairingPanel({
             ) : engineUrlScope === "lan" ? (
               <Wifi className="h-5 w-5 text-synth-secondary" />
             ) : (
-              <PlugZap className="h-5 w-5 text-synth-primary" />
+              <PlugZap className="h-5 w-5 text-synth-secondary" />
             )}
             <h3 className="text-base font-semibold text-white">
               {isCompanionJoin ? "Join Host Engine" : "Local Engine Pairing"}
@@ -392,7 +392,7 @@ export function EnginePairingPanel({
             }`}
           >
             <label className="block">
-              <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+              <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-synth-secondary">
                 Engine URL
               </span>
               <input
@@ -409,14 +409,14 @@ export function EnginePairingPanel({
                         : "idle",
                   });
                 }}
-                className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-primary"
+                className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-secondary"
                 placeholder="http://localhost:8080 or http://192.168.1.20:8080"
               />
             </label>
 
             {isCompanionJoin ? (
               <label className="block">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-synth-secondary">
                   Invite code
                 </span>
                 <input
@@ -426,20 +426,20 @@ export function EnginePairingPanel({
                       event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""),
                     )
                   }
-                  className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg px-3 font-mono text-sm tracking-widest text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-primary"
+                  className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg px-3 font-mono text-sm tracking-widest text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-secondary"
                   maxLength={8}
                   placeholder="A1B2C3D4"
                 />
               </label>
             ) : (
               <label className="relative block">
-                <span className="mb-1 block text-xs font-medium uppercase tracking-wide text-gray-500">
+                <span className="mb-1 block text-xs font-bold uppercase tracking-wide text-synth-secondary">
                   Pairing token
                 </span>
                 <input
                   value={token}
                   onChange={(event) => setToken(event.target.value)}
-                  className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg px-3 pr-11 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-primary"
+                  className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg px-3 pr-11 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-secondary"
                   placeholder="Desktop app token"
                   type={showToken ? "text" : "password"}
                 />
@@ -466,7 +466,7 @@ export function EnginePairingPanel({
             <div
               className={`mt-3 rounded-lg border px-3 py-2 text-xs leading-5 ${
                 engineUrlScope === "lan"
-                  ? "border-amber-400/30 bg-amber-400/10 text-amber-200"
+                  ? "border-amber-400/30 bg-synth-bg text-amber-200"
                   : "border-synth-border bg-synth-bg text-gray-400"
               }`}
             >
@@ -508,7 +508,7 @@ export function EnginePairingPanel({
               pairingState === "checking" ||
               (isCompanionJoin && pairingState !== "paired" && !preflightReady)
             }
-            className="inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-lg border border-synth-primary/70 bg-synth-primary/15 px-4 text-sm font-semibold text-white transition-colors hover:bg-synth-primary/25 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-lg border border-synth-border bg-synth-elevated px-4 text-sm font-semibold text-white transition-colors hover:bg-synth-surface disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
           >
             {pairingState === "checking" ? (

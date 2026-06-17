@@ -49,7 +49,7 @@ export default function EngineConnection() {
     <div className="mx-auto min-h-screen w-full max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="mb-6">
         <Link
-          className="group inline-flex items-center gap-2 font-medium text-gray-400 transition-colors hover:text-synth-primary"
+          className="group inline-flex items-center gap-2 font-medium text-gray-400 transition-colors hover:text-white"
           to="/"
         >
           <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
@@ -57,7 +57,7 @@ export default function EngineConnection() {
         </Link>
       </div>
 
-      <div className="mb-8 border-l-4 border-synth-secondary pl-3">
+      <div className="mb-8 border-l-4 border-synth-border pl-3">
         <h1 className="text-3xl font-extrabold text-white">
           Engine Connection
         </h1>
@@ -73,10 +73,10 @@ export default function EngineConnection() {
             className="flex items-center gap-3 rounded-lg border border-synth-border bg-synth-surface px-4 py-3"
             key={step}
           >
-            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-synth-primary/50 bg-synth-primary/10 text-xs font-bold text-synth-primary">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-synth-border bg-synth-elevated text-xs font-bold text-white">
               {index + 1}
             </span>
-            <span className="text-sm font-semibold text-gray-300">{step}</span>
+            <span className="text-sm font-semibold text-white">{step}</span>
           </div>
         ))}
       </div>

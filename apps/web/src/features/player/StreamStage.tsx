@@ -19,7 +19,7 @@ export function StreamStage({
   videoRef,
 }: StreamStageProps) {
   return (
-    <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl border border-synth-border bg-black shadow-glow-card ring-1 ring-synth-primary/10">
+    <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg border border-synth-border bg-black shadow-card">
       {status === "connecting" && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-black">
           <LoaderCircle
@@ -30,7 +30,7 @@ export function StreamStage({
       )}
       {status === "error" && (
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-synth-bg/90 backdrop-blur-sm px-6 text-center">
-          <AlertTriangle className="w-12 h-12 text-red-400 mb-4 drop-shadow-[0_0_12px_rgba(248,113,113,0.45)]" />
+          <AlertTriangle className="w-12 h-12 text-red-400 mb-4" />
           <p className="text-lg text-gray-200 font-semibold">
             Stream could not start
           </p>
@@ -41,7 +41,7 @@ export function StreamStage({
           )}
           {onRetry && (
             <button
-              className="mt-5 inline-flex h-11 items-center gap-2 rounded-lg border border-synth-primary/60 bg-synth-primary/15 px-4 text-sm font-semibold text-white transition-colors hover:bg-synth-primary/25"
+              className="mt-5 inline-flex h-11 items-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-white transition-colors hover:bg-synth-elevated"
               onClick={onRetry}
               type="button"
             >

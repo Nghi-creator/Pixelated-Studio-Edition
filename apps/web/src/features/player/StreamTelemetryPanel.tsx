@@ -83,7 +83,7 @@ function HistoryChart({
         <polyline
           fill="none"
           points={makePoints(primaryValues)}
-          stroke="rgb(255,77,143)"
+          stroke="#B86F88"
           strokeLinecap="round"
           strokeLinejoin="round"
           strokeWidth="2"
@@ -92,7 +92,7 @@ function HistoryChart({
           <polyline
             fill="none"
             points={makePoints(secondaryValues)}
-            stroke="rgb(255,159,67)"
+            stroke="#D8A4B5"
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth="2"
@@ -188,16 +188,16 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
   };
 
   return (
-    <section className="fixed bottom-4 left-4 right-4 z-40 rounded-lg border border-synth-border bg-synth-surface/95 p-3 shadow-glow-card backdrop-blur-xl sm:bottom-auto sm:left-auto sm:right-4 sm:top-20 sm:w-72 xl:static xl:flex xl:h-full xl:w-full xl:flex-col xl:justify-between">
+    <section className="fixed bottom-4 left-4 right-4 z-40 rounded-lg border border-synth-border bg-synth-surface p-3 shadow-card sm:bottom-auto sm:left-auto sm:right-4 sm:top-20 sm:w-72 xl:static xl:flex xl:h-full xl:w-full xl:flex-col xl:justify-between">
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="inline-flex items-center gap-2 text-sm font-semibold text-gray-200">
-          <Activity className="h-4 w-4 text-synth-primary" />
+          <Activity className="h-4 w-4 text-synth-secondary" />
           Stream Stats
         </p>
         <div className="flex items-center gap-1">
           <button
             aria-label="Copy stream telemetry JSON"
-            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-synth-border bg-synth-bg px-2 text-xs font-semibold text-gray-300 transition hover:border-synth-primary/70 hover:text-white"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-synth-border bg-synth-bg px-2 text-xs font-semibold text-gray-300 transition hover:bg-synth-elevated hover:text-white"
             onClick={copyTelemetry}
             title="Copy stream telemetry JSON"
             type="button"
@@ -213,7 +213,7 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
           </button>
           <button
             aria-label="Hide stream stats"
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-synth-border bg-synth-bg text-gray-400 transition hover:border-synth-primary/70 hover:text-white"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-synth-border bg-synth-bg text-gray-400 transition hover:bg-synth-elevated hover:text-white"
             onClick={onClose}
             title="Hide stream stats"
             type="button"
