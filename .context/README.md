@@ -8,12 +8,10 @@ may describe behavior that has since changed.
 
 - `current-infrastructure.md`: deployed and local architecture, runtime
   boundaries, and operational behavior.
-- `deep-product-audit-2026-06-13.md`: completed optimization ledger, deployment
-  actions, verification status, and remaining environment-dependent work.
-- `directory-structure-audit-2026-06-14.md`: completed repository organization
-  decisions and structural guardrails.
-- `project-flows.md`: detailed product flows; verify older sections against the
-  infrastructure snapshot before implementation.
+- `deep-product-audit-2026-06-13.md`: concise health snapshot, current deploy
+  action, and remaining environment-dependent proof.
+- `project-flows.md`: compact runtime flow map for boot, pairing, gameplay,
+  multiplayer, submissions, and hosted deploys.
 
 ## Active Operational Checklists
 
