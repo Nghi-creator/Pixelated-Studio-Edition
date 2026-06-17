@@ -2,49 +2,64 @@
 
 Date: 2026-06-17
 
+## Phase Status
+
+- Phase 1: Complete on 2026-06-17, then recalibrated after visual review. Token migration now targets a concrete black backdrop with dusty dark-pastel pink large surfaces, cleaner pastel pink accents, white text, and deeper pink selected states.
+- Phase 2: Pending.
+- Phase 3: Pending.
+- Phase 4: Pending.
+- Phase 5: Pending.
+- Phase 6: Pending.
+
 ## Short Take
 
 The pink direction is good, but I would avoid using the two pinks as loud UI accents everywhere. The current UI feels generic mostly because the whole system is built around a synth/neon vocabulary: dark purple/black surfaces, hot pink, orange secondary, radial glow backgrounds, text shadows, and glow shadows.
 
-The reference image works best if we treat it as a softer editorial palette:
+The reference image works best if we treat the two pinks as the actual UI material on a concrete black dark-mode backdrop:
 
-- `#FFC2D1` Pink Champagne: main accent, buttons, active states, section markers.
-- `#FF8FAB` Light Pink: hover, progress, subtle emphasis, secondary accent.
-- `#FFE5EC` Lavender Blush: page wash, soft panels, empty states.
-- Keep a small amount of deep ink for contrast instead of staying all-pastel.
-- Add one non-pink neutral family so the product does not become one-note.
+- `#4A2835` Dusty dark-pastel pink: main panel/surface color so large elements read pink without shouting.
+- `#5A3140` Deeper dusty pink: selected/pressed/elevated state.
+- `#7E465B` Border pink: visible edges without a glow-like outline.
+- `#B86F88` Cleaner pastel pink: primary controls and compact emphasis.
+- `#FF8FAB` and `#FFC2D1`: reference pinks reserved for brighter small details, not broad filled surfaces.
+- `#FFE5EC` Lavender Blush: tiny highlight only, never a broad page background.
+- Keep the app backdrop near-black, similar in restraint to Supabase dark mode.
+- Text should stay white on pink UI elements.
+- Avoid the "pink outline on grey-black card" look; panels and important controls should be visibly pink.
+- Avoid placing adjacent peer controls in dramatically different pink shades; use the deeper shade mainly for selected/pressed states.
+- Treat pink intensity by element size: large blocks must be dim and dusty; small controls can be cleaner and lighter.
 
-My recommendation: move Pixelated from "neon arcade dashboard" to "classic console library / studio desk." Still retro, but more tasteful, quieter, and more memorable.
+My recommendation: move Pixelated from "neon arcade dashboard" to "black studio console with filled pink interface pieces." Still retro, but cleaner, darker, sharper, and less generic.
 
 ## Palette Proposal
 
-Use the two requested shades as the brand signal, with enough neutral structure for readability.
+Use the two requested shades as the brand signal over a restrained black UI, with derived deeper pinks for filled surfaces and selected states.
 
 ```txt
 brand.champagne     #FFC2D1
 brand.lightPink     #FF8FAB
 brand.blush         #FFE5EC
 brand.roseInk       #3A1824
-neutral.paper       #FFF8FA
-neutral.canvas      #F8EEF2
-neutral.surface     #FFFFFF
-neutral.elevated    #FFF2F6
-neutral.border      #E7C7D1
-neutral.text        #24171C
-neutral.muted       #765866
+neutral.paper       #0B090A
+neutral.canvas      #100B0E
+neutral.surface     #4A2835
+neutral.elevated    #5A3140
+neutral.border      #7E465B
+neutral.text        #FFF7FA
+neutral.muted       #CFA4B2
 status.success      #2F7D5B
 status.warning      #9A6A20
 status.danger       #B64242
-console.black       #111014
+console.black       #080708
 ```
 
-Optional dark mode can still exist, but it should be "soft theater" rather than neon:
+The main mode should be dark, but without glow:
 
 ```txt
-dark.bg             #171114
-dark.surface        #22181D
-dark.elevated       #2F2228
-dark.border         #4A333C
+dark.bg             #050505
+dark.surface        #4A2835
+dark.elevated       #5A3140
+dark.border         #7E465B
 dark.text           #FFF7F9
 dark.muted          #C9AEB8
 ```
@@ -71,20 +86,20 @@ Update Tailwind `synth` tokens rather than rewriting every component manually.
 
 Recommended mapping:
 
-- `synth.bg`: light blush/paper background.
-- `synth.surface`: white or very pale blush.
-- `synth.elevated`: pale pink surface.
-- `synth.border`: dusty rose border.
-- `synth.primary`: Pink Champagne.
-- `synth.primary-hover`: Light Pink.
-- `synth.secondary`: a muted rose-ink or status-neutral accent, not orange.
-- `synth.ink`: deep rose ink.
+- `synth.bg`: concrete black.
+- `synth.surface`: subdued filled pink.
+- `synth.elevated`: deeper pink for selected/pressed states.
+- `synth.border`: light pink edge.
+- `synth.primary`: Light Pink.
+- `synth.primary-hover`: Pink Champagne.
+- `synth.secondary`: Pink Champagne for paired accent details.
+- `synth.ink`: white text on pink buttons.
 
 Add new shadows:
 
-- `shadow-panel`: `0 16px 40px rgba(58, 24, 36, 0.08)`.
-- `shadow-card`: `0 10px 24px rgba(58, 24, 36, 0.07)`.
-- `shadow-pressed`: `inset 0 1px 2px rgba(58, 24, 36, 0.08)`.
+- `shadow-panel`: black elevation only, no pink bloom.
+- `shadow-card`: black elevation only, no pink bloom.
+- `shadow-pressed`: subtle black inset.
 
 Then remove or alias glow shadows to non-glow shadows during migration.
 

@@ -7,7 +7,15 @@
     @apply antialiased;
   }
 
+  body {
+    @apply bg-synth-bg text-white;
+  }
+
   ::selection {
     @apply bg-synth-primary text-synth-ink;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-synth-primary/50 ring-offset-2 ring-offset-synth-bg;
   }
 }

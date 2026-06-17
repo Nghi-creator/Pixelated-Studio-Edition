@@ -8,19 +8,45 @@
         theme: {
           extend: {
             colors: {
+              brand: {
+                champagne: "#FFC2D1",
+                "light-pink": "#FF8FAB",
+                blush: "#FFE5EC",
+                "rose-ink": "#3A1824",
+              },
+              neutral: {
+                paper: "#0B090A",
+                canvas: "#100B0E",
+                surface: "#4A2835",
+                elevated: "#5A3140",
+                border: "#7E465B",
+                text: "#FFF7FA",
+                muted: "#CFA4B2",
+              },
+              status: {
+                success: "#2F7D5B",
+                warning: "#9A6A20",
+                danger: "#B64242",
+              },
+              console: {
+                black: "#080708",
+              },
               synth: {
-                bg: "#0b0f19",
-                surface: "#111827",
-                primary: "#ff4d8f",
-                "primary-hover": "#ff3377",
-                secondary: "#ff9f43",
-                border: "#1f2937",
-                ink: "#050505",
+                bg: "#050505",
+                surface: "#4A2835",
+                elevated: "#5A3140",
+                primary: "#B86F88",
+                "primary-hover": "#C97893",
+                secondary: "#D8A4B5",
+                border: "#7E465B",
+                ink: "#FFFFFF",
               },
             },
             boxShadow: {
-              "glow-primary": "0 0 20px rgba(255,77,143,0.4)",
-              "glow-primary-sm": "0 0 10px rgba(255,77,143,0.3)",
+              panel: "0 18px 48px rgba(0,0,0,0.42)",
+              card: "0 12px 30px rgba(0,0,0,0.34)",
+              "glow-primary": "0 18px 48px rgba(0,0,0,0.42)",
+              "glow-primary-sm": "0 10px 24px rgba(0,0,0,0.30)",
             },
           },
         },
@@ -31,21 +57,21 @@
         width: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #111827;
+        background: #050505;
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb {
-        background: #1f2937;
+        background: #4a2835;
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #ff4d8f;
+        background: #7e465b;
       }
       .docker-recovery-action {
-        border: 1px solid #ffb04f;
+        border: 1px solid #b86f88;
         border-radius: 0.375rem;
-        background: #ffb04f;
-        color: #050505;
+        background: #b86f88;
+        color: #ffffff;
         cursor: pointer;
         font-size: 0.75rem;
         font-weight: 700;
@@ -56,9 +82,9 @@
           color 150ms ease;
       }
       .docker-recovery-action:hover:not(:disabled) {
-        border-color: #ffc473;
-        background: #ffc473;
-        color: #050505;
+        border-color: #5a3140;
+        background: #5a3140;
+        color: #ffffff;
       }
       .docker-recovery-action:disabled {
         cursor: not-allowed;
@@ -129,7 +155,7 @@
       <header class="mb-6 flex flex-wrap items-end justify-between gap-5">
         <div>
           <h1
-            class="text-4xl font-extrabold tracking-tight text-white [text-shadow:0_0_30px_rgba(255,77,143,0.3),0_2px_10px_rgba(0,0,0,0.8)]"
+            class="text-4xl font-extrabold tracking-tight text-white [text-shadow:0_2px_14px_rgba(0,0,0,0.82)]"
           >
             PIXELATED <span class="text-synth-primary">Studio</span>
           </h1>
