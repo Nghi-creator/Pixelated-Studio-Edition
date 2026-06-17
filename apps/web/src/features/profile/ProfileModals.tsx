@@ -30,7 +30,7 @@ export function AvatarCropModal({
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
       role="dialog"
     >
-      <div className="bg-synth-surface border border-synth-border rounded-2xl w-full max-w-lg overflow-hidden shadow-glow-card flex flex-col">
+      <div className="bg-synth-surface border border-synth-border rounded-lg w-full max-w-lg overflow-hidden shadow-card flex flex-col">
         <div className="p-4 border-b border-synth-border flex justify-between items-center">
           <h3 id="avatar-crop-title" className="text-white font-bold">
             Crop your image
@@ -85,7 +85,7 @@ export function AvatarCropModal({
               disabled={isCropping}
               onClick={onConfirm}
               type="button"
-              className="px-5 py-2.5 bg-synth-primary hover:bg-synth-primary-hover text-synth-ink rounded-lg transition-colors font-bold shadow-glow-primary-sm"
+              className="px-5 py-2.5 bg-synth-primary hover:bg-synth-primary-hover text-white rounded-lg transition-colors font-bold "
             >
               {isCropping ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -121,10 +121,10 @@ export function DeleteAccountModal({
     <div
       aria-labelledby="delete-account-title"
       aria-modal="true"
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4"
       role="dialog"
     >
-      <div className="bg-synth-surface border border-red-500/30 rounded-2xl w-full max-w-md overflow-hidden shadow-glow-card flex flex-col">
+      <div className="bg-synth-surface border border-red-500/30 rounded-lg w-full max-w-md overflow-hidden shadow-card flex flex-col">
         <div className="p-6 border-b border-synth-border flex justify-between items-center bg-red-500/10">
           <h3
             id="delete-account-title"
@@ -173,7 +173,7 @@ export function DeleteAccountModal({
                 onChange={(event) => onDeleteInputChange(event.target.value)}
                 placeholder={hasPassword ? "Your password" : "DELETE"}
                 required
-                className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 transition-all"
+                className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500 transition-all"
               />
             </div>
 

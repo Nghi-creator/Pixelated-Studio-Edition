@@ -363,14 +363,14 @@ export default function Profile() {
   if (loadError) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center px-4">
-        <div className="max-w-md rounded-2xl border border-red-500/30 bg-synth-surface p-8 text-center shadow-glow-card">
+        <div className="max-w-md rounded-lg border border-red-500/30 bg-synth-surface p-8 text-center shadow-card">
           <AlertOctagon className="mx-auto mb-4 h-10 w-10 text-red-400" />
           <h1 className="mb-2 text-xl font-bold text-white">
             Account settings unavailable
           </h1>
           <p className="mb-6 text-sm text-gray-400">{loadError}</p>
           <button
-            className="mx-auto flex items-center gap-2 rounded-lg bg-synth-primary px-5 py-2.5 font-bold text-synth-ink"
+            className="mx-auto flex items-center gap-2 rounded-lg bg-synth-primary px-5 py-2.5 font-bold text-white"
             onClick={() => setLoadAttempt((attempt) => attempt + 1)}
             type="button"
           >
@@ -419,7 +419,7 @@ export default function Profile() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full mt-8">
         <button
           onClick={() => navigate("/")}
-          className="flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors mb-8 w-fit"
+          className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-8 w-fit"
         >
           <ArrowLeft className="w-5 h-5" /> Back to Home
         </button>
@@ -430,7 +430,7 @@ export default function Profile() {
 
         <div className="space-y-8">
           {/* PROFILE SECTION */}
-          <div className="bg-synth-surface border border-synth-border rounded-2xl p-6 md:p-8 shadow-glow-card">
+          <div className="bg-synth-surface border border-synth-border rounded-lg p-6 md:p-8 shadow-card">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               Public Profile
             </h2>
@@ -457,7 +457,7 @@ export default function Profile() {
                   aria-label="Choose a new avatar"
                   disabled={savingProfile}
                   onClick={() => fileInputRef.current?.click()}
-                  className="relative w-24 h-24 rounded-full overflow-hidden group cursor-pointer border-2 border-transparent hover:border-synth-primary transition-all shadow-lg ring-0 hover:shadow-glow-primary-sm"
+                  className="relative w-24 h-24 rounded-full overflow-hidden group cursor-pointer border-2 border-transparent hover:border-synth-border transition-colors shadow-card"
                   type="button"
                 >
                   <Avatar
@@ -468,7 +468,7 @@ export default function Profile() {
                     size="lg"
                     src={displayAvatar}
                   />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center backdrop-blur-sm">
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center">
                     <Camera className="w-6 h-6 text-white mb-1" />
                     <span className="text-[10px] text-white font-bold uppercase tracking-wider">
                       Change
@@ -511,14 +511,14 @@ export default function Profile() {
                   disabled={savingProfile}
                   maxLength={80}
                   required
-                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-synth-secondary transition-all"
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={savingProfile || !username.trim()}
-                className="bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2 shadow-glow-primary-sm"
+                className="bg-synth-primary hover:bg-synth-primary-hover text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2 "
               >
                 {savingProfile ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -531,7 +531,7 @@ export default function Profile() {
           </div>
 
           {/* SECURITY SECTION */}
-          <div className="bg-synth-surface border border-synth-border rounded-2xl p-6 md:p-8 shadow-glow-card">
+          <div className="bg-synth-surface border border-synth-border rounded-lg p-6 md:p-8 shadow-card">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               Security
             </h2>
@@ -558,7 +558,7 @@ export default function Profile() {
                     placeholder="Enter current password"
                     required
                     disabled={savingPassword}
-                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-all"
+                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 transition-all"
                   />
                 </div>
                 <div>
@@ -573,7 +573,7 @@ export default function Profile() {
                     required
                     minLength={PASSWORD_MIN_LENGTH}
                     disabled={savingPassword}
-                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 focus:ring-1 focus:ring-red-400 transition-all"
+                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 transition-all"
                   />
                 </div>
                 <p className="text-xs leading-5 text-gray-400">

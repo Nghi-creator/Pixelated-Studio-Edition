@@ -166,9 +166,9 @@ export default function Auth() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4">
-      <div className="w-full max-w-xl bg-synth-surface/85 backdrop-blur-xl border border-synth-border rounded-2xl shadow-glow-card p-8 ring-1 ring-synth-primary/10">
+      <div className="w-full max-w-xl bg-synth-surface border border-synth-border rounded-lg shadow-card p-8">
         <div className="text-center mb-8">
-          <Gamepad2 className="w-12 h-12 text-synth-primary mx-auto mb-4 drop-shadow-[0_0_16px_rgba(255,77,143,0.5)]" />
+          <Gamepad2 className="w-12 h-12 text-synth-secondary mx-auto mb-4" />
           <h2 className="text-3xl font-bold text-white mb-2">
             {isForgotPassword
               ? "Reset Password"
@@ -220,7 +220,7 @@ export default function Auth() {
                 placeholder="Email address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+                className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-secondary transition-all"
                 required
               />
             </div>
@@ -228,7 +228,7 @@ export default function Auth() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-3 rounded-lg shadow-glow-primary-sm transition-all flex justify-center items-center active:scale-[0.99]"
+              className="w-full bg-synth-primary hover:bg-synth-primary-hover text-white font-bold py-3 rounded-lg transition-all flex justify-center items-center active:scale-[0.99]"
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -260,7 +260,7 @@ export default function Auth() {
                   placeholder="Email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-secondary transition-all"
                   required
                 />
               </div>
@@ -273,7 +273,7 @@ export default function Auth() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   minLength={isLogin ? undefined : PASSWORD_MIN_LENGTH}
-                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-11 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-11 py-3 focus:outline-none focus:border-synth-secondary transition-all"
                   required
                 />
                 <button
@@ -303,7 +303,7 @@ export default function Auth() {
                     onCopy={(e) => e.preventDefault()}
                     onCut={(e) => e.preventDefault()}
                     onPaste={(e) => e.preventDefault()}
-                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-11 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-11 py-3 focus:outline-none focus:border-synth-secondary transition-all"
                     required
                   />
                   <button
@@ -348,7 +348,7 @@ export default function Auth() {
                       setError(null);
                       setMessage(null);
                     }}
-                    className="text-synth-primary hover:text-synth-secondary-hover text-sm transition-colors"
+                    className="text-synth-secondary hover:text-white text-sm transition-colors"
                   >
                     Forgot Password?
                   </button>
@@ -358,7 +358,7 @@ export default function Auth() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-3 rounded-lg shadow-glow-primary-sm transition-all flex justify-center items-center active:scale-[0.99]"
+                className="w-full bg-synth-primary hover:bg-synth-primary-hover text-white font-bold py-3 rounded-lg transition-all flex justify-center items-center active:scale-[0.99]"
               >
                 {loading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
@@ -381,7 +381,7 @@ export default function Auth() {
             <div className="grid grid-cols-2 gap-4 mb-6">
               <button
                 onClick={() => handleOAuth("github")}
-                className="flex items-center justify-center gap-2 bg-synth-bg hover:bg-synth-elevated border border-synth-border hover:border-synth-secondary/40 text-white py-2.5 rounded-lg transition-all"
+                className="flex items-center justify-center gap-2 bg-synth-bg hover:bg-synth-elevated border border-synth-border text-white py-2.5 rounded-lg transition-all"
               >
                 <FaGithub className="w-5 h-5" />
                 GitHub
@@ -389,7 +389,7 @@ export default function Auth() {
 
               <button
                 onClick={() => handleOAuth("google")}
-                className="flex items-center justify-center gap-2 bg-synth-bg hover:bg-synth-elevated border border-synth-border hover:border-synth-secondary/40 text-white py-2.5 rounded-lg transition-all"
+                className="flex items-center justify-center gap-2 bg-synth-bg hover:bg-synth-elevated border border-synth-border text-white py-2.5 rounded-lg transition-all"
               >
                 <FaGoogle className="w-5 h-5" />
                 Google
@@ -417,7 +417,7 @@ export default function Auth() {
                 <button
                   type="button"
                   onClick={() => navigate("/")}
-                  className="text-synth-primary hover:text-synth-secondary-hover text-sm font-medium transition-colors"
+                  className="text-synth-secondary hover:text-white text-sm font-medium transition-colors"
                 >
                   Continue as Guest &rarr;
                 </button>
