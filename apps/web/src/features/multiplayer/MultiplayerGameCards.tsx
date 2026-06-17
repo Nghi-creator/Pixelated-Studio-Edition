@@ -18,22 +18,22 @@ const multiplayerBackState = {
 export function CloudGameCard({ game }: { game: ApiGame }) {
   return (
     <Link
-      className="group overflow-hidden rounded-lg border border-synth-border bg-synth-surface transition-all hover:border-synth-primary/60 hover:shadow-glow-primary-sm"
+      className="group overflow-hidden rounded-lg border border-synth-border bg-synth-surface transition-colors hover:bg-synth-elevated"
       state={multiplayerBackState}
       to={`/play/${game.id}`}
     >
       <div className="aspect-[4/5] overflow-hidden bg-synth-bg">
         <img
           alt={game.title}
-          className="h-full w-full object-cover opacity-80 transition-all duration-300 group-hover:scale-105 group-hover:opacity-100"
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
           src={game.cover_url}
         />
       </div>
-      <div className="flex min-h-20 flex-col justify-between gap-3 p-3">
+      <div className="flex min-h-20 flex-col justify-between gap-3 border-t border-synth-border p-3">
         <p className="line-clamp-2 text-sm font-bold text-white">
           {game.title}
         </p>
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-synth-primary">
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-synth-secondary">
           <Play className="h-3.5 w-3.5" />
           Host lobby
         </span>
@@ -45,7 +45,7 @@ export function CloudGameCard({ game }: { game: ApiGame }) {
 export function LocalGameCard({ game }: { game: LocalGame }) {
   return (
     <Link
-      className="group flex min-h-44 flex-col justify-between rounded-lg border border-synth-border bg-synth-surface p-4 transition-all hover:border-synth-secondary/70 hover:shadow-glow-primary-sm"
+      className="group flex min-h-44 flex-col justify-between rounded-lg border border-synth-border bg-synth-surface p-4 transition-colors hover:bg-synth-elevated"
       state={multiplayerBackState}
       to={`/play/${encodeURIComponent(game.id)}`}
     >
@@ -97,4 +97,3 @@ export function MultiplayerGameGridSkeleton({ source }: { source: GameSource }) 
     </div>
   );
 }
-

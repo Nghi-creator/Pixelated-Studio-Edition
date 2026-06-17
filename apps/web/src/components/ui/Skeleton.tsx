@@ -50,8 +50,8 @@ export function HeroSkeleton() {
   return (
     <div className="relative h-[360px] w-full overflow-hidden bg-synth-bg md:h-[440px]">
       <Skeleton className="absolute inset-0 rounded-none opacity-55" />
-      <div className="absolute inset-0 bg-gradient-to-r from-synth-bg via-synth-bg/70 to-transparent" />
-      <div className="absolute inset-0 bg-gradient-to-t from-synth-bg via-synth-primary/10 to-transparent" />
+      <div className="absolute inset-0 bg-black/55" />
+      <div className="absolute inset-y-0 left-0 w-3/4 bg-gradient-to-r from-synth-bg via-synth-bg/80 to-transparent" />
 
       <Skeleton className="absolute left-4 top-1/2 h-14 w-14 -translate-y-1/2 rounded-full opacity-40" />
       <Skeleton className="absolute right-4 top-1/2 h-14 w-14 -translate-y-1/2 rounded-full opacity-40" />
@@ -82,7 +82,7 @@ export function GamesCatalogSkeleton() {
   return (
     <div className="w-full">
       <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <Skeleton className="h-8 w-36 border-l-4 border-synth-secondary/35" />
+        <Skeleton className="h-8 w-36 border-l-4 border-synth-border" />
         <Skeleton className="h-10 w-full rounded-lg md:w-96" />
       </div>
       <GameGridSkeleton />
@@ -125,7 +125,7 @@ export function AdminTableSkeleton({
   rows?: number;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-synth-border bg-synth-surface shadow-glow-card">
+    <div className="overflow-hidden rounded-xl border border-synth-border bg-synth-surface shadow-card">
       <div
         className="grid border-b border-synth-border bg-synth-bg p-4"
         style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))` }}
@@ -202,7 +202,7 @@ export function ModerationQueueSkeleton() {
         </div>
       </div>
 
-      <section className="rounded-xl border border-synth-border bg-synth-surface p-6 shadow-glow-card">
+      <section className="rounded-xl border border-synth-border bg-synth-surface p-6 shadow-card">
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           <div className="w-full flex-1 space-y-7">
             <div>
@@ -241,7 +241,7 @@ export function ProfileSkeleton() {
       <Skeleton className="mb-4 h-11 w-80 max-w-full" />
 
       <div className="space-y-8">
-        <section className="rounded-2xl border border-synth-border bg-synth-surface p-6 shadow-glow-card md:p-8">
+        <section className="rounded-2xl border border-synth-border bg-synth-surface p-6 shadow-card md:p-8">
           <Skeleton className="mb-10 h-7 w-40" />
 
           <div className="mb-10 flex justify-center">
@@ -261,7 +261,7 @@ export function ProfileSkeleton() {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-synth-border bg-synth-surface p-6 shadow-glow-card md:p-8">
+        <section className="rounded-2xl border border-synth-border bg-synth-surface p-6 shadow-card md:p-8">
           <Skeleton className="mb-10 h-7 w-28" />
 
           <div className="space-y-7">

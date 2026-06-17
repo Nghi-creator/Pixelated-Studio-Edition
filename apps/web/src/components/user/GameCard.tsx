@@ -40,31 +40,33 @@ export default function GameCard({
   return (
     <Link
       to={`/play/${id}`}
-      className="group relative block rounded-xl overflow-hidden bg-synth-surface border border-synth-border hover:border-synth-primary/55 hover:shadow-glow-primary-sm transition-all cursor-pointer"
+      className="group relative block overflow-hidden rounded-lg border border-synth-border bg-synth-surface transition-colors hover:bg-synth-elevated"
     >
-      <img
-        src={coverUrl}
-        alt={title}
-        className="w-full h-64 md:h-72 object-cover opacity-80 group-hover:opacity-100 group-hover:scale-105 transition-all duration-300"
-      />
+      <div className="overflow-hidden bg-synth-bg">
+        <img
+          src={coverUrl}
+          alt={title}
+          className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] md:h-72"
+        />
+      </div>
 
       <button
         onClick={toggleFavorite}
         aria-label={isFavorited ? `Remove ${title} from favorites` : `Add ${title} to favorites`}
         disabled={isPending}
         title={favoriteError || undefined}
-        className="absolute top-2 right-2 bg-synth-bg/85 border border-synth-border/60 p-2 rounded-full opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity hover:scale-110 focus:outline-none z-10 backdrop-blur-sm disabled:cursor-wait disabled:opacity-70"
+        className="absolute right-2 top-2 z-10 rounded-md border border-synth-border bg-synth-surface p-2 text-white transition-colors hover:bg-synth-elevated focus:outline-none disabled:cursor-wait disabled:opacity-70"
       >
         {isPending ? (
-          <Loader2 className="h-5 w-5 animate-spin text-synth-primary" />
+          <Loader2 className="h-5 w-5 animate-spin text-white" />
         ) : (
           <Heart
-            className={`w-5 h-5 transition-colors ${isFavorited ? "fill-synth-primary text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.5)]" : "text-white hover:text-synth-primary"}`}
+            className={`w-5 h-5 transition-colors ${isFavorited ? "fill-white text-white" : "text-white/80 hover:text-white"}`}
           />
         )}
       </button>
 
-      <div className="absolute bottom-0 w-full p-4 bg-gradient-to-t from-synth-bg via-synth-bg/92 to-transparent">
+      <div className="border-t border-synth-border p-3">
         <h3 className="font-bold text-lg truncate text-white">{title}</h3>
       </div>
     </Link>
