@@ -45,7 +45,9 @@ import {
 } from "./engine/launch";
 
 type ActiveCompanion = {
+  advertisedUrls: string[];
   certPath: string;
+  exposureMode: EngineLaunchContext["exposureMode"];
   launchUrl: string;
   urls: string[];
 };
@@ -102,7 +104,9 @@ async function startCompanion(
     });
     const hostedInviteUrls = launchContext.companionUrls.map(createHostedInviteUrl);
     activeCompanion = {
+      advertisedUrls: launchContext.advertisedUrls,
       certPath: companion.certPath,
+      exposureMode: launchContext.exposureMode,
       launchUrl: `https://localhost:${companion.port}`,
       urls: hostedInviteUrls,
     };
@@ -142,13 +146,18 @@ async function startCompanion(
 }
 
 export function createWebLaunchUrl() {
-  if (!activeCompanion) {
+  if (!activeCompanion || !engineToken) {
     throw new Error("Start the engine before launching the web app.");
   }
 
   const url = new URL(hostedWebUrl);
-  url.searchParams.set("companionUrl", activeCompanion.launchUrl);
-  url.searchParams.set("launchTicket", createCompanionLaunchTicket());
+  if (activeCompanion.exposureMode === "local") {
+    url.searchParams.set("engineUrl", activeCompanion.advertisedUrls[0] || "http://localhost:8080");
+    url.searchParams.set("engineToken", engineToken);
+  } else {
+    url.searchParams.set("companionUrl", activeCompanion.launchUrl);
+    url.searchParams.set("launchTicket", createCompanionLaunchTicket());
+  }
   return url.toString();
 }
 

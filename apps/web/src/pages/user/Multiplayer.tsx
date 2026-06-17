@@ -252,7 +252,7 @@ export default function Multiplayer() {
       </div>
 
       <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="border-l-4 border-synth-secondary pl-3">
+        <div>
           <h1 className="text-3xl font-extrabold text-white">Multiplayer</h1>
           <p className="mt-1 max-w-2xl text-sm leading-6 text-gray-400">
             Set up a LAN lobby. Hosts choose a game; guests join from an invite

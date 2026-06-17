@@ -214,7 +214,7 @@ export default function UserManagement() {
       )}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <Users className="text-synth-primary w-8 h-8 drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
+          <Users className="text-synth-secondary w-8 h-8" />
           User Management
         </h1>
 
@@ -232,7 +232,7 @@ export default function UserManagement() {
                 setPage(1);
                 setLoadError("");
               }}
-              className="block w-full rounded-lg border border-synth-border bg-synth-surface py-2 pl-10 pr-3 text-sm text-gray-300 placeholder-gray-500 shadow-inner transition-colors focus:border-synth-primary focus:outline-none focus:ring-1 focus:ring-synth-primary"
+              className="block w-full rounded-lg border border-synth-border bg-synth-surface py-2 pl-10 pr-3 text-sm text-gray-300 placeholder-gray-500 shadow-inner transition-colors focus:border-synth-secondary focus:outline-none"
             />
           </div>
 
@@ -248,7 +248,7 @@ export default function UserManagement() {
         </div>
       )}
 
-      <div className="bg-synth-surface border border-synth-border rounded-xl overflow-hidden shadow-glow-card">
+      <div className="bg-[#2B1720] border border-synth-border rounded-lg overflow-hidden shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -296,7 +296,7 @@ export default function UserManagement() {
                 return (
                   <tr
                     key={user.id}
-                    className="hover:bg-synth-primary/5 transition-colors"
+                    className="hover:bg-[#351B27] transition-colors"
                   >
                     {/* User Info */}
                     <td className="p-4">
@@ -310,7 +310,7 @@ export default function UserManagement() {
                           <div className="text-white font-bold flex items-center gap-2">
                             @{user.username || "Unknown"}
                             {isSelf && (
-                              <span className="text-xs bg-synth-primary/20 text-synth-primary px-2 py-0.5 rounded-full border border-synth-primary/30">
+                              <span className="text-xs bg-[#9B0048] text-white px-2 py-0.5 rounded-full border border-[#C02066]">
                                 You
                               </span>
                             )}
@@ -364,11 +364,7 @@ export default function UserManagement() {
                                 handleToggleRole(user.id, user.role)
                               }
                               disabled={isPending || Boolean(pendingUserId)}
-                              className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                                user.role === "admin"
-                                  ? "bg-synth-elevated text-gray-300 hover:bg-synth-border"
-                                  : "bg-synth-secondary/15 text-synth-secondary hover:bg-synth-secondary/25 border border-synth-secondary/25"
-                              }`}
+                              className="px-3 py-1.5 rounded-lg text-sm font-bold transition-all border border-[#C02066] bg-[#9B0048] text-white hover:bg-[#B00052]"
                             >
                               {isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />

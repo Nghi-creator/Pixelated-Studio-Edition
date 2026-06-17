@@ -18,19 +18,19 @@ export function PlayerControls({
     <div className="mt-6 w-full max-w-5xl rounded-lg border border-synth-border bg-synth-surface p-4">
       <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_minmax(360px,auto)] md:items-start">
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-gray-400">
+          <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-synth-secondary">
             <span className="inline-flex items-center gap-2">
               <span>Move</span>
-              <kbd className="rounded border border-synth-border bg-synth-elevated px-2 py-1 font-mono text-gray-200">
+              <kbd className="rounded border border-synth-border bg-synth-bg px-2 py-1 font-mono text-gray-200">
                 ARROWS
               </kbd>
             </span>
             <span className="inline-flex items-center gap-2">
               <span>Action</span>
-              <kbd className="rounded border border-synth-border bg-synth-elevated px-2 py-1 font-mono text-gray-200">
+              <kbd className="rounded border border-synth-border bg-synth-bg px-2 py-1 font-mono text-gray-200">
                 Z
               </kbd>
-              <kbd className="rounded border border-synth-border bg-synth-elevated px-2 py-1 font-mono text-gray-200">
+              <kbd className="rounded border border-synth-border bg-synth-bg px-2 py-1 font-mono text-gray-200">
                 X
               </kbd>
             </span>
@@ -49,7 +49,7 @@ export function PlayerControls({
                   onClick={() => onStreamProfileChange(profile.id)}
                   className={`min-h-12 rounded-lg border px-3 text-left transition-colors ${
                     isSelected
-                      ? "border-synth-primary bg-synth-primary/15 text-white"
+                      ? "border-synth-border bg-synth-elevated text-white"
                       : "border-synth-border bg-synth-bg text-gray-400 hover:text-white"
                   }`}
                 >

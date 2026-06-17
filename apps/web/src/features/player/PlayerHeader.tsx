@@ -29,9 +29,9 @@ export function PlayerHeader({
           : "Idle";
   const statusDotClass =
     status === "playing"
-      ? "bg-green-500 shadow-[0_0_10px_#22c55e]"
+      ? "bg-green-500"
       : status === "error"
-        ? "bg-red-500 shadow-[0_0_10px_#ef4444]"
+        ? "bg-red-500"
         : "bg-yellow-500 animate-pulse";
 
   return (
@@ -39,7 +39,7 @@ export function PlayerHeader({
       <div className="p-4">
         <Link
           to={backRoute}
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors"
+          className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
           {backText}
@@ -60,7 +60,7 @@ export function PlayerHeader({
             title="Toggle stream telemetry"
             className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
               showStreamTelemetry
-                ? "border-synth-primary bg-synth-primary/15 text-synth-primary"
+                ? "border-synth-border bg-synth-elevated text-white"
                 : "border-synth-border bg-synth-surface text-gray-400 hover:text-white"
             }`}
           >

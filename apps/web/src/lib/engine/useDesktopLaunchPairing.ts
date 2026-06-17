@@ -14,8 +14,36 @@ type LaunchRedemption = {
 export function useDesktopLaunchPairing() {
   useEffect(() => {
     const url = new URL(window.location.href);
+    const engineUrl = url.searchParams.get("engineUrl");
+    const engineToken = url.searchParams.get("engineToken");
     const launchTicket = url.searchParams.get("launchTicket");
     const companionUrl = url.searchParams.get("companionUrl");
+
+    if (engineUrl && engineToken) {
+      setEngineUrl(engineUrl);
+      setEngineToken(engineToken);
+      fetch(`${engineUrl}/local-games`, {
+        cache: "no-store",
+        headers: {
+          "X-Engine-Token": engineToken,
+          "X-User-Id": "connection-monitor",
+        },
+      }).catch((error) => {
+        console.warn("Desktop launch client presence ping failed.", error);
+      });
+      url.searchParams.delete("engineUrl");
+      url.searchParams.delete("engineToken");
+      window.history.replaceState({}, "", url);
+
+      void api.pairLocalEngine(engineUrl).catch((error) => {
+        console.warn(
+          "Desktop launch pairing registration v1 failed after local launch.",
+          error,
+        );
+      });
+      return;
+    }
+
     if (!launchTicket || !companionUrl) return;
 
     const pairFromDesktop = async () => {

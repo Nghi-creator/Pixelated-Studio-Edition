@@ -8,19 +8,47 @@
         theme: {
           extend: {
             colors: {
+              brand: {
+                champagne: "#FFC2D1",
+                "light-pink": "#FF8FAB",
+                blush: "#FFE5EC",
+                "rose-ink": "#3A1824",
+              },
+              neutral: {
+                paper: "#0B090A",
+                canvas: "#100B0E",
+                surface: "#2B1720",
+                elevated: "#351B27",
+                border: "#5D263A",
+                text: "#FFF7FA",
+                muted: "#CFA4B2",
+              },
+              status: {
+                success: "#2F7D5B",
+                warning: "#9A6A20",
+                danger: "#B64242",
+              },
+              console: {
+                black: "#080708",
+              },
               synth: {
-                bg: "#0b0f19",
-                surface: "#111827",
-                primary: "#ff4d8f",
-                "primary-hover": "#ff3377",
-                secondary: "#ff9f43",
-                border: "#1f2937",
-                ink: "#050505",
+                bg: "#050505",
+                surface: "#2B1720",
+                elevated: "#351B27",
+                primary: "#91516A",
+                "primary-hover": "#A15E78",
+                action: "#9B0048",
+                "action-hover": "#B00052",
+                secondary: "#F38BB4",
+                border: "#5D263A",
+                ink: "#FFFFFF",
               },
             },
             boxShadow: {
-              "glow-primary": "0 0 20px rgba(255,77,143,0.4)",
-              "glow-primary-sm": "0 0 10px rgba(255,77,143,0.3)",
+              panel: "0 18px 48px rgba(0,0,0,0.42)",
+              card: "0 12px 30px rgba(0,0,0,0.34)",
+              "glow-primary": "0 18px 48px rgba(0,0,0,0.42)",
+              "glow-primary-sm": "0 10px 24px rgba(0,0,0,0.30)",
             },
           },
         },
@@ -31,21 +59,21 @@
         width: 8px;
       }
       ::-webkit-scrollbar-track {
-        background: #111827;
+        background: #050505;
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb {
-        background: #1f2937;
+        background: #2b1720;
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #ff4d8f;
+        background: #5d263a;
       }
       .docker-recovery-action {
-        border: 1px solid #ffb04f;
+        border: 1px solid #9B0048;
         border-radius: 0.375rem;
-        background: #ffb04f;
-        color: #050505;
+        background: #9B0048;
+        color: #ffffff;
         cursor: pointer;
         font-size: 0.75rem;
         font-weight: 700;
@@ -56,9 +84,9 @@
           color 150ms ease;
       }
       .docker-recovery-action:hover:not(:disabled) {
-        border-color: #ffc473;
-        background: #ffc473;
-        color: #050505;
+        border-color: #B00052;
+        background: #B00052;
+        color: #ffffff;
       }
       .docker-recovery-action:disabled {
         cursor: not-allowed;
@@ -99,13 +127,9 @@
   <body
     class="bg-synth-bg text-gray-300 font-sans min-h-screen p-6 pt-20 relative overflow-y-auto"
   >
-    <div
-      class="absolute inset-0 bg-gradient-to-br from-synth-bg via-synth-bg/90 to-synth-primary/10 -z-10"
-    ></div>
-
     <button
       id="open-docs"
-      class="absolute top-6 right-6 flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors bg-synth-surface border border-synth-border px-4 py-2 rounded-full font-medium text-sm z-10"
+      class="absolute top-6 right-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors bg-synth-surface border border-synth-border px-4 py-2 rounded-full font-medium text-sm z-10"
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -129,22 +153,22 @@
       <header class="mb-6 flex flex-wrap items-end justify-between gap-5">
         <div>
           <h1
-            class="text-4xl font-extrabold tracking-tight text-white [text-shadow:0_0_30px_rgba(255,77,143,0.3),0_2px_10px_rgba(0,0,0,0.8)]"
+            class="text-4xl font-extrabold tracking-tight text-white"
           >
-            PIXELATED <span class="text-synth-primary">Studio</span>
+            PIXELATED <span class="text-synth-secondary">Studio</span>
           </h1>
         </div>
       </header>
 
-      <section class="mb-5 rounded-xl border border-synth-border bg-synth-surface/95 p-4 shadow-2xl">
+      <section class="mb-5 rounded-lg border border-synth-border bg-synth-surface/95 p-4 shadow-2xl">
         <div class="flex flex-wrap items-center gap-3">
-          <div class="flex items-center gap-4 rounded-lg border border-synth-border bg-[#050810] px-4 py-2.5">
+          <div class="flex items-center gap-4 rounded-lg border border-synth-border bg-synth-bg px-4 py-2.5">
             <p id="exposure-label" class="min-w-28 text-sm font-bold text-white">
               Local only
             </p>
             <label
               for="lan-toggle"
-              class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full bg-synth-border transition-colors has-[:checked]:bg-synth-primary"
+              class="relative inline-flex h-7 w-12 shrink-0 cursor-pointer items-center rounded-full bg-synth-border transition-colors has-[:checked]:bg-synth-elevated"
             >
               <input id="lan-toggle" type="checkbox" class="peer sr-only" />
               <span
@@ -155,7 +179,7 @@
 
           <button
             id="power-btn"
-            class="flex items-center justify-center gap-2 rounded-lg bg-synth-primary px-6 py-3 text-sm font-bold text-synth-ink shadow-glow-primary transition-all hover:bg-synth-primary-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
+            class="flex items-center justify-center gap-2 rounded-lg bg-synth-primary px-6 py-3 text-sm font-bold text-white transition-all hover:bg-synth-primary-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70 disabled:active:scale-100"
           >
             <svg
               id="power-icon"
@@ -168,14 +192,14 @@
               stroke-width="2.5"
               stroke-linecap="round"
               stroke-linejoin="round"
-              class="stroke-synth-ink"
+              class="stroke-white"
             >
               <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
               <line x1="12" y1="2" x2="12" y2="12" />
             </svg>
             <svg
               id="power-spinner"
-              class="hidden h-[19px] w-[19px] animate-spin stroke-synth-ink"
+              class="hidden h-[19px] w-[19px] animate-spin stroke-white"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -201,7 +225,7 @@
 
           <button
             id="launch-web"
-            class="hidden items-center justify-center gap-2 rounded-lg bg-red-500 px-5 py-3 text-sm font-bold text-synth-ink transition-colors hover:bg-red-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+            class="hidden items-center justify-center gap-2 rounded-lg bg-synth-action px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-synth-action-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
             type="button"
           >
             Launch Web
@@ -225,13 +249,13 @@
       </section>
 
       <div id="desktop-panels" class="grid items-start gap-5 lg:grid-cols-3">
-        <section id="runtime-panel" class="flex min-h-[560px] min-w-0 flex-col overflow-hidden rounded-xl border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
+        <section id="runtime-panel" class="flex min-h-[560px] min-w-0 flex-col overflow-hidden rounded-lg border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
           <div class="mb-4">
-            <p class="text-[10px] uppercase tracking-[0.22em] text-synth-primary">Runtime Output</p>
+            <p class="text-[10px] uppercase tracking-[0.22em] text-synth-secondary">Runtime Output</p>
             <h2 class="mt-1 text-lg font-bold text-white">System logs</h2>
             <p class="mt-1 text-xs leading-5 text-gray-400">Live output from the desktop orchestrator and engine runtime.</p>
           </div>
-          <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-synth-border bg-[#050810] shadow-inner">
+          <div class="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-synth-border bg-synth-bg shadow-inner">
             <div class="flex items-center gap-2 bg-synth-border/50 px-3 py-1.5">
               <div class="h-2.5 w-2.5 rounded-full bg-red-500/80"></div>
               <div class="h-2.5 w-2.5 rounded-full bg-yellow-500/80"></div>
@@ -247,19 +271,19 @@
             </div>
             <div id="log" class="min-h-0 flex-1 overflow-y-scroll overscroll-contain whitespace-pre-wrap p-3 font-mono text-[11px] leading-relaxed text-synth-secondary"></div>
           </div>
-          <div id="token-panel" class="hidden mt-4 rounded-lg border border-synth-border bg-[#050810] p-3">
+          <div id="token-panel" class="hidden mt-4 rounded-lg border border-synth-border bg-synth-bg p-3">
             <div class="flex items-center justify-between gap-3">
               <p class="text-[10px] uppercase tracking-widest text-gray-400">Host-Local Pairing Token</p>
-              <button id="copy-token" class="text-xs font-bold text-synth-primary transition-colors hover:text-synth-secondary" type="button">Copy</button>
+              <button id="copy-token" class="text-xs font-bold text-synth-secondary transition-colors hover:text-synth-secondary" type="button">Copy</button>
             </div>
             <code id="engine-token" class="mt-1 block break-all font-mono text-xs text-synth-secondary"></code>
           </div>
         </section>
 
-        <section id="startup-panel" class="flex min-h-[560px] min-w-0 flex-col overflow-hidden rounded-xl border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
+        <section id="startup-panel" class="flex min-h-[560px] min-w-0 flex-col overflow-hidden rounded-lg border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
           <div class="flex items-start justify-between gap-3">
             <div>
-              <p class="text-[10px] uppercase tracking-[0.22em] text-synth-primary">
+              <p class="text-[10px] uppercase tracking-[0.22em] text-synth-secondary">
                 Startup Pipeline
               </p>
               <h2 class="mt-1 text-lg font-bold text-white">Engine readiness</h2>
@@ -269,14 +293,14 @@
             </div>
             <p
               id="phase-summary"
-              class="shrink-0 rounded-full border border-synth-border bg-[#050810] px-2.5 py-1 text-[10px] uppercase tracking-widest text-gray-500"
+              class="shrink-0 rounded-full border border-synth-border bg-synth-bg px-2.5 py-1 text-[10px] uppercase tracking-widest text-gray-500"
             >
               Idle
             </p>
           </div>
           <div
             id="docker-recovery"
-            class="mt-5 hidden rounded-lg border border-synth-border bg-[#050810] p-4 font-mono shadow-inner"
+            class="mt-5 hidden rounded-lg border border-synth-border bg-synth-bg p-4 font-mono shadow-inner"
           >
             <p
               id="docker-recovery-title"
@@ -327,9 +351,9 @@
           <div id="phase-list" class="mt-5 grid min-h-0 flex-1 auto-rows-fr gap-3"></div>
         </section>
 
-        <section id="guest-access-panel" class="flex min-h-[560px] min-w-0 flex-col rounded-xl border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
+        <section id="guest-access-panel" class="flex min-h-[560px] min-w-0 flex-col rounded-lg border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
           <div class="mb-4">
-            <p class="text-[10px] uppercase tracking-[0.22em] text-synth-primary">
+            <p class="text-[10px] uppercase tracking-[0.22em] text-synth-secondary">
               Guest Access
             </p>
             <h2 class="mt-1 text-lg font-bold text-white">LAN companion</h2>
@@ -342,15 +366,15 @@
             id="companion-qr-stage"
             class="flex items-center justify-center"
           >
-            <div class="mx-auto flex aspect-square w-full max-w-64 items-center justify-center rounded-2xl border border-dashed border-synth-primary/40 bg-[#050810] p-4 shadow-inner">
+            <div class="mx-auto flex aspect-square w-full max-w-64 items-center justify-center rounded-lg border border-dashed border-synth-border bg-synth-bg p-4 shadow-inner">
               <div id="companion-qr-placeholder" class="text-center">
-                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-xl border border-synth-border bg-synth-surface text-2xl text-synth-primary">⌗</div>
+                <div class="mx-auto flex h-14 w-14 items-center justify-center rounded-lg border border-synth-border bg-synth-surface text-2xl text-synth-secondary">⌗</div>
                 <p class="mt-4 text-xs font-bold uppercase tracking-widest text-gray-300">QR join frame</p>
                 <p class="mt-2 text-xs leading-5 text-gray-500">The secure join QR appears here when the LAN companion is ready.</p>
               </div>
-              <div id="companion-qr" class="hidden rounded-xl bg-white p-3 text-center">
+              <div id="companion-qr" class="hidden rounded-lg bg-white p-3 text-center">
                 <img id="companion-qr-image" class="mx-auto h-44 w-44" alt="QR code for the LAN HTTPS join page" />
-                <p class="mt-2 text-xs font-bold text-synth-ink">Scan to open the join page</p>
+                <p class="mt-2 text-xs font-bold text-gray-900">Scan to open the join page</p>
               </div>
             </div>
           </div>
@@ -363,7 +387,7 @@
               </p>
               <button
                 id="copy-companion"
-                class="text-xs font-bold text-synth-primary hover:text-synth-secondary transition-colors"
+                class="text-xs font-bold text-synth-secondary hover:text-synth-secondary transition-colors"
                 type="button"
               >
                 Copy
@@ -375,7 +399,7 @@
             ></div>
             <div
               id="companion-invite"
-              class="hidden mt-3 rounded-lg border border-synth-primary/40 bg-synth-primary/10 p-3"
+              class="hidden mt-3 rounded-lg border border-synth-border bg-synth-bg p-3"
             >
               <p class="text-[10px] uppercase tracking-widest text-gray-400">
                 Invite Code
@@ -402,7 +426,7 @@
               >
                 <button
                   id="regenerate-invite"
-                  class="rounded-md border border-synth-primary/60 bg-synth-primary/15 px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-synth-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
+                  class="rounded-md border border-synth-border bg-synth-elevated px-3 py-1.5 text-xs font-bold text-white transition-colors hover:bg-synth-surface disabled:cursor-not-allowed disabled:opacity-50"
                   type="button"
                 >
                   Regenerate
@@ -428,10 +452,10 @@
         </section>
       </div>
 
-      <section id="client-access-panel" class="mt-5 rounded-xl border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
+      <section id="client-access-panel" class="mt-5 rounded-lg border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
         <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <div>
-            <p class="text-[10px] uppercase tracking-[0.22em] text-synth-primary">
+            <p class="text-[10px] uppercase tracking-[0.22em] text-synth-secondary">
               Client Access
             </p>
             <h2 class="mt-1 text-lg font-bold text-white">
@@ -444,7 +468,7 @@
           <div class="flex flex-wrap gap-2">
             <button
               id="rotate-token"
-              class="rounded-lg border border-synth-primary/70 bg-synth-primary/15 px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-synth-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-lg border border-synth-border bg-synth-elevated px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-synth-surface disabled:cursor-not-allowed disabled:opacity-50"
               type="button"
             >
               Rotate Token
@@ -460,10 +484,10 @@
 
     <div
       id="docs-modal"
-      class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300"
+      class="fixed inset-0 bg-black/90 z-50 flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-300"
     >
       <div
-        class="bg-synth-surface border border-synth-border rounded-xl w-full max-w-3xl max-h-[80vh] flex flex-col shadow-glow-primary overflow-hidden"
+        class="bg-synth-surface border border-synth-border rounded-lg w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden"
       >
         <div
           class="flex justify-between items-center p-6 border-b border-synth-border"
@@ -479,7 +503,7 @@
               stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
-              class="text-synth-primary"
+              class="text-synth-secondary"
             >
               <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
               <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
@@ -511,7 +535,7 @@
 
         <div class="p-6 overflow-y-auto space-y-6 text-sm text-gray-300">
           <div>
-            <h3 class="text-lg font-bold text-synth-primary mb-2">
+            <h3 class="text-lg font-bold text-synth-secondary mb-2">
               Prerequisites
             </h3>
             <p class="mb-2">
@@ -541,7 +565,7 @@
           </div>
 
           <div>
-            <h3 class="text-lg font-bold text-synth-primary mb-2">
+            <h3 class="text-lg font-bold text-synth-secondary mb-2">
               Current Architecture
             </h3>
             <p>
@@ -558,7 +582,7 @@
           </div>
 
           <div>
-            <h3 class="text-lg font-bold text-synth-primary mb-2">
+            <h3 class="text-lg font-bold text-synth-secondary mb-2">
               Exposure Control
             </h3>
             <p>

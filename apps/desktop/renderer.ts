@@ -496,8 +496,12 @@ function setStatusPresentation(text: string, tone: StatusTone) {
       dot: "bg-emerald-400",
     },
     running: {
-      badge: ["border-orange-500/50", "bg-orange-500/10", "text-orange-300"],
-      dot: "bg-orange-400",
+      badge: [
+        "border-synth-action/60",
+        "bg-synth-action/15",
+        "text-synth-secondary",
+      ],
+      dot: "bg-synth-secondary",
     },
   } as const;
   const allBadgeClasses = Object.values(toneClasses).flatMap(
@@ -528,10 +532,10 @@ function setLaunchWebVisible(visible: boolean) {
 function setStatusBadge(active: boolean) {
   if (active) {
     setStatusPresentation("Engine Ready", "ready");
-    powerBtn.classList.replace("bg-synth-primary", "bg-red-500");
+    powerBtn.classList.replace("bg-synth-primary", "bg-synth-action");
     powerBtn.classList.replace(
       "hover:bg-synth-primary-hover",
-      "hover:bg-red-600",
+      "hover:bg-synth-action-hover",
     );
     powerBtn.classList.remove("shadow-glow-primary");
     powerText.innerText = "Shutdown Engine";
@@ -552,9 +556,9 @@ function setStatusBadge(active: boolean) {
   }
 
   setStatusPresentation("Engine Offline", "offline");
-  powerBtn.classList.replace("bg-red-500", "bg-synth-primary");
+  powerBtn.classList.replace("bg-synth-action", "bg-synth-primary");
   powerBtn.classList.replace(
-    "hover:bg-red-600",
+    "hover:bg-synth-action-hover",
     "hover:bg-synth-primary-hover",
   );
   powerBtn.classList.add("shadow-glow-primary");
@@ -576,9 +580,9 @@ function setStatusBadge(active: boolean) {
 }
 
 function resetFailedUi() {
-  powerBtn.classList.replace("bg-red-500", "bg-synth-primary");
+  powerBtn.classList.replace("bg-synth-action", "bg-synth-primary");
   powerBtn.classList.replace(
-    "hover:bg-red-600",
+    "hover:bg-synth-action-hover",
     "hover:bg-synth-primary-hover",
   );
   powerBtn.classList.add("shadow-glow-primary");

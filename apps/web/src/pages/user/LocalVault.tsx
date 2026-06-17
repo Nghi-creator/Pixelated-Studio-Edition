@@ -218,15 +218,15 @@ export default function LocalVault() {
       <div className="mb-6">
         <Link
           to="/"
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors font-medium group"
+          className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors font-medium group"
         >
           <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
           Back to Library
         </Link>
       </div>
 
-      <div className="mb-8 border-l-4 border-synth-secondary pl-3">
-        <h2 className="text-3xl font-extrabold text-white drop-shadow-[0_0_12px_rgba(255,159,67,0.2)]">
+      <div className="mb-8">
+        <h2 className="text-3xl font-extrabold text-white">
           Local Vault
         </h2>
         <p className="text-gray-400 mt-1 flex items-center gap-2">
@@ -265,12 +265,12 @@ export default function LocalVault() {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        className={`relative mb-12 w-full h-64 rounded-xl border-2 border-dashed flex flex-col items-center justify-center transition-all overflow-hidden ${
+        className={`relative mb-12 flex h-64 w-full flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
           isEnginePaired ? "cursor-pointer" : "cursor-not-allowed opacity-60"
         } ${
           isDragging
-            ? "border-synth-primary bg-synth-primary/10 shadow-glow-primary"
-            : "border-synth-border bg-synth-surface hover:border-synth-secondary/50"
+            ? "border-[#C01662] bg-[#2B1720]"
+            : "border-synth-border bg-synth-bg hover:border-[#7E3250] hover:bg-[#120A0E]"
         }`}
       >
         <input
@@ -283,10 +283,10 @@ export default function LocalVault() {
         />
 
         {isUploading ? (
-          <Loader2 className="w-12 h-12 text-synth-primary animate-spin mb-4" />
+          <Loader2 className="w-12 h-12 text-white animate-spin mb-4" />
         ) : (
           <UploadCloud
-            className={`w-12 h-12 mb-4 transition-colors ${isDragging ? "text-synth-primary" : "text-gray-500"}`}
+            className={`w-12 h-12 mb-4 transition-colors ${isDragging ? "text-white" : "text-[#F38BB4]"}`}
           />
         )}
 
@@ -302,21 +302,26 @@ export default function LocalVault() {
 
       {/* THE LOCAL GAME GRID */}
       {isLoadingGames ? (
-        <div className="text-center py-20 text-gray-500 bg-synth-surface rounded-xl border border-synth-border">
-          <Loader2 className="w-10 h-10 mx-auto mb-4 animate-spin text-synth-primary" />
+        <div className="text-center py-16 text-gray-500">
+          <Loader2 className="w-10 h-10 mx-auto mb-4 animate-spin text-white" />
           <p className="text-xl">Loading Local Vault...</p>
         </div>
       ) : localGames.length === 0 ? (
-        <div className="text-center py-20 text-gray-500 bg-synth-surface rounded-xl border border-synth-border">
-          <Gamepad2 className="w-12 h-12 mx-auto mb-4 opacity-20" />
-          <p className="text-xl">
+        <div className="mx-auto max-w-xl border-t border-synth-border/70 py-10 text-center text-gray-500">
+          <Gamepad2 className="w-10 h-10 mx-auto mb-4 text-[#F38BB4] opacity-70" />
+          <p className="text-lg text-gray-400">
             {isEnginePaired
               ? "Your local vault is empty."
               : "Pair the local engine to view your vault."}
           </p>
+          {isEnginePaired && (
+            <p className="mt-2 text-sm leading-6 text-gray-600">
+              Upload a `.nes` ROM above and it will appear here.
+            </p>
+          )}
           {vaultMessage?.tone === "error" && (
             <button
-              className="mt-4 rounded-lg border border-synth-primary/60 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-synth-primary/15"
+              className="mt-4 rounded-lg border border-synth-border bg-synth-bg px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-synth-surface"
               onClick={() => fetchLocalGames(userId)}
               type="button"
             >
@@ -330,16 +335,21 @@ export default function LocalVault() {
             <Link
               key={filename}
               to={`/play/${filename}`}
-              className="group relative block rounded-xl overflow-hidden bg-synth-surface border border-synth-border hover:border-synth-primary/55 hover:shadow-glow-primary-sm transition-all h-64"
+              className="group relative flex h-64 flex-col justify-between overflow-hidden rounded-lg border border-synth-border bg-synth-surface p-4 transition-colors hover:bg-synth-elevated"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-synth-bg via-synth-surface to-synth-primary/20 flex flex-col items-center justify-center p-4">
-                <Gamepad2 className="w-16 h-16 text-synth-primary/40 group-hover:text-synth-primary group-hover:scale-110 transition-all duration-300 drop-shadow-[0_0_8px_rgba(255,77,143,0.5)]" />
+              <div>
+                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg border border-synth-border bg-synth-bg text-synth-secondary">
+                  <Gamepad2 className="h-6 w-6" />
+                </div>
+                <h3 className="line-clamp-4 text-sm font-bold text-white md:text-base">
+                  {getLocalGameTitle(filename)}
+                </h3>
               </div>
 
               <button
                 disabled={pendingDeleteFilename === filename}
                 onClick={(e) => requestDeleteLocalGame(e, filename)}
-                className="absolute top-2 right-2 bg-synth-bg/85 border border-synth-border p-2 rounded-full opacity-0 group-hover:opacity-100 transition-all hover:border-red-500 hover:bg-red-500/20 focus:outline-none z-10 backdrop-blur-sm"
+                className="absolute top-2 right-2 bg-synth-bg border border-synth-border p-2 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-colors hover:border-red-500 hover:bg-red-500/20 focus:outline-none z-10"
                 title="Delete from Local Vault"
                 type="button"
               >
@@ -350,11 +360,9 @@ export default function LocalVault() {
                 )}
               </button>
 
-              <div className="absolute bottom-0 w-full p-4 bg-gradient-to-t from-synth-bg via-synth-bg/92 to-transparent">
-                <h3 className="font-bold text-sm md:text-md truncate text-white">
-                  {getLocalGameTitle(filename)}
-                </h3>
-              </div>
+              <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-synth-secondary">
+                Play local ROM
+              </span>
             </Link>
           ))}
         </div>

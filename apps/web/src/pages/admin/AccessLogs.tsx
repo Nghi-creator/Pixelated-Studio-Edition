@@ -113,7 +113,7 @@ export default function AccessLogs() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <Activity className="text-synth-primary w-8 h-8 drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
+          <Activity className="text-synth-secondary w-8 h-8" />
           User Sessions
         </h1>
         <span className="bg-synth-secondary/15 text-synth-secondary border border-synth-secondary/30 px-4 py-2 rounded-full font-semibold">
@@ -121,7 +121,7 @@ export default function AccessLogs() {
         </span>
       </div>
 
-      <div className="bg-synth-surface border border-synth-border rounded-xl overflow-hidden shadow-glow-card">
+      <div className="bg-[#2B1720] border border-synth-border rounded-lg overflow-hidden shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -158,7 +158,7 @@ export default function AccessLogs() {
                 logs.map((log) => (
                   <tr
                     key={log.user_id || "guest"}
-                    className="hover:bg-synth-primary/5 transition-colors"
+                    className="hover:bg-[#351B27] transition-colors"
                   >
                     <td className="p-4">
                       {log.user_id ? (

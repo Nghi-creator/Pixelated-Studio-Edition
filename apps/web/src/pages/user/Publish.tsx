@@ -150,8 +150,8 @@ export default function Publish() {
   if (isSuccess) {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-32 w-full min-h-screen flex flex-col items-center justify-center text-center">
-        <div className="w-20 h-20 bg-synth-primary/20 rounded-full flex items-center justify-center mb-6 shadow-glow-primary">
-          <CheckCircle className="w-10 h-10 text-synth-primary" />
+        <div className="w-20 h-20 bg-synth-surface rounded-lg flex items-center justify-center mb-6 border border-synth-border">
+          <CheckCircle className="w-10 h-10 text-synth-secondary" />
         </div>
         <h2 className="text-4xl font-extrabold text-white mb-4">
           Application Received!
@@ -163,7 +163,7 @@ export default function Publish() {
         </p>
         <Link
           to="/"
-          className="bg-synth-surface border border-synth-border hover:border-synth-primary text-white font-bold py-3 px-8 rounded-xl transition-all shadow-glow-card hover:shadow-glow-primary-sm"
+          className="bg-synth-surface border border-synth-border hover:bg-synth-elevated text-white font-bold py-3 px-8 rounded-lg transition-colors"
         >
           Return to Library
         </Link>
@@ -176,15 +176,15 @@ export default function Publish() {
       <div className="mb-6">
         <Link
           to="/"
-          className="inline-flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors font-medium group"
+          className="inline-flex items-center gap-2 text-gray-400 hover:text-synth-secondary transition-colors font-medium group"
         >
           <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
           Back to Library
         </Link>
       </div>
 
-      <div className="mb-10 border-l-4 border-synth-secondary pl-3">
-        <h2 className="text-3xl font-extrabold text-white drop-shadow-[0_0_12px_rgba(255,159,67,0.2)]">
+      <div className="mb-10">
+        <h2 className="text-3xl font-extrabold text-white">
           Developer Program
         </h2>
         <p className="text-gray-400 mt-2 flex items-center gap-2 text-lg">
@@ -192,10 +192,10 @@ export default function Publish() {
         </p>
       </div>
 
-      <div className="bg-synth-surface border border-synth-border rounded-2xl p-8 shadow-glow-card">
+      <div className="bg-synth-surface border border-synth-border rounded-lg p-8 shadow-card">
         <p className="text-gray-300 mb-8 leading-relaxed">
           Are you a retro developer? Test your{" "}
-          <code className="text-synth-primary bg-synth-bg px-2 py-1 rounded">
+          <code className="text-synth-secondary bg-synth-bg px-2 py-1 rounded">
             .nes
           </code>{" "}
           games in our Local Vault for free, or apply below to have them
@@ -220,7 +220,7 @@ export default function Publish() {
                 htmlFor="publish-author"
               >
                 Developer Name{" "}
-                <span className="text-synth-primary ml-1">*</span>
+                <span className="text-synth-secondary ml-1">*</span>
               </label>
               <input
                 id="publish-author"
@@ -229,7 +229,7 @@ export default function Publish() {
                 onChange={(e) => setAuthorName(e.target.value)}
                 required
                 disabled={isSubmitting}
-                className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-primary transition-colors"
+                className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-secondary transition-colors"
                 placeholder="Studio or Creator Name"
               />
             </div>
@@ -238,7 +238,7 @@ export default function Publish() {
                 className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
                 htmlFor="publish-email"
               >
-                Contact Email <span className="text-synth-primary ml-1">*</span>
+                Contact Email <span className="text-synth-secondary ml-1">*</span>
               </label>
               <input
                 id="publish-email"
@@ -247,7 +247,7 @@ export default function Publish() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isSubmitting}
-                className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-primary transition-colors"
+                className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-secondary transition-colors"
                 placeholder="you@domain.com"
               />
             </div>
@@ -258,7 +258,7 @@ export default function Publish() {
               className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
               htmlFor="publish-title"
             >
-              Game Title <span className="text-synth-primary ml-1">*</span>
+              Game Title <span className="text-synth-secondary ml-1">*</span>
             </label>
             <input
               id="publish-title"
@@ -267,7 +267,7 @@ export default function Publish() {
               onChange={(e) => setGameTitle(e.target.value)}
               required
               disabled={isSubmitting}
-              className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-primary transition-colors"
+              className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-secondary transition-colors"
               placeholder="Epic Quest 198X"
             />
           </div>
@@ -277,7 +277,7 @@ export default function Publish() {
               className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
               htmlFor="publish-rom"
             >
-              ROM File (.nes) <span className="text-synth-primary ml-1">*</span>
+              ROM File (.nes) <span className="text-synth-secondary ml-1">*</span>
             </label>
             <div
               className={`relative w-full h-14 bg-synth-bg border-2 border-dashed rounded-xl flex items-center justify-center transition-colors group cursor-pointer overflow-hidden ${
@@ -285,7 +285,7 @@ export default function Publish() {
                   ? "border-red-400"
                   : romFile
                     ? "border-synth-primary"
-                    : "border-synth-border hover:border-synth-primary"
+                    : "border-synth-border hover:border-synth-secondary"
               }`}
             >
               <input
@@ -299,7 +299,7 @@ export default function Publish() {
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
               />
               <div
-                className={`flex items-center gap-2 transition-colors ${romFile ? "text-synth-primary" : "text-gray-400 group-hover:text-synth-primary"}`}
+                className={`flex items-center gap-2 transition-colors ${romFile ? "text-synth-secondary" : "text-gray-400 group-hover:text-synth-secondary"}`}
               >
                 {romFile ? (
                   <CheckCircle className="w-5 h-5" />
@@ -336,7 +336,7 @@ export default function Publish() {
                     ? "border-red-400"
                     : coverFile
                       ? "border-synth-secondary"
-                      : "border-synth-border hover:border-synth-primary"
+                      : "border-synth-border hover:border-synth-secondary"
                 }`}
               >
                 <input
@@ -351,7 +351,7 @@ export default function Publish() {
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
                 <div
-                  className={`flex items-center gap-2 transition-colors ${coverFile ? "text-synth-secondary" : "text-gray-500 group-hover:text-synth-primary"}`}
+                  className={`flex items-center gap-2 transition-colors ${coverFile ? "text-synth-secondary" : "text-gray-500 group-hover:text-synth-secondary"}`}
                 >
                   {coverFile ? (
                     <CheckCircle className="w-4 h-4" />
@@ -386,7 +386,7 @@ export default function Publish() {
                     ? "border-red-400"
                     : bannerFile
                       ? "border-synth-secondary"
-                      : "border-synth-border hover:border-synth-primary"
+                      : "border-synth-border hover:border-synth-secondary"
                 }`}
               >
                 <input
@@ -403,7 +403,7 @@ export default function Publish() {
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                 />
                 <div
-                  className={`flex items-center gap-2 transition-colors ${bannerFile ? "text-synth-secondary" : "text-gray-500 group-hover:text-synth-primary"}`}
+                  className={`flex items-center gap-2 transition-colors ${bannerFile ? "text-synth-secondary" : "text-gray-500 group-hover:text-synth-secondary"}`}
                 >
                   {bannerFile ? (
                     <CheckCircle className="w-4 h-4" />
@@ -442,7 +442,7 @@ export default function Publish() {
               onChange={(e) => setDescription(e.target.value)}
               rows={4}
               disabled={isSubmitting}
-              className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-primary transition-colors resize-none"
+              className="w-full bg-synth-bg border border-synth-border text-white rounded-xl px-4 py-3 focus:outline-none focus:border-synth-secondary transition-colors resize-none"
               placeholder="Tell us about your game and controls..."
             ></textarea>
           </div>
@@ -450,7 +450,7 @@ export default function Publish() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full bg-synth-primary hover:bg-synth-primary-hover text-black font-bold text-lg py-4 rounded-xl flex items-center justify-center gap-2 transition-all shadow-glow-primary active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-synth-primary hover:bg-synth-primary-hover text-white font-bold text-lg py-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <>

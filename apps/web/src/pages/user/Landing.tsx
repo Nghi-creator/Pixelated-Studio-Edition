@@ -29,7 +29,7 @@ const hasOnlyZeroPlayCounts = (games: Game[]) =>
 function CatalogRefreshPanel({ label }: { label: string }) {
   return (
     <div className="relative" role="status" aria-label={label}>
-      <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-synth-primary/40 bg-synth-primary/10 px-3 py-1.5 text-sm font-semibold text-synth-primary shadow-glow-card">
+      <div className="mb-4 inline-flex items-center gap-2 rounded-md border border-synth-border bg-synth-surface px-3 py-1.5 text-sm font-semibold text-white">
         <Loader2 className="h-4 w-4 animate-spin" />
         {label}
       </div>
@@ -176,7 +176,7 @@ export default function Landing() {
         <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <h2
             id="all-games"
-            className="scroll-mt-24 text-2xl font-bold border-l-4 border-synth-secondary pl-3 drop-shadow-[0_0_12px_rgba(255,159,67,0.2)]"
+            className="scroll-mt-24 text-2xl font-bold text-white"
           >
             All Games
           </h2>
@@ -193,7 +193,7 @@ export default function Landing() {
                 setSearchQuery(e.target.value);
                 setCurrentPage(1);
               }}
-              className="block w-full pl-10 pr-10 py-2 border border-synth-border rounded-lg leading-5 bg-synth-surface text-gray-300 placeholder-gray-500 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-colors shadow-inner"
+              className="block w-full rounded-lg border border-synth-border bg-synth-bg py-2 pl-10 pr-10 leading-5 text-white placeholder:text-gray-500 transition-colors focus:border-synth-secondary focus:outline-none"
             />
           </div>
         </div>

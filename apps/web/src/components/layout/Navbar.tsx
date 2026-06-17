@@ -123,26 +123,31 @@ export default function Navbar() {
   const isLocalPage = location.pathname === "/local";
   const isMultiplayerPage = location.pathname === "/multiplayer";
   const isPublishPage = location.pathname === "/publish";
+  const getNavIconClass = (isActive: boolean) =>
+    `inline-flex h-10 w-10 items-center justify-center rounded-md border transition-colors ${
+      isActive
+        ? "border-synth-border bg-synth-surface text-white"
+        : "border-transparent text-gray-400 hover:border-synth-border/70 hover:bg-synth-surface/60 hover:text-white"
+    }`;
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-synth-bg/90 backdrop-blur-md border-b border-synth-border/70 transition-all shadow-[0_1px_0_rgba(255,77,143,0.06)]">
+    <nav className="fixed top-0 w-full z-50 bg-synth-bg border-b border-synth-border/60 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-4">
-            <Link to="/" className="flex items-center gap-2 group">
-              <span className="text-xl font-extrabold tracking-widest bg-gradient-to-r from-synth-primary to-synth-secondary bg-clip-text text-transparent">
+            <Link to="/" className="flex items-baseline gap-2 group">
+              <span className="text-xl font-extrabold tracking-widest text-white">
                 PIXELATED
+              </span>
+              <span className="hidden text-[10px] font-bold uppercase tracking-[0.22em] text-synth-secondary sm:inline">
+                Studio
               </span>
             </Link>
 
             <Link
               to="/engine"
               title={isEnginePaired ? "Engine Connected" : "Connect Engine"}
-              className={`relative transition-colors ${
-                isEnginePage
-                  ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
-                  : "text-gray-400 hover:text-synth-primary"
-              }`}
+              className={`relative ${getNavIconClass(isEnginePage)}`}
             >
               <PlugZap className="h-6 w-6" />
               <span
@@ -167,14 +172,10 @@ export default function Navbar() {
               <Link
                 to="/publish"
                 title="Submit a Game"
-                className={`transition-colors ${
-                  isPublishPage
-                    ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
-                    : "text-gray-400 hover:text-synth-primary"
-                }`}
+                className={getNavIconClass(isPublishPage)}
               >
                 <UploadCloud
-                  className={`w-5 h-5 ${isPublishPage ? "fill-synth-primary/20" : ""}`}
+                  className={`w-5 h-5 ${isPublishPage ? "fill-white/10" : ""}`}
                 />
               </Link>
             ) : null}
@@ -183,28 +184,20 @@ export default function Navbar() {
             <Link
               to="/multiplayer"
               title="Multiplayer"
-              className={`transition-colors ${
-                isMultiplayerPage
-                  ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
-                  : "text-gray-400 hover:text-synth-primary"
-              }`}
+              className={getNavIconClass(isMultiplayerPage)}
             >
               <Users
-                className={`w-6 h-6 ${isMultiplayerPage ? "fill-synth-primary/20" : ""}`}
+                className={`w-6 h-6 ${isMultiplayerPage ? "fill-white/10" : ""}`}
               />
             </Link>
 
             <Link
               to="/local"
               title="Local Vault"
-              className={`transition-colors ${
-                isLocalPage
-                  ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
-                  : "text-gray-400 hover:text-synth-primary"
-              }`}
+              className={getNavIconClass(isLocalPage)}
             >
               <HardDrive
-                className={`w-6 h-6 ${isLocalPage ? "fill-synth-primary/20" : ""}`}
+                className={`w-6 h-6 ${isLocalPage ? "fill-white/10" : ""}`}
               />
             </Link>
 
@@ -213,21 +206,17 @@ export default function Navbar() {
               to="/favorites"
               onClick={handleFavoritesClick}
               title="Cloud Favorites"
-              className={`transition-colors ${
-                isFavoritesPage
-                  ? "text-synth-primary drop-shadow-[0_0_8px_rgba(255,77,143,0.4)]"
-                  : "text-gray-400 hover:text-synth-primary"
-              }`}
+              className={getNavIconClass(isFavoritesPage)}
             >
               <Heart
-                className={`w-6 h-6 ${isFavoritesPage ? "fill-synth-primary" : ""}`}
+                className={`w-6 h-6 ${isFavoritesPage ? "fill-white/20" : ""}`}
               />
             </Link>
 
             {user ? (
               <div className="flex items-center gap-3">
                 {isDeveloper && (
-                  <span className="hidden sm:flex items-center gap-1 bg-synth-primary/10 border border-synth-primary/30 text-synth-primary px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest cursor-default">
+                  <span className="hidden sm:flex items-center gap-1 rounded-md border border-synth-border bg-synth-surface px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-widest text-white cursor-default">
                     <Code className="w-3 h-3" /> Dev
                   </span>
                 )}
@@ -239,7 +228,7 @@ export default function Navbar() {
                   >
                     <Avatar
                       alt="User Avatar"
-                      className="border-2 border-transparent transition-all ring-0 hover:border-synth-primary hover:shadow-glow-primary-sm"
+                      className="border-2 border-transparent transition-colors ring-0 hover:border-synth-border"
                       loading="eager"
                       name={dbUsername || user.email}
                       src={dbAvatarUrl}
@@ -247,9 +236,9 @@ export default function Navbar() {
                   </button>
 
                   {isDropdownOpen && (
-                    <div className="absolute right-0 mt-1 w-48 bg-synth-surface border border-synth-border rounded-xl shadow-glow-card py-2 z-50 backdrop-blur-xl">
+                    <div className="absolute right-0 mt-2 w-48 rounded-lg border border-synth-border bg-synth-surface py-2 shadow-card z-50">
                       <div className="px-4 py-2 border-b border-synth-border mb-2">
-                        <p className="text-sm text-gray-400 truncate">
+                        <p className="text-sm text-synth-secondary truncate">
                           Signed in as
                         </p>
                         <p className="text-sm font-bold text-white truncate flex items-center gap-1.5">
@@ -289,12 +278,12 @@ export default function Navbar() {
             ) : (
               <Link
                 to="/login"
-                className="flex items-center gap-3 bg-synth-surface hover:bg-synth-elevated border border-synth-border hover:border-synth-primary/45 py-1.5 pl-1.5 pr-4 rounded-full transition-all group shadow-glow-primary-sm hover:shadow-glow-primary"
+                className="flex items-center gap-3 rounded-md border border-synth-border bg-synth-surface py-1.5 pl-1.5 pr-4 transition-colors group hover:bg-synth-elevated"
               >
-                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-synth-primary to-synth-secondary flex items-center justify-center shadow-glow-primary-sm">
-                  <UserIcon className="w-4 h-4 text-black" />
+                <div className="w-8 h-8 rounded bg-synth-elevated flex items-center justify-center">
+                  <UserIcon className="w-4 h-4 text-white" />
                 </div>
-                <span className="text-sm font-medium text-gray-300 group-hover:text-white">
+                <span className="text-sm font-medium text-white">
                   Sign In
                 </span>
               </Link>

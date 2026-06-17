@@ -96,7 +96,7 @@ export default function ResetPassword() {
   if (success) {
     return (
       <div className="min-h-[85vh] flex items-center justify-center p-4">
-        <div className="w-full max-w-md bg-synth-surface/85 backdrop-blur-xl border border-synth-border rounded-2xl shadow-glow-card p-12 text-center ring-1 ring-synth-primary/10">
+        <div className="w-full max-w-md bg-synth-surface border border-synth-border rounded-lg shadow-card p-12 text-center">
           <CheckCircle2 className="w-16 h-16 text-green-400 mx-auto mb-6" />
           <h2 className="text-3xl font-bold text-white mb-2">
             Password Updated
@@ -109,9 +109,9 @@ export default function ResetPassword() {
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-synth-surface/85 backdrop-blur-xl border border-synth-border rounded-2xl shadow-glow-card p-8 ring-1 ring-synth-primary/10">
+      <div className="w-full max-w-md bg-synth-surface border border-synth-border rounded-lg shadow-card p-8">
         <div className="text-center mb-8">
-          <Gamepad2 className="w-12 h-12 text-synth-primary mx-auto mb-4 drop-shadow-[0_0_16px_rgba(255,77,143,0.5)]" />
+          <Gamepad2 className="w-12 h-12 text-synth-secondary mx-auto mb-4" />
           <h2 className="text-3xl font-bold text-white mb-2">
             Create New Password
           </h2>
@@ -135,7 +135,7 @@ export default function ResetPassword() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               minLength={PASSWORD_MIN_LENGTH}
-              className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+              className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-secondary transition-all"
               required
             />
           </div>
@@ -152,7 +152,7 @@ export default function ResetPassword() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               minLength={PASSWORD_MIN_LENGTH}
-              className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+              className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-secondary transition-all"
               required
             />
           </div>
@@ -160,7 +160,7 @@ export default function ResetPassword() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-synth-primary hover:bg-synth-primary-hover text-synth-ink font-bold py-3 rounded-lg shadow-glow-primary-sm transition-all flex justify-center items-center mt-6 active:scale-[0.99]"
+            className="w-full bg-synth-primary hover:bg-synth-primary-hover text-white font-bold py-3 rounded-lg transition-all flex justify-center items-center mt-6 active:scale-[0.99]"
           >
             {loading ? (
               <Loader2 className="w-5 h-5 animate-spin" />

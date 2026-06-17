@@ -22,16 +22,16 @@ export function Pagination({
   );
 
   return (
-    <nav aria-label="Pagination" className="flex flex-wrap items-center gap-2">
+    <nav aria-label="Pagination" className="flex flex-wrap items-center gap-1.5">
       <button
         aria-label="Previous page"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-synth-border bg-synth-surface text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-synth-border bg-transparent text-gray-400 transition-colors hover:border-synth-secondary hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
         disabled={disabled || safeCurrentPage === 1}
         onClick={() => onPageChange(safeCurrentPage - 1)}
         title="Previous page"
         type="button"
       >
-        <ChevronLeft aria-hidden="true" className="h-5 w-5" />
+        <ChevronLeft aria-hidden="true" className="h-4 w-4" />
       </button>
 
       {visiblePageNumbers.map((page, index) => {
@@ -39,7 +39,7 @@ export function Pagination({
         const needsGap = previousPage && page - previousPage > 1;
 
         return (
-          <span className="inline-flex items-center gap-2" key={page}>
+          <span className="inline-flex items-center gap-1.5" key={page}>
             {needsGap && (
               <span aria-hidden="true" className="px-1 text-sm text-gray-600">
                 ...
@@ -48,10 +48,10 @@ export function Pagination({
             <button
               aria-current={page === safeCurrentPage ? "page" : undefined}
               aria-label={`Page ${page}`}
-              className={`h-10 min-w-10 rounded-lg border px-3 text-sm font-bold transition-colors ${
+              className={`relative h-8 min-w-8 rounded-full px-2 text-sm font-bold transition-colors ${
                 page === safeCurrentPage
-                  ? "border-synth-primary bg-synth-primary/15 text-white"
-                  : "border-synth-border bg-synth-surface text-gray-400 hover:border-synth-primary/70 hover:text-white"
+                  ? "text-white after:absolute after:bottom-0.5 after:left-1/2 after:h-0.5 after:w-4 after:-translate-x-1/2 after:rounded-full after:bg-synth-secondary"
+                  : "text-gray-500 hover:text-white"
               }`}
               disabled={disabled}
               onClick={() => onPageChange(page)}
@@ -65,13 +65,13 @@ export function Pagination({
 
       <button
         aria-label="Next page"
-        className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-synth-border bg-synth-surface text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-synth-border bg-transparent text-gray-400 transition-colors hover:border-synth-secondary hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
         disabled={disabled || safeCurrentPage === safeTotalPages}
         onClick={() => onPageChange(safeCurrentPage + 1)}
         title="Next page"
         type="button"
       >
-        <ChevronRight aria-hidden="true" className="h-5 w-5" />
+        <ChevronRight aria-hidden="true" className="h-4 w-4" />
       </button>
     </nav>
   );

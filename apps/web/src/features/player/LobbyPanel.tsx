@@ -59,11 +59,11 @@ export function LobbyPanel({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="inline-flex h-10 items-center gap-2 rounded-lg border border-synth-primary/40 bg-synth-primary/10 px-4 text-sm font-bold text-white shadow-glow-primary-sm transition-colors hover:border-synth-primary/80 hover:bg-synth-primary/20"
+        className="inline-flex h-10 items-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-bold text-white transition-colors hover:bg-synth-elevated"
       >
-        <Users className="h-4 w-4 text-synth-primary" />
+        <Users className="h-4 w-4 text-synth-secondary" />
         Lobby
-        <span className="rounded-full border border-synth-primary/30 bg-synth-bg/70 px-2 py-0.5 text-[10px] font-semibold text-gray-300">
+        <span className="rounded-full border border-synth-border bg-synth-bg px-2 py-0.5 text-[10px] font-semibold text-gray-300">
           {participants.length}
         </span>
         {currentParticipant && (
@@ -97,7 +97,7 @@ export function LobbyPanel({
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-synth-border text-gray-400 transition-colors hover:border-synth-primary/70 hover:text-white"
+                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-synth-border text-gray-400 transition-colors hover:bg-synth-elevated hover:text-white"
                 title="Close lobby"
               >
                 <X className="h-4 w-4" />
@@ -110,14 +110,14 @@ export function LobbyPanel({
                   {shareGuidance ? "LAN Invite" : "Spectator Invite"}
                 </p>
                 <div className="flex items-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-3 py-2">
-                  <Link2 className="h-4 w-4 shrink-0 text-synth-primary" />
+                  <Link2 className="h-4 w-4 shrink-0 text-synth-secondary" />
                   <span className="min-w-0 flex-1 truncate text-xs text-gray-400">
                     {shareUrl}
                   </span>
                   <button
                     type="button"
                     onClick={copyShareUrl}
-                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-synth-border text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white"
+                    className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-synth-border text-gray-300 transition-colors hover:bg-synth-elevated hover:text-white"
                     title={
                       shareGuidance
                         ? "Copy HTTPS join link and invite-code guidance"
@@ -165,10 +165,10 @@ export function LobbyPanel({
                         }
                         className={`h-10 rounded-lg border text-sm font-semibold transition-colors ${
                           isCurrentSlot
-                            ? "border-synth-primary bg-synth-primary/20 text-white"
+                            ? "border-synth-border bg-synth-elevated text-white"
                             : isDisabled
                               ? "cursor-not-allowed border-synth-border bg-synth-bg text-gray-600"
-                              : "border-synth-border bg-synth-surface text-gray-300 hover:border-synth-primary/70 hover:text-white"
+                              : "border-synth-border bg-synth-surface text-gray-300 hover:bg-synth-elevated hover:text-white"
                         }`}
                       >
                         P{playerIndex}
@@ -187,7 +187,7 @@ export function LobbyPanel({
                   <button
                     type="button"
                     onClick={onReleaseSlot}
-                    className="mt-3 h-10 w-full rounded-lg border border-synth-border bg-synth-surface text-sm font-semibold text-gray-300 transition-colors hover:border-synth-primary/70 hover:text-white"
+                    className="mt-3 h-10 w-full rounded-lg border border-synth-border bg-synth-surface text-sm font-semibold text-gray-300 transition-colors hover:bg-synth-elevated hover:text-white"
                   >
                     Watch Only
                   </button>
@@ -214,12 +214,12 @@ export function LobbyPanel({
                           key={participant.socketId}
                           className={`flex min-h-12 items-center justify-between rounded-lg border px-3 ${
                             isCurrent
-                              ? "border-synth-primary/70 bg-synth-primary/10"
+                              ? "border-synth-border bg-synth-elevated"
                               : "border-synth-border bg-synth-surface"
                           }`}
                         >
                           <div className="flex min-w-0 items-center gap-2">
-                            <RoleIcon className="h-4 w-4 shrink-0 text-synth-primary" />
+                            <RoleIcon className="h-4 w-4 shrink-0 text-synth-secondary" />
                             <div className="min-w-0">
                               <span className="block truncate text-sm font-medium text-gray-200">
                                 {participant.displayName}
