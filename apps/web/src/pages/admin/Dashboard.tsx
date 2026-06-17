@@ -248,7 +248,7 @@ export default function Dashboard() {
           </button>
         </div>
       ) : reports.length === 0 ? (
-        <div className="bg-synth-surface border border-synth-border rounded-lg p-12 text-center text-gray-400 shadow-card">
+        <div className="bg-[#2B1720] border border-synth-border rounded-lg p-12 text-center text-gray-400 shadow-card">
           <Check className="w-12 h-12 text-green-500 mx-auto mb-4 opacity-50" />
           <p className="text-xl">Queue is clear.</p>
           <p className="text-sm mt-2">

@@ -121,7 +121,7 @@ export default function AccessLogs() {
         </span>
       </div>
 
-      <div className="bg-synth-surface border border-synth-border rounded-lg overflow-hidden shadow-card">
+      <div className="bg-[#2B1720] border border-synth-border rounded-lg overflow-hidden shadow-card">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -158,7 +158,7 @@ export default function AccessLogs() {
                 logs.map((log) => (
                   <tr
                     key={log.user_id || "guest"}
-                    className="hover:bg-synth-elevated/40 transition-colors"
+                    className="hover:bg-[#351B27] transition-colors"
                   >
                     <td className="p-4">
                       {log.user_id ? (

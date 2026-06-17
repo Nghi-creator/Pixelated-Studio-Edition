@@ -91,7 +91,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
             aria-label="Previous featured game"
             onClick={handlePrev}
             type="button"
-            className="absolute left-4 top-1/2 z-30 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md border border-synth-border bg-synth-surface text-white opacity-0 transition-colors hover:bg-synth-elevated group-hover:opacity-100"
+            className="absolute left-4 top-1/2 z-30 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-synth-border bg-synth-surface text-white opacity-0 transition-colors hover:bg-synth-elevated group-hover:opacity-100"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
@@ -99,7 +99,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
             aria-label="Next featured game"
             onClick={handleNext}
             type="button"
-            className="absolute right-4 top-1/2 z-30 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md border border-synth-border bg-synth-surface text-white opacity-0 transition-colors hover:bg-synth-elevated group-hover:opacity-100"
+            className="absolute right-4 top-1/2 z-30 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-synth-border bg-synth-surface text-white opacity-0 transition-colors hover:bg-synth-elevated group-hover:opacity-100"
           >
             <ChevronRight className="h-6 w-6" />
           </button>

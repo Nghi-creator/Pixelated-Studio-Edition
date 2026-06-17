@@ -57,7 +57,7 @@ export default function EngineConnection() {
         </Link>
       </div>
 
-      <div className="mb-8 border-l-4 border-synth-border pl-3">
+      <div className="mb-8">
         <h1 className="text-3xl font-extrabold text-white">
           Engine Connection
         </h1>
@@ -70,10 +70,10 @@ export default function EngineConnection() {
           "Pair locally or join with an invite code",
         ].map((step, index) => (
           <div
-            className="flex items-center gap-3 rounded-lg border border-synth-border bg-synth-surface px-4 py-3"
+            className="flex items-center gap-3 rounded-lg border border-[#6A2941] bg-[#2B1720] px-4 py-3"
             key={step}
           >
-            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-synth-border bg-synth-elevated text-xs font-bold text-white">
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#D03A79] bg-[#A6004B] text-xs font-bold text-white">
               {index + 1}
             </span>
             <span className="text-sm font-semibold text-white">{step}</span>

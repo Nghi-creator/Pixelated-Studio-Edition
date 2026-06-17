@@ -80,10 +80,10 @@ export default function ReportCard({
 
   return (
     <div
-      className={`bg-synth-surface border rounded-lg p-6 flex flex-col md:flex-row gap-6 justify-between items-start transition-all relative shadow-card ${
+      className={`bg-[#2B1720] border rounded-lg p-6 flex flex-col md:flex-row gap-6 justify-between items-start transition-all relative shadow-card ${
         showLockBadge || isPendingOtherAdmin
           ? "border-synth-secondary/40"
-          : "border-synth-border hover:bg-synth-elevated/40"
+          : "border-synth-border hover:bg-[#351B27]"
       }`}
     >
       {/* Left Side: The Content & Details */}

@@ -183,7 +183,7 @@ export default function Publish() {
         </Link>
       </div>
 
-      <div className="mb-10 border-l-4 border-synth-border pl-3">
+      <div className="mb-10">
         <h2 className="text-3xl font-extrabold text-white">
           Developer Program
         </h2>

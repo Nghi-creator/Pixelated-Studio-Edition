@@ -17,9 +17,9 @@
               neutral: {
                 paper: "#0B090A",
                 canvas: "#100B0E",
-                surface: "#4A2835",
-                elevated: "#5A3140",
-                border: "#7E465B",
+                surface: "#2B1720",
+                elevated: "#351B27",
+                border: "#5D263A",
                 text: "#FFF7FA",
                 muted: "#CFA4B2",
               },
@@ -33,12 +33,14 @@
               },
               synth: {
                 bg: "#050505",
-                surface: "#4A2835",
-                elevated: "#5A3140",
-                primary: "#B86F88",
-                "primary-hover": "#C97893",
-                secondary: "#D8A4B5",
-                border: "#7E465B",
+                surface: "#2B1720",
+                elevated: "#351B27",
+                primary: "#91516A",
+                "primary-hover": "#A15E78",
+                action: "#9B0048",
+                "action-hover": "#B00052",
+                secondary: "#F38BB4",
+                border: "#5D263A",
                 ink: "#FFFFFF",
               },
             },
@@ -61,16 +63,16 @@
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb {
-        background: #4a2835;
+        background: #2b1720;
         border-radius: 4px;
       }
       ::-webkit-scrollbar-thumb:hover {
-        background: #7e465b;
+        background: #5d263a;
       }
       .docker-recovery-action {
-        border: 1px solid #b86f88;
+        border: 1px solid #9B0048;
         border-radius: 0.375rem;
-        background: #b86f88;
+        background: #9B0048;
         color: #ffffff;
         cursor: pointer;
         font-size: 0.75rem;
@@ -82,8 +84,8 @@
           color 150ms ease;
       }
       .docker-recovery-action:hover:not(:disabled) {
-        border-color: #5a3140;
-        background: #5a3140;
+        border-color: #B00052;
+        background: #B00052;
         color: #ffffff;
       }
       .docker-recovery-action:disabled {
@@ -223,7 +225,7 @@
 
           <button
             id="launch-web"
-            class="hidden items-center justify-center gap-2 rounded-lg bg-red-500 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-red-600 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+            class="hidden items-center justify-center gap-2 rounded-lg bg-synth-action px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-synth-action-hover active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
             type="button"
           >
             Launch Web

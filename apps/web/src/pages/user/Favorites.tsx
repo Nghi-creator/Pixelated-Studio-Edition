@@ -88,7 +88,7 @@ export default function Favorites() {
             </button>
           </div>
         ) : favorites.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-synth-border bg-synth-surface/70 py-32 text-center">
+          <div className="py-32 text-center">
             <HeartCrack className="w-16 h-16 mx-auto mb-6 text-synth-border" />
             <h3 className="text-2xl font-bold text-gray-300 mb-2">
               No favorites yet
@@ -99,7 +99,7 @@ export default function Favorites() {
             </p>
             <button
               onClick={() => navigate("/")}
-              className="mx-auto flex items-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-8 py-3 font-bold text-white transition-colors hover:bg-synth-elevated"
+              className="mx-auto flex items-center gap-2 rounded-lg border border-synth-border bg-synth-bg px-8 py-3 font-bold text-white transition-colors hover:bg-synth-surface"
             >
               <Gamepad2 className="w-5 h-5" /> Browse Games
             </button>

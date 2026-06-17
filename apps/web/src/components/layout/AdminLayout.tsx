@@ -95,10 +95,10 @@ export default function AdminLayout() {
   return (
     <div className="flex h-screen bg-synth-bg text-white overflow-hidden">
       {/* 1. The Sidebar */}
-      <aside className="w-64 bg-synth-surface border-r border-synth-border flex flex-col flex-shrink-0 shadow-panel">
+      <aside className="w-64 bg-[#2B1720] border-r border-synth-border flex flex-col flex-shrink-0 shadow-panel">
         {/* Brand Header */}
         <div className="h-20 flex items-center px-6 border-b border-synth-border">
-          <ShieldAlert className="w-6 h-6 text-synth-secondary mr-3" />
+          <ShieldAlert className="w-6 h-6 text-white mr-3" />
           <span className="text-xl font-extrabold tracking-wider text-white">
             MOD PANEL
           </span>
@@ -116,8 +116,8 @@ export default function AdminLayout() {
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   isActive
-                    ? "bg-synth-elevated text-white font-bold border border-synth-border"
-                    : "text-synth-secondary hover:bg-synth-elevated/70 hover:text-white font-medium border border-transparent"
+                    ? "border border-[#C02066] bg-[#9B0048] text-white font-bold"
+                    : "text-white hover:bg-synth-elevated/70 font-medium border border-transparent"
                 }`}
               >
                 <Icon
@@ -133,7 +133,7 @@ export default function AdminLayout() {
         <div className="p-4 border-t border-synth-border space-y-2">
           <Link
             to="/"
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-synth-secondary hover:bg-synth-elevated/70 hover:text-white transition-all font-medium"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-white hover:bg-synth-elevated/70 transition-all font-medium"
           >
             <ArrowLeft className="w-5 h-5" />
             Back to Main Site

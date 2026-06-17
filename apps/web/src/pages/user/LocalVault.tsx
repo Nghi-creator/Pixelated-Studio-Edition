@@ -225,7 +225,7 @@ export default function LocalVault() {
         </Link>
       </div>
 
-      <div className="mb-8 border-l-4 border-synth-border pl-3">
+      <div className="mb-8">
         <h2 className="text-3xl font-extrabold text-white">
           Local Vault
         </h2>
@@ -269,8 +269,8 @@ export default function LocalVault() {
           isEnginePaired ? "cursor-pointer" : "cursor-not-allowed opacity-60"
         } ${
           isDragging
-            ? "border-synth-secondary bg-synth-elevated"
-            : "border-synth-border bg-synth-surface hover:bg-synth-elevated"
+            ? "border-[#C01662] bg-[#2B1720]"
+            : "border-synth-border bg-synth-bg hover:border-[#7E3250] hover:bg-[#120A0E]"
         }`}
       >
         <input
@@ -286,7 +286,7 @@ export default function LocalVault() {
           <Loader2 className="w-12 h-12 text-white animate-spin mb-4" />
         ) : (
           <UploadCloud
-            className={`w-12 h-12 mb-4 transition-colors ${isDragging ? "text-white" : "text-synth-secondary"}`}
+            className={`w-12 h-12 mb-4 transition-colors ${isDragging ? "text-white" : "text-[#F38BB4]"}`}
           />
         )}
 
@@ -302,21 +302,26 @@ export default function LocalVault() {
 
       {/* THE LOCAL GAME GRID */}
       {isLoadingGames ? (
-        <div className="text-center py-20 text-gray-500 bg-synth-surface rounded-lg border border-synth-border">
+        <div className="text-center py-16 text-gray-500">
           <Loader2 className="w-10 h-10 mx-auto mb-4 animate-spin text-white" />
           <p className="text-xl">Loading Local Vault...</p>
         </div>
       ) : localGames.length === 0 ? (
-        <div className="text-center py-20 text-gray-500 bg-synth-surface rounded-lg border border-synth-border">
-          <Gamepad2 className="w-12 h-12 mx-auto mb-4 text-synth-secondary opacity-60" />
-          <p className="text-xl">
+        <div className="mx-auto max-w-xl border-t border-synth-border/70 py-10 text-center text-gray-500">
+          <Gamepad2 className="w-10 h-10 mx-auto mb-4 text-[#F38BB4] opacity-70" />
+          <p className="text-lg text-gray-400">
             {isEnginePaired
               ? "Your local vault is empty."
               : "Pair the local engine to view your vault."}
           </p>
+          {isEnginePaired && (
+            <p className="mt-2 text-sm leading-6 text-gray-600">
+              Upload a `.nes` ROM above and it will appear here.
+            </p>
+          )}
           {vaultMessage?.tone === "error" && (
             <button
-              className="mt-4 rounded-lg border border-synth-border bg-synth-elevated px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-synth-surface"
+              className="mt-4 rounded-lg border border-synth-border bg-synth-bg px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-synth-surface"
               onClick={() => fetchLocalGames(userId)}
               type="button"
             >

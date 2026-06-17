@@ -18,7 +18,7 @@ const multiplayerBackState = {
 export function CloudGameCard({ game }: { game: ApiGame }) {
   return (
     <Link
-      className="group overflow-hidden rounded-lg border border-synth-border bg-synth-surface transition-colors hover:bg-synth-elevated"
+      className="group overflow-hidden rounded-lg border border-synth-border bg-synth-bg transition-colors hover:bg-synth-surface"
       state={multiplayerBackState}
       to={`/play/${game.id}`}
     >
@@ -45,7 +45,7 @@ export function CloudGameCard({ game }: { game: ApiGame }) {
 export function LocalGameCard({ game }: { game: LocalGame }) {
   return (
     <Link
-      className="group flex min-h-44 flex-col justify-between rounded-lg border border-synth-border bg-synth-surface p-4 transition-colors hover:bg-synth-elevated"
+      className="group flex min-h-44 flex-col justify-between rounded-lg border border-synth-border bg-synth-bg p-4 transition-colors hover:bg-synth-surface"
       state={multiplayerBackState}
       to={`/play/${encodeURIComponent(game.id)}`}
     >
@@ -69,7 +69,7 @@ export function MultiplayerGameGridSkeleton({ source }: { source: GameSource }) 
       {Array.from({ length: 10 }, (_, index) =>
         source === "cloud" ? (
           <div
-            className="overflow-hidden rounded-lg border border-synth-border bg-synth-surface"
+            className="overflow-hidden rounded-lg border border-synth-border bg-synth-bg"
             key={index}
           >
             <Skeleton className="aspect-[4/5] w-full rounded-none" />
@@ -80,7 +80,7 @@ export function MultiplayerGameGridSkeleton({ source }: { source: GameSource }) 
           </div>
         ) : (
           <div
-            className="flex min-h-44 flex-col justify-between rounded-lg border border-synth-border bg-synth-surface p-4"
+            className="flex min-h-44 flex-col justify-between rounded-lg border border-synth-border bg-synth-bg p-4"
             key={index}
           >
             <div>

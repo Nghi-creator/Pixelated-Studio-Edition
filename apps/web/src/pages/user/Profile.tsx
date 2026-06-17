@@ -430,7 +430,7 @@ export default function Profile() {
 
         <div className="space-y-8">
           {/* PROFILE SECTION */}
-          <div className="bg-synth-surface border border-synth-border rounded-lg p-6 md:p-8 shadow-card">
+          <div className="bg-[#2B1720] border border-synth-border rounded-lg p-6 md:p-8 shadow-card">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               Public Profile
             </h2>
@@ -531,7 +531,7 @@ export default function Profile() {
           </div>
 
           {/* SECURITY SECTION */}
-          <div className="bg-synth-surface border border-synth-border rounded-lg p-6 md:p-8 shadow-card">
+          <div className="bg-[#2B1720] border border-synth-border rounded-lg p-6 md:p-8 shadow-card">
             <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
               Security
             </h2>
@@ -582,7 +582,7 @@ export default function Profile() {
                 <button
                   type="submit"
                   disabled={savingPassword}
-                  className="bg-synth-elevated hover:bg-synth-border border border-synth-border text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2"
+                  className="bg-synth-primary hover:bg-synth-primary-hover text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2"
                 >
                   {savingPassword ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
