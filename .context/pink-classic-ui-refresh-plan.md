@@ -5,7 +5,7 @@ Date: 2026-06-17
 ## Phase Status
 
 - Phase 1: Complete on 2026-06-17, then recalibrated after visual review. Token migration now targets a concrete black backdrop with dusty dark-pastel pink large surfaces, cleaner pastel pink accents, white text, and deeper pink selected states.
-- Phase 2: Pending.
+- Phase 2: Complete on 2026-06-17. Global shell, navbar, footer, and admin layout now use the flat black backdrop, filled dusty-pink states, and no decorative neon radial/glow treatments.
 - Phase 3: Pending.
 - Phase 4: Pending.
 - Phase 5: Pending.

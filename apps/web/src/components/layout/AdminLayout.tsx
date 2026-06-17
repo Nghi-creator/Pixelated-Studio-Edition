@@ -95,11 +95,11 @@ export default function AdminLayout() {
   return (
     <div className="flex h-screen bg-synth-bg text-white overflow-hidden">
       {/* 1. The Sidebar */}
-      <aside className="w-64 bg-synth-surface border-r border-synth-border flex flex-col flex-shrink-0 shadow-[4px_0_24px_rgba(0,0,0,0.25)]">
+      <aside className="w-64 bg-synth-surface border-r border-synth-border flex flex-col flex-shrink-0 shadow-panel">
         {/* Brand Header */}
         <div className="h-20 flex items-center px-6 border-b border-synth-border">
-          <ShieldAlert className="w-6 h-6 text-synth-secondary mr-3 drop-shadow-[0_0_10px_rgba(255,159,67,0.5)]" />
-          <span className="text-xl font-extrabold tracking-wider bg-gradient-to-r from-white to-synth-secondary/90 bg-clip-text text-transparent">
+          <ShieldAlert className="w-6 h-6 text-synth-secondary mr-3" />
+          <span className="text-xl font-extrabold tracking-wider text-white">
             MOD PANEL
           </span>
         </div>
@@ -116,12 +116,12 @@ export default function AdminLayout() {
                 to={item.path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   isActive
-                    ? "bg-synth-primary/15 text-synth-primary font-bold shadow-glow-primary-sm border border-synth-primary/25"
-                    : "text-gray-400 hover:bg-synth-elevated hover:text-white font-medium border border-transparent"
+                    ? "bg-synth-elevated text-white font-bold border border-synth-border"
+                    : "text-synth-secondary hover:bg-synth-elevated/70 hover:text-white font-medium border border-transparent"
                 }`}
               >
                 <Icon
-                  className={`w-5 h-5 ${isActive ? "fill-current opacity-20" : ""}`}
+                  className={`w-5 h-5 ${isActive ? "fill-white/10" : ""}`}
                 />
                 {item.name}
               </Link>
@@ -133,7 +133,7 @@ export default function AdminLayout() {
         <div className="p-4 border-t border-synth-border space-y-2">
           <Link
             to="/"
-            className="flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-synth-elevated hover:text-white transition-all font-medium"
+            className="flex items-center gap-3 px-4 py-3 rounded-xl text-synth-secondary hover:bg-synth-elevated/70 hover:text-white transition-all font-medium"
           >
             <ArrowLeft className="w-5 h-5" />
             Back to Main Site
@@ -150,12 +150,8 @@ export default function AdminLayout() {
       </aside>
 
       {/* 2. The Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-synth-bg relative">
-        <div
-          className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_90%_10%,rgba(255,77,143,0.08),transparent_50%),radial-gradient(ellipse_60%_40%_at_10%_90%,rgba(255,159,67,0.06),transparent_48%)]"
-          aria-hidden
-        />
-        <div className="relative z-10 p-8 max-w-6xl mx-auto">
+      <main className="flex-1 overflow-y-auto bg-synth-bg">
+        <div className="p-8 max-w-6xl mx-auto">
           <Outlet />
         </div>
       </main>
