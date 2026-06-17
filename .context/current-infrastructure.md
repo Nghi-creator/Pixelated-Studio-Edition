@@ -1,380 +1,145 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-06-14
+Last reviewed: 2026-06-17
 
-## Project Shape
+This is the compact source of truth for the current deployed/local system.
+Implementation history and stale audit detail belong in Git history.
 
-PIXELATED Studio is currently a React + Supabase web app paired with a local Electron desktop orchestrator. The desktop app builds and runs a Docker container that hosts the emulator, captures a virtual display, and streams video/audio to the browser over WebRTC.
+## Top-Level Shape
 
-Top-level areas:
+```text
+apps/web/       Vite React 19 frontend
+apps/desktop/   Electron desktop app, Docker orchestration, HTTPS companion
+engine/runtime/ local engine API, Socket.IO signaling, emulator/runtime image
+services/api/   hosted Fastify control plane
+supabase/       migrations, storage/RLS policy, RPCs
+scripts/        hosted, LAN, release, and smoke tooling
+```
 
-- `apps/web/`: Vite, React 19, TypeScript, Tailwind frontend.
-- `apps/desktop/`: Electron desktop launcher and Docker orchestration UI.
-- `engine/runtime/`: local Express/Socket.IO bridge, Docker image, RetroArch/GStreamer runtime, Python WebRTC sender, and a mixed TypeScript/JavaScript Node runtime that builds to `dist/`.
-- `services/api/`: localhost-first Fastify + TypeScript backend control-plane skeleton.
-- `supabase/`: database, storage, RLS, RPC, and realtime migrations.
-- `assets/`: README/banner architecture imagery.
-- `scripts/hosted/`: hosted auth and signed-in pairing browser smoke checks.
-- `scripts/lan/`: LAN multiplayer smoke, artifact summarization, and their
-  colocated tests.
+## Hosted API
 
-Release packaging note: desktop artifacts are produced from `apps/desktop` with
-`npm run dist`. That script builds `apps/web/dist` first, and electron-builder
-bundles that React production output into the app as `resources/web-dist` for
-the LAN HTTPS companion. It then runs `npm run smoke:release` against the
-unpacked packaged app and fails the release if the archive or bundled resources
-violate the desktop runtime contract.
+`services/api` is the app data boundary. Browser Supabase usage should stay
+limited to auth/session and intentional Storage uploads.
 
-## Backend API
+Owns:
 
-Current status:
+- Supabase JWT verification, roles, and permissions.
+- Catalog, favorites, comments, reactions, profile, submissions, moderation,
+  admin users, and access-log routes.
+- Cloud session creation/verification and backend-approved boot targets.
+- Local pairing metadata without storing desktop engine tokens.
+- Multiplayer lobby metadata, stream metrics, cleanup jobs, and ICE server
+  configuration.
+- Production shared rate limiting through Redis REST when configured.
 
-- Phase 3 localhost skeleton exists in `services/api/`.
-- `services/api/src/routes/` remains the stable flat registration surface.
-  Catalog and moderation route composition, validation contracts, and
-  service/policy helpers live under `services/api/src/modules/catalog/` and
-  `services/api/src/modules/moderation/`.
-- Default local URL is `http://127.0.0.1:4000`.
-- Production API startup defaults to `0.0.0.0` when `NODE_ENV=production` so hosts like Render can detect the open port.
-- `GET /` returns a small liveness response for provider root probes.
-- `GET /health` returns service name, environment, uptime, active rate-limit
-  store mode, and `ok: true`.
-- `GET /ready` returns `503` until the required Supabase backend env vars are
-  configured. Production readiness also requires the shared Redis REST
-  rate-limit store.
-- `GET /me` verifies a Supabase bearer token and returns the authenticated user id/email.
-- `GET /me/permissions` verifies a Supabase bearer token, reads `profiles`, and returns role/profile data plus a small abilities object.
-- `GET /games` and `GET /games/:gameId` read approved game catalog metadata through the API.
-- `GET /games` accepts `page`, `pageSize`, and optional `search`; the backend returns paginated catalog metadata plus a compatibility `featuredGames` list.
-- `GET /games` returns `Cache-Control: public, max-age=30, s-maxage=60` and reports backend catalog cache state through `X-Pixelated-Cache: MISS` or `HIT`.
-- `GET /games/featured` returns an uncached pool of up to 5 homepage hero games with `Cache-Control: no-store`, so banner rotation/random zero-play fallback is not frozen by the public catalog cache. Games with real play counts are ranked by play count; when all sampled play counts are zero, the pool is shuffled and the homepage refreshes it every 30 seconds.
-- `GET /favorites`, `GET /favorites/:gameId`, `PUT /favorites/:gameId`, and `DELETE /favorites/:gameId` manage favorites through the API.
-- `GET /games/:gameId/reactions` and `PUT /games/:gameId/reaction` manage game reactions through the API.
-- `GET /games/:gameId/comments`, `POST /games/:gameId/comments`, `DELETE /comments/:commentId`, and `PUT /comments/:commentId/reaction` manage player comments and comment reactions through the API.
-- `GET /profile`, `PATCH /profile`, and `DELETE /me/account` manage user profile data and account deletion through the API.
-- `POST /games/:gameId/play-count` increments play count through the API instead of direct browser RPC.
-- `POST /moderation/comments/:commentId/report` submits comment reports through the API using the authenticated user id.
-- `POST /admin/reports/:reportId/action` resolves moderation queue actions through the API for ignore, delete-comment, and ban-user actions.
-- `GET /admin/reports` loads the moderation queue through the API for authenticated admins/super admins.
-- `GET /admin/reports` accepts `page` and `pageSize` for server-side moderation queue pagination.
-- `GET /admin/users` and `PATCH /admin/users/:userId` move admin user management through the API.
-- `GET /admin/users` accepts `page`, `pageSize`, and optional `search` for server-side user-management pagination and username filtering.
-- `GET /admin/access-logs` loads access logs through the API for authenticated admins/super admins.
-- `POST /submissions/games` creates developer game submission records through the API for authenticated users.
-- `POST /submissions/games` can optionally send the submission notification server-side when `FORMSPREE_SUBMISSION_URL` is configured.
-- `POST /access-logs` records guest or authenticated session/access logs through the API.
-- `POST /sessions` creates a short-lived backend session for cloud games, persists a hashed session token in Supabase, resolves `games.rom_url || games.rom_filename`, and returns the engine boot target to React.
-- `POST /sessions/:sessionId/verify` verifies a short-lived session token and returns the backend-approved boot target to the local engine.
-- `POST /local-pairings` persists authenticated local-engine pairing intent and endpoint metadata without storing the desktop pairing token.
-- `GET /local-pairings/current` and `DELETE /local-pairings/current` expose/clear the current user's local pairing metadata.
-- `PUT /multiplayer/lobbies/:sessionId` persists authenticated host-owned multiplayer lobby metadata without storing engine tokens.
-- `GET /multiplayer/lobbies/recent` returns the authenticated host's recent active multiplayer lobbies.
-- `DELETE /multiplayer/lobbies/:sessionId` marks the authenticated host's lobby ended.
-- `POST /metrics/stream` persists authenticated, sampled WebRTC telemetry snapshots.
-- `GET /metrics/stream/recent` returns recent persisted telemetry snapshots for the authenticated user.
-- `GET /webrtc/ice-servers` returns authenticated WebRTC ICE configuration. It always supports configured STUN URLs and can issue short-lived coturn REST credentials when `TURN_URLS` and `TURN_SHARED_SECRET` are configured.
-- The API schedules control-plane retention cleanup on startup.
-- Cleanup deletes expired/stopped backend sessions and stream metrics older than `STREAM_METRIC_RETENTION_DAYS`.
-- CORS allows local Vite origins and the hosted Vercel origin.
-- API CORS origin matching normalizes trailing slashes to avoid deploy config mistakes.
-- Supabase anon/service clients are scaffolded and used by auth/permissions routes when API env vars are configured.
-- `services/api/.env` exists locally and is ignored; production keys live on the backend host.
-- API cleanup cadence is controlled by `CONTROL_PLANE_CLEANUP_INTERVAL_MS`, defaulting to one hour.
-- Session verification, comments, reactions, play counts, and reports use
-  atomic shared fixed-window counters when `RATE_LIMIT_REDIS_REST_URL` and
-  `RATE_LIMIT_REDIS_REST_TOKEN` are configured. Redis calls have a bounded
-  timeout and fall back to the bounded per-instance limiter during outages.
-- The production Render API currently reports the Upstash-compatible Redis
-  rate-limit store active and passes the shared-store readiness check.
-- Submission and stream-metric throttles coordinate through existing Supabase
-  rows rather than Redis.
-- `services/api/tests/` has a focused `npm run test` suite for persisted sessions, local pairings, stream metrics, and cleanup behavior.
-- API tests also cover the backend-owned data boundary for catalog/favorites, comment ownership/reactions, profile update/account deletion, admin user authorization, and admin access-log authorization.
-- `npm run smoke:staging` verifies the hosted catalog cache contract, the uncached featured route, signed-in identity/permissions, access-log write/upsert schema, admin access-log summary RPC schema when authorized, authenticated submission upload cleanup in Supabase Storage, local pairing restore, multiplayer lobby create/update/recent/delete, cloud session verification, and stream metric persistence.
-- `npm run predeploy:hosted` runs the strict hosted access-log schema probe first
-  after automatically signing in a dedicated staging admin smoke account, then
-  runs the submission cleanup storage-policy probe before typecheck, lint, and
-  build. A bearer token remains available as a local override. It is the
-  predeploy gate for both Render API and Vercel web deploys so missing
-  `public.access_logs`, `public.admin_access_log_summary`, or
-  `submissions/{userId}/...` delete-policy migrations fail before deployment.
-- Root scripts expose `npm run verify:api`, `npm run check:access-log-schema`,
-  `npm run check:submission-cleanup-policy`, and `npm run predeploy:hosted`.
-  `.github/workflows/hosted-api-deploy-gate.yml` runs the local API contract on
-  pull requests and the real hosted predeploy gate on `main`, manual dispatch,
-  or reusable deploy-workflow calls.
-- On 2026-05-26, the local API passed pre-hosting checks after the project owner filled `services/api/.env`: typecheck, lint, build, `/health`, `/ready`, protected-route 401 behavior, and Vercel-origin CORS.
-- `apps/web/src/lib/apiClient.ts` calls the API with the current Supabase access token.
-- The web API client uses `VITE_API_URL` when configured. If it is missing, localhost browsers fall back to `http://127.0.0.1:4000`, while non-local browser hosts fall back to `https://pixelated-api-services.onrender.com` to avoid production builds accidentally calling viewer-local localhost.
-- Cloud/library game boot, game catalog reads, favorites, reactions, comments, profiles, player play-count tracking, game submission metadata/notification, access logging, admin user management, admin access-log reads, admin reports, and comment reporting now depend on the API.
-- The web app has no direct Supabase table/RPC/realtime calls under `apps/web/src`; Supabase remains in the browser for auth/session management and Storage uploads.
-- `supabase/migrations/20260527111500_api_owned_social_writes.sql` was pushed to hosted Supabase on 2026-05-27, removing direct browser data policies for workflows now owned by the API.
-- Hosted Supabase access logs need `supabase/migrations/20260603090000_repair_access_logs_path.sql` pushed after a 2026-06-03 schema-drift check found `public.access_logs.path` missing in production. The hosted staging smoke now probes this contract automatically by writing/updating one unique access-log session, and the API labels recognized Supabase column/index/RPC mismatches as `access_log_schema_drift` with the relevant repair migrations.
-- Access logging is now session-oriented instead of route-oriented. The Vercel web app creates one browser-session id in `sessionStorage`, posts it to the API on app entry/auth transitions, and the API upserts `public.access_logs` by `session_id`. Admin access logs are summarized through `public.admin_access_log_summary`, showing user, first seen, last seen, and session count instead of individual paths.
+Important runtime checks:
+
+- `GET /`, `HEAD /`, `GET /health`, `GET /ready`.
+- Production must listen on `0.0.0.0`.
+- `/ready` requires Supabase config and production shared rate-limit store.
+
+Primary gates:
+
+- `npm run verify:api`
+- `npm run verify:hosted-contract`
+- `npm run predeploy:hosted` with staging secrets
 
 ## Web App
 
-Runtime stack:
+`apps/web` owns the user experience and browser orchestration.
 
-- Vite + React + TypeScript.
-- `@supabase/supabase-js` for auth/session management and direct Storage uploads.
-- `apps/web/src/lib/apiClient.ts` for app data reads/writes through `services/api`.
-- `apps/web/src/lib/auth/` owns browser auth infrastructure,
-  `apps/web/src/lib/engine/` owns reusable engine connection state/hooks, and
-  `apps/web/src/lib/webrtc/` owns shared peer/session/input/telemetry behavior.
-- `apps/web/src/features/` owns feature-specific UI and hooks; `.tsx` modules
-  contain JSX while `.ts` modules contain non-JSX logic in the same feature
-  boundary.
-- `socket.io-client` connects directly to the local engine at `http://localhost:8080`.
-- The web app centralizes the engine base URL in
-  `apps/web/src/lib/engine/engineConfig.ts`; override with `VITE_ENGINE_URL`.
-- Routes are declared in `apps/web/src/App.tsx`.
-- The Vercel project uses `apps/web` as its Root Directory, and
-  `apps/web/vercel.json` rewrites direct route requests to `/index.html` so
-  React `BrowserRouter` routes survive hosted browser refreshes.
+Main routes:
 
-Main user-facing routes:
+- `/`: cloud library
+- `/engine`: engine connection and pairing
+- `/play/:id`: player and WebRTC stream
+- `/local`: Local Vault
+- `/multiplayer`: LAN/multiplayer setup
+- `/favorites`, `/profile`, `/publish`, `/login`, `/reset-password`
+- `/admin`, `/admin/users`, `/admin/logs`
 
-- `/`: cloud game library.
-- `/engine`: shared desktop-engine connection and pairing setup.
-- `/play/:id`: WebRTC player plus reactions/comments.
-- `/local`: local vault for uploaded `.nes` files on the local engine.
-- `/multiplayer`: LAN host/join setup and game selection.
-- `/favorites`, `/profile`, `/publish`, `/login`, `/reset-password`.
+Key behaviors:
 
-Admin routes:
+- Uses `apps/web/src/lib/apiClient.ts` for app data through `services/api`.
+- Uses Supabase client for auth/session and Storage uploads.
+- Stores engine URL/token in browser local storage.
+- Requires engine pairing for `/play/:id`, `/local`, and `/multiplayer`.
+- Cloud game boot asks the API for a signed session before asking the local
+  engine to boot.
+- Local Vault talks directly to the paired local engine.
+- WebRTC receiver, input capture, retry state, and telemetry live under
+  `apps/web/src/lib/webrtc/` and player feature modules.
+- Connection monitor clears raw/invalid tokens on explicit rejection, while
+  companion tokens survive transient network/proxy probe failures.
 
-- `/admin`: moderation queue.
-- `/admin/users`: user management.
-- `/admin/logs`: access logs.
+## Desktop App
 
-Current important frontend behaviors:
+`apps/desktop` owns local engine lifecycle and the LAN HTTPS companion.
 
-- `lib/webrtc/useWebRTC.ts` owns React stream/status lifecycle while helper
-  modules resolve game boot targets, create WebRTC peer connections, and
-  forward keyboard input.
-- For cloud/library games, `useWebRTC` asks the backend API to create a session before emitting `start-game` with `mode: "cloud"` and the backend `sessionToken` to the local engine.
-- The prompt-only engine token flow has been replaced by a dedicated `/engine` connection page linked from the navbar.
-- `/play/:id`, `/local`, and `/multiplayer` require a saved engine token. Unpaired visits redirect to `/engine` and return to the requested route after successful pairing.
-- The navbar engine plug shows whether this browser currently has an engine token saved; pairing changes update it immediately.
-- The pairing panel classifies local, LAN, and custom engine URLs; LAN-looking URLs must match an engine reporting `exposureMode: "lan"` from `/health`.
-- Pairing errors now distinguish rejected tokens, local-only engines reached through LAN URLs, unreachable LAN hosts, and likely HTTPS-hosted-app to HTTP-LAN browser blocking.
-- Hosted Vercel to HTTP LAN engine pairing was blocked by Chrome with `LocalNetworkAccessPermissionDenied` during a 2026-05-28 smoke attempt, so LAN multiplayer still needs a local HTTPS or browser-approved private-network access strategy.
-- The desktop pairing token remains browser-local in `localStorage`; the backend only receives the engine URL/intent metadata.
-- Pairing remains browser-local and is completed before the player mounts, keeping active play and Local Vault screens focused on their primary tasks.
-- `useWebRTC` sends sampled telemetry to the API every five seconds when authenticated; telemetry remains visible in the developer toggle.
-- `useWebRTC` asks the API for ICE servers before creating the browser peer connection. If the API is unavailable or the user is unsigned, it falls back to Google STUN.
-- Failed or long-disconnected WebRTC sessions now show a retry action that creates a fresh session id and restarts negotiation without leaving the player page.
-- `/play/:id` is composed from `apps/web/src/features/player/` hooks/components for stream display, telemetry, metadata, reactions, comments, reporting, and play-count tracking.
-- The player page now includes a local lobby panel. It displays participants, host/player/spectator roles, assigned player slots, and a copyable `?session=<id>&role=spectator` invite URL.
-- Guest player pages opened with a session URL join the existing local-engine session without emitting `start-game`; the engine replays `python-ready` for late joiners when the requested game session is already active.
-- Guests can request/release player slots through the lobby panel. Input is attached only when the local participant owns a player slot.
-- The lobby panel shows connected participants and lets the host remove non-host guests through the engine `lobby-kick` event.
-- Signed-in hosts publish non-secret lobby snapshots to the backend when local `lobby-state` changes. Anonymous/local-only play continues if that backend call is unauthorized or unavailable.
-- Local vault uploads/deletes ROMs by calling the local engine with `X-User-Id` and `X-Engine-Token` headers.
-- Publishing requires a signed-in non-super-admin user, uploads ROM/images directly from the browser to the authenticated user's folder in Supabase Storage bucket `submissions`, then creates submission metadata and triggers optional notification through the API.
-- Game catalog pagination/search, favorites, comments, reactions, profile updates/deletion, admin user pagination/search, admin reports, and admin access logs are loaded or mutated through the API instead of direct browser Supabase table/RPC/realtime calls.
-- Session tracking calls the API to insert browser-load access logs; the backend derives user id from the optional Supabase bearer token.
+Owns:
 
-## Desktop Orchestrator
+- Docker diagnostics, build/pull/run, health polling, stop/cleanup.
+- Per-run engine token generation and display.
+- Local vs LAN exposure.
+- Companion HTTPS server, QR code, invite codes, launch tickets, and proxying.
+- Connected-browser listing, per-client revoke, and token rotation.
+- Packaged app release smoke.
 
-Runtime stack:
+Packaging:
 
-- Electron main process source in `apps/desktop/main.ts`, compiled to `apps/desktop/dist/main.js`.
-- Preload bridge source in `apps/desktop/preload.ts`, compiled to `apps/desktop/dist/preload.js`.
-- Desktop renderer source in `apps/desktop/renderer.ts` and `apps/desktop/renderer/*.ts`, compiled to `apps/desktop/dist/renderer.js` and `apps/desktop/dist/renderer/*.js`. `apps/desktop/index.html` loads the compiled renderer scripts.
-- Desktop main-process helpers under `apps/desktop/main/` are now TypeScript for Docker orchestration, exposure mode, health polling, config, lifecycle state, and the LAN HTTPS companion server.
-- `apps/desktop/main/companionServer.ts` composes the HTTPS companion while
-  `apps/desktop/main/companion/` owns certificate, invite-state, status-page,
-  and authenticated proxy behavior.
-- `apps/desktop/main/engineController.ts` owns engine lifecycle composition
-  while `apps/desktop/main/engine/launch.ts` owns launch context, LAN invites,
-  and Docker run arguments.
-- Desktop packaging helper source is `apps/desktop/scripts/prepareWebDist.ts`, compiled to `apps/desktop/dist/scripts/prepareWebDist.js`.
-- Uses the local Docker CLI through argument-array `spawn` and `execFile`
-  calls.
-- Packaged releases are built with `cd apps/desktop && npm run dist`; this script runs the React production build first and electron-builder bundles `apps/web/dist` as `resources/web-dist`.
-- `npm run dist` now ends with `npm run smoke:release`, which inspects electron-builder's unpacked packaged `app.asar` plus external resources rather than trusting source or compile output alone.
-- The packaged release smoke requires the packaged main entry, desktop HTML, preload, and every HTML-loaded renderer script; verifies the main process points at the packaged preload/HTML; rejects CommonJS/`require` output in renderer browser scripts; rejects preload imports other than Electron; checks the expected preload IPC API; verifies bundled `resources/web-dist` exactly matches the fresh `apps/web/dist` tree and that its production index references valid assets; and checks the bundled engine runtime Dockerfile.
-- Packaged renderer scripts must compile as browser scripts without CommonJS `exports` references. The sandboxed preload bridge must only use Electron-supported modules; QR generation runs in the main process through `ipcRenderer.invoke("create-companion-qr")`.
-- A June 6, 2026 manual packaged-release smoke caught and fixed an inert UI regression caused by CommonJS renderer output plus a preload-local-module import. The automated packaged release smoke added on June 7 encodes those failure signatures and runs inside the `npm run dist` contract.
+- `cd apps/desktop && npm run dist`
+- Builds `apps/web/dist`, bundles it as `resources/web-dist`, packages Electron,
+  then runs release smoke against the unpacked packaged app.
 
-Current lifecycle:
+## Engine Runtime
 
-1. User clicks initialize in the Electron UI.
-2. Electron checks `docker info`.
-3. Electron builds local image `pixelated-engine` from `engine/runtime/Dockerfile`.
-4. Electron generates a random pairing token for this engine run.
-5. Electron displays the pairing token in the desktop UI for host-local use.
-6. Electron removes any stale `pixelated-node` container.
-7. Electron runs a detached container named `pixelated-node` with `-v pixelated-roms:/roms`. In local mode it publishes `-p 127.0.0.1:8080:8080`; in explicit LAN mode it publishes `-p 0.0.0.0:8080:8080`. It passes an explicit `PIXELATED_ALLOWED_ORIGINS` allowlist containing the hosted Vercel app plus `http://localhost:5173` and `http://127.0.0.1:5173` by default, alongside `PIXELATED_ALLOWED_ROM_HOSTS`, `PIXELATED_API_URL`, `PIXELATED_ENGINE_TOKEN`, `PIXELATED_ENGINE_EXPOSURE_MODE`, and `PIXELATED_ADVERTISED_URLS`.
-8. Electron polls `http://127.0.0.1:8080/health` and only marks the engine successful after it returns `ok: true`.
-9. On stop/window close, Electron removes `pixelated-node`.
+`engine/runtime` is the token-gated local engine service inside Docker.
 
-The desktop UI now receives structured engine lifecycle states: checking Docker,
-pulling image, building image, removing stale container, starting container,
-waiting for health, ready, stopping, stopped, and failed. The launcher still
-builds locally by default, but packaged releases can set
-`PIXELATED_ENGINE_IMAGE` and `PIXELATED_ENGINE_PULL=1` to pull a prebuilt image
-first. Pull failures fall back to a local build unless
-`PIXELATED_ENGINE_BUILD_FALLBACK=0` is set.
+Owns:
 
-Notable constraints:
+- Express HTTP routes and Socket.IO signaling.
+- `/health`, Local Vault upload/list/delete, telemetry routes.
+- Cloud ROM download after backend session verification.
+- RetroArch/camera process lifecycle.
+- WebRTC signaling relay and ICE forwarding.
+- Input routing and lobby/session rooms.
+- Revoked browser client/access identity enforcement.
 
-- Container name and port are fixed.
-- Build happens on user machine from the distributed app folder.
-- Health verifies core local engine dependencies: Xvfb, PulseAudio startup, RetroArch binary/config/core, Python/GStreamer bridge presence, and `/roms` writability.
-- LAN/multiplayer support is planned in `.context/lan-multiplayer-plan.md`. Current engine exposure defaults to loopback-only, with explicit desktop LAN mode available for LAN testing.
-- LAN mode now also starts a desktop-hosted HTTPS companion server on `PIXELATED_COMPANION_PORT`, defaulting to `8090`.
-- The companion server serves the built React app from `apps/web/dist` in development and from bundled `resources/web-dist` in packaged desktop builds. It injects the engine URL override to its own origin and proxies engine HTTP plus Socket.IO/WebSocket traffic to `127.0.0.1:8080`.
-- The companion uses a runtime-generated self-signed certificate under the Electron user data directory. Guests may need to trust/bypass that certificate warning during the first LAN test.
-- The desktop UI displays HTTPS companion join URLs separately from raw LAN engine URLs and renders the first companion join URL as a scan-to-join QR code.
-- LAN mode creates an 8-character invite code that expires after 10 minutes. The companion exposes `POST /invite/redeem` on the HTTPS join page; a valid code returns a short-lived companion credential, not the raw engine token.
-- The companion exposes unauthenticated, non-secret `GET /invite/preflight` state for the guest join page. A successful HTTPS response confirms certificate acceptance for that browser, classifies the invite as active/expired/revoked, probes `127.0.0.1:8080/health`, and reports whether Join is ready.
-- The companion refuses invite redemption with an explicit `host_engine_unavailable` response when its local engine health probe fails. It also rechecks that the invite was not regenerated, revoked, or expired while the probe was running.
-- Hosts can regenerate or revoke the active LAN invite code from the desktop LAN panel without restarting the engine or HTTPS companion. Regeneration replaces the active code and clears unconnected companion credentials; revocation leaves the join page up but makes `/invite/redeem` fail closed until a new code is generated.
-- The companion translates valid companion credentials into the real `X-Engine-Token` header while proxying to `127.0.0.1:8080`, including Socket.IO handshakes through the `companionToken` query parameter.
-- The desktop LAN panel now tells hosts that the guest page runs certificate, invite, and engine checks before enabling Join.
-- `PIXELATED_WEB_DIST_DIR` can override the companion asset directory for custom layouts, but release artifacts should use the bundled `resources/web-dist` contract.
+Runtime pieces:
 
-## Engine Container
-
-Image base:
-
-- `ubuntu:22.04`.
-
-Installed runtime pieces:
-
-- Xvfb virtual display.
-- PulseAudio.
-- GStreamer and WebRTC-related plugins.
-- Python 3 with `python-socketio[client]`.
-- RetroArch.
-- Mesen libretro core compiled from source during Docker build.
-- Node.js 20.
-- Express, Socket.IO, CORS, Multer.
-
-Runtime processes:
-
-- `server.ts`: Express + Socket.IO composition root, compiled to `dist/server.js` for runtime start.
-- `engine/runtime/src/`: local engine modules for config, health/local vault HTTP routes, Socket.IO signaling, ROM download/storage, runtime process control, input injection, and health telemetry. Config, HTTP routes, signaling/session contracts, runtime process control, ROM/session helpers, input helpers, and health/resource telemetry helpers are now TypeScript.
-- Engine runtime source is TypeScript-only. `npm run check` rejects `.js` files
-  under `engine/runtime/src/` before building and validating compiled syntax.
-- `Xvfb :99`: virtual screen.
-- PulseAudio system daemon.
-- RetroArch process per game.
-- `camera.py`: GStreamer `webrtcbin` sender for X11 capture and PulseAudio monitor.
-- `npm run build` compiles the runtime to `dist/`; `npm run check`, `npm test`, and Docker startup use compiled JavaScript.
-
-Data paths:
-
-- Local uploaded ROMs are stored under `/roms/<userId>/`, backed by the named Docker volume `pixelated-roms`.
-- Cloud ROM URLs are downloaded into `/tmp/cloud_game_<uuid>.nes` after HTTPS, host allowlist, size, and timeout validation. The active temp cloud ROM is deleted on session cleanup or when a new game replaces it.
-- Cloud game starts must include `mode: "cloud"` and the backend `sessionToken`; the engine verifies the token through `PIXELATED_API_URL`, requires the verified backend session mode to be `cloud`, and only then uses the backend-approved boot target.
-
-Streaming/signaling:
-
-- `GET /health` is exposed for Electron readiness checks and returns structured subsystem state.
-- `/health` also reports `exposureMode` and `advertisedUrls` so the desktop/web surfaces can distinguish local-only and LAN engine exposure.
-- Browser connects to Node Socket.IO at `localhost:8080`.
-- Node forwards WebRTC offers, answers, and ICE candidates between browser and Python sender inside a Socket.IO room named `session:<id>`.
-- Python connects back to Node at `http://localhost:8080`.
-- Browser receives VP8 video and Opus audio.
-- WebRTC signaling now includes a browser-generated `peerId`. Node places each browser in a peer-specific room so camera answers and ICE candidates route only to the matching browser instead of broadcasting to every viewer in the session.
-- `camera.py` now tracks one GStreamer `webrtcbin` pipeline per peer inside the camera process, allowing multiple viewers to negotiate against the same running game session in principle. A real two-browser Docker/RetroArch smoke is still pending.
-- Viewer cleanup emits `webrtc-peer-disconnect`, letting the camera tear down that peer pipeline without stopping the host game session.
-- `camera.py` writes a small peer-state file so `/health` can report current camera peer count and peer ids during multiplayer smoke tests.
-- `/health` now includes `checks.resources` with camera peer state, Node RSS, and RetroArch/camera process RSS plus average CPU since process start when Linux `/proc` data is available.
-- The local engine now keeps in-memory lobby state per session. The first browser participant becomes `host` with player slot 1; later participants can join as `player` or `spectator`, request/release player slots, and receive `lobby-state` updates.
-- Lobby host permissions gate start, stop, and kick actions engine-side. Host disconnect stops the session; guest disconnect only cleans up that peer/viewer path.
-- React forwards API-issued ICE server config in `start-game`; Node passes it to `camera.py` through `PIXELATED_ICE_SERVERS`; Python configures GStreamer `webrtcbin` with the matching STUN/TURN servers.
-- React forwards the selected stream profile in `start-game`; Node validates bitrate/framerate bounds and passes it to `camera.py` through `PIXELATED_STREAM_PROFILE`; Python applies the profile to GStreamer capture framerate and VP8 target bitrate.
-- React generates the current session id, Node passes it into `camera.py` through `PIXELATED_SESSION_ID`, and both browser/camera sockets join the same room before WebRTC negotiation.
-- React polls browser WebRTC stats once per second for FPS, bitrate, ICE state, packet loss, and jitter. The player hides those metrics by default and exposes them through a persisted developer telemetry toggle.
-- During an active LAN smoke run, the Stream Stats copy action submits the host
-  or guest snapshot through the engine/HTTPS companion. The smoke harness reads
-  the token-protected in-memory capture and writes both snapshots directly into
-  its active artifact bundle; outside a smoke run, the action keeps its
-  clipboard behavior.
-- `scripts/lan/multiplayerSmoke.mjs` can automate the HTTPS companion flow with
-  `--invite-code`: it validates preflight state, redeems a short-lived companion
-  credential, joins the lobby as a spectator through the companion Socket.IO
-  proxy, drives a camera peer-count transition, and verifies disconnect
-  cleanup. Browser certificate trust remains the manual boundary.
-- Root commands expose `npm run smoke:lan`, `npm run smoke:lan-summary`, and
-  `npm run test:smoke`; hosted workflows retain `npm run smoke:hosted-auth` and
-  `npm run smoke:hosted-pairing`.
-- Engine-side download failures and camera/GStreamer failures emit `engine-error` to the browser session.
-
-Input:
-
-- Browser keydown/keyup events are attached by `apps/web/src/lib/webrtcInput.ts` and go through Socket.IO.
-- Browser keydown/keyup events include `playerIndex`, defaulting to player 1 until the lobby UI exposes assigned slots.
-- Node authorizes input against local lobby slot state before injecting any key.
-- Preferred input path is now virtual gamepads: Node forwards normalized controller actions to `input_gamepad.py`, which creates four Linux `uinput` gamepads through Python `evdev`.
-- When `/dev/uinput` is unavailable, Node falls back to X11 keyboard injection for player 1 and player 2 only.
-- Player 3 and player 4 require virtual gamepad support; if unavailable, the engine rejects their input with a clear error.
-- Node executes `xdotool keydown/keyup` against display `:99`.
-- RetroArch config generation enables udev/autodetect and four libretro joypad ports for the virtual gamepad path.
-- React emits `stop-session` during player cleanup; Node stops the active emulator/camera processes and removes the active temp cloud ROM.
+- Xvfb, PulseAudio, RetroArch, Mesen core, GStreamer/Python bridge, Node 20.
+- Docker volume `pixelated-roms` stores Local Vault ROMs.
+- Default Docker publish is loopback-only; LAN publish is explicit desktop mode.
 
 ## Supabase
 
-Used as the persistence/auth/storage provider behind the API:
+Owns:
 
-- Auth.
-- Postgres tables.
-- Storage buckets.
-- Realtime publication.
-- RPC functions.
-- Row Level Security policies.
+- Auth, Postgres, Storage, RLS, and RPCs.
+- Submission Storage bucket policies.
+- Hosted schema/policy state checked by predeploy gates.
 
-Core tables inferred from migrations:
+Current known deployment-sensitive migration:
 
-- `games`: library metadata, ROM filename/url, cover/backdrop/banner, play count, author/dev metadata.
-- `profiles`: auth-linked profile, username, email, avatar, role, ban flag.
-- `favorites`: user-game join table.
-- `likes`, `comments`, `comment_likes`: social reactions and comments.
-- `reported_comments`: moderation queue.
-- `access_logs`: page/session logging.
-- `game_submissions`: developer upload applications.
-- `backend_sessions`: backend-owned playable session records with hashed session tokens and approved boot targets.
-- `local_engine_pairings`: backend-owned local engine pairing intent metadata without desktop pairing secrets.
-- `multiplayer_lobbies`: backend-owned host lobby metadata for multiplayer sessions without desktop engine tokens.
-- `stream_metrics`: sampled WebRTC telemetry for authenticated user sessions.
+```txt
+supabase/migrations/20260614153000_allow_own_submission_cleanup.sql
+```
 
-Storage buckets inferred from migrations:
+## CI/CD
 
-- `avatars`: public avatar images.
-- `default_library`: public library ROM/media assets.
-- `submissions`: public developer submission upload target.
-- `web_roms`: private user ROM bucket from a migration, but the current local vault code uses the local Docker engine instead.
+Key workflows:
 
-Security model today:
+- `.github/workflows/hosted-api-deploy-gate.yml`
+- `.github/workflows/hosted-deploy.yml`
+- `.github/workflows/desktop-release-validation.yml`
 
-- App data reads/writes now route through `services/api`; the browser no longer calls Supabase tables, RPCs, or realtime channels directly under `apps/web/src`.
-- Supabase RLS remains enabled as defense in depth and for storage/auth-adjacent access, while the backend service-role client performs validated control-plane operations.
-- Admin pages still do client-side role checks for routing/UX, but the API performs the real admin/super-admin authorization for admin reads and mutations.
-- Local engine HTTP routes and Socket.IO handshakes require the per-run pairing token generated by Electron.
-- LAN guests should not receive the raw pairing token. They redeem the short-lived desktop invite code against the host's HTTPS companion, store the returned companion credential locally, and the companion maps that credential to the host-local engine token while proxying.
-- Desktop invite regeneration/revocation does not rotate the engine token or restart the container. It only changes the companion-side invite state and clears unconnected companion credentials.
-- Cloud game boot also requires backend-created session intent: `mode: "cloud"` plus a session token that the engine verifies with the API before downloading or booting the approved ROM target.
-- Direct/local React pairing stores the pairing token in browser `localStorage` and sends it through `X-Engine-Token` for REST calls and Socket.IO auth for streaming. Companion joins store a `companion:` credential instead; REST sends the companion credential in `X-Engine-Token`, while Socket.IO sends it as `companionToken` query data for host-side translation.
-- The Python camera bridge receives `PIXELATED_ENGINE_TOKEN` through env and uses it when connecting to Node Socket.IO.
-- The Docker port is published only to host loopback in local mode. Engine CORS stays explicit and permits the hosted Vercel app plus the two local Vite development origins by default; unknown origins remain rejected.
-- Local vault uploads are limited to `.nes` filenames and capped by `PIXELATED_MAX_ROM_SIZE_BYTES`, defaulting to 8 MiB.
-- Developer submission storage uploads now require an authenticated Supabase user, and `game_submissions.submitter_id` records who submitted the game.
-- Direct public inserts into `access_logs` are disabled; access logs are created by the backend service-role client.
-- The pushed hardening migration removes direct browser policies for favorites, likes, comments, comment likes, reported comments, profile updates, and admin access-log reads now that the API/web data boundary is live.
+Important scripts:
 
-## Deployment Model
+- `npm run verify:hosted-contract`
+- `npm run predeploy:hosted`
+- `npm run smoke:hosted-pairing`
+- `npm run smoke:hosted-auth`
+- `npm run smoke:lan`
+- `npm --prefix apps/desktop run smoke:release`
 
-Current likely deployment:
-
-- Web frontend hosted on Vercel or similar static hosting.
-- Supabase hosted project.
-- Local Electron app distributed as `.dmg`, `.exe`, and `.AppImage`.
-- Docker engine runs locally on the user's host.
-- Browser connects to `localhost:8080`, so the cloud web app depends on a local desktop engine for streaming.
-
-This is closer to a hybrid local cloud-gaming node than a fully hosted cloud-gaming service. That is a valid architecture for developer self-hosting, but it has different scaling needs than a centralized cloud fleet.
+Provider auto-deploys should not bypass GitHub deploy gates.

@@ -8,12 +8,10 @@ may describe behavior that has since changed.
 
 - `current-infrastructure.md`: deployed and local architecture, runtime
   boundaries, and operational behavior.
-- `deep-product-audit-2026-06-13.md`: completed optimization ledger, deployment
-  actions, verification status, and remaining environment-dependent work.
-- `directory-structure-audit-2026-06-14.md`: completed repository organization
-  decisions and structural guardrails.
-- `project-flows.md`: detailed product flows; verify older sections against the
-  infrastructure snapshot before implementation.
+- `deep-product-audit-2026-06-13.md`: concise health snapshot, current deploy
+  action, and remaining environment-dependent proof.
+- `project-flows.md`: compact runtime flow map for boot, pairing, gameplay,
+  multiplayer, submissions, and hosted deploys.
 
 ## Active Operational Checklists
 
@@ -24,14 +22,10 @@ may describe behavior that has since changed.
 ## Design And Planning References
 
 - `target-architecture-refurbishment.md`
-- `refurbishment-execution-plan.md`
-- `lan-multiplayer-plan.md`
-- `docker-onboarding-plan.md`
-- `performance-latency-plan.md`
 
 ## Historical Notes And Evidence
 
-- `suggestions.md`: accumulated historical recommendations; not a current
-  backlog.
-- `smoke-artifacts/`: checked-in smoke evidence.
-- `hosted-auth-smoke/` and `hosted-pairing-smoke/`: ignored local smoke output.
+Historical plans, stale recommendation ledgers, checked-in smoke evidence, and
+local hosted smoke bundles have been removed from `.context/`. New smoke output
+should remain transient unless the user explicitly asks to preserve it as
+evidence.
