@@ -80,10 +80,10 @@ export default function ReportCard({
 
   return (
     <div
-      className={`bg-synth-surface border rounded-xl p-6 flex flex-col md:flex-row gap-6 justify-between items-start transition-all relative shadow-glow-card ${
+      className={`bg-synth-surface border rounded-lg p-6 flex flex-col md:flex-row gap-6 justify-between items-start transition-all relative shadow-card ${
         showLockBadge || isPendingOtherAdmin
           ? "border-synth-secondary/40"
-          : "border-synth-border hover:border-synth-primary/35"
+          : "border-synth-border hover:bg-synth-elevated/40"
       }`}
     >
       {/* Left Side: The Content & Details */}
@@ -98,7 +98,7 @@ export default function ReportCard({
         </div>
 
         <div>
-          <h4 className="text-xs font-bold text-synth-primary uppercase tracking-wider mb-2">
+          <h4 className="text-xs font-bold text-synth-secondary uppercase tracking-wider mb-2">
             Content
           </h4>
           <div className="bg-synth-bg p-4 rounded-lg border border-synth-border">
@@ -118,7 +118,7 @@ export default function ReportCard({
             Reported by:{" "}
             <span
               className={
-                isReporter ? "text-synth-primary font-bold" : "text-gray-300"
+                isReporter ? "text-synth-secondary font-bold" : "text-gray-300"
               }
             >
               @{report.profiles?.username || "Unknown"} {isReporter && "(You)"}
@@ -147,7 +147,7 @@ export default function ReportCard({
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             disabled={pending}
-            className="flex items-center gap-2 px-4 py-2 bg-synth-elevated hover:bg-synth-border border border-synth-border text-white text-sm font-bold rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-synth-primary/30 disabled:cursor-wait disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-synth-elevated hover:bg-synth-border border border-synth-border text-white text-sm font-bold rounded-lg transition-colors focus:outline-none disabled:cursor-wait disabled:opacity-50"
           >
             Action{" "}
             <ChevronDown
@@ -156,7 +156,7 @@ export default function ReportCard({
           </button>
 
           {isDropdownOpen && (
-            <div className="absolute right-0 mt-2 w-48 bg-synth-bg border border-synth-border rounded-xl shadow-glow-card py-2 z-50 overflow-hidden backdrop-blur-xl">
+            <div className="absolute right-0 mt-2 w-48 bg-synth-bg border border-synth-border rounded-lg shadow-card py-2 z-50 overflow-hidden">
               <button
                 onClick={() => {
                   setIsDropdownOpen(false);

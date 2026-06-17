@@ -9,7 +9,7 @@ Date: 2026-06-17
 - Phase 3: Complete on 2026-06-17. Library hero, catalog cards, favorites empty state, multiplayer library cards, and library skeleton states now use flatter game-art-first presentation with no neon glow/text-shadow treatments.
 - Phase 4: Complete on 2026-06-17. Engine setup, pairing panel, Local Vault, player stage, controls, lobby, and telemetry now use flat black/dusty-pink styling with no neon glow, gradient, or old hot-pink/orange chart treatments.
 - Phase 5: Complete on 2026-06-17. Auth, reset password, publish, profile, and profile modals now use flat black fields, dusty-pink panels, quiet shadows, and no neon glow/ring/backdrop-blur treatments.
-- Phase 6: Pending.
+- Phase 6: Complete on 2026-06-17. Admin pages/components and the desktop shell now use flat black/dusty-pink styling with quiet shadows and no neon glow, gradient, text-shadow, or backdrop-blur treatments.
 
 ## Short Take
 

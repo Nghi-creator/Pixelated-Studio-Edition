@@ -201,7 +201,7 @@ export default function Dashboard() {
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <LayoutDashboard className="text-synth-primary w-8 h-8 drop-shadow-[0_0_12px_rgba(255,77,143,0.45)]" />
+          <LayoutDashboard className="text-synth-secondary w-8 h-8" />
           Moderation Queue
         </h1>
 
@@ -223,7 +223,7 @@ export default function Dashboard() {
             </select>
           </div>
 
-          <span className="bg-synth-primary/15 text-synth-primary border border-synth-primary/30 px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap">
+          <span className="bg-synth-surface text-white border border-synth-border px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap">
             {totalReports} Pending
           </span>
         </div>
@@ -237,7 +237,7 @@ export default function Dashboard() {
       )}
 
       {loadError ? (
-        <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-8 text-center text-red-200">
+        <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-8 text-center text-red-200">
           <p>{loadError}</p>
           <button
             className="mt-4 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
@@ -248,7 +248,7 @@ export default function Dashboard() {
           </button>
         </div>
       ) : reports.length === 0 ? (
-        <div className="bg-synth-surface border border-synth-border rounded-xl p-12 text-center text-gray-400 shadow-glow-card">
+        <div className="bg-synth-surface border border-synth-border rounded-lg p-12 text-center text-gray-400 shadow-card">
           <Check className="w-12 h-12 text-green-500 mx-auto mb-4 opacity-50" />
           <p className="text-xl">Queue is clear.</p>
           <p className="text-sm mt-2">
