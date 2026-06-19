@@ -5,6 +5,12 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      proof_mode:
+        description: Run non-destructive deploy proof without triggering Render or Vercel deploy hooks.
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: hosted-deploy-${{ github.ref }}
@@ -18,6 +24,8 @@ jobs:
     name: Hosted API deploy gate
     if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/hosted-api-deploy-gate.yml
+    with:
+      proof_mode: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
     secrets: inherit
 
   deploy-render-api:
@@ -34,10 +42,12 @@ jobs:
     steps:
       - name: Require Render deploy configuration
         run: |
-          test -n "$RENDER_API_DEPLOY_HOOK_URL" || {
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}" != "true" ]; then
+            test -n "$RENDER_API_DEPLOY_HOOK_URL" || {
             echo "::error::Missing production environment secret RENDER_API_DEPLOY_HOOK_URL."
             exit 1
-          }
+            }
+          fi
           test -n "$HOSTED_API_URL" || {
             echo "::error::Missing production environment variable HOSTED_API_URL."
             exit 1
@@ -58,9 +68,61 @@ jobs:
           }
           uptime="$(jq --exit-status '.uptimeSeconds | numbers' <<<"$health")"
           echo "started_at_seconds=$(($(date +%s) - uptime))" >> "$GITHUB_OUTPUT"
+          mkdir -p .context/hosted-deploy-proof
+          jq --null-input \
+            --arg mode "${{ (github.event_name == 'workflow_dispatch' && inputs.proof_mode) && 'proof' || 'deploy' }}" \
+            --arg apiUrl "$HOSTED_API_URL" \
+            --argjson health "$health" \
+            --argjson ready "$ready" \
+            --arg startedAtSeconds "$(($(date +%s) - uptime))" \
+            --arg deployHook "${{ (github.event_name == 'workflow_dispatch' && inputs.proof_mode) && 'skipped' || 'pending' }}" \
+            '{
+              mode: $mode,
+              provider: "render",
+              apiUrl: $apiUrl,
+              readiness: {
+                healthOk: ($health.ok == true),
+                readyOk: ($ready.ok == true),
+                rateLimitStore: $health.rateLimitStore,
+                sharedRateLimitStore: $ready.checks.sharedRateLimitStore,
+                startedAtSeconds: ($startedAtSeconds | tonumber)
+              },
+              deployHook: $deployHook
+            }' > .context/hosted-deploy-proof/render-api.json
 
       - name: Trigger Render API deploy
-        run: curl --fail-with-body --request POST "$RENDER_API_DEPLOY_HOOK_URL"
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
+        run: |
+          curl --fail-with-body --request POST "$RENDER_API_DEPLOY_HOOK_URL"
+          jq '.deployHook = "triggered"' .context/hosted-deploy-proof/render-api.json > .context/hosted-deploy-proof/render-api.tmp
+          mv .context/hosted-deploy-proof/render-api.tmp .context/hosted-deploy-proof/render-api.json
+          {
+            echo "## Hosted deploy: Render API"
+            echo
+            echo "- Readiness checks: exercised"
+            echo "- Production deploy hook: triggered"
+            echo "- API URL: $HOSTED_API_URL"
+          } > .context/hosted-deploy-proof/render-api.md
+
+      - name: Record skipped Render API deploy hook
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
+        run: |
+          {
+            echo "## Hosted deploy proof: Render API"
+            echo
+            echo "- Readiness checks: exercised"
+            echo "- Production deploy hook: skipped by proof_mode"
+            echo "- API URL: $HOSTED_API_URL"
+          } > .context/hosted-deploy-proof/render-api.md
+
+      - name: Upload Render deploy proof artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: warn
+          name: hosted-deploy-render-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .context/hosted-deploy-proof/
+          retention-days: 14
 
   deploy-vercel-web:
     name: Deploy Vercel web
@@ -76,10 +138,12 @@ jobs:
     steps:
       - name: Require Vercel deploy configuration
         run: |
-          test -n "$VERCEL_WEB_DEPLOY_HOOK_URL" || {
+          if [ "${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}" != "true" ]; then
+            test -n "$VERCEL_WEB_DEPLOY_HOOK_URL" || {
             echo "::error::Missing production environment secret VERCEL_WEB_DEPLOY_HOOK_URL."
             exit 1
-          }
+            }
+          fi
           test -n "$HOSTED_WEB_URL" || {
             echo "::error::Missing production environment variable HOSTED_WEB_URL."
             exit 1
@@ -89,10 +153,58 @@ jobs:
         id: baseline
         run: |
           curl --fail-with-body --silent --show-error "$HOSTED_WEB_URL/engine" --output current-engine.html
-          echo "html_sha256=$(sha256sum current-engine.html | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+          html_sha256="$(sha256sum current-engine.html | cut -d ' ' -f 1)"
+          echo "html_sha256=$html_sha256" >> "$GITHUB_OUTPUT"
+          mkdir -p .context/hosted-deploy-proof
+          jq --null-input \
+            --arg mode "${{ (github.event_name == 'workflow_dispatch' && inputs.proof_mode) && 'proof' || 'deploy' }}" \
+            --arg webUrl "$HOSTED_WEB_URL" \
+            --arg htmlSha256 "$html_sha256" \
+            --arg deployHook "${{ (github.event_name == 'workflow_dispatch' && inputs.proof_mode) && 'skipped' || 'pending' }}" \
+            '{
+              mode: $mode,
+              provider: "vercel",
+              webUrl: $webUrl,
+              readiness: {
+                engineRouteFetched: true,
+                htmlSha256: $htmlSha256
+              },
+              deployHook: $deployHook
+            }' > .context/hosted-deploy-proof/vercel-web.json
 
       - name: Trigger Vercel web deploy
-        run: curl --fail-with-body --request POST "$VERCEL_WEB_DEPLOY_HOOK_URL"
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
+        run: |
+          curl --fail-with-body --request POST "$VERCEL_WEB_DEPLOY_HOOK_URL"
+          jq '.deployHook = "triggered"' .context/hosted-deploy-proof/vercel-web.json > .context/hosted-deploy-proof/vercel-web.tmp
+          mv .context/hosted-deploy-proof/vercel-web.tmp .context/hosted-deploy-proof/vercel-web.json
+          {
+            echo "## Hosted deploy: Vercel web"
+            echo
+            echo "- /engine readiness fetch: exercised"
+            echo "- Production deploy hook: triggered"
+            echo "- Web URL: $HOSTED_WEB_URL"
+          } > .context/hosted-deploy-proof/vercel-web.md
+
+      - name: Record skipped Vercel web deploy hook
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
+        run: |
+          {
+            echo "## Hosted deploy proof: Vercel web"
+            echo
+            echo "- /engine readiness fetch: exercised"
+            echo "- Production deploy hook: skipped by proof_mode"
+            echo "- Web URL: $HOSTED_WEB_URL"
+          } > .context/hosted-deploy-proof/vercel-web.md
+
+      - name: Upload Vercel deploy proof artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: warn
+          name: hosted-deploy-vercel-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .context/hosted-deploy-proof/
+          retention-days: 14
 
   hosted-pairing-smoke:
     name: Signed-in hosted pairing smoke
@@ -120,6 +232,7 @@ jobs:
           node-version: 22
 
       - name: Require hosted smoke configuration
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
         run: |
           test -n "$HOSTED_SMOKE_EMAIL" || {
             echo "::error::Missing production environment secret HOSTED_SMOKE_EMAIL."
@@ -138,19 +251,48 @@ jobs:
             exit 1
           }
 
+      - name: Record hosted pairing proof mode
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
+        run: |
+          mkdir -p .context/hosted-pairing-smoke/proof
+          jq --null-input \
+            --arg mode proof \
+            --arg renderBaseline "$HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS" \
+            --arg vercelBaseline "$HOSTED_SMOKE_VERCEL_BASELINE_HTML_SHA256" \
+            '{
+              mode: $mode,
+              contractSmoke: "exercised",
+              signedInBrowserSmoke: "skipped",
+              reason: "proof_mode skips production-mutating hosted smoke after readiness proof",
+              renderBaselineStartedAtSeconds: $renderBaseline,
+              vercelBaselineHtmlSha256: $vercelBaseline
+            }' > .context/hosted-pairing-smoke/proof/proof-report.json
+
       - name: Install smoke and desktop dependencies
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
         run: |
           npm ci
           npm ci --prefix apps/desktop
 
+      - name: Install hosted pairing contract dependencies
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
+        run: npm ci
+
       - name: Install Chromium
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
         run: npx playwright install --with-deps chromium
 
       - name: Build desktop companion
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
         run: npm run build --prefix apps/desktop
 
       - name: Run signed-in hosted pairing smoke
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
         run: npm run smoke:hosted-pairing
+
+      - name: Run hosted pairing contract proof
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
+        run: npm run smoke:hosted-pairing -- --contract-only
 
       - name: Upload hosted pairing smoke bundle
         if: always()
@@ -183,6 +325,7 @@ jobs:
           node-version: 22
 
       - name: Require hosted auth smoke configuration
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
         run: |
           test -n "$HOSTED_AUTH_SMOKE_EMAIL" || {
             echo "::error::Missing production environment secret HOSTED_SMOKE_EMAIL."
@@ -197,14 +340,33 @@ jobs:
             exit 1
           }
 
+      - name: Record hosted auth proof mode
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
+        run: |
+          mkdir -p .context/hosted-auth-smoke/proof
+          jq --null-input \
+            --arg mode proof \
+            '{
+              mode: $mode,
+              contractSmoke: "exercised",
+              browserAuthSmoke: "skipped",
+              reason: "proof_mode skips production-mutating hosted auth smoke after readiness proof"
+            }' > .context/hosted-auth-smoke/proof/proof-report.json
+
       - name: Install auth smoke dependencies
         run: npm ci
 
       - name: Install Chromium
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
         run: npx playwright install --with-deps chromium
 
       - name: Run hosted auth regression smoke
+        if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
         run: npm run smoke:hosted-auth
+
+      - name: Run hosted auth contract proof
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
+        run: npm run smoke:hosted-auth -- --contract-only
 
       - name: Upload hosted auth smoke bundle
         if: always()
