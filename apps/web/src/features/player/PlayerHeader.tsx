@@ -32,7 +32,7 @@ export function PlayerHeader({
       ? "bg-green-500"
       : status === "error"
         ? "bg-red-500"
-        : "bg-yellow-500 animate-pulse";
+        : "bg-synth-secondary animate-pulse";
 
   return (
     <div className="w-full max-w-5xl flex flex-col mb-6">

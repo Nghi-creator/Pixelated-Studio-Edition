@@ -137,7 +137,7 @@ export default function ReportCard({
         </div>
       ) : isPendingOtherAdmin ? (
         <div
-          className="px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 text-yellow-500 text-sm font-bold rounded-lg flex items-center gap-2 cursor-help whitespace-nowrap"
+          className="px-4 py-2 bg-synth-primary/10 border border-synth-primary/20 text-synth-secondary text-sm font-bold rounded-lg flex items-center gap-2 cursor-help whitespace-nowrap"
           title="You reported this. Another admin must review it to prevent bias."
         >
           <Clock className="w-4 h-4" /> Awaiting Peer Review

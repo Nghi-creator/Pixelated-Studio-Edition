@@ -140,7 +140,7 @@ async function startCompanion(
     });
     event.reply(
       "server-log",
-      `<span class="text-amber-300">Warning: Desktop HTTPS companion could not start: ${message}</span>`,
+      `<span class="text-synth-secondary">Warning: Desktop HTTPS companion could not start: ${message}</span>`,
     );
   }
 }

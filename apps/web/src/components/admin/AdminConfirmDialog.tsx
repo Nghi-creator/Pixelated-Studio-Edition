@@ -35,7 +35,7 @@ export function AdminConfirmDialog({
             id="admin-confirm-title"
           >
             <AlertTriangle
-              className={isDanger ? "h-5 w-5 text-red-400" : "h-5 w-5 text-amber-300"}
+              className={isDanger ? "h-5 w-5 text-red-400" : "h-5 w-5 text-synth-secondary"}
             />
             {confirmation.title}
           </h2>
@@ -64,7 +64,7 @@ export function AdminConfirmDialog({
               className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-colors disabled:cursor-wait disabled:opacity-60 ${
                 isDanger
                   ? "border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20"
-                  : "border border-amber-400/30 bg-amber-400/10 text-amber-200 hover:bg-amber-400/20"
+                  : "border border-synth-primary/30 bg-synth-primary/10 text-synth-secondary hover:bg-synth-primary/20"
               }`}
               disabled={isPending}
               onClick={onConfirm}

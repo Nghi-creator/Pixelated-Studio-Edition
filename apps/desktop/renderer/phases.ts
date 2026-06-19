@@ -115,7 +115,7 @@
 
     if (status === "active") {
       return {
-        dot: "bg-synth-primary animate-pulse shadow-glow-primary",
+        dot: "bg-synth-primary animate-pulse",
         item: "border-synth-primary/50 bg-synth-primary/10",
         label: "text-white",
         meta: "text-synth-secondary",
@@ -162,14 +162,14 @@
         idle: ["border-synth-border", "bg-[#050810]", "text-gray-500"],
         stopped: ["border-synth-border", "bg-[#050810]", "text-gray-500"],
         starting: [
-          "border-orange-500/50",
-          "bg-orange-500/10",
-          "text-orange-300",
+          "border-synth-primary/50",
+          "bg-synth-primary/10",
+          "text-synth-secondary",
         ],
         stopping: [
-          "border-orange-500/50",
-          "bg-orange-500/10",
-          "text-orange-300",
+          "border-synth-primary/50",
+          "bg-synth-primary/10",
+          "text-synth-secondary",
         ],
         ready: [
           "border-emerald-500/50",

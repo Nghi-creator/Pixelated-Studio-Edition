@@ -24,7 +24,7 @@ export default {
         },
         status: {
           success: "#2F7D5B",
-          warning: "#9A6A20",
+          warning: "#B86F88",
           danger: "#B64242",
         },
         console: {
@@ -46,10 +46,6 @@ export default {
         panel: "0 18px 48px rgba(0, 0, 0, 0.42)",
         card: "0 12px 30px rgba(0, 0, 0, 0.34)",
         pressed: "inset 0 1px 2px rgba(0, 0, 0, 0.34)",
-        "glow-primary": "0 18px 48px rgba(0, 0, 0, 0.42)",
-        "glow-primary-sm": "0 10px 24px rgba(0, 0, 0, 0.30)",
-        "glow-secondary": "0 10px 24px rgba(0, 0, 0, 0.28)",
-        "glow-card": "0 12px 30px rgba(0, 0, 0, 0.34)",
       },
     },
   },
