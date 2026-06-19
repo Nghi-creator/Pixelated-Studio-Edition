@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import {
-  UploadCloud,
   Send,
   ArrowLeft,
   Loader2,
@@ -16,6 +15,7 @@ import {
   validateRomFile,
   validateSubmissionImageFile,
 } from "../../features/publish/publishSubmission";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 
 type FileErrorKey = "banner" | "cover" | "rom";
 
@@ -151,7 +151,7 @@ export default function Publish() {
     return (
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-32 w-full min-h-screen flex flex-col items-center justify-center text-center">
         <div className="w-20 h-20 bg-synth-surface rounded-lg flex items-center justify-center mb-6 border border-synth-border">
-          <CheckCircle className="w-10 h-10 text-synth-secondary" />
+          <PixelIcon className="h-10 w-10 text-synth-secondary" name="publish" />
         </div>
         <h2 className="text-4xl font-extrabold text-white mb-4">
           Application Received!
@@ -304,7 +304,7 @@ export default function Publish() {
                 {romFile ? (
                   <CheckCircle className="w-5 h-5" />
                 ) : (
-                  <UploadCloud className="w-5 h-5" />
+                  <PixelIcon className="h-5 w-5" name="upload" />
                 )}
                 <span className="font-medium text-sm">
                   {romFile ? romFile.name : "Click to attach .nes file"}

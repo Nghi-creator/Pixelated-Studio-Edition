@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { HeartCrack, Gamepad2, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import GameCard from "../../components/user/GameCard";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { FavoritesPageSkeleton } from "../../components/ui/Skeleton";
 import { replaceFavoriteIds } from "../../features/favorites/favoriteState";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 
 interface SavedGame {
   id: string;
@@ -89,7 +90,10 @@ export default function Favorites() {
           </div>
         ) : favorites.length === 0 ? (
           <div className="py-32 text-center">
-            <HeartCrack className="w-16 h-16 mx-auto mb-6 text-synth-border" />
+            <PixelIcon
+              className="mx-auto mb-6 h-16 w-16 text-synth-border"
+              name="favorites"
+            />
             <h3 className="text-2xl font-bold text-gray-300 mb-2">
               No favorites yet
             </h3>
@@ -99,9 +103,9 @@ export default function Favorites() {
             </p>
             <button
               onClick={() => navigate("/")}
-              className="mx-auto flex items-center gap-2 rounded-lg border border-synth-border bg-synth-bg px-8 py-3 font-bold text-white transition-colors hover:bg-synth-surface"
+              className="mx-auto flex items-center rounded-lg border border-synth-border bg-synth-bg px-8 py-3 font-bold text-white transition-colors hover:bg-synth-surface"
             >
-              <Gamepad2 className="w-5 h-5" /> Browse Games
+              Browse Games
             </button>
           </div>
         ) : (

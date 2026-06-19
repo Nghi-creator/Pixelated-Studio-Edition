@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, RefreshCw, Search, Users } from "lucide-react";
+import { Loader2, RefreshCw, Search } from "lucide-react";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
 import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 import {
   AdminConfirmDialog,
   type AdminConfirmation,
@@ -214,7 +215,7 @@ export default function UserManagement() {
       )}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <Users className="text-synth-secondary w-8 h-8" />
+          <PixelIcon className="text-synth-secondary w-8 h-8" name="users" />
           User Management
         </h1>
 

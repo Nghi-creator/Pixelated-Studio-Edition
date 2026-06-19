@@ -1,9 +1,7 @@
 import {
-  CheckCircle2,
   Eye,
   EyeOff,
   Loader2,
-  PlugZap,
   Trash2,
   Wifi,
 } from "lucide-react";
@@ -46,6 +44,7 @@ import {
   parseEngineUrl,
 } from "./pairingUtils";
 import { LanPreflightChecks } from "./LanPreflightChecks";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 
 type EnginePairingPanelProps = {
   compact?: boolean;
@@ -377,11 +376,11 @@ export function EnginePairingPanel({
         <div className="min-w-0 flex-1">
           <div className="mb-3 flex items-center gap-2">
             {pairingState === "paired" ? (
-              <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              <PixelIcon className="h-5 w-5 text-[#C02066]" name="engine-on" />
             ) : engineUrlScope === "lan" ? (
-              <Wifi className="h-5 w-5 text-[#F38BB4]" />
+              <Wifi className="h-5 w-5 text-amber-400" />
             ) : (
-              <PlugZap className="h-5 w-5 text-[#F38BB4]" />
+              <PixelIcon className="h-5 w-5 text-amber-400" name="engine-off" />
             )}
             <h3 className="text-base font-semibold text-white">
               {isCompanionJoin ? "Join Host Engine" : "Local Engine Pairing"}

@@ -22,7 +22,7 @@ function PreflightRow({
 }) {
   const toneClass =
     tone === "pass"
-      ? "text-emerald-200"
+      ? "text-[#F38BB4]"
       : tone === "fail"
         ? "text-red-200"
         : tone === "checking"
@@ -155,4 +155,3 @@ export function LanPreflightChecks({
     </div>
   );
 }
-

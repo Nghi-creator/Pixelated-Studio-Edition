@@ -4,10 +4,8 @@ import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
-  Crown,
   LogIn,
   Search,
-  Users,
   Wifi,
 } from "lucide-react";
 import { api, getAuthSession, type ApiGame } from "../../lib/apiClient";
@@ -37,6 +35,7 @@ import {
 } from "../../features/multiplayer/inviteUtils";
 import { Pagination } from "../../components/ui/Pagination";
 import { getPageSlice } from "../../components/ui/paginationUtils";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 
 type MultiplayerMode = "host" | "join";
 
@@ -75,8 +74,8 @@ function StatusPill({ paired }: { paired: boolean }) {
     <div
       className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${
         paired
-          ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
-          : "border-synth-primary/30 bg-synth-primary/10 text-synth-secondary"
+          ? "border-[#C02066]/40 bg-[#9B0048]/15 text-[#F38BB4]"
+          : "border-amber-400/30 bg-amber-400/10 text-amber-200"
       }`}
     >
       {paired ? (
@@ -265,7 +264,7 @@ export default function Multiplayer() {
       <div className="mb-6 grid gap-3 sm:grid-cols-2">
         <ModeButton
           active={mode === "host"}
-          icon={<Crown className="h-4 w-4" />}
+          icon={<PixelIcon className="h-4 w-4" name="multiplayer" />}
           label="Host Game"
           onClick={() => setMode("host")}
         />
@@ -281,7 +280,7 @@ export default function Multiplayer() {
         <section className="rounded-lg border border-synth-border bg-synth-surface p-5">
           <div className="mb-5 flex items-start gap-3">
             <div className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-synth-border bg-synth-bg text-synth-primary">
-              <Users className="h-5 w-5" />
+              <PixelIcon className="h-5 w-5" name="multiplayer" />
             </div>
             <div>
               <h2 className="text-lg font-bold text-white">
@@ -311,7 +310,7 @@ export default function Multiplayer() {
             <div
               className={`mt-3 rounded-lg border px-3 py-2 text-sm ${
                 joinInvite
-                  ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+                  ? "border-[#C02066]/40 bg-[#9B0048]/15 text-[#F38BB4]"
                   : "border-red-400/30 bg-red-500/10 text-red-200"
               }`}
             >
@@ -354,19 +353,14 @@ export default function Multiplayer() {
           id="multiplayer-game-catalog"
         >
           <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex items-start gap-3">
-              <div className="mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-synth-border bg-synth-bg text-synth-secondary">
-                <Crown className="h-5 w-5" />
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-white">
-                  Choose A Game To Host
-                </h2>
-                <p className="mt-1 text-sm leading-6 text-gray-400">
-                  The player page will start the lobby and expose invite, slots,
-                  and stream controls after the game opens.
-                </p>
-              </div>
+            <div>
+              <h2 className="text-lg font-bold text-white">
+                Choose A Game To Host
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-gray-400">
+                The player page will start the lobby and expose invite, slots,
+                and stream controls after the game opens.
+              </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-[auto_auto_minmax(220px,320px)]">
