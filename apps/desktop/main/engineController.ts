@@ -37,6 +37,7 @@ import { waitForEngineHealth } from "./health";
 import { emitEngineState, setCurrentEnginePhase } from "./state";
 import {
   createEngineLaunchContext,
+  createHostedWebLaunchUrl,
   createHostedInviteUrl,
   createLanInvite,
   getDockerRunArgs,
@@ -150,15 +151,13 @@ export function createWebLaunchUrl() {
     throw new Error("Start the engine before launching the web app.");
   }
 
-  const url = new URL(hostedWebUrl);
-  if (activeCompanion.exposureMode === "local") {
-    url.searchParams.set("engineUrl", activeCompanion.advertisedUrls[0] || "http://localhost:8080");
-    url.searchParams.set("engineToken", engineToken);
-  } else {
-    url.searchParams.set("companionUrl", activeCompanion.launchUrl);
-    url.searchParams.set("launchTicket", createCompanionLaunchTicket());
-  }
-  return url.toString();
+  return createHostedWebLaunchUrl({
+    advertisedUrls: activeCompanion.advertisedUrls,
+    companionLaunchUrl: activeCompanion.launchUrl,
+    createLaunchTicket: createCompanionLaunchTicket,
+    engineToken,
+    exposureMode: activeCompanion.exposureMode,
+  });
 }
 
 export function regenerateLanInvite(event: IpcMainEvent) {
