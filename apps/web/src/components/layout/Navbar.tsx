@@ -152,7 +152,7 @@ export default function Navbar() {
               <PlugZap className="h-6 w-6" />
               <span
                 className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-synth-bg ${
-                  isEnginePaired ? "bg-emerald-400" : "bg-amber-400"
+                  isEnginePaired ? "bg-emerald-400" : "bg-synth-secondary"
                 }`}
               />
             </Link>

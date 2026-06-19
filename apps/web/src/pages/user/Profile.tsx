@@ -442,7 +442,7 @@ export default function Profile() {
                   profileMessage.type === "success"
                     ? "bg-green-500/10 border-green-500/50 text-green-400"
                     : profileMessage.type === "warning"
-                      ? "bg-amber-500/10 border-amber-500/50 text-amber-300"
+                      ? "bg-synth-primary/10 border-synth-primary/50 text-synth-secondary"
                       : "bg-red-500/10 border-red-500/50 text-red-400"
                 }`}
                 role={profileMessage.type === "error" ? "alert" : "status"}

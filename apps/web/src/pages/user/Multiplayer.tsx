@@ -58,7 +58,7 @@ function ModeButton({
     <button
       className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-bold transition-colors ${
         active
-          ? "border-synth-primary/70 bg-synth-primary/20 text-white shadow-glow-primary-sm"
+          ? "border-synth-primary/70 bg-synth-primary/20 text-white shadow-card"
           : "border-synth-border bg-synth-surface text-gray-400 hover:border-synth-primary/50 hover:text-white"
       }`}
       onClick={onClick}
@@ -76,7 +76,7 @@ function StatusPill({ paired }: { paired: boolean }) {
       className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${
         paired
           ? "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
-          : "border-amber-400/30 bg-amber-500/10 text-amber-200"
+          : "border-synth-primary/30 bg-synth-primary/10 text-synth-secondary"
       }`}
     >
       {paired ? (
@@ -399,7 +399,7 @@ export default function Multiplayer() {
           </div>
 
           {gameSource === "local" && !isEnginePaired && (
-            <div className="mb-5 rounded-lg border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+            <div className="mb-5 rounded-lg border border-synth-primary/30 bg-synth-primary/10 px-4 py-3 text-sm text-synth-secondary">
               Pair the desktop engine before loading Local Vault games.
             </div>
           )}

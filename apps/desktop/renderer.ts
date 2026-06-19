@@ -537,7 +537,7 @@ function setStatusBadge(active: boolean) {
       "hover:bg-synth-primary-hover",
       "hover:bg-synth-action-hover",
     );
-    powerBtn.classList.remove("shadow-glow-primary");
+    powerBtn.classList.remove("shadow-panel");
     powerText.innerText = "Shutdown Engine";
     setPowerPending(false);
     setLaunchWebVisible(true);
@@ -561,7 +561,7 @@ function setStatusBadge(active: boolean) {
     "hover:bg-synth-action-hover",
     "hover:bg-synth-primary-hover",
   );
-  powerBtn.classList.add("shadow-glow-primary");
+  powerBtn.classList.add("shadow-panel");
   powerText.innerText = "Initialize Engine";
   setPowerPending(false);
   setLaunchWebVisible(false);
@@ -585,7 +585,7 @@ function resetFailedUi() {
     "hover:bg-synth-action-hover",
     "hover:bg-synth-primary-hover",
   );
-  powerBtn.classList.add("shadow-glow-primary");
+  powerBtn.classList.add("shadow-panel");
   powerText.innerText = "Initialize Engine";
   setPowerPending(false);
   setLaunchWebVisible(false);

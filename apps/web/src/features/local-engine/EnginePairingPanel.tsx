@@ -470,7 +470,7 @@ export function EnginePairingPanel({
             <div
               className={`mt-3 rounded-lg border px-3 py-2 text-xs leading-5 ${
                 engineUrlScope === "lan"
-                  ? "border-amber-400/30 bg-synth-bg text-amber-200"
+                  ? "border-synth-primary/30 bg-synth-bg text-synth-secondary"
                   : "border-synth-border bg-synth-bg text-gray-400"
               }`}
             >

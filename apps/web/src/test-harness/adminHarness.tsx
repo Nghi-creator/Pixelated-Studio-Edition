@@ -444,7 +444,7 @@ export function AdminHarness() {
             Open local delete
           </button>
           <button
-            className="rounded-lg border border-amber-400/60 px-4 py-2 text-sm font-semibold text-amber-100"
+            className="rounded-lg border border-synth-primary/60 px-4 py-2 text-sm font-semibold text-synth-secondary"
             onClick={() => setLocalVaultMessage(INVALID_ENGINE_TOKEN_MESSAGE)}
             type="button"
           >

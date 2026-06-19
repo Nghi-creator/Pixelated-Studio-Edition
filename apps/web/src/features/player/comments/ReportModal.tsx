@@ -19,10 +19,10 @@ export function ReportModal({
 }: ReportModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-synth-surface border border-synth-border rounded-2xl w-full max-w-md overflow-hidden shadow-glow-card">
+      <div className="bg-synth-surface border border-synth-border rounded-2xl w-full max-w-md overflow-hidden shadow-card">
         <div className="flex justify-between items-center p-6 border-b border-synth-border">
           <h3 className="text-xl font-bold text-white flex items-center gap-2">
-            <AlertTriangle className="text-yellow-500 w-5 h-5" />
+            <AlertTriangle className="text-synth-secondary w-5 h-5" />
             Report Comment
           </h3>
           <button
@@ -66,7 +66,7 @@ export function ReportModal({
             <button
               type="submit"
               disabled={isSubmittingReport || !reportReason.trim()}
-              className="px-6 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+              className="px-6 py-2 bg-synth-primary hover:bg-synth-primary-hover text-white font-bold rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
             >
               {isSubmittingReport && (
                 <Loader2 className="w-4 h-4 animate-spin" />

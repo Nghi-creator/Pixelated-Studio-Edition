@@ -26,7 +26,7 @@ export function ReactionButtons({
           aria-label="Like game"
           disabled={isLoading}
           onClick={() => onReaction(true)}
-          className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all disabled:cursor-wait disabled:opacity-50 ${userReaction === true ? "bg-synth-primary/20 text-synth-primary shadow-glow-primary-sm" : "text-gray-400 hover:bg-synth-elevated hover:text-white"}`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full transition-all disabled:cursor-wait disabled:opacity-50 ${userReaction === true ? "bg-synth-primary/20 text-synth-primary shadow-card" : "text-gray-400 hover:bg-synth-elevated hover:text-white"}`}
         >
           <ThumbsUp
             className={`w-4 h-4 ${userReaction === true ? "fill-current" : ""}`}

@@ -69,7 +69,7 @@ export function CommentItem({
                 <button
                   onClick={() => onReportComment(comment.id)}
                   disabled={pending}
-                  className="text-gray-500 hover:text-yellow-500 transition-colors disabled:cursor-wait disabled:opacity-50"
+                  className="text-gray-500 hover:text-synth-secondary transition-colors disabled:cursor-wait disabled:opacity-50"
                   title="Report Comment"
                 >
                   <Flag className="w-4 h-4" />
