@@ -36,10 +36,36 @@ type DockerRunOptions = EngineLaunchContext & {
   engineToken: string;
 };
 
+type WebLaunchUrlOptions = {
+  advertisedUrls: string[];
+  companionLaunchUrl: string;
+  createLaunchTicket: () => string;
+  engineToken: string;
+  exposureMode: ExposureMode;
+};
+
 export function createHostedInviteUrl(companionUrl: string) {
   const url = new URL("/engine", hostedWebUrl);
   url.searchParams.set("companionUrl", companionUrl);
   url.searchParams.set("join", "invite");
+  return url.toString();
+}
+
+export function createHostedWebLaunchUrl({
+  advertisedUrls,
+  companionLaunchUrl,
+  createLaunchTicket,
+  engineToken,
+  exposureMode,
+}: WebLaunchUrlOptions) {
+  const url = new URL(hostedWebUrl);
+  if (exposureMode === "local") {
+    url.searchParams.set("engineUrl", advertisedUrls[0] || "http://localhost:8080");
+    url.searchParams.set("engineToken", engineToken);
+  } else {
+    url.searchParams.set("companionUrl", companionLaunchUrl);
+    url.searchParams.set("launchTicket", createLaunchTicket());
+  }
   return url.toString();
 }
 
@@ -104,4 +130,3 @@ export function createLanInvite() {
     inviteExpiresAt: Date.now() + INVITE_CODE_TTL_MS,
   };
 }
-

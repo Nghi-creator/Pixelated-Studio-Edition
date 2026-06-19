@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   createEngineLaunchContext,
   createHostedInviteUrl,
+  createHostedWebLaunchUrl,
   createLanInvite,
   getDockerRunArgs,
 } from "../main/engine/launch";
@@ -48,3 +49,36 @@ test("engine launch helpers build hosted invite and Docker arguments", () => {
   );
 });
 
+test("hosted web launch URL uses direct local pairing and ticketed LAN pairing", () => {
+  const localUrl = new URL(
+    createHostedWebLaunchUrl({
+      advertisedUrls: ["http://127.0.0.1:8080"],
+      companionLaunchUrl: "https://localhost:8090",
+      createLaunchTicket: () => {
+        throw new Error("Local launch should not create a companion ticket.");
+      },
+      engineToken: "local-token",
+      exposureMode: "local",
+    }),
+  );
+
+  assert.equal(localUrl.searchParams.get("engineUrl"), "http://127.0.0.1:8080");
+  assert.equal(localUrl.searchParams.get("engineToken"), "local-token");
+  assert.equal(localUrl.searchParams.get("companionUrl"), null);
+  assert.equal(localUrl.searchParams.get("launchTicket"), null);
+
+  const lanUrl = new URL(
+    createHostedWebLaunchUrl({
+      advertisedUrls: ["http://192.168.1.20:8080"],
+      companionLaunchUrl: "https://localhost:8090",
+      createLaunchTicket: () => "launch-ticket",
+      engineToken: "lan-token",
+      exposureMode: "lan",
+    }),
+  );
+
+  assert.equal(lanUrl.searchParams.get("companionUrl"), "https://localhost:8090");
+  assert.equal(lanUrl.searchParams.get("launchTicket"), "launch-ticket");
+  assert.equal(lanUrl.searchParams.get("engineUrl"), null);
+  assert.equal(lanUrl.searchParams.get("engineToken"), null);
+});

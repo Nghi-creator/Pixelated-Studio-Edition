@@ -358,6 +358,18 @@ function assertHostedPairingContract() {
       "src",
       "lib",
       "engine",
+      "desktopLaunchPairing.ts",
+    ),
+    "utf8",
+  );
+  const launchPairingHook = fs.readFileSync(
+    path.join(
+      rootDir,
+      "apps",
+      "web",
+      "src",
+      "lib",
+      "engine",
       "useDesktopLaunchPairing.ts",
     ),
     "utf8",
@@ -379,12 +391,17 @@ function assertHostedPairingContract() {
     "utf8",
   );
 
-  assert.match(desktopController, /launchTicket/);
+  assert.match(desktopController, /createHostedWebLaunchUrl/);
+  assert.match(desktopController, /createCompanionLaunchTicket/);
   assert.match(desktopCompanion, /createCompanionLaunchTicket/);
   assert.match(desktopCompanion, /startCompanionServer/);
+  assert.match(launchPairingHook, /pairFromDesktopLaunchUrl/);
+  assert.match(launchPairing, /engineUrl[\s\S]*engineToken/);
+  assert.match(launchPairing, /setEngineToken\(engineToken\)/);
+  assert.match(launchPairing, /companionUrl[\s\S]*launchTicket/);
+  assert.match(launchPairing, /createCompanionEngineToken\(payload\.companionToken\)/);
   assert.match(launchPairing, /Desktop launch pairing registration v1 failed/);
   assert.match(launchPairing, /pairLocalEngine/);
-  assert.match(launchPairing, /launchTicket/);
   assert.match(enginePairingPanel, /Engine URL/);
   assert.match(authSource, /Sign In/);
 }

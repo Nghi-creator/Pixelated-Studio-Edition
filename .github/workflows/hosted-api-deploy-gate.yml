@@ -3,7 +3,19 @@ name: Hosted API Deploy Gate
 on:
   pull_request:
   workflow_dispatch:
+    inputs:
+      proof_mode:
+        description: Run only non-destructive contract checks and skip staging predeploy.
+        required: false
+        type: boolean
+        default: false
   workflow_call:
+    inputs:
+      proof_mode:
+        description: Run only non-destructive contract checks and skip staging predeploy.
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: hosted-api-deploy-gate-${{ github.ref }}
@@ -66,7 +78,7 @@ jobs:
 
   hosted-predeploy:
     name: Hosted schema and predeploy
-    if: github.event_name != 'pull_request'
+    if: github.event_name != 'pull_request' && !inputs.proof_mode
     needs:
       - api-contract
       - hosted-contract
@@ -118,3 +130,39 @@ jobs:
 
       - name: Run hosted API predeploy gate
         run: npm run predeploy:hosted
+
+  proof-summary:
+    name: Hosted deploy gate proof summary
+    if: inputs.proof_mode
+    needs:
+      - api-contract
+      - hosted-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Record hosted deploy gate proof mode
+        run: |
+          mkdir -p .context/hosted-deploy-gate-proof
+          jq --null-input \
+            '{
+              mode: "proof",
+              apiContract: "exercised",
+              hostedContract: "exercised",
+              stagingPredeploy: "skipped",
+              reason: "proof_mode verifies deploy gate wiring without requiring staging predeploy secrets"
+            }' > .context/hosted-deploy-gate-proof/proof-report.json
+          {
+            echo "## Hosted deploy gate proof"
+            echo
+            echo "- API contract: exercised"
+            echo "- Hosted web and smoke contract: exercised"
+            echo "- Staging predeploy: skipped by proof_mode"
+          } > .context/hosted-deploy-gate-proof/proof-report.md
+
+      - name: Upload hosted deploy gate proof artifact
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: error
+          name: hosted-deploy-gate-proof-${{ github.run_id }}-${{ github.run_attempt }}
+          path: .context/hosted-deploy-gate-proof/
+          retention-days: 14
