@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Check, LayoutDashboard, Filter } from "lucide-react";
+import { Check, Filter } from "lucide-react";
 import ReportCard, { type Report } from "../../components/admin/ReportCard";
 import {
   AdminConfirmDialog,
@@ -12,6 +12,7 @@ import {
 } from "../../lib/apiClient";
 import { ModerationQueueSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 import {
   getAdminApiErrorMessage,
   getPageAfterRemoval,
@@ -201,7 +202,7 @@ export default function Dashboard() {
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <LayoutDashboard className="text-synth-secondary w-8 h-8" />
+          <PixelIcon className="text-synth-secondary w-8 h-8" name="moderation" />
           Moderation Queue
         </h1>
 
@@ -249,7 +250,7 @@ export default function Dashboard() {
         </div>
       ) : reports.length === 0 ? (
         <div className="bg-[#2B1720] border border-synth-border rounded-lg p-12 text-center text-gray-400 shadow-card">
-          <Check className="w-12 h-12 text-green-500 mx-auto mb-4 opacity-50" />
+          <Check className="w-12 h-12 text-[#C02066] mx-auto mb-4 opacity-70" />
           <p className="text-xl">Queue is clear.</p>
           <p className="text-sm mt-2">
             No reports matching this server filter right now.

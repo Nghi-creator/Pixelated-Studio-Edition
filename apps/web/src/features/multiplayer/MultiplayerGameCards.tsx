@@ -1,6 +1,7 @@
-import { Gamepad2, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Skeleton } from "../../components/ui/Skeleton";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 import type { ApiGame } from "../../lib/apiTypes";
 
 export type GameSource = "cloud" | "local";
@@ -51,7 +52,7 @@ export function LocalGameCard({ game }: { game: LocalGame }) {
     >
       <div>
         <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg border border-synth-border bg-synth-bg text-synth-secondary">
-          <Gamepad2 className="h-6 w-6" />
+          <PixelIcon className="h-6 w-6" name="cartridge" />
         </div>
         <p className="line-clamp-3 text-sm font-bold text-white">{game.title}</p>
       </div>

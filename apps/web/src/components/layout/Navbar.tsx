@@ -1,15 +1,8 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
-  Heart,
   LogOut,
-  User as UserIcon,
-  ShieldAlert,
-  HardDrive,
-  UploadCloud,
   Code,
-  Users,
-  PlugZap,
   Loader2,
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
@@ -17,6 +10,7 @@ import type { User } from "@supabase/supabase-js";
 import { api, getAuthSession } from "../../lib/apiClient";
 import { Avatar } from "../ui/Avatar";
 import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engine/engineAuth";
+import { PixelIcon } from "../ui/PixelIcon";
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
@@ -135,7 +129,11 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-4">
-            <Link to="/" className="flex items-baseline gap-2 group">
+            <Link to="/" className="flex items-center gap-2 group">
+              <PixelIcon
+                className="h-7 w-7 text-synth-secondary transition-colors group-hover:text-white"
+                name="brand"
+              />
               <span className="text-xl font-extrabold tracking-widest text-white">
                 PIXELATED
               </span>
@@ -149,10 +147,13 @@ export default function Navbar() {
               title={isEnginePaired ? "Engine Connected" : "Connect Engine"}
               className={`relative ${getNavIconClass(isEnginePage)}`}
             >
-              <PlugZap className="h-6 w-6" />
+              <PixelIcon
+                className="h-6 w-6"
+                name={isEnginePaired ? "engine-on" : "engine-off"}
+              />
               <span
                 className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-synth-bg ${
-                  isEnginePaired ? "bg-emerald-400" : "bg-synth-secondary"
+                  isEnginePaired ? "bg-[#9B0048]" : "bg-amber-400"
                 }`}
               />
             </Link>
@@ -174,9 +175,7 @@ export default function Navbar() {
                 title="Submit a Game"
                 className={getNavIconClass(isPublishPage)}
               >
-                <UploadCloud
-                  className={`w-5 h-5 ${isPublishPage ? "fill-white/10" : ""}`}
-                />
+                <PixelIcon className="h-5 w-5" name="mail" />
               </Link>
             ) : null}
 
@@ -186,9 +185,7 @@ export default function Navbar() {
               title="Multiplayer"
               className={getNavIconClass(isMultiplayerPage)}
             >
-              <Users
-                className={`w-6 h-6 ${isMultiplayerPage ? "fill-white/10" : ""}`}
-              />
+              <PixelIcon className="h-6 w-6" name="multiplayer" />
             </Link>
 
             <Link
@@ -196,9 +193,7 @@ export default function Navbar() {
               title="Local Vault"
               className={getNavIconClass(isLocalPage)}
             >
-              <HardDrive
-                className={`w-6 h-6 ${isLocalPage ? "fill-white/10" : ""}`}
-              />
+              <PixelIcon className="h-6 w-6" name="publish" />
             </Link>
 
             {/* FAVORITES LINK */}
@@ -208,9 +203,7 @@ export default function Navbar() {
               title="Cloud Favorites"
               className={getNavIconClass(isFavoritesPage)}
             >
-              <Heart
-                className={`w-6 h-6 ${isFavoritesPage ? "fill-white/20" : ""}`}
-              />
+              <PixelIcon className="h-6 w-6" name="favorites" />
             </Link>
 
             {user ? (
@@ -253,7 +246,7 @@ export default function Navbar() {
                           onClick={() => setIsDropdownOpen(false)}
                           className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-synth-elevated hover:text-white transition-colors"
                         >
-                          <ShieldAlert className="w-4 h-4" /> Admin Panel
+                          <PixelIcon className="w-4 h-4" name="admin" /> Admin Panel
                         </Link>
                       )}
 
@@ -262,7 +255,7 @@ export default function Navbar() {
                         onClick={() => setIsDropdownOpen(false)}
                         className="flex items-center gap-2 px-4 py-2 text-sm text-gray-300 hover:bg-synth-elevated hover:text-white transition-colors"
                       >
-                        <UserIcon className="w-4 h-4" /> Profile
+                        <PixelIcon className="w-4 h-4" name="profile" /> Profile
                       </Link>
 
                       <button
@@ -281,7 +274,7 @@ export default function Navbar() {
                 className="flex items-center gap-3 rounded-md border border-synth-border bg-synth-surface py-1.5 pl-1.5 pr-4 transition-colors group hover:bg-synth-elevated"
               >
                 <div className="w-8 h-8 rounded bg-synth-elevated flex items-center justify-center">
-                  <UserIcon className="w-4 h-4 text-white" />
+                  <PixelIcon className="w-4 h-4 text-white" name="profile" />
                 </div>
                 <span className="text-sm font-medium text-white">
                   Sign In

@@ -1,17 +1,15 @@
 import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
-  LayoutDashboard,
-  Users,
   ArrowLeft,
   LogOut,
   ShieldAlert,
-  Activity,
   LoaderCircle,
   RefreshCw,
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import { api, getAuthSession } from "../../lib/apiClient";
+import { PixelIcon } from "../ui/PixelIcon";
 
 export default function AdminLayout() {
   const location = useLocation();
@@ -62,9 +60,9 @@ export default function AdminLayout() {
   };
 
   const navItems = [
-    { name: "Moderation Queue", path: "/admin", icon: LayoutDashboard },
-    { name: "User Management", path: "/admin/users", icon: Users },
-    { name: "Access Logs", path: "/admin/logs", icon: Activity },
+    { name: "Moderation Queue", path: "/admin", icon: "moderation" as const },
+    { name: "User Management", path: "/admin/users", icon: "users" as const },
+    { name: "Access Logs", path: "/admin/logs", icon: "logs" as const },
   ];
 
   if (!roleChecked) {
@@ -98,7 +96,7 @@ export default function AdminLayout() {
       <aside className="w-64 bg-[#2B1720] border-r border-synth-border flex flex-col flex-shrink-0 shadow-panel">
         {/* Brand Header */}
         <div className="h-20 flex items-center px-6 border-b border-synth-border">
-          <ShieldAlert className="w-6 h-6 text-white mr-3" />
+          <PixelIcon className="w-6 h-6 text-synth-secondary mr-3" name="admin" />
           <span className="text-xl font-extrabold tracking-wider text-white">
             MOD PANEL
           </span>
@@ -108,8 +106,6 @@ export default function AdminLayout() {
         <nav className="flex-1 py-6 px-4 space-y-2 overflow-y-auto">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
-            const Icon = item.icon;
-
             return (
               <Link
                 key={item.path}
@@ -120,9 +116,7 @@ export default function AdminLayout() {
                     : "text-white hover:bg-synth-elevated/70 font-medium border border-transparent"
                 }`}
               >
-                <Icon
-                  className={`w-5 h-5 ${isActive ? "fill-white/10" : ""}`}
-                />
+                <PixelIcon className="w-5 h-5" name={item.icon} />
                 {item.name}
               </Link>
             );

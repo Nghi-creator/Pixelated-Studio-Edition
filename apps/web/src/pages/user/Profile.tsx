@@ -440,7 +440,7 @@ export default function Profile() {
               <div
                 className={`p-4 rounded-lg mb-6 border ${
                   profileMessage.type === "success"
-                    ? "bg-green-500/10 border-green-500/50 text-green-400"
+                    ? "bg-[#9B0048]/15 border-[#C02066]/50 text-[#F38BB4]"
                     : profileMessage.type === "warning"
                       ? "bg-synth-primary/10 border-synth-primary/50 text-synth-secondary"
                       : "bg-red-500/10 border-red-500/50 text-red-400"
@@ -539,7 +539,7 @@ export default function Profile() {
             {/* Password Message Block */}
             {passwordMessage && (
               <div
-                className={`p-4 rounded-lg mb-6 border ${passwordMessage.type === "success" ? "bg-green-500/10 border-green-500/50 text-green-400" : "bg-red-500/10 border-red-500/50 text-red-400"}`}
+                className={`p-4 rounded-lg mb-6 border ${passwordMessage.type === "success" ? "bg-[#9B0048]/15 border-[#C02066]/50 text-[#F38BB4]" : "bg-red-500/10 border-red-500/50 text-red-400"}`}
               >
                 {passwordMessage.text}
               </div>

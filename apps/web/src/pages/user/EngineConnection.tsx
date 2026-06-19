@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2, MonitorCog } from "lucide-react";
+import { ArrowLeft, CheckCircle2 } from "lucide-react";
 import {
   Link,
   useLocation,
@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
 import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engine/engineAuth";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 
 type EngineLocationState = {
   returnState?: unknown;
@@ -82,18 +83,18 @@ export default function EngineConnection() {
       </div>
 
       {isPaired && (
-        <div className="mb-6 flex flex-col gap-3 rounded-lg border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-100 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-6 flex flex-col gap-3 rounded-lg border border-[#C02066]/40 bg-[#9B0048]/15 px-4 py-3 text-sm text-[#F38BB4] sm:flex-row sm:items-center sm:justify-between">
           <span className="inline-flex items-center gap-2 font-semibold">
             <CheckCircle2 className="h-4 w-4" />
             This browser has a saved engine connection.
           </span>
           {isReturning && (
             <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-emerald-300/40 bg-emerald-300/10 px-4 font-bold text-white transition-colors hover:bg-emerald-300/20"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#C02066]/50 bg-[#9B0048]/20 px-4 font-bold text-white transition-colors hover:bg-[#9B0048]/30"
               onClick={continueToDestination}
               type="button"
             >
-              <MonitorCog className="h-4 w-4" />
+              <PixelIcon className="h-4 w-4" name="engine-on" />
               Continue
             </button>
           )}

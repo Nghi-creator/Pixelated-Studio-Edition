@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { Activity } from "lucide-react";
 import { api, ApiError } from "../../lib/apiClient";
 import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
 import { getPageRangeLabel } from "../../features/admin/adminState";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 
 const LOGS_PER_PAGE = 25;
 const ACCESS_LOGS_TIMEOUT_MS = 10_000;
@@ -113,7 +113,7 @@ export default function AccessLogs() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold text-white flex items-center gap-3">
-          <Activity className="text-synth-secondary w-8 h-8" />
+          <PixelIcon className="text-synth-secondary w-8 h-8" name="logs" />
           User Sessions
         </h1>
         <span className="bg-synth-secondary/15 text-synth-secondary border border-synth-secondary/30 px-4 py-2 rounded-full font-semibold">

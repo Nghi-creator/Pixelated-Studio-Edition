@@ -29,10 +29,10 @@ export function PlayerHeader({
           : "Idle";
   const statusDotClass =
     status === "playing"
-      ? "bg-green-500"
+      ? "bg-[#9B0048]"
       : status === "error"
         ? "bg-red-500"
-        : "bg-synth-secondary animate-pulse";
+        : "bg-amber-400 animate-pulse";
 
   return (
     <div className="w-full max-w-5xl flex flex-col mb-6">

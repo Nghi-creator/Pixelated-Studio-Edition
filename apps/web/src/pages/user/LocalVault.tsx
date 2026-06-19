@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
   AlertCircle,
-  UploadCloud,
-  Gamepad2,
   Loader2,
   ArrowLeft,
   Trash2,
@@ -28,6 +26,7 @@ import {
   uploadLocalVaultRom,
   validateLocalRomFile,
 } from "../../features/local-vault/localVaultClient";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 
 export default function LocalVault() {
   const [localGames, setLocalGames] = useState<string[]>([]);
@@ -239,7 +238,7 @@ export default function LocalVault() {
           className={`mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${
             vaultMessage.tone === "error"
               ? "border-red-400/30 bg-red-500/10 text-red-200"
-              : "border-emerald-400/30 bg-emerald-500/10 text-emerald-200"
+              : "border-[#C02066]/40 bg-[#9B0048]/15 text-[#F38BB4]"
           }`}
         >
           {vaultMessage.tone === "error" ? (
@@ -285,8 +284,9 @@ export default function LocalVault() {
         {isUploading ? (
           <Loader2 className="w-12 h-12 text-white animate-spin mb-4" />
         ) : (
-          <UploadCloud
-            className={`w-12 h-12 mb-4 transition-colors ${isDragging ? "text-white" : "text-[#F38BB4]"}`}
+          <PixelIcon
+            className={`mb-4 h-12 w-12 transition-colors ${isDragging ? "text-white" : "text-[#F38BB4]"}`}
+            name="upload"
           />
         )}
 
@@ -308,7 +308,10 @@ export default function LocalVault() {
         </div>
       ) : localGames.length === 0 ? (
         <div className="mx-auto max-w-xl border-t border-synth-border/70 py-10 text-center text-gray-500">
-          <Gamepad2 className="w-10 h-10 mx-auto mb-4 text-[#F38BB4] opacity-70" />
+          <PixelIcon
+            className="mx-auto mb-4 h-10 w-10 text-[#F38BB4] opacity-70"
+            name={isEnginePaired ? "empty" : "engine-off"}
+          />
           <p className="text-lg text-gray-400">
             {isEnginePaired
               ? "Your local vault is empty."
@@ -339,7 +342,7 @@ export default function LocalVault() {
             >
               <div>
                 <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg border border-synth-border bg-synth-bg text-synth-secondary">
-                  <Gamepad2 className="h-6 w-6" />
+                  <PixelIcon className="h-6 w-6" name="cartridge" />
                 </div>
                 <h3 className="line-clamp-4 text-sm font-bold text-white md:text-base">
                   {getLocalGameTitle(filename)}

@@ -1,5 +1,6 @@
-import { Copy, Crown, Gamepad2, Link2, Monitor, Users, X } from "lucide-react";
+import { Copy, Link2, X } from "lucide-react";
 import { useState } from "react";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 import type {
   EngineInputCapabilities,
   LobbyParticipant,
@@ -18,10 +19,10 @@ type LobbyPanelProps = {
   shareUrl: string;
 };
 
-function getRoleIcon(participant: LobbyParticipant) {
-  if (participant.role === "host") return Crown;
-  if (participant.role === "player") return Gamepad2;
-  return Monitor;
+function getRoleIconName(participant: LobbyParticipant) {
+  if (participant.role === "host") return "engine-on";
+  if (participant.role === "player") return "cartridge";
+  return "profile";
 }
 
 export function LobbyPanel({
@@ -61,7 +62,7 @@ export function LobbyPanel({
         onClick={() => setIsOpen(true)}
         className="inline-flex h-10 items-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-bold text-white transition-colors hover:bg-synth-elevated"
       >
-        <Users className="h-4 w-4 text-synth-secondary" />
+        <PixelIcon className="h-4 w-4 text-synth-secondary" name="multiplayer" />
         Lobby
         <span className="rounded-full border border-synth-border bg-synth-bg px-2 py-0.5 text-[10px] font-semibold text-gray-300">
           {participants.length}
@@ -205,7 +206,7 @@ export function LobbyPanel({
                     </div>
                   ) : (
                     participants.map((participant) => {
-                      const RoleIcon = getRoleIcon(participant);
+                      const roleIconName = getRoleIconName(participant);
                       const isCurrent =
                         currentParticipant?.socketId === participant.socketId;
 
@@ -219,12 +220,15 @@ export function LobbyPanel({
                           }`}
                         >
                           <div className="flex min-w-0 items-center gap-2">
-                            <RoleIcon className="h-4 w-4 shrink-0 text-synth-secondary" />
+                            <PixelIcon
+                              className="h-4 w-4 shrink-0 text-synth-secondary"
+                              name={roleIconName}
+                            />
                             <div className="min-w-0">
                               <span className="block truncate text-sm font-medium text-gray-200">
                                 {participant.displayName}
                               </span>
-                              <span className="block text-[10px] uppercase tracking-wide text-emerald-400">
+                              <span className="block text-[10px] uppercase tracking-wide text-[#C02066]">
                                 Connected
                               </span>
                             </div>

@@ -4,7 +4,6 @@ import {
   ArrowLeft,
   Eye,
   EyeOff,
-  Gamepad2,
   Loader2,
   Lock,
   Mail,
@@ -17,6 +16,7 @@ import {
   PASSWORD_MIN_LENGTH,
   PASSWORD_POLICY_HINT,
 } from "../../lib/auth/passwordPolicy";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 
 const getAuthErrorMessage = (error: Error) => {
   if (error.message.toLowerCase().includes("email rate limit exceeded")) {
@@ -168,7 +168,10 @@ export default function Auth() {
     <div className="min-h-[85vh] flex items-center justify-center p-4">
       <div className="w-full max-w-xl bg-synth-surface border border-synth-border rounded-lg shadow-card p-8">
         <div className="text-center mb-8">
-          <Gamepad2 className="w-12 h-12 text-synth-secondary mx-auto mb-4" />
+          <PixelIcon
+            className="mx-auto mb-4 h-12 w-12 text-synth-secondary"
+            name="brand"
+          />
           <h2 className="text-3xl font-bold text-white mb-2">
             {isForgotPassword
               ? "Reset Password"
@@ -192,11 +195,11 @@ export default function Auth() {
         )}
 
         {message && (
-          <div className="mb-6 rounded-lg border border-green-500/50 bg-green-500/10 px-4 py-3 text-center text-sm text-green-400">
+          <div className="mb-6 rounded-lg border border-[#C02066]/50 bg-[#9B0048]/15 px-4 py-3 text-center text-sm text-[#F38BB4]">
             <p>{message}</p>
             {verificationPendingEmail && (
               <button
-                className="mt-3 inline-flex items-center justify-center gap-2 rounded-md border border-green-400/40 bg-green-400/10 px-3 py-2 font-semibold text-green-200 transition-colors hover:bg-green-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-3 inline-flex items-center justify-center gap-2 rounded-md border border-[#C02066]/50 bg-[#9B0048]/20 px-3 py-2 font-semibold text-[#F38BB4] transition-colors hover:bg-[#9B0048]/30 disabled:cursor-not-allowed disabled:opacity-50"
                 disabled={resendLoading || resendCooldown > 0}
                 onClick={() => void handleResendConfirmation()}
                 type="button"

@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Lock, Gamepad2, Loader2, CheckCircle2 } from "lucide-react";
+import { Lock, Loader2, CheckCircle2 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import {
   getPasswordPolicyError,
   PASSWORD_MIN_LENGTH,
   PASSWORD_POLICY_HINT,
 } from "../../lib/auth/passwordPolicy";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -97,7 +98,7 @@ export default function ResetPassword() {
     return (
       <div className="min-h-[85vh] flex items-center justify-center p-4">
         <div className="w-full max-w-md bg-synth-surface border border-synth-border rounded-lg shadow-card p-12 text-center">
-          <CheckCircle2 className="w-16 h-16 text-green-400 mx-auto mb-6" />
+          <CheckCircle2 className="w-16 h-16 text-[#C02066] mx-auto mb-6" />
           <h2 className="text-3xl font-bold text-white mb-2">
             Password Updated
           </h2>
@@ -111,7 +112,10 @@ export default function ResetPassword() {
     <div className="min-h-[85vh] flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-synth-surface border border-synth-border rounded-lg shadow-card p-8">
         <div className="text-center mb-8">
-          <Gamepad2 className="w-12 h-12 text-synth-secondary mx-auto mb-4" />
+          <PixelIcon
+            className="mx-auto mb-4 h-12 w-12 text-synth-secondary"
+            name="brand"
+          />
           <h2 className="text-3xl font-bold text-white mb-2">
             Create New Password
           </h2>
