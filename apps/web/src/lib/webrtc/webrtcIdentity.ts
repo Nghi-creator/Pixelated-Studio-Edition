@@ -10,3 +10,8 @@ export const createWebRTCRetryIdentity = (hasFixedSession: boolean) => ({
   peerId: createWebRTCSessionId(),
   sessionId: hasFixedSession ? null : createWebRTCSessionId(),
 });
+
+export const createWebRTCProfileRestartIdentity = () => ({
+  peerId: createWebRTCSessionId(),
+  sessionId: null,
+});
