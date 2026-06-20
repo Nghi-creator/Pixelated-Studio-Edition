@@ -60,9 +60,8 @@ export function LobbyPanel({
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        className="inline-flex h-10 items-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-bold text-white transition-colors hover:bg-synth-elevated"
+        className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#5D263A] bg-[#351B27] px-4 text-sm font-bold text-white transition-colors hover:bg-[#2B1720]"
       >
-        <PixelIcon className="h-4 w-4 text-synth-secondary" name="multiplayer" />
         Lobby
         <span className="rounded-full border border-synth-border bg-synth-bg px-2 py-0.5 text-[10px] font-semibold text-gray-300">
           {participants.length}

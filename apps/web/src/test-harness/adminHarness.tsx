@@ -12,6 +12,10 @@ import {
   validateLocalRomFile,
 } from "../features/local-vault/localVaultClient";
 import { LobbyPanel } from "../features/player/LobbyPanel";
+import {
+  PlayerControls,
+  PlayerInstructions,
+} from "../features/player/PlayerControls";
 import { PlayerHeader } from "../features/player/PlayerHeader";
 import { StreamStage } from "../features/player/StreamStage";
 import { StreamTelemetryPanel } from "../features/player/StreamTelemetryPanel";
@@ -24,6 +28,10 @@ import {
   type WebRTCTelemetry,
 } from "../lib/webrtc/webrtcTelemetry";
 import type { WebRTCStatus } from "../lib/webrtc/webrtcSession";
+import {
+  STREAM_PROFILES,
+  type StreamProfileId,
+} from "../lib/engine/streamProfiles";
 import { Pagination } from "../components/ui/Pagination";
 
 declare global {
@@ -149,6 +157,7 @@ function BootRecoveryHarness({
         status={state.status}
       />
       <StreamStage
+        isMuted={false}
         onRetry={retryBoot}
         showStreamTelemetry
         status={state.status}
@@ -179,6 +188,9 @@ export function AdminHarness() {
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishRom, setPublishRom] = useState<File | null>(null);
   const [showTelemetry, setShowTelemetry] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
+  const [streamProfileId, setStreamProfileId] =
+    useState<StreamProfileId>("balanced");
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const record = (event: string) => {
@@ -279,12 +291,23 @@ export function AdminHarness() {
           status="error"
         />
         <StreamStage
+          controls={
+            <PlayerControls
+              isMuted={isMuted}
+              onMuteToggle={() => setIsMuted((muted) => !muted)}
+              onStreamProfileChange={setStreamProfileId}
+              selectedStreamProfileId={streamProfileId}
+              streamProfiles={STREAM_PROFILES}
+            />
+          }
+          isMuted={isMuted}
           onRetry={() => record("stream-retry")}
           showStreamTelemetry={showTelemetry}
           status="error"
           telemetry={streamTelemetry}
           videoRef={videoRef}
         />
+        <PlayerInstructions />
         {showTelemetry && (
           <StreamTelemetryPanel
             gameId="harness-game"

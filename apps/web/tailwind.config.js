@@ -37,6 +37,8 @@ export default {
           border: "#7E465B",
           primary: "#B86F88",
           "primary-hover": "#C97893",
+          action: "#9B0048",
+          "action-hover": "#B00052",
           secondary: "#D8A4B5",
           "secondary-hover": "#E8B8C6",
           ink: "#FFFFFF",
