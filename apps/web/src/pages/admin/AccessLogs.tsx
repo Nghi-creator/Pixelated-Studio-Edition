@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api, ApiError } from "../../lib/apiClient";
+import { api, ApiError } from "../../lib/api/apiClient";
 import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
 import { getPageRangeLabel } from "../../features/admin/adminState";

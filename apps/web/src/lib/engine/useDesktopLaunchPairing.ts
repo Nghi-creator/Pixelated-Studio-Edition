@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { api } from "../apiClient";
+import { api } from "../api/apiClient";
 import { pairFromDesktopLaunchUrl } from "./desktopLaunchPairing";
 import {
   createCompanionEngineToken,

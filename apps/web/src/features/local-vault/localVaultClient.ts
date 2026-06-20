@@ -1,4 +1,4 @@
-import { getAuthSession } from "../../lib/apiClient";
+import { getAuthSession } from "../../lib/api/apiClient";
 import {
   clearEngineToken,
   engineAuthHeaders,

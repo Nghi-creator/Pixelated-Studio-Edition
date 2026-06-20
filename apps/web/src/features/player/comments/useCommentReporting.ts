@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { ApiError, api } from "../../../lib/apiClient";
+import { ApiError, api } from "../../../lib/api/apiClient";
 import { getSocialErrorMessage } from "../socialFeedback";
 
 export function useCommentReporting(currentUser: User | null) {

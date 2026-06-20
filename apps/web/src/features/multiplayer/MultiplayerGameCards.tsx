@@ -2,7 +2,7 @@ import { Play } from "lucide-react";
 import { Link } from "react-router-dom";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { PixelIcon } from "../../components/ui/PixelIcon";
-import type { ApiGame } from "../../lib/apiTypes";
+import type { ApiGame } from "../../lib/api/apiTypes";
 
 export type GameSource = "cloud" | "local";
 

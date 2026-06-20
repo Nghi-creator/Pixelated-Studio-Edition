@@ -8,7 +8,7 @@ import {
   Search,
   Wifi,
 } from "lucide-react";
-import { api, getAuthSession, type ApiGame } from "../../lib/apiClient";
+import { api, getAuthSession, type ApiGame } from "../../lib/api/apiClient";
 import {
   clearEngineToken,
   engineAuthHeaders,

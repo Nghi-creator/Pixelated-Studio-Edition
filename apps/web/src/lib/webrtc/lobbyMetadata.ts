@@ -1,4 +1,4 @@
-import type { ApiMultiplayerLobbyPayload } from "../apiTypes";
+import type { ApiMultiplayerLobbyPayload } from "../api/apiTypes";
 import type {
   EngineInputCapabilities,
   EngineShareContext,

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { FaGithub, FaGoogle } from "react-icons/fa";
 import { supabase } from "../../lib/auth/supabaseClient";
-import { getPublicAppUrl } from "../../lib/appUrl";
+import { getPublicAppUrl } from "../../lib/navigation/appUrl";
 import {
   getPasswordPolicyError,
   PASSWORD_MIN_LENGTH,

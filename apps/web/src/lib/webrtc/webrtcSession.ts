@@ -1,4 +1,4 @@
-import { api, getAuthSession } from "../apiClient";
+import { api, getAuthSession } from "../api/apiClient";
 export { createWebRTCSessionId } from "./webrtcIdentity";
 
 export type WebRTCStatus = "idle" | "connecting" | "playing" | "error";

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import GameCard from "../../components/user/GameCard";
-import { api, getAuthSession } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/api/apiClient";
 import { FavoritesPageSkeleton } from "../../components/ui/Skeleton";
 import { replaceFavoriteIds } from "../../features/favorites/favoriteState";
 import { PixelIcon } from "../../components/ui/PixelIcon";

@@ -8,7 +8,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
-import { api, getAuthSession } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/api/apiClient";
 import { PixelIcon } from "../ui/PixelIcon";
 
 export default function AdminLayout() {

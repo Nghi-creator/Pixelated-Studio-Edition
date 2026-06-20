@@ -1,4 +1,4 @@
-import type { ApiGameSubmissionPayload } from "../../lib/apiTypes";
+import type { ApiGameSubmissionPayload } from "../../lib/api/apiTypes";
 
 export const MAX_SUBMISSION_ROM_BYTES = 8 * 1024 * 1024;
 export const MAX_SUBMISSION_IMAGE_BYTES = 5 * 1024 * 1024;

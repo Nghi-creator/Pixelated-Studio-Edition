@@ -9,7 +9,7 @@ import {
   api,
   getAuthSession,
   type ApiAdminReportAction,
-} from "../../lib/apiClient";
+} from "../../lib/api/apiClient";
 import { ModerationQueueSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
 import { PixelIcon } from "../../components/ui/PixelIcon";

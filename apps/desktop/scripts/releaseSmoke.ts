@@ -183,8 +183,8 @@ function assertPackagedApp(archivePath: string) {
     "package.json",
     "index.html",
     "dist/main.js",
-    "dist/main/dockerDiagnostics.js",
-    "dist/main/dockerRecovery.js",
+    "dist/main/docker/diagnostics.js",
+    "dist/main/docker/recovery.js",
     "dist/preload.js",
     ...EXPECTED_RENDERER_SCRIPTS,
   ];

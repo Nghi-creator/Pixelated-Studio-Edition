@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { AlertOctagon } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
-import { api, ApiError, getAuthSession } from "../../lib/apiClient";
+import { api, ApiError, getAuthSession } from "../../lib/api/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
 import { ProfileSkeleton } from "../../components/ui/Skeleton";
 import {

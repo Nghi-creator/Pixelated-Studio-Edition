@@ -18,10 +18,11 @@ const port = Number(process.env.PIXELATED_WEB_INTERACTION_PORT || 5174);
 const baseUrl = `http://127.0.0.1:${port}`;
 const harnessSourcePath = path.join(
   webRoot,
-  "interaction-tests",
+  "tests",
+  "interaction",
   "adminHarness.html",
 );
-const harnessPath = "/interaction-tests/adminHarness.html";
+const harnessPath = "/tests/interaction/adminHarness.html";
 const interactionTimeoutMs = Number(
   process.env.PIXELATED_WEB_INTERACTION_TIMEOUT_MS || 15_000,
 );

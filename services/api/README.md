@@ -150,7 +150,7 @@ If Supabase env vars are missing, authenticated routes return `503`.
 
 ## Data Boundary
 
-The browser should not call Supabase tables, RPCs, or realtime channels directly. `apps/web/src/lib/apiClient.ts` is the frontend boundary for app data. Browser-side Supabase usage should stay limited to auth/session handling and Storage uploads that intentionally need direct signed-in client upload behavior.
+The browser should not call Supabase tables, RPCs, or realtime channels directly. `apps/web/src/lib/api/apiClient.ts` is the frontend boundary for app data. Browser-side Supabase usage should stay limited to auth/session handling and Storage uploads that intentionally need direct signed-in client upload behavior.
 
 `supabase/migrations/20260527111500_api_owned_social_writes.sql` removes direct browser policies for the workflows now owned by this API. Deploy the matching API and web builds before pushing that migration, or push it immediately after both are live.
 
@@ -211,7 +211,11 @@ Run the focused API test suite from this folder:
 npm run test
 ```
 
-Tests live under `services/api/tests/`. The current tests use Fastify injection and a fake Supabase service, so they do not require local database access.
+Tests are grouped under `services/api/tests/unit`, `integration`, and `smoke`.
+The route-level integration tests use Fastify injection and a fake Supabase
+service, so they do not require local database access. HTTP routes mirror their
+domains under `src/routes/admin`, `auth`, `catalog`, `multiplayer`, `system`,
+and `users`.
 
 ## Staging Smoke
 

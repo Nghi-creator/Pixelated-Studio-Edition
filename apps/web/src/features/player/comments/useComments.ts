@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { api } from "../../../lib/apiClient";
+import { api } from "../../../lib/api/apiClient";
 import type { GameComment } from "../types";
 import { getSocialErrorMessage } from "../socialFeedback";
 import { mergeCommentPage } from "./commentPages";

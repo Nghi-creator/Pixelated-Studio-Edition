@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Search } from "lucide-react";
 import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
-import { api } from "../../lib/apiClient";
+import { api } from "../../lib/api/apiClient";
 import {
   GameGridSkeleton,
   GamesCatalogSkeleton,

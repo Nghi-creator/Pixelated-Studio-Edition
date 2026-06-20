@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { api, ApiError } from "../apiClient";
+import { api, ApiError } from "../api/apiClient";
 import {
   clearEngineToken,
   ENGINE_PAIRING_EVENT,
@@ -19,7 +19,10 @@ import {
   resolveGameBootTarget,
   type WebRTCStatus,
 } from "./webrtcSession";
-import { createWebRTCRetryIdentity } from "./webrtcIdentity";
+import {
+  createWebRTCProfileRestartIdentity,
+  createWebRTCRetryIdentity,
+} from "./webrtcIdentity";
 import {
   INITIAL_WEBRTC_TELEMETRY,
   startWebRTCTelemetry,
@@ -107,6 +110,10 @@ export function useWebRTC(
   const shareContextRef = useRef(shareContext);
   const lastMetricSentAtRef = useRef(0);
   const metricsDisabledRef = useRef(false);
+  const streamProfileRef = useRef(streamProfile);
+  const appliedStreamProfileIdRef = useRef(streamProfile.id);
+  const seamlessRestartRef = useRef(false);
+  const profileAutoRetriesRemainingRef = useRef(0);
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -130,8 +137,23 @@ export function useWebRTC(
   }, []);
 
   useEffect(() => {
+    streamProfileRef.current = streamProfile;
+    if (appliedStreamProfileIdRef.current === streamProfile.id) return;
+
+    appliedStreamProfileIdRef.current = streamProfile.id;
+    const identity = createWebRTCProfileRestartIdentity();
+    peerIdRef.current = identity.peerId;
+    seamlessRestartRef.current = true;
+    profileAutoRetriesRemainingRef.current = 1;
+    setRetryVersion((currentVersion) => currentVersion + 1);
+  }, [streamProfile]);
+
+  useEffect(() => {
     if (!gameId) return;
 
+    const activeStreamProfile = streamProfileRef.current;
+    const seamlessRestart = seamlessRestartRef.current;
+    seamlessRestartRef.current = false;
     const peerId = peerIdRef.current;
     const mode = options.mode || "host";
     const requestedRole =
@@ -171,10 +193,26 @@ export function useWebRTC(
     let disconnectedTimeoutId: number | null = null;
     let heartbeatIntervalId: number | null = null;
     let disposed = false;
+    let automaticRecoveryQueued = false;
+    let incomingStream: MediaStream | null = null;
     let iceServersForSession: RTCIceServer[] = FALLBACK_ICE_SERVERS;
 
     const failStream = (message: string) => {
       if (disposed) return;
+      if (
+        seamlessRestart &&
+        !automaticRecoveryQueued &&
+        profileAutoRetriesRemainingRef.current > 0
+      ) {
+        automaticRecoveryQueued = true;
+        profileAutoRetriesRemainingRef.current -= 1;
+        const identity = createWebRTCProfileRestartIdentity();
+        peerIdRef.current = identity.peerId;
+        seamlessRestartRef.current = true;
+        setRetryVersion((currentVersion) => currentVersion + 1);
+        return;
+      }
+
       setTelemetry((currentTelemetry) => ({
         ...currentTelemetry,
         lastEngineError: message,
@@ -184,17 +222,27 @@ export function useWebRTC(
     };
 
     const initialize = async () => {
-      setStatus("connecting");
-      setStream(null);
-      setLobbyState(null);
-      setLocalParticipant(null);
-      localParticipantRef.current = null;
-      setInputCapabilities(CHECKING_INPUT_CAPABILITIES);
-      setShareContext({
-        companionUrls: [],
-        exposureMode: "unknown",
-      });
-      setTelemetry(INITIAL_WEBRTC_TELEMETRY);
+      if (seamlessRestart) {
+        setStatus((currentStatus) =>
+          currentStatus === "playing" ? "playing" : "connecting",
+        );
+        setTelemetry((currentTelemetry) => ({
+          ...currentTelemetry,
+          lastEngineError: null,
+        }));
+      } else {
+        setStatus("connecting");
+        setStream(null);
+        setLobbyState(null);
+        setLocalParticipant(null);
+        localParticipantRef.current = null;
+        setInputCapabilities(CHECKING_INPUT_CAPABILITIES);
+        setShareContext({
+          companionUrls: [],
+          exposureMode: "unknown",
+        });
+        setTelemetry(INITIAL_WEBRTC_TELEMETRY);
+      }
       lastMetricSentAtRef.current = 0;
 
       const [nextIceServers, nextInputCapabilities, nextShareContext] =
@@ -216,11 +264,10 @@ export function useWebRTC(
         socket,
         sessionId,
         onTrack: (track) => {
-          setStream((prevStream) => {
-            const newStream = prevStream || new MediaStream();
-            newStream.addTrack(track);
-            return newStream;
-          });
+          incomingStream ||= new MediaStream();
+          incomingStream.addTrack(track);
+          setStream(incomingStream);
+          profileAutoRetriesRemainingRef.current = 0;
           setStatus("playing");
         },
       });
@@ -382,9 +429,9 @@ export function useWebRTC(
           sessionId,
           iceServers: iceServersForSession,
           streamProfile: {
-            bitrateKbps: streamProfile.bitrateKbps,
-            fps: streamProfile.fps,
-            id: streamProfile.id,
+            bitrateKbps: activeStreamProfile.bitrateKbps,
+            fps: activeStreamProfile.fps,
+            id: activeStreamProfile.id,
           },
           ...bootTarget,
         });
@@ -466,6 +513,8 @@ export function useWebRTC(
 
     return () => {
       disposed = true;
+      const preserveActiveSession =
+        seamlessRestart || seamlessRestartRef.current;
       stopTelemetry();
       detachEngineInput();
       if (disconnectedTimeoutId !== null) {
@@ -475,11 +524,15 @@ export function useWebRTC(
         window.clearInterval(heartbeatIntervalId);
       }
 
-      if (pcRef.current) {
-        pcRef.current.close();
+      if (pc) {
+        pc.close();
+        if (pcRef.current === pc) pcRef.current = null;
       }
       socket.emit("webrtc-peer-disconnect", { peerId, sessionId });
-      if (localParticipantRef.current?.role === "host") {
+      if (
+        !preserveActiveSession &&
+        localParticipantRef.current?.role === "host"
+      ) {
         api.endMultiplayerLobby(sessionId).catch((err) => {
           if (err instanceof ApiError && [401, 503].includes(err.status)) {
             return;
@@ -501,8 +554,10 @@ export function useWebRTC(
       socket.off("lobby-state");
       socket.off("python-ready");
 
-      setStream(null);
-      setTelemetry(INITIAL_WEBRTC_TELEMETRY);
+      if (!preserveActiveSession) {
+        setStream(null);
+        setTelemetry(INITIAL_WEBRTC_TELEMETRY);
+      }
     };
   }, [
     gameId,
@@ -513,7 +568,6 @@ export function useWebRTC(
     pairingVersion,
     retryVersion,
     sessionId,
-    streamProfile,
   ]);
 
   const retry = () => {
@@ -522,6 +576,8 @@ export function useWebRTC(
     if (identity.sessionId) setSessionId(identity.sessionId);
     metricsDisabledRef.current = false;
     lastMetricSentAtRef.current = 0;
+    seamlessRestartRef.current = false;
+    profileAutoRetriesRemainingRef.current = 0;
     setRetryVersion((currentVersion) => currentVersion + 1);
   };
 
