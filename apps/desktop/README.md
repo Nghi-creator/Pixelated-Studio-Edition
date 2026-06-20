@@ -2,11 +2,18 @@
 
 Electron wrapper for starting and stopping the local Docker engine.
 
+Main-process code is grouped under `main/companion`, `main/docker`,
+`main/engine`, `main/network`, and `main/runtime`. Tests are split between
+`tests/unit/<subsystem>/` and `tests/integration/`.
+
 Run from this folder:
 
 ```sh
 npm start
 ```
+
+`npm run build` clears stale compiler output before rebuilding, so moved files
+cannot remain in `dist` and accidentally enter a test run or packaged release.
 
 Package a release from this folder:
 

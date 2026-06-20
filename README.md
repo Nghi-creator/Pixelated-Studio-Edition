@@ -35,6 +35,25 @@ You can run the product locally, or drop the container onto a DigitalOcean dropl
 
 ---
 
+## Repository layout
+
+```text
+apps/
+  web/                 React client; shared libraries and unit/interaction tests
+  desktop/             Electron shell; main-process subsystems and release tests
+engine/runtime/        Containerized game and WebRTC runtime
+services/api/          Fastify API; domain-grouped routes and tests
+scripts/               Hosted, LAN, and browser smoke tooling
+supabase/              Database migrations, configuration, and email templates
+assets/                Repository-level artwork
+```
+
+Each application keeps framework entrypoints at its root. Supporting code is
+grouped by domain, while test trees separate unit, integration, interaction,
+and smoke coverage where those types apply.
+
+---
+
 ## 🌟 PIXELATED Studio desktop app
 
 PIXELATED Studio is distributed as a standalone, pre-packaged desktop application. You do not need to compile the source code to use it.

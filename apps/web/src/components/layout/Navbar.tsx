@@ -7,7 +7,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import type { User } from "@supabase/supabase-js";
-import { api, getAuthSession } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/api/apiClient";
 import { Avatar } from "../ui/Avatar";
 import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engine/engineAuth";
 import { PixelIcon } from "../ui/PixelIcon";

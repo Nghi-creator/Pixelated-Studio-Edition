@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { api } from "../../lib/apiClient";
+import { api } from "../../lib/api/apiClient";
 
 export function usePlayCount(gameId: string | undefined) {
   useEffect(() => {

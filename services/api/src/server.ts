@@ -3,21 +3,21 @@ import { env } from "./config/env.js";
 import { scheduleControlPlaneCleanup } from "./modules/maintenance/controlPlaneCleanup.js";
 import { createLoggerOptions } from "./plugins/logger.js";
 import { registerCors } from "./plugins/cors.js";
-import { registerAccessLogRoutes } from "./routes/accessLogs.js";
-import { registerAdminUserRoutes } from "./routes/adminUsers.js";
-import { registerAuthMethodsRoutes } from "./routes/authMethods.js";
-import { registerCatalogRoutes } from "./routes/catalog.js";
-import { registerGameRoutes } from "./routes/games.js";
-import { registerHealthRoutes } from "./routes/health.js";
-import { registerLocalPairingRoutes } from "./routes/localPairings.js";
-import { registerMeRoutes } from "./routes/me.js";
-import { registerMetricRoutes } from "./routes/metrics.js";
-import { registerModerationRoutes } from "./routes/moderation.js";
-import { registerMultiplayerRoutes } from "./routes/multiplayer.js";
-import { registerProfileRoutes } from "./routes/profiles.js";
-import { registerSessionRoutes } from "./routes/sessions.js";
-import { registerSubmissionRoutes } from "./routes/submissions.js";
-import { registerWebRTCRoutes } from "./routes/webrtc.js";
+import { registerAccessLogRoutes } from "./routes/admin/accessLogs.js";
+import { registerAdminUserRoutes } from "./routes/admin/adminUsers.js";
+import { registerModerationRoutes } from "./routes/admin/moderation.js";
+import { registerAuthMethodsRoutes } from "./routes/auth/authMethods.js";
+import { registerMeRoutes } from "./routes/auth/me.js";
+import { registerSessionRoutes } from "./routes/auth/sessions.js";
+import { registerCatalogRoutes } from "./routes/catalog/catalog.js";
+import { registerGameRoutes } from "./routes/catalog/games.js";
+import { registerSubmissionRoutes } from "./routes/catalog/submissions.js";
+import { registerLocalPairingRoutes } from "./routes/multiplayer/localPairings.js";
+import { registerMultiplayerRoutes } from "./routes/multiplayer/multiplayer.js";
+import { registerWebRTCRoutes } from "./routes/multiplayer/webrtc.js";
+import { registerHealthRoutes } from "./routes/system/health.js";
+import { registerMetricRoutes } from "./routes/system/metrics.js";
+import { registerProfileRoutes } from "./routes/users/profiles.js";
 
 export async function buildServer() {
   const app = Fastify({

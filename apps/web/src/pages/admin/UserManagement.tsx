@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, RefreshCw, Search } from "lucide-react";
-import { api, getAuthSession } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/api/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
 import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";

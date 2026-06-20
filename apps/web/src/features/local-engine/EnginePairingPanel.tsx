@@ -1,6 +1,6 @@
 import { Eye, EyeOff, Loader2, Trash2, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
-import { api, ApiError } from "../../lib/apiClient";
+import { api, ApiError } from "../../lib/api/apiClient";
 import {
   clearEngineToken,
   createCompanionEngineToken,

@@ -12,13 +12,13 @@ import {
   startEngine,
   startDockerAndResume,
   stopEngine,
-} from "./main/engineController";
-import { createCompanionQrDataUrl } from "./main/companionQr";
+} from "./main/engine/controller";
+import { createCompanionQrDataUrl } from "./main/companion/qr";
 import {
   getDockerResourceUrl,
   isDockerDiagnosticCode,
   type DockerResource,
-} from "./main/dockerDiagnostics";
+} from "./main/docker/diagnostics";
 
 let mainWindow: BrowserWindow | null = null;
 

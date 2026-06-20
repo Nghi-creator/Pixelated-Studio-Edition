@@ -17,7 +17,7 @@ import { useAuthUser } from "../../features/player/useAuthUser";
 import { useGameMetadata } from "../../features/player/useGameMetadata";
 import { useGameReactions } from "../../features/player/useGameReactions";
 import { usePlayCount } from "../../features/player/usePlayCount";
-import { api } from "../../lib/apiClient";
+import { api } from "../../lib/api/apiClient";
 import {
   getStreamProfile,
   STREAM_PROFILES,

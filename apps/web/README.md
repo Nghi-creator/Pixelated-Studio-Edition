@@ -2,10 +2,21 @@
 
 Vite/React frontend for the hosted Pixelated Studio web app.
 
+Shared browser infrastructure lives under `src/lib/`, grouped into `api`,
+`auth`, `engine`, `navigation`, `session`, and `webrtc`. Tests live under
+`tests/unit/<domain>/`; the browser harness lives under `tests/interaction/`.
+
 Run from this folder:
 
 ```sh
 npm run dev
+```
+
+Run unit tests and the production build with:
+
+```sh
+npm test
+npm run build
 ```
 
 Important env vars:

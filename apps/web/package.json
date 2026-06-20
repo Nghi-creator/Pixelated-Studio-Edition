@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "test": "node --test --experimental-strip-types \"tests/*.test.ts\""
+    "test": "node --test --experimental-strip-types \"tests/unit/**/*.test.ts\""
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.100.0",

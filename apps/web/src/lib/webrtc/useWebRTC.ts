@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
-import { api, ApiError } from "../apiClient";
+import { api, ApiError } from "../api/apiClient";
 import {
   clearEngineToken,
   ENGINE_PAIRING_EVENT,

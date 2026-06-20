@@ -5,16 +5,16 @@ import {
   engineAllowedOrigins,
   engineImage,
   hostedWebUrl,
-} from "../config";
-import { hasHostUinput } from "../docker";
-import { buildDockerRunArgs } from "../dockerCommands";
+} from "../runtime/config";
+import { hasHostUinput } from "../docker/client";
+import { buildDockerRunArgs } from "../docker/commands";
 import {
   getAdvertisedCompanionUrls,
   getAdvertisedEngineUrls,
   getDockerPublishHost,
   normalizeExposureMode,
   type ExposureMode,
-} from "../exposure";
+} from "../network/exposure";
 
 const INVITE_CODE_TTL_MS = 10 * 60 * 1000;
 

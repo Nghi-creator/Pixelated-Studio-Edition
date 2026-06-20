@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabase } from "../../lib/auth/supabaseClient";
-import { api, getAuthSession } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/api/apiClient";
 import {
   getPublishErrorMessage,
   submitGameForReview,

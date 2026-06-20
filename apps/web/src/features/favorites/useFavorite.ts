@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, getAuthSession } from "../../lib/apiClient";
+import { api, getAuthSession } from "../../lib/api/apiClient";
 import { supabase } from "../../lib/auth/supabaseClient";
 import {
   ensureFavoritesLoaded,

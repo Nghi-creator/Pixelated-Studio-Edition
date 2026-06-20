@@ -7,7 +7,7 @@ import {
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import AdminLayout from "./components/layout/AdminLayout";
-import { useSessionTracker } from "./lib/useSessionTracker";
+import { useSessionTracker } from "./lib/session/useSessionTracker";
 import { useEngineConnectionMonitor } from "./lib/engine/useEngineConnectionMonitor";
 import { useDesktopLaunchPairing } from "./lib/engine/useDesktopLaunchPairing";
 
