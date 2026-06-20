@@ -1,10 +1,4 @@
-import {
-  Eye,
-  EyeOff,
-  Loader2,
-  Trash2,
-  Wifi,
-} from "lucide-react";
+import { Eye, EyeOff, Loader2, Trash2, Wifi } from "lucide-react";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "../../lib/apiClient";
 import {
@@ -58,8 +52,8 @@ export function EnginePairingPanel({
   const [engineUrl, setEngineUrlInput] = useState(
     () => getInviteCompanionUrl(window.location.search) || getEngineUrl(),
   );
-  const [inviteJoinRequested, setInviteJoinRequested] = useState(
-    () => Boolean(getInviteCompanionUrl(window.location.search)),
+  const [inviteJoinRequested, setInviteJoinRequested] = useState(() =>
+    Boolean(getInviteCompanionUrl(window.location.search)),
   );
   const [inviteCode, setInviteCode] = useState("");
   const [token, setToken] = useState(getEngineToken);
@@ -85,8 +79,8 @@ export function EnginePairingPanel({
   const parsedEngineUrl = parseEngineUrl(engineUrl);
   const isCompanionJoin = Boolean(
     inviteJoinRequested &&
-      parsedEngineUrl &&
-      isLikelyCompanionUrl(parsedEngineUrl),
+    parsedEngineUrl &&
+    isLikelyCompanionUrl(parsedEngineUrl),
   );
   const preflightReady =
     lanPreflight.status === "complete" && lanPreflight.payload.ready === true;
@@ -119,7 +113,9 @@ export function EnginePairingPanel({
         setEngineUrlInput(pairing.engineUrl);
       })
       .catch((err) => {
-        if (!(err instanceof ApiError && [401, 404, 503].includes(err.status))) {
+        if (
+          !(err instanceof ApiError && [401, 404, 503].includes(err.status))
+        ) {
           console.warn("Failed to load backend local pairing:", err);
         }
       });
@@ -127,7 +123,8 @@ export function EnginePairingPanel({
 
   useEffect(() => {
     const parsedUrl = parseEngineUrl(engineUrl);
-    if (!isCompanionJoin || !parsedUrl || !isLikelyCompanionUrl(parsedUrl)) return;
+    if (!isCompanionJoin || !parsedUrl || !isLikelyCompanionUrl(parsedUrl))
+      return;
 
     let active = true;
     const checkPreflight = () => {
@@ -187,7 +184,9 @@ export function EnginePairingPanel({
 
     if (joiningWithInvite && !preflightReady) {
       setPairingState("error");
-      setMessage("Complete the LAN join checks before entering the invite code.");
+      setMessage(
+        "Complete the LAN join checks before entering the invite code.",
+      );
       return;
     }
 
@@ -216,8 +215,9 @@ export function EnginePairingPanel({
         );
 
         if (!inviteResponse.ok) {
-          const failurePayload =
-            (await inviteResponse.json().catch(() => ({}))) as InviteRedeemPayload;
+          const failurePayload = (await inviteResponse
+            .json()
+            .catch(() => ({}))) as InviteRedeemPayload;
           setPairingState("error");
           setMessage(
             getInviteFailureMessage(inviteResponse.status, failurePayload.code),
@@ -232,7 +232,9 @@ export function EnginePairingPanel({
           (await inviteResponse.json()) as InviteRedeemPayload;
         if (!invitePayload.companionToken) {
           setPairingState("error");
-          setMessage("The host join page did not return a companion credential.");
+          setMessage(
+            "The host join page did not return a companion credential.",
+          );
           return;
         }
 
@@ -308,27 +310,27 @@ export function EnginePairingPanel({
       setEngineUrl(normalizedUrl);
       setEngineToken(normalizedToken);
 
-      let successMessage =
-        joiningWithInvite
-          ? "Joined the host engine. Keep this page open while you play."
-          : actualScope === "lan"
-            ? "LAN engine paired. Keep the desktop app running while guests connect."
-            : "Local engine paired.";
+      let successMessage = joiningWithInvite
+        ? "Joined the host engine. Keep this page open while you play."
+        : actualScope === "lan"
+          ? "LAN engine paired. Keep the desktop app running while guests connect."
+          : "Local engine paired.";
 
       try {
         await api.pairLocalEngine(normalizedUrl);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
-          successMessage =
-            joiningWithInvite
-              ? "Joined the host engine. Sign in to register pairing intent with the API."
-              : "Engine token saved locally. Sign in to register pairing intent with the API.";
+          successMessage = joiningWithInvite
+            ? "Joined the host engine. Sign in to register pairing intent with the API."
+            : "Engine token saved locally. Sign in to register pairing intent with the API.";
         } else {
-          console.warn("Local engine paired, but API registration failed:", err);
-          successMessage =
-            joiningWithInvite
-              ? "Joined the host engine. Backend pairing registration is unavailable."
-              : "Engine token saved locally. Backend pairing registration is unavailable.";
+          console.warn(
+            "Local engine paired, but API registration failed:",
+            err,
+          );
+          successMessage = joiningWithInvite
+            ? "Joined the host engine. Backend pairing registration is unavailable."
+            : "Engine token saved locally. Backend pairing registration is unavailable.";
         }
       }
 
@@ -426,7 +428,9 @@ export function EnginePairingPanel({
                   value={inviteCode}
                   onChange={(event) =>
                     setInviteCode(
-                      event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""),
+                      event.target.value
+                        .toUpperCase()
+                        .replace(/[^A-Z0-9]/g, ""),
                     )
                   }
                   className="h-11 w-full rounded-lg border border-[#7E3250] bg-synth-bg px-3 font-mono text-sm tracking-widest text-white outline-none transition-colors placeholder:text-gray-600 focus:border-[#C01662]"

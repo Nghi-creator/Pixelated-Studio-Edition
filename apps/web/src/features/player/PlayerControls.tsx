@@ -49,14 +49,18 @@ export function PlayerControls({
                   onClick={() => onStreamProfileChange(profile.id)}
                   className={`min-h-12 rounded-lg border px-3 text-left transition-colors ${
                     isSelected
-                      ? "border-synth-border bg-synth-elevated text-white"
+                      ? "border-synth-action-hover bg-synth-action text-white"
                       : "border-synth-border bg-synth-bg text-gray-400 hover:text-white"
                   }`}
                 >
                   <span className="block text-sm font-semibold">
                     {profile.label}
                   </span>
-                  <span className="block text-xs text-gray-500">
+                  <span
+                    className={`block text-xs ${
+                      isSelected ? "text-white/70" : "text-gray-500"
+                    }`}
+                  >
                     {profile.fps}fps · {profile.bitrateKbps}kbps
                   </span>
                 </button>
