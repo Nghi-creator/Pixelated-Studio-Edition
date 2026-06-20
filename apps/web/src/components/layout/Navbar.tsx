@@ -230,6 +230,10 @@ export default function Navbar() {
 
                   {isDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 rounded-lg border border-synth-border bg-synth-surface py-2 shadow-card z-50">
+                      <span
+                        aria-hidden="true"
+                        className="absolute -top-2 right-3 h-4 w-4 rotate-45 border-l border-t border-synth-border bg-synth-surface"
+                      />
                       <div className="px-4 py-2 border-b border-synth-border mb-2">
                         <p className="text-sm text-synth-secondary truncate">
                           Signed in as

@@ -1,5 +1,6 @@
-import { Activity, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 import type { WebRTCStatus } from "../../lib/webrtc/webrtcSession";
 
 type PlayerHeaderProps = {
@@ -64,7 +65,7 @@ export function PlayerHeader({
                 : "border-synth-border bg-synth-surface text-gray-400 hover:text-white"
             }`}
           >
-            <Activity className="h-4 w-4" />
+            <PixelIcon className="h-4 w-4" name="logs" />
           </button>
 
           <div className="flex items-center gap-2 bg-synth-surface px-4 py-2 rounded-full border border-synth-border">

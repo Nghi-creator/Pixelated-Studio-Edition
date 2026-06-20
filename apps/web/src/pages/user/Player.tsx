@@ -5,7 +5,10 @@ import { LobbyPanel } from "../../features/player/LobbyPanel";
 import { ReportModal } from "../../features/player/comments/ReportModal";
 import { useCommentReporting } from "../../features/player/comments/useCommentReporting";
 import { useComments } from "../../features/player/comments/useComments";
-import { PlayerControls } from "../../features/player/PlayerControls";
+import {
+  PlayerControls,
+  PlayerInstructions,
+} from "../../features/player/PlayerControls";
 import { PlayerHeader } from "../../features/player/PlayerHeader";
 import { ReactionButtons } from "../../features/player/ReactionButtons";
 import { StreamStage } from "../../features/player/StreamStage";
@@ -39,6 +42,7 @@ export default function Player() {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [isMuted, setIsMuted] = useState(false);
 
   const [streamProfileId, setStreamProfileId] = useState<StreamProfileId>(() => {
     if (typeof window === "undefined") return "balanced";
@@ -275,6 +279,16 @@ export default function Player() {
         }`}
       >
         <StreamStage
+          controls={
+            <PlayerControls
+              isMuted={isMuted}
+              onMuteToggle={() => setIsMuted((muted) => !muted)}
+              onStreamProfileChange={setStreamProfileId}
+              selectedStreamProfileId={streamProfileId}
+              streamProfiles={STREAM_PROFILES}
+            />
+          }
+          isMuted={isMuted}
           onRetry={retry}
           showStreamTelemetry={showStreamTelemetry}
           status={status}
@@ -295,7 +309,7 @@ export default function Player() {
         )}
       </div>
 
-      <div className="mt-3 flex w-full max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mt-3 flex w-full max-w-5xl">
         {authorName ? (
           <p className="text-sm font-medium text-synth-primary">
             Developed by: {authorName}
@@ -303,24 +317,22 @@ export default function Player() {
         ) : (
           <span />
         )}
-
-        <LobbyPanel
-          currentParticipant={localParticipant}
-          inputCapabilities={inputCapabilities}
-          lobbyState={lobbyState}
-          onKickParticipant={kickParticipant}
-          onReleaseSlot={releasePlayerSlot}
-          onRequestSlot={requestPlayerSlot}
-          shareGuidance={shareInvite.guidance}
-          shareText={shareInvite.text}
-          shareUrl={shareInvite.url}
-        />
       </div>
 
-      <PlayerControls
-        onStreamProfileChange={setStreamProfileId}
-        selectedStreamProfileId={streamProfileId}
-        streamProfiles={STREAM_PROFILES}
+      <PlayerInstructions
+        lobby={
+          <LobbyPanel
+            currentParticipant={localParticipant}
+            inputCapabilities={inputCapabilities}
+            lobbyState={lobbyState}
+            onKickParticipant={kickParticipant}
+            onReleaseSlot={releasePlayerSlot}
+            onRequestSlot={requestPlayerSlot}
+            shareGuidance={shareInvite.guidance}
+            shareText={shareInvite.text}
+            shareUrl={shareInvite.url}
+          />
+        }
       />
 
       <CommentsPanel
