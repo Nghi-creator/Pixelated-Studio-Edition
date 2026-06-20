@@ -343,11 +343,25 @@ async function cleanup() {
 
 function assertHostedPairingContract() {
   const desktopController = fs.readFileSync(
-    path.join(rootDir, "apps", "desktop", "main", "engineController.ts"),
+    path.join(
+      rootDir,
+      "apps",
+      "desktop",
+      "main",
+      "engine",
+      "controller.ts",
+    ),
     "utf8",
   );
   const desktopCompanion = fs.readFileSync(
-    path.join(rootDir, "apps", "desktop", "main", "companionServer.ts"),
+    path.join(
+      rootDir,
+      "apps",
+      "desktop",
+      "main",
+      "companion",
+      "server.ts",
+    ),
     "utf8",
   );
   const launchPairing = fs.readFileSync(
@@ -433,7 +447,8 @@ async function main() {
       "desktop",
       "dist",
       "main",
-      "companionServer.js",
+      "companion",
+      "server.js",
     );
     assert.equal(fs.existsSync(modulePath), true, "Run the desktop build first.");
     companion = require(modulePath);
