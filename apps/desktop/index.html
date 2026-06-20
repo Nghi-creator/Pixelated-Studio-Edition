@@ -230,12 +230,12 @@
           </button>
 
           <div
-            class="status-badge ml-auto flex min-w-0 max-w-full items-center gap-2 rounded-full border border-red-500/50 bg-red-500/10 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-300 sm:max-w-md"
+            class="status-badge ml-auto flex min-w-0 max-w-full items-center gap-2 rounded-full border border-red-500/70 bg-red-500/20 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-200 sm:max-w-md"
             title="Engine Offline"
           >
             <span
               id="status-dot"
-              class="h-2.5 w-2.5 shrink-0 rounded-full bg-red-400"
+              class="h-2.5 w-2.5 shrink-0 rounded-full bg-red-500"
             ></span>
             <span id="status-text" class="min-w-0 truncate">Engine Offline</span>
           </div>
@@ -452,21 +452,21 @@
 
       <section id="client-access-panel" class="mt-5 rounded-lg border border-synth-border bg-synth-surface/95 p-5 shadow-2xl">
         <div class="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
+          <div class="min-w-0 flex-1">
             <p class="text-[10px] uppercase tracking-[0.22em] text-synth-secondary">
               Client Access
             </p>
             <h2 class="mt-1 text-lg font-bold text-white">
               Connected browsers
             </h2>
-            <p class="mt-1 max-w-3xl text-xs leading-5 text-gray-400">
+            <p class="mt-1 text-xs leading-5 text-gray-400">
               Same-browser tabs are expected. Revoke disconnects one browser client. Rotate restarts the engine with a new host-local pairing token.
             </p>
           </div>
           <div class="flex flex-wrap gap-2">
             <button
               id="rotate-token"
-              class="rounded-lg border border-synth-border bg-synth-elevated px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-synth-surface disabled:cursor-not-allowed disabled:opacity-50"
+              class="rounded-lg border border-[#7E465B] bg-[#5A3140] px-4 py-2 text-xs font-bold text-white transition-colors hover:bg-[#4A2835] disabled:cursor-not-allowed disabled:opacity-50"
               type="button"
             >
               Rotate Token

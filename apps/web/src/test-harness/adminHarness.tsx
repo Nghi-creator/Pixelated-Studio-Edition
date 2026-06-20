@@ -293,10 +293,13 @@ export function AdminHarness() {
         <StreamStage
           controls={
             <PlayerControls
+              gameTitle="Harness Game"
               isMuted={isMuted}
               onMuteToggle={() => setIsMuted((muted) => !muted)}
               onStreamProfileChange={setStreamProfileId}
+              onToggleTelemetry={() => setShowTelemetry((visible) => !visible)}
               selectedStreamProfileId={streamProfileId}
+              showStreamTelemetry={showTelemetry}
               streamProfiles={STREAM_PROFILES}
             />
           }

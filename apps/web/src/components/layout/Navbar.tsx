@@ -148,7 +148,9 @@ export default function Navbar() {
               className={`relative ${getNavIconClass(isEnginePage)}`}
             >
               <PixelIcon
-                className="h-6 w-6"
+                className={`h-6 w-6 ${
+                  isEnginePaired ? "text-[#9B0048]" : "text-gray-400"
+                }`}
                 name={isEnginePaired ? "engine-on" : "engine-off"}
               />
               <span

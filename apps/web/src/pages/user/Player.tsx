@@ -264,6 +264,7 @@ export default function Player() {
         backRoute={backRoute}
         backText={backText}
         gameTitle={gameTitle}
+        hideGameChrome
         onToggleTelemetry={() =>
           setShowStreamTelemetry((isVisible) => !isVisible)
         }
@@ -281,10 +282,15 @@ export default function Player() {
         <StreamStage
           controls={
             <PlayerControls
+              gameTitle={gameTitle}
               isMuted={isMuted}
               onMuteToggle={() => setIsMuted((muted) => !muted)}
               onStreamProfileChange={setStreamProfileId}
+              onToggleTelemetry={() =>
+                setShowStreamTelemetry((isVisible) => !isVisible)
+              }
               selectedStreamProfileId={streamProfileId}
+              showStreamTelemetry={showStreamTelemetry}
               streamProfiles={STREAM_PROFILES}
             />
           }

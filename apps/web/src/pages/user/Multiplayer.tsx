@@ -57,8 +57,8 @@ function ModeButton({
     <button
       className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-bold transition-colors ${
         active
-          ? "border-synth-primary/70 bg-synth-primary/20 text-white shadow-card"
-          : "border-synth-border bg-synth-surface text-gray-400 hover:border-synth-primary/50 hover:text-white"
+          ? "border-[#C02066] bg-[#9B0048] text-white shadow-card"
+          : "border-[#C02066]/50 bg-[#9B0048]/15 text-gray-300 hover:border-[#C02066] hover:bg-[#9B0048]/30 hover:text-white"
       }`}
       onClick={onClick}
       type="button"
@@ -423,7 +423,7 @@ export default function Multiplayer() {
 
                 {cloudTotalPages > 1 && (
                   <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <p className="text-sm text-gray-500">
+                    <p className="text-sm text-white">
                       Showing {cloudPageStart + 1}-
                       {Math.min(
                         cloudPageStart + cloudGames.length,
@@ -432,8 +432,9 @@ export default function Multiplayer() {
                       of {cloudTotal}
                     </p>
 
-                    <Pagination
-                      currentPage={safeCloudPage}
+                  <Pagination
+                    berryArrows
+                    currentPage={safeCloudPage}
                       onPageChange={(page) => changeCatalogPage(page, "cloud")}
                       totalPages={cloudTotalPages}
                     />
@@ -457,7 +458,7 @@ export default function Multiplayer() {
 
               {localPageSlice.totalPages > 1 && (
                 <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm text-white">
                     Showing {localPageSlice.pageStart + 1}-
                     {Math.min(
                       localPageSlice.pageStart + localPageSlice.items.length,
@@ -466,6 +467,7 @@ export default function Multiplayer() {
                     of {filteredLocalGames.length}
                   </p>
                   <Pagination
+                    berryArrows
                     currentPage={localPageSlice.safeCurrentPage}
                     onPageChange={(page) => changeCatalogPage(page, "local")}
                     totalPages={localPageSlice.totalPages}
