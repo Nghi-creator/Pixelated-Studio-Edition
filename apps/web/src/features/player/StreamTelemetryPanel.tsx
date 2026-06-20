@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Activity, Clipboard, X } from "lucide-react";
+import { Clipboard, X } from "lucide-react";
 import { engineAuthHeaders } from "../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../lib/engine/engineConfig";
 import type { WebRTCTelemetry } from "../../lib/webrtc/webrtcTelemetry";
@@ -191,7 +191,6 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
     <section className="fixed bottom-4 left-4 right-4 z-40 rounded-lg border border-synth-border bg-synth-surface p-3 shadow-card sm:bottom-auto sm:left-auto sm:right-4 sm:top-20 sm:w-72 xl:static xl:flex xl:h-full xl:w-full xl:flex-col xl:justify-between">
       <div className="mb-3 flex items-center justify-between gap-2">
         <p className="inline-flex items-center gap-2 text-sm font-semibold text-gray-200">
-          <Activity className="h-4 w-4 text-synth-secondary" />
           Stream Stats
         </p>
         <div className="flex items-center gap-1">

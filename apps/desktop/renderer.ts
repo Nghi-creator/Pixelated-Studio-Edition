@@ -488,8 +488,8 @@ type StatusTone = "offline" | "ready" | "running";
 function setStatusPresentation(text: string, tone: StatusTone) {
   const toneClasses = {
     offline: {
-      badge: ["border-red-500/50", "bg-red-500/10", "text-red-300"],
-      dot: "bg-red-400",
+      badge: ["border-red-500/70", "bg-red-500/20", "text-red-200"],
+      dot: "bg-red-500",
     },
     ready: {
       badge: ["border-emerald-500/50", "bg-emerald-500/10", "text-emerald-300"],

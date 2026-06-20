@@ -10,12 +10,14 @@ type PlayerHeaderProps = {
   showStreamTelemetry: boolean;
   status: WebRTCStatus;
   onToggleTelemetry: () => void;
+  hideGameChrome?: boolean;
 };
 
 export function PlayerHeader({
   backRoute,
   backText,
   gameTitle,
+  hideGameChrome = false,
   onToggleTelemetry,
   showStreamTelemetry,
   status,
@@ -34,10 +36,26 @@ export function PlayerHeader({
       : status === "error"
         ? "bg-red-500"
         : "bg-amber-400 animate-pulse";
+  const statusBadge = (
+    <div className="flex items-center gap-2 rounded-full border border-synth-border bg-synth-surface px-4 py-2">
+      <div className={`h-2.5 w-2.5 rounded-full ${statusDotClass}`} />
+      <span className="text-sm font-medium uppercase tracking-wider text-gray-300">
+        {statusLabel}
+      </span>
+    </div>
+  );
 
   return (
-    <div className="w-full max-w-5xl flex flex-col mb-6">
-      <div className="p-4">
+    <div
+      className={`flex w-full max-w-5xl flex-col ${
+        hideGameChrome ? "mb-1" : "mb-6"
+      }`}
+    >
+      <div
+        className={`flex items-center gap-4 ${
+          hideGameChrome ? "justify-between px-1 py-2" : "justify-start p-4"
+        }`}
+      >
         <Link
           to={backRoute}
           className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
@@ -45,10 +63,12 @@ export function PlayerHeader({
           <ArrowLeft className="w-5 h-5" />
           {backText}
         </Link>
+        {hideGameChrome && statusBadge}
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row sm:justify-between sm:items-center">
-        <h1 className="text-3xl font-extrabold text-white tracking-tight">
+      {!hideGameChrome && (
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-3xl font-extrabold tracking-tight text-white">
           {gameTitle || "Loading Game..."}
         </h1>
 
@@ -67,15 +87,10 @@ export function PlayerHeader({
           >
             <PixelIcon className="h-4 w-4" name="logs" />
           </button>
-
-          <div className="flex items-center gap-2 bg-synth-surface px-4 py-2 rounded-full border border-synth-border">
-            <div className={`w-2.5 h-2.5 rounded-full ${statusDotClass}`} />
-            <span className="text-sm font-medium text-gray-300 uppercase tracking-wider">
-              {statusLabel}
-            </span>
-          </div>
+          {statusBadge}
         </div>
       </div>
+      )}
     </div>
   );
 }

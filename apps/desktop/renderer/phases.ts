@@ -124,10 +124,10 @@
 
     if (status === "failed") {
       return {
-        dot: "bg-red-400",
-        item: "border-red-500/50 bg-red-500/10",
+        dot: "bg-red-500",
+        item: "border-red-500/70 bg-red-500/20",
         label: "text-red-100",
-        meta: "text-red-300",
+        meta: "text-red-200",
       };
     }
 
@@ -176,7 +176,7 @@
           "bg-emerald-500/10",
           "text-emerald-300",
         ],
-        failed: ["border-red-500/50", "bg-red-500/10", "text-red-300"],
+        failed: ["border-red-500/70", "bg-red-500/20", "text-red-200"],
       } as const;
       const allSummaryToneClasses = Object.values(summaryToneClasses).flat();
 

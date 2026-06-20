@@ -1,14 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  Loader2,
-  ArrowLeft,
-  Lock,
-  Save,
-  Camera,
-  AlertOctagon,
-  RefreshCw,
-} from "lucide-react";
+import { AlertOctagon } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { api, ApiError, getAuthSession } from "../../lib/apiClient";
@@ -374,7 +366,7 @@ export default function Profile() {
             onClick={() => setLoadAttempt((attempt) => attempt + 1)}
             type="button"
           >
-            <RefreshCw className="h-4 w-4" /> Retry
+            Retry
           </button>
         </div>
       </div>
@@ -421,7 +413,7 @@ export default function Profile() {
           onClick={() => navigate("/")}
           className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-8 w-fit"
         >
-          <ArrowLeft className="w-5 h-5" /> Back to Home
+          Back to Home
         </button>
 
         <h1 className="text-4xl font-extrabold tracking-tight mb-2 text-white">
@@ -469,7 +461,6 @@ export default function Profile() {
                     src={displayAvatar}
                   />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center">
-                    <Camera className="w-6 h-6 text-white mb-1" />
                     <span className="text-[10px] text-white font-bold uppercase tracking-wider">
                       Change
                     </span>
@@ -520,12 +511,7 @@ export default function Profile() {
                 disabled={savingProfile || !username.trim()}
                 className="bg-synth-primary hover:bg-synth-primary-hover text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2 "
               >
-                {savingProfile ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                Save Profile
+                {savingProfile ? "Saving..." : "Save Profile"}
               </button>
             </form>
           </div>
@@ -584,12 +570,7 @@ export default function Profile() {
                   disabled={savingPassword}
                   className="bg-synth-primary hover:bg-synth-primary-hover text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2"
                 >
-                  {savingPassword ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Lock className="w-4 h-4" />
-                  )}
-                  Update Password
+                  {savingPassword ? "Updating..." : "Update Password"}
                 </button>
               </form>
             ) : (

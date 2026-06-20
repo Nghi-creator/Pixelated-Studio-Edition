@@ -1,23 +1,30 @@
 import { Settings, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 import type {
   StreamProfile,
   StreamProfileId,
 } from "../../lib/engine/streamProfiles";
 
 type PlayerControlsProps = {
+  gameTitle: string;
   isMuted: boolean;
   onMuteToggle: () => void;
   onStreamProfileChange: (profileId: StreamProfileId) => void;
+  onToggleTelemetry: () => void;
   selectedStreamProfileId: StreamProfileId;
+  showStreamTelemetry: boolean;
   streamProfiles: StreamProfile[];
 };
 
 export function PlayerControls({
+  gameTitle,
   isMuted,
   onMuteToggle,
   onStreamProfileChange,
+  onToggleTelemetry,
   selectedStreamProfileId,
+  showStreamTelemetry,
   streamProfiles,
 }: PlayerControlsProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -52,8 +59,23 @@ export function PlayerControls({
   return (
     <div
       ref={controlsRef}
-      className="relative z-20 flex h-14 w-full items-center justify-end gap-2 rounded-t-lg border border-b-0 border-synth-border bg-synth-surface px-3"
+      className="relative z-20 flex h-14 w-full items-center gap-2 rounded-t-lg border border-b-0 border-synth-border bg-synth-surface px-3"
     >
+      <h1 className="min-w-0 flex-1 truncate text-lg font-extrabold text-white sm:text-xl">
+        {gameTitle || "Loading Game..."}
+      </h1>
+
+      <button
+        type="button"
+        onClick={onToggleTelemetry}
+        className={controlButtonClass}
+        aria-label="Toggle stream telemetry"
+        aria-pressed={showStreamTelemetry}
+        title="Toggle stream telemetry"
+      >
+        <PixelIcon aria-hidden="true" className="h-5 w-5" name="logs" />
+      </button>
+
       <button
         type="button"
         onClick={onMuteToggle}
