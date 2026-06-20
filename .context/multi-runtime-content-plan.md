@@ -14,6 +14,18 @@ The catalog must never infer redistribution permission from price, age,
 availability, or a “homebrew” label. Every published build must retain its
 license evidence, source link, attribution, and immutable checksum.
 
+## Phase tracker
+
+- [ ] Phase 0 — Rights and schema foundation
+- [ ] Phase 1 — Multi-core libretro engine
+- [ ] Phase 2 — Automated licensed-ROM candidates
+- [ ] Phase 3 — Debian native proof of concept
+- [ ] Phase 4 — Native catalog operations
+- [ ] Phase 5 — Additional libretro platforms
+
+When a phase meets every acceptance criterion in this plan, change its checkbox
+to `[x]` and add a short completion note beneath the corresponding phase.
+
 ## Current architecture and constraints
 
 The engine already has most of the platform-independent pieces:
