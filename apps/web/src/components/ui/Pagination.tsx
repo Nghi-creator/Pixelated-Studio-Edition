@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getVisiblePageNumbers } from "./paginationUtils";
 
 interface PaginationProps {
+  berryArrows?: boolean;
   currentPage: number;
   disabled?: boolean;
   onPageChange: (page: number) => void;
@@ -9,6 +10,7 @@ interface PaginationProps {
 }
 
 export function Pagination({
+  berryArrows = false,
   currentPage,
   disabled = false,
   onPageChange,
@@ -25,7 +27,11 @@ export function Pagination({
     <nav aria-label="Pagination" className="flex flex-wrap items-center gap-1.5">
       <button
         aria-label="Previous page"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-synth-border bg-transparent text-gray-400 transition-colors hover:border-synth-secondary hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-gray-300 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-35 ${
+          berryArrows
+            ? "border-[#C02066] bg-[#9B0048] hover:bg-[#B00052]"
+            : "border-synth-border bg-transparent hover:border-synth-secondary"
+        }`}
         disabled={disabled || safeCurrentPage === 1}
         onClick={() => onPageChange(safeCurrentPage - 1)}
         title="Previous page"
@@ -65,7 +71,11 @@ export function Pagination({
 
       <button
         aria-label="Next page"
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-synth-border bg-transparent text-gray-400 transition-colors hover:border-synth-secondary hover:text-white disabled:cursor-not-allowed disabled:opacity-35"
+        className={`inline-flex h-8 w-8 items-center justify-center rounded-full border text-gray-300 transition-colors hover:text-white disabled:cursor-not-allowed disabled:opacity-35 ${
+          berryArrows
+            ? "border-[#C02066] bg-[#9B0048] hover:bg-[#B00052]"
+            : "border-synth-border bg-transparent hover:border-synth-secondary"
+        }`}
         disabled={disabled || safeCurrentPage === safeTotalPages}
         onClick={() => onPageChange(safeCurrentPage + 1)}
         title="Next page"

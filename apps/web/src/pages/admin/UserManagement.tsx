@@ -328,11 +328,11 @@ export default function UserManagement() {
                     {/* Status Badge */}
                     <td className="p-4">
                       {user.is_banned ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold">
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/70 bg-red-500/20 px-3 py-1 text-xs font-bold text-red-200">
                           Banned
                         </span>
                       ) : user.role === "super_admin" ? (
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold">
                           Super Admin
                         </span>
                       ) : user.role === "admin" ? (
@@ -385,7 +385,7 @@ export default function UserManagement() {
                               className={`px-3 py-1.5 rounded-lg text-sm font-bold transition-all ${
                                 user.is_banned
                                   ? "bg-synth-elevated text-gray-300 hover:bg-synth-border hover:text-white"
-                                  : "bg-red-500/10 text-red-500 hover:bg-red-500/20"
+                                  : "border border-red-500/70 bg-red-500/20 text-red-200 hover:bg-red-500/30"
                               }`}
                             >
                               {isPending ? (
