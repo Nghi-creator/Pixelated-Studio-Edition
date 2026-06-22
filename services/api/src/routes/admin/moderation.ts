@@ -1,1 +1,1 @@
-export { registerModerationRoutes } from "../../modules/moderation/moderationRoutes.js";
+export { registerModerationRoutes } from "../../modules/moderation/http/registerModerationRoutes.js";

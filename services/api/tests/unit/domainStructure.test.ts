@@ -13,7 +13,7 @@ import {
   canResolveTargetRole,
   canReviewOwnReport,
   getPageRange as getModerationPageRange,
-} from "../../src/modules/moderation/moderationPolicy.js";
+} from "../../src/modules/moderation/domain/moderationPolicy.js";
 
 test("catalog helpers normalize cache keys and page ranges", () => {
   assert.equal(
