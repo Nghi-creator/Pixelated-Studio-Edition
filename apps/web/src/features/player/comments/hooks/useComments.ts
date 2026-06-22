@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { api } from "../../../lib/api/apiClient";
-import type { GameComment } from "../types";
-import { getSocialErrorMessage } from "../socialFeedback";
-import { mergeCommentPage } from "./commentPages";
+import { api } from "../../../../lib/api/apiClient";
+import type { GameComment } from "../../types";
+import { getSocialErrorMessage } from "../../socialFeedback";
+import { mergeCommentPage } from "../utils/commentPages";
 
 export function useComments(gameId: string | undefined, currentUser: User | null) {
   const [comments, setComments] = useState<GameComment[]>([]);

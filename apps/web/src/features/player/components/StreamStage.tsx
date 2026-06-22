@@ -1,7 +1,7 @@
 import { AlertTriangle, LoaderCircle, RotateCcw } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
-import type { WebRTCStatus } from "../../lib/webrtc/webrtcSession";
-import type { WebRTCTelemetry } from "../../lib/webrtc/webrtcTelemetry";
+import type { WebRTCStatus } from "../../../lib/webrtc/webrtcSession";
+import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
 
 type StreamStageProps = {
   controls?: ReactNode;

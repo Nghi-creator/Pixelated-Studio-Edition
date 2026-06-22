@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { ApiError, api } from "../../../lib/api/apiClient";
-import { getSocialErrorMessage } from "../socialFeedback";
+import { ApiError, api } from "../../../../lib/api/apiClient";
+import { getSocialErrorMessage } from "../../socialFeedback";
 
 export function useCommentReporting(currentUser: User | null) {
   const [reportingCommentId, setReportingCommentId] = useState<string | null>(

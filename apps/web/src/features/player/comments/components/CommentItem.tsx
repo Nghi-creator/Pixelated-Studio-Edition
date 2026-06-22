@@ -1,7 +1,7 @@
 import { Flag, ThumbsDown, ThumbsUp, Trash2 } from "lucide-react";
 import type { User } from "@supabase/supabase-js";
-import type { GameComment } from "../types";
-import { Avatar } from "../../../components/ui/Avatar";
+import type { GameComment } from "../../types";
+import { Avatar } from "../../../../components/ui/Avatar";
 
 type CommentItemProps = {
   comment: GameComment;

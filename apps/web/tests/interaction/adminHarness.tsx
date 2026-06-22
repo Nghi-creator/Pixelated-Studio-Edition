@@ -11,14 +11,14 @@ import {
   INVALID_ENGINE_TOKEN_MESSAGE,
   validateLocalRomFile,
 } from "../../src/features/local-vault/localVaultClient";
-import { LobbyPanel } from "../../src/features/player/LobbyPanel";
+import { LobbyPanel } from "../../src/features/player/components/LobbyPanel";
 import {
   PlayerControls,
   PlayerInstructions,
-} from "../../src/features/player/PlayerControls";
-import { PlayerHeader } from "../../src/features/player/PlayerHeader";
-import { StreamStage } from "../../src/features/player/StreamStage";
-import { StreamTelemetryPanel } from "../../src/features/player/StreamTelemetryPanel";
+} from "../../src/features/player/components/PlayerControls";
+import { PlayerHeader } from "../../src/features/player/components/PlayerHeader";
+import { StreamStage } from "../../src/features/player/components/StreamStage";
+import { StreamTelemetryPanel } from "../../src/features/player/components/StreamTelemetryPanel";
 import {
   validateRomFile,
   validateSubmissionImageFile,

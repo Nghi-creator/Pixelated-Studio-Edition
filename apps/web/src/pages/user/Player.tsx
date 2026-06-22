@@ -1,22 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { CommentsPanel } from "../../features/player/comments/CommentsPanel";
-import { LobbyPanel } from "../../features/player/LobbyPanel";
-import { ReportModal } from "../../features/player/comments/ReportModal";
-import { useCommentReporting } from "../../features/player/comments/useCommentReporting";
-import { useComments } from "../../features/player/comments/useComments";
+import { CommentsPanel } from "../../features/player/comments/components/CommentsPanel";
+import { LobbyPanel } from "../../features/player/components/LobbyPanel";
+import { ReportModal } from "../../features/player/comments/components/ReportModal";
+import { useCommentReporting } from "../../features/player/comments/hooks/useCommentReporting";
+import { useComments } from "../../features/player/comments/hooks/useComments";
 import {
   PlayerControls,
   PlayerInstructions,
-} from "../../features/player/PlayerControls";
-import { PlayerHeader } from "../../features/player/PlayerHeader";
-import { ReactionButtons } from "../../features/player/ReactionButtons";
-import { StreamStage } from "../../features/player/StreamStage";
-import { StreamTelemetryPanel } from "../../features/player/StreamTelemetryPanel";
-import { useAuthUser } from "../../features/player/useAuthUser";
-import { useGameMetadata } from "../../features/player/useGameMetadata";
-import { useGameReactions } from "../../features/player/useGameReactions";
-import { usePlayCount } from "../../features/player/usePlayCount";
+} from "../../features/player/components/PlayerControls";
+import { PlayerHeader } from "../../features/player/components/PlayerHeader";
+import { ReactionButtons } from "../../features/player/components/ReactionButtons";
+import { StreamStage } from "../../features/player/components/StreamStage";
+import { StreamTelemetryPanel } from "../../features/player/components/StreamTelemetryPanel";
+import { useAuthUser } from "../../features/player/hooks/useAuthUser";
+import { useGameMetadata } from "../../features/player/hooks/useGameMetadata";
+import { useGameReactions } from "../../features/player/hooks/useGameReactions";
+import { usePlayCount } from "../../features/player/hooks/usePlayCount";
 import { api } from "../../lib/api/apiClient";
 import {
   getStreamProfile,

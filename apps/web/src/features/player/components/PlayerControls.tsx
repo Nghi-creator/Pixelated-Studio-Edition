@@ -1,10 +1,10 @@
 import { Settings, Volume2, VolumeX } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { PixelIcon } from "../../components/ui/PixelIcon";
+import { PixelIcon } from "../../../components/ui/PixelIcon";
 import type {
   StreamProfile,
   StreamProfileId,
-} from "../../lib/engine/streamProfiles";
+} from "../../../lib/engine/streamProfiles";
 
 type PlayerControlsProps = {
   gameTitle: string;

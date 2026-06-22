@@ -1,5 +1,5 @@
 import type { User } from "@supabase/supabase-js";
-import type { GameComment } from "../types";
+import type { GameComment } from "../../types";
 import { CommentForm } from "./CommentForm";
 import { CommentItem } from "./CommentItem";
 
