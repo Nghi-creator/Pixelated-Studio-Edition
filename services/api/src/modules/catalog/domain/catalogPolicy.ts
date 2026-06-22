@@ -1,10 +1,4 @@
-import { supabaseService } from "../auth/supabaseAuth.js";
-import { timed, type TimingFields } from "../observability/timing.js";
-
-type ProfileRole = { role: string | null };
 type FeaturedGame = { play_count?: number | null };
-
-export type CatalogService = NonNullable<typeof supabaseService>;
 
 export function isAdminRole(role: string | null | undefined) {
   return role === "admin" || role === "super_admin";
@@ -32,38 +26,6 @@ export function selectFeaturedGames<T extends FeaturedGame>(rows: T[]) {
     (game) => typeof game.play_count === "number" && game.play_count > 0,
   );
   return (hasAnyPlays ? rows : shuffleRows(rows)).slice(0, 5);
-}
-
-export async function fetchFeaturedGames(
-  service: CatalogService,
-  timings: TimingFields,
-) {
-  const { data, error } = await timed(
-    timings,
-    "featured_games_query_ms",
-    () =>
-      service
-        .from("games")
-        .select("id,title,cover_url,backdrop_url,play_count")
-        .order("play_count", { ascending: false })
-        .limit(100),
-  );
-  if (error) throw error;
-  return selectFeaturedGames(data || []);
-}
-
-export async function getUserRole(
-  service: CatalogService | null,
-  userId: string,
-) {
-  if (!service) return null;
-  const { data, error } = await service
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle<ProfileRole>();
-  if (error) throw error;
-  return data?.role || null;
 }
 
 function shuffleRows<T>(rows: T[]) {

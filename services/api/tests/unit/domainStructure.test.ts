@@ -4,11 +4,11 @@ import {
   getCatalogCacheKey,
   getPageRange as getCatalogPageRange,
   selectFeaturedGames,
-} from "../../src/modules/catalog/catalogService.js";
+} from "../../src/modules/catalog/domain/catalogPolicy.js";
 import {
   getGameSearchScore,
   searchAndRankGames,
-} from "../../src/modules/catalog/catalogSearch.js";
+} from "../../src/modules/catalog/domain/catalogSearch.js";
 import {
   canResolveTargetRole,
   canReviewOwnReport,

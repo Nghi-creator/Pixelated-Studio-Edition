@@ -1,1 +1,1 @@
-export { registerCatalogRoutes } from "../../modules/catalog/catalogRoutes.js";
+export { registerCatalogRoutes } from "../../modules/catalog/http/registerCatalogRoutes.js";
