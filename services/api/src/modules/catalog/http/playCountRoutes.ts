@@ -13,14 +13,14 @@ const gameParamsSchema = z.object({
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
-type GameRouteOptions = {
+type PlayCountRouteOptions = {
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
 };
 
-export async function registerGameRoutes(
+export async function registerPlayCountRoutes(
   app: FastifyInstance,
-  options: GameRouteOptions = {},
+  options: PlayCountRouteOptions = {},
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
