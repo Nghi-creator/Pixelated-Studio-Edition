@@ -2,8 +2,8 @@ import type { FastifyInstance } from "fastify";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../auth/supabaseAuth.js";
-import { getCachedUserRole } from "../auth/roleCache.js";
+} from "../../auth/supabaseAuth.js";
+import { getCachedUserRole } from "../../auth/roleCache.js";
 import {
   adminReportActionSchema,
   adminReportParamsSchema,
@@ -16,10 +16,10 @@ import {
   canReviewOwnReport,
   getPageRange,
   isAdminRole,
-} from "./moderationPolicy.js";
-import { logTiming, timed } from "../observability/timing.js";
-import { rejectRateLimitedRequest } from "../security/rateLimitResponse.js";
-import { createRateLimiter } from "../security/sharedRateLimiter.js";
+} from "../domain/moderationPolicy.js";
+import { logTiming, timed } from "../../observability/timing.js";
+import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
+import { createRateLimiter } from "../../security/sharedRateLimiter.js";
 
 type ProfileRole = {
   is_banned?: boolean;

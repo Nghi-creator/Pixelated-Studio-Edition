@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { api } from "../../lib/api/apiClient";
+import { api } from "../../../lib/api/apiClient";
 
 const formatFallbackTitle = (gameId: string) =>
   gameId.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());

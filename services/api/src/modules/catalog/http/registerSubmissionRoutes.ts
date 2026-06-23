@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { env } from "../../config/env.js";
+import { env } from "../../../config/env.js";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../modules/auth/supabaseAuth.js";
+} from "../../auth/supabaseAuth.js";
 
 const submissionBodySchema = z.object({
   authorName: z.string().trim().min(1).max(120),

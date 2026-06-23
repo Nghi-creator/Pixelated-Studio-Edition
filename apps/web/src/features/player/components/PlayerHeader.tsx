@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
-import { PixelIcon } from "../../components/ui/PixelIcon";
-import type { WebRTCStatus } from "../../lib/webrtc/webrtcSession";
+import { PixelIcon } from "../../../components/ui/PixelIcon";
+import type { WebRTCStatus } from "../../../lib/webrtc/webrtcSession";
 
 type PlayerHeaderProps = {
   backRoute: string;

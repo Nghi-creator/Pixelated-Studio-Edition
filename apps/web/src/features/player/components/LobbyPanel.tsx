@@ -1,11 +1,11 @@
 import { Copy, Link2, X } from "lucide-react";
 import { useState } from "react";
-import { PixelIcon } from "../../components/ui/PixelIcon";
+import { PixelIcon } from "../../../components/ui/PixelIcon";
 import type {
   EngineInputCapabilities,
   LobbyParticipant,
   LobbyState,
-} from "../../lib/webrtc/useWebRTC";
+} from "../../../lib/webrtc/useWebRTC";
 
 type LobbyPanelProps = {
   currentParticipant: LobbyParticipant | null;

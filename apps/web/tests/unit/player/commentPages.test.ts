@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mergeCommentPage } from "../../../src/features/player/comments/commentPages.ts";
+import { mergeCommentPage } from "../../../src/features/player/comments/utils/commentPages.ts";
 
 test("initial comment pages replace stale results", () => {
   assert.deepEqual(mergeCommentPage([{ id: "old" }], [{ id: "fresh" }], true), [

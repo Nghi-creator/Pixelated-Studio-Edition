@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { api } from "../../lib/api/apiClient";
-import { getSocialErrorMessage } from "./socialFeedback";
+import { api } from "../../../lib/api/apiClient";
+import { getSocialErrorMessage } from "../socialFeedback";
 
 export function useGameReactions(gameId: string | undefined, currentUser: User | null) {
   const [likes, setLikes] = useState(0);

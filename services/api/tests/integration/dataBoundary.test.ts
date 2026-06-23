@@ -6,14 +6,14 @@ import type { User } from "@supabase/supabase-js";
 import { registerAccessLogRoutes } from "../../src/routes/admin/accessLogs.js";
 import { registerAdminUserRoutes } from "../../src/routes/admin/adminUsers.js";
 import { registerAuthMethodsRoutes } from "../../src/routes/auth/authMethods.js";
-import { registerCatalogRoutes } from "../../src/routes/catalog/catalog.js";
-import { registerGameRoutes } from "../../src/routes/catalog/games.js";
+import { registerCatalogRoutes } from "../../src/modules/catalog/http/registerCatalogRoutes.js";
+import { registerPlayCountRoutes } from "../../src/modules/catalog/http/playCountRoutes.js";
 import { registerLocalPairingRoutes } from "../../src/routes/multiplayer/localPairings.js";
 import { registerMeRoutes } from "../../src/routes/auth/me.js";
 import { registerMetricRoutes } from "../../src/routes/system/metrics.js";
-import { registerModerationRoutes } from "../../src/routes/admin/moderation.js";
+import { registerModerationRoutes } from "../../src/modules/moderation/http/registerModerationRoutes.js";
 import { registerProfileRoutes } from "../../src/routes/users/profiles.js";
-import { registerSubmissionRoutes } from "../../src/routes/catalog/submissions.js";
+import { registerSubmissionRoutes } from "../../src/modules/catalog/http/registerSubmissionRoutes.js";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const OTHER_USER_ID = "22222222-2222-4222-8222-222222222222";
@@ -511,7 +511,7 @@ async function createDataBoundaryApp(db: FakeSupabase, userId = USER_ID) {
   await registerAdminUserRoutes(app, options);
   await registerAuthMethodsRoutes(app);
   await registerCatalogRoutes(app, options);
-  await registerGameRoutes(app, options);
+  await registerPlayCountRoutes(app, options);
   await registerLocalPairingRoutes(app, options);
   await registerMeRoutes(app, options);
   await registerMetricRoutes(app, options);

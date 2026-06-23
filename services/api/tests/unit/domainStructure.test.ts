@@ -4,16 +4,16 @@ import {
   getCatalogCacheKey,
   getPageRange as getCatalogPageRange,
   selectFeaturedGames,
-} from "../../src/modules/catalog/catalogService.js";
+} from "../../src/modules/catalog/domain/catalogPolicy.js";
 import {
   getGameSearchScore,
   searchAndRankGames,
-} from "../../src/modules/catalog/catalogSearch.js";
+} from "../../src/modules/catalog/domain/catalogSearch.js";
 import {
   canResolveTargetRole,
   canReviewOwnReport,
   getPageRange as getModerationPageRange,
-} from "../../src/modules/moderation/moderationPolicy.js";
+} from "../../src/modules/moderation/domain/moderationPolicy.js";
 
 test("catalog helpers normalize cache keys and page ranges", () => {
   assert.equal(
