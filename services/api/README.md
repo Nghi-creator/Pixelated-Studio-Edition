@@ -174,6 +174,9 @@ TURN_STATIC_USERNAME=<optional static TURN username>
 TURN_STATIC_CREDENTIAL=<optional static TURN credential>
 TURN_CREDENTIAL_TTL_SECONDS=3600
 FORMSPREE_SUBMISSION_URL=<optional Formspree endpoint for submission notifications>
+GLOBAL_RATE_LIMIT_PER_MINUTE=600
+PUBLIC_READ_RATE_LIMIT_PER_MINUTE=180
+HEALTH_RATE_LIMIT_PER_MINUTE=120
 RATE_LIMIT_REDIS_REST_URL=<Upstash-compatible Redis REST endpoint>
 RATE_LIMIT_REDIS_REST_TOKEN=<Redis REST bearer token>
 RATE_LIMIT_REDIS_TIMEOUT_MS=1000
@@ -190,10 +193,19 @@ temporarily unavailable, the API falls back to that local limiter so protected
 routes remain available with per-instance abuse protection. Redis requests are
 bounded by `RATE_LIMIT_REDIS_TIMEOUT_MS` before fallback.
 
+Production enables Fastify proxy trust so `request.ip` uses the client address
+forwarded by Render's ingress. Keep production traffic behind a trusted ingress;
+do not expose the Node port directly while accepting client-supplied forwarded
+headers. Render supplies the volumetric edge DDoS layer, while these API limits
+protect application work such as authentication and database queries.
+
 ### Abuse-Control Limits
 
 | Workflow | Limit | Coordination |
 | --- | --- | --- |
+| All non-health API requests | 600 per client IP per minute | Redis shared counter |
+| Public catalog reads | 180 per client IP per minute | Redis shared counter |
+| Liveness and readiness checks | 120 per client IP per minute | Redis shared counter |
 | Session verification by IP | 1,000 per minute | Redis shared counter |
 | Session verification by IP and session | 30 per minute | Redis shared counter |
 | Comments | 10 per user per minute | Redis shared counter |

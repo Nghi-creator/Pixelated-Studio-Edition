@@ -3,6 +3,7 @@ import { env } from "./config/env.js";
 import { scheduleControlPlaneCleanup } from "./modules/maintenance/controlPlaneCleanup.js";
 import { createLoggerOptions } from "./plugins/logger.js";
 import { registerCors } from "./plugins/cors.js";
+import { registerGlobalRateLimit } from "./plugins/rateLimit.js";
 import { registerAccessLogRoutes } from "./routes/admin/accessLogs.js";
 import { registerAdminUserRoutes } from "./routes/admin/adminUsers.js";
 import { registerModerationRoutes } from "./modules/moderation/http/registerModerationRoutes.js";
@@ -22,9 +23,11 @@ import { registerProfileRoutes } from "./routes/users/profiles.js";
 export async function buildServer() {
   const app = Fastify({
     logger: createLoggerOptions(),
+    trustProxy: env.trustProxy,
   });
 
   await registerCors(app);
+  await registerGlobalRateLimit(app);
   await registerHealthRoutes(app);
   await registerAuthMethodsRoutes(app);
   await registerAccessLogRoutes(app);

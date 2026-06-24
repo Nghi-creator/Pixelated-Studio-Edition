@@ -28,6 +28,21 @@ const envSchema = z.object({
     blankToUndefined,
     z.string().url().optional(),
   ),
+  GLOBAL_RATE_LIMIT_PER_MINUTE: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(600),
+  HEALTH_RATE_LIMIT_PER_MINUTE: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(120),
+  PUBLIC_READ_RATE_LIMIT_PER_MINUTE: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(180),
   RATE_LIMIT_REDIS_REST_TOKEN: z.preprocess(blankToUndefined, z.string().optional()),
   RATE_LIMIT_REDIS_REST_URL: z.preprocess(
     blankToUndefined,
@@ -82,6 +97,7 @@ export const env = {
         .filter(Boolean),
     ]),
   ),
+  trustProxy: parsedEnv.data.NODE_ENV === "production",
 };
 
 export const sharedRateLimitStoreConfigured = Boolean(
