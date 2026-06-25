@@ -11,10 +11,15 @@ import { logTiming, timed } from "../../modules/observability/timing.js";
 const candidateQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
-  platformId: z.enum(["nes", "gb", "gbc", "gba"]).optional(),
+  platformId: z.enum(["nes", "gb", "gbc", "gba", "linux"]).optional(),
   search: z.string().trim().max(120).optional(),
   sourceKind: z
-    .enum(["homebrew_hub_gb", "homebrew_hub_gba", "homebrew_hub_nes"])
+    .enum([
+      "homebrew_hub_gb",
+      "homebrew_hub_gba",
+      "homebrew_hub_nes",
+      "debian_main_games",
+    ])
     .optional(),
   status: z
     .enum(["needs_review", "approved", "rejected", "promoted"])
@@ -34,10 +39,10 @@ const candidateReviewBodySchema = z.discriminatedUnion("action", [
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 type CandidateRow = {
-  artifact_filename: string;
-  artifact_sha256: string;
-  artifact_size: number;
-  artifact_url: string;
+  artifact_filename: string | null;
+  artifact_sha256: string | null;
+  artifact_size: number | null;
+  artifact_url: string | null;
   asset_license_spdx: string | null;
   attribution_text: string;
   code_license_spdx: string;
@@ -46,8 +51,12 @@ type CandidateRow = {
   developer_url: string | null;
   id: string;
   import_status: string;
+  launch_manifest_id: string | null;
   license_url: string | null;
   original_release_url: string | null;
+  package_component: string | null;
+  package_name: string | null;
+  package_version: string | null;
   platform_id: string;
   review_notes: string | null;
   runtime_id: string;
@@ -83,6 +92,10 @@ const CANDIDATE_COLUMNS = [
   "artifact_filename",
   "artifact_size",
   "artifact_sha256",
+  "launch_manifest_id",
+  "package_name",
+  "package_version",
+  "package_component",
   "code_license_spdx",
   "asset_license_spdx",
   "cover_license_spdx",
@@ -141,6 +154,15 @@ async function mirrorCandidateArtifact(
   candidate: CandidateRow,
   fetchArtifact: typeof fetch,
 ) {
+  if (
+    !candidate.artifact_url ||
+    !candidate.artifact_filename ||
+    !candidate.artifact_size ||
+    !candidate.artifact_sha256
+  ) {
+    throw new Error("Candidate is missing artifact metadata.");
+  }
+
   assertAllowedArtifactUrl(candidate.artifact_url);
   const response = await fetchArtifact(candidate.artifact_url);
   if (!response.ok) {
@@ -198,6 +220,10 @@ async function createGeneratedCover(
   const platform = candidate.platform_id.toUpperCase();
   const title = escapeSvgText(candidate.title);
   const license = escapeSvgText(candidate.code_license_spdx);
+  const subtitle =
+    candidate.runtime_kind === "native_linux"
+      ? "Reviewed Debian native package"
+      : "Reviewed homebrew build";
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
   <title id="title">${title}</title>
   <desc id="desc">Generated Pixelated catalog cover for ${title}</desc>
@@ -212,7 +238,7 @@ async function createGeneratedCover(
   <rect x="48" y="48" width="864" height="444" rx="38" fill="rgba(42,17,29,0.62)" stroke="#e6abc0" stroke-width="4"/>
   <text x="92" y="150" fill="#f9eef3" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="4">${platform}</text>
   <text x="92" y="276" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="72" font-weight="800">${title}</text>
-  <text x="92" y="366" fill="#f1c9d7" font-family="Inter, Arial, sans-serif" font-size="30">Reviewed homebrew build</text>
+  <text x="92" y="366" fill="#f1c9d7" font-family="Inter, Arial, sans-serif" font-size="30">${subtitle}</text>
   <text x="92" y="424" fill="#e6abc0" font-family="Inter, Arial, sans-serif" font-size="24">License: ${license}</text>
   <circle cx="814" cy="138" r="44" fill="#e6abc0" opacity="0.9"/>
   <circle cx="864" cy="190" r="28" fill="#ffffff" opacity="0.72"/>
@@ -222,7 +248,11 @@ async function createGeneratedCover(
     "covers",
     sanitizeObjectSegment(candidate.source_commit),
     sanitizeObjectSegment(candidate.platform_id),
-    `${candidate.artifact_sha256}.svg`,
+    `${sanitizeObjectSegment(
+      candidate.artifact_sha256 ||
+        candidate.launch_manifest_id ||
+        candidate.id,
+    )}.svg`,
   ].join("/");
 
   const bucket = service.storage.from("catalog_artifacts");
@@ -255,17 +285,22 @@ async function promoteCandidate(
   fetchArtifact: typeof fetch,
 ) {
   const now = new Date().toISOString();
-  const mirroredArtifact = await mirrorCandidateArtifact(
-    service,
-    candidate,
-    fetchArtifact,
-  );
+  const isNative = candidate.runtime_kind === "native_linux";
+  const mirroredArtifact = isNative
+    ? null
+    : await mirrorCandidateArtifact(service, candidate, fetchArtifact);
   const generatedCover = await createGeneratedCover(service, candidate);
+  const catalogFilename = isNative
+    ? `${candidate.launch_manifest_id}-native`
+    : candidate.artifact_filename;
+  if (!catalogFilename) {
+    throw new Error("Candidate is missing a catalog filename.");
+  }
 
   const { data: existingGame, error: existingGameError } = await service
     .from("games")
     .select("id")
-    .eq("rom_filename", candidate.artifact_filename)
+    .eq("rom_filename", catalogFilename)
     .maybeSingle<GameRow>();
   if (existingGameError) throw existingGameError;
 
@@ -276,8 +311,8 @@ async function promoteCandidate(
     backdrop_url: generatedCover.publicUrl,
     cover_url: generatedCover.publicUrl,
     publication_status: "published",
-    rom_filename: candidate.artifact_filename,
-    rom_url: mirroredArtifact.publicUrl,
+    rom_filename: catalogFilename,
+    rom_url: mirroredArtifact?.publicUrl || null,
     title: candidate.title,
   };
 
@@ -313,12 +348,13 @@ async function promoteCandidate(
   if (existingBuildError) throw existingBuildError;
 
   const buildPayload = {
-    artifact_filename: candidate.artifact_filename,
-    artifact_sha256: candidate.artifact_sha256,
-    artifact_size: candidate.artifact_size,
-    artifact_url: mirroredArtifact.publicUrl,
+    artifact_filename: isNative ? null : candidate.artifact_filename,
+    artifact_sha256: isNative ? null : candidate.artifact_sha256,
+    artifact_size: isNative ? null : candidate.artifact_size,
+    artifact_url: mirroredArtifact?.publicUrl || null,
     enabled: true,
     game_id: game.id,
+    launch_manifest_id: isNative ? candidate.launch_manifest_id : null,
     platform_id: candidate.platform_id,
     runtime_id: candidate.runtime_id,
     runtime_kind: candidate.runtime_kind,
@@ -363,7 +399,9 @@ async function promoteCandidate(
     modification_allowed: true,
     original_release_url: candidate.original_release_url,
     review_notes: notes || candidate.review_notes,
-    source_url: `${candidate.source_repo_url}/blob/${candidate.source_commit}/${candidate.source_entry_path}`,
+    source_url: isNative
+      ? candidate.source_repo_url
+      : `${candidate.source_repo_url}/blob/${candidate.source_commit}/${candidate.source_entry_path}`,
     verified_at: now,
     verified_by: reviewerId,
   };
@@ -387,7 +425,9 @@ async function promoteCandidate(
       promoted_game_id: game.id,
       review_notes: [
         notes || candidate.review_notes,
-        `Mirrored artifact path: catalog_artifacts/${mirroredArtifact.objectPath}`,
+        mirroredArtifact
+          ? `Mirrored artifact path: catalog_artifacts/${mirroredArtifact.objectPath}`
+          : null,
         `Generated cover path: catalog_artifacts/${generatedCover.objectPath}`,
       ].filter(Boolean).join("\n"),
       reviewed_at: now,

@@ -386,6 +386,18 @@ cleanup path should be carried into Phase 4's native operations work.
 4. Add automated boot/input/video/audio smoke tests per approved game.
 5. Roll out new image versions without changing active sessions.
 
+Progress note — 2026-06-26: added the first Phase 4 slice. Created a locked
+native runtime manifest for `debian-native-v1`, added a Debian native candidate
+importer that emits `debian_main_games` review rows from that lock, extended
+the candidate schema for native package metadata and `launch_manifest_id`, and
+updated admin promotion so native candidates create catalog games/builds/rights
+without mirroring a ROM artifact or accepting executable paths from the
+database. Added consistency tests to keep the Docker package pins, lock file,
+and engine launch manifests aligned. Phase 4 remains open until admin review
+can author/validate new launch manifests, native boot/audio/video/input smoke
+tests are automated per candidate, and versioned native images can roll out
+without disrupting active sessions.
+
 ### Phase 5 — Additional libretro platforms
 
 Add platforms only when both a maintained core and a sustainable licensed

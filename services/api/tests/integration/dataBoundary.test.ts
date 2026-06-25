@@ -780,6 +780,65 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
   await app.close();
 });
 
+test("admin can promote a Debian native candidate without mirroring a ROM artifact", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: null,
+    artifact_sha256: null,
+    artifact_size: null,
+    artifact_url: null,
+    asset_license_spdx: "Debian-main",
+    attribution_text:
+      "Frozen-Bubble from Debian trixie main/games package frozen-bubble 2.212-13+b1.",
+    code_license_spdx: "Debian-main",
+    cover_license_spdx: null,
+    developer_name: "Debian Games Team",
+    developer_url: "https://tracker.debian.org/pkg/frozen-bubble",
+    id: "12121212-1212-4121-8121-121212121212",
+    import_status: "needs_review",
+    launch_manifest_id: "frozen-bubble",
+    license_url:
+      "https://metadata.ftp-master.debian.org/changelogs/main/f/frozen-bubble/frozen-bubble_2.212-13_copyright",
+    original_release_url: "https://packages.debian.org/trixie/frozen-bubble",
+    package_component: "main",
+    package_name: "frozen-bubble",
+    package_version: "2.212-13+b1",
+    platform_id: "linux",
+    review_notes: null,
+    runtime_id: "debian-native-v1",
+    runtime_kind: "native_linux",
+    source_commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    source_entry_path: "trixie/main/games/frozen-bubble/2.212-13+b1",
+    source_repo_url: "https://tracker.debian.org/pkg/frozen-bubble",
+    title: "Frozen-Bubble",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "native reviewed" },
+    url: "/admin/catalog-candidates/12121212-1212-4121-8121-121212121212",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.games.length, 1);
+  assert.equal(db.rows.games[0]?.rom_filename, "frozen-bubble-native");
+  assert.equal(db.rows.games[0]?.rom_url, null);
+  assert.equal(db.rows.game_builds.length, 1);
+  assert.equal(db.rows.game_builds[0]?.artifact_url, null);
+  assert.equal(db.rows.game_builds[0]?.launch_manifest_id, "frozen-bubble");
+  assert.equal(db.rows.game_builds[0]?.runtime_kind, "native_linux");
+  assert.equal(db.uploadedStorageObjects.length, 1);
+  assert.match(
+    db.uploadedStorageObjects[0]?.path || "",
+    /^covers\/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\/linux\/frozen-bubble\.svg$/,
+  );
+  assert.equal(db.rows.game_rights[0]?.source_url, "https://tracker.debian.org/pkg/frozen-bubble");
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.import_status, "promoted");
+  await app.close();
+});
+
 test("catalog candidate review requires admin access", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
