@@ -29,8 +29,11 @@ export type ApiPermissionsResponse = {
 
 export type ApiSessionResponse = {
   boot: {
+    artifactSha256: string | null;
+    artifactSize: number | null;
     romFilename: string | null;
     romUrl: string | null;
+    runtimeId: string;
   };
   engineUrl: string;
   expiresAt: string;

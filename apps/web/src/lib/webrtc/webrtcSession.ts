@@ -3,6 +3,15 @@ export { createWebRTCSessionId } from "./webrtcIdentity";
 
 export type WebRTCStatus = "idle" | "connecting" | "playing" | "error";
 
+const LOCAL_VAULT_EXTENSIONS = [".nes", ".gb", ".gbc", ".gba"];
+
+function isLocalVaultGameId(gameId: string) {
+  const lowerGameId = gameId.toLowerCase();
+  return LOCAL_VAULT_EXTENSIONS.some((extension) =>
+    lowerGameId.endsWith(extension),
+  );
+}
+
 export const resolveGameBootTarget = async (
   gameId: string,
   clientSessionId: string,
@@ -10,7 +19,7 @@ export const resolveGameBootTarget = async (
   const session = await getAuthSession();
   const userId = session?.user?.id || "anonymous";
 
-  if (gameId.toLowerCase().endsWith(".nes")) {
+  if (isLocalVaultGameId(gameId)) {
     console.log(
       `[WebRTC] Local Vault game detected. Booting directly: ${gameId} for user ${userId}`,
     );

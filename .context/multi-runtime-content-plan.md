@@ -274,6 +274,14 @@ while preserving legacy browser-key input. Phase 1 remains open until the
 frontend emits normalized actions and verified GB/GBC/GBA catalog titles are
 seeded and smoke-tested end-to-end.
 
+Progress note — 2026-06-25: added the third Phase 1 slice: the web player now
+emits normalized game actions, Local Vault frontend validation/UI accepts
+`.nes`, `.gb`, `.gbc`, and `.gba`, and cloud session response types include
+runtime/integrity metadata. Attempted an engine Docker build, but Docker was not
+running locally (`Cannot connect to the Docker daemon`). Phase 1 remains open
+until the Docker image build is verified and reviewed GB/GBC/GBA catalog builds
+are seeded and smoke-tested end-to-end.
+
 ### Phase 2 — Automated licensed-ROM candidates
 
 1. Add a scheduled/manual Homebrew Hub metadata importer.
