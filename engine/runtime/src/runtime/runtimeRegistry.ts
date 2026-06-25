@@ -4,8 +4,9 @@ export type RuntimeDefinition = {
   corePath?: string;
   extensions: string[];
   id: string;
-  inputProfile: "nes" | "gba";
+  inputProfile: "nes" | "gba" | "native_gamepad";
   kind: RuntimeKind;
+  launchManifestIds?: string[];
   maxArtifactBytes: number;
 };
 
@@ -25,6 +26,14 @@ export const RUNTIME_REGISTRY: Record<string, RuntimeDefinition> = {
     inputProfile: "gba",
     kind: "libretro",
     maxArtifactBytes: 32 * 1024 * 1024,
+  },
+  "debian-native-v1": {
+    extensions: [],
+    id: "debian-native-v1",
+    inputProfile: "native_gamepad",
+    kind: "native_linux",
+    launchManifestIds: ["frozen-bubble", "neverball"],
+    maxArtifactBytes: 0,
   },
 };
 

@@ -22,6 +22,7 @@ const createSessionBodySchema = z.object({
 type BackendSessionRow = {
   boot_artifact_sha256: string | null;
   boot_artifact_size: number | null;
+  boot_launch_manifest_id: string | null;
   boot_rom_filename: string | null;
   boot_rom_url: string | null;
   boot_runtime_id: string;
@@ -67,6 +68,7 @@ function mapBoot(row: BackendSessionRow) {
   return {
     artifactSha256: row.boot_artifact_sha256,
     artifactSize: row.boot_artifact_size,
+    launchManifestId: row.boot_launch_manifest_id,
     romFilename: row.boot_rom_filename,
     romUrl: row.boot_rom_url,
     runtimeId: row.boot_runtime_id,
@@ -82,7 +84,7 @@ async function getLiveSession(
   const { data, error } = await service
     .from("backend_sessions")
     .select(
-      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,boot_runtime_id,boot_artifact_size,boot_artifact_sha256,expires_at,deleted_at",
+      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,boot_runtime_id,boot_artifact_size,boot_artifact_sha256,boot_launch_manifest_id,expires_at,deleted_at",
     )
     .eq("id", sessionId)
     .is("deleted_at", null)
@@ -148,8 +150,12 @@ export async function registerSessionRoutes(
         return reply.status(422).send({ error: "Game has no approved build" });
       }
       const romTarget = build?.artifact_url || build?.artifact_filename;
-      if (!romTarget) {
+      const launchManifestId = build.launch_manifest_id || null;
+      if (build.runtime_kind === "libretro" && !romTarget) {
         return reply.status(422).send({ error: "Game has no ROM target" });
+      }
+      if (build.runtime_kind === "native_linux" && !launchManifestId) {
+        return reply.status(422).send({ error: "Game has no launch manifest" });
       }
 
       const sessionId = createSessionId(parsedBody.data.clientSessionId);
@@ -165,6 +171,7 @@ export async function registerSessionRoutes(
       const boot = {
         artifactSha256: build.artifact_sha256 || null,
         artifactSize: build.artifact_size || null,
+        launchManifestId,
         romFilename: build.artifact_filename || null,
         romUrl: build.artifact_url || null,
         runtimeId: build.runtime_id,
@@ -175,6 +182,7 @@ export async function registerSessionRoutes(
         .insert({
           boot_artifact_sha256: boot.artifactSha256,
           boot_artifact_size: boot.artifactSize,
+          boot_launch_manifest_id: boot.launchManifestId,
           boot_rom_filename: boot.romFilename,
           boot_rom_url: boot.romUrl,
           boot_runtime_id: boot.runtimeId,

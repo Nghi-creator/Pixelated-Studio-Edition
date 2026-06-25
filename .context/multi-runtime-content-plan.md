@@ -19,7 +19,7 @@ license evidence, source link, attribution, and immutable checksum.
 - [ ] Phase 0 — Rights and schema foundation
 - [x] Phase 1 — Multi-core libretro engine
 - [x] Phase 2 — Automated licensed-ROM candidates
-- [ ] Phase 3 — Debian native proof of concept
+- [x] Phase 3 — Debian native proof of concept
 - [ ] Phase 4 — Native catalog operations
 - [ ] Phase 5 — Additional libretro platforms
 
@@ -362,6 +362,21 @@ fallback until gameplay capture replaces it.
 
 **Acceptance:** both native games launch without accepting a command, package,
 or executable path from the database or browser.
+
+Completion note — 2026-06-26: Phase 3 is complete for the proof-of-concept
+acceptance. Added a separate Debian Trixie native runtime image that installs
+pinned Debian `main` builds of Frozen-Bubble and Neverball at image-build time,
+added engine-owned launch manifests for `frozen-bubble` and `neverball`, and
+extended the runtime/session path so native cloud sessions boot only those
+allowlisted manifest IDs. The database stores `runtime_kind = native_linux`,
+`runtime_id = debian-native-v1`, and `launch_manifest_id`; it never supplies a
+package name, command, executable path, or arbitrary arguments. Added catalog
+seed data with Debian copyright/source links, exposed verified rights metadata
+through `/games/:gameId`, and surfaced license/copyright/source links in the
+web player header. Docker smoke verified both `/usr/games/frozen-bubble` and
+`/usr/games/neverball` launch under Xvfb with headless SDL audio. Per-title
+resource-limit hardening beyond the single allowlisted process and session
+cleanup path should be carried into Phase 4's native operations work.
 
 ### Phase 4 — Native catalog operations
 

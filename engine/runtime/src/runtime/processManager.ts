@@ -5,6 +5,7 @@ import { injectKey, type KeyAction } from "../input/injectKey";
 import { translateKey } from "../input/translateKey";
 import { removeFileIfExists } from "../roms/cloudRomDownloader";
 import type { StreamProfile } from "../signaling/startGameHandlers";
+import { getNativeLaunchManifest } from "./nativeLaunchManifests";
 import { pulseAudioArgs } from "./processCommands";
 import { getRuntimeDefinition } from "./runtimeRegistry";
 
@@ -131,7 +132,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
   ): void {
     const runtimeId = bootOptions.runtimeId || "mesen";
     const runtime = getRuntimeDefinition(runtimeId);
-    if (!runtime || runtime.kind !== "libretro" || !runtime.corePath) {
+    if (!runtime) {
       throw new Error(`Unsupported runtime: ${runtimeId}`);
     }
 
@@ -142,22 +143,46 @@ export function createProcessManager(options: ProcessManagerOptions) {
     activeSessionId = sessionId;
     activeCloudRomPath = bootOptions.isCloudRom ? absoluteRomPath : null;
 
-    console.log(
-      `[Engine] Mounting ${runtime.id} content for session ${sessionId}: ${absoluteRomPath}`,
-    );
+    if (runtime.kind === "libretro") {
+      if (!runtime.corePath) {
+        throw new Error(`Unsupported runtime: ${runtimeId}`);
+      }
 
-    retroarchProcess = spawn(
-      "retroarch",
-      [
-        "-f",
-        "-L",
-        runtime.corePath,
-        "--appendconfig",
-        "/app/retroarch.cfg",
-        absoluteRomPath,
-      ],
-      { env: { ...process.env, DISPLAY: ":99", PULSE_SERVER: "127.0.0.1" } },
-    );
+      console.log(
+        `[Engine] Mounting ${runtime.id} content for session ${sessionId}: ${absoluteRomPath}`,
+      );
+
+      retroarchProcess = spawn(
+        "retroarch",
+        [
+          "-f",
+          "-L",
+          runtime.corePath,
+          "--appendconfig",
+          "/app/retroarch.cfg",
+          absoluteRomPath,
+        ],
+        { env: { ...process.env, DISPLAY: ":99", PULSE_SERVER: "127.0.0.1" } },
+      );
+    } else {
+      const manifest = getNativeLaunchManifest(absoluteRomPath);
+      if (!manifest || !runtime.launchManifestIds?.includes(manifest.id)) {
+        throw new Error(`Unsupported native launch manifest: ${absoluteRomPath}`);
+      }
+
+      console.log(
+        `[Engine] Launching native manifest ${manifest.id} for session ${sessionId}`,
+      );
+
+      retroarchProcess = spawn(manifest.executable, manifest.args, {
+        env: {
+          ...process.env,
+          DISPLAY: ":99",
+          PULSE_SERVER: "127.0.0.1",
+          SDL_AUDIODRIVER: process.env.SDL_AUDIODRIVER || "dummy",
+        },
+      });
+    }
 
     setTimeout(() => {
       console.log("[Engine] Starting Python WebRTC Camera Bridge...");

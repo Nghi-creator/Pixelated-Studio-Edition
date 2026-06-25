@@ -35,13 +35,26 @@ export type GameBuildRow = {
 };
 
 type GameRightsRow = {
+  asset_license_spdx?: string | null;
+  attribution_text?: string | null;
+  code_license_spdx?: string | null;
+  commercial_use_allowed?: boolean | null;
+  cover_license_spdx?: string | null;
   game_build_id: string | null;
   game_id: string;
+  id?: string;
+  license_url?: string | null;
+  modification_allowed?: boolean | null;
+  original_release_url?: string | null;
+  permission_evidence_url?: string | null;
+  review_notes?: string | null;
+  source_url?: string | null;
   verified_at: string | null;
 };
 
 export type PublishedCatalogGame = CatalogGameRow & {
   game_builds: GameBuildRow[];
+  game_rights: GameRightsRow[];
 };
 
 export const PUBLIC_CATALOG_GAME_COLUMNS = [
@@ -106,7 +119,25 @@ export async function attachPublishedBuilds(
         .returns<GameBuildRow[]>(),
       service
         .from("game_rights")
-        .select("game_id,game_build_id,verified_at")
+        .select(
+          [
+            "id",
+            "game_id",
+            "game_build_id",
+            "code_license_spdx",
+            "asset_license_spdx",
+            "cover_license_spdx",
+            "license_url",
+            "source_url",
+            "original_release_url",
+            "permission_evidence_url",
+            "attribution_text",
+            "commercial_use_allowed",
+            "modification_allowed",
+            "review_notes",
+            "verified_at",
+          ].join(","),
+        )
         .in("game_id", gameIds)
         .returns<GameRightsRow[]>(),
     ]);
@@ -119,6 +150,13 @@ export async function attachPublishedBuilds(
       .filter((row) => Boolean(row.verified_at))
       .map((row) => rightsKey(row.game_id, row.game_build_id)),
   );
+  const rightsByGame = new Map<string, GameRightsRow[]>();
+  for (const row of rights || []) {
+    if (!row.verified_at) continue;
+    const gameRights = rightsByGame.get(row.game_id) || [];
+    gameRights.push(row);
+    rightsByGame.set(row.game_id, gameRights);
+  }
   const buildsByGame = new Map<string, GameBuildRow[]>();
   for (const build of builds || []) {
     if (!buildIsRightsVerified(build, verifiedRights)) continue;
@@ -131,6 +169,7 @@ export async function attachPublishedBuilds(
     .map((game) => ({
       ...game,
       game_builds: buildsByGame.get(game.id) || [],
+      game_rights: rightsByGame.get(game.id) || [],
     }))
     .filter((game) => game.game_builds.length === 1);
 }

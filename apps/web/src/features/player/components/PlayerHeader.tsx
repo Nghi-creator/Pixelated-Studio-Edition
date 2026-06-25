@@ -1,11 +1,13 @@
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PixelIcon } from "../../../components/ui/PixelIcon";
+import type { ApiGame } from "../../../lib/api/apiClient";
 import type { WebRTCStatus } from "../../../lib/webrtc/webrtcSession";
 
 type PlayerHeaderProps = {
   backRoute: string;
   backText: string;
+  gameRights?: NonNullable<ApiGame["game_rights"]>;
   gameTitle: string;
   showStreamTelemetry: boolean;
   status: WebRTCStatus;
@@ -16,6 +18,7 @@ type PlayerHeaderProps = {
 export function PlayerHeader({
   backRoute,
   backText,
+  gameRights = [],
   gameTitle,
   hideGameChrome = false,
   onToggleTelemetry,
@@ -44,6 +47,37 @@ export function PlayerHeader({
       </span>
     </div>
   );
+  const primaryRights = gameRights[0] || null;
+  const rightsLinks = primaryRights ? (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-400">
+      {(primaryRights.code_license_spdx || primaryRights.asset_license_spdx) && (
+        <span>
+          License:{" "}
+          {primaryRights.code_license_spdx || primaryRights.asset_license_spdx}
+        </span>
+      )}
+      {primaryRights.license_url && (
+        <a
+          className="text-[#e6abc0] hover:text-white"
+          href={primaryRights.license_url}
+          rel="noreferrer"
+          target="_blank"
+        >
+          Copyright
+        </a>
+      )}
+      {primaryRights.source_url && (
+        <a
+          className="text-[#e6abc0] hover:text-white"
+          href={primaryRights.source_url}
+          rel="noreferrer"
+          target="_blank"
+        >
+          Source
+        </a>
+      )}
+    </div>
+  ) : null;
 
   return (
     <div
@@ -66,11 +100,18 @@ export function PlayerHeader({
         {hideGameChrome && statusBadge}
       </div>
 
+      {hideGameChrome && rightsLinks && (
+        <div className="px-1 pb-2">{rightsLinks}</div>
+      )}
+
       {!hideGameChrome && (
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-3xl font-extrabold tracking-tight text-white">
-          {gameTitle || "Loading Game..."}
-        </h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-extrabold tracking-tight text-white">
+            {gameTitle || "Loading Game..."}
+          </h1>
+          {rightsLinks}
+        </div>
 
         <div className="flex items-center gap-2">
           <button

@@ -28,8 +28,9 @@ type HarnessOverrides = {
     sessionId: string;
     sessionToken: string;
   }) => Promise<{
+    launchManifestId?: string | null;
     mode: string;
-    romTarget: string;
+    romTarget?: string | null;
     runtimeId?: string | null;
     userId?: string | null;
   }>;
@@ -169,6 +170,32 @@ test("verified mGBA cloud sessions use a matching temporary extension", async ()
   assert.match(downloads[0]?.destinationPath || "", /\.gba$/);
   assert.equal(downloads[0]?.validation.runtimeId, "mgba");
   assert.equal(booted[0]?.options.runtimeId, "mgba");
+});
+
+test("verified native sessions boot an allowlisted launch manifest without download", async () => {
+  const { booted, downloads, socket } = createHarness({
+    verifyBackendSession: () =>
+      Promise.resolve({
+        launchManifestId: "frozen-bubble",
+        mode: "cloud",
+        romTarget: null,
+        runtimeId: "debian-native-v1",
+        userId: "verified-user",
+      }),
+  });
+
+  socket.emit("start-game", {
+    mode: "cloud",
+    romFilename: "ignored-by-backend",
+    sessionId: "session-native",
+    sessionToken: "token",
+  });
+  await flushStartGame();
+
+  assert.deepEqual(downloads, []);
+  assert.equal(booted[0]?.romPath, "frozen-bubble");
+  assert.equal(booted[0]?.sessionId, "session-native");
+  assert.equal(booted[0]?.options.runtimeId, "debian-native-v1");
 });
 
 test("non-cloud backend sessions cannot boot through cloud intent", async () => {

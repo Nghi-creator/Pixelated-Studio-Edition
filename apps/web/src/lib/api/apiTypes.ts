@@ -31,6 +31,7 @@ export type ApiSessionResponse = {
   boot: {
     artifactSha256: string | null;
     artifactSize: number | null;
+    launchManifestId: string | null;
     romFilename: string | null;
     romUrl: string | null;
     runtimeId: string;
@@ -152,6 +153,36 @@ export type ApiGame = {
   author_name?: string | null;
   backdrop_url?: string | null;
   cover_url: string;
+  game_builds?: {
+    artifact_filename: string | null;
+    artifact_sha256?: string | null;
+    artifact_size?: number | null;
+    artifact_url: string | null;
+    enabled: boolean;
+    game_id: string;
+    id: string;
+    launch_manifest_id?: string | null;
+    platform_id: string;
+    runtime_id: string;
+    runtime_kind: "libretro" | "native_linux";
+  }[];
+  game_rights?: {
+    asset_license_spdx?: string | null;
+    attribution_text?: string | null;
+    code_license_spdx?: string | null;
+    commercial_use_allowed?: boolean | null;
+    cover_license_spdx?: string | null;
+    game_build_id: string | null;
+    game_id: string;
+    id?: string;
+    license_url?: string | null;
+    modification_allowed?: boolean | null;
+    original_release_url?: string | null;
+    permission_evidence_url?: string | null;
+    review_notes?: string | null;
+    source_url?: string | null;
+    verified_at: string | null;
+  }[];
   id: string;
   play_count?: number | null;
   rom_filename?: string | null;

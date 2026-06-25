@@ -417,6 +417,58 @@ test("sessions persist hashed tokens and verify approved boot targets", async ()
   await app.close();
 });
 
+test("native Linux sessions persist launch manifests without ROM targets", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGame(db, {
+    id: GAME_ID,
+    rom_filename: "native-placeholder",
+    rom_url: null,
+  });
+  const build = db.gameBuilds.get(`${GAME_ID}-build`);
+  if (build) {
+    build.artifact_filename = null;
+    build.artifact_url = null;
+    build.launch_manifest_id = "frozen-bubble";
+    build.platform_id = "linux";
+    build.runtime_id = "debian-native-v1";
+    build.runtime_kind = "native_linux";
+  }
+  const app = await createTestApp(db);
+
+  const createResponse = await app.inject({
+    method: "POST",
+    payload: { clientSessionId: "native-session-1", gameId: GAME_ID, mode: "cloud" },
+    url: "/sessions",
+  });
+
+  assert.equal(createResponse.statusCode, 200);
+  const created = createResponse.json<{
+    boot: { launchManifestId: string; romUrl: string | null };
+    sessionId: string;
+    sessionToken: string;
+  }>();
+  assert.equal(created.boot.launchManifestId, "frozen-bubble");
+  assert.equal(created.boot.romUrl, null);
+
+  const verifyResponse = await app.inject({
+    method: "POST",
+    payload: { sessionToken: created.sessionToken },
+    url: `/sessions/${created.sessionId}/verify`,
+  });
+
+  assert.equal(verifyResponse.statusCode, 200);
+  assert.equal(
+    verifyResponse.json<{ boot: { launchManifestId: string } }>().boot
+      .launchManifestId,
+    "frozen-bubble",
+  );
+  assert.equal(
+    verifyResponse.json<{ boot: { runtimeId: string } }>().boot.runtimeId,
+    "debian-native-v1",
+  );
+  await app.close();
+});
+
 test("session creation rejects games without verified rights", async () => {
   const db = new FakeSupabase();
   db.games.set(GAME_ID, {

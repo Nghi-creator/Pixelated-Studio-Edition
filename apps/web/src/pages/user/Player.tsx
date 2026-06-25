@@ -91,7 +91,7 @@ export default function Player() {
     requestedRole: playerMode === "host" ? "host" : invitedRole,
     sessionId: invitedSessionId,
   });
-  const { authorName, gameTitle } = useGameMetadata(id);
+  const { authorName, gameRights, gameTitle } = useGameMetadata(id);
 
   useEffect(() => {
     if (!currentUser) {
@@ -263,6 +263,7 @@ export default function Player() {
       <PlayerHeader
         backRoute={backRoute}
         backText={backText}
+        gameRights={gameRights}
         gameTitle={gameTitle}
         hideGameChrome
         onToggleTelemetry={() =>

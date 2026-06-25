@@ -1,0 +1,47 @@
+ARG DEBIAN_IMAGE=debian:trixie-slim
+ARG NODE_IMAGE=node:20.20.2-bookworm-slim
+
+FROM ${NODE_IMAGE} AS app-builder
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci
+
+COPY server.ts tsconfig.json ./
+COPY src ./src
+RUN npm run build && npm prune --omit=dev
+
+FROM ${DEBIAN_IMAGE} AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    frozen-bubble=2.212-13+b1 \
+    gstreamer1.0-nice \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-pulseaudio \
+    gstreamer1.0-tools \
+    neverball=1.6.0+git20180603-3+b2 \
+    pulseaudio \
+    python3 \
+    python3-evdev \
+    python3-gi \
+    python3-gst-1.0 \
+    xdotool \
+    xvfb \
+    && rm -rf /var/lib/apt/lists/* \
+    && usermod -aG pulse-access root \
+    && mkdir -p /app /roms
+
+COPY --from=app-builder /usr/local/bin/node /usr/local/bin/node
+COPY --from=app-builder /app/dist /app/dist
+COPY --from=app-builder /app/node_modules /app/node_modules
+COPY camera.py input_gamepad.py /app/
+
+WORKDIR /app
+
+CMD ["node", "dist/server.js"]
