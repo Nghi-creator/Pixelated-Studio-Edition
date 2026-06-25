@@ -28,6 +28,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    cmake \
     g++ \
     gcc \
     git \
@@ -40,9 +41,26 @@ RUN git init /tmp/mgba && \
     git -C /tmp/mgba remote add origin https://github.com/mgba-emu/mgba.git && \
     git -C /tmp/mgba fetch --depth 1 origin "${MGBA_REF}" && \
     git -C /tmp/mgba checkout --detach FETCH_HEAD && \
-    make -C /tmp/mgba -f Makefile.libretro -j4 && \
+    cmake -S /tmp/mgba -B /tmp/mgba/build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_LIBRETRO=ON \
+      -DBUILD_QT=OFF \
+      -DBUILD_SDL=OFF \
+      -DBUILD_SHARED=OFF \
+      -DUSE_DEBUGGERS=OFF \
+      -DUSE_DISCORD_RPC=OFF \
+      -DUSE_EDITLINE=OFF \
+      -DUSE_ELF=OFF \
+      -DUSE_FFMPEG=OFF \
+      -DUSE_LIBZIP=OFF \
+      -DUSE_LUA=OFF \
+      -DUSE_LZMA=OFF \
+      -DUSE_MINIZIP=OFF \
+      -DUSE_PNG=OFF \
+      -DUSE_SQLITE3=OFF && \
+    cmake --build /tmp/mgba/build --target mgba_libretro -j4 && \
     mkdir -p /out && \
-    cp /tmp/mgba/mgba_libretro.so /out/
+    find /tmp/mgba/build -name mgba_libretro.so -exec cp {} /out/ \;
 
 FROM ${UBUNTU_IMAGE} AS python-builder
 

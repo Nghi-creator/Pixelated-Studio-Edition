@@ -17,7 +17,7 @@ license evidence, source link, attribution, and immutable checksum.
 ## Phase tracker
 
 - [ ] Phase 0 — Rights and schema foundation
-- [ ] Phase 1 — Multi-core libretro engine
+- [x] Phase 1 — Multi-core libretro engine
 - [ ] Phase 2 — Automated licensed-ROM candidates
 - [ ] Phase 3 — Debian native proof of concept
 - [ ] Phase 4 — Native catalog operations
@@ -278,9 +278,21 @@ Progress note — 2026-06-25: added the third Phase 1 slice: the web player now
 emits normalized game actions, Local Vault frontend validation/UI accepts
 `.nes`, `.gb`, `.gbc`, and `.gba`, and cloud session response types include
 runtime/integrity metadata. Attempted an engine Docker build, but Docker was not
-running locally (`Cannot connect to the Docker daemon`). Phase 1 remains open
-until the Docker image build is verified and reviewed GB/GBC/GBA catalog builds
-are seeded and smoke-tested end-to-end.
+running locally (`Cannot connect to the Docker daemon`). Phase 1 remained open
+until the Docker image build was verified and reviewed GB/GBC/GBA catalog builds
+were seeded and smoke-tested end-to-end.
+
+Completion note — 2026-06-25: Phase 1 is complete. The engine image now builds
+with pinned Mesen and mGBA libretro cores; the built image contains both
+`/cores/mesen_libretro.so` and `/cores/mgba_libretro.so`. Added a curated
+Phase 1 smoke catalog fixture plus a Supabase migration publishing one reviewed
+NES, GB, GBC, and GBA title with exact source commits, artifact URLs, sizes,
+checksums, runtime IDs, platform IDs, and verified rights records. Engine tests
+validate those exact local mirror artifacts against extension/header/size/SHA
+rules, cloud sessions bind backend-approved runtime/integrity metadata, and
+Local Vault resolves supported uploads through the engine registry. A container
+smoke run launched each curated artifact with its allowlisted core under Xvfb:
+Nova the Squirrel on Mesen, Rex Runner GB/Rebound/xniq on mGBA.
 
 ### Phase 2 — Automated licensed-ROM candidates
 
