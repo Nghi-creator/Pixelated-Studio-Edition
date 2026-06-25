@@ -184,6 +184,69 @@ async function mirrorCandidateArtifact(
   };
 }
 
+function escapeSvgText(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+async function createGeneratedCover(
+  service: SupabaseServiceLike,
+  candidate: CandidateRow,
+) {
+  const platform = candidate.platform_id.toUpperCase();
+  const title = escapeSvgText(candidate.title);
+  const license = escapeSvgText(candidate.code_license_spdx);
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">${title}</title>
+  <desc id="desc">Generated Pixelated catalog cover for ${title}</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#2a111d"/>
+      <stop offset="45%" stop-color="#5a263b"/>
+      <stop offset="100%" stop-color="#d79aae"/>
+    </linearGradient>
+  </defs>
+  <rect width="960" height="540" fill="url(#bg)"/>
+  <rect x="48" y="48" width="864" height="444" rx="38" fill="rgba(42,17,29,0.62)" stroke="#e6abc0" stroke-width="4"/>
+  <text x="92" y="150" fill="#f9eef3" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700" letter-spacing="4">${platform}</text>
+  <text x="92" y="276" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="72" font-weight="800">${title}</text>
+  <text x="92" y="366" fill="#f1c9d7" font-family="Inter, Arial, sans-serif" font-size="30">Reviewed homebrew build</text>
+  <text x="92" y="424" fill="#e6abc0" font-family="Inter, Arial, sans-serif" font-size="24">License: ${license}</text>
+  <circle cx="814" cy="138" r="44" fill="#e6abc0" opacity="0.9"/>
+  <circle cx="864" cy="190" r="28" fill="#ffffff" opacity="0.72"/>
+</svg>`;
+
+  const objectPath = [
+    "covers",
+    sanitizeObjectSegment(candidate.source_commit),
+    sanitizeObjectSegment(candidate.platform_id),
+    `${candidate.artifact_sha256}.svg`,
+  ].join("/");
+
+  const bucket = service.storage.from("catalog_artifacts");
+  const { error: uploadError } = await bucket.upload(
+    objectPath,
+    Buffer.from(svg),
+    {
+      contentType: "image/svg+xml",
+      upsert: true,
+    },
+  );
+  if (uploadError) throw uploadError;
+
+  const { data } = bucket.getPublicUrl(objectPath);
+  if (!data.publicUrl) {
+    throw new Error("Failed to resolve generated cover public URL.");
+  }
+
+  return {
+    objectPath,
+    publicUrl: data.publicUrl,
+  };
+}
+
 async function promoteCandidate(
   service: SupabaseServiceLike,
   candidate: CandidateRow,
@@ -197,6 +260,7 @@ async function promoteCandidate(
     candidate,
     fetchArtifact,
   );
+  const generatedCover = await createGeneratedCover(service, candidate);
 
   const { data: existingGame, error: existingGameError } = await service
     .from("games")
@@ -209,6 +273,8 @@ async function promoteCandidate(
     author_name: candidate.developer_name || candidate.title,
     developer_name: candidate.developer_name,
     developer_url: candidate.developer_url,
+    backdrop_url: generatedCover.publicUrl,
+    cover_url: generatedCover.publicUrl,
     publication_status: "published",
     rom_filename: candidate.artifact_filename,
     rom_url: mirroredArtifact.publicUrl,
@@ -230,8 +296,6 @@ async function promoteCandidate(
       .from("games")
       .insert({
         ...gamePayload,
-        backdrop_url: null,
-        cover_url: null,
       })
       .select("id")
       .single<GameRow>();
@@ -292,7 +356,7 @@ async function promoteCandidate(
     asset_license_spdx: candidate.asset_license_spdx || candidate.code_license_spdx,
     attribution_text: candidate.attribution_text,
     code_license_spdx: candidate.code_license_spdx,
-    cover_license_spdx: candidate.cover_license_spdx,
+    cover_license_spdx: candidate.cover_license_spdx || "CC0-1.0",
     game_build_id: build.id,
     game_id: game.id,
     license_url: candidate.license_url,
@@ -324,6 +388,7 @@ async function promoteCandidate(
       review_notes: [
         notes || candidate.review_notes,
         `Mirrored artifact path: catalog_artifacts/${mirroredArtifact.objectPath}`,
+        `Generated cover path: catalog_artifacts/${generatedCover.objectPath}`,
       ].filter(Boolean).join("\n"),
       reviewed_at: now,
       reviewed_by: reviewerId,

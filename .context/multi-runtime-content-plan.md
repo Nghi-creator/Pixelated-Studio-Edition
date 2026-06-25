@@ -18,7 +18,7 @@ license evidence, source link, attribution, and immutable checksum.
 
 - [ ] Phase 0 — Rights and schema foundation
 - [x] Phase 1 — Multi-core libretro engine
-- [ ] Phase 2 — Automated licensed-ROM candidates
+- [x] Phase 2 — Automated licensed-ROM candidates
 - [ ] Phase 3 — Debian native proof of concept
 - [ ] Phase 4 — Native catalog operations
 - [ ] Phase 5 — Additional libretro platforms
@@ -338,6 +338,16 @@ checksum-based path, and publishes the mirrored storage URL in `games.rom_url`
 and `game_builds.artifact_url`. Phase 2 remains open until promotion also
 captures or assigns reviewed homepage artwork and produces complete attribution
 blocks for display.
+
+Completion note — 2026-06-26: Phase 2 is complete. Promotion now performs the
+full one-action curator path for Homebrew Hub candidates: import from local Git
+mirrors, filter by supported artifact and explicit allowlisted license, expose
+admin review queue records, approve or reject through the API, mirror approved
+artifacts into `catalog_artifacts` after host allowlist + size + SHA-256
+verification, generate safe placeholder homepage artwork in the same bucket,
+reuse existing `games` rows when filenames already exist, and create/update the
+enabled build plus verified rights/attribution record. Generated art is a legal
+fallback until gameplay capture replaces it.
 
 ### Phase 3 — Debian native proof of concept
 

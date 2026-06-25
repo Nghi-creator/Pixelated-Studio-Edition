@@ -752,11 +752,22 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
     String(db.rows.game_builds[0]?.artifact_url),
     /^https:\/\/storage\.example\.test\/catalog_artifacts\/homebrew-hub\//,
   );
-  assert.equal(db.uploadedStorageObjects.length, 1);
+  assert.equal(db.uploadedStorageObjects.length, 2);
   assert.equal(db.uploadedStorageObjects[0]?.bucket, "catalog_artifacts");
   assert.equal(db.uploadedStorageObjects[0]?.bytes, artifactBytes.length);
+  assert.equal(db.uploadedStorageObjects[1]?.bucket, "catalog_artifacts");
+  assert.match(
+    db.uploadedStorageObjects[1]?.path || "",
+    /^covers\/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\/nes\//,
+  );
+  assert.match(
+    String(db.rows.games[0]?.cover_url),
+    /^https:\/\/storage\.example\.test\/catalog_artifacts\/covers\//,
+  );
+  assert.equal(db.rows.games[0]?.backdrop_url, db.rows.games[0]?.cover_url);
   assert.equal(db.rows.game_rights.length, 1);
   assert.equal(db.rows.game_rights[0]?.game_id, GAME_ID);
+  assert.equal(db.rows.game_rights[0]?.cover_license_spdx, "CC0-1.0");
   assert.equal(
     db.rows.game_rights[0]?.source_url,
     "https://github.com/nesdev-org/homebrew-db/blob/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/entries/novathesquirrel/game.json",
