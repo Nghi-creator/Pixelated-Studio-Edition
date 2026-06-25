@@ -307,6 +307,18 @@ Nova the Squirrel on Mesen, Rex Runner GB/Rebound/xniq on mGBA.
 **Acceptance:** adding a supported upstream release requires review and one
 approval action, not manual database/storage editing.
 
+Progress note — 2026-06-26: added the first Phase 2 slice. Created the
+`catalog_ingestion_candidates` review table with admin/service-role RLS, added a
+manual Homebrew Hub candidate importer, and added an admin-only
+`GET /admin/catalog-candidates` review queue endpoint. The importer reads local
+Homebrew Hub Git clones, filters to playable `.nes`/`.gb`/`.gbc`/`.gba`
+artifacts with explicit allowlisted licenses, computes exact size/SHA-256, pins
+source commits, stores rights warnings, and never publishes candidates directly.
+A real dry run against the current local GB/GBC/GBA/NES mirrors found 111
+candidate artifacts. Phase 2 remains open until approval/promotion mirrors
+approved artifacts into controlled storage and generates reviewed artwork and
+attribution blocks with one curator action.
+
 ### Phase 3 — Debian native proof of concept
 
 1. Create a separate Debian-based native runtime image.

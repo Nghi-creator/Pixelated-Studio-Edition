@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "check:access-log-schema": "tsx scripts/stagingSmoke.ts --access-log-schema-only",
     "check:submission-cleanup-policy": "tsx scripts/stagingSmoke.ts --submission-cleanup-policy-only",
+    "import:homebrew-candidates": "tsx scripts/importHomebrewHubCandidates.ts",
     "lint": "eslint .",
     "predeploy:hosted": "npm run check:access-log-schema && npm run check:submission-cleanup-policy && npm run typecheck && npm run lint && npm run build",
     "smoke:staging": "tsx scripts/stagingSmoke.ts",
