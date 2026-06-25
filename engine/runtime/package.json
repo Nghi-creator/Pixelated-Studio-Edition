@@ -7,6 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "check": "npm run check:source && npm run build && node --check dist/server.js && find dist/src -name '*.js' -exec node --check {} \\;",
     "check:source": "test -z \"$(find src -name '*.js' -print -quit)\"",
+    "smoke:native": "node scripts/smokeNativeRuntime.mjs",
     "test": "npm run build && node --test dist/src/**/*.test.js",
     "start": "node dist/server.js"
   },

@@ -398,6 +398,16 @@ can author/validate new launch manifests, native boot/audio/video/input smoke
 tests are automated per candidate, and versioned native images can roll out
 without disrupting active sessions.
 
+Progress note — 2026-06-26: added the second Phase 4 slice. The native Docker
+image now embeds `native-runtime.lock.json`, and `npm run smoke:native` reads
+the local lock manifest, verifies the embedded lock checksum inside the image,
+checks every package executable remains under `/usr/games`, boots each locked
+game under Xvfb with headless SDL audio, and fails if a game exits immediately
+instead of staying alive. Verified against `pixelated-engine-native:phase4` for
+Frozen-Bubble and Neverball. Phase 4 remains open until review can author new
+launch manifests safely, input/video/audio telemetry is captured per native
+candidate, and native image rollout/version selection is wired into operations.
+
 ### Phase 5 — Additional libretro platforms
 
 Add platforms only when both a maintained core and a sustainable licensed
