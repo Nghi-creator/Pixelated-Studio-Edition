@@ -319,6 +319,17 @@ candidate artifacts. Phase 2 remains open until approval/promotion mirrors
 approved artifacts into controlled storage and generates reviewed artwork and
 attribution blocks with one curator action.
 
+Progress note — 2026-06-26: added the second Phase 2 slice. Admins can now
+`PATCH /admin/catalog-candidates/:candidateId` with `promote` or `reject`.
+Promotion reuses an existing `games` row when the candidate artifact filename
+already exists, then creates or updates the enabled `game_builds` row and
+verified `game_rights` record from the candidate's pinned metadata. This keeps
+legacy rows intact while allowing one reviewed candidate to become playable
+without manual database editing. Phase 2 remains open until promotion first
+mirrors approved artifacts into controlled storage and captures reviewed
+artwork/attribution blocks instead of pointing catalog builds straight at the
+upstream raw artifact URL.
+
 ### Phase 3 — Debian native proof of concept
 
 1. Create a separate Debian-based native runtime image.
