@@ -36,6 +36,8 @@ type StartGamePayload = {
 };
 
 type VerifiedBackendSession = {
+  expectedSha256?: string | null;
+  expectedSizeBytes?: number | null;
   mode: string;
   romTarget: string;
   runtimeId?: string | null;
@@ -56,7 +58,15 @@ type Runtime = {
 type RegisterStartGameOptions = {
   apiUrl: string;
   canStartGame?: (socket: Socket, sessionId: string) => boolean;
-  downloadCloudRom(romUrl: string, destinationPath: string): Promise<void>;
+  downloadCloudRom(
+    romUrl: string,
+    destinationPath: string,
+    validation: {
+      expectedSha256?: string | null;
+      expectedSizeBytes?: number | null;
+      runtimeId: string;
+    },
+  ): Promise<void>;
   runtime: Runtime;
   verifyBackendSession(options: {
     apiUrl: string;
@@ -141,6 +151,8 @@ export function registerStartGameHandler(
     let romFileOrUrl =
       typeof payload.romFilename === "string" ? payload.romFilename : "";
     let runtimeId = "mesen";
+    let expectedSha256: string | null | undefined;
+    let expectedSizeBytes: number | null | undefined;
     let safeUserId = sanitizeUserId(payload.userId || "anonymous");
     socket.data.sessionId = sessionId;
     socket.join(getSessionRoom(sessionId));
@@ -187,6 +199,8 @@ export function registerStartGameHandler(
         if (!getRuntimeDefinition(runtimeId)) {
           throw new Error("Backend session selected an unsupported runtime.");
         }
+        expectedSha256 = verifiedSession.expectedSha256;
+        expectedSizeBytes = verifiedSession.expectedSizeBytes;
         safeUserId = sanitizeUserId(verifiedSession.userId || safeUserId);
       } catch (err) {
         console.error("[Engine] Cloud session verification failed:", err);
@@ -223,7 +237,11 @@ export function registerStartGameHandler(
       );
 
       try {
-        await downloadCloudRom(romFileOrUrl, tmpPath);
+        await downloadCloudRom(romFileOrUrl, tmpPath, {
+          expectedSha256,
+          expectedSizeBytes,
+          runtimeId,
+        });
         console.log("[Engine] Download complete. Booting Cloud Game.");
         runtime.bootGame(tmpPath, sessionId, {
           ...(iceServers.length > 0 ? { iceServers } : {}),

@@ -360,6 +360,12 @@ test("sessions persist hashed tokens and verify approved boot targets", async ()
     rom_filename: "fallback.nes",
     rom_url: "https://pxksbsloksyfwiqyfkrz.supabase.co/game.nes",
   });
+  const build = db.gameBuilds.get(`${GAME_ID}-build`);
+  if (build) {
+    build.artifact_size = 1234;
+    build.artifact_sha256 =
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  }
   const app = await createTestApp(db);
 
   const createResponse = await app.inject({
@@ -391,6 +397,14 @@ test("sessions persist hashed tokens and verify approved boot targets", async ()
   assert.equal(
     verifyResponse.json<{ boot: { runtimeId: string } }>().boot.runtimeId,
     "mesen",
+  );
+  assert.equal(
+    verifyResponse.json<{ boot: { artifactSize: number } }>().boot.artifactSize,
+    1234,
+  );
+  assert.equal(
+    verifyResponse.json<{ boot: { artifactSha256: string } }>().boot.artifactSha256,
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
   );
 
   const badVerifyResponse = await app.inject({

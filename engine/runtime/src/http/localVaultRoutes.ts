@@ -2,8 +2,12 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import type { Express, Request, RequestHandler, Response } from "express";
+import { validateGameArtifact } from "../roms/artifactValidation";
 import { getUserFolder } from "../roms/localRomStore";
-import { getSupportedExtensions } from "../runtime/runtimeRegistry";
+import {
+  findRuntimeByExtension,
+  getSupportedExtensions,
+} from "../runtime/runtimeRegistry";
 
 const multer = require("multer");
 
@@ -14,6 +18,7 @@ type MulterError = Error & {
 type MulterFile = {
   filename: string;
   originalname: string;
+  path: string;
 };
 
 type RequestWithFile = Request & {
@@ -121,6 +126,27 @@ export function registerLocalVaultRoutes(
       const uploadRequest = req as RequestWithFile;
       if (!uploadRequest.file) {
         return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const runtime = findRuntimeByExtension(uploadRequest.file.filename);
+      if (!runtime) {
+        fs.unlink(uploadRequest.file.path, () => {});
+        return res.status(400).json({ error: "Unsupported game file type" });
+      }
+
+      try {
+        validateGameArtifact(uploadRequest.file.path, {
+          fileLabel: "Local game file",
+          runtimeId: runtime.id,
+        });
+      } catch (validationError) {
+        fs.unlink(uploadRequest.file.path, () => {});
+        return res.status(400).json({
+          error:
+            validationError instanceof Error
+              ? validationError.message
+              : "Invalid game file",
+        });
       }
 
       console.log(

@@ -41,11 +41,11 @@ export const corsOptions = {
 };
 
 export const MAX_ROM_SIZE_BYTES = Number(
-  process.env.PIXELATED_MAX_ROM_SIZE_BYTES || 8 * 1024 * 1024,
+  process.env.PIXELATED_MAX_ROM_SIZE_BYTES || 32 * 1024 * 1024,
 );
 
 export const MAX_CLOUD_ROM_SIZE_BYTES = Number(
-  process.env.PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES || 8 * 1024 * 1024,
+  process.env.PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES || 32 * 1024 * 1024,
 );
 
 export const CLOUD_ROM_DOWNLOAD_TIMEOUT_MS = Number(

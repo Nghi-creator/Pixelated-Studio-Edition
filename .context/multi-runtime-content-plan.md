@@ -266,6 +266,14 @@ extension support. Phase 1 remains open until checksum/header validation,
 runtime-aware upload limits, normalized L/R input actions, and end-to-end
 verified GB/GBC/GBA catalog titles are finished.
 
+Progress note — 2026-06-25: added the second Phase 1 slice: backend sessions
+now bind optional artifact size/SHA-256, cloud downloads and Local Vault uploads
+validate runtime extension, runtime max size, cartridge headers, and checksum
+when present, and engine input now accepts normalized L/R-capable game actions
+while preserving legacy browser-key input. Phase 1 remains open until the
+frontend emits normalized actions and verified GB/GBC/GBA catalog titles are
+seeded and smoke-tested end-to-end.
+
 ### Phase 2 — Automated licensed-ROM candidates
 
 1. Add a scheduled/manual Homebrew Hub metadata importer.

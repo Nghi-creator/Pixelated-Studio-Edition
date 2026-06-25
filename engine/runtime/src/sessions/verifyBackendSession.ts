@@ -5,6 +5,8 @@ type VerifyBackendSessionOptions = {
 };
 
 export type VerifiedBackendSession = {
+  expectedSha256?: string | null;
+  expectedSizeBytes?: number | null;
   mode: string;
   romTarget: string;
   runtimeId?: string;
@@ -44,6 +46,8 @@ export async function verifyBackendSession(
 
     const verifiedSession = (await response.json()) as {
       boot?: {
+        artifactSha256?: unknown;
+        artifactSize?: unknown;
         romFilename?: unknown;
         runtimeId?: unknown;
         romUrl?: unknown;
@@ -65,6 +69,14 @@ export async function verifyBackendSession(
     }
 
     return {
+      expectedSha256:
+        typeof verifiedSession.boot?.artifactSha256 === "string"
+          ? verifiedSession.boot.artifactSha256
+          : null,
+      expectedSizeBytes:
+        typeof verifiedSession.boot?.artifactSize === "number"
+          ? verifiedSession.boot.artifactSize
+          : null,
       mode:
         typeof verifiedSession.mode === "string" ? verifiedSession.mode : "",
       romTarget,

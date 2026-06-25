@@ -14,7 +14,15 @@ type RuntimeBootOptions = {
 };
 
 type HarnessOverrides = {
-  downloadCloudRom?: (romUrl: string, destinationPath: string) => Promise<void>;
+  downloadCloudRom?: (
+    romUrl: string,
+    destinationPath: string,
+    validation: {
+      expectedSha256?: string | null;
+      expectedSizeBytes?: number | null;
+      runtimeId: string;
+    },
+  ) => Promise<void>;
   verifyBackendSession?: (options: {
     apiUrl: string;
     sessionId: string;
@@ -52,15 +60,19 @@ function createHarness(overrides: HarnessOverrides = {}) {
     romPath: string;
     sessionId: string;
   }> = [];
-  const downloads: Array<{ destinationPath: string; romUrl: string }> = [];
+  const downloads: Array<{
+    destinationPath: string;
+    romUrl: string;
+    validation: { runtimeId: string };
+  }> = [];
   const calls = { verify: 0 };
 
   registerStartGameHandler(socket as never, {
     apiUrl: "http://api.test",
     downloadCloudRom:
       overrides.downloadCloudRom ||
-      ((romUrl, destinationPath) => {
-        downloads.push({ destinationPath, romUrl });
+      ((romUrl, destinationPath, validation) => {
+        downloads.push({ destinationPath, romUrl, validation });
         return Promise.resolve();
       }),
     runtime: {
@@ -125,6 +137,7 @@ test("verified cloud sessions replace browser supplied boot targets", async () =
   assert.equal(calls.verify, 1);
   assert.equal(downloads[0]?.romUrl, "https://cdn.example.test/game.nes");
   assert.match(downloads[0]?.destinationPath || "", /\.nes$/);
+  assert.equal(downloads[0]?.validation.runtimeId, "mesen");
   assert.equal(booted[0]?.sessionId, "session-2");
   assert.deepEqual(booted[0]?.options, {
     isCloudRom: true,
@@ -154,6 +167,7 @@ test("verified mGBA cloud sessions use a matching temporary extension", async ()
 
   assert.equal(downloads[0]?.romUrl, "https://cdn.example.test/game.gba?download=1");
   assert.match(downloads[0]?.destinationPath || "", /\.gba$/);
+  assert.equal(downloads[0]?.validation.runtimeId, "mgba");
   assert.equal(booted[0]?.options.runtimeId, "mgba");
 });
 

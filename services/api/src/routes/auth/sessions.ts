@@ -20,6 +20,8 @@ const createSessionBodySchema = z.object({
 });
 
 type BackendSessionRow = {
+  boot_artifact_sha256: string | null;
+  boot_artifact_size: number | null;
   boot_rom_filename: string | null;
   boot_rom_url: string | null;
   boot_runtime_id: string;
@@ -63,6 +65,8 @@ function sessionTokenMatches(storedHash: string, sessionToken: string) {
 
 function mapBoot(row: BackendSessionRow) {
   return {
+    artifactSha256: row.boot_artifact_sha256,
+    artifactSize: row.boot_artifact_size,
     romFilename: row.boot_rom_filename,
     romUrl: row.boot_rom_url,
     runtimeId: row.boot_runtime_id,
@@ -78,7 +82,7 @@ async function getLiveSession(
   const { data, error } = await service
     .from("backend_sessions")
     .select(
-      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,boot_runtime_id,expires_at,deleted_at",
+      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,boot_runtime_id,boot_artifact_size,boot_artifact_sha256,expires_at,deleted_at",
     )
     .eq("id", sessionId)
     .is("deleted_at", null)
@@ -159,6 +163,8 @@ export async function registerSessionRoutes(
       const sessionToken = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
       const boot = {
+        artifactSha256: build.artifact_sha256 || null,
+        artifactSize: build.artifact_size || null,
         romFilename: build.artifact_filename || null,
         romUrl: build.artifact_url || null,
         runtimeId: build.runtime_id,
@@ -167,6 +173,8 @@ export async function registerSessionRoutes(
       const { error: sessionError } = await service
         .from("backend_sessions")
         .insert({
+          boot_artifact_sha256: boot.artifactSha256,
+          boot_artifact_size: boot.artifactSize,
           boot_rom_filename: boot.romFilename,
           boot_rom_url: boot.romUrl,
           boot_runtime_id: boot.runtimeId,

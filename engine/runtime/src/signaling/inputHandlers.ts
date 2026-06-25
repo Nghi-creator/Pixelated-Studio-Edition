@@ -1,6 +1,7 @@
 import type { Socket } from "socket.io";
 
 type InputPayload = {
+  gameAction?: unknown;
   key?: unknown;
   playerIndex?: unknown;
   sessionId?: unknown;
@@ -78,7 +79,7 @@ function handleKeyAction(
 
   const didSendInput = (options.sendInput || runtime.sendInput)?.(
     action,
-    payload.key,
+    payload.gameAction || payload.key,
     playerIndex,
   );
 
