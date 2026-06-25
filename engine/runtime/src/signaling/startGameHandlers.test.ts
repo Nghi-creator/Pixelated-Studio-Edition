@@ -9,6 +9,7 @@ import {
 
 type RuntimeBootOptions = {
   isCloudRom?: boolean;
+  runtimeId: string;
   streamProfile: StreamProfile;
 };
 
@@ -21,6 +22,7 @@ type HarnessOverrides = {
   }) => Promise<{
     mode: string;
     romTarget: string;
+    runtimeId?: string | null;
     userId?: string | null;
   }>;
 };
@@ -73,6 +75,7 @@ function createHarness(overrides: HarnessOverrides = {}) {
         return Promise.resolve({
           mode: "cloud",
           romTarget: "https://cdn.example.test/game.nes",
+          runtimeId: "mesen",
           userId: "verified-user",
           options,
         });
@@ -121,11 +124,37 @@ test("verified cloud sessions replace browser supplied boot targets", async () =
 
   assert.equal(calls.verify, 1);
   assert.equal(downloads[0]?.romUrl, "https://cdn.example.test/game.nes");
+  assert.match(downloads[0]?.destinationPath || "", /\.nes$/);
   assert.equal(booted[0]?.sessionId, "session-2");
   assert.deepEqual(booted[0]?.options, {
     isCloudRom: true,
+    runtimeId: "mesen",
     streamProfile: { bitrateKbps: 1000, fps: 60, id: "balanced" },
   });
+});
+
+test("verified mGBA cloud sessions use a matching temporary extension", async () => {
+  const { booted, downloads, socket } = createHarness({
+    verifyBackendSession: () =>
+      Promise.resolve({
+        mode: "cloud",
+        romTarget: "https://cdn.example.test/game.gba?download=1",
+        runtimeId: "mgba",
+        userId: "verified-user",
+      }),
+  });
+
+  socket.emit("start-game", {
+    mode: "cloud",
+    romFilename: "https://attacker.example.test/game.nes",
+    sessionId: "session-gba",
+    sessionToken: "token",
+  });
+  await flushStartGame();
+
+  assert.equal(downloads[0]?.romUrl, "https://cdn.example.test/game.gba?download=1");
+  assert.match(downloads[0]?.destinationPath || "", /\.gba$/);
+  assert.equal(booted[0]?.options.runtimeId, "mgba");
 });
 
 test("non-cloud backend sessions cannot boot through cloud intent", async () => {
@@ -134,6 +163,7 @@ test("non-cloud backend sessions cannot boot through cloud intent", async () => 
       Promise.resolve({
         mode: "local",
         romTarget: "https://cdn.example.test/game.nes",
+        runtimeId: "mesen",
         userId: "verified-user",
       }),
   });
@@ -168,8 +198,25 @@ test("local vault starts still use local rom paths without backend verification"
   assert.equal(booted[0]?.romPath, "/roms/local-user/game.nes");
   assert.equal(booted[0]?.sessionId, "session-4");
   assert.deepEqual(booted[0]?.options, {
+    runtimeId: "mesen",
     streamProfile: { bitrateKbps: 1000, fps: 60, id: "balanced" },
   });
+});
+
+test("local vault starts infer runtime from supported file extensions", async () => {
+  const { booted, calls, socket } = createHarness();
+
+  socket.emit("start-game", {
+    mode: "local",
+    romFilename: "nested/game.gbc",
+    sessionId: "session-gbc",
+    userId: "local-user",
+  });
+  await flushStartGame();
+
+  assert.equal(calls.verify, 0);
+  assert.equal(booted[0]?.romPath, "/roms/local-user/game.gbc");
+  assert.equal(booted[0]?.options.runtimeId, "mgba");
 });
 
 test("stream profiles are clamped before reaching the runtime", () => {

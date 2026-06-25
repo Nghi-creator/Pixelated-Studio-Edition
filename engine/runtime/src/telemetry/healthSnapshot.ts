@@ -22,7 +22,7 @@ type HealthPaths = {
   cameraPeerState: string;
   gamepadBridge: string;
   gstreamerBinary: string;
-  mesenCore: string;
+  libretroCores: string[];
   pythonBinary: string;
   retroarchBinary: string;
   retroarchConfig: string;
@@ -82,7 +82,7 @@ export function createHealthSnapshot(options: HealthSnapshotOptions) {
       },
       retroarch: {
         binaryExists: pathExists(healthPaths.retroarchBinary),
-        mesenCoreExists: pathExists(healthPaths.mesenCore),
+        libretroCoresExist: healthPaths.libretroCores.every(pathExists),
         configExists: pathExists(healthPaths.retroarchConfig),
       },
       cameraBridge: {
@@ -119,7 +119,7 @@ export function createHealthSnapshot(options: HealthSnapshotOptions) {
       checks.virtualDisplay.socketReady &&
       checks.audio.processStarted &&
       checks.retroarch.binaryExists &&
-      checks.retroarch.mesenCoreExists &&
+      checks.retroarch.libretroCoresExist &&
       checks.retroarch.configExists &&
       checks.cameraBridge.fileExists &&
       checks.cameraBridge.pythonExists &&

@@ -24,7 +24,7 @@ describe("engine health snapshot", () => {
         cameraPeerState: existingFile,
         gamepadBridge: existingFile,
         gstreamerBinary: existingFile,
-        mesenCore: existingFile,
+        libretroCores: [existingFile],
         pythonBinary: existingFile,
         retroarchBinary: existingFile,
         retroarchConfig: existingFile,

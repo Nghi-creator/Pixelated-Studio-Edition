@@ -78,7 +78,7 @@ export const HEALTH_PATHS = {
   cameraPeerState: "/tmp/pixelated_camera_peers.json",
   gamepadBridge: path.join(process.cwd(), "input_gamepad.py"),
   gstreamerBinary: "/usr/bin/gst-launch-1.0",
-  mesenCore: "/cores/mesen_libretro.so",
+  libretroCores: ["/cores/mesen_libretro.so", "/cores/mgba_libretro.so"],
   pythonBinary: "/usr/bin/python3",
   retroarchBinary: "/usr/bin/retroarch",
   retroarchConfig: "/app/retroarch.cfg",

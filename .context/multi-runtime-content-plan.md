@@ -258,6 +258,14 @@ until reviewer signed access and admin rights/build fields are implemented.
 **Acceptance:** one verified title for each of NES, GB, GBC, and GBA launches
 through both cloud catalog and Local Vault without arbitrary core selection.
 
+Progress note — 2026-06-25: added the first Phase 1 slice: pinned mGBA
+Docker build, engine-owned `mesen`/`mgba` runtime registry, runtime-selected
+RetroArch core launch, backend-approved `runtimeId` in cloud sessions,
+format-neutral cloud temp filenames, and Local Vault `.nes`/`.gb`/`.gbc`/`.gba`
+extension support. Phase 1 remains open until checksum/header validation,
+runtime-aware upload limits, normalized L/R input actions, and end-to-end
+verified GB/GBC/GBA catalog titles are finished.
+
 ### Phase 2 — Automated licensed-ROM candidates
 
 1. Add a scheduled/manual Homebrew Hub metadata importer.

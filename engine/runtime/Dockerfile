@@ -21,6 +21,29 @@ RUN git init /tmp/mesen && \
     mkdir -p /out && \
     cp /tmp/mesen/Libretro/mesen_libretro.so /out/
 
+FROM ${UBUNTU_IMAGE} AS mgba-builder
+
+ARG MGBA_REF=0.10.5
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    g++ \
+    gcc \
+    git \
+    make \
+    pkg-config \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git init /tmp/mgba && \
+    git -C /tmp/mgba remote add origin https://github.com/mgba-emu/mgba.git && \
+    git -C /tmp/mgba fetch --depth 1 origin "${MGBA_REF}" && \
+    git -C /tmp/mgba checkout --detach FETCH_HEAD && \
+    make -C /tmp/mgba -f Makefile.libretro -j4 && \
+    mkdir -p /out && \
+    cp /tmp/mgba/mgba_libretro.so /out/
+
 FROM ${UBUNTU_IMAGE} AS python-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -71,6 +94,7 @@ COPY --from=app-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=app-builder /app/dist /app/dist
 COPY --from=app-builder /app/node_modules /app/node_modules
 COPY --from=mesen-builder /out/mesen_libretro.so /cores/mesen_libretro.so
+COPY --from=mgba-builder /out/mgba_libretro.so /cores/mgba_libretro.so
 COPY --from=python-builder /out /usr/local/lib/python3.10/dist-packages
 COPY camera.py input_gamepad.py /app/
 

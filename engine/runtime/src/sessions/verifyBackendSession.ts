@@ -7,6 +7,7 @@ type VerifyBackendSessionOptions = {
 export type VerifiedBackendSession = {
   mode: string;
   romTarget: string;
+  runtimeId?: string;
   userId?: string;
 };
 
@@ -44,6 +45,7 @@ export async function verifyBackendSession(
     const verifiedSession = (await response.json()) as {
       boot?: {
         romFilename?: unknown;
+        runtimeId?: unknown;
         romUrl?: unknown;
       };
       mode?: unknown;
@@ -66,6 +68,10 @@ export async function verifyBackendSession(
       mode:
         typeof verifiedSession.mode === "string" ? verifiedSession.mode : "",
       romTarget,
+      runtimeId:
+        typeof verifiedSession.boot?.runtimeId === "string"
+          ? verifiedSession.boot.runtimeId
+          : undefined,
       userId:
         typeof verifiedSession.user?.id === "string"
           ? verifiedSession.user.id

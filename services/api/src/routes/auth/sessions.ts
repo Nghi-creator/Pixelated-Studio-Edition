@@ -22,6 +22,7 @@ const createSessionBodySchema = z.object({
 type BackendSessionRow = {
   boot_rom_filename: string | null;
   boot_rom_url: string | null;
+  boot_runtime_id: string;
   deleted_at: string | null;
   expires_at: string;
   game_id: string;
@@ -64,6 +65,7 @@ function mapBoot(row: BackendSessionRow) {
   return {
     romFilename: row.boot_rom_filename,
     romUrl: row.boot_rom_url,
+    runtimeId: row.boot_runtime_id,
   };
 }
 
@@ -76,7 +78,7 @@ async function getLiveSession(
   const { data, error } = await service
     .from("backend_sessions")
     .select(
-      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,expires_at,deleted_at",
+      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,boot_runtime_id,expires_at,deleted_at",
     )
     .eq("id", sessionId)
     .is("deleted_at", null)
@@ -159,6 +161,7 @@ export async function registerSessionRoutes(
       const boot = {
         romFilename: build.artifact_filename || null,
         romUrl: build.artifact_url || null,
+        runtimeId: build.runtime_id,
       };
 
       const { error: sessionError } = await service
@@ -166,6 +169,7 @@ export async function registerSessionRoutes(
         .insert({
           boot_rom_filename: boot.romFilename,
           boot_rom_url: boot.romUrl,
+          boot_runtime_id: boot.runtimeId,
           deleted_at: null,
           expires_at: expiresAt,
           game_id: parsedBody.data.gameId,

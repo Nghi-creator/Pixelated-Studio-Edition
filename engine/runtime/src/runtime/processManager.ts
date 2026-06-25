@@ -6,6 +6,7 @@ import { translateKey } from "../input/translateKey";
 import { removeFileIfExists } from "../roms/cloudRomDownloader";
 import type { StreamProfile } from "../signaling/startGameHandlers";
 import { pulseAudioArgs } from "./processCommands";
+import { getRuntimeDefinition } from "./runtimeRegistry";
 
 type IceServer = {
   credential?: string;
@@ -23,6 +24,7 @@ type ProcessManagerOptions = {
 type BootOptions = {
   iceServers?: IceServer[];
   isCloudRom?: boolean;
+  runtimeId?: string;
   streamProfile?: StreamProfile;
 };
 
@@ -127,6 +129,12 @@ export function createProcessManager(options: ProcessManagerOptions) {
     sessionId: string,
     bootOptions: BootOptions = {},
   ): void {
+    const runtimeId = bootOptions.runtimeId || "mesen";
+    const runtime = getRuntimeDefinition(runtimeId);
+    if (!runtime || runtime.kind !== "libretro" || !runtime.corePath) {
+      throw new Error(`Unsupported runtime: ${runtimeId}`);
+    }
+
     if (retroarchProcess) retroarchProcess.kill();
     if (cameraProcess) cameraProcess.kill();
     if (activeCloudRomPath) removeFileIfExists(activeCloudRomPath);
@@ -135,7 +143,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
     activeCloudRomPath = bootOptions.isCloudRom ? absoluteRomPath : null;
 
     console.log(
-      `[Engine] Mounting ROM for session ${sessionId}: ${absoluteRomPath}`,
+      `[Engine] Mounting ${runtime.id} content for session ${sessionId}: ${absoluteRomPath}`,
     );
 
     retroarchProcess = spawn(
@@ -143,7 +151,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
       [
         "-f",
         "-L",
-        "/cores/mesen_libretro.so",
+        runtime.corePath,
         "--appendconfig",
         "/app/retroarch.cfg",
         absoluteRomPath,

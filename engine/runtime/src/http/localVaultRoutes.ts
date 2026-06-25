@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import type { Express, Request, RequestHandler, Response } from "express";
 import { getUserFolder } from "../roms/localRomStore";
+import { getSupportedExtensions } from "../runtime/runtimeRegistry";
 
 const multer = require("multer");
 
@@ -25,13 +26,14 @@ type LocalVaultRouteOptions = {
 };
 
 function createLocalVaultUpload(maxRomSizeBytes: number) {
+  const supportedExtensions = getSupportedExtensions();
   const storage = multer.diskStorage({
     destination(req: Request, file: MulterFile, cb: (err: Error | null, destination: string) => void) {
       const userId = req.headers["x-user-id"];
       cb(null, getUserFolder(userId));
     },
     filename(req: Request, file: MulterFile, cb: (err: Error | null, filename: string) => void) {
-      const safeFilename = path.basename(file.originalname || "unknown.nes");
+      const safeFilename = path.basename(file.originalname || "unknown.rom");
       cb(null, `${Date.now()}-${crypto.randomUUID()}-${safeFilename}`);
     },
   });
@@ -48,8 +50,17 @@ function createLocalVaultUpload(maxRomSizeBytes: number) {
       cb: (err: Error | null, acceptFile?: boolean) => void,
     ) {
       const safeFilename = path.basename(file.originalname || "");
-      if (!safeFilename.toLowerCase().endsWith(".nes")) {
-        cb(new Error("Only .nes ROM files are supported"));
+      const lowerFilename = safeFilename.toLowerCase();
+      if (
+        !supportedExtensions.some((extension) =>
+          lowerFilename.endsWith(extension),
+        )
+      ) {
+        cb(
+          new Error(
+            `Only ${supportedExtensions.join(", ")} game files are supported`,
+          ),
+        );
         return;
       }
 
@@ -64,6 +75,7 @@ export function registerLocalVaultRoutes(
 ): void {
   const { maxRomSizeBytes, requireEngineToken } = options;
   const upload = createLocalVaultUpload(maxRomSizeBytes);
+  const supportedExtensions = getSupportedExtensions();
 
   app.get("/local-games", requireEngineToken, (req: Request, res: Response) => {
     try {
@@ -72,7 +84,12 @@ export function registerLocalVaultRoutes(
 
       const files = fs
         .readdirSync(userFolder)
-        .filter((file) => file.toLowerCase().endsWith(".nes"))
+        .filter((file) => {
+          const lowerFilename = file.toLowerCase();
+          return supportedExtensions.some((extension) =>
+            lowerFilename.endsWith(extension),
+          );
+        })
         .map((file) => ({
           name: file,
           time: fs.statSync(path.join(userFolder, file)).mtime.getTime(),

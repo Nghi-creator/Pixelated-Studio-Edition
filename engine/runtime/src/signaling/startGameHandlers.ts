@@ -7,6 +7,11 @@ import {
   normalizeSessionId,
 } from "./sessionRooms";
 import { sanitizeUserId } from "../roms/localRomStore";
+import {
+  findRuntimeByExtension,
+  getRuntimeDefinition,
+  getRuntimeExtensionForTarget,
+} from "../runtime/runtimeRegistry";
 
 type IceServer = {
   credential?: string;
@@ -33,12 +38,14 @@ type StartGamePayload = {
 type VerifiedBackendSession = {
   mode: string;
   romTarget: string;
+  runtimeId?: string | null;
   userId?: string | null;
 };
 
 type RuntimeBootOptions = {
   iceServers?: IceServer[];
   isCloudRom?: boolean;
+  runtimeId: string;
   streamProfile: StreamProfile;
 };
 
@@ -133,6 +140,7 @@ export function registerStartGameHandler(
       joinSession(socket, crypto.randomUUID(), "browser");
     let romFileOrUrl =
       typeof payload.romFilename === "string" ? payload.romFilename : "";
+    let runtimeId = "mesen";
     let safeUserId = sanitizeUserId(payload.userId || "anonymous");
     socket.data.sessionId = sessionId;
     socket.join(getSessionRoom(sessionId));
@@ -175,6 +183,10 @@ export function registerStartGameHandler(
         }
 
         romFileOrUrl = verifiedSession.romTarget;
+        runtimeId = verifiedSession.runtimeId || "";
+        if (!getRuntimeDefinition(runtimeId)) {
+          throw new Error("Backend session selected an unsupported runtime.");
+        }
         safeUserId = sanitizeUserId(verifiedSession.userId || safeUserId);
       } catch (err) {
         console.error("[Engine] Cloud session verification failed:", err);
@@ -194,7 +206,18 @@ export function registerStartGameHandler(
     }
 
     if (romFileOrUrl.startsWith("http")) {
-      const tmpPath = `/tmp/cloud_game_${crypto.randomUUID()}.nes`;
+      const registryRuntime = getRuntimeDefinition(runtimeId);
+      if (!registryRuntime) {
+        socket.emit("engine-error", {
+          message: "Cloud session selected an unsupported runtime.",
+        });
+        return;
+      }
+      const extension = getRuntimeExtensionForTarget(
+        romFileOrUrl,
+        registryRuntime,
+      );
+      const tmpPath = `/tmp/cloud_game_${crypto.randomUUID()}${extension}`;
       console.log(
         "[Engine] Cloud URL detected. Downloading ROM to temporary storage...",
       );
@@ -205,6 +228,7 @@ export function registerStartGameHandler(
         runtime.bootGame(tmpPath, sessionId, {
           ...(iceServers.length > 0 ? { iceServers } : {}),
           isCloudRom: true,
+          runtimeId,
           streamProfile,
         });
       } catch (err) {
@@ -215,11 +239,19 @@ export function registerStartGameHandler(
       }
     } else {
       const safeRomFile = path.basename(romFileOrUrl);
+      const registryRuntime = findRuntimeByExtension(safeRomFile);
+      if (!registryRuntime) {
+        socket.emit("engine-error", {
+          message: "Unsupported local game file type.",
+        });
+        return;
+      }
       runtime.bootGame(
         path.join("/roms", safeUserId, safeRomFile),
         sessionId,
         {
           ...(iceServers.length > 0 ? { iceServers } : {}),
+          runtimeId: registryRuntime.id,
           streamProfile,
         },
       );

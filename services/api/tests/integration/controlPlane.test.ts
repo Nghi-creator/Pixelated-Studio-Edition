@@ -388,6 +388,10 @@ test("sessions persist hashed tokens and verify approved boot targets", async ()
     verifyResponse.json<{ boot: { romUrl: string } }>().boot.romUrl,
     "https://pxksbsloksyfwiqyfkrz.supabase.co/game.nes",
   );
+  assert.equal(
+    verifyResponse.json<{ boot: { runtimeId: string } }>().boot.runtimeId,
+    "mesen",
+  );
 
   const badVerifyResponse = await app.inject({
     method: "POST",
