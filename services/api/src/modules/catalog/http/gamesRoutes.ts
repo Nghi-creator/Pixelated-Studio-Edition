@@ -1,12 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import { searchAndRankGames } from "../domain/catalogSearch.js";
 import { getCatalogCacheKey, getPageRange } from "../domain/catalogPolicy.js";
-import { fetchFeaturedGames } from "../services/catalogService.js";
-import { logTiming, timed } from "../../observability/timing.js";
+import {
+  fetchFeaturedGames,
+  fetchPublishedCatalogGames,
+  fetchPublishedGameById,
+  type PublishedCatalogGame,
+} from "../services/catalogService.js";
+import { logTiming } from "../../observability/timing.js";
 import type { CatalogRouteContext } from "./catalogRouteContext.js";
 import { gameParamsSchema, gamesQuerySchema } from "./contracts.js";
-
-const MAX_SEARCH_CANDIDATES = 1000;
 
 export function registerGamesCatalogRoutes(
   app: FastifyInstance,
@@ -52,27 +55,11 @@ export function registerGamesCatalogRoutes(
     }
 
     const { end, start } = getPageRange(page, pageSize);
-    let gamesQuery = service
-      .from("games")
-      .select("*", { count: "exact" })
-      .order("title");
-
-    if (search) {
-      gamesQuery = service
-        .from("games")
-        .select("*")
-        .order("title")
-        .limit(MAX_SEARCH_CANDIDATES);
-    }
-
-    const { data, count, error } = await timed(
-      timings,
-      "games_query_ms",
-      () => (search ? gamesQuery : gamesQuery.range(start, end)),
-    );
-
-    if (error) {
-      request.log.error({ err: error }, "Failed to load games");
+    let data: PublishedCatalogGame[] = [];
+    try {
+      data = await fetchPublishedCatalogGames(service, timings);
+    } catch (err) {
+      request.log.error({ err }, "Failed to load games");
       return reply.status(500).send({ error: "Failed to load games" });
     }
 
@@ -87,7 +74,7 @@ export function registerGamesCatalogRoutes(
       ? searchAndRankGames(data || [], search)
       : data || [];
     const pagedGames = search ? rankedGames.slice(start, end + 1) : rankedGames;
-    const total = search ? rankedGames.length : count || 0;
+    const total = rankedGames.length;
     const response = {
       featuredGames,
       games: pagedGames,
@@ -152,14 +139,11 @@ export function registerGamesCatalogRoutes(
       return reply.status(400).send({ error: "Invalid game id" });
     }
 
-    const { data, error } = await service
-      .from("games")
-      .select("id,title,author_name,rom_url,rom_filename,cover_url,backdrop_url,play_count")
-      .eq("id", params.data.gameId)
-      .maybeSingle();
-
-    if (error) {
-      request.log.error({ err: error }, "Failed to load game");
+    let data = null;
+    try {
+      data = await fetchPublishedGameById(service, params.data.gameId);
+    } catch (err) {
+      request.log.error({ err }, "Failed to load game");
       return reply.status(500).send({ error: "Failed to load game" });
     }
     if (!data) return reply.status(404).send({ error: "Game not found" });

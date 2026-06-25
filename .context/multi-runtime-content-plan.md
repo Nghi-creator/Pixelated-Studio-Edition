@@ -237,6 +237,11 @@ source adapters
 **Acceptance:** every playable public card resolves to one enabled build and a
 verified rights record.
 
+Progress note — 2026-06-25: added the initial `game_builds`/`game_rights`
+migration, legacy NES-to-`mesen` build backfill, private submissions bucket
+flip, and backend fail-closed catalog/session filtering. Phase 0 remains open
+until reviewer signed access and admin rights/build fields are implemented.
+
 ### Phase 1 — Multi-core libretro engine
 
 1. Pin and build the mGBA libretro core in the engine Dockerfile.

@@ -14,6 +14,8 @@ const GAME_ID = "33333333-3333-4333-8333-333333333333";
 
 type TableName =
   | "backend_sessions"
+  | "game_builds"
+  | "game_rights"
   | "games"
   | "local_engine_pairings"
   | "multiplayer_lobbies"
@@ -28,12 +30,14 @@ type QueryResult<T> = {
 
 type Filter = {
   field: string;
-  op: "eq" | "gt" | "is" | "lt" | "not";
+  op: "eq" | "gt" | "in" | "is" | "lt" | "not";
   value: unknown;
 };
 
 class FakeSupabase {
   games = new Map<string, RecordRow>();
+  gameBuilds = new Map<string, RecordRow>();
+  gameRights = new Map<string, RecordRow>();
   sessions = new Map<string, RecordRow>();
   pairings = new Map<string, RecordRow>();
   multiplayerLobbies = new Map<string, RecordRow>();
@@ -45,6 +49,8 @@ class FakeSupabase {
 
   tableRows(table: TableName) {
     if (table === "games") return Array.from(this.games.values());
+    if (table === "game_builds") return Array.from(this.gameBuilds.values());
+    if (table === "game_rights") return Array.from(this.gameRights.values());
     if (table === "backend_sessions") return Array.from(this.sessions.values());
     if (table === "local_engine_pairings") return Array.from(this.pairings.values());
     if (table === "multiplayer_lobbies") {
@@ -84,6 +90,11 @@ class FakeQueryBuilder {
 
   gt(field: string, value: unknown) {
     this.filters.push({ field, op: "gt", value });
+    return this;
+  }
+
+  in(field: string, value: unknown[]) {
+    this.filters.push({ field, op: "in", value });
     return this;
   }
 
@@ -212,6 +223,9 @@ class FakeQueryBuilder {
     const value = row[filter.field];
     if (filter.op === "eq") return value === filter.value;
     if (filter.op === "gt") return String(value) > String(filter.value);
+    if (filter.op === "in" && Array.isArray(filter.value)) {
+      return filter.value.includes(value);
+    }
     if (filter.op === "lt") return String(value) < String(filter.value);
     if (filter.op === "is") return value === filter.value;
     return value !== filter.value;
@@ -229,6 +243,16 @@ class FakeQueryBuilder {
   private upsertRow(row: RecordRow) {
     if (this.table === "backend_sessions") {
       this.db.sessions.set(String(row.id), { ...row });
+      return;
+    }
+
+    if (this.table === "game_builds") {
+      this.db.gameBuilds.set(String(row.id), { ...row });
+      return;
+    }
+
+    if (this.table === "game_rights") {
+      this.db.gameRights.set(String(row.id), { ...row });
       return;
     }
 
@@ -288,6 +312,33 @@ function requireUser(userId = USER_ID) {
   };
 }
 
+function seedPublishedGame(
+  db: FakeSupabase,
+  game: RecordRow & { id: string },
+) {
+  const buildId = `${game.id}-build`;
+  db.games.set(game.id, {
+    publication_status: "published",
+    ...game,
+  });
+  db.gameBuilds.set(buildId, {
+    artifact_filename: game.rom_filename || `${game.id}.nes`,
+    artifact_url: game.rom_url || null,
+    enabled: true,
+    game_id: game.id,
+    id: buildId,
+    platform_id: "nes",
+    runtime_id: "mesen",
+    runtime_kind: "libretro",
+  });
+  db.gameRights.set(`${game.id}-rights`, {
+    game_build_id: buildId,
+    game_id: game.id,
+    id: `${game.id}-rights`,
+    verified_at: new Date().toISOString(),
+  });
+}
+
 async function createTestApp(db: FakeSupabase, userId = USER_ID) {
   const app = Fastify({ logger: false });
   const options = {
@@ -304,7 +355,7 @@ async function createTestApp(db: FakeSupabase, userId = USER_ID) {
 
 test("sessions persist hashed tokens and verify approved boot targets", async () => {
   const db = new FakeSupabase();
-  db.games.set(GAME_ID, {
+  seedPublishedGame(db, {
     id: GAME_ID,
     rom_filename: "fallback.nes",
     rom_url: "https://pxksbsloksyfwiqyfkrz.supabase.co/game.nes",
@@ -348,6 +399,26 @@ test("sessions persist hashed tokens and verify approved boot targets", async ()
   await app.close();
 });
 
+test("session creation rejects games without verified rights", async () => {
+  const db = new FakeSupabase();
+  db.games.set(GAME_ID, {
+    id: GAME_ID,
+    publication_status: "published",
+    rom_filename: "unreviewed.nes",
+  });
+  const app = await createTestApp(db);
+
+  const response = await app.inject({
+    method: "POST",
+    payload: { clientSessionId: "session-unreviewed", gameId: GAME_ID },
+    url: "/sessions",
+  });
+
+  assert.equal(response.statusCode, 404);
+  assert.equal(db.sessions.has("session-unreviewed"), false);
+  await app.close();
+});
+
 test("session ownership protects authenticated lookup", async () => {
   const db = new FakeSupabase();
   db.sessions.set("session-owned", {
@@ -374,7 +445,7 @@ test("session ownership protects authenticated lookup", async () => {
 
 test("session creation cannot overwrite another user's active session", async () => {
   const db = new FakeSupabase();
-  db.games.set(GAME_ID, {
+  seedPublishedGame(db, {
     id: GAME_ID,
     rom_filename: "game.nes",
     rom_url: null,

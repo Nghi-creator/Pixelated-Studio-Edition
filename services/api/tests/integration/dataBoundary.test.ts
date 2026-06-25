@@ -28,6 +28,8 @@ type TableName =
   | "comment_likes"
   | "comments"
   | "favorites"
+  | "game_builds"
+  | "game_rights"
   | "game_submissions"
   | "games"
   | "likes"
@@ -63,6 +65,8 @@ class FakeSupabase {
     comment_likes: [],
     comments: [],
     favorites: [],
+    game_builds: [],
+    game_rights: [],
     game_submissions: [],
     games: [],
     likes: [],
@@ -533,9 +537,40 @@ function seedProfiles(db: FakeSupabase) {
   );
 }
 
+function seedPublishedGames(db: FakeSupabase, ...games: RecordRow[]) {
+  for (const game of games) {
+    const gameId = String(game.id);
+    const buildId = `${gameId}-build`;
+    db.rows.games.push({
+      publication_status: "published",
+      rom_filename: `${gameId}.nes`,
+      ...game,
+    });
+    db.rows.game_builds.push({
+      artifact_filename: game.rom_filename || `${gameId}.nes`,
+      artifact_url: game.rom_url || null,
+      enabled: true,
+      game_id: gameId,
+      id: buildId,
+      platform_id: "nes",
+      runtime_id: "mesen",
+      runtime_kind: "libretro",
+    });
+    db.rows.game_rights.push({
+      attribution_text: `${game.title || gameId} test attribution`,
+      code_license_spdx: "MIT",
+      game_build_id: buildId,
+      game_id: gameId,
+      license_url: "https://example.test/license",
+      source_url: "https://example.test/source",
+      verified_at: new Date().toISOString(),
+    });
+  }
+}
+
 test("catalog and favorites are served through backend routes", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push({ id: GAME_ID, title: "Zeta" });
+  seedPublishedGames(db, { id: GAME_ID, title: "Zeta" });
   db.rows.favorites.push({
     game_id: GAME_ID,
     games: { id: GAME_ID, title: "Zeta" },
@@ -563,9 +598,26 @@ test("catalog and favorites are served through backend routes", async () => {
   await app.close();
 });
 
+test("catalog hides games without an enabled build and verified rights", async () => {
+  const db = new FakeSupabase();
+  db.rows.games.push({
+    id: "unreviewed-game",
+    publication_status: "published",
+    title: "Unreviewed",
+  });
+  const app = await createDataBoundaryApp(db);
+
+  const response = await app.inject({ method: "GET", url: "/games" });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json<{ games: unknown[] }>().games, []);
+  await app.close();
+});
+
 test("catalog route paginates, searches, and returns featured games", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push(
+  seedPublishedGames(
+    db,
     { cover_url: "/a.png", id: "game-a", play_count: 2, title: "Alpha Quest" },
     { cover_url: "/b.png", id: "game-b", play_count: 20, title: "Beta Quest" },
     { cover_url: "/c.png", id: "game-c", play_count: 5, title: "Gamma Run" },
@@ -606,14 +658,22 @@ test("catalog route paginates, searches, and returns featured games", async () =
 
 test("catalog route caches public game pages briefly", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push({ id: "cache-game-a", play_count: 1, title: "Cache Alpha" });
+  seedPublishedGames(db, {
+    id: "cache-game-a",
+    play_count: 1,
+    title: "Cache Alpha",
+  });
   const app = await createDataBoundaryApp(db);
 
   const firstResponse = await app.inject({
     method: "GET",
     url: "/games?page=1&pageSize=15&search=cache-alpha-unique",
   });
-  db.rows.games.push({ id: "cache-game-b", play_count: 20, title: "Cache Alpha Unique" });
+  seedPublishedGames(db, {
+    id: "cache-game-b",
+    play_count: 20,
+    title: "Cache Alpha Unique",
+  });
   const secondResponse = await app.inject({
     method: "GET",
     url: "/games?page=1&pageSize=15&search=cache-alpha-unique",
@@ -630,7 +690,7 @@ test("catalog route caches public game pages briefly", async () => {
 
 test("catalog cache keeps featured games fresh", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push({
+  seedPublishedGames(db, {
     cover_url: "/a.png",
     id: "cache-featured-a",
     play_count: 1,
@@ -642,7 +702,7 @@ test("catalog cache keeps featured games fresh", async () => {
     method: "GET",
     url: "/games?page=1&pageSize=15&search=cache-featured-alpha",
   });
-  db.rows.games.push({
+  seedPublishedGames(db, {
     cover_url: "/b.png",
     id: "cache-featured-b",
     play_count: 20,
@@ -667,7 +727,11 @@ test("catalog cache keeps featured games fresh", async () => {
 
 test("featured games route bypasses shared catalog cache headers", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push({ id: "featured-a", play_count: 1, title: "Featured A" });
+  seedPublishedGames(db, {
+    id: "featured-a",
+    play_count: 1,
+    title: "Featured A",
+  });
   const app = await createDataBoundaryApp(db);
 
   const response = await app.inject({
@@ -688,7 +752,8 @@ test("featured games route bypasses shared catalog cache headers", async () => {
 
 test("featured games route returns a wider pool while all play counts are zero", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push(
+  seedPublishedGames(
+    db,
     { id: "zero-featured-a", play_count: 0, title: "Zero Featured A" },
     { id: "zero-featured-b", play_count: 0, title: "Zero Featured B" },
     { id: "zero-featured-c", play_count: 0, title: "Zero Featured C" },

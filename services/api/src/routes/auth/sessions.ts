@@ -5,6 +5,7 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../../modules/auth/supabaseAuth.js";
+import { fetchPublishedGameById } from "../../modules/catalog/services/catalogService.js";
 import { createRateLimiter } from "../../modules/security/sharedRateLimiter.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
@@ -124,17 +125,23 @@ export async function registerSessionRoutes(
         return reply.status(400).send({ error: "Invalid session request" });
       }
 
-      const { data, error } = await service
-        .from("games")
-        .select("rom_url, rom_filename")
-        .eq("id", parsedBody.data.gameId)
-        .single();
+      let game = null;
+      try {
+        game = await fetchPublishedGameById(service, parsedBody.data.gameId);
+      } catch (err) {
+        request.log.error({ err }, "Failed to load session game");
+        return reply.status(500).send({ error: "Failed to create session" });
+      }
 
-      if (error || !data) {
+      if (!game) {
         return reply.status(404).send({ error: "Game not found" });
       }
 
-      const romTarget = data.rom_url || data.rom_filename;
+      const build = game.game_builds[0];
+      if (!build) {
+        return reply.status(422).send({ error: "Game has no approved build" });
+      }
+      const romTarget = build?.artifact_url || build?.artifact_filename;
       if (!romTarget) {
         return reply.status(422).send({ error: "Game has no ROM target" });
       }
@@ -150,8 +157,8 @@ export async function registerSessionRoutes(
       const sessionToken = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
       const boot = {
-        romFilename: data.rom_filename || null,
-        romUrl: data.rom_url || null,
+        romFilename: build.artifact_filename || null,
+        romUrl: build.artifact_url || null,
       };
 
       const { error: sessionError } = await service
