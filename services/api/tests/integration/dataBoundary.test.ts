@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import test from "node:test";
 import Fastify from "fastify";
 import type { FastifyRequest } from "fastify";
@@ -62,6 +63,11 @@ class FakeSupabase {
     submissions: [],
   };
   removedStorageObjects: { bucket: string; paths: string[] }[] = [];
+  uploadedStorageObjects: {
+    bucket: string;
+    bytes: number;
+    path: string;
+  }[] = [];
   rows: Record<TableName, RecordRow[]> = {
     access_logs: [],
     catalog_ingestion_candidates: [],
@@ -141,6 +147,29 @@ class FakeSupabase {
         this.removedStorageObjects.push({ bucket, paths });
         return { data: paths, error: null };
       },
+      upload: async (path: string, body: Blob | Buffer | Uint8Array) => {
+        if (this.storageErrors.has(bucket)) {
+          return { data: null, error: new Error(`${bucket} storage unavailable`) };
+        }
+
+        const bytes =
+          body instanceof Blob
+            ? body.size
+            : Buffer.isBuffer(body)
+              ? body.length
+              : body.byteLength;
+        this.storageObjects[bucket] = [
+          ...(this.storageObjects[bucket] || []).filter(
+            (existingPath) => existingPath !== path,
+          ),
+          path,
+        ];
+        this.uploadedStorageObjects.push({ bucket, bytes, path });
+        return { data: { path }, error: null };
+      },
+      getPublicUrl: (path: string) => ({
+        data: { publicUrl: `https://storage.example.test/${bucket}/${path}` },
+      }),
     }),
   };
 
@@ -506,9 +535,18 @@ function requireUser(userId = USER_ID) {
   };
 }
 
-async function createDataBoundaryApp(db: FakeSupabase, userId = USER_ID) {
+function sha256(bytes: Buffer) {
+  return crypto.createHash("sha256").update(bytes).digest("hex");
+}
+
+async function createDataBoundaryApp(
+  db: FakeSupabase,
+  userId = USER_ID,
+  artifactBytes = Buffer.from("test-artifact"),
+) {
   const app = Fastify({ logger: false });
   const options = {
+    fetchArtifact: async () => new Response(artifactBytes),
     requireUser: requireUser(userId),
     supabase: db as never,
     supabaseAnon: db as never,
@@ -663,6 +701,7 @@ test("catalog route paginates, searches, and returns featured games", async () =
 test("admin can promote a catalog ingestion candidate without deleting existing games", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
+  const artifactBytes = Buffer.from("nova-rom");
   db.rows.games.push({
     id: GAME_ID,
     publication_status: "draft",
@@ -671,10 +710,9 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
   });
   db.rows.catalog_ingestion_candidates.push({
     artifact_filename: "nova.nes",
-    artifact_sha256:
-      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-    artifact_size: 262160,
-    artifact_url: "https://example.test/nova.nes",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/repo/nova.nes",
     asset_license_spdx: "GPL-3.0-or-later",
     attribution_text: "Nova attribution",
     code_license_spdx: "GPL-3.0-or-later",
@@ -694,7 +732,7 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
     source_repo_url: "https://github.com/nesdev-org/homebrew-db",
     title: "Nova the Squirrel",
   });
-  const app = await createDataBoundaryApp(db, ADMIN_ID);
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
 
   const response = await app.inject({
     method: "PATCH",
@@ -710,6 +748,13 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
   assert.equal(db.rows.game_builds.length, 1);
   assert.equal(db.rows.game_builds[0]?.game_id, GAME_ID);
   assert.equal(db.rows.game_builds[0]?.runtime_id, "mesen");
+  assert.match(
+    String(db.rows.game_builds[0]?.artifact_url),
+    /^https:\/\/storage\.example\.test\/catalog_artifacts\/homebrew-hub\//,
+  );
+  assert.equal(db.uploadedStorageObjects.length, 1);
+  assert.equal(db.uploadedStorageObjects[0]?.bucket, "catalog_artifacts");
+  assert.equal(db.uploadedStorageObjects[0]?.bytes, artifactBytes.length);
   assert.equal(db.rows.game_rights.length, 1);
   assert.equal(db.rows.game_rights[0]?.game_id, GAME_ID);
   assert.equal(
@@ -732,7 +777,7 @@ test("catalog candidate review requires admin access", async () => {
     artifact_sha256:
       "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     artifact_size: 32768,
-    artifact_url: "https://example.test/game.gb",
+    artifact_url: "https://raw.githubusercontent.com/example/repo/game.gb",
     asset_license_spdx: "MIT",
     attribution_text: "Game attribution",
     code_license_spdx: "MIT",

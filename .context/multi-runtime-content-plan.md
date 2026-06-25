@@ -330,6 +330,15 @@ mirrors approved artifacts into controlled storage and captures reviewed
 artwork/attribution blocks instead of pointing catalog builds straight at the
 upstream raw artifact URL.
 
+Progress note — 2026-06-26: added the third Phase 2 slice. Approved candidate
+promotion now downloads artifacts only from allowlisted upstream hosts, verifies
+byte size and SHA-256 against the imported candidate record, uploads the artifact
+to the new public `catalog_artifacts` storage bucket under a deterministic
+checksum-based path, and publishes the mirrored storage URL in `games.rom_url`
+and `game_builds.artifact_url`. Phase 2 remains open until promotion also
+captures or assigns reviewed homepage artwork and produces complete attribution
+blocks for display.
+
 ### Phase 3 — Debian native proof of concept
 
 1. Create a separate Debian-based native runtime image.

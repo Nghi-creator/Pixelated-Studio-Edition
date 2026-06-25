@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getCachedUserRole } from "../../modules/auth/roleCache.js";
@@ -61,6 +62,7 @@ type GameBuildRow = { id: string };
 type GameRightsRow = { id: string };
 
 type CatalogCandidateRouteOptions = {
+  fetchArtifact?: typeof fetch;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
 };
@@ -95,6 +97,7 @@ const CANDIDATE_COLUMNS = [
   "first_seen_at",
   "last_seen_at",
 ].join(",");
+const ALLOWED_ARTIFACT_HOSTS = new Set(["raw.githubusercontent.com"]);
 
 async function requireAdminRole(
   service: SupabaseServiceLike,
@@ -108,13 +111,92 @@ async function requireAdminRole(
   };
 }
 
+function sanitizeObjectSegment(value: string) {
+  return value
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120) || "artifact";
+}
+
+function sha256(bytes: Buffer) {
+  return crypto.createHash("sha256").update(bytes).digest("hex");
+}
+
+function assertAllowedArtifactUrl(value: string) {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error("Candidate artifact URL is invalid.");
+  }
+
+  if (url.protocol !== "https:" || !ALLOWED_ARTIFACT_HOSTS.has(url.hostname)) {
+    throw new Error("Candidate artifact URL host is not allowed.");
+  }
+}
+
+async function mirrorCandidateArtifact(
+  service: SupabaseServiceLike,
+  candidate: CandidateRow,
+  fetchArtifact: typeof fetch,
+) {
+  assertAllowedArtifactUrl(candidate.artifact_url);
+  const response = await fetchArtifact(candidate.artifact_url);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch candidate artifact: ${response.status}`);
+  }
+
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (bytes.length !== candidate.artifact_size) {
+    throw new Error(
+      `Candidate artifact size mismatch. Expected ${candidate.artifact_size}, received ${bytes.length}.`,
+    );
+  }
+
+  const actualSha256 = sha256(bytes);
+  if (actualSha256 !== candidate.artifact_sha256) {
+    throw new Error("Candidate artifact checksum mismatch.");
+  }
+
+  const objectPath = [
+    "homebrew-hub",
+    sanitizeObjectSegment(candidate.source_commit),
+    sanitizeObjectSegment(candidate.platform_id),
+    `${candidate.artifact_sha256}-${sanitizeObjectSegment(candidate.artifact_filename)}`,
+  ].join("/");
+
+  const bucket = service.storage.from("catalog_artifacts");
+  const { error: uploadError } = await bucket.upload(objectPath, bytes, {
+    contentType: "application/octet-stream",
+    upsert: true,
+  });
+  if (uploadError) throw uploadError;
+
+  const { data } = bucket.getPublicUrl(objectPath);
+  if (!data.publicUrl) {
+    throw new Error("Failed to resolve mirrored artifact public URL.");
+  }
+
+  return {
+    objectPath,
+    publicUrl: data.publicUrl,
+  };
+}
+
 async function promoteCandidate(
   service: SupabaseServiceLike,
   candidate: CandidateRow,
   reviewerId: string,
   notes: string | null,
+  fetchArtifact: typeof fetch,
 ) {
   const now = new Date().toISOString();
+  const mirroredArtifact = await mirrorCandidateArtifact(
+    service,
+    candidate,
+    fetchArtifact,
+  );
 
   const { data: existingGame, error: existingGameError } = await service
     .from("games")
@@ -129,7 +211,7 @@ async function promoteCandidate(
     developer_url: candidate.developer_url,
     publication_status: "published",
     rom_filename: candidate.artifact_filename,
-    rom_url: candidate.artifact_url,
+    rom_url: mirroredArtifact.publicUrl,
     title: candidate.title,
   };
 
@@ -170,7 +252,7 @@ async function promoteCandidate(
     artifact_filename: candidate.artifact_filename,
     artifact_sha256: candidate.artifact_sha256,
     artifact_size: candidate.artifact_size,
-    artifact_url: candidate.artifact_url,
+    artifact_url: mirroredArtifact.publicUrl,
     enabled: true,
     game_id: game.id,
     platform_id: candidate.platform_id,
@@ -239,7 +321,10 @@ async function promoteCandidate(
       import_status: "promoted",
       promoted_build_id: build.id,
       promoted_game_id: game.id,
-      review_notes: notes || candidate.review_notes,
+      review_notes: [
+        notes || candidate.review_notes,
+        `Mirrored artifact path: catalog_artifacts/${mirroredArtifact.objectPath}`,
+      ].filter(Boolean).join("\n"),
       reviewed_at: now,
       reviewed_by: reviewerId,
       updated_at: now,
@@ -258,6 +343,7 @@ export async function registerCatalogCandidateRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const fetchArtifact = options.fetchArtifact || fetch;
 
   app.get(
     "/admin/catalog-candidates",
@@ -406,6 +492,7 @@ export async function registerCatalogCandidateRoutes(
           candidate,
           user.id,
           body.data.notes || null,
+          fetchArtifact,
         );
         return promoted;
       } catch (err) {
