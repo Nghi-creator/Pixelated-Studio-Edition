@@ -408,6 +408,18 @@ Frozen-Bubble and Neverball. Phase 4 remains open until review can author new
 launch manifests safely, input/video/audio telemetry is captured per native
 candidate, and native image rollout/version selection is wired into operations.
 
+Progress note — 2026-06-26: added the third Phase 4 slice. Native image builds
+now derive a stable Docker tag from the runtime ID plus lock-manifest hash
+(`pixelated-engine-native:<runtimeId>-<lockHash12>`), and the native Dockerfile
+records the runtime ID and full lock SHA-256 as image labels. `npm run
+build:native` builds that versioned image, and `npm run smoke:native` defaults
+to the same lock-derived image tag so smoke tests target the exact image version
+represented by `native-runtime.lock.json`. The generated command was verified
+with `--print`; the actual Docker build could not be rerun in this step because
+Docker Desktop was not reachable. Phase 4 remains open until this versioned
+image tag is wired into desktop/hosted runtime selection without disrupting
+active sessions.
+
 ### Phase 5 — Additional libretro platforms
 
 Add platforms only when both a maintained core and a sustainable licensed

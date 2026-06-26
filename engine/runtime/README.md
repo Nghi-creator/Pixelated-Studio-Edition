@@ -39,11 +39,14 @@ It installs only the pinned Debian `main` packages listed in
 manifests instead of database-supplied commands.
 
 ```sh
-docker build -t pixelated-engine-native:phase4 -f Dockerfile.native .
-npm run smoke:native -- --image pixelated-engine-native:phase4
+npm run build:native
+npm run smoke:native
 ```
 
-`npm run smoke:native` verifies the embedded lock file checksum, executable
+`npm run build:native` tags the image from the lock hash, for example
+`pixelated-engine-native:debian-native-v1-46d11e8650c8`, and writes the runtime
+ID plus lock SHA-256 into image labels. `npm run smoke:native` defaults to that
+same versioned tag, then verifies the embedded lock file checksum, executable
 paths, Xvfb boot, and headless SDL audio for every package in the lock manifest.
 
 Cloud game starts verify their backend-created session token before booting a ROM. Set `PIXELATED_API_URL` when running the container manually:

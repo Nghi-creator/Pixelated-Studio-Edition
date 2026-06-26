@@ -1,12 +1,11 @@
-import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
-import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
-import { fileURLToPath } from "node:url";
-
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const runtimeRoot = path.resolve(scriptDir, "..");
+import {
+  loadNativeRuntimeLock,
+  nativeRuntimeImageTag,
+  runtimeRoot,
+} from "./nativeRuntimeLock.mjs";
 
 function getArgValue(name) {
   const index = process.argv.indexOf(name);
@@ -19,19 +18,6 @@ function hasArg(name) {
 
 function shellSingleQuote(value) {
   return `'${String(value).replaceAll("'", "'\"'\"'")}'`;
-}
-
-function sha256(value) {
-  return crypto.createHash("sha256").update(value).digest("hex");
-}
-
-function loadLock(manifestPath) {
-  const bytes = fs.readFileSync(manifestPath);
-  const parsed = JSON.parse(bytes.toString("utf8"));
-  if (!Array.isArray(parsed.packages) || parsed.packages.length === 0) {
-    throw new Error("Native runtime lock manifest must include packages.");
-  }
-  return { hash: sha256(bytes), manifest: parsed };
 }
 
 function packageSmokeShell(packages, timeoutSeconds, expectedLockHash) {
@@ -96,21 +82,21 @@ fi`;
 }
 
 function main() {
-  const image =
-    getArgValue("--image") ||
-    process.env.NATIVE_RUNTIME_IMAGE ||
-    "pixelated-engine-native:phase4";
   const manifestPath = path.resolve(
     getArgValue("--manifest") ||
       process.env.NATIVE_RUNTIME_LOCK_MANIFEST ||
       path.join(runtimeRoot, "native-runtime.lock.json"),
   );
+  const { hash, manifest } = loadNativeRuntimeLock(manifestPath);
+  const image =
+    getArgValue("--image") ||
+    process.env.NATIVE_RUNTIME_IMAGE ||
+    nativeRuntimeImageTag(manifest, hash);
   const timeoutSeconds = Number(getArgValue("--timeout-seconds") || 8);
   if (!Number.isFinite(timeoutSeconds) || timeoutSeconds < 1) {
     throw new Error("--timeout-seconds must be a positive number.");
   }
 
-  const { hash, manifest } = loadLock(manifestPath);
   const shell = packageSmokeShell(manifest.packages, timeoutSeconds, hash);
 
   if (hasArg("--print-shell")) {

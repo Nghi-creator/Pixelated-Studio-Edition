@@ -1,4 +1,6 @@
 ARG DEBIAN_IMAGE=debian:trixie-slim
+ARG NATIVE_RUNTIME_ID=debian-native-v1
+ARG NATIVE_RUNTIME_LOCK_SHA256=unknown
 ARG NODE_IMAGE=node:20.20.2-bookworm-slim
 
 FROM ${NODE_IMAGE} AS app-builder
@@ -15,6 +17,9 @@ RUN npm run build && npm prune --omit=dev
 FROM ${DEBIAN_IMAGE} AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
+LABEL com.pixelated.runtime.kind="native_linux" \
+      com.pixelated.runtime.id="${NATIVE_RUNTIME_ID}" \
+      com.pixelated.runtime.lock_sha256="${NATIVE_RUNTIME_LOCK_SHA256}"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     frozen-bubble=2.212-13+b1 \
