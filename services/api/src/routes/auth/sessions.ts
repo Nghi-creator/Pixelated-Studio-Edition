@@ -72,6 +72,10 @@ function mapBoot(row: BackendSessionRow) {
     romFilename: row.boot_rom_filename,
     romUrl: row.boot_rom_url,
     runtimeId: row.boot_runtime_id,
+    runtimeKind:
+      row.boot_launch_manifest_id && !row.boot_rom_url && !row.boot_rom_filename
+        ? "native_linux"
+        : "libretro",
   };
 }
 
@@ -175,6 +179,7 @@ export async function registerSessionRoutes(
         romFilename: build.artifact_filename || null,
         romUrl: build.artifact_url || null,
         runtimeId: build.runtime_id,
+        runtimeKind: build.runtime_kind,
       };
 
       const { error: sessionError } = await service

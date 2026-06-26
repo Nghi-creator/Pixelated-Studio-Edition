@@ -37,6 +37,7 @@ type HealthSnapshotOptions = {
   exposureMode?: "local" | "lan";
   getRuntimeState: () => RuntimeState;
   healthPaths: HealthPaths;
+  runtimeKind?: "libretro" | "native_linux";
 };
 
 function pathExists(filePath: string): boolean {
@@ -67,6 +68,7 @@ export function createHealthSnapshot(options: HealthSnapshotOptions) {
     exposureMode = "local",
     healthPaths,
     getRuntimeState,
+    runtimeKind = "libretro",
   } = options;
 
   return function getHealthSnapshot() {
@@ -113,14 +115,19 @@ export function createHealthSnapshot(options: HealthSnapshotOptions) {
       resources: createResourceSnapshot(runtimeState),
     };
 
+    const runtimeBinariesReady =
+      runtimeKind === "native_linux"
+        ? true
+        : checks.retroarch.binaryExists &&
+          checks.retroarch.libretroCoresExist &&
+          checks.retroarch.configExists;
+
     const ok =
       checks.node &&
       checks.virtualDisplay.processStarted &&
       checks.virtualDisplay.socketReady &&
       checks.audio.processStarted &&
-      checks.retroarch.binaryExists &&
-      checks.retroarch.libretroCoresExist &&
-      checks.retroarch.configExists &&
+      runtimeBinariesReady &&
       checks.cameraBridge.fileExists &&
       checks.cameraBridge.pythonExists &&
       checks.cameraBridge.gstreamerExists &&
@@ -132,6 +139,7 @@ export function createHealthSnapshot(options: HealthSnapshotOptions) {
       advertisedUrls,
       companionUrls,
       exposureMode,
+      runtimeKind,
       uptime: process.uptime(),
       engineTokenRequired: Boolean(engineToken),
       checks,

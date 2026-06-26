@@ -18,6 +18,7 @@ type EngineHealthPayload = {
     };
   };
   exposureMode?: "local" | "lan";
+  runtimeKind?: "libretro" | "native_linux";
 };
 
 export const CHECKING_INPUT_CAPABILITIES: EngineInputCapabilities = {
@@ -100,3 +101,9 @@ export async function loadEngineShareContext(): Promise<EngineShareContext> {
   }
 }
 
+export async function loadEngineRuntimeKind() {
+  const response = await fetch(engineEndpoint("/health"));
+  if (!response.ok) throw new Error("Engine health check failed.");
+  const health = (await response.json()) as EngineHealthPayload;
+  return health.runtimeKind || "libretro";
+}

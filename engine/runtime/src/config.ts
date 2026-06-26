@@ -59,6 +59,10 @@ export const PIXELATED_API_URL = (process.env.PIXELATED_API_URL || "").replace(
 );
 export const ENGINE_EXPOSURE_MODE =
   process.env.PIXELATED_ENGINE_EXPOSURE_MODE === "lan" ? "lan" : "local";
+export const ENGINE_RUNTIME_KIND =
+  process.env.PIXELATED_ENGINE_RUNTIME_KIND === "native_linux"
+    ? "native_linux"
+    : "libretro";
 export const ADVERTISED_URLS = (process.env.PIXELATED_ADVERTISED_URLS || "")
   .split(",")
   .map((url) => url.trim())

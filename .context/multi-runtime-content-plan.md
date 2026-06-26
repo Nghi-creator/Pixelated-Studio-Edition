@@ -432,6 +432,17 @@ existing libretro behavior or interrupting already-running sessions. Phase 4
 remains open until native mode can be selected automatically per approved game
 session and hosted runtime rollout uses the same image-version contract.
 
+Progress note — 2026-06-26: added the fifth Phase 4 slice. Backend session boot
+metadata now includes the approved build's `runtimeKind`, engine `/health`
+advertises the active runtime kind, and native health no longer falsely depends
+on RetroArch/core files. The web player checks the required session runtime
+against the paired/running engine before emitting `start-game`, producing a
+clear restart instruction when a native Linux game is opened against a libretro
+engine or vice versa. This is the safe compatibility gate before full automatic
+per-game engine orchestration. Phase 4 remains open until the desktop/web flow
+can switch or request the correct runtime image automatically per selected
+catalog game.
+
 ### Phase 5 — Additional libretro platforms
 
 Add platforms only when both a maintained core and a sustainable licensed

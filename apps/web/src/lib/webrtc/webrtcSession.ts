@@ -1,4 +1,6 @@
 import { api, getAuthSession } from "../api/apiClient";
+import { loadEngineRuntimeKind } from "./engineContext";
+import { assertEngineRuntimeKindMatches } from "./runtimeKind";
 export { createWebRTCSessionId } from "./webrtcIdentity";
 
 export type WebRTCStatus = "idle" | "connecting" | "playing" | "error";
@@ -27,6 +29,9 @@ export const resolveGameBootTarget = async (
   }
 
   const backendSession = await api.createSession(gameId, clientSessionId);
+  const requiredRuntimeKind = backendSession.boot.runtimeKind || "libretro";
+  const activeRuntimeKind = await loadEngineRuntimeKind();
+  assertEngineRuntimeKindMatches(requiredRuntimeKind, activeRuntimeKind);
   const romFilename = backendSession.boot.launchManifestId
     ? backendSession.boot.launchManifestId
     : backendSession.boot.romUrl || backendSession.boot.romFilename;

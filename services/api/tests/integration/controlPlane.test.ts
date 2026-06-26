@@ -399,6 +399,10 @@ test("sessions persist hashed tokens and verify approved boot targets", async ()
     "mesen",
   );
   assert.equal(
+    verifyResponse.json<{ boot: { runtimeKind: string } }>().boot.runtimeKind,
+    "libretro",
+  );
+  assert.equal(
     verifyResponse.json<{ boot: { artifactSize: number } }>().boot.artifactSize,
     1234,
   );
@@ -449,6 +453,10 @@ test("native Linux sessions persist launch manifests without ROM targets", async
   }>();
   assert.equal(created.boot.launchManifestId, "frozen-bubble");
   assert.equal(created.boot.romUrl, null);
+  assert.equal(
+    createResponse.json<{ boot: { runtimeKind: string } }>().boot.runtimeKind,
+    "native_linux",
+  );
 
   const verifyResponse = await app.inject({
     method: "POST",
@@ -465,6 +473,10 @@ test("native Linux sessions persist launch manifests without ROM targets", async
   assert.equal(
     verifyResponse.json<{ boot: { runtimeId: string } }>().boot.runtimeId,
     "debian-native-v1",
+  );
+  assert.equal(
+    verifyResponse.json<{ boot: { runtimeKind: string } }>().boot.runtimeKind,
+    "native_linux",
   );
   await app.close();
 });

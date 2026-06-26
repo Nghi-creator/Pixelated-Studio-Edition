@@ -4,6 +4,7 @@ import {
   createWebRTCProfileRestartIdentity,
   createWebRTCRetryIdentity,
 } from "../../../src/lib/webrtc/webrtcIdentity.ts";
+import { assertEngineRuntimeKindMatches } from "../../../src/lib/webrtc/runtimeKind.ts";
 
 test("WebRTC retry rotates peer identity and local session identity", () => {
   const first = createWebRTCRetryIdentity(false);
@@ -27,4 +28,21 @@ test("stream profile restarts rotate only the peer identity", () => {
   assert.notEqual(first.peerId, second.peerId);
   assert.equal(first.sessionId, null);
   assert.equal(second.sessionId, null);
+});
+
+test("engine runtime guard explains native/libretro mismatches before boot", () => {
+  assert.doesNotThrow(() =>
+    assertEngineRuntimeKindMatches("libretro", "libretro"),
+  );
+  assert.doesNotThrow(() =>
+    assertEngineRuntimeKindMatches("native_linux", "native_linux"),
+  );
+  assert.throws(
+    () => assertEngineRuntimeKindMatches("native_linux", "libretro"),
+    /native Linux engine/,
+  );
+  assert.throws(
+    () => assertEngineRuntimeKindMatches("libretro", "native_linux"),
+    /libretro engine/,
+  );
 });

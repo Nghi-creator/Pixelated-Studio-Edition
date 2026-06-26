@@ -35,6 +35,7 @@ export type ApiSessionResponse = {
     romFilename: string | null;
     romUrl: string | null;
     runtimeId: string;
+    runtimeKind: "libretro" | "native_linux";
   };
   engineUrl: string;
   expiresAt: string;
