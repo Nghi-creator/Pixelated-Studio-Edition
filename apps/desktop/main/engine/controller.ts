@@ -66,6 +66,10 @@ export type EngineClientPayload = {
   userAgent: string;
 };
 
+type EngineHealthPayload = {
+  runtimeKind?: EngineRuntimeKind;
+};
+
 let engineToken: string | null = null;
 let activeCompanion: ActiveCompanion | null = null;
 let activeStartupAttempt = 0;
@@ -229,6 +233,10 @@ export async function listEngineClients() {
   if (!engineToken) return { clients: [] as EngineClientPayload[] };
 
   return requestEngineControl<{ clients: EngineClientPayload[] }>("/clients");
+}
+
+async function getEngineHealth() {
+  return requestEngineControl<EngineHealthPayload>("/health");
 }
 
 export async function revokeEngineClient(clientId: string) {
@@ -399,6 +407,14 @@ async function requestEngineRuntimeSwitch(
   }
 
   try {
+    const health = await getEngineHealth();
+    if (health.runtimeKind === runtimeKind) {
+      return {
+        runtimeKind,
+        status: "unchanged" as const,
+      };
+    }
+
     const blocker = getRuntimeSwitchBlocker((await listEngineClients()).clients);
     if (blocker) {
       event.reply(

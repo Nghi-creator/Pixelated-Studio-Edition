@@ -20,7 +20,7 @@ license evidence, source link, attribution, and immutable checksum.
 - [x] Phase 1 — Multi-core libretro engine
 - [x] Phase 2 — Automated licensed-ROM candidates
 - [x] Phase 3 — Debian native proof of concept
-- [ ] Phase 4 — Native catalog operations
+- [x] Phase 4 — Native catalog operations
 - [ ] Phase 5 — Additional libretro platforms
 
 When a phase meets every acceptance criterion in this plan, change its checkbox
@@ -470,6 +470,17 @@ of treating it as a generic unavailable switch, so a native/libretro mismatch no
 longer silently interrupts someone already playing. Phase 4 remains open until
 runtime rollout can route new sessions to compatible engine instances without
 requiring a shared-container restart.
+
+Completion note — 2026-06-27: Phase 4 is complete for the current
+single-desktop-engine architecture. Debian `main` native candidates can be
+imported into review, promoted without ROM mirroring, launched only through
+engine-owned manifests, built into a lock-derived versioned native image, and
+smoke-tested against the pinned lock. Desktop/web runtime switching is
+token-protected, idempotent when the requested runtime is already active, and
+non-disruptive by contract: the switch is refused while active session clients
+are connected. Future multi-instance routing can improve UX by starting new
+sessions on a compatible engine without a shared-container restart, but the
+Phase 4 safety requirement is satisfied by refusing disruptive rollout.
 
 ### Phase 5 — Additional libretro platforms
 

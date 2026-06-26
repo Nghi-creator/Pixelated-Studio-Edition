@@ -127,6 +127,10 @@ export async function requestEngineRuntimeSwitch(
     return { status: "restarting" as const };
   }
 
+  if (response.status === 200) {
+    return { status: "unchanged" as const };
+  }
+
   if (response.status === 409) {
     const payload = (await response.json().catch(() => ({}))) as {
       error?: unknown;

@@ -48,6 +48,10 @@ export type RuntimeSwitchResult =
       status: "restarting";
     }
   | {
+      runtimeKind: "libretro" | "native_linux";
+      status: "unchanged";
+    }
+  | {
       activeClientCount?: number;
       activeSessionCount?: number;
       code: string;
@@ -485,7 +489,7 @@ async function handleRuntimeSwitchRequest(
       return true;
     }
 
-    sendJson(res, 202, result);
+    sendJson(res, result.status === "restarting" ? 202 : 200, result);
   } catch (err) {
     sendJson(res, 400, { error: err instanceof Error ? err.message : String(err) });
   }
