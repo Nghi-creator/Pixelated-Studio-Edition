@@ -123,5 +123,22 @@ export async function requestEngineRuntimeSwitch(
     method: "POST",
   });
 
-  return response.status === 202;
+  if (response.status === 202) {
+    return { status: "restarting" as const };
+  }
+
+  if (response.status === 409) {
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: unknown;
+    };
+    return {
+      error:
+        typeof payload.error === "string"
+          ? payload.error
+          : "A game session is active on this desktop engine. Stop the current stream before switching runtimes.",
+      status: "blocked" as const,
+    };
+  }
+
+  return { status: "unavailable" as const };
 }

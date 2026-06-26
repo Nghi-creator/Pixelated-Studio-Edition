@@ -462,6 +462,15 @@ message because they do not go through the companion control plane. Phase 4
 remains open until runtime switches avoid disrupting active sessions and the
 same image-version rollout contract exists for hosted/native operations.
 
+Progress note — 2026-06-27: added the eighth Phase 4 slice. Runtime switch
+requests now inspect the engine's connected-client list before restarting and
+return a `409 runtime_switch_active_session` response when any non-camera client
+is attached to an active session. The web client surfaces that blocker instead
+of treating it as a generic unavailable switch, so a native/libretro mismatch no
+longer silently interrupts someone already playing. Phase 4 remains open until
+runtime rollout can route new sessions to compatible engine instances without
+requiring a shared-container restart.
+
 ### Phase 5 — Additional libretro platforms
 
 Add platforms only when both a maintained core and a sustainable licensed

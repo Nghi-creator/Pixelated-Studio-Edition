@@ -35,10 +35,13 @@ export const resolveGameBootTarget = async (
   const requiredRuntimeKind = backendSession.boot.runtimeKind || "libretro";
   const activeRuntimeKind = await loadEngineRuntimeKind();
   if (requiredRuntimeKind !== activeRuntimeKind) {
-    const switchRequested = await requestEngineRuntimeSwitch(requiredRuntimeKind).catch(
-      () => false,
+    const switchResult = await requestEngineRuntimeSwitch(requiredRuntimeKind).catch(
+      () => ({ status: "unavailable" as const }),
     );
-    if (switchRequested) {
+    if (switchResult.status === "blocked") {
+      throw new Error(switchResult.error);
+    }
+    if (switchResult.status === "restarting") {
       throw new Error(
         requiredRuntimeKind === "native_linux"
           ? "Pixelated Desktop is switching to the native Linux engine. Wait for the desktop engine to show ready, then press Play again."

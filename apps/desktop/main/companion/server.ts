@@ -42,6 +42,19 @@ const RUNTIME_SWITCH_PATH = "/runtime/switch";
 const HOST_ACCESS_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 const VALID_RUNTIME_KINDS = new Set(["libretro", "native_linux"]);
 
+export type RuntimeSwitchResult =
+  | {
+      runtimeKind: "libretro" | "native_linux";
+      status: "restarting";
+    }
+  | {
+      activeClientCount?: number;
+      activeSessionCount?: number;
+      code: string;
+      error: string;
+      status?: "blocked";
+    };
+
 export type CompanionServerOptions = {
   certDir: string;
   engineToken: string;
@@ -49,7 +62,9 @@ export type CompanionServerOptions = {
   inviteExpiresAt?: number;
   lanAddresses: string[];
   launchAllowedOrigins: string[];
-  onRuntimeSwitch?: (runtimeKind: "libretro" | "native_linux") => void;
+  onRuntimeSwitch?: (
+    runtimeKind: "libretro" | "native_linux",
+  ) => Promise<RuntimeSwitchResult> | RuntimeSwitchResult;
   port: number;
   preserveSecurityState?: boolean;
 };
@@ -400,7 +415,9 @@ async function handleRuntimeSwitchRequest(
   req: IncomingMessage,
   res: ServerResponse,
   allowedOrigins: string[],
-  onRuntimeSwitch?: (runtimeKind: "libretro" | "native_linux") => void,
+  onRuntimeSwitch?: (
+    runtimeKind: "libretro" | "native_linux",
+  ) => Promise<RuntimeSwitchResult> | RuntimeSwitchResult,
 ) {
   if (!req.url?.startsWith(RUNTIME_SWITCH_PATH)) {
     return false;
@@ -457,14 +474,18 @@ async function handleRuntimeSwitchRequest(
       return true;
     }
 
-    sendJson(res, 202, {
-      runtimeKind,
-      status: "restarting",
-    });
-    setTimeout(
-      () => onRuntimeSwitch(runtimeKind as "libretro" | "native_linux"),
-      0,
+    const result = await onRuntimeSwitch(
+      runtimeKind as "libretro" | "native_linux",
     );
+    if ("error" in result) {
+      sendJson(res, result.code === "runtime_switch_active_session" ? 409 : 503, {
+        ...result,
+        status: result.status || "blocked",
+      });
+      return true;
+    }
+
+    sendJson(res, 202, result);
   } catch (err) {
     sendJson(res, 400, { error: err instanceof Error ? err.message : String(err) });
   }

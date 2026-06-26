@@ -35,6 +35,7 @@ import {
 import { getLanIpv4Addresses } from "../network/exposure";
 import { waitForEngineHealth } from "../runtime/health";
 import { emitEngineState, setCurrentEnginePhase } from "../runtime/state";
+import { getRuntimeSwitchBlocker } from "./runtimeSwitch";
 import {
   createEngineLaunchContext,
   createHostedWebLaunchUrl,
@@ -101,9 +102,8 @@ async function startCompanion(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
       ],
-      onRuntimeSwitch: (runtimeKind) => {
-        requestEngineRuntimeSwitch(event, runtimeKind);
-      },
+      onRuntimeSwitch: (runtimeKind) =>
+        requestEngineRuntimeSwitch(event, runtimeKind),
       port: companionPort,
       preserveSecurityState: launchContext.preserveCompanionSecurity,
     });
@@ -381,7 +381,7 @@ function continueEngineStartup(
     });
 }
 
-function requestEngineRuntimeSwitch(
+async function requestEngineRuntimeSwitch(
   event: IpcMainEvent,
   runtimeKind: EngineRuntimeKind,
 ) {
@@ -391,30 +391,61 @@ function requestEngineRuntimeSwitch(
       "server-log",
       "Runtime switch requested, but engine initialization is already in progress.",
     );
-    return;
+    return {
+      code: "runtime_switch_busy",
+      error: "Engine initialization is already in progress.",
+      status: "blocked" as const,
+    };
   }
 
-  activeStartupAttempt += 1;
-  startupInProgress = false;
-  recoveryInProgress = false;
-  emitEngineState(event, "STOPPING", `Switching runtime to ${runtimeKind}`);
-  event.reply(
-    "server-log",
-    `Switching engine runtime to ${runtimeKind}. Restarting container...`,
-  );
-  const safeEnv = getSafeEnv();
-  stopCompanionServer({ preserveSecurityState: true });
-  activeCompanion = null;
+  try {
+    const blocker = getRuntimeSwitchBlocker((await listEngineClients()).clients);
+    if (blocker) {
+      event.reply(
+        "server-log",
+        "Runtime switch blocked because a game session is active.",
+      );
+      return {
+        ...blocker,
+        status: "blocked" as const,
+      };
+    }
+  } catch (err) {
+    return {
+      code: "runtime_switch_client_check_failed",
+      error: getErrorMessage(err),
+      status: "blocked" as const,
+    };
+  }
 
-  void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
-    .catch(() => undefined)
-    .finally(() => {
-      startEngine(event, {
-        exposureMode,
-        preserveCompanionSecurity: true,
-        runtimeKind,
+  setTimeout(() => {
+    activeStartupAttempt += 1;
+    startupInProgress = false;
+    recoveryInProgress = false;
+    emitEngineState(event, "STOPPING", `Switching runtime to ${runtimeKind}`);
+    event.reply(
+      "server-log",
+      `Switching engine runtime to ${runtimeKind}. Restarting container...`,
+    );
+    const safeEnv = getSafeEnv();
+    stopCompanionServer({ preserveSecurityState: true });
+    activeCompanion = null;
+
+    void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+      .catch(() => undefined)
+      .finally(() => {
+        startEngine(event, {
+          exposureMode,
+          preserveCompanionSecurity: true,
+          runtimeKind,
+        });
       });
-    });
+  }, 0);
+
+  return {
+    runtimeKind,
+    status: "restarting" as const,
+  };
 }
 
 export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {}) {
