@@ -451,6 +451,17 @@ the default libretro startup path remains unchanged. Phase 4 remains open until
 the companion/browser runtime switch flow can preserve or safely reissue
 pairing tokens across restarts.
 
+Progress note — 2026-06-26: added the seventh Phase 4 slice. The desktop
+companion now exposes a token-protected `/runtime/switch` endpoint for paired
+browser sessions, and web playback requests that endpoint when a selected game
+requires a different runtime than the active engine. The desktop responds before
+restarting, preserves companion access state across the intentional runtime
+switch, removes the old engine container, and restarts with the requested
+runtime kind. Direct engine pairings still fall back to the manual restart
+message because they do not go through the companion control plane. Phase 4
+remains open until runtime switches avoid disrupting active sessions and the
+same image-version rollout contract exists for hosted/native operations.
+
 ### Phase 5 — Additional libretro platforms
 
 Add platforms only when both a maintained core and a sustainable licensed

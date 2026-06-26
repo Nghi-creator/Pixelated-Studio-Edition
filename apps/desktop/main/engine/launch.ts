@@ -22,6 +22,7 @@ const INVITE_CODE_TTL_MS = 10 * 60 * 1000;
 
 export type StartEngineOptions = {
   exposureMode?: unknown;
+  preserveCompanionSecurity?: unknown;
   runtimeKind?: unknown;
 };
 
@@ -30,6 +31,7 @@ export type EngineLaunchContext = {
   companionUrls: string[];
   includeUinputDevice: boolean;
   exposureMode: ExposureMode;
+  preserveCompanionSecurity: boolean;
   runtimeConfig: EngineRuntimeConfig;
   runtimeKind: EngineRuntimeKind;
   inviteCode?: string;
@@ -37,7 +39,10 @@ export type EngineLaunchContext = {
   publishHost: string;
 };
 
-type DockerRunOptions = Omit<EngineLaunchContext, "runtimeConfig" | "runtimeKind"> & {
+type DockerRunOptions = Omit<
+  EngineLaunchContext,
+  "preserveCompanionSecurity" | "runtimeConfig" | "runtimeKind"
+> & {
   engineToken: string;
   runtimeConfig?: EngineRuntimeConfig;
   runtimeKind?: EngineRuntimeKind;
@@ -114,6 +119,7 @@ export function createEngineLaunchContext(
   options: StartEngineOptions = {},
 ): EngineLaunchContext {
   const exposureMode = normalizeExposureMode(options.exposureMode);
+  const preserveCompanionSecurity = options.preserveCompanionSecurity === true;
   const runtimeConfig = resolveEngineRuntimeConfig(options.runtimeKind);
   const runtimeKind = runtimeConfig.engineRuntimeKind;
   const publishHost = getDockerPublishHost(exposureMode);
@@ -132,6 +138,7 @@ export function createEngineLaunchContext(
     companionUrls,
     includeUinputDevice,
     exposureMode,
+    preserveCompanionSecurity,
     runtimeConfig,
     runtimeKind,
     inviteCode,

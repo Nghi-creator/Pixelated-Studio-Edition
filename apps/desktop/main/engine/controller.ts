@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { app, shell, type IpcMainEvent } from "electron";
 import path from "path";
 import {
+  type EngineRuntimeKind,
   companionPort,
   hostedWebUrl,
 } from "../runtime/config";
@@ -100,7 +101,11 @@ async function startCompanion(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
       ],
+      onRuntimeSwitch: (runtimeKind) => {
+        requestEngineRuntimeSwitch(event, runtimeKind);
+      },
       port: companionPort,
+      preserveSecurityState: launchContext.preserveCompanionSecurity,
     });
     const hostedInviteUrls = launchContext.companionUrls.map(createHostedInviteUrl);
     activeCompanion = {
@@ -376,6 +381,42 @@ function continueEngineStartup(
     });
 }
 
+function requestEngineRuntimeSwitch(
+  event: IpcMainEvent,
+  runtimeKind: EngineRuntimeKind,
+) {
+  const exposureMode = activeCompanion?.exposureMode || "local";
+  if (startupInProgress || recoveryInProgress) {
+    event.reply(
+      "server-log",
+      "Runtime switch requested, but engine initialization is already in progress.",
+    );
+    return;
+  }
+
+  activeStartupAttempt += 1;
+  startupInProgress = false;
+  recoveryInProgress = false;
+  emitEngineState(event, "STOPPING", `Switching runtime to ${runtimeKind}`);
+  event.reply(
+    "server-log",
+    `Switching engine runtime to ${runtimeKind}. Restarting container...`,
+  );
+  const safeEnv = getSafeEnv();
+  stopCompanionServer({ preserveSecurityState: true });
+  activeCompanion = null;
+
+  void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+    .catch(() => undefined)
+    .finally(() => {
+      startEngine(event, {
+        exposureMode,
+        preserveCompanionSecurity: true,
+        runtimeKind,
+      });
+    });
+}
+
 export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {}) {
   if (startupInProgress || recoveryInProgress) {
     event.reply("server-log", "Engine initialization is already in progress.");
@@ -394,7 +435,9 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
   startupInProgress = true;
 
   engineToken = crypto.randomBytes(24).toString("base64url");
-  stopCompanionServer();
+  stopCompanionServer({
+    preserveSecurityState: launchContext.preserveCompanionSecurity,
+  });
   activeCompanion = null;
 
   void diagnoseDocker(safeEnv).then((diagnostic) => {

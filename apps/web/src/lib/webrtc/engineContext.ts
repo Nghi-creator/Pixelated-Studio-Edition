@@ -1,4 +1,6 @@
 import { engineEndpoint } from "../engine/engineConfig";
+import { engineAuthHeaders } from "../engine/engineAuth";
+import type { EngineRuntimeKind } from "./runtimeKind";
 import type {
   EngineInputCapabilities,
   EngineShareContext,
@@ -106,4 +108,20 @@ export async function loadEngineRuntimeKind() {
   if (!response.ok) throw new Error("Engine health check failed.");
   const health = (await response.json()) as EngineHealthPayload;
   return health.runtimeKind || "libretro";
+}
+
+export async function requestEngineRuntimeSwitch(
+  runtimeKind: EngineRuntimeKind,
+) {
+  const response = await fetch(engineEndpoint("/runtime/switch"), {
+    body: JSON.stringify({ runtimeKind }),
+    cache: "no-store",
+    headers: {
+      "content-type": "application/json",
+      ...engineAuthHeaders(),
+    },
+    method: "POST",
+  });
+
+  return response.status === 202;
 }

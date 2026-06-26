@@ -1,5 +1,8 @@
 import { api, getAuthSession } from "../api/apiClient";
-import { loadEngineRuntimeKind } from "./engineContext";
+import {
+  loadEngineRuntimeKind,
+  requestEngineRuntimeSwitch,
+} from "./engineContext";
 import { assertEngineRuntimeKindMatches } from "./runtimeKind";
 export { createWebRTCSessionId } from "./webrtcIdentity";
 
@@ -31,6 +34,18 @@ export const resolveGameBootTarget = async (
   const backendSession = await api.createSession(gameId, clientSessionId);
   const requiredRuntimeKind = backendSession.boot.runtimeKind || "libretro";
   const activeRuntimeKind = await loadEngineRuntimeKind();
+  if (requiredRuntimeKind !== activeRuntimeKind) {
+    const switchRequested = await requestEngineRuntimeSwitch(requiredRuntimeKind).catch(
+      () => false,
+    );
+    if (switchRequested) {
+      throw new Error(
+        requiredRuntimeKind === "native_linux"
+          ? "Pixelated Desktop is switching to the native Linux engine. Wait for the desktop engine to show ready, then press Play again."
+          : "Pixelated Desktop is switching to the libretro engine. Wait for the desktop engine to show ready, then press Play again.",
+      );
+    }
+  }
   assertEngineRuntimeKindMatches(requiredRuntimeKind, activeRuntimeKind);
   const romFilename = backendSession.boot.launchManifestId
     ? backendSession.boot.launchManifestId
