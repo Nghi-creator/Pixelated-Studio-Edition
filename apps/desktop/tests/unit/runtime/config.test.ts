@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   normalizeEngineRuntimeKind,
+  resolveEngineRuntimeConfig,
   shouldPullEngineImage,
 } from "../../../main/runtime/config";
 
@@ -50,4 +51,16 @@ test("engine image pull defaults compare against the selected runtime default im
     }),
     true,
   );
+});
+
+test("engine runtime config can be resolved per requested startup", () => {
+  const libretro = resolveEngineRuntimeConfig("libretro");
+  assert.equal(libretro.engineRuntimeKind, "libretro");
+  assert.equal(libretro.engineImage, "pixelated-engine");
+  assert.equal(libretro.nativeRuntimeLock, null);
+
+  const native = resolveEngineRuntimeConfig("native_linux");
+  assert.equal(native.engineRuntimeKind, "native_linux");
+  assert.match(native.engineImage, /^pixelated-engine-native/);
+  assert.equal(native.nativeRuntimeLock?.runtimeId, "debian-native-v1");
 });

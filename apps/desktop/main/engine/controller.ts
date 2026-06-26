@@ -3,7 +3,6 @@ import { app, shell, type IpcMainEvent } from "electron";
 import path from "path";
 import {
   companionPort,
-  engineImage,
   hostedWebUrl,
 } from "../runtime/config";
 import {
@@ -340,7 +339,7 @@ function continueEngineStartup(
   if (attempt !== activeStartupAttempt) return;
   event.reply("server-log", "Docker Engine found.");
 
-  prepareEngineImage(event, safeEnv)
+  prepareEngineImage(event, safeEnv, launchContext.runtimeConfig)
     .then(() => {
       event.reply("server-log", "Image ready. Preparing WebRTC Node...");
       emitEngineState(event, "REMOVING_STALE", "pixelated-node");
@@ -382,7 +381,8 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
     event.reply("server-log", "Engine initialization is already in progress.");
     return;
   }
-  if (!isSafeDockerImageRef(engineImage)) {
+  const launchContext = createEngineLaunchContext(options);
+  if (!isSafeDockerImageRef(launchContext.runtimeConfig.engineImage)) {
     rejectInvalidImage(event);
     return;
   }
@@ -390,7 +390,6 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
   emitEngineState(event, "CHECKING_DOCKER");
   event.reply("server-log", "Checking Docker daemon...");
   const safeEnv = getSafeEnv();
-  const launchContext = createEngineLaunchContext(options);
   const attempt = ++activeStartupAttempt;
   startupInProgress = true;
 

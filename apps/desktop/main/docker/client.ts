@@ -8,11 +8,9 @@ import type { IpcMainEvent } from "electron";
 import fs from "fs";
 import {
   buildFallback,
-  engineImage,
-  engineRuntimeKind,
   engineRuntimeDir,
-  nativeRuntimeLock,
-  pullEngineImage,
+  resolveEngineRuntimeConfig,
+  type EngineRuntimeConfig,
 } from "../runtime/config";
 import { emitEngineState } from "../runtime/state";
 
@@ -81,7 +79,15 @@ export function execFileCommand(
 export async function prepareEngineImage(
   event: IpcMainEvent,
   safeEnv: NodeJS.ProcessEnv,
+  runtimeConfig: EngineRuntimeConfig = resolveEngineRuntimeConfig(),
 ) {
+  const {
+    engineImage,
+    engineRuntimeKind,
+    nativeRuntimeLock,
+    pullEngineImage,
+  } = runtimeConfig;
+
   if (!isSafeDockerImageRef(engineImage)) {
     throw new Error("Invalid PIXELATED_ENGINE_IMAGE value.");
   }

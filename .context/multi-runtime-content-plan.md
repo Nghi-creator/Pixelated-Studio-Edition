@@ -443,6 +443,14 @@ per-game engine orchestration. Phase 4 remains open until the desktop/web flow
 can switch or request the correct runtime image automatically per selected
 catalog game.
 
+Progress note — 2026-06-26: added the sixth Phase 4 slice. Desktop startup now
+resolves runtime config per launch request instead of only at process/env load.
+`startEngine` accepts `runtimeKind: "native_linux"` and selects the native
+image, `Dockerfile.native`, and native lock build args for that launch, while
+the default libretro startup path remains unchanged. Phase 4 remains open until
+the companion/browser runtime switch flow can preserve or safely reissue
+pairing tokens across restarts.
+
 ### Phase 5 — Additional libretro platforms
 
 Add platforms only when both a maintained core and a sustainable licensed

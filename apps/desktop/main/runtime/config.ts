@@ -124,3 +124,42 @@ export const pullEngineImage = shouldPullEngineImage({
 });
 export const buildFallback = process.env.PIXELATED_ENGINE_BUILD_FALLBACK !== "0";
 export const webDistDir = resolveWebDistDir();
+
+export type EngineRuntimeConfig = {
+  defaultEngineImage: string;
+  engineImage: string;
+  engineRuntimeKind: EngineRuntimeKind;
+  nativeRuntimeLock: { hash: string; runtimeId: string } | null;
+  pullEngineImage: boolean;
+};
+
+export function resolveEngineRuntimeConfig(
+  runtimeKindInput: unknown = process.env.PIXELATED_ENGINE_RUNTIME_KIND,
+): EngineRuntimeConfig {
+  const resolvedRuntimeKind = normalizeEngineRuntimeKind(runtimeKindInput);
+  const resolvedDefaultEngineImage =
+    resolvedRuntimeKind === "native_linux"
+      ? defaultNativeEngineImage
+      : defaultLibretroEngineImage;
+  const resolvedNativeEngineImage =
+    process.env.PIXELATED_ENGINE_NATIVE_IMAGE || defaultNativeEngineImage;
+  const resolvedEngineImage =
+    process.env.PIXELATED_ENGINE_IMAGE ||
+    (resolvedRuntimeKind === "native_linux"
+      ? resolvedNativeEngineImage
+      : defaultLibretroEngineImage);
+  const resolvedNativeRuntimeLock =
+    resolvedRuntimeKind === "native_linux" ? readNativeRuntimeLock() : null;
+
+  return {
+    defaultEngineImage: resolvedDefaultEngineImage,
+    engineImage: resolvedEngineImage,
+    engineRuntimeKind: resolvedRuntimeKind,
+    nativeRuntimeLock: resolvedNativeRuntimeLock,
+    pullEngineImage: shouldPullEngineImage({
+      defaultImage: resolvedDefaultEngineImage,
+      image: resolvedEngineImage,
+      pullSetting: process.env.PIXELATED_ENGINE_PULL,
+    }),
+  };
+}
