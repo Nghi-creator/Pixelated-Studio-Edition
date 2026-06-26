@@ -28,6 +28,17 @@ function readPrefix(filePath: string, length: number) {
   }
 }
 
+function readFileWindow(filePath: string, offset: number, length: number) {
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const buffer = Buffer.alloc(length);
+    const bytesRead = fs.readSync(fd, buffer, 0, length, offset);
+    return bytesRead === length ? buffer : null;
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
 function bufferStartsWith(buffer: Buffer, prefix: Buffer, offset = 0) {
   if (buffer.length < offset + prefix.length) return false;
   return prefix.every((value, index) => buffer[offset + index] === value);
@@ -58,7 +69,44 @@ function validateHeader(filePath: string, extension: string) {
     if (!bufferStartsWith(header, GBA_NINTENDO_LOGO_PREFIX, 0x04)) {
       throw new Error("Invalid GBA cartridge header.");
     }
+    return;
   }
+
+  if (extension === ".sfc" || extension === ".smc") {
+    if (!hasValidSnesHeader(filePath)) {
+      throw new Error("Invalid SNES cartridge header.");
+    }
+  }
+}
+
+function hasValidSnesHeader(filePath: string) {
+  const stat = fs.statSync(filePath);
+  const headerOffsets = [0x7fc0, 0xffc0, 0x40ffc0, 0x81c0];
+
+  return headerOffsets.some((offset) => {
+    if (stat.size < offset + 0x40) return false;
+
+    const header = readFileWindow(filePath, offset, 0x40);
+    if (!header) return false;
+
+    const title = header.subarray(0, 21);
+    const printableTitleBytes = title.filter(
+      (value) => value === 0x00 || (value >= 0x20 && value <= 0x7e),
+    ).length;
+    const mapMode = header[0x15];
+    const romType = header[0x16];
+    const romSize = header[0x17];
+    const complement = header.readUInt16LE(0x1c);
+    const checksum = header.readUInt16LE(0x1e);
+
+    return (
+      printableTitleBytes >= 16 &&
+      [0x20, 0x21, 0x25, 0x30, 0x31, 0x35].includes(mapMode) &&
+      romType <= 0x35 &&
+      romSize <= 0x0d &&
+      ((checksum + complement) & 0xffff) === 0xffff
+    );
+  });
 }
 
 export function validateGameArtifact(

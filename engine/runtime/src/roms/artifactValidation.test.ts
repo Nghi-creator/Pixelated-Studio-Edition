@@ -54,11 +54,31 @@ test("validates GB/GBC and GBA cartridge signatures", () => {
   validateGameArtifact(writeTempRom("game.gba", gbaBytes), { runtimeId: "mgba" });
 });
 
+test("validates SNES internal cartridge headers", () => {
+  const bytes = Buffer.alloc(0x10000);
+  const headerOffset = 0x7fc0;
+  Buffer.from("PIXELATED SNES TEST  ").copy(bytes, headerOffset);
+  bytes[headerOffset + 0x15] = 0x20;
+  bytes[headerOffset + 0x16] = 0x00;
+  bytes[headerOffset + 0x17] = 0x09;
+  bytes.writeUInt16LE(0xedcb, headerOffset + 0x1c);
+  bytes.writeUInt16LE(0x1234, headerOffset + 0x1e);
+
+  validateGameArtifact(writeTempRom("game.sfc", bytes), { runtimeId: "bsnes" });
+});
+
 test("rejects invalid cartridge headers", () => {
   const filePath = writeTempRom("broken.gba", Buffer.alloc(0x160));
 
   assert.throws(
     () => validateGameArtifact(filePath, { runtimeId: "mgba" }),
     /Invalid GBA cartridge header/,
+  );
+
+  assert.throws(
+    () => validateGameArtifact(writeTempRom("broken.sfc", Buffer.alloc(0x10000)), {
+      runtimeId: "bsnes",
+    }),
+    /Invalid SNES cartridge header/,
   );
 });

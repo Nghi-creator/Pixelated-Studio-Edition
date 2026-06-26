@@ -62,6 +62,27 @@ RUN git init /tmp/mgba && \
     mkdir -p /out && \
     find /tmp/mgba/build -name mgba_libretro.so -exec cp {} /out/ \;
 
+FROM ${UBUNTU_IMAGE} AS bsnes-builder
+
+ARG BSNES_REF=ac0b6b1fe5cb9448492f4c6b3d815205eefbd142
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    g++ \
+    git \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git init /tmp/bsnes-mercury && \
+    git -C /tmp/bsnes-mercury remote add origin https://github.com/libretro/bsnes-mercury.git && \
+    git -C /tmp/bsnes-mercury fetch --depth 1 origin "${BSNES_REF}" && \
+    git -C /tmp/bsnes-mercury checkout --detach FETCH_HEAD && \
+    make -C /tmp/bsnes-mercury -j4 platform=unix PROFILE=performance && \
+    mkdir -p /out && \
+    cp /tmp/bsnes-mercury/bsnes_mercury_performance_libretro.so /out/bsnes_libretro.so && \
+    test -s /out/bsnes_libretro.so
+
 FROM ${UBUNTU_IMAGE} AS python-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -113,6 +134,7 @@ COPY --from=app-builder /app/dist /app/dist
 COPY --from=app-builder /app/node_modules /app/node_modules
 COPY --from=mesen-builder /out/mesen_libretro.so /cores/mesen_libretro.so
 COPY --from=mgba-builder /out/mgba_libretro.so /cores/mgba_libretro.so
+COPY --from=bsnes-builder /out/bsnes_libretro.so /cores/bsnes_libretro.so
 COPY --from=python-builder /out /usr/local/lib/python3.10/dist-packages
 COPY camera.py input_gamepad.py /app/
 

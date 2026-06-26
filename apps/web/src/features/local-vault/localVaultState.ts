@@ -1,5 +1,5 @@
-export const LOCAL_VAULT_EXTENSIONS = [".nes", ".gb", ".gbc", ".gba"];
-export const MAX_LOCAL_ROM_BYTES = 32 * 1024 * 1024;
+export const LOCAL_VAULT_EXTENSIONS = [".nes", ".gb", ".gbc", ".gba", ".sfc", ".smc"];
+export const MAX_LOCAL_ROM_BYTES = 64 * 1024 * 1024;
 export const INVALID_ENGINE_TOKEN_MESSAGE =
   "The saved pairing token was rejected. Enter the current desktop token to reconnect.";
 export const LOCAL_ENGINE_UNREACHABLE_MESSAGE =
@@ -21,16 +21,16 @@ export function validateLocalRomFile(file: Pick<File, "name" | "size"> | null) {
   if (!file) return "Choose a supported ROM file first.";
   const lowerFilename = file.name.toLowerCase();
   if (!LOCAL_VAULT_EXTENSIONS.some((extension) => lowerFilename.endsWith(extension))) {
-    return "Only .nes, .gb, .gbc, and .gba files are supported.";
+    return "Only .nes, .gb, .gbc, .gba, .sfc, and .smc files are supported.";
   }
   if (file.size > MAX_LOCAL_ROM_BYTES) {
-    return "ROM files must be 32 MB or smaller.";
+    return "ROM files must be 64 MB or smaller.";
   }
   return null;
 }
 
 export function getLocalGameTitle(filename: string) {
-  return filename.replace(/\.(nes|gb|gbc|gba)$/i, "");
+  return filename.replace(/\.(nes|gb|gbc|gba|sfc|smc)$/i, "");
 }
 
 export function normalizeLocalGameFilenames(payload: unknown) {

@@ -489,6 +489,15 @@ content source exist. Likely technical candidates include SNES, Genesis/Mega
 Drive, Atari 2600, and PC Engine, but core availability alone is not a reason to
 publish a platform.
 
+Progress note — 2026-06-27: added the first Phase 5 slice for SNES/SFC runtime
+readiness without publishing public catalog entries. The engine Dockerfile now
+builds a pinned `bsnes-mercury` libretro core, the runtime registry allowlists
+`bsnes` for `.sfc`/`.smc`, artifact validation checks SNES internal headers
+instead of trusting extensions alone, and Local Vault accepts SNES files up to
+the runtime-specific 64 MB ceiling. This intentionally does not add a SNES
+catalog importer or homepage games; public SNES publication still needs a
+sustainable source of ROMs with explicit redistribution rights.
+
 ## Security boundaries
 
 - Runtime IDs and launch manifests are allowlisted in the engine image.

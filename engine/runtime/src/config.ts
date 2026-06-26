@@ -41,7 +41,7 @@ export const corsOptions = {
 };
 
 export const MAX_ROM_SIZE_BYTES = Number(
-  process.env.PIXELATED_MAX_ROM_SIZE_BYTES || 32 * 1024 * 1024,
+  process.env.PIXELATED_MAX_ROM_SIZE_BYTES || 64 * 1024 * 1024,
 );
 
 export const MAX_CLOUD_ROM_SIZE_BYTES = Number(
@@ -82,7 +82,11 @@ export const HEALTH_PATHS = {
   cameraPeerState: "/tmp/pixelated_camera_peers.json",
   gamepadBridge: path.join(process.cwd(), "input_gamepad.py"),
   gstreamerBinary: "/usr/bin/gst-launch-1.0",
-  libretroCores: ["/cores/mesen_libretro.so", "/cores/mgba_libretro.so"],
+  libretroCores: [
+    "/cores/mesen_libretro.so",
+    "/cores/mgba_libretro.so",
+    "/cores/bsnes_libretro.so",
+  ],
   pythonBinary: "/usr/bin/python3",
   retroarchBinary: "/usr/bin/retroarch",
   retroarchConfig: "/app/retroarch.cfg",

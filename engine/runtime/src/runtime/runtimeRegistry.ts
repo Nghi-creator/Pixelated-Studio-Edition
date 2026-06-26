@@ -4,7 +4,7 @@ export type RuntimeDefinition = {
   corePath?: string;
   extensions: string[];
   id: string;
-  inputProfile: "nes" | "gba" | "native_gamepad";
+  inputProfile: "nes" | "gba" | "snes" | "native_gamepad";
   kind: RuntimeKind;
   launchManifestIds?: string[];
   maxArtifactBytes: number;
@@ -26,6 +26,14 @@ export const RUNTIME_REGISTRY: Record<string, RuntimeDefinition> = {
     inputProfile: "gba",
     kind: "libretro",
     maxArtifactBytes: 32 * 1024 * 1024,
+  },
+  bsnes: {
+    corePath: "/cores/bsnes_libretro.so",
+    extensions: [".sfc", ".smc"],
+    id: "bsnes",
+    inputProfile: "snes",
+    kind: "libretro",
+    maxArtifactBytes: 64 * 1024 * 1024,
   },
   "debian-native-v1": {
     extensions: [],
