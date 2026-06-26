@@ -420,6 +420,18 @@ Docker Desktop was not reachable. Phase 4 remains open until this versioned
 image tag is wired into desktop/hosted runtime selection without disrupting
 active sessions.
 
+Progress note — 2026-06-26: added the fourth Phase 4 slice. The desktop
+launcher now has an opt-in runtime channel via
+`PIXELATED_ENGINE_RUNTIME_KIND=native_linux`. The default path remains
+`libretro`/`pixelated-engine`, while native mode resolves the
+lock-derived native image tag, avoids pulling that local versioned tag by
+default, builds `Dockerfile.native` with runtime ID and lock SHA-256 build args,
+and passes `PIXELATED_ENGINE_RUNTIME_KIND` into the container for diagnostics.
+This wires native image version selection into desktop startup without changing
+existing libretro behavior or interrupting already-running sessions. Phase 4
+remains open until native mode can be selected automatically per approved game
+session and hosted runtime rollout uses the same image-version contract.
+
 ### Phase 5 — Additional libretro platforms
 
 Add platforms only when both a maintained core and a sustainable licensed

@@ -76,6 +76,21 @@ If the pull fails, the launcher falls back to a local build unless disabled:
 PIXELATED_ENGINE_BUILD_FALLBACK=0
 ```
 
+Native Debian runtime images are opt-in so existing libretro sessions keep using
+the default `pixelated-engine` image. To test native Linux catalog builds, select
+the native runtime channel before starting the desktop app:
+
+```txt
+PIXELATED_ENGINE_RUNTIME_KIND=native_linux
+```
+
+With no explicit image override, the launcher derives the native image tag from
+`engine-runtime/native-runtime.lock.json`, for example
+`pixelated-engine-native:debian-native-v1-46d11e8650c8`, builds
+`Dockerfile.native`, and passes the lock SHA-256 into image labels. Use
+`PIXELATED_ENGINE_NATIVE_IMAGE` or `PIXELATED_ENGINE_IMAGE` to override that
+tag for prebuilt native runtime images.
+
 The desktop UI reports structured startup states: checking Docker, pulling or
 building the image, removing stale containers, starting the container, waiting
 for health, ready, stopping, stopped, and failed.

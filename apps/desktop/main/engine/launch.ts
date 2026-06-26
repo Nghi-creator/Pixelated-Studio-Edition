@@ -4,6 +4,7 @@ import {
   companionPort,
   engineAllowedOrigins,
   engineImage,
+  engineRuntimeKind,
   hostedWebUrl,
 } from "../runtime/config";
 import { hasHostUinput } from "../docker/client";
@@ -91,6 +92,7 @@ export function getDockerRunArgs({
     apiUrl: backendApiUrl,
     companionUrls,
     engineImage,
+    engineRuntimeKind,
     engineToken,
     exposureMode,
     includeUinputDevice,

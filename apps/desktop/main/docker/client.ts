@@ -9,7 +9,9 @@ import fs from "fs";
 import {
   buildFallback,
   engineImage,
+  engineRuntimeKind,
   engineRuntimeDir,
+  nativeRuntimeLock,
   pullEngineImage,
 } from "../runtime/config";
 import { emitEngineState } from "../runtime/state";
@@ -100,8 +102,27 @@ export async function prepareEngineImage(
   }
 
   emitEngineState(event, "BUILDING_IMAGE", engineRuntimeDir);
-  event.reply("server-log", "Building local engine image...");
-  await streamFile(event, "docker", ["build", "-t", engineImage, "."], {
+  event.reply(
+    "server-log",
+    `Building local ${engineRuntimeKind === "native_linux" ? "native" : "libretro"} engine image...`,
+  );
+  const buildArgs =
+    engineRuntimeKind === "native_linux"
+      ? [
+          "build",
+          "-t",
+          engineImage,
+          "-f",
+          "Dockerfile.native",
+          "--build-arg",
+          `NATIVE_RUNTIME_ID=${nativeRuntimeLock?.runtimeId || "debian-native-v1"}`,
+          "--build-arg",
+          `NATIVE_RUNTIME_LOCK_SHA256=${nativeRuntimeLock?.hash || "unknown"}`,
+          ".",
+        ]
+      : ["build", "-t", engineImage, "."];
+
+  await streamFile(event, "docker", buildArgs, {
     cwd: engineRuntimeDir,
     env: safeEnv,
   });

@@ -12,6 +12,7 @@ test("Docker run arguments preserve environment values without shell quoting", (
     apiUrl: "https://api.example.test/path?value=$HOME",
     companionUrls: ["https://192.168.1.20:8090"],
     engineImage: "pixelated-engine:test",
+    engineRuntimeKind: "native_linux",
     engineToken: "token with $hell `chars`",
     exposureMode: "lan",
     includeUinputDevice: true,
@@ -31,6 +32,7 @@ test("Docker run arguments preserve environment values without shell quoting", (
     "pixelated-roms:/roms",
   ]);
   assert.ok(args.includes("PIXELATED_ENGINE_TOKEN=token with $hell `chars`"));
+  assert.ok(args.includes("PIXELATED_ENGINE_RUNTIME_KIND=native_linux"));
   assert.ok(args.includes("PIXELATED_API_URL=https://api.example.test/path?value=$HOME"));
   assert.equal(args.at(-1), "pixelated-engine:test");
 });
