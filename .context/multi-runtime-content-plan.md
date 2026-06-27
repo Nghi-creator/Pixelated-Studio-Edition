@@ -561,6 +561,17 @@ validator module with focused unit coverage, while the admin candidate route
 only orchestrates review and promotion. This keeps future platform additions
 out of the route body and makes the publication boundary easier to audit.
 
+Progress note — 2026-06-27: added the ninth Phase 5 slice with the first real
+redistribution-evidenced curated source. `.context/phase5-curated-roms.json`
+pins `moon-watcher/Scorpion-Illuminati-Core` at commit
+`08728404021f9a34afdbe74d1a22fbfdebc00867`, references its Artistic-2.0
+license evidence, and imports the built Genesis ROM as a `picodrive`/`genesis`
+review candidate with exact size and SHA-256. Strict importer dry-run passed,
+and the pinned raw artifact was independently checked for size, SHA-256, and
+Genesis `SEGA` header. Phase 5 remains open until this candidate is imported
+into the target DB, promoted through admin review, and smoke-tested in a Docker
+engine image.
+
 ## Security boundaries
 
 - Runtime IDs and launch manifests are allowlisted in the engine image.
