@@ -73,7 +73,7 @@ export function registerGamesCatalogRoutes(
     const rankedGames = search
       ? searchAndRankGames(data || [], search)
       : data || [];
-    const pagedGames = search ? rankedGames.slice(start, end + 1) : rankedGames;
+    const pagedGames = rankedGames.slice(start, end + 1);
     const total = rankedGames.length;
     const response = {
       featuredGames,

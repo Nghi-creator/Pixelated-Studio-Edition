@@ -697,6 +697,19 @@ test("catalog route paginates, searches, and returns featured games", async () =
   );
   const app = await createDataBoundaryApp(db);
 
+  const unsearchedResponse = await app.inject({
+    method: "GET",
+    url: "/games?page=2&pageSize=2",
+  });
+
+  assert.equal(unsearchedResponse.statusCode, 200);
+  assert.deepEqual(
+    unsearchedResponse
+      .json<{ games: { id: string }[] }>()
+      .games.map((game) => game.id),
+    ["game-e", "game-f"],
+  );
+
   const response = await app.inject({
     method: "GET",
     url: "/games?page=2&pageSize=2&search=quest",
