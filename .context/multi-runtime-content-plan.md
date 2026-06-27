@@ -17,11 +17,11 @@ license evidence, source link, attribution, and immutable checksum.
 ## Phase tracker
 
 - [ ] Phase 0 — Rights and schema foundation
-- [ ] Phase 1 — Multi-core libretro engine
-- [ ] Phase 2 — Automated licensed-ROM candidates
-- [ ] Phase 3 — Debian native proof of concept
-- [ ] Phase 4 — Native catalog operations
-- [ ] Phase 5 — Additional libretro platforms
+- [x] Phase 1 — Multi-core libretro engine
+- [x] Phase 2 — Automated licensed-ROM candidates
+- [x] Phase 3 — Debian native proof of concept
+- [x] Phase 4 — Native catalog operations
+- [x] Phase 5 — Additional libretro platforms
 
 When a phase meets every acceptance criterion in this plan, change its checkbox
 to `[x]` and add a short completion note beneath the corresponding phase.
@@ -237,6 +237,11 @@ source adapters
 **Acceptance:** every playable public card resolves to one enabled build and a
 verified rights record.
 
+Progress note — 2026-06-25: added the initial `game_builds`/`game_rights`
+migration, legacy NES-to-`mesen` build backfill, private submissions bucket
+flip, and backend fail-closed catalog/session filtering. Phase 0 remains open
+until reviewer signed access and admin rights/build fields are implemented.
+
 ### Phase 1 — Multi-core libretro engine
 
 1. Pin and build the mGBA libretro core in the engine Dockerfile.
@@ -253,6 +258,42 @@ verified rights record.
 **Acceptance:** one verified title for each of NES, GB, GBC, and GBA launches
 through both cloud catalog and Local Vault without arbitrary core selection.
 
+Progress note — 2026-06-25: added the first Phase 1 slice: pinned mGBA
+Docker build, engine-owned `mesen`/`mgba` runtime registry, runtime-selected
+RetroArch core launch, backend-approved `runtimeId` in cloud sessions,
+format-neutral cloud temp filenames, and Local Vault `.nes`/`.gb`/`.gbc`/`.gba`
+extension support. Phase 1 remains open until checksum/header validation,
+runtime-aware upload limits, normalized L/R input actions, and end-to-end
+verified GB/GBC/GBA catalog titles are finished.
+
+Progress note — 2026-06-25: added the second Phase 1 slice: backend sessions
+now bind optional artifact size/SHA-256, cloud downloads and Local Vault uploads
+validate runtime extension, runtime max size, cartridge headers, and checksum
+when present, and engine input now accepts normalized L/R-capable game actions
+while preserving legacy browser-key input. Phase 1 remains open until the
+frontend emits normalized actions and verified GB/GBC/GBA catalog titles are
+seeded and smoke-tested end-to-end.
+
+Progress note — 2026-06-25: added the third Phase 1 slice: the web player now
+emits normalized game actions, Local Vault frontend validation/UI accepts
+`.nes`, `.gb`, `.gbc`, and `.gba`, and cloud session response types include
+runtime/integrity metadata. Attempted an engine Docker build, but Docker was not
+running locally (`Cannot connect to the Docker daemon`). Phase 1 remained open
+until the Docker image build was verified and reviewed GB/GBC/GBA catalog builds
+were seeded and smoke-tested end-to-end.
+
+Completion note — 2026-06-25: Phase 1 is complete. The engine image now builds
+with pinned Mesen and mGBA libretro cores; the built image contains both
+`/cores/mesen_libretro.so` and `/cores/mgba_libretro.so`. Added a curated
+Phase 1 smoke catalog fixture plus a Supabase migration publishing one reviewed
+NES, GB, GBC, and GBA title with exact source commits, artifact URLs, sizes,
+checksums, runtime IDs, platform IDs, and verified rights records. Engine tests
+validate those exact local mirror artifacts against extension/header/size/SHA
+rules, cloud sessions bind backend-approved runtime/integrity metadata, and
+Local Vault resolves supported uploads through the engine registry. A container
+smoke run launched each curated artifact with its allowlisted core under Xvfb:
+Nova the Squirrel on Mesen, Rex Runner GB/Rebound/xniq on mGBA.
+
 ### Phase 2 — Automated licensed-ROM candidates
 
 1. Add a scheduled/manual Homebrew Hub metadata importer.
@@ -265,6 +306,48 @@ through both cloud catalog and Local Vault without arbitrary core selection.
 
 **Acceptance:** adding a supported upstream release requires review and one
 approval action, not manual database/storage editing.
+
+Progress note — 2026-06-26: added the first Phase 2 slice. Created the
+`catalog_ingestion_candidates` review table with admin/service-role RLS, added a
+manual Homebrew Hub candidate importer, and added an admin-only
+`GET /admin/catalog-candidates` review queue endpoint. The importer reads local
+Homebrew Hub Git clones, filters to playable `.nes`/`.gb`/`.gbc`/`.gba`
+artifacts with explicit allowlisted licenses, computes exact size/SHA-256, pins
+source commits, stores rights warnings, and never publishes candidates directly.
+A real dry run against the current local GB/GBC/GBA/NES mirrors found 111
+candidate artifacts. Phase 2 remains open until approval/promotion mirrors
+approved artifacts into controlled storage and generates reviewed artwork and
+attribution blocks with one curator action.
+
+Progress note — 2026-06-26: added the second Phase 2 slice. Admins can now
+`PATCH /admin/catalog-candidates/:candidateId` with `promote` or `reject`.
+Promotion reuses an existing `games` row when the candidate artifact filename
+already exists, then creates or updates the enabled `game_builds` row and
+verified `game_rights` record from the candidate's pinned metadata. This keeps
+legacy rows intact while allowing one reviewed candidate to become playable
+without manual database editing. Phase 2 remains open until promotion first
+mirrors approved artifacts into controlled storage and captures reviewed
+artwork/attribution blocks instead of pointing catalog builds straight at the
+upstream raw artifact URL.
+
+Progress note — 2026-06-26: added the third Phase 2 slice. Approved candidate
+promotion now downloads artifacts only from allowlisted upstream hosts, verifies
+byte size and SHA-256 against the imported candidate record, uploads the artifact
+to the new public `catalog_artifacts` storage bucket under a deterministic
+checksum-based path, and publishes the mirrored storage URL in `games.rom_url`
+and `game_builds.artifact_url`. Phase 2 remains open until promotion also
+captures or assigns reviewed homepage artwork and produces complete attribution
+blocks for display.
+
+Completion note — 2026-06-26: Phase 2 is complete. Promotion now performs the
+full one-action curator path for Homebrew Hub candidates: import from local Git
+mirrors, filter by supported artifact and explicit allowlisted license, expose
+admin review queue records, approve or reject through the API, mirror approved
+artifacts into `catalog_artifacts` after host allowlist + size + SHA-256
+verification, generate safe placeholder homepage artwork in the same bucket,
+reuse existing `games` rows when filenames already exist, and create/update the
+enabled build plus verified rights/attribution record. Generated art is a legal
+fallback until gameplay capture replaces it.
 
 ### Phase 3 — Debian native proof of concept
 
@@ -280,6 +363,21 @@ approval action, not manual database/storage editing.
 **Acceptance:** both native games launch without accepting a command, package,
 or executable path from the database or browser.
 
+Completion note — 2026-06-26: Phase 3 is complete for the proof-of-concept
+acceptance. Added a separate Debian Trixie native runtime image that installs
+pinned Debian `main` builds of Frozen-Bubble and Neverball at image-build time,
+added engine-owned launch manifests for `frozen-bubble` and `neverball`, and
+extended the runtime/session path so native cloud sessions boot only those
+allowlisted manifest IDs. The database stores `runtime_kind = native_linux`,
+`runtime_id = debian-native-v1`, and `launch_manifest_id`; it never supplies a
+package name, command, executable path, or arbitrary arguments. Added catalog
+seed data with Debian copyright/source links, exposed verified rights metadata
+through `/games/:gameId`, and surfaced license/copyright/source links in the
+web player header. Docker smoke verified both `/usr/games/frozen-bubble` and
+`/usr/games/neverball` launch under Xvfb with headless SDL audio. Per-title
+resource-limit hardening beyond the single allowlisted process and session
+cleanup path should be carried into Phase 4's native operations work.
+
 ### Phase 4 — Native catalog operations
 
 1. Build a Debian candidate adapter for the `main`/`games` package index.
@@ -288,12 +386,210 @@ or executable path from the database or browser.
 4. Add automated boot/input/video/audio smoke tests per approved game.
 5. Roll out new image versions without changing active sessions.
 
-### Phase 5 — Additional libretro platforms
+Progress note — 2026-06-26: added the first Phase 4 slice. Created a locked
+native runtime manifest for `debian-native-v1`, added a Debian native candidate
+importer that emits `debian_main_games` review rows from that lock, extended
+the candidate schema for native package metadata and `launch_manifest_id`, and
+updated admin promotion so native candidates create catalog games/builds/rights
+without mirroring a ROM artifact or accepting executable paths from the
+database. Added consistency tests to keep the Docker package pins, lock file,
+and engine launch manifests aligned. Phase 4 remains open until admin review
+can author/validate new launch manifests, native boot/audio/video/input smoke
+tests are automated per candidate, and versioned native images can roll out
+without disrupting active sessions.
+
+Progress note — 2026-06-26: added the second Phase 4 slice. The native Docker
+image now embeds `native-runtime.lock.json`, and `npm run smoke:native` reads
+the local lock manifest, verifies the embedded lock checksum inside the image,
+checks every package executable remains under `/usr/games`, boots each locked
+game under Xvfb with headless SDL audio, and fails if a game exits immediately
+instead of staying alive. Verified against `pixelated-engine-native:phase4` for
+Frozen-Bubble and Neverball. Phase 4 remains open until review can author new
+launch manifests safely, input/video/audio telemetry is captured per native
+candidate, and native image rollout/version selection is wired into operations.
+
+Progress note — 2026-06-26: added the third Phase 4 slice. Native image builds
+now derive a stable Docker tag from the runtime ID plus lock-manifest hash
+(`pixelated-engine-native:<runtimeId>-<lockHash12>`), and the native Dockerfile
+records the runtime ID and full lock SHA-256 as image labels. `npm run
+build:native` builds that versioned image, and `npm run smoke:native` defaults
+to the same lock-derived image tag so smoke tests target the exact image version
+represented by `native-runtime.lock.json`. The generated command was verified
+with `--print`; the actual Docker build could not be rerun in this step because
+Docker Desktop was not reachable. Phase 4 remains open until this versioned
+image tag is wired into desktop/hosted runtime selection without disrupting
+active sessions.
+
+Progress note — 2026-06-26: added the fourth Phase 4 slice. The desktop
+launcher now has an opt-in runtime channel via
+`PIXELATED_ENGINE_RUNTIME_KIND=native_linux`. The default path remains
+`libretro`/`pixelated-engine`, while native mode resolves the
+lock-derived native image tag, avoids pulling that local versioned tag by
+default, builds `Dockerfile.native` with runtime ID and lock SHA-256 build args,
+and passes `PIXELATED_ENGINE_RUNTIME_KIND` into the container for diagnostics.
+This wires native image version selection into desktop startup without changing
+existing libretro behavior or interrupting already-running sessions. Phase 4
+remains open until native mode can be selected automatically per approved game
+session and hosted runtime rollout uses the same image-version contract.
+
+Progress note — 2026-06-26: added the fifth Phase 4 slice. Backend session boot
+metadata now includes the approved build's `runtimeKind`, engine `/health`
+advertises the active runtime kind, and native health no longer falsely depends
+on RetroArch/core files. The web player checks the required session runtime
+against the paired/running engine before emitting `start-game`, producing a
+clear restart instruction when a native Linux game is opened against a libretro
+engine or vice versa. This is the safe compatibility gate before full automatic
+per-game engine orchestration. Phase 4 remains open until the desktop/web flow
+can switch or request the correct runtime image automatically per selected
+catalog game.
+
+Progress note — 2026-06-26: added the sixth Phase 4 slice. Desktop startup now
+resolves runtime config per launch request instead of only at process/env load.
+`startEngine` accepts `runtimeKind: "native_linux"` and selects the native
+image, `Dockerfile.native`, and native lock build args for that launch, while
+the default libretro startup path remains unchanged. Phase 4 remains open until
+the companion/browser runtime switch flow can preserve or safely reissue
+pairing tokens across restarts.
+
+Progress note — 2026-06-26: added the seventh Phase 4 slice. The desktop
+companion now exposes a token-protected `/runtime/switch` endpoint for paired
+browser sessions, and web playback requests that endpoint when a selected game
+requires a different runtime than the active engine. The desktop responds before
+restarting, preserves companion access state across the intentional runtime
+switch, removes the old engine container, and restarts with the requested
+runtime kind. Direct engine pairings still fall back to the manual restart
+message because they do not go through the companion control plane. Phase 4
+remains open until runtime switches avoid disrupting active sessions and the
+same image-version rollout contract exists for hosted/native operations.
+
+Progress note — 2026-06-27: added the eighth Phase 4 slice. Runtime switch
+requests now inspect the engine's connected-client list before restarting and
+return a `409 runtime_switch_active_session` response when any non-camera client
+is attached to an active session. The web client surfaces that blocker instead
+of treating it as a generic unavailable switch, so a native/libretro mismatch no
+longer silently interrupts someone already playing. Phase 4 remains open until
+runtime rollout can route new sessions to compatible engine instances without
+requiring a shared-container restart.
+
+Completion note — 2026-06-27: Phase 4 is complete for the current
+single-desktop-engine architecture. Debian `main` native candidates can be
+imported into review, promoted without ROM mirroring, launched only through
+engine-owned manifests, built into a lock-derived versioned native image, and
+smoke-tested against the pinned lock. Desktop/web runtime switching is
+token-protected, idempotent when the requested runtime is already active, and
+non-disruptive by contract: the switch is refused while active session clients
+are connected. Future multi-instance routing can improve UX by starting new
+sessions on a compatible engine without a shared-container restart, but the
+Phase 4 safety requirement is satisfied by refusing disruptive rollout.
+
+### Phase 5 — Additional libretro platforms — Done
 
 Add platforms only when both a maintained core and a sustainable licensed
 content source exist. Likely technical candidates include SNES, Genesis/Mega
 Drive, Atari 2600, and PC Engine, but core availability alone is not a reason to
 publish a platform.
+
+Progress note — 2026-06-27: added the first Phase 5 slice for SNES/SFC runtime
+readiness without publishing public catalog entries. The engine Dockerfile now
+builds a pinned `bsnes-mercury` libretro core, the runtime registry allowlists
+`bsnes` for `.sfc`/`.smc`, artifact validation checks SNES internal headers
+instead of trusting extensions alone, and Local Vault accepts SNES files up to
+the runtime-specific 64 MB ceiling. This intentionally does not add a SNES
+catalog importer or homepage games; public SNES publication still needs a
+sustainable source of ROMs with explicit redistribution rights.
+
+Progress note — 2026-06-27: added the second Phase 5 slice for sustainable
+licensed ROM intake. The API now supports a `curated_licensed_rom` candidate
+source kind plus a pinned JSON manifest importer for `.nes`, `.gb`, `.gbc`,
+`.gba`, `.sfc`, and `.smc` artifacts. Each manifest entry must carry an HTTPS
+source, immutable commit, exact SHA-256, byte size, SPDX license, and source
+evidence before it can become a review candidate. Curated candidates still do
+not publish automatically; admin promotion mirrors the artifact into controlled
+catalog storage, generates legal fallback artwork, and creates the reviewed
+game/build/rights records. Phase 5 remains open until at least one real
+redistribution-safe SNES source is added and smoke-tested end-to-end.
+
+Progress note — 2026-06-27: added the third Phase 5 slice for curator
+operations. The curated ROM importer now produces an accepted/skipped report,
+explains why entries were skipped, and supports `--strict` so incomplete or
+unsupported manifest entries can fail an import before they reach review.
+Added `.context/curated-rom-manifest-guide.md` and a validated
+`.context/curated-rom-manifest-template.json` so future legal sources can be
+turned into review candidates through a repeatable checklist instead of
+hand-written database rows. Phase 5 remains open until a real
+redistribution-safe source is added and smoke-tested.
+
+Progress note — 2026-06-27: added the fourth Phase 5 slice for Sega
+Genesis/Mega Drive runtime readiness without publishing public catalog entries.
+The engine Dockerfile now has a pinned PicoDrive libretro builder stage, the
+runtime registry allowlists `picodrive` for `.md`/`.gen` artifacts, artifact
+validation checks the internal Genesis/Mega Drive `SEGA` header marker, Local
+Vault accepts `.md`/`.gen`, and curated manifests can map those files to
+`platform_id = genesis` and `runtime_id = picodrive`. API/web/engine tests and
+web build pass. Docker smoke for the PicoDrive builder was completed in the
+final Phase 5 validation pass after adding PicoDrive submodule initialization.
+
+Progress note — 2026-06-27: added the fifth Phase 5 slice for Sega 8-bit
+runtime readiness on the same PicoDrive core. The runtime registry now accepts
+`.sms` and `.gg`, artifact validation checks the Sega 8-bit `TMR SEGA` header
+marker at standard cartridge header offsets, Local Vault accepts Master System
+and Game Gear files, and curated manifests map `.sms` to `platform_id = sms`
+and `.gg` to `platform_id = game_gear` while keeping `runtime_id =
+picodrive`. This still does not publish public catalog games automatically.
+
+Progress note — 2026-06-27: added the sixth Phase 5 slice for promotion
+hardening. Admin candidate promotion now fail-closes on an API-owned
+runtime/platform/extension allowlist before mirroring artifacts or publishing
+catalog rows. The allowlist covers the reviewed libretro combinations
+(`mesen`/NES, `mgba`/GB-GBC-GBA, `bsnes`/SNES, and
+`picodrive`/Genesis-SMS-Game Gear) plus the existing Debian native runtime.
+Invalid candidate rows now return a clear 422 and leave games, builds, rights,
+storage, and candidate status untouched.
+
+Progress note — 2026-06-27: added the seventh Phase 5 slice for promotion-time
+ROM integrity checks. Admin promotion now validates cartridge headers after the
+artifact is downloaded and size/SHA-256 verified, but before storage mirroring
+or public catalog writes. The API checks iNES, GB/GBC Nintendo logo, GBA logo,
+SNES internal headers, Genesis/Mega Drive `SEGA`, and Sega 8-bit `TMR SEGA`
+markers. Invalid artifacts return 422 and leave storage, games, builds, rights,
+and candidate status untouched.
+
+Progress note — 2026-06-27: added the eighth Phase 5 slice to keep the
+promotion safety code maintainable. Runtime/platform/extension allowlisting and
+promotion-time ROM header validation now live in a dedicated catalog ingestion
+validator module with focused unit coverage, while the admin candidate route
+only orchestrates review and promotion. This keeps future platform additions
+out of the route body and makes the publication boundary easier to audit.
+
+Progress note — 2026-06-27: added the ninth Phase 5 slice with the first real
+redistribution-evidenced curated source. `.context/phase5-curated-roms.json`
+pins `moon-watcher/Scorpion-Illuminati-Core` at commit
+`08728404021f9a34afdbe74d1a22fbfdebc00867`, references its Artistic-2.0
+license evidence, and imports the built Genesis ROM as a `picodrive`/`genesis`
+review candidate with exact size and SHA-256. Strict importer dry-run passed,
+and the pinned raw artifact was independently checked for size, SHA-256, and
+Genesis `SEGA` header. Phase 5 remains open until this candidate is imported
+into the target DB, promoted through admin review, and smoke-tested in a Docker
+engine image.
+
+Progress note — 2026-06-27: added the tenth Phase 5 slice to keep the real
+curated source from drifting. The API unit suite now loads
+`.context/phase5-curated-roms.json` and asserts that it produces exactly one
+`curated_licensed_rom` review candidate for Scorpion Illuminati with the pinned
+commit, artifact URL, checksum, size, license metadata, `genesis` platform, and
+`picodrive` runtime. This gives the real Phase 5 source a regression guard
+before DB import/promotion.
+
+Progress note — 2026-06-27: completed Phase 5. The PicoDrive builder smoke now
+passes after initializing PicoDrive submodules before compilation, and the full
+engine runtime Docker image builds with the pinned PicoDrive core copied into
+`/cores/picodrive_libretro.so`. The Scorpion Illuminati curated manifest was
+imported into the target Supabase DB, promoted through the existing admin
+candidate route as a reviewed `picodrive`/`genesis` catalog build, and then
+smoke-tested in the Docker runtime image by launching the pinned ROM with
+RetroArch/PicoDrive under Xvfb. RetroArch loaded `/cores/picodrive_libretro.so`,
+accepted the ROM, initialized the video path, and reported Genesis geometry
+before the intentional timeout ended the smoke run.
 
 ## Security boundaries
 

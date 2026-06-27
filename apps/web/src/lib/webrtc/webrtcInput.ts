@@ -6,6 +6,28 @@ type InputTargetLike = EventTarget & {
   tagName?: string;
 };
 
+const keyToGameAction: Record<string, string> = {
+  ArrowDown: "dpad_down",
+  ArrowLeft: "dpad_left",
+  ArrowRight: "dpad_right",
+  ArrowUp: "dpad_up",
+  Enter: "start",
+  Shift: "select",
+  " ": "select",
+  a: "shoulder_left",
+  A: "shoulder_left",
+  s: "shoulder_right",
+  S: "shoulder_right",
+  x: "face_east",
+  X: "face_east",
+  z: "face_south",
+  Z: "face_south",
+};
+
+export function getGameActionForKey(key: string) {
+  return keyToGameAction[key] || "";
+}
+
 export function shouldIgnoreGameInput(event: KeyboardEvent) {
   if (event.defaultPrevented) return true;
 
@@ -31,12 +53,18 @@ export const attachEngineInput = (
   const handleKeyDown = (event: KeyboardEvent) => {
     if (shouldIgnoreGameInput(event)) return;
     if (event.repeat) return;
-    socket.emit("keydown", { sessionId, playerIndex, key: event.key });
+    const gameAction = getGameActionForKey(event.key);
+    if (!gameAction) return;
+    socket.emit("keydown", { sessionId, playerIndex, gameAction });
+    event.preventDefault();
   };
 
   const handleKeyUp = (event: KeyboardEvent) => {
     if (shouldIgnoreGameInput(event)) return;
-    socket.emit("keyup", { sessionId, playerIndex, key: event.key });
+    const gameAction = getGameActionForKey(event.key);
+    if (!gameAction) return;
+    socket.emit("keyup", { sessionId, playerIndex, gameAction });
+    event.preventDefault();
   };
 
   window.addEventListener("keydown", handleKeyDown);
@@ -49,5 +77,6 @@ export const attachEngineInput = (
 };
 
 export const __testing = {
+  getGameActionForKey,
   shouldIgnoreGameInput,
 };

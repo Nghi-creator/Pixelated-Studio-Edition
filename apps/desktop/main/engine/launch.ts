@@ -3,8 +3,10 @@ import {
   backendApiUrl,
   companionPort,
   engineAllowedOrigins,
-  engineImage,
   hostedWebUrl,
+  resolveEngineRuntimeConfig,
+  type EngineRuntimeKind,
+  type EngineRuntimeConfig,
 } from "../runtime/config";
 import { hasHostUinput } from "../docker/client";
 import { buildDockerRunArgs } from "../docker/commands";
@@ -20,6 +22,8 @@ const INVITE_CODE_TTL_MS = 10 * 60 * 1000;
 
 export type StartEngineOptions = {
   exposureMode?: unknown;
+  preserveCompanionSecurity?: unknown;
+  runtimeKind?: unknown;
 };
 
 export type EngineLaunchContext = {
@@ -27,13 +31,21 @@ export type EngineLaunchContext = {
   companionUrls: string[];
   includeUinputDevice: boolean;
   exposureMode: ExposureMode;
+  preserveCompanionSecurity: boolean;
+  runtimeConfig: EngineRuntimeConfig;
+  runtimeKind: EngineRuntimeKind;
   inviteCode?: string;
   inviteExpiresAt?: number;
   publishHost: string;
 };
 
-type DockerRunOptions = EngineLaunchContext & {
+type DockerRunOptions = Omit<
+  EngineLaunchContext,
+  "preserveCompanionSecurity" | "runtimeConfig" | "runtimeKind"
+> & {
   engineToken: string;
+  runtimeConfig?: EngineRuntimeConfig;
+  runtimeKind?: EngineRuntimeKind;
 };
 
 type WebLaunchUrlOptions = {
@@ -76,7 +88,11 @@ export function getDockerRunArgs({
   engineToken,
   exposureMode,
   publishHost,
+  runtimeConfig,
+  runtimeKind,
 }: DockerRunOptions) {
+  const resolvedRuntimeConfig =
+    runtimeConfig || resolveEngineRuntimeConfig(runtimeKind);
   const allowedOrigins = [
     engineAllowedOrigins,
     `https://localhost:${companionPort}`,
@@ -90,7 +106,8 @@ export function getDockerRunArgs({
     allowedOrigins,
     apiUrl: backendApiUrl,
     companionUrls,
-    engineImage,
+    engineImage: resolvedRuntimeConfig.engineImage,
+    engineRuntimeKind: resolvedRuntimeConfig.engineRuntimeKind,
     engineToken,
     exposureMode,
     includeUinputDevice,
@@ -102,6 +119,9 @@ export function createEngineLaunchContext(
   options: StartEngineOptions = {},
 ): EngineLaunchContext {
   const exposureMode = normalizeExposureMode(options.exposureMode);
+  const preserveCompanionSecurity = options.preserveCompanionSecurity === true;
+  const runtimeConfig = resolveEngineRuntimeConfig(options.runtimeKind);
+  const runtimeKind = runtimeConfig.engineRuntimeKind;
   const publishHost = getDockerPublishHost(exposureMode);
   const advertisedUrls = getAdvertisedEngineUrls(exposureMode);
   const companionUrls = getAdvertisedCompanionUrls(exposureMode, companionPort);
@@ -118,6 +138,9 @@ export function createEngineLaunchContext(
     companionUrls,
     includeUinputDevice,
     exposureMode,
+    preserveCompanionSecurity,
+    runtimeConfig,
+    runtimeKind,
     inviteCode,
     inviteExpiresAt,
     publishHost,

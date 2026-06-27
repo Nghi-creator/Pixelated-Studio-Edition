@@ -8,9 +8,9 @@ import type { IpcMainEvent } from "electron";
 import fs from "fs";
 import {
   buildFallback,
-  engineImage,
   engineRuntimeDir,
-  pullEngineImage,
+  resolveEngineRuntimeConfig,
+  type EngineRuntimeConfig,
 } from "../runtime/config";
 import { emitEngineState } from "../runtime/state";
 
@@ -79,7 +79,15 @@ export function execFileCommand(
 export async function prepareEngineImage(
   event: IpcMainEvent,
   safeEnv: NodeJS.ProcessEnv,
+  runtimeConfig: EngineRuntimeConfig = resolveEngineRuntimeConfig(),
 ) {
+  const {
+    engineImage,
+    engineRuntimeKind,
+    nativeRuntimeLock,
+    pullEngineImage,
+  } = runtimeConfig;
+
   if (!isSafeDockerImageRef(engineImage)) {
     throw new Error("Invalid PIXELATED_ENGINE_IMAGE value.");
   }
@@ -100,8 +108,27 @@ export async function prepareEngineImage(
   }
 
   emitEngineState(event, "BUILDING_IMAGE", engineRuntimeDir);
-  event.reply("server-log", "Building local engine image...");
-  await streamFile(event, "docker", ["build", "-t", engineImage, "."], {
+  event.reply(
+    "server-log",
+    `Building local ${engineRuntimeKind === "native_linux" ? "native" : "libretro"} engine image...`,
+  );
+  const buildArgs =
+    engineRuntimeKind === "native_linux"
+      ? [
+          "build",
+          "-t",
+          engineImage,
+          "-f",
+          "Dockerfile.native",
+          "--build-arg",
+          `NATIVE_RUNTIME_ID=${nativeRuntimeLock?.runtimeId || "debian-native-v1"}`,
+          "--build-arg",
+          `NATIVE_RUNTIME_LOCK_SHA256=${nativeRuntimeLock?.hash || "unknown"}`,
+          ".",
+        ]
+      : ["build", "-t", engineImage, "."];
+
+  await streamFile(event, "docker", buildArgs, {
     cwd: engineRuntimeDir,
     env: safeEnv,
   });

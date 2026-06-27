@@ -7,6 +7,11 @@ import {
   normalizeSessionId,
 } from "./sessionRooms";
 import { sanitizeUserId } from "../roms/localRomStore";
+import {
+  findRuntimeByExtension,
+  getRuntimeDefinition,
+  getRuntimeExtensionForTarget,
+} from "../runtime/runtimeRegistry";
 
 type IceServer = {
   credential?: string;
@@ -31,14 +36,19 @@ type StartGamePayload = {
 };
 
 type VerifiedBackendSession = {
+  expectedSha256?: string | null;
+  expectedSizeBytes?: number | null;
+  launchManifestId?: string | null;
   mode: string;
-  romTarget: string;
+  romTarget?: string | null;
+  runtimeId?: string | null;
   userId?: string | null;
 };
 
 type RuntimeBootOptions = {
   iceServers?: IceServer[];
   isCloudRom?: boolean;
+  runtimeId: string;
   streamProfile: StreamProfile;
 };
 
@@ -49,7 +59,15 @@ type Runtime = {
 type RegisterStartGameOptions = {
   apiUrl: string;
   canStartGame?: (socket: Socket, sessionId: string) => boolean;
-  downloadCloudRom(romUrl: string, destinationPath: string): Promise<void>;
+  downloadCloudRom(
+    romUrl: string,
+    destinationPath: string,
+    validation: {
+      expectedSha256?: string | null;
+      expectedSizeBytes?: number | null;
+      runtimeId: string;
+    },
+  ): Promise<void>;
   runtime: Runtime;
   verifyBackendSession(options: {
     apiUrl: string;
@@ -131,8 +149,12 @@ export function registerStartGameHandler(
       normalizeSessionId(payload.sessionId) ||
       socket.data.sessionId ||
       joinSession(socket, crypto.randomUUID(), "browser");
-    let romFileOrUrl =
+    let romFileOrUrl: string | null =
       typeof payload.romFilename === "string" ? payload.romFilename : "";
+    let launchManifestId: string | null | undefined;
+    let runtimeId = "mesen";
+    let expectedSha256: string | null | undefined;
+    let expectedSizeBytes: number | null | undefined;
     let safeUserId = sanitizeUserId(payload.userId || "anonymous");
     socket.data.sessionId = sessionId;
     socket.join(getSessionRoom(sessionId));
@@ -150,8 +172,8 @@ export function registerStartGameHandler(
       `\n[Node.js] React requested game boot for session ${sessionId}: ${romFileOrUrl}`,
     );
 
-    if (!romFileOrUrl) {
-      console.warn("[Node.js] Ignoring start-game without a ROM target");
+    if (!romFileOrUrl && !hasCloudSessionIntent(payload)) {
+      console.warn("[Node.js] Ignoring start-game without a game target");
       return;
     }
 
@@ -174,7 +196,21 @@ export function registerStartGameHandler(
           throw new Error("Backend session is not approved for cloud boot.");
         }
 
-        romFileOrUrl = verifiedSession.romTarget;
+        romFileOrUrl = verifiedSession.romTarget || "";
+        runtimeId = verifiedSession.runtimeId || "";
+        const verifiedRuntime = getRuntimeDefinition(runtimeId);
+        if (!verifiedRuntime) {
+          throw new Error("Backend session selected an unsupported runtime.");
+        }
+        launchManifestId = verifiedSession.launchManifestId;
+        if (verifiedRuntime.kind === "libretro" && !romFileOrUrl) {
+          throw new Error("Backend session did not provide a ROM target.");
+        }
+        if (verifiedRuntime.kind === "native_linux" && !launchManifestId) {
+          throw new Error("Backend session did not provide a launch manifest.");
+        }
+        expectedSha256 = verifiedSession.expectedSha256;
+        expectedSizeBytes = verifiedSession.expectedSizeBytes;
         safeUserId = sanitizeUserId(verifiedSession.userId || safeUserId);
       } catch (err) {
         console.error("[Engine] Cloud session verification failed:", err);
@@ -193,18 +229,49 @@ export function registerStartGameHandler(
       return;
     }
 
-    if (romFileOrUrl.startsWith("http")) {
-      const tmpPath = `/tmp/cloud_game_${crypto.randomUUID()}.nes`;
+    const verifiedRuntime = getRuntimeDefinition(runtimeId);
+    if (verifiedRuntime?.kind === "native_linux") {
+      try {
+        runtime.bootGame(launchManifestId || "", sessionId, {
+          ...(iceServers.length > 0 ? { iceServers } : {}),
+          isCloudRom: false,
+          runtimeId,
+          streamProfile,
+        });
+      } catch (err) {
+        console.error("[Engine] Failed to launch native game:", err);
+        socket.emit("engine-error", {
+          message: err instanceof Error ? err.message : "Native game failed",
+        });
+      }
+    } else if (romFileOrUrl?.startsWith("http")) {
+      const registryRuntime = getRuntimeDefinition(runtimeId);
+      if (!registryRuntime) {
+        socket.emit("engine-error", {
+          message: "Cloud session selected an unsupported runtime.",
+        });
+        return;
+      }
+      const extension = getRuntimeExtensionForTarget(
+        romFileOrUrl,
+        registryRuntime,
+      );
+      const tmpPath = `/tmp/cloud_game_${crypto.randomUUID()}${extension}`;
       console.log(
         "[Engine] Cloud URL detected. Downloading ROM to temporary storage...",
       );
 
       try {
-        await downloadCloudRom(romFileOrUrl, tmpPath);
+        await downloadCloudRom(romFileOrUrl, tmpPath, {
+          expectedSha256,
+          expectedSizeBytes,
+          runtimeId,
+        });
         console.log("[Engine] Download complete. Booting Cloud Game.");
         runtime.bootGame(tmpPath, sessionId, {
           ...(iceServers.length > 0 ? { iceServers } : {}),
           isCloudRom: true,
+          runtimeId,
           streamProfile,
         });
       } catch (err) {
@@ -213,13 +280,21 @@ export function registerStartGameHandler(
           message: err instanceof Error ? err.message : "Cloud ROM failed",
         });
       }
-    } else {
+    } else if (romFileOrUrl) {
       const safeRomFile = path.basename(romFileOrUrl);
+      const registryRuntime = findRuntimeByExtension(safeRomFile);
+      if (!registryRuntime) {
+        socket.emit("engine-error", {
+          message: "Unsupported local game file type.",
+        });
+        return;
+      }
       runtime.bootGame(
         path.join("/roms", safeUserId, safeRomFile),
         sessionId,
         {
           ...(iceServers.length > 0 ? { iceServers } : {}),
+          runtimeId: registryRuntime.id,
           streamProfile,
         },
       );

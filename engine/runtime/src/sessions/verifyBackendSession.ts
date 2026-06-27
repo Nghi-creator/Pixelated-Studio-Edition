@@ -5,8 +5,12 @@ type VerifyBackendSessionOptions = {
 };
 
 export type VerifiedBackendSession = {
+  expectedSha256?: string | null;
+  expectedSizeBytes?: number | null;
+  launchManifestId?: string | null;
   mode: string;
-  romTarget: string;
+  romTarget?: string | null;
+  runtimeId?: string;
   userId?: string;
 };
 
@@ -43,7 +47,11 @@ export async function verifyBackendSession(
 
     const verifiedSession = (await response.json()) as {
       boot?: {
+        artifactSha256?: unknown;
+        artifactSize?: unknown;
+        launchManifestId?: unknown;
         romFilename?: unknown;
+        runtimeId?: unknown;
         romUrl?: unknown;
       };
       mode?: unknown;
@@ -58,14 +66,31 @@ export async function verifyBackendSession(
           ? verifiedSession.boot.romFilename
           : "";
 
-    if (!romTarget) {
-      throw new Error("Backend session has no approved ROM target.");
+    const launchManifestId =
+      typeof verifiedSession.boot?.launchManifestId === "string"
+        ? verifiedSession.boot.launchManifestId
+        : null;
+    if (!romTarget && !launchManifestId) {
+      throw new Error("Backend session has no approved boot target.");
     }
 
     return {
+      expectedSha256:
+        typeof verifiedSession.boot?.artifactSha256 === "string"
+          ? verifiedSession.boot.artifactSha256
+          : null,
+      expectedSizeBytes:
+        typeof verifiedSession.boot?.artifactSize === "number"
+          ? verifiedSession.boot.artifactSize
+          : null,
+      launchManifestId,
       mode:
         typeof verifiedSession.mode === "string" ? verifiedSession.mode : "",
       romTarget,
+      runtimeId:
+        typeof verifiedSession.boot?.runtimeId === "string"
+          ? verifiedSession.boot.runtimeId
+          : undefined,
       userId:
         typeof verifiedSession.user?.id === "string"
           ? verifiedSession.user.id

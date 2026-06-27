@@ -20,6 +20,7 @@ import {
   consumeCompanionLaunchTicket,
   createCompanionAccessToken,
   createCompanionLaunchTicket,
+  getCompanionAccessTokenScope,
   getCompanionInviteState,
   getCompanionInviteStatus,
   recordCompanionInviteFailure,
@@ -37,7 +38,26 @@ const INVITE_PATH = "/invite";
 const PREFLIGHT_INVITE_PATH = "/invite/preflight";
 const REDEEM_INVITE_PATH = "/invite/redeem";
 const REDEEM_LAUNCH_PATH = "/launch/redeem";
+const RUNTIME_SWITCH_PATH = "/runtime/switch";
 const HOST_ACCESS_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const VALID_RUNTIME_KINDS = new Set(["libretro", "native_linux"]);
+
+export type RuntimeSwitchResult =
+  | {
+      runtimeKind: "libretro" | "native_linux";
+      status: "restarting";
+    }
+  | {
+      runtimeKind: "libretro" | "native_linux";
+      status: "unchanged";
+    }
+  | {
+      activeClientCount?: number;
+      activeSessionCount?: number;
+      code: string;
+      error: string;
+      status?: "blocked";
+    };
 
 export type CompanionServerOptions = {
   certDir: string;
@@ -46,7 +66,11 @@ export type CompanionServerOptions = {
   inviteExpiresAt?: number;
   lanAddresses: string[];
   launchAllowedOrigins: string[];
+  onRuntimeSwitch?: (
+    runtimeKind: "libretro" | "native_linux",
+  ) => Promise<RuntimeSwitchResult> | RuntimeSwitchResult;
   port: number;
+  preserveSecurityState?: boolean;
 };
 
 export type CompanionServerResult = CertificatePaths & {
@@ -111,7 +135,10 @@ function setCompanionCorsHeaders(
   const origin = serializeHeaderValue(req.headers.origin);
   if (!origin || !allowedOrigins.includes(origin)) return false;
 
-  res.setHeader("access-control-allow-headers", "content-type");
+  res.setHeader(
+    "access-control-allow-headers",
+    "content-type, x-engine-token, x-pixelated-client-id",
+  );
   res.setHeader("access-control-allow-methods", "POST, OPTIONS");
   res.setHeader("access-control-allow-origin", origin);
   if (req.headers["access-control-request-private-network"] === "true") {
@@ -119,6 +146,18 @@ function setCompanionCorsHeaders(
   }
   res.setHeader("vary", "Origin");
   return true;
+}
+
+function getCompanionTokenFromRequest(req: IncomingMessage) {
+  const headerToken = serializeHeaderValue(req.headers["x-engine-token"]);
+  if (headerToken) return headerToken;
+
+  try {
+    const url = new URL(req.url || "/", "https://pixelated.local");
+    return url.searchParams.get("companionToken") || "";
+  } catch {
+    return "";
+  }
 }
 
 function probeEngineHealth(timeoutMs = 1500) {
@@ -376,6 +415,88 @@ async function handleLaunchRequest(
   return true;
 }
 
+async function handleRuntimeSwitchRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  allowedOrigins: string[],
+  onRuntimeSwitch?: (
+    runtimeKind: "libretro" | "native_linux",
+  ) => Promise<RuntimeSwitchResult> | RuntimeSwitchResult,
+) {
+  if (!req.url?.startsWith(RUNTIME_SWITCH_PATH)) {
+    return false;
+  }
+
+  const origin = serializeHeaderValue(req.headers.origin);
+  if (origin && !setCompanionCorsHeaders(req, res, allowedOrigins)) {
+    sendJson(res, 403, {
+      code: "runtime_switch_origin_forbidden",
+      error: "Runtime switch origin is not allowed",
+    });
+    return true;
+  }
+
+  if (req.method === "OPTIONS") {
+    res.writeHead(204);
+    res.end();
+    return true;
+  }
+
+  if (req.method !== "POST") return false;
+
+  const tokenScope = getCompanionAccessTokenScope(getCompanionTokenFromRequest(req));
+  if (!tokenScope) {
+    sendJson(res, 401, {
+      code: "runtime_switch_token_invalid",
+      error: "Companion token is invalid or expired",
+    });
+    return true;
+  }
+
+  if (!onRuntimeSwitch) {
+    sendJson(res, 503, {
+      code: "runtime_switch_unavailable",
+      error: "Runtime switching is not available",
+    });
+    return true;
+  }
+
+  try {
+    const body = await readJsonBody(req);
+    const runtimeKind =
+      body &&
+      typeof body === "object" &&
+      typeof (body as { runtimeKind?: unknown }).runtimeKind === "string"
+        ? (body as { runtimeKind: string }).runtimeKind
+        : "";
+
+    if (!VALID_RUNTIME_KINDS.has(runtimeKind)) {
+      sendJson(res, 400, {
+        code: "runtime_switch_invalid_kind",
+        error: "Runtime kind must be libretro or native_linux",
+      });
+      return true;
+    }
+
+    const result = await onRuntimeSwitch(
+      runtimeKind as "libretro" | "native_linux",
+    );
+    if ("error" in result) {
+      sendJson(res, result.code === "runtime_switch_active_session" ? 409 : 503, {
+        ...result,
+        status: result.status || "blocked",
+      });
+      return true;
+    }
+
+    sendJson(res, result.status === "restarting" ? 202 : 200, result);
+  } catch (err) {
+    sendJson(res, 400, { error: err instanceof Error ? err.message : String(err) });
+  }
+
+  return true;
+}
+
 function serializeHeaderValue(value: number | string | string[] | undefined) {
   if (Array.isArray(value)) return value.join(", ");
   return value === undefined ? "" : String(value);
@@ -388,9 +509,11 @@ export function startCompanionServer({
   inviteExpiresAt,
   lanAddresses,
   launchAllowedOrigins,
+  onRuntimeSwitch,
   port,
+  preserveSecurityState = false,
 }: CompanionServerOptions) {
-  stopCompanionServer();
+  stopCompanionServer({ preserveSecurityState });
   if (inviteCode && inviteExpiresAt) {
     updateCompanionInvite(inviteCode, inviteExpiresAt);
   } else {
@@ -409,6 +532,17 @@ export function startCompanionServer({
       }
 
       if (await handleLaunchRequest(req, res, launchAllowedOrigins)) {
+        return;
+      }
+
+      if (
+        await handleRuntimeSwitchRequest(
+          req,
+          res,
+          launchAllowedOrigins,
+          onRuntimeSwitch,
+        )
+      ) {
         return;
       }
 
@@ -444,10 +578,12 @@ export function startCompanionServer({
   });
 }
 
-export function stopCompanionServer() {
+export function stopCompanionServer(options: { preserveSecurityState?: boolean } = {}) {
   if (companionServer) {
     companionServer.close();
     companionServer = null;
   }
-  resetCompanionSecurityState();
+  if (!options.preserveSecurityState) {
+    resetCompanionSecurityState();
+  }
 }

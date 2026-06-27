@@ -1,4 +1,6 @@
 import { engineEndpoint } from "../engine/engineConfig";
+import { engineAuthHeaders } from "../engine/engineAuth";
+import type { EngineRuntimeKind } from "./runtimeKind";
 import type {
   EngineInputCapabilities,
   EngineShareContext,
@@ -18,6 +20,7 @@ type EngineHealthPayload = {
     };
   };
   exposureMode?: "local" | "lan";
+  runtimeKind?: "libretro" | "native_linux";
 };
 
 export const CHECKING_INPUT_CAPABILITIES: EngineInputCapabilities = {
@@ -100,3 +103,46 @@ export async function loadEngineShareContext(): Promise<EngineShareContext> {
   }
 }
 
+export async function loadEngineRuntimeKind() {
+  const response = await fetch(engineEndpoint("/health"));
+  if (!response.ok) throw new Error("Engine health check failed.");
+  const health = (await response.json()) as EngineHealthPayload;
+  return health.runtimeKind || "libretro";
+}
+
+export async function requestEngineRuntimeSwitch(
+  runtimeKind: EngineRuntimeKind,
+) {
+  const response = await fetch(engineEndpoint("/runtime/switch"), {
+    body: JSON.stringify({ runtimeKind }),
+    cache: "no-store",
+    headers: {
+      "content-type": "application/json",
+      ...engineAuthHeaders(),
+    },
+    method: "POST",
+  });
+
+  if (response.status === 202) {
+    return { status: "restarting" as const };
+  }
+
+  if (response.status === 200) {
+    return { status: "unchanged" as const };
+  }
+
+  if (response.status === 409) {
+    const payload = (await response.json().catch(() => ({}))) as {
+      error?: unknown;
+    };
+    return {
+      error:
+        typeof payload.error === "string"
+          ? payload.error
+          : "A game session is active on this desktop engine. Stop the current stream before switching runtimes.",
+      status: "blocked" as const,
+    };
+  }
+
+  return { status: "unavailable" as const };
+}

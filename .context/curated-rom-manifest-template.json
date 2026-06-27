@@ -1,0 +1,26 @@
+{
+  "repoUrl": "https://github.com/example/legal-rom-source",
+  "rawBaseUrl": "https://raw.githubusercontent.com/example/legal-rom-source",
+  "sourceCommit": "0123456789abcdef0123456789abcdef01234567",
+  "manifestPath": "curation/pixelated-roms.json",
+  "entries": [
+    {
+      "title": "Example Game",
+      "slug": "example-game",
+      "developerName": "Example Developer",
+      "developerUrl": "https://example.com",
+      "sourceEntryPath": "roms/example-game.sfc",
+      "artifactFilename": "example-game.sfc",
+      "artifactSha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "artifactSize": 1048576,
+      "codeLicenseSpdx": "GPL-3.0-or-later",
+      "assetLicenseSpdx": "CC-BY-SA-4.0",
+      "licenseUrl": "https://github.com/example/legal-rom-source/blob/0123456789abcdef0123456789abcdef01234567/LICENSE",
+      "originalReleaseUrl": "https://example.com/example-game",
+      "attributionText": "Example Game by Example Developer. Code: GPL-3.0-or-later. Assets: CC-BY-SA-4.0. Source and license evidence pinned at commit 0123456789abcdef0123456789abcdef01234567.",
+      "rightsWarnings": [
+        "Confirm cover art is generated or separately licensed before publication."
+      ]
+    }
+  ]
+}

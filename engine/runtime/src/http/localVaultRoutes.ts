@@ -2,7 +2,12 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import type { Express, Request, RequestHandler, Response } from "express";
+import { validateGameArtifact } from "../roms/artifactValidation";
 import { getUserFolder } from "../roms/localRomStore";
+import {
+  findRuntimeByExtension,
+  getSupportedExtensions,
+} from "../runtime/runtimeRegistry";
 
 const multer = require("multer");
 
@@ -13,6 +18,7 @@ type MulterError = Error & {
 type MulterFile = {
   filename: string;
   originalname: string;
+  path: string;
 };
 
 type RequestWithFile = Request & {
@@ -25,13 +31,14 @@ type LocalVaultRouteOptions = {
 };
 
 function createLocalVaultUpload(maxRomSizeBytes: number) {
+  const supportedExtensions = getSupportedExtensions();
   const storage = multer.diskStorage({
     destination(req: Request, file: MulterFile, cb: (err: Error | null, destination: string) => void) {
       const userId = req.headers["x-user-id"];
       cb(null, getUserFolder(userId));
     },
     filename(req: Request, file: MulterFile, cb: (err: Error | null, filename: string) => void) {
-      const safeFilename = path.basename(file.originalname || "unknown.nes");
+      const safeFilename = path.basename(file.originalname || "unknown.rom");
       cb(null, `${Date.now()}-${crypto.randomUUID()}-${safeFilename}`);
     },
   });
@@ -48,8 +55,17 @@ function createLocalVaultUpload(maxRomSizeBytes: number) {
       cb: (err: Error | null, acceptFile?: boolean) => void,
     ) {
       const safeFilename = path.basename(file.originalname || "");
-      if (!safeFilename.toLowerCase().endsWith(".nes")) {
-        cb(new Error("Only .nes ROM files are supported"));
+      const lowerFilename = safeFilename.toLowerCase();
+      if (
+        !supportedExtensions.some((extension) =>
+          lowerFilename.endsWith(extension),
+        )
+      ) {
+        cb(
+          new Error(
+            `Only ${supportedExtensions.join(", ")} game files are supported`,
+          ),
+        );
         return;
       }
 
@@ -64,6 +80,7 @@ export function registerLocalVaultRoutes(
 ): void {
   const { maxRomSizeBytes, requireEngineToken } = options;
   const upload = createLocalVaultUpload(maxRomSizeBytes);
+  const supportedExtensions = getSupportedExtensions();
 
   app.get("/local-games", requireEngineToken, (req: Request, res: Response) => {
     try {
@@ -72,7 +89,12 @@ export function registerLocalVaultRoutes(
 
       const files = fs
         .readdirSync(userFolder)
-        .filter((file) => file.toLowerCase().endsWith(".nes"))
+        .filter((file) => {
+          const lowerFilename = file.toLowerCase();
+          return supportedExtensions.some((extension) =>
+            lowerFilename.endsWith(extension),
+          );
+        })
         .map((file) => ({
           name: file,
           time: fs.statSync(path.join(userFolder, file)).mtime.getTime(),
@@ -104,6 +126,27 @@ export function registerLocalVaultRoutes(
       const uploadRequest = req as RequestWithFile;
       if (!uploadRequest.file) {
         return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      const runtime = findRuntimeByExtension(uploadRequest.file.filename);
+      if (!runtime) {
+        fs.unlink(uploadRequest.file.path, () => {});
+        return res.status(400).json({ error: "Unsupported game file type" });
+      }
+
+      try {
+        validateGameArtifact(uploadRequest.file.path, {
+          fileLabel: "Local game file",
+          runtimeId: runtime.id,
+        });
+      } catch (validationError) {
+        fs.unlink(uploadRequest.file.path, () => {});
+        return res.status(400).json({
+          error:
+            validationError instanceof Error
+              ? validationError.message
+              : "Invalid game file",
+        });
       }
 
       console.log(

@@ -24,7 +24,7 @@ describe("engine health snapshot", () => {
         cameraPeerState: existingFile,
         gamepadBridge: existingFile,
         gstreamerBinary: existingFile,
-        mesenCore: existingFile,
+        libretroCores: [existingFile],
         pythonBinary: existingFile,
         retroarchBinary: existingFile,
         retroarchConfig: existingFile,
@@ -35,6 +35,38 @@ describe("engine health snapshot", () => {
 
     const snapshot = getHealthSnapshot();
     assert.equal(snapshot.exposureMode, "lan");
+    assert.equal(snapshot.runtimeKind, "libretro");
     assert.deepEqual(snapshot.companionUrls, ["https://192.168.1.20:8090"]);
+  });
+
+  it("does not require RetroArch binaries for native Linux runtime health", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pixelated-health-"));
+    const existingFile = path.join(tempDir, "ready");
+    fs.writeFileSync(existingFile, "");
+
+    const getHealthSnapshot = createHealthSnapshot({
+      getRuntimeState: () => ({
+        pulseAudioProcess: { exitCode: null },
+        virtualDisplayProcess: { exitCode: null },
+      }),
+      healthPaths: {
+        cameraBridge: existingFile,
+        cameraPeerState: existingFile,
+        gamepadBridge: existingFile,
+        gstreamerBinary: existingFile,
+        libretroCores: [path.join(tempDir, "missing-core")],
+        pythonBinary: existingFile,
+        retroarchBinary: path.join(tempDir, "missing-retroarch"),
+        retroarchConfig: path.join(tempDir, "missing-config"),
+        roms: tempDir,
+        xvfbSocket: existingFile,
+      },
+      runtimeKind: "native_linux",
+    });
+
+    const snapshot = getHealthSnapshot();
+    assert.equal(snapshot.ok, true);
+    assert.equal(snapshot.runtimeKind, "native_linux");
+    assert.equal(snapshot.checks.retroarch.binaryExists, false);
   });
 });

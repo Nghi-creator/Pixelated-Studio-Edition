@@ -30,6 +30,25 @@ PIXELATED_ENGINE_PULL=1
 Keep `PIXELATED_ENGINE_BUILD_FALLBACK=1` or leave it unset during development so
 the desktop app can fall back to building this folder if a pull fails.
 
+## Native Debian runtime
+
+The native proof-of-concept image is built separately from the libretro image.
+It installs only the pinned Debian `main` packages listed in
+`native-runtime.lock.json`, embeds that same lock file at
+`/app/native-runtime.lock.json`, and launches games through engine-owned
+manifests instead of database-supplied commands.
+
+```sh
+npm run build:native
+npm run smoke:native
+```
+
+`npm run build:native` tags the image from the lock hash, for example
+`pixelated-engine-native:debian-native-v1-46d11e8650c8`, and writes the runtime
+ID plus lock SHA-256 into image labels. `npm run smoke:native` defaults to that
+same versioned tag, then verifies the embedded lock file checksum, executable
+paths, Xvfb boot, and headless SDL audio for every package in the lock manifest.
+
 Cloud game starts verify their backend-created session token before booting a ROM. Set `PIXELATED_API_URL` when running the container manually:
 
 ```sh

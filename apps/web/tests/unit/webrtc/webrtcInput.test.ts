@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { __testing } from "../../../src/lib/webrtc/webrtcInput.ts";
+import { attachEngineInput, __testing } from "../../../src/lib/webrtc/webrtcInput.ts";
 
 function keyboardEventFor(target: EventTarget) {
   return {
@@ -45,4 +45,81 @@ test("game input respects explicit ignore containers and prevented events", () =
     } as unknown as KeyboardEvent),
     true,
   );
+});
+
+test("game input maps browser keys to normalized game actions", () => {
+  assert.equal(__testing.getGameActionForKey("ArrowUp"), "dpad_up");
+  assert.equal(__testing.getGameActionForKey("z"), "face_south");
+  assert.equal(__testing.getGameActionForKey("x"), "face_east");
+  assert.equal(__testing.getGameActionForKey("a"), "shoulder_left");
+  assert.equal(__testing.getGameActionForKey("s"), "shoulder_right");
+  assert.equal(__testing.getGameActionForKey("Enter"), "start");
+  assert.equal(__testing.getGameActionForKey("Shift"), "select");
+  assert.equal(__testing.getGameActionForKey("q"), "");
+});
+
+test("attached engine input emits normalized actions", () => {
+  const originalWindow = globalThis.window;
+  const listeners = new Map<string, (event: KeyboardEvent) => void>();
+  const emitted: Array<{ event: string; payload: unknown }> = [];
+  const socket = {
+    emit: (event: string, payload: unknown) => {
+      emitted.push({ event, payload });
+    },
+  };
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      addEventListener: (event: string, handler: (event: KeyboardEvent) => void) => {
+        listeners.set(event, handler);
+      },
+      removeEventListener: (event: string) => {
+        listeners.delete(event);
+      },
+    },
+  });
+
+  try {
+    const detach = attachEngineInput(socket as never, "session-1", 2);
+    listeners.get("keydown")?.({
+      defaultPrevented: false,
+      key: "a",
+      preventDefault: () => undefined,
+      repeat: false,
+      target: { tagName: "DIV" },
+    } as unknown as KeyboardEvent);
+    listeners.get("keyup")?.({
+      defaultPrevented: false,
+      key: "a",
+      preventDefault: () => undefined,
+      target: { tagName: "DIV" },
+    } as unknown as KeyboardEvent);
+
+    assert.deepEqual(emitted, [
+      {
+        event: "keydown",
+        payload: {
+          gameAction: "shoulder_left",
+          playerIndex: 2,
+          sessionId: "session-1",
+        },
+      },
+      {
+        event: "keyup",
+        payload: {
+          gameAction: "shoulder_left",
+          playerIndex: 2,
+          sessionId: "session-1",
+        },
+      },
+    ]);
+    detach();
+    assert.equal(listeners.size, 0);
+  } finally {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
+  }
 });

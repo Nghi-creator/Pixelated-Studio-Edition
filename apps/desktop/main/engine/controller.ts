@@ -2,8 +2,8 @@ import crypto from "crypto";
 import { app, shell, type IpcMainEvent } from "electron";
 import path from "path";
 import {
+  type EngineRuntimeKind,
   companionPort,
-  engineImage,
   hostedWebUrl,
 } from "../runtime/config";
 import {
@@ -35,6 +35,7 @@ import {
 import { getLanIpv4Addresses } from "../network/exposure";
 import { waitForEngineHealth } from "../runtime/health";
 import { emitEngineState, setCurrentEnginePhase } from "../runtime/state";
+import { getRuntimeSwitchBlocker } from "./runtimeSwitch";
 import {
   createEngineLaunchContext,
   createHostedWebLaunchUrl,
@@ -63,6 +64,10 @@ export type EngineClientPayload = {
   sessionId: string | null;
   socketCount: number;
   userAgent: string;
+};
+
+type EngineHealthPayload = {
+  runtimeKind?: EngineRuntimeKind;
 };
 
 let engineToken: string | null = null;
@@ -101,7 +106,10 @@ async function startCompanion(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
       ],
+      onRuntimeSwitch: (runtimeKind) =>
+        requestEngineRuntimeSwitch(event, runtimeKind),
       port: companionPort,
+      preserveSecurityState: launchContext.preserveCompanionSecurity,
     });
     const hostedInviteUrls = launchContext.companionUrls.map(createHostedInviteUrl);
     activeCompanion = {
@@ -227,6 +235,10 @@ export async function listEngineClients() {
   return requestEngineControl<{ clients: EngineClientPayload[] }>("/clients");
 }
 
+async function getEngineHealth() {
+  return requestEngineControl<EngineHealthPayload>("/health");
+}
+
 export async function revokeEngineClient(clientId: string) {
   return requestEngineControl<{ disconnected: number }>(
     `/clients/${encodeURIComponent(clientId)}/revoke`,
@@ -340,7 +352,7 @@ function continueEngineStartup(
   if (attempt !== activeStartupAttempt) return;
   event.reply("server-log", "Docker Engine found.");
 
-  prepareEngineImage(event, safeEnv)
+  prepareEngineImage(event, safeEnv, launchContext.runtimeConfig)
     .then(() => {
       event.reply("server-log", "Image ready. Preparing WebRTC Node...");
       emitEngineState(event, "REMOVING_STALE", "pixelated-node");
@@ -377,12 +389,88 @@ function continueEngineStartup(
     });
 }
 
+async function requestEngineRuntimeSwitch(
+  event: IpcMainEvent,
+  runtimeKind: EngineRuntimeKind,
+) {
+  const exposureMode = activeCompanion?.exposureMode || "local";
+  if (startupInProgress || recoveryInProgress) {
+    event.reply(
+      "server-log",
+      "Runtime switch requested, but engine initialization is already in progress.",
+    );
+    return {
+      code: "runtime_switch_busy",
+      error: "Engine initialization is already in progress.",
+      status: "blocked" as const,
+    };
+  }
+
+  try {
+    const health = await getEngineHealth();
+    if (health.runtimeKind === runtimeKind) {
+      return {
+        runtimeKind,
+        status: "unchanged" as const,
+      };
+    }
+
+    const blocker = getRuntimeSwitchBlocker((await listEngineClients()).clients);
+    if (blocker) {
+      event.reply(
+        "server-log",
+        "Runtime switch blocked because a game session is active.",
+      );
+      return {
+        ...blocker,
+        status: "blocked" as const,
+      };
+    }
+  } catch (err) {
+    return {
+      code: "runtime_switch_client_check_failed",
+      error: getErrorMessage(err),
+      status: "blocked" as const,
+    };
+  }
+
+  setTimeout(() => {
+    activeStartupAttempt += 1;
+    startupInProgress = false;
+    recoveryInProgress = false;
+    emitEngineState(event, "STOPPING", `Switching runtime to ${runtimeKind}`);
+    event.reply(
+      "server-log",
+      `Switching engine runtime to ${runtimeKind}. Restarting container...`,
+    );
+    const safeEnv = getSafeEnv();
+    stopCompanionServer({ preserveSecurityState: true });
+    activeCompanion = null;
+
+    void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+      .catch(() => undefined)
+      .finally(() => {
+        startEngine(event, {
+          exposureMode,
+          preserveCompanionSecurity: true,
+          runtimeKind,
+        });
+      });
+  }, 0);
+
+  return {
+    runtimeKind,
+    status: "restarting" as const,
+  };
+}
+
 export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {}) {
   if (startupInProgress || recoveryInProgress) {
     event.reply("server-log", "Engine initialization is already in progress.");
     return;
   }
-  if (!isSafeDockerImageRef(engineImage)) {
+  const launchContext = createEngineLaunchContext(options);
+  if (!isSafeDockerImageRef(launchContext.runtimeConfig.engineImage)) {
     rejectInvalidImage(event);
     return;
   }
@@ -390,12 +478,13 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
   emitEngineState(event, "CHECKING_DOCKER");
   event.reply("server-log", "Checking Docker daemon...");
   const safeEnv = getSafeEnv();
-  const launchContext = createEngineLaunchContext(options);
   const attempt = ++activeStartupAttempt;
   startupInProgress = true;
 
   engineToken = crypto.randomBytes(24).toString("base64url");
-  stopCompanionServer();
+  stopCompanionServer({
+    preserveSecurityState: launchContext.preserveCompanionSecurity,
+  });
   activeCompanion = null;
 
   void diagnoseDocker(safeEnv).then((diagnostic) => {

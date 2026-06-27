@@ -6,6 +6,7 @@ import { registerCors } from "./plugins/cors.js";
 import { registerGlobalRateLimit } from "./plugins/rateLimit.js";
 import { registerAccessLogRoutes } from "./routes/admin/accessLogs.js";
 import { registerAdminUserRoutes } from "./routes/admin/adminUsers.js";
+import { registerCatalogCandidateRoutes } from "./routes/admin/catalogCandidates.js";
 import { registerModerationRoutes } from "./modules/moderation/http/registerModerationRoutes.js";
 import { registerAuthMethodsRoutes } from "./routes/auth/authMethods.js";
 import { registerMeRoutes } from "./routes/auth/me.js";
@@ -31,6 +32,7 @@ export async function buildServer() {
   await registerHealthRoutes(app);
   await registerAuthMethodsRoutes(app);
   await registerAccessLogRoutes(app);
+  await registerCatalogCandidateRoutes(app);
   await registerCatalogRoutes(app);
   await registerMeRoutes(app);
   await registerProfileRoutes(app);

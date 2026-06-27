@@ -41,11 +41,11 @@ export const corsOptions = {
 };
 
 export const MAX_ROM_SIZE_BYTES = Number(
-  process.env.PIXELATED_MAX_ROM_SIZE_BYTES || 8 * 1024 * 1024,
+  process.env.PIXELATED_MAX_ROM_SIZE_BYTES || 64 * 1024 * 1024,
 );
 
 export const MAX_CLOUD_ROM_SIZE_BYTES = Number(
-  process.env.PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES || 8 * 1024 * 1024,
+  process.env.PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES || 32 * 1024 * 1024,
 );
 
 export const CLOUD_ROM_DOWNLOAD_TIMEOUT_MS = Number(
@@ -59,6 +59,10 @@ export const PIXELATED_API_URL = (process.env.PIXELATED_API_URL || "").replace(
 );
 export const ENGINE_EXPOSURE_MODE =
   process.env.PIXELATED_ENGINE_EXPOSURE_MODE === "lan" ? "lan" : "local";
+export const ENGINE_RUNTIME_KIND =
+  process.env.PIXELATED_ENGINE_RUNTIME_KIND === "native_linux"
+    ? "native_linux"
+    : "libretro";
 export const ADVERTISED_URLS = (process.env.PIXELATED_ADVERTISED_URLS || "")
   .split(",")
   .map((url) => url.trim())
@@ -78,7 +82,12 @@ export const HEALTH_PATHS = {
   cameraPeerState: "/tmp/pixelated_camera_peers.json",
   gamepadBridge: path.join(process.cwd(), "input_gamepad.py"),
   gstreamerBinary: "/usr/bin/gst-launch-1.0",
-  mesenCore: "/cores/mesen_libretro.so",
+  libretroCores: [
+    "/cores/mesen_libretro.so",
+    "/cores/mgba_libretro.so",
+    "/cores/bsnes_libretro.so",
+    "/cores/picodrive_libretro.so",
+  ],
   pythonBinary: "/usr/bin/python3",
   retroarchBinary: "/usr/bin/retroarch",
   retroarchConfig: "/app/retroarch.cfg",

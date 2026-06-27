@@ -1,0 +1,27 @@
+{
+  "repoUrl": "https://github.com/moon-watcher/Scorpion-Illuminati-Core",
+  "rawBaseUrl": "https://raw.githubusercontent.com/moon-watcher/Scorpion-Illuminati-Core",
+  "sourceCommit": "08728404021f9a34afdbe74d1a22fbfdebc00867",
+  "manifestPath": "README.md",
+  "entries": [
+    {
+      "title": "Scorpion Illuminati",
+      "slug": "scorpion-illuminati",
+      "developerName": "moon-watcher",
+      "developerUrl": "https://github.com/moon-watcher",
+      "sourceEntryPath": "bin/rom.bin",
+      "artifactFilename": "scorpion-illuminati.md",
+      "artifactSha256": "14c9d2fa5fcba490f01b14adff6fd43c7ed63805ef68d48f9b599952c280d95d",
+      "artifactSize": 28120,
+      "codeLicenseSpdx": "Artistic-2.0",
+      "assetLicenseSpdx": "Artistic-2.0",
+      "licenseUrl": "https://github.com/moon-watcher/Scorpion-Illuminati-Core/blob/08728404021f9a34afdbe74d1a22fbfdebc00867/LICENSE.md",
+      "originalReleaseUrl": "https://github.com/moon-watcher/Scorpion-Illuminati-Core",
+      "attributionText": "Scorpion Illuminati by moon-watcher. Licensed under Artistic-2.0; source, built ROM, and license evidence are pinned at commit 08728404021f9a34afdbe74d1a22fbfdebc00867.",
+      "rightsWarnings": [
+        "README describes the game as open source under the Artistic license; reviewer should preserve LICENSE.md attribution with any publication.",
+        "Use generated Pixelated cover art unless upstream art is separately reviewed."
+      ]
+    }
+  ]
+}

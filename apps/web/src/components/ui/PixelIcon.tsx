@@ -6,6 +6,7 @@ type PixelIconName =
   | "engine-on"
   | "empty"
   | "favorites"
+  | "gamepad"
   | "logs"
   | "mail"
   | "moderation"
@@ -59,6 +60,18 @@ export function PixelIcon({ name, ...props }: PixelIconProps) {
           <path {...sharedProps} d="M6 5h12v14H6z" />
           <path {...sharedProps} d="M8.5 8h7v4h-7zM9 15h6" />
           <path fill="currentColor" d="M6 5h2v2H6zM16 17h2v2h-2zM10 17h4v1.5h-4z" />
+        </>
+      )}
+
+      {name === "gamepad" && (
+        <>
+          <path
+            {...sharedProps}
+            d="M7 9h10l3 2.5v5L18 19h-3l-2-2h-2l-2 2H6l-2-2.5v-5z"
+          />
+          <path {...sharedProps} d="M7.5 13h4M9.5 11v4" />
+          <path fill="currentColor" d="M15 12h2v2h-2zM17 14h2v2h-2z" />
+          <path fill="currentColor" d="M7 9h2v2H7zM15 17h3v2h-3z" opacity="0.28" />
         </>
       )}
 

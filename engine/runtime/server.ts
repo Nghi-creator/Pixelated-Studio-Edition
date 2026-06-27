@@ -8,6 +8,7 @@ import {
   COMPANION_URLS,
   corsOptions,
   ENGINE_EXPOSURE_MODE,
+  ENGINE_RUNTIME_KIND,
   ENGINE_TOKEN,
   HEALTH_PATHS,
   MAX_CLOUD_ROM_SIZE_BYTES,
@@ -89,6 +90,7 @@ const getHealthSnapshot = createHealthSnapshot({
   engineToken: ENGINE_TOKEN,
   getRuntimeState: runtime.getRuntimeState,
   healthPaths: HEALTH_PATHS,
+  runtimeKind: ENGINE_RUNTIME_KIND,
 });
 const lobby = createLobbyManager();
 

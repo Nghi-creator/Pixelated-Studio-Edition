@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "runtimeId": "debian-native-v1",
+  "distribution": "debian",
+  "suite": "trixie",
+  "component": "main",
+  "section": "games",
+  "packages": [
+    {
+      "title": "Frozen-Bubble",
+      "manifestId": "frozen-bubble",
+      "packageName": "frozen-bubble",
+      "packageVersion": "2.212-13+b1",
+      "sourcePackageName": "frozen-bubble",
+      "sourcePackageVersion": "2.212-13",
+      "executable": "/usr/games/frozen-bubble",
+      "args": ["--fullscreen"],
+      "licenseUrl": "https://metadata.ftp-master.debian.org/changelogs/main/f/frozen-bubble/frozen-bubble_2.212-13_copyright",
+      "sourceUrl": "https://tracker.debian.org/pkg/frozen-bubble",
+      "packageUrl": "https://packages.debian.org/trixie/frozen-bubble"
+    },
+    {
+      "title": "Neverball",
+      "manifestId": "neverball",
+      "packageName": "neverball",
+      "packageVersion": "1.6.0+git20180603-3+b2",
+      "sourcePackageName": "neverball",
+      "sourcePackageVersion": "1.6.0+git20180603-3",
+      "executable": "/usr/games/neverball",
+      "args": ["--fullscreen"],
+      "licenseUrl": "https://metadata.ftp-master.debian.org/changelogs/main/n/neverball/neverball_1.6.0+git20180603-3_copyright",
+      "sourceUrl": "https://tracker.debian.org/pkg/neverball",
+      "packageUrl": "https://packages.debian.org/trixie/neverball"
+    }
+  ]
+}

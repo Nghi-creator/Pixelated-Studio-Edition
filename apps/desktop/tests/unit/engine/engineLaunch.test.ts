@@ -18,6 +18,19 @@ test("engine launch context separates local and LAN exposure", () => {
   assert.equal(lan.exposureMode, "lan");
   assert.match(lan.inviteCode || "", /^[A-F0-9]{8}$/);
   assert.ok(lan.inviteExpiresAt && lan.inviteExpiresAt > Date.now());
+  assert.equal(local.runtimeKind, "libretro");
+  assert.equal(local.runtimeConfig.engineImage, "pixelated-engine");
+});
+
+test("engine launch context can request the native runtime for a restart", () => {
+  const native = createEngineLaunchContext({
+    exposureMode: "local",
+    runtimeKind: "native_linux",
+  });
+
+  assert.equal(native.runtimeKind, "native_linux");
+  assert.equal(native.runtimeConfig.engineRuntimeKind, "native_linux");
+  assert.match(native.runtimeConfig.engineImage, /^pixelated-engine-native/);
 });
 
 test("engine launch helpers build hosted invite and Docker arguments", () => {
@@ -47,6 +60,18 @@ test("engine launch helpers build hosted invite and Docker arguments", () => {
       "PIXELATED_COMPANION_URLS=https://192.168.1.20:8090",
     ),
   );
+
+  const nativeArgs = getDockerRunArgs({
+    advertisedUrls: ["http://127.0.0.1:8080"],
+    companionUrls: [],
+    engineToken: "token",
+    exposureMode: "local",
+    includeUinputDevice: false,
+    publishHost: "127.0.0.1",
+    runtimeKind: "native_linux",
+  });
+  assert.ok(nativeArgs.includes("PIXELATED_ENGINE_RUNTIME_KIND=native_linux"));
+  assert.match(nativeArgs.at(-1) || "", /^pixelated-engine-native/);
 });
 
 test("hosted web launch URL uses direct local pairing and ticketed LAN pairing", () => {

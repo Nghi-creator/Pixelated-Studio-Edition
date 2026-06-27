@@ -1,10 +1,17 @@
 import fs from "fs";
 import https from "https";
+import { validateGameArtifact } from "./artifactValidation";
 
 type CloudRomDownloaderOptions = {
   allowedRomHosts: string[];
   maxCloudRomSizeBytes: number;
   timeoutMs: number;
+};
+
+type DownloadValidationOptions = {
+  expectedSha256?: string | null;
+  expectedSizeBytes?: number | null;
+  runtimeId: string;
 };
 
 export function removeFileIfExists(filePath: string): void {
@@ -40,6 +47,7 @@ export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
   function downloadCloudRom(
     romUrl: string,
     destinationPath: string,
+    validation: DownloadValidationOptions,
   ): Promise<void> {
     const parsedUrl = validateCloudRomUrl(romUrl);
 
@@ -94,7 +102,18 @@ export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
         file.on("finish", () => {
           if (settled) return;
           settled = true;
-          file.close(() => resolve());
+          file.close(() => {
+            try {
+              validateGameArtifact(destinationPath, {
+                ...validation,
+                fileLabel: "Cloud ROM",
+              });
+              resolve();
+            } catch (err) {
+              removeFileIfExists(destinationPath);
+              reject(err);
+            }
+          });
         });
 
         response.pipe(file);

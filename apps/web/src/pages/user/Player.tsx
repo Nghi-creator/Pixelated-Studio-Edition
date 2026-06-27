@@ -91,7 +91,7 @@ export default function Player() {
     requestedRole: playerMode === "host" ? "host" : invitedRole,
     sessionId: invitedSessionId,
   });
-  const { authorName, gameTitle } = useGameMetadata(id);
+  const { authorName, gameRights, gameTitle } = useGameMetadata(id);
 
   useEffect(() => {
     if (!currentUser) {
@@ -201,7 +201,9 @@ export default function Player() {
       window.removeEventListener("keydown", preventScroll, { capture: true });
   }, []);
 
-  const isLocalGame = id?.toLowerCase().endsWith(".nes");
+  const isLocalGame = /\.(nes|gb|gbc|gba|sfc|smc|md|gen|sms|gg)$/i.test(
+    id || "",
+  );
   const fallbackBackRoute = isLocalGame ? "/local" : "/";
   const fallbackBackText = isLocalGame
     ? "Back to Local Vault"
@@ -263,6 +265,7 @@ export default function Player() {
       <PlayerHeader
         backRoute={backRoute}
         backText={backText}
+        gameRights={gameRights}
         gameTitle={gameTitle}
         hideGameChrome
         onToggleTelemetry={() =>

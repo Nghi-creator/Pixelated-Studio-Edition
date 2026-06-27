@@ -5,6 +5,7 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../../modules/auth/supabaseAuth.js";
+import { fetchPublishedGameById } from "../../modules/catalog/services/catalogService.js";
 import { createRateLimiter } from "../../modules/security/sharedRateLimiter.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
@@ -19,8 +20,12 @@ const createSessionBodySchema = z.object({
 });
 
 type BackendSessionRow = {
+  boot_artifact_sha256: string | null;
+  boot_artifact_size: number | null;
+  boot_launch_manifest_id: string | null;
   boot_rom_filename: string | null;
   boot_rom_url: string | null;
+  boot_runtime_id: string;
   deleted_at: string | null;
   expires_at: string;
   game_id: string;
@@ -61,8 +66,16 @@ function sessionTokenMatches(storedHash: string, sessionToken: string) {
 
 function mapBoot(row: BackendSessionRow) {
   return {
+    artifactSha256: row.boot_artifact_sha256,
+    artifactSize: row.boot_artifact_size,
+    launchManifestId: row.boot_launch_manifest_id,
     romFilename: row.boot_rom_filename,
     romUrl: row.boot_rom_url,
+    runtimeId: row.boot_runtime_id,
+    runtimeKind:
+      row.boot_launch_manifest_id && !row.boot_rom_url && !row.boot_rom_filename
+        ? "native_linux"
+        : "libretro",
   };
 }
 
@@ -75,7 +88,7 @@ async function getLiveSession(
   const { data, error } = await service
     .from("backend_sessions")
     .select(
-      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,expires_at,deleted_at",
+      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,boot_runtime_id,boot_artifact_size,boot_artifact_sha256,boot_launch_manifest_id,expires_at,deleted_at",
     )
     .eq("id", sessionId)
     .is("deleted_at", null)
@@ -124,19 +137,29 @@ export async function registerSessionRoutes(
         return reply.status(400).send({ error: "Invalid session request" });
       }
 
-      const { data, error } = await service
-        .from("games")
-        .select("rom_url, rom_filename")
-        .eq("id", parsedBody.data.gameId)
-        .single();
+      let game = null;
+      try {
+        game = await fetchPublishedGameById(service, parsedBody.data.gameId);
+      } catch (err) {
+        request.log.error({ err }, "Failed to load session game");
+        return reply.status(500).send({ error: "Failed to create session" });
+      }
 
-      if (error || !data) {
+      if (!game) {
         return reply.status(404).send({ error: "Game not found" });
       }
 
-      const romTarget = data.rom_url || data.rom_filename;
-      if (!romTarget) {
+      const build = game.game_builds[0];
+      if (!build) {
+        return reply.status(422).send({ error: "Game has no approved build" });
+      }
+      const romTarget = build?.artifact_url || build?.artifact_filename;
+      const launchManifestId = build.launch_manifest_id || null;
+      if (build.runtime_kind === "libretro" && !romTarget) {
         return reply.status(422).send({ error: "Game has no ROM target" });
+      }
+      if (build.runtime_kind === "native_linux" && !launchManifestId) {
+        return reply.status(422).send({ error: "Game has no launch manifest" });
       }
 
       const sessionId = createSessionId(parsedBody.data.clientSessionId);
@@ -150,15 +173,24 @@ export async function registerSessionRoutes(
       const sessionToken = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
       const boot = {
-        romFilename: data.rom_filename || null,
-        romUrl: data.rom_url || null,
+        artifactSha256: build.artifact_sha256 || null,
+        artifactSize: build.artifact_size || null,
+        launchManifestId,
+        romFilename: build.artifact_filename || null,
+        romUrl: build.artifact_url || null,
+        runtimeId: build.runtime_id,
+        runtimeKind: build.runtime_kind,
       };
 
       const { error: sessionError } = await service
         .from("backend_sessions")
         .insert({
+          boot_artifact_sha256: boot.artifactSha256,
+          boot_artifact_size: boot.artifactSize,
+          boot_launch_manifest_id: boot.launchManifestId,
           boot_rom_filename: boot.romFilename,
           boot_rom_url: boot.romUrl,
+          boot_runtime_id: boot.runtimeId,
           deleted_at: null,
           expires_at: expiresAt,
           game_id: parsedBody.data.gameId,

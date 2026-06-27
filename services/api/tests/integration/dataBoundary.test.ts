@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import test from "node:test";
 import Fastify from "fastify";
 import type { FastifyRequest } from "fastify";
 import type { User } from "@supabase/supabase-js";
 import { registerAccessLogRoutes } from "../../src/routes/admin/accessLogs.js";
 import { registerAdminUserRoutes } from "../../src/routes/admin/adminUsers.js";
+import { registerCatalogCandidateRoutes } from "../../src/routes/admin/catalogCandidates.js";
 import { registerAuthMethodsRoutes } from "../../src/routes/auth/authMethods.js";
 import { registerCatalogRoutes } from "../../src/modules/catalog/http/registerCatalogRoutes.js";
 import { registerPlayCountRoutes } from "../../src/modules/catalog/http/playCountRoutes.js";
@@ -28,6 +30,9 @@ type TableName =
   | "comment_likes"
   | "comments"
   | "favorites"
+  | "catalog_ingestion_candidates"
+  | "game_builds"
+  | "game_rights"
   | "game_submissions"
   | "games"
   | "likes"
@@ -58,11 +63,19 @@ class FakeSupabase {
     submissions: [],
   };
   removedStorageObjects: { bucket: string; paths: string[] }[] = [];
+  uploadedStorageObjects: {
+    bucket: string;
+    bytes: number;
+    path: string;
+  }[] = [];
   rows: Record<TableName, RecordRow[]> = {
     access_logs: [],
+    catalog_ingestion_candidates: [],
     comment_likes: [],
     comments: [],
     favorites: [],
+    game_builds: [],
+    game_rights: [],
     game_submissions: [],
     games: [],
     likes: [],
@@ -134,6 +147,29 @@ class FakeSupabase {
         this.removedStorageObjects.push({ bucket, paths });
         return { data: paths, error: null };
       },
+      upload: async (path: string, body: Blob | Buffer | Uint8Array) => {
+        if (this.storageErrors.has(bucket)) {
+          return { data: null, error: new Error(`${bucket} storage unavailable`) };
+        }
+
+        const bytes =
+          body instanceof Blob
+            ? body.size
+            : Buffer.isBuffer(body)
+              ? body.length
+              : body.byteLength;
+        this.storageObjects[bucket] = [
+          ...(this.storageObjects[bucket] || []).filter(
+            (existingPath) => existingPath !== path,
+          ),
+          path,
+        ];
+        this.uploadedStorageObjects.push({ bucket, bytes, path });
+        return { data: { path }, error: null };
+      },
+      getPublicUrl: (path: string) => ({
+        data: { publicUrl: `https://storage.example.test/${bucket}/${path}` },
+      }),
     }),
   };
 
@@ -499,9 +535,46 @@ function requireUser(userId = USER_ID) {
   };
 }
 
-async function createDataBoundaryApp(db: FakeSupabase, userId = USER_ID) {
+function sha256(bytes: Buffer) {
+  return crypto.createHash("sha256").update(bytes).digest("hex");
+}
+
+function validNesRom() {
+  return Buffer.concat([Buffer.from([0x4e, 0x45, 0x53, 0x1a]), Buffer.alloc(32)]);
+}
+
+function validSnesRom() {
+  const bytes = Buffer.alloc(0x10000);
+  const headerOffset = 0x7fc0;
+  Buffer.from("PIXELATED SNES TEST  ").copy(bytes, headerOffset);
+  bytes[headerOffset + 0x15] = 0x20;
+  bytes[headerOffset + 0x16] = 0x00;
+  bytes[headerOffset + 0x17] = 0x09;
+  bytes.writeUInt16LE(0xedcb, headerOffset + 0x1c);
+  bytes.writeUInt16LE(0x1234, headerOffset + 0x1e);
+  return bytes;
+}
+
+function validGameGearRom() {
+  const bytes = Buffer.alloc(0x8000);
+  Buffer.from("TMR SEGA").copy(bytes, 0x7ff0);
+  return bytes;
+}
+
+function validGenesisRom() {
+  const bytes = Buffer.alloc(0x200);
+  Buffer.from("SEGA MEGA DRIVE").copy(bytes, 0x100);
+  return bytes;
+}
+
+async function createDataBoundaryApp(
+  db: FakeSupabase,
+  userId = USER_ID,
+  artifactBytes = Buffer.from("test-artifact"),
+) {
   const app = Fastify({ logger: false });
   const options = {
+    fetchArtifact: async () => new Response(artifactBytes),
     requireUser: requireUser(userId),
     supabase: db as never,
     supabaseAnon: db as never,
@@ -509,6 +582,7 @@ async function createDataBoundaryApp(db: FakeSupabase, userId = USER_ID) {
 
   await registerAccessLogRoutes(app, options);
   await registerAdminUserRoutes(app, options);
+  await registerCatalogCandidateRoutes(app, options);
   await registerAuthMethodsRoutes(app);
   await registerCatalogRoutes(app, options);
   await registerPlayCountRoutes(app, options);
@@ -533,9 +607,40 @@ function seedProfiles(db: FakeSupabase) {
   );
 }
 
+function seedPublishedGames(db: FakeSupabase, ...games: RecordRow[]) {
+  for (const game of games) {
+    const gameId = String(game.id);
+    const buildId = `${gameId}-build`;
+    db.rows.games.push({
+      publication_status: "published",
+      rom_filename: `${gameId}.nes`,
+      ...game,
+    });
+    db.rows.game_builds.push({
+      artifact_filename: game.rom_filename || `${gameId}.nes`,
+      artifact_url: game.rom_url || null,
+      enabled: true,
+      game_id: gameId,
+      id: buildId,
+      platform_id: "nes",
+      runtime_id: "mesen",
+      runtime_kind: "libretro",
+    });
+    db.rows.game_rights.push({
+      attribution_text: `${game.title || gameId} test attribution`,
+      code_license_spdx: "MIT",
+      game_build_id: buildId,
+      game_id: gameId,
+      license_url: "https://example.test/license",
+      source_url: "https://example.test/source",
+      verified_at: new Date().toISOString(),
+    });
+  }
+}
+
 test("catalog and favorites are served through backend routes", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push({ id: GAME_ID, title: "Zeta" });
+  seedPublishedGames(db, { id: GAME_ID, title: "Zeta" });
   db.rows.favorites.push({
     game_id: GAME_ID,
     games: { id: GAME_ID, title: "Zeta" },
@@ -563,9 +668,26 @@ test("catalog and favorites are served through backend routes", async () => {
   await app.close();
 });
 
+test("catalog hides games without an enabled build and verified rights", async () => {
+  const db = new FakeSupabase();
+  db.rows.games.push({
+    id: "unreviewed-game",
+    publication_status: "published",
+    title: "Unreviewed",
+  });
+  const app = await createDataBoundaryApp(db);
+
+  const response = await app.inject({ method: "GET", url: "/games" });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json<{ games: unknown[] }>().games, []);
+  await app.close();
+});
+
 test("catalog route paginates, searches, and returns featured games", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push(
+  seedPublishedGames(
+    db,
     { cover_url: "/a.png", id: "game-a", play_count: 2, title: "Alpha Quest" },
     { cover_url: "/b.png", id: "game-b", play_count: 20, title: "Beta Quest" },
     { cover_url: "/c.png", id: "game-c", play_count: 5, title: "Gamma Run" },
@@ -574,6 +696,19 @@ test("catalog route paginates, searches, and returns featured games", async () =
     { cover_url: "/f.png", id: "game-f", play_count: 1, title: "Echo Run" },
   );
   const app = await createDataBoundaryApp(db);
+
+  const unsearchedResponse = await app.inject({
+    method: "GET",
+    url: "/games?page=2&pageSize=2",
+  });
+
+  assert.equal(unsearchedResponse.statusCode, 200);
+  assert.deepEqual(
+    unsearchedResponse
+      .json<{ games: { id: string }[] }>()
+      .games.map((game) => game.id),
+    ["game-e", "game-f"],
+  );
 
   const response = await app.inject({
     method: "GET",
@@ -604,16 +739,448 @@ test("catalog route paginates, searches, and returns featured games", async () =
   await app.close();
 });
 
+test("admin can promote a catalog ingestion candidate without deleting existing games", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = validNesRom();
+  db.rows.games.push({
+    id: GAME_ID,
+    publication_status: "draft",
+    rom_filename: "nova.nes",
+    title: "Old Nova Row",
+  });
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "nova.nes",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/repo/nova.nes",
+    asset_license_spdx: "GPL-3.0-or-later",
+    attribution_text: "Nova attribution",
+    code_license_spdx: "GPL-3.0-or-later",
+    cover_license_spdx: null,
+    developer_name: "NovaSquirrel",
+    developer_url: "https://example.test/nova",
+    id: "88888888-8888-4888-8888-888888888888",
+    import_status: "needs_review",
+    license_url: "https://www.gnu.org/licenses/gpl-3.0.html",
+    original_release_url: null,
+    platform_id: "nes",
+    review_notes: null,
+    runtime_id: "mesen",
+    runtime_kind: "libretro",
+    source_kind: "homebrew_hub_nes",
+    source_commit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    source_entry_path: "entries/novathesquirrel/game.json",
+    source_repo_url: "https://github.com/nesdev-org/homebrew-db",
+    title: "Nova the Squirrel",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "reviewed" },
+    url: "/admin/catalog-candidates/88888888-8888-4888-8888-888888888888",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.games.length, 1);
+  assert.equal(db.rows.games[0]?.id, GAME_ID);
+  assert.equal(db.rows.games[0]?.publication_status, "published");
+  assert.equal(db.rows.games[0]?.title, "Nova the Squirrel");
+  assert.equal(db.rows.game_builds.length, 1);
+  assert.equal(db.rows.game_builds[0]?.game_id, GAME_ID);
+  assert.equal(db.rows.game_builds[0]?.runtime_id, "mesen");
+  assert.match(
+    String(db.rows.game_builds[0]?.artifact_url),
+    /^https:\/\/storage\.example\.test\/catalog_artifacts\/homebrew-hub\//,
+  );
+  assert.equal(db.uploadedStorageObjects.length, 2);
+  assert.equal(db.uploadedStorageObjects[0]?.bucket, "catalog_artifacts");
+  assert.equal(db.uploadedStorageObjects[0]?.bytes, artifactBytes.length);
+  assert.equal(db.uploadedStorageObjects[1]?.bucket, "catalog_artifacts");
+  assert.match(
+    db.uploadedStorageObjects[1]?.path || "",
+    /^covers\/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\/nes\//,
+  );
+  assert.match(
+    String(db.rows.games[0]?.cover_url),
+    /^https:\/\/storage\.example\.test\/catalog_artifacts\/covers\//,
+  );
+  assert.equal(db.rows.games[0]?.backdrop_url, db.rows.games[0]?.cover_url);
+  assert.equal(db.rows.game_rights.length, 1);
+  assert.equal(db.rows.game_rights[0]?.game_id, GAME_ID);
+  assert.equal(db.rows.game_rights[0]?.cover_license_spdx, "CC0-1.0");
+  assert.equal(
+    db.rows.game_rights[0]?.source_url,
+    "https://github.com/nesdev-org/homebrew-db/blob/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/entries/novathesquirrel/game.json",
+  );
+  assert.equal(
+    db.rows.catalog_ingestion_candidates[0]?.import_status,
+    "promoted",
+  );
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.promoted_game_id, GAME_ID);
+  await app.close();
+});
+
+test("admin can promote a curated SNES candidate into a bsnes build", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = validSnesRom();
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "demo.sfc",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/curated-roms/demo.sfc",
+    asset_license_spdx: "GPL-3.0-or-later",
+    attribution_text: "Demo SNES attribution",
+    code_license_spdx: "GPL-3.0-or-later",
+    cover_license_spdx: null,
+    developer_name: "Example Dev",
+    developer_url: "https://example.test/dev",
+    id: "99999999-9999-4999-8999-999999999999",
+    import_status: "needs_review",
+    license_url: "https://example.test/license",
+    original_release_url: "https://example.test/demo-snes",
+    platform_id: "snes",
+    review_notes: null,
+    runtime_id: "bsnes",
+    runtime_kind: "libretro",
+    source_kind: "curated_licensed_rom",
+    source_commit: "cccccccccccccccccccccccccccccccccccccccc",
+    source_entry_path: "curated/snes.json#demo.sfc",
+    source_repo_url: "https://github.com/example/curated-roms",
+    title: "Demo SNES",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "curated reviewed" },
+    url: "/admin/catalog-candidates/99999999-9999-4999-8999-999999999999",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.games.length, 1);
+  assert.equal(db.rows.games[0]?.rom_filename, "demo.sfc");
+  assert.match(
+    String(db.rows.games[0]?.rom_url),
+    /^https:\/\/storage\.example\.test\/catalog_artifacts\/curated-roms\//,
+  );
+  assert.equal(db.rows.game_builds.length, 1);
+  assert.equal(db.rows.game_builds[0]?.runtime_id, "bsnes");
+  assert.equal(db.rows.game_builds[0]?.platform_id, "snes");
+  assert.equal(db.rows.game_builds[0]?.artifact_filename, "demo.sfc");
+  assert.match(
+    String(db.rows.game_builds[0]?.artifact_url),
+    /^https:\/\/storage\.example\.test\/catalog_artifacts\/curated-roms\//,
+  );
+  assert.equal(db.uploadedStorageObjects.length, 2);
+  assert.match(
+    db.uploadedStorageObjects[0]?.path || "",
+    /^curated-roms\/cccccccccccccccccccccccccccccccccccccccc\/snes\//,
+  );
+  assert.match(
+    db.uploadedStorageObjects[1]?.path || "",
+    /^covers\/cccccccccccccccccccccccccccccccccccccccc\/snes\//,
+  );
+  assert.equal(
+    db.rows.game_rights[0]?.source_url,
+    "https://github.com/example/curated-roms/blob/cccccccccccccccccccccccccccccccccccccccc/curated/snes.json#demo.sfc",
+  );
+  assert.equal(
+    db.rows.catalog_ingestion_candidates[0]?.import_status,
+    "promoted",
+  );
+  await app.close();
+});
+
+test("admin can promote a curated Game Gear candidate into a PicoDrive build", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = validGameGearRom();
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "gear.gg",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/curated-roms/gear.gg",
+    asset_license_spdx: "MIT",
+    attribution_text: "Gear attribution",
+    code_license_spdx: "MIT",
+    cover_license_spdx: null,
+    developer_name: "Example Dev",
+    developer_url: "https://example.test/dev",
+    id: "10101010-1010-4010-8010-101010101010",
+    import_status: "needs_review",
+    license_url: "https://example.test/license",
+    original_release_url: "https://example.test/gear",
+    platform_id: "game_gear",
+    review_notes: null,
+    runtime_id: "picodrive",
+    runtime_kind: "libretro",
+    source_kind: "curated_licensed_rom",
+    source_commit: "dddddddddddddddddddddddddddddddddddddddd",
+    source_entry_path: "curated/sega.json#gear.gg",
+    source_repo_url: "https://github.com/example/curated-roms",
+    title: "Gear Demo",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "picodrive reviewed" },
+    url: "/admin/catalog-candidates/10101010-1010-4010-8010-101010101010",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.games.length, 1);
+  assert.equal(db.rows.games[0]?.rom_filename, "gear.gg");
+  assert.equal(db.rows.game_builds.length, 1);
+  assert.equal(db.rows.game_builds[0]?.runtime_id, "picodrive");
+  assert.equal(db.rows.game_builds[0]?.platform_id, "game_gear");
+  assert.equal(db.rows.game_builds[0]?.artifact_filename, "gear.gg");
+  assert.match(
+    db.uploadedStorageObjects[0]?.path || "",
+    /^curated-roms\/dddddddddddddddddddddddddddddddddddddddd\/game_gear\//,
+  );
+  assert.match(
+    db.uploadedStorageObjects[1]?.path || "",
+    /^covers\/dddddddddddddddddddddddddddddddddddddddd\/game_gear\//,
+  );
+  assert.equal(
+    db.rows.game_rights[0]?.source_url,
+    "https://github.com/example/curated-roms/blob/dddddddddddddddddddddddddddddddddddddddd/curated/sega.json#gear.gg",
+  );
+  assert.equal(
+    db.rows.catalog_ingestion_candidates[0]?.import_status,
+    "promoted",
+  );
+  await app.close();
+});
+
+test("admin promotion rejects unallowlisted candidate runtime/platform pairs", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = validGenesisRom();
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "drive.md",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/curated-roms/drive.md",
+    asset_license_spdx: "MIT",
+    attribution_text: "Mismatch attribution",
+    code_license_spdx: "MIT",
+    cover_license_spdx: null,
+    developer_name: "Example Dev",
+    developer_url: null,
+    id: "11111111-1111-4111-8111-111111111111",
+    import_status: "needs_review",
+    license_url: "https://example.test/license",
+    original_release_url: null,
+    platform_id: "genesis",
+    review_notes: null,
+    runtime_id: "bsnes",
+    runtime_kind: "libretro",
+    source_kind: "curated_licensed_rom",
+    source_commit: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    source_entry_path: "curated/sega.json#drive.md",
+    source_repo_url: "https://github.com/example/curated-roms",
+    title: "Mismatch Demo",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "should fail" },
+    url: "/admin/catalog-candidates/11111111-1111-4111-8111-111111111111",
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.json(), {
+    error: "Candidate libretro runtime/platform is not allowlisted.",
+  });
+  assert.equal(db.rows.games.length, 0);
+  assert.equal(db.rows.game_builds.length, 0);
+  assert.equal(db.rows.game_rights.length, 0);
+  assert.equal(db.uploadedStorageObjects.length, 0);
+  assert.equal(
+    db.rows.catalog_ingestion_candidates[0]?.import_status,
+    "needs_review",
+  );
+  await app.close();
+});
+
+test("admin promotion rejects candidates with invalid cartridge headers", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = Buffer.alloc(0x200);
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "drive.md",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/curated-roms/drive.md",
+    asset_license_spdx: "MIT",
+    attribution_text: "Invalid header attribution",
+    code_license_spdx: "MIT",
+    cover_license_spdx: null,
+    developer_name: "Example Dev",
+    developer_url: null,
+    id: "12121212-1212-4121-8121-121212121212",
+    import_status: "needs_review",
+    license_url: "https://example.test/license",
+    original_release_url: null,
+    platform_id: "genesis",
+    review_notes: null,
+    runtime_id: "picodrive",
+    runtime_kind: "libretro",
+    source_kind: "curated_licensed_rom",
+    source_commit: "ffffffffffffffffffffffffffffffffffffffff",
+    source_entry_path: "curated/sega.json#drive.md",
+    source_repo_url: "https://github.com/example/curated-roms",
+    title: "Invalid Header Demo",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "should fail" },
+    url: "/admin/catalog-candidates/12121212-1212-4121-8121-121212121212",
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.json(), {
+    error: "Invalid Genesis/Mega Drive cartridge header.",
+  });
+  assert.equal(db.rows.games.length, 0);
+  assert.equal(db.rows.game_builds.length, 0);
+  assert.equal(db.rows.game_rights.length, 0);
+  assert.equal(db.uploadedStorageObjects.length, 0);
+  assert.equal(
+    db.rows.catalog_ingestion_candidates[0]?.import_status,
+    "needs_review",
+  );
+  await app.close();
+});
+
+test("admin can promote a Debian native candidate without mirroring a ROM artifact", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: null,
+    artifact_sha256: null,
+    artifact_size: null,
+    artifact_url: null,
+    asset_license_spdx: "Debian-main",
+    attribution_text:
+      "Frozen-Bubble from Debian trixie main/games package frozen-bubble 2.212-13+b1.",
+    code_license_spdx: "Debian-main",
+    cover_license_spdx: null,
+    developer_name: "Debian Games Team",
+    developer_url: "https://tracker.debian.org/pkg/frozen-bubble",
+    id: "12121212-1212-4121-8121-121212121212",
+    import_status: "needs_review",
+    launch_manifest_id: "frozen-bubble",
+    license_url:
+      "https://metadata.ftp-master.debian.org/changelogs/main/f/frozen-bubble/frozen-bubble_2.212-13_copyright",
+    original_release_url: "https://packages.debian.org/trixie/frozen-bubble",
+    package_component: "main",
+    package_name: "frozen-bubble",
+    package_version: "2.212-13+b1",
+    platform_id: "linux",
+    review_notes: null,
+    runtime_id: "debian-native-v1",
+    runtime_kind: "native_linux",
+    source_kind: "debian_main_games",
+    source_commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    source_entry_path: "trixie/main/games/frozen-bubble/2.212-13+b1",
+    source_repo_url: "https://tracker.debian.org/pkg/frozen-bubble",
+    title: "Frozen-Bubble",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "native reviewed" },
+    url: "/admin/catalog-candidates/12121212-1212-4121-8121-121212121212",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.games.length, 1);
+  assert.equal(db.rows.games[0]?.rom_filename, "frozen-bubble-native");
+  assert.equal(db.rows.games[0]?.rom_url, null);
+  assert.equal(db.rows.game_builds.length, 1);
+  assert.equal(db.rows.game_builds[0]?.artifact_url, null);
+  assert.equal(db.rows.game_builds[0]?.launch_manifest_id, "frozen-bubble");
+  assert.equal(db.rows.game_builds[0]?.runtime_kind, "native_linux");
+  assert.equal(db.uploadedStorageObjects.length, 1);
+  assert.match(
+    db.uploadedStorageObjects[0]?.path || "",
+    /^covers\/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\/linux\/frozen-bubble\.svg$/,
+  );
+  assert.equal(db.rows.game_rights[0]?.source_url, "https://tracker.debian.org/pkg/frozen-bubble");
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.import_status, "promoted");
+  await app.close();
+});
+
+test("catalog candidate review requires admin access", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "game.gb",
+    artifact_sha256:
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    artifact_size: 32768,
+    artifact_url: "https://raw.githubusercontent.com/example/repo/game.gb",
+    asset_license_spdx: "MIT",
+    attribution_text: "Game attribution",
+    code_license_spdx: "MIT",
+    cover_license_spdx: null,
+    developer_name: "dev",
+    developer_url: null,
+    id: "99999999-9999-4999-8999-999999999999",
+    import_status: "needs_review",
+    license_url: "https://opensource.org/license/mit",
+    original_release_url: null,
+    platform_id: "gb",
+    review_notes: null,
+    runtime_id: "mgba",
+    runtime_kind: "libretro",
+    source_commit: "cccccccccccccccccccccccccccccccccccccccc",
+    source_entry_path: "entries/game/game.json",
+    source_repo_url: "https://github.com/gbdev/database",
+    title: "Game",
+  });
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote" },
+    url: "/admin/catalog-candidates/99999999-9999-4999-8999-999999999999",
+  });
+
+  assert.equal(response.statusCode, 403);
+  assert.equal(db.rows.games.length, 0);
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.import_status, "needs_review");
+  await app.close();
+});
+
 test("catalog route caches public game pages briefly", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push({ id: "cache-game-a", play_count: 1, title: "Cache Alpha" });
+  seedPublishedGames(db, {
+    id: "cache-game-a",
+    play_count: 1,
+    title: "Cache Alpha",
+  });
   const app = await createDataBoundaryApp(db);
 
   const firstResponse = await app.inject({
     method: "GET",
     url: "/games?page=1&pageSize=15&search=cache-alpha-unique",
   });
-  db.rows.games.push({ id: "cache-game-b", play_count: 20, title: "Cache Alpha Unique" });
+  seedPublishedGames(db, {
+    id: "cache-game-b",
+    play_count: 20,
+    title: "Cache Alpha Unique",
+  });
   const secondResponse = await app.inject({
     method: "GET",
     url: "/games?page=1&pageSize=15&search=cache-alpha-unique",
@@ -630,7 +1197,7 @@ test("catalog route caches public game pages briefly", async () => {
 
 test("catalog cache keeps featured games fresh", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push({
+  seedPublishedGames(db, {
     cover_url: "/a.png",
     id: "cache-featured-a",
     play_count: 1,
@@ -642,7 +1209,7 @@ test("catalog cache keeps featured games fresh", async () => {
     method: "GET",
     url: "/games?page=1&pageSize=15&search=cache-featured-alpha",
   });
-  db.rows.games.push({
+  seedPublishedGames(db, {
     cover_url: "/b.png",
     id: "cache-featured-b",
     play_count: 20,
@@ -667,7 +1234,11 @@ test("catalog cache keeps featured games fresh", async () => {
 
 test("featured games route bypasses shared catalog cache headers", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push({ id: "featured-a", play_count: 1, title: "Featured A" });
+  seedPublishedGames(db, {
+    id: "featured-a",
+    play_count: 1,
+    title: "Featured A",
+  });
   const app = await createDataBoundaryApp(db);
 
   const response = await app.inject({
@@ -688,7 +1259,8 @@ test("featured games route bypasses shared catalog cache headers", async () => {
 
 test("featured games route returns a wider pool while all play counts are zero", async () => {
   const db = new FakeSupabase();
-  db.rows.games.push(
+  seedPublishedGames(
+    db,
     { id: "zero-featured-a", play_count: 0, title: "Zero Featured A" },
     { id: "zero-featured-b", play_count: 0, title: "Zero Featured B" },
     { id: "zero-featured-c", play_count: 0, title: "Zero Featured C" },

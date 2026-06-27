@@ -9,18 +9,29 @@ import {
 
 type RuntimeBootOptions = {
   isCloudRom?: boolean;
+  runtimeId: string;
   streamProfile: StreamProfile;
 };
 
 type HarnessOverrides = {
-  downloadCloudRom?: (romUrl: string, destinationPath: string) => Promise<void>;
+  downloadCloudRom?: (
+    romUrl: string,
+    destinationPath: string,
+    validation: {
+      expectedSha256?: string | null;
+      expectedSizeBytes?: number | null;
+      runtimeId: string;
+    },
+  ) => Promise<void>;
   verifyBackendSession?: (options: {
     apiUrl: string;
     sessionId: string;
     sessionToken: string;
   }) => Promise<{
+    launchManifestId?: string | null;
     mode: string;
-    romTarget: string;
+    romTarget?: string | null;
+    runtimeId?: string | null;
     userId?: string | null;
   }>;
 };
@@ -50,15 +61,19 @@ function createHarness(overrides: HarnessOverrides = {}) {
     romPath: string;
     sessionId: string;
   }> = [];
-  const downloads: Array<{ destinationPath: string; romUrl: string }> = [];
+  const downloads: Array<{
+    destinationPath: string;
+    romUrl: string;
+    validation: { runtimeId: string };
+  }> = [];
   const calls = { verify: 0 };
 
   registerStartGameHandler(socket as never, {
     apiUrl: "http://api.test",
     downloadCloudRom:
       overrides.downloadCloudRom ||
-      ((romUrl, destinationPath) => {
-        downloads.push({ destinationPath, romUrl });
+      ((romUrl, destinationPath, validation) => {
+        downloads.push({ destinationPath, romUrl, validation });
         return Promise.resolve();
       }),
     runtime: {
@@ -73,6 +88,7 @@ function createHarness(overrides: HarnessOverrides = {}) {
         return Promise.resolve({
           mode: "cloud",
           romTarget: "https://cdn.example.test/game.nes",
+          runtimeId: "mesen",
           userId: "verified-user",
           options,
         });
@@ -121,11 +137,65 @@ test("verified cloud sessions replace browser supplied boot targets", async () =
 
   assert.equal(calls.verify, 1);
   assert.equal(downloads[0]?.romUrl, "https://cdn.example.test/game.nes");
+  assert.match(downloads[0]?.destinationPath || "", /\.nes$/);
+  assert.equal(downloads[0]?.validation.runtimeId, "mesen");
   assert.equal(booted[0]?.sessionId, "session-2");
   assert.deepEqual(booted[0]?.options, {
     isCloudRom: true,
+    runtimeId: "mesen",
     streamProfile: { bitrateKbps: 1000, fps: 60, id: "balanced" },
   });
+});
+
+test("verified mGBA cloud sessions use a matching temporary extension", async () => {
+  const { booted, downloads, socket } = createHarness({
+    verifyBackendSession: () =>
+      Promise.resolve({
+        mode: "cloud",
+        romTarget: "https://cdn.example.test/game.gba?download=1",
+        runtimeId: "mgba",
+        userId: "verified-user",
+      }),
+  });
+
+  socket.emit("start-game", {
+    mode: "cloud",
+    romFilename: "https://attacker.example.test/game.nes",
+    sessionId: "session-gba",
+    sessionToken: "token",
+  });
+  await flushStartGame();
+
+  assert.equal(downloads[0]?.romUrl, "https://cdn.example.test/game.gba?download=1");
+  assert.match(downloads[0]?.destinationPath || "", /\.gba$/);
+  assert.equal(downloads[0]?.validation.runtimeId, "mgba");
+  assert.equal(booted[0]?.options.runtimeId, "mgba");
+});
+
+test("verified native sessions boot an allowlisted launch manifest without download", async () => {
+  const { booted, downloads, socket } = createHarness({
+    verifyBackendSession: () =>
+      Promise.resolve({
+        launchManifestId: "frozen-bubble",
+        mode: "cloud",
+        romTarget: null,
+        runtimeId: "debian-native-v1",
+        userId: "verified-user",
+      }),
+  });
+
+  socket.emit("start-game", {
+    mode: "cloud",
+    romFilename: "ignored-by-backend",
+    sessionId: "session-native",
+    sessionToken: "token",
+  });
+  await flushStartGame();
+
+  assert.deepEqual(downloads, []);
+  assert.equal(booted[0]?.romPath, "frozen-bubble");
+  assert.equal(booted[0]?.sessionId, "session-native");
+  assert.equal(booted[0]?.options.runtimeId, "debian-native-v1");
 });
 
 test("non-cloud backend sessions cannot boot through cloud intent", async () => {
@@ -134,6 +204,7 @@ test("non-cloud backend sessions cannot boot through cloud intent", async () => 
       Promise.resolve({
         mode: "local",
         romTarget: "https://cdn.example.test/game.nes",
+        runtimeId: "mesen",
         userId: "verified-user",
       }),
   });
@@ -168,8 +239,57 @@ test("local vault starts still use local rom paths without backend verification"
   assert.equal(booted[0]?.romPath, "/roms/local-user/game.nes");
   assert.equal(booted[0]?.sessionId, "session-4");
   assert.deepEqual(booted[0]?.options, {
+    runtimeId: "mesen",
     streamProfile: { bitrateKbps: 1000, fps: 60, id: "balanced" },
   });
+});
+
+test("local vault starts infer runtime from supported file extensions", async () => {
+  const { booted, calls, socket } = createHarness();
+
+  socket.emit("start-game", {
+    mode: "local",
+    romFilename: "nested/game.gbc",
+    sessionId: "session-gbc",
+    userId: "local-user",
+  });
+  await flushStartGame();
+
+  assert.equal(calls.verify, 0);
+  assert.equal(booted[0]?.romPath, "/roms/local-user/game.gbc");
+  assert.equal(booted[0]?.options.runtimeId, "mgba");
+});
+
+test("local vault starts infer PicoDrive for Genesis and Mega Drive files", async () => {
+  const { booted, calls, socket } = createHarness();
+
+  socket.emit("start-game", {
+    mode: "local",
+    romFilename: "nested/drive.md",
+    sessionId: "session-genesis",
+    userId: "local-user",
+  });
+  await flushStartGame();
+
+  assert.equal(calls.verify, 0);
+  assert.equal(booted[0]?.romPath, "/roms/local-user/drive.md");
+  assert.equal(booted[0]?.options.runtimeId, "picodrive");
+});
+
+test("local vault starts infer PicoDrive for Sega 8-bit files", async () => {
+  const { booted, calls, socket } = createHarness();
+
+  socket.emit("start-game", {
+    mode: "local",
+    romFilename: "nested/master.sms",
+    sessionId: "session-sms",
+    userId: "local-user",
+  });
+  await flushStartGame();
+
+  assert.equal(calls.verify, 0);
+  assert.equal(booted[0]?.romPath, "/roms/local-user/master.sms");
+  assert.equal(booted[0]?.options.runtimeId, "picodrive");
 });
 
 test("stream profiles are clamped before reaching the runtime", () => {

@@ -4,6 +4,7 @@ type DockerRunArgsOptions = {
   apiUrl: string;
   companionUrls: string[];
   engineImage: string;
+  engineRuntimeKind?: "libretro" | "native_linux";
   engineToken: string;
   exposureMode: "lan" | "local";
   includeUinputDevice: boolean;
@@ -18,6 +19,7 @@ export function buildDockerRunArgs({
   apiUrl,
   companionUrls,
   engineImage,
+  engineRuntimeKind = "libretro",
   engineToken,
   exposureMode,
   includeUinputDevice,
@@ -41,6 +43,8 @@ export function buildDockerRunArgs({
     `PIXELATED_API_URL=${apiUrl}`,
     "-e",
     `PIXELATED_ENGINE_TOKEN=${engineToken}`,
+    "-e",
+    `PIXELATED_ENGINE_RUNTIME_KIND=${engineRuntimeKind}`,
     "-e",
     `PIXELATED_ENGINE_EXPOSURE_MODE=${exposureMode}`,
     "-e",

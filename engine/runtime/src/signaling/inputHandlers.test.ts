@@ -92,6 +92,32 @@ test("guest input for assigned player slot 2 is routed to slot 2", () => {
   assert.deepEqual(guest.outbound, []);
 });
 
+test("normalized game actions are routed instead of browser key names", () => {
+  const lobby = createLobbyManager();
+  const host = new FakeSocket("host-1");
+  const inputs: Array<{ action: string; key: unknown; playerIndex: number }> = [];
+
+  lobby.joinLobby(host as never, { sessionId: "session-1" });
+  registerInputHandlers(host as never, runtime, {
+    canSendInput: lobby.canSendInput,
+    sendInput: (action, key, playerIndex) => {
+      inputs.push({ action, key, playerIndex });
+      return true;
+    },
+  });
+
+  host.emit("keydown", {
+    gameAction: "shoulder_left",
+    key: "ArrowRight",
+    playerIndex: 1,
+    sessionId: "session-1",
+  });
+
+  assert.deepEqual(inputs, [
+    { action: "keydown", key: "shoulder_left", playerIndex: 1 },
+  ]);
+});
+
 test("guest input for assigned player slot 4 is routed when virtual gamepads accept it", () => {
   const lobby = createLobbyManager();
   const host = new FakeSocket("host-1");

@@ -21,6 +21,91 @@ RUN git init /tmp/mesen && \
     mkdir -p /out && \
     cp /tmp/mesen/Libretro/mesen_libretro.so /out/
 
+FROM ${UBUNTU_IMAGE} AS mgba-builder
+
+ARG MGBA_REF=0.10.5
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    cmake \
+    g++ \
+    gcc \
+    git \
+    make \
+    pkg-config \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git init /tmp/mgba && \
+    git -C /tmp/mgba remote add origin https://github.com/mgba-emu/mgba.git && \
+    git -C /tmp/mgba fetch --depth 1 origin "${MGBA_REF}" && \
+    git -C /tmp/mgba checkout --detach FETCH_HEAD && \
+    cmake -S /tmp/mgba -B /tmp/mgba/build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DBUILD_LIBRETRO=ON \
+      -DBUILD_QT=OFF \
+      -DBUILD_SDL=OFF \
+      -DBUILD_SHARED=OFF \
+      -DUSE_DEBUGGERS=OFF \
+      -DUSE_DISCORD_RPC=OFF \
+      -DUSE_EDITLINE=OFF \
+      -DUSE_ELF=OFF \
+      -DUSE_FFMPEG=OFF \
+      -DUSE_LIBZIP=OFF \
+      -DUSE_LUA=OFF \
+      -DUSE_LZMA=OFF \
+      -DUSE_MINIZIP=OFF \
+      -DUSE_PNG=OFF \
+      -DUSE_SQLITE3=OFF && \
+    cmake --build /tmp/mgba/build --target mgba_libretro -j4 && \
+    mkdir -p /out && \
+    find /tmp/mgba/build -name mgba_libretro.so -exec cp {} /out/ \;
+
+FROM ${UBUNTU_IMAGE} AS bsnes-builder
+
+ARG BSNES_REF=ac0b6b1fe5cb9448492f4c6b3d815205eefbd142
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    g++ \
+    git \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git init /tmp/bsnes-mercury && \
+    git -C /tmp/bsnes-mercury remote add origin https://github.com/libretro/bsnes-mercury.git && \
+    git -C /tmp/bsnes-mercury fetch --depth 1 origin "${BSNES_REF}" && \
+    git -C /tmp/bsnes-mercury checkout --detach FETCH_HEAD && \
+    make -C /tmp/bsnes-mercury -j4 platform=unix PROFILE=performance && \
+    mkdir -p /out && \
+    cp /tmp/bsnes-mercury/bsnes_mercury_performance_libretro.so /out/bsnes_libretro.so && \
+    test -s /out/bsnes_libretro.so
+
+FROM ${UBUNTU_IMAGE} AS picodrive-builder
+
+ARG PICODRIVE_REF=f0d4a0118a9733a1f10bce5a4ac772c474f9300d
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    gcc \
+    g++ \
+    git \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git init /tmp/picodrive && \
+    git -C /tmp/picodrive remote add origin https://github.com/libretro/picodrive.git && \
+    git -C /tmp/picodrive fetch --depth 1 origin "${PICODRIVE_REF}" && \
+    git -C /tmp/picodrive checkout --detach FETCH_HEAD && \
+    git -C /tmp/picodrive submodule update --init --depth 1 --recursive && \
+    make -C /tmp/picodrive -f Makefile.libretro -j4 platform=unix && \
+    mkdir -p /out && \
+    cp /tmp/picodrive/picodrive_libretro.so /out/ && \
+    test -s /out/picodrive_libretro.so
+
 FROM ${UBUNTU_IMAGE} AS python-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -71,6 +156,9 @@ COPY --from=app-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=app-builder /app/dist /app/dist
 COPY --from=app-builder /app/node_modules /app/node_modules
 COPY --from=mesen-builder /out/mesen_libretro.so /cores/mesen_libretro.so
+COPY --from=mgba-builder /out/mgba_libretro.so /cores/mgba_libretro.so
+COPY --from=bsnes-builder /out/bsnes_libretro.so /cores/bsnes_libretro.so
+COPY --from=picodrive-builder /out/picodrive_libretro.so /cores/picodrive_libretro.so
 COPY --from=python-builder /out /usr/local/lib/python3.10/dist-packages
 COPY camera.py input_gamepad.py /app/
 
