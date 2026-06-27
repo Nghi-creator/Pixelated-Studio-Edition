@@ -1,7 +1,10 @@
 import { Play } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { GameArtworkFallback } from "../../components/user/GameArtworkFallback";
+import {
+  GameArtworkFallback,
+  isGeneratedCatalogArtworkUrl,
+} from "../../components/user/GameArtworkFallback";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import type { ApiGame } from "../../lib/api/apiTypes";
@@ -20,6 +23,10 @@ const multiplayerBackState = {
 
 export function CloudGameCard({ game }: { game: ApiGame }) {
   const [coverFailed, setCoverFailed] = useState(false);
+  const showCover =
+    Boolean(game.cover_url) &&
+    !coverFailed &&
+    !isGeneratedCatalogArtworkUrl(game.cover_url);
 
   return (
     <Link
@@ -28,7 +35,7 @@ export function CloudGameCard({ game }: { game: ApiGame }) {
       to={`/play/${game.id}`}
     >
       <div className="aspect-[4/5] overflow-hidden bg-synth-bg">
-        {game.cover_url && !coverFailed ? (
+        {showCover ? (
           <img
             alt={game.title}
             className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"

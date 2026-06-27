@@ -2,7 +2,10 @@ import { Heart, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useFavorite } from "../../features/favorites/useFavorite";
-import { GameArtworkFallback } from "./GameArtworkFallback";
+import {
+  GameArtworkFallback,
+  isGeneratedCatalogArtworkUrl,
+} from "./GameArtworkFallback";
 
 interface GameCardProps {
   id: string;
@@ -24,6 +27,10 @@ export default function GameCard({
     isPending,
     toggleFavorite: toggleFavoriteState,
   } = useFavorite(id);
+  const showCover =
+    Boolean(coverUrl) &&
+    !coverFailed &&
+    !isGeneratedCatalogArtworkUrl(coverUrl);
 
   const toggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -45,7 +52,7 @@ export default function GameCard({
       className="group relative block overflow-hidden rounded-lg border border-synth-border bg-synth-surface transition-colors hover:bg-synth-elevated"
     >
       <div className="overflow-hidden bg-synth-bg">
-        {coverUrl && !coverFailed ? (
+        {showCover ? (
           <img
             src={coverUrl}
             alt={title}

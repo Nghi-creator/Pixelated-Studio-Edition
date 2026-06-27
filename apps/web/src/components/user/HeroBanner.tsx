@@ -9,7 +9,10 @@ import {
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFavorite } from "../../features/favorites/useFavorite";
-import { GameArtworkFallback } from "./GameArtworkFallback";
+import {
+  GameArtworkFallback,
+  isGeneratedCatalogArtworkUrl,
+} from "./GameArtworkFallback";
 
 interface Game {
   id: string;
@@ -89,7 +92,9 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
       {featuredGames.map((game, index) => {
         const artworkUrl = game.backdrop_url || game.cover_url;
         const isActive = index === safeCurrentIndex;
-        const artworkFailed = failedArtworkIds.has(game.id);
+        const artworkFailed =
+          failedArtworkIds.has(game.id) ||
+          isGeneratedCatalogArtworkUrl(artworkUrl);
 
         return artworkUrl && !artworkFailed ? (
           <img
