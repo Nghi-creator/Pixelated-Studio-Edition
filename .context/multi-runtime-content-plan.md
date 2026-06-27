@@ -554,6 +554,13 @@ SNES internal headers, Genesis/Mega Drive `SEGA`, and Sega 8-bit `TMR SEGA`
 markers. Invalid artifacts return 422 and leave storage, games, builds, rights,
 and candidate status untouched.
 
+Progress note — 2026-06-27: added the eighth Phase 5 slice to keep the
+promotion safety code maintainable. Runtime/platform/extension allowlisting and
+promotion-time ROM header validation now live in a dedicated catalog ingestion
+validator module with focused unit coverage, while the admin candidate route
+only orchestrates review and promotion. This keeps future platform additions
+out of the route body and makes the publication boundary easier to audit.
+
 ## Security boundaries
 
 - Runtime IDs and launch manifests are allowlisted in the engine image.
