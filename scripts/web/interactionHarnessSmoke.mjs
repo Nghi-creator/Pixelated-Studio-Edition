@@ -73,6 +73,8 @@ async function readBuiltHarnessContract(outDir) {
 }
 
 function assertBuiltHarnessContract(source) {
+  const localVaultSupportedRomMessage =
+    "Only .nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, and .gg files are supported.";
   const requiredMarkers = [
     "Open confirmation",
     "Confirm Ban",
@@ -82,7 +84,7 @@ function assertBuiltHarnessContract(source) {
     "Local boot failed: the desktop engine could not open demo-local.nes from Local Vault.",
     "LAN Invite",
     "ROM uploads must use the .nes file extension.",
-    "Only .nes files are supported.",
+    localVaultSupportedRomMessage,
     "The saved pairing token was rejected. Enter the current desktop token to reconnect.",
   ];
 
@@ -319,7 +321,7 @@ async function run() {
     await page.getByRole("button", { name: "Hide stream stats" }).click();
     await page.getByText("telemetry-hidden").waitFor();
     await streamStage
-      .getByRole("button", { name: "Toggle stream telemetry" })
+      .locator('button.rounded-full[aria-label="Toggle stream telemetry"]')
       .click();
     await page.getByText("telemetry-toggle-on").waitFor();
     await page.getByText("Stream Stats").waitFor();
@@ -437,7 +439,11 @@ async function run() {
       mimeType: "application/zip",
       name: "local.zip",
     });
-    await page.getByText("Only .nes files are supported.").waitFor();
+    await page
+      .getByText(
+        "Only .nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, and .gg files are supported.",
+      )
+      .waitFor();
     await page.getByRole("button", { name: "Open local delete" }).click();
     await page.getByRole("dialog", { name: "Delete local ROM?" }).waitFor();
     await page.getByRole("button", { name: "Delete ROM" }).click();
