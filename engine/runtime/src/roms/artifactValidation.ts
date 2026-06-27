@@ -17,6 +17,8 @@ const GBA_NINTENDO_LOGO_PREFIX = Buffer.from([
   0x24, 0xff, 0xae, 0x51, 0x69, 0x9a, 0xa2, 0x21,
 ]);
 
+const SEGA_8BIT_HEADER = Buffer.from("TMR SEGA");
+
 function readPrefix(filePath: string, length: number) {
   const fd = fs.openSync(filePath, "r");
   try {
@@ -83,7 +85,25 @@ function validateHeader(filePath: string, extension: string) {
     if (!bufferStartsWith(header, Buffer.from("SEGA"), 0x100)) {
       throw new Error("Invalid Genesis/Mega Drive cartridge header.");
     }
+    return;
   }
+
+  if (extension === ".sms" || extension === ".gg") {
+    if (!hasValidSega8BitHeader(filePath)) {
+      throw new Error("Invalid Sega 8-bit cartridge header.");
+    }
+  }
+}
+
+function hasValidSega8BitHeader(filePath: string) {
+  const stat = fs.statSync(filePath);
+  const headerOffsets = [0x1ff0, 0x3ff0, 0x7ff0];
+
+  return headerOffsets.some((offset) => {
+    if (stat.size < offset + SEGA_8BIT_HEADER.length) return false;
+    const header = readFileWindow(filePath, offset, SEGA_8BIT_HEADER.length);
+    return header ? header.equals(SEGA_8BIT_HEADER) : false;
+  });
 }
 
 function hasValidSnesHeader(filePath: string) {

@@ -79,6 +79,20 @@ test("validates Genesis and Mega Drive cartridge headers", () => {
   });
 });
 
+test("validates Sega Master System and Game Gear cartridge headers", () => {
+  const smsBytes = Buffer.alloc(0x4000);
+  Buffer.from("TMR SEGA").copy(smsBytes, 0x3ff0);
+  validateGameArtifact(writeTempRom("game.sms", smsBytes), {
+    runtimeId: "picodrive",
+  });
+
+  const ggBytes = Buffer.alloc(0x8000);
+  Buffer.from("TMR SEGA").copy(ggBytes, 0x7ff0);
+  validateGameArtifact(writeTempRom("game.gg", ggBytes), {
+    runtimeId: "picodrive",
+  });
+});
+
 test("rejects invalid cartridge headers", () => {
   const filePath = writeTempRom("broken.gba", Buffer.alloc(0x160));
 
@@ -99,5 +113,12 @@ test("rejects invalid cartridge headers", () => {
       runtimeId: "picodrive",
     }),
     /Invalid Genesis\/Mega Drive cartridge header/,
+  );
+
+  assert.throws(
+    () => validateGameArtifact(writeTempRom("broken.sms", Buffer.alloc(0x4000)), {
+      runtimeId: "picodrive",
+    }),
+    /Invalid Sega 8-bit cartridge header/,
   );
 });

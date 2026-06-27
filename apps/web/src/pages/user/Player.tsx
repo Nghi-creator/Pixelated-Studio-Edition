@@ -201,7 +201,9 @@ export default function Player() {
       window.removeEventListener("keydown", preventScroll, { capture: true });
   }, []);
 
-  const isLocalGame = /\.(nes|gb|gbc|gba|sfc|smc|md|gen)$/i.test(id || "");
+  const isLocalGame = /\.(nes|gb|gbc|gba|sfc|smc|md|gen|sms|gg)$/i.test(
+    id || "",
+  );
   const fallbackBackRoute = isLocalGame ? "/local" : "/";
   const fallbackBackText = isLocalGame
     ? "Back to Local Vault"

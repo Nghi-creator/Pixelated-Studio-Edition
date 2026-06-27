@@ -276,6 +276,22 @@ test("local vault starts infer PicoDrive for Genesis and Mega Drive files", asyn
   assert.equal(booted[0]?.options.runtimeId, "picodrive");
 });
 
+test("local vault starts infer PicoDrive for Sega 8-bit files", async () => {
+  const { booted, calls, socket } = createHarness();
+
+  socket.emit("start-game", {
+    mode: "local",
+    romFilename: "nested/master.sms",
+    sessionId: "session-sms",
+    userId: "local-user",
+  });
+  await flushStartGame();
+
+  assert.equal(calls.verify, 0);
+  assert.equal(booted[0]?.romPath, "/roms/local-user/master.sms");
+  assert.equal(booted[0]?.options.runtimeId, "picodrive");
+});
+
 test("stream profiles are clamped before reaching the runtime", () => {
   assert.deepEqual(
     normalizeStreamProfile({

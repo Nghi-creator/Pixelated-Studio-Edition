@@ -275,7 +275,7 @@ export default function LocalVault() {
         <input
           key={fileInputVersion}
           type="file"
-          accept=".nes,.gb,.gbc,.gba,.sfc,.smc,.md,.gen"
+          accept=".nes,.gb,.gbc,.gba,.sfc,.smc,.md,.gen,.sms,.gg"
           disabled={!isEnginePaired || isUploading}
           onChange={handleFileInput}
           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
@@ -295,7 +295,7 @@ export default function LocalVault() {
         </h3>
         <p className="text-sm text-gray-400">
           {isEnginePaired
-            ? "or click to browse your files (.nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen)"
+            ? "or click to browse your files (.nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, .gg)"
             : "pair the local engine before uploading"}
         </p>
       </div>
@@ -319,7 +319,7 @@ export default function LocalVault() {
           </p>
           {isEnginePaired && (
             <p className="mt-2 text-sm leading-6 text-gray-600">
-              Upload a `.nes`, `.gb`, `.gbc`, `.gba`, `.sfc`, `.smc`, `.md`, or `.gen` ROM above and it will appear here.
+              Upload a `.nes`, `.gb`, `.gbc`, `.gba`, `.sfc`, `.smc`, `.md`, `.gen`, `.sms`, or `.gg` ROM above and it will appear here.
             </p>
           )}
           {vaultMessage?.tone === "error" && (

@@ -40,6 +40,24 @@ test("curated ROM manifest importer maps supported entries to runtime review can
           title: "Drive Demo",
         },
         {
+          artifactFilename: "master.sms",
+          artifactSha256:
+            "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
+          artifactSize: 131072,
+          codeLicenseSpdx: "MIT",
+          sourceEntryPath: "roms/master.sms",
+          title: "Master Demo",
+        },
+        {
+          artifactFilename: "gear.gg",
+          artifactSha256:
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+          artifactSize: 131072,
+          codeLicenseSpdx: "MIT",
+          sourceEntryPath: "roms/gear.gg",
+          title: "Gear Demo",
+        },
+        {
           artifactFilename: "notes.txt",
           artifactSha256:
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
@@ -58,7 +76,7 @@ test("curated ROM manifest importer maps supported entries to runtime review can
 
   const candidates = collectCuratedRomCandidates(manifest);
 
-  assert.equal(candidates.length, 2);
+  assert.equal(candidates.length, 4);
   assert.equal(candidates[0]?.sourceKind, "curated_licensed_rom");
   assert.equal(candidates[0]?.platformId, "snes");
   assert.equal(candidates[0]?.runtimeId, "bsnes");
@@ -73,6 +91,10 @@ test("curated ROM manifest importer maps supported entries to runtime review can
     candidates[1]?.artifactUrl,
     "https://raw.githubusercontent.com/example/curated-roms/1111111111111111111111111111111111111111/roms/drive.md",
   );
+  assert.equal(candidates[2]?.platformId, "sms");
+  assert.equal(candidates[2]?.runtimeId, "picodrive");
+  assert.equal(candidates[3]?.platformId, "game_gear");
+  assert.equal(candidates[3]?.runtimeId, "picodrive");
 });
 
 test("curated ROM manifest requires pinned repository metadata", () => {

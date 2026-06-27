@@ -529,6 +529,14 @@ Vault accepts `.md`/`.gen`, and curated manifests can map those files to
 web build pass. Docker smoke for the PicoDrive builder is still pending because
 Docker Desktop was not reachable on this machine.
 
+Progress note — 2026-06-27: added the fifth Phase 5 slice for Sega 8-bit
+runtime readiness on the same PicoDrive core. The runtime registry now accepts
+`.sms` and `.gg`, artifact validation checks the Sega 8-bit `TMR SEGA` header
+marker at standard cartridge header offsets, Local Vault accepts Master System
+and Game Gear files, and curated manifests map `.sms` to `platform_id = sms`
+and `.gg` to `platform_id = game_gear` while keeping `runtime_id =
+picodrive`. This still does not publish public catalog games automatically.
+
 ## Security boundaries
 
 - Runtime IDs and launch manifests are allowlisted in the engine image.

@@ -17,6 +17,8 @@ const LOCAL_VAULT_EXTENSIONS = [
   ".smc",
   ".md",
   ".gen",
+  ".sms",
+  ".gg",
 ];
 
 function isLocalVaultGameId(gameId: string) {

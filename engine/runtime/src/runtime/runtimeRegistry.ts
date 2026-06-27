@@ -37,7 +37,7 @@ export const RUNTIME_REGISTRY: Record<string, RuntimeDefinition> = {
   },
   picodrive: {
     corePath: "/cores/picodrive_libretro.so",
-    extensions: [".md", ".gen"],
+    extensions: [".md", ".gen", ".sms", ".gg"],
     id: "picodrive",
     inputProfile: "genesis",
     kind: "libretro",

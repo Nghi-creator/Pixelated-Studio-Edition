@@ -12,7 +12,17 @@ const candidateQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
   platformId: z
-    .enum(["nes", "gb", "gbc", "gba", "snes", "genesis", "linux"])
+    .enum([
+      "nes",
+      "gb",
+      "gbc",
+      "gba",
+      "snes",
+      "genesis",
+      "sms",
+      "game_gear",
+      "linux",
+    ])
     .optional(),
   search: z.string().trim().max(120).optional(),
   sourceKind: z

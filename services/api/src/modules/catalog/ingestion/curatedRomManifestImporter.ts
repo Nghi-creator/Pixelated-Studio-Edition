@@ -46,7 +46,15 @@ export type CuratedRomCandidate = {
   developerUrl: string | null;
   licenseUrl: string | null;
   originalReleaseUrl: string | null;
-  platformId: "nes" | "gb" | "gbc" | "gba" | "snes" | "genesis";
+  platformId:
+    | "nes"
+    | "gb"
+    | "gbc"
+    | "gba"
+    | "snes"
+    | "genesis"
+    | "sms"
+    | "game_gear";
   rightsWarnings: string[];
   runtimeId: "mesen" | "mgba" | "bsnes" | "picodrive";
   sourceCommit: string;
@@ -110,6 +118,12 @@ function getPlatform(filename: string) {
   }
   if (extension === ".md" || extension === ".gen") {
     return { platformId: "genesis" as const, runtimeId: "picodrive" as const };
+  }
+  if (extension === ".sms") {
+    return { platformId: "sms" as const, runtimeId: "picodrive" as const };
+  }
+  if (extension === ".gg") {
+    return { platformId: "game_gear" as const, runtimeId: "picodrive" as const };
   }
   return null;
 }
