@@ -539,6 +539,34 @@ function sha256(bytes: Buffer) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
+function validNesRom() {
+  return Buffer.concat([Buffer.from([0x4e, 0x45, 0x53, 0x1a]), Buffer.alloc(32)]);
+}
+
+function validSnesRom() {
+  const bytes = Buffer.alloc(0x10000);
+  const headerOffset = 0x7fc0;
+  Buffer.from("PIXELATED SNES TEST  ").copy(bytes, headerOffset);
+  bytes[headerOffset + 0x15] = 0x20;
+  bytes[headerOffset + 0x16] = 0x00;
+  bytes[headerOffset + 0x17] = 0x09;
+  bytes.writeUInt16LE(0xedcb, headerOffset + 0x1c);
+  bytes.writeUInt16LE(0x1234, headerOffset + 0x1e);
+  return bytes;
+}
+
+function validGameGearRom() {
+  const bytes = Buffer.alloc(0x8000);
+  Buffer.from("TMR SEGA").copy(bytes, 0x7ff0);
+  return bytes;
+}
+
+function validGenesisRom() {
+  const bytes = Buffer.alloc(0x200);
+  Buffer.from("SEGA MEGA DRIVE").copy(bytes, 0x100);
+  return bytes;
+}
+
 async function createDataBoundaryApp(
   db: FakeSupabase,
   userId = USER_ID,
@@ -701,7 +729,7 @@ test("catalog route paginates, searches, and returns featured games", async () =
 test("admin can promote a catalog ingestion candidate without deleting existing games", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
-  const artifactBytes = Buffer.from("nova-rom");
+  const artifactBytes = validNesRom();
   db.rows.games.push({
     id: GAME_ID,
     publication_status: "draft",
@@ -784,7 +812,7 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
 test("admin can promote a curated SNES candidate into a bsnes build", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
-  const artifactBytes = Buffer.from("snes-rom");
+  const artifactBytes = validSnesRom();
   db.rows.catalog_ingestion_candidates.push({
     artifact_filename: "demo.sfc",
     artifact_sha256: sha256(artifactBytes),
@@ -856,7 +884,7 @@ test("admin can promote a curated SNES candidate into a bsnes build", async () =
 test("admin can promote a curated Game Gear candidate into a PicoDrive build", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
-  const artifactBytes = Buffer.from("game-gear-rom");
+  const artifactBytes = validGameGearRom();
   db.rows.catalog_ingestion_candidates.push({
     artifact_filename: "gear.gg",
     artifact_sha256: sha256(artifactBytes),
@@ -919,7 +947,7 @@ test("admin can promote a curated Game Gear candidate into a PicoDrive build", a
 test("admin promotion rejects unallowlisted candidate runtime/platform pairs", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
-  const artifactBytes = Buffer.from("mismatch-rom");
+  const artifactBytes = validGenesisRom();
   db.rows.catalog_ingestion_candidates.push({
     artifact_filename: "drive.md",
     artifact_sha256: sha256(artifactBytes),
@@ -956,6 +984,58 @@ test("admin promotion rejects unallowlisted candidate runtime/platform pairs", a
   assert.equal(response.statusCode, 422);
   assert.deepEqual(response.json(), {
     error: "Candidate libretro runtime/platform is not allowlisted.",
+  });
+  assert.equal(db.rows.games.length, 0);
+  assert.equal(db.rows.game_builds.length, 0);
+  assert.equal(db.rows.game_rights.length, 0);
+  assert.equal(db.uploadedStorageObjects.length, 0);
+  assert.equal(
+    db.rows.catalog_ingestion_candidates[0]?.import_status,
+    "needs_review",
+  );
+  await app.close();
+});
+
+test("admin promotion rejects candidates with invalid cartridge headers", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = Buffer.alloc(0x200);
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "drive.md",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/curated-roms/drive.md",
+    asset_license_spdx: "MIT",
+    attribution_text: "Invalid header attribution",
+    code_license_spdx: "MIT",
+    cover_license_spdx: null,
+    developer_name: "Example Dev",
+    developer_url: null,
+    id: "12121212-1212-4121-8121-121212121212",
+    import_status: "needs_review",
+    license_url: "https://example.test/license",
+    original_release_url: null,
+    platform_id: "genesis",
+    review_notes: null,
+    runtime_id: "picodrive",
+    runtime_kind: "libretro",
+    source_kind: "curated_licensed_rom",
+    source_commit: "ffffffffffffffffffffffffffffffffffffffff",
+    source_entry_path: "curated/sega.json#drive.md",
+    source_repo_url: "https://github.com/example/curated-roms",
+    title: "Invalid Header Demo",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "should fail" },
+    url: "/admin/catalog-candidates/12121212-1212-4121-8121-121212121212",
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.json(), {
+    error: "Invalid Genesis/Mega Drive cartridge header.",
   });
   assert.equal(db.rows.games.length, 0);
   assert.equal(db.rows.game_builds.length, 0);

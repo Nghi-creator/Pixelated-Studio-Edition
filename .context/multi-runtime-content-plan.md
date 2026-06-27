@@ -546,6 +546,14 @@ catalog rows. The allowlist covers the reviewed libretro combinations
 Invalid candidate rows now return a clear 422 and leave games, builds, rights,
 storage, and candidate status untouched.
 
+Progress note — 2026-06-27: added the seventh Phase 5 slice for promotion-time
+ROM integrity checks. Admin promotion now validates cartridge headers after the
+artifact is downloaded and size/SHA-256 verified, but before storage mirroring
+or public catalog writes. The API checks iNES, GB/GBC Nintendo logo, GBA logo,
+SNES internal headers, Genesis/Mega Drive `SEGA`, and Sega 8-bit `TMR SEGA`
+markers. Invalid artifacts return 422 and leave storage, games, builds, rights,
+and candidate status untouched.
+
 ## Security boundaries
 
 - Runtime IDs and launch manifests are allowlisted in the engine image.
