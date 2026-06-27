@@ -853,6 +853,121 @@ test("admin can promote a curated SNES candidate into a bsnes build", async () =
   await app.close();
 });
 
+test("admin can promote a curated Game Gear candidate into a PicoDrive build", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = Buffer.from("game-gear-rom");
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "gear.gg",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/curated-roms/gear.gg",
+    asset_license_spdx: "MIT",
+    attribution_text: "Gear attribution",
+    code_license_spdx: "MIT",
+    cover_license_spdx: null,
+    developer_name: "Example Dev",
+    developer_url: "https://example.test/dev",
+    id: "10101010-1010-4010-8010-101010101010",
+    import_status: "needs_review",
+    license_url: "https://example.test/license",
+    original_release_url: "https://example.test/gear",
+    platform_id: "game_gear",
+    review_notes: null,
+    runtime_id: "picodrive",
+    runtime_kind: "libretro",
+    source_kind: "curated_licensed_rom",
+    source_commit: "dddddddddddddddddddddddddddddddddddddddd",
+    source_entry_path: "curated/sega.json#gear.gg",
+    source_repo_url: "https://github.com/example/curated-roms",
+    title: "Gear Demo",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "picodrive reviewed" },
+    url: "/admin/catalog-candidates/10101010-1010-4010-8010-101010101010",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.games.length, 1);
+  assert.equal(db.rows.games[0]?.rom_filename, "gear.gg");
+  assert.equal(db.rows.game_builds.length, 1);
+  assert.equal(db.rows.game_builds[0]?.runtime_id, "picodrive");
+  assert.equal(db.rows.game_builds[0]?.platform_id, "game_gear");
+  assert.equal(db.rows.game_builds[0]?.artifact_filename, "gear.gg");
+  assert.match(
+    db.uploadedStorageObjects[0]?.path || "",
+    /^curated-roms\/dddddddddddddddddddddddddddddddddddddddd\/game_gear\//,
+  );
+  assert.match(
+    db.uploadedStorageObjects[1]?.path || "",
+    /^covers\/dddddddddddddddddddddddddddddddddddddddd\/game_gear\//,
+  );
+  assert.equal(
+    db.rows.game_rights[0]?.source_url,
+    "https://github.com/example/curated-roms/blob/dddddddddddddddddddddddddddddddddddddddd/curated/sega.json#gear.gg",
+  );
+  assert.equal(
+    db.rows.catalog_ingestion_candidates[0]?.import_status,
+    "promoted",
+  );
+  await app.close();
+});
+
+test("admin promotion rejects unallowlisted candidate runtime/platform pairs", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = Buffer.from("mismatch-rom");
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "drive.md",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/curated-roms/drive.md",
+    asset_license_spdx: "MIT",
+    attribution_text: "Mismatch attribution",
+    code_license_spdx: "MIT",
+    cover_license_spdx: null,
+    developer_name: "Example Dev",
+    developer_url: null,
+    id: "11111111-1111-4111-8111-111111111111",
+    import_status: "needs_review",
+    license_url: "https://example.test/license",
+    original_release_url: null,
+    platform_id: "genesis",
+    review_notes: null,
+    runtime_id: "bsnes",
+    runtime_kind: "libretro",
+    source_kind: "curated_licensed_rom",
+    source_commit: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    source_entry_path: "curated/sega.json#drive.md",
+    source_repo_url: "https://github.com/example/curated-roms",
+    title: "Mismatch Demo",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "should fail" },
+    url: "/admin/catalog-candidates/11111111-1111-4111-8111-111111111111",
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.json(), {
+    error: "Candidate libretro runtime/platform is not allowlisted.",
+  });
+  assert.equal(db.rows.games.length, 0);
+  assert.equal(db.rows.game_builds.length, 0);
+  assert.equal(db.rows.game_rights.length, 0);
+  assert.equal(db.uploadedStorageObjects.length, 0);
+  assert.equal(
+    db.rows.catalog_ingestion_candidates[0]?.import_status,
+    "needs_review",
+  );
+  await app.close();
+});
+
 test("admin can promote a Debian native candidate without mirroring a ROM artifact", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getCachedUserRole } from "../../modules/auth/roleCache.js";
@@ -90,6 +91,28 @@ type CatalogCandidateRouteOptions = {
   supabase?: SupabaseServiceLike | null;
 };
 
+class CandidateValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CandidateValidationError";
+  }
+}
+
+const LIBRETRO_CANDIDATE_RULES = [
+  { extensions: [".nes"], platformId: "nes", runtimeId: "mesen" },
+  { extensions: [".gb"], platformId: "gb", runtimeId: "mgba" },
+  { extensions: [".gbc"], platformId: "gbc", runtimeId: "mgba" },
+  { extensions: [".gba"], platformId: "gba", runtimeId: "mgba" },
+  { extensions: [".sfc", ".smc"], platformId: "snes", runtimeId: "bsnes" },
+  {
+    extensions: [".md", ".gen"],
+    platformId: "genesis",
+    runtimeId: "picodrive",
+  },
+  { extensions: [".sms"], platformId: "sms", runtimeId: "picodrive" },
+  { extensions: [".gg"], platformId: "game_gear", runtimeId: "picodrive" },
+];
+
 const CANDIDATE_COLUMNS = [
   "id",
   "source_kind",
@@ -154,6 +177,43 @@ function candidateArtifactRoot(candidate: CandidateRow) {
   if (candidate.source_kind === "curated_licensed_rom") return "curated-roms";
   if (candidate.source_kind === "debian_main_games") return "debian-main";
   return "homebrew-hub";
+}
+
+function assertCandidateRuntimeAllowed(candidate: CandidateRow) {
+  if (candidate.runtime_kind === "native_linux") {
+    if (
+      candidate.runtime_id !== "debian-native-v1" ||
+      candidate.platform_id !== "linux" ||
+      !candidate.launch_manifest_id
+    ) {
+      throw new CandidateValidationError(
+        "Candidate native runtime/platform is not allowlisted.",
+      );
+    }
+    return;
+  }
+
+  if (!candidate.artifact_filename) {
+    throw new CandidateValidationError("Candidate is missing an artifact filename.");
+  }
+
+  const rule = LIBRETRO_CANDIDATE_RULES.find(
+    (entry) =>
+      entry.runtimeId === candidate.runtime_id &&
+      entry.platformId === candidate.platform_id,
+  );
+  if (!rule) {
+    throw new CandidateValidationError(
+      "Candidate libretro runtime/platform is not allowlisted.",
+    );
+  }
+
+  const extension = path.extname(candidate.artifact_filename).toLowerCase();
+  if (!rule.extensions.includes(extension)) {
+    throw new CandidateValidationError(
+      `Candidate artifact extension ${extension || "(none)"} is not allowlisted for ${candidate.platform_id}/${candidate.runtime_id}.`,
+    );
+  }
 }
 
 function assertAllowedArtifactUrl(value: string) {
@@ -305,6 +365,7 @@ async function promoteCandidate(
   fetchArtifact: typeof fetch,
 ) {
   const now = new Date().toISOString();
+  assertCandidateRuntimeAllowed(candidate);
   const isNative = candidate.runtime_kind === "native_linux";
   const mirroredArtifact = isNative
     ? null
@@ -622,6 +683,9 @@ export async function registerCatalogCandidateRoutes(
         return promoted;
       } catch (err) {
         request.log.error({ err }, "Failed to review catalog candidate");
+        if (err instanceof CandidateValidationError) {
+          return reply.status(422).send({ error: err.message });
+        }
         return reply.status(500).send({ error: "Failed to review candidate" });
       }
     },

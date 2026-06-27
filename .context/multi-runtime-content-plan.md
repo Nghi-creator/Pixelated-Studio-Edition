@@ -537,6 +537,15 @@ and Game Gear files, and curated manifests map `.sms` to `platform_id = sms`
 and `.gg` to `platform_id = game_gear` while keeping `runtime_id =
 picodrive`. This still does not publish public catalog games automatically.
 
+Progress note — 2026-06-27: added the sixth Phase 5 slice for promotion
+hardening. Admin candidate promotion now fail-closes on an API-owned
+runtime/platform/extension allowlist before mirroring artifacts or publishing
+catalog rows. The allowlist covers the reviewed libretro combinations
+(`mesen`/NES, `mgba`/GB-GBC-GBA, `bsnes`/SNES, and
+`picodrive`/Genesis-SMS-Game Gear) plus the existing Debian native runtime.
+Invalid candidate rows now return a clear 422 and leave games, builds, rights,
+storage, and candidate status untouched.
+
 ## Security boundaries
 
 - Runtime IDs and launch manifests are allowlisted in the engine image.
