@@ -572,6 +572,14 @@ Genesis `SEGA` header. Phase 5 remains open until this candidate is imported
 into the target DB, promoted through admin review, and smoke-tested in a Docker
 engine image.
 
+Progress note — 2026-06-27: added the tenth Phase 5 slice to keep the real
+curated source from drifting. The API unit suite now loads
+`.context/phase5-curated-roms.json` and asserts that it produces exactly one
+`curated_licensed_rom` review candidate for Scorpion Illuminati with the pinned
+commit, artifact URL, checksum, size, license metadata, `genesis` platform, and
+`picodrive` runtime. This gives the real Phase 5 source a regression guard
+before DB import/promotion.
+
 ## Security boundaries
 
 - Runtime IDs and launch manifests are allowlisted in the engine image.
