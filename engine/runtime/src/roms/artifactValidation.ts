@@ -76,6 +76,13 @@ function validateHeader(filePath: string, extension: string) {
     if (!hasValidSnesHeader(filePath)) {
       throw new Error("Invalid SNES cartridge header.");
     }
+    return;
+  }
+
+  if (extension === ".md" || extension === ".gen") {
+    if (!bufferStartsWith(header, Buffer.from("SEGA"), 0x100)) {
+      throw new Error("Invalid Genesis/Mega Drive cartridge header.");
+    }
   }
 }
 

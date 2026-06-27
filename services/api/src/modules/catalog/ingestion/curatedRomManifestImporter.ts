@@ -46,9 +46,9 @@ export type CuratedRomCandidate = {
   developerUrl: string | null;
   licenseUrl: string | null;
   originalReleaseUrl: string | null;
-  platformId: "nes" | "gb" | "gbc" | "gba" | "snes";
+  platformId: "nes" | "gb" | "gbc" | "gba" | "snes" | "genesis";
   rightsWarnings: string[];
-  runtimeId: "mesen" | "mgba" | "bsnes";
+  runtimeId: "mesen" | "mgba" | "bsnes" | "picodrive";
   sourceCommit: string;
   sourceEntryPath: string;
   sourceKind: "curated_licensed_rom";
@@ -107,6 +107,9 @@ function getPlatform(filename: string) {
   }
   if (extension === ".sfc" || extension === ".smc") {
     return { platformId: "snes" as const, runtimeId: "bsnes" as const };
+  }
+  if (extension === ".md" || extension === ".gen") {
+    return { platformId: "genesis" as const, runtimeId: "picodrive" as const };
   }
   return null;
 }

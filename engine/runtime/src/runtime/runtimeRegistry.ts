@@ -4,7 +4,7 @@ export type RuntimeDefinition = {
   corePath?: string;
   extensions: string[];
   id: string;
-  inputProfile: "nes" | "gba" | "snes" | "native_gamepad";
+  inputProfile: "nes" | "gba" | "snes" | "genesis" | "native_gamepad";
   kind: RuntimeKind;
   launchManifestIds?: string[];
   maxArtifactBytes: number;
@@ -34,6 +34,14 @@ export const RUNTIME_REGISTRY: Record<string, RuntimeDefinition> = {
     inputProfile: "snes",
     kind: "libretro",
     maxArtifactBytes: 64 * 1024 * 1024,
+  },
+  picodrive: {
+    corePath: "/cores/picodrive_libretro.so",
+    extensions: [".md", ".gen"],
+    id: "picodrive",
+    inputProfile: "genesis",
+    kind: "libretro",
+    maxArtifactBytes: 16 * 1024 * 1024,
   },
   "debian-native-v1": {
     extensions: [],

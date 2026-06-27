@@ -519,6 +519,16 @@ turned into review candidates through a repeatable checklist instead of
 hand-written database rows. Phase 5 remains open until a real
 redistribution-safe source is added and smoke-tested.
 
+Progress note — 2026-06-27: added the fourth Phase 5 slice for Sega
+Genesis/Mega Drive runtime readiness without publishing public catalog entries.
+The engine Dockerfile now has a pinned PicoDrive libretro builder stage, the
+runtime registry allowlists `picodrive` for `.md`/`.gen` artifacts, artifact
+validation checks the internal Genesis/Mega Drive `SEGA` header marker, Local
+Vault accepts `.md`/`.gen`, and curated manifests can map those files to
+`platform_id = genesis` and `runtime_id = picodrive`. API/web/engine tests and
+web build pass. Docker smoke for the PicoDrive builder is still pending because
+Docker Desktop was not reachable on this machine.
+
 ## Security boundaries
 
 - Runtime IDs and launch manifests are allowlisted in the engine image.

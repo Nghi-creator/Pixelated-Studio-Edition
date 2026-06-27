@@ -11,7 +11,7 @@ The manifest is only an intake format. Importing it creates
 Every entry needs:
 
 - a playable artifact filename ending in `.nes`, `.gb`, `.gbc`, `.gba`, `.sfc`,
-  or `.smc`;
+  `.smc`, `.md`, or `.gen`;
 - an HTTPS artifact URL, or a `sourceEntryPath` that can be resolved through the
   manifest's pinned `rawBaseUrl` and `sourceCommit`;
 - exact `artifactSha256` and `artifactSize`;
@@ -94,4 +94,4 @@ Entry fields:
 | `.gbc` | `gbc` | `mgba` |
 | `.gba` | `gba` | `mgba` |
 | `.sfc`, `.smc` | `snes` | `bsnes` |
-
+| `.md`, `.gen` | `genesis` | `picodrive` |

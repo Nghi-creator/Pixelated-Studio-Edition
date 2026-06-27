@@ -260,6 +260,22 @@ test("local vault starts infer runtime from supported file extensions", async ()
   assert.equal(booted[0]?.options.runtimeId, "mgba");
 });
 
+test("local vault starts infer PicoDrive for Genesis and Mega Drive files", async () => {
+  const { booted, calls, socket } = createHarness();
+
+  socket.emit("start-game", {
+    mode: "local",
+    romFilename: "nested/drive.md",
+    sessionId: "session-genesis",
+    userId: "local-user",
+  });
+  await flushStartGame();
+
+  assert.equal(calls.verify, 0);
+  assert.equal(booted[0]?.romPath, "/roms/local-user/drive.md");
+  assert.equal(booted[0]?.options.runtimeId, "picodrive");
+});
+
 test("stream profiles are clamped before reaching the runtime", () => {
   assert.deepEqual(
     normalizeStreamProfile({

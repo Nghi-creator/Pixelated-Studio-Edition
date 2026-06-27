@@ -83,6 +83,28 @@ RUN git init /tmp/bsnes-mercury && \
     cp /tmp/bsnes-mercury/bsnes_mercury_performance_libretro.so /out/bsnes_libretro.so && \
     test -s /out/bsnes_libretro.so
 
+FROM ${UBUNTU_IMAGE} AS picodrive-builder
+
+ARG PICODRIVE_REF=f0d4a0118a9733a1f10bce5a4ac772c474f9300d
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    gcc \
+    g++ \
+    git \
+    make \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git init /tmp/picodrive && \
+    git -C /tmp/picodrive remote add origin https://github.com/libretro/picodrive.git && \
+    git -C /tmp/picodrive fetch --depth 1 origin "${PICODRIVE_REF}" && \
+    git -C /tmp/picodrive checkout --detach FETCH_HEAD && \
+    make -C /tmp/picodrive -f Makefile.libretro -j4 platform=unix && \
+    mkdir -p /out && \
+    cp /tmp/picodrive/picodrive_libretro.so /out/ && \
+    test -s /out/picodrive_libretro.so
+
 FROM ${UBUNTU_IMAGE} AS python-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -135,6 +157,7 @@ COPY --from=app-builder /app/node_modules /app/node_modules
 COPY --from=mesen-builder /out/mesen_libretro.so /cores/mesen_libretro.so
 COPY --from=mgba-builder /out/mgba_libretro.so /cores/mgba_libretro.so
 COPY --from=bsnes-builder /out/bsnes_libretro.so /cores/bsnes_libretro.so
+COPY --from=picodrive-builder /out/picodrive_libretro.so /cores/picodrive_libretro.so
 COPY --from=python-builder /out /usr/local/lib/python3.10/dist-packages
 COPY camera.py input_gamepad.py /app/
 

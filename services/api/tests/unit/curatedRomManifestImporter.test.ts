@@ -16,7 +16,7 @@ function writeManifest(payload: Record<string, unknown>) {
   return manifestPath;
 }
 
-test("curated ROM manifest importer maps SNES entries to bsnes review candidates", () => {
+test("curated ROM manifest importer maps supported entries to runtime review candidates", () => {
   const manifest = readCuratedRomManifest(
     writeManifest({
       entries: [
@@ -29,6 +29,15 @@ test("curated ROM manifest importer maps SNES entries to bsnes review candidates
           licenseUrl: "https://example.test/license",
           sourceEntryPath: "roms/demo.sfc",
           title: "Demo SNES",
+        },
+        {
+          artifactFilename: "drive.md",
+          artifactSha256:
+            "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          artifactSize: 524288,
+          codeLicenseSpdx: "MIT",
+          sourceEntryPath: "roms/drive.md",
+          title: "Drive Demo",
         },
         {
           artifactFilename: "notes.txt",
@@ -49,7 +58,7 @@ test("curated ROM manifest importer maps SNES entries to bsnes review candidates
 
   const candidates = collectCuratedRomCandidates(manifest);
 
-  assert.equal(candidates.length, 1);
+  assert.equal(candidates.length, 2);
   assert.equal(candidates[0]?.sourceKind, "curated_licensed_rom");
   assert.equal(candidates[0]?.platformId, "snes");
   assert.equal(candidates[0]?.runtimeId, "bsnes");
@@ -58,6 +67,12 @@ test("curated ROM manifest importer maps SNES entries to bsnes review candidates
     "https://raw.githubusercontent.com/example/curated-roms/1111111111111111111111111111111111111111/roms/demo.sfc",
   );
   assert.equal(candidates[0]?.sourceEntryPath, "curated/snes.json#demo.sfc");
+  assert.equal(candidates[1]?.platformId, "genesis");
+  assert.equal(candidates[1]?.runtimeId, "picodrive");
+  assert.equal(
+    candidates[1]?.artifactUrl,
+    "https://raw.githubusercontent.com/example/curated-roms/1111111111111111111111111111111111111111/roms/drive.md",
+  );
 });
 
 test("curated ROM manifest requires pinned repository metadata", () => {

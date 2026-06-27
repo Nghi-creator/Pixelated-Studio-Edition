@@ -86,6 +86,7 @@ export const HEALTH_PATHS = {
     "/cores/mesen_libretro.so",
     "/cores/mgba_libretro.so",
     "/cores/bsnes_libretro.so",
+    "/cores/picodrive_libretro.so",
   ],
   pythonBinary: "/usr/bin/python3",
   retroarchBinary: "/usr/bin/retroarch",

@@ -67,6 +67,18 @@ test("validates SNES internal cartridge headers", () => {
   validateGameArtifact(writeTempRom("game.sfc", bytes), { runtimeId: "bsnes" });
 });
 
+test("validates Genesis and Mega Drive cartridge headers", () => {
+  const bytes = Buffer.alloc(0x200);
+  Buffer.from("SEGA MEGA DRIVE").copy(bytes, 0x100);
+
+  validateGameArtifact(writeTempRom("game.md", bytes), {
+    runtimeId: "picodrive",
+  });
+  validateGameArtifact(writeTempRom("game.gen", bytes), {
+    runtimeId: "picodrive",
+  });
+});
+
 test("rejects invalid cartridge headers", () => {
   const filePath = writeTempRom("broken.gba", Buffer.alloc(0x160));
 
@@ -80,5 +92,12 @@ test("rejects invalid cartridge headers", () => {
       runtimeId: "bsnes",
     }),
     /Invalid SNES cartridge header/,
+  );
+
+  assert.throws(
+    () => validateGameArtifact(writeTempRom("broken.md", Buffer.alloc(0x200)), {
+      runtimeId: "picodrive",
+    }),
+    /Invalid Genesis\/Mega Drive cartridge header/,
   );
 });

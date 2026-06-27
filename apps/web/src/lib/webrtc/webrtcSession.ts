@@ -8,7 +8,16 @@ export { createWebRTCSessionId } from "./webrtcIdentity";
 
 export type WebRTCStatus = "idle" | "connecting" | "playing" | "error";
 
-const LOCAL_VAULT_EXTENSIONS = [".nes", ".gb", ".gbc", ".gba", ".sfc", ".smc"];
+const LOCAL_VAULT_EXTENSIONS = [
+  ".nes",
+  ".gb",
+  ".gbc",
+  ".gba",
+  ".sfc",
+  ".smc",
+  ".md",
+  ".gen",
+];
 
 function isLocalVaultGameId(gameId: string) {
   const lowerGameId = gameId.toLowerCase();
