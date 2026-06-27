@@ -482,7 +482,7 @@ are connected. Future multi-instance routing can improve UX by starting new
 sessions on a compatible engine without a shared-container restart, but the
 Phase 4 safety requirement is satisfied by refusing disruptive rollout.
 
-### Phase 5 — Additional libretro platforms
+### Phase 5 — Additional libretro platforms — Done
 
 Add platforms only when both a maintained core and a sustainable licensed
 content source exist. Likely technical candidates include SNES, Genesis/Mega
@@ -526,8 +526,8 @@ runtime registry allowlists `picodrive` for `.md`/`.gen` artifacts, artifact
 validation checks the internal Genesis/Mega Drive `SEGA` header marker, Local
 Vault accepts `.md`/`.gen`, and curated manifests can map those files to
 `platform_id = genesis` and `runtime_id = picodrive`. API/web/engine tests and
-web build pass. Docker smoke for the PicoDrive builder is still pending because
-Docker Desktop was not reachable on this machine.
+web build pass. Docker smoke for the PicoDrive builder was completed in the
+final Phase 5 validation pass after adding PicoDrive submodule initialization.
 
 Progress note — 2026-06-27: added the fifth Phase 5 slice for Sega 8-bit
 runtime readiness on the same PicoDrive core. The runtime registry now accepts
@@ -579,6 +579,17 @@ curated source from drifting. The API unit suite now loads
 commit, artifact URL, checksum, size, license metadata, `genesis` platform, and
 `picodrive` runtime. This gives the real Phase 5 source a regression guard
 before DB import/promotion.
+
+Progress note — 2026-06-27: completed Phase 5. The PicoDrive builder smoke now
+passes after initializing PicoDrive submodules before compilation, and the full
+engine runtime Docker image builds with the pinned PicoDrive core copied into
+`/cores/picodrive_libretro.so`. The Scorpion Illuminati curated manifest was
+imported into the target Supabase DB, promoted through the existing admin
+candidate route as a reviewed `picodrive`/`genesis` catalog build, and then
+smoke-tested in the Docker runtime image by launching the pinned ROM with
+RetroArch/PicoDrive under Xvfb. RetroArch loaded `/cores/picodrive_libretro.so`,
+accepted the ROM, initialized the video path, and reported Genesis geometry
+before the intentional timeout ended the smoke run.
 
 ## Security boundaries
 

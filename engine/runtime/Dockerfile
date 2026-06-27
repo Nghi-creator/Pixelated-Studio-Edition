@@ -100,6 +100,7 @@ RUN git init /tmp/picodrive && \
     git -C /tmp/picodrive remote add origin https://github.com/libretro/picodrive.git && \
     git -C /tmp/picodrive fetch --depth 1 origin "${PICODRIVE_REF}" && \
     git -C /tmp/picodrive checkout --detach FETCH_HEAD && \
+    git -C /tmp/picodrive submodule update --init --depth 1 --recursive && \
     make -C /tmp/picodrive -f Makefile.libretro -j4 platform=unix && \
     mkdir -p /out && \
     cp /tmp/picodrive/picodrive_libretro.so /out/ && \
