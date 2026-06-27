@@ -11,8 +11,8 @@ import { useNavigate } from "react-router-dom";
 import { useFavorite } from "../../features/favorites/useFavorite";
 import {
   GameArtworkFallback,
-  isGeneratedCatalogArtworkUrl,
 } from "./GameArtworkFallback";
+import { isGeneratedCatalogArtworkUrl } from "./gameArtworkUtils";
 
 interface Game {
   id: string;

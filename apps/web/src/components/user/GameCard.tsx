@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useFavorite } from "../../features/favorites/useFavorite";
 import {
   GameArtworkFallback,
-  isGeneratedCatalogArtworkUrl,
 } from "./GameArtworkFallback";
+import { isGeneratedCatalogArtworkUrl } from "./gameArtworkUtils";
 
 interface GameCardProps {
   id: string;
