@@ -118,12 +118,12 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
       <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-synth-bg via-synth-bg/80 to-transparent md:w-3/4" />
 
       {featuredGames.length > 1 && (
-        <>
+        <div className="pointer-events-none absolute inset-y-0 left-0 right-0 z-40 flex items-center justify-between px-4 opacity-0 transition-opacity group-hover:opacity-100">
           <button
             aria-label="Previous featured game"
             onClick={handlePrev}
             type="button"
-            className="absolute left-4 top-1/2 z-30 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-synth-border bg-synth-surface text-white opacity-0 transition-colors hover:bg-synth-elevated group-hover:opacity-100"
+            className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-synth-border bg-synth-surface text-white transition-colors hover:bg-synth-elevated"
           >
             <ChevronLeft className="h-6 w-6" />
           </button>
@@ -131,11 +131,11 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
             aria-label="Next featured game"
             onClick={handleNext}
             type="button"
-            className="absolute right-4 top-1/2 z-30 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-synth-border bg-synth-surface text-white opacity-0 transition-colors hover:bg-synth-elevated group-hover:opacity-100"
+            className="pointer-events-auto inline-flex h-11 w-11 items-center justify-center rounded-full border border-synth-border bg-synth-surface text-white transition-colors hover:bg-synth-elevated"
           >
             <ChevronRight className="h-6 w-6" />
           </button>
-        </>
+        </div>
       )}
 
       <div className="absolute top-1/2 left-0 transform -translate-y-1/2 z-20 w-full">
