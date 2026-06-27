@@ -11,7 +11,7 @@ import { logTiming, timed } from "../../modules/observability/timing.js";
 const candidateQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(100).default(25),
-  platformId: z.enum(["nes", "gb", "gbc", "gba", "linux"]).optional(),
+  platformId: z.enum(["nes", "gb", "gbc", "gba", "snes", "linux"]).optional(),
   search: z.string().trim().max(120).optional(),
   sourceKind: z
     .enum([
@@ -19,6 +19,7 @@ const candidateQuerySchema = z.object({
       "homebrew_hub_gba",
       "homebrew_hub_nes",
       "debian_main_games",
+      "curated_licensed_rom",
     ])
     .optional(),
   status: z
@@ -61,6 +62,7 @@ type CandidateRow = {
   review_notes: string | null;
   runtime_id: string;
   runtime_kind: "libretro" | "native_linux";
+  source_kind: string;
   source_commit: string;
   source_entry_path: string;
   source_repo_url: string;
@@ -136,6 +138,12 @@ function sha256(bytes: Buffer) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
+function candidateArtifactRoot(candidate: CandidateRow) {
+  if (candidate.source_kind === "curated_licensed_rom") return "curated-roms";
+  if (candidate.source_kind === "debian_main_games") return "debian-main";
+  return "homebrew-hub";
+}
+
 function assertAllowedArtifactUrl(value: string) {
   let url: URL;
   try {
@@ -182,7 +190,7 @@ async function mirrorCandidateArtifact(
   }
 
   const objectPath = [
-    "homebrew-hub",
+    candidateArtifactRoot(candidate),
     sanitizeObjectSegment(candidate.source_commit),
     sanitizeObjectSegment(candidate.platform_id),
     `${candidate.artifact_sha256}-${sanitizeObjectSegment(candidate.artifact_filename)}`,

@@ -498,6 +498,17 @@ the runtime-specific 64 MB ceiling. This intentionally does not add a SNES
 catalog importer or homepage games; public SNES publication still needs a
 sustainable source of ROMs with explicit redistribution rights.
 
+Progress note — 2026-06-27: added the second Phase 5 slice for sustainable
+licensed ROM intake. The API now supports a `curated_licensed_rom` candidate
+source kind plus a pinned JSON manifest importer for `.nes`, `.gb`, `.gbc`,
+`.gba`, `.sfc`, and `.smc` artifacts. Each manifest entry must carry an HTTPS
+source, immutable commit, exact SHA-256, byte size, SPDX license, and source
+evidence before it can become a review candidate. Curated candidates still do
+not publish automatically; admin promotion mirrors the artifact into controlled
+catalog storage, generates legal fallback artwork, and creates the reviewed
+game/build/rights records. Phase 5 remains open until at least one real
+redistribution-safe SNES source is added and smoke-tested end-to-end.
+
 ## Security boundaries
 
 - Runtime IDs and launch manifests are allowlisted in the engine image.

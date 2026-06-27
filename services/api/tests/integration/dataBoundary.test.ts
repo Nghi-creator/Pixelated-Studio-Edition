@@ -727,6 +727,7 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
     review_notes: null,
     runtime_id: "mesen",
     runtime_kind: "libretro",
+    source_kind: "homebrew_hub_nes",
     source_commit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     source_entry_path: "entries/novathesquirrel/game.json",
     source_repo_url: "https://github.com/nesdev-org/homebrew-db",
@@ -780,6 +781,78 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
   await app.close();
 });
 
+test("admin can promote a curated SNES candidate into a bsnes build", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = Buffer.from("snes-rom");
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "demo.sfc",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/curated-roms/demo.sfc",
+    asset_license_spdx: "GPL-3.0-or-later",
+    attribution_text: "Demo SNES attribution",
+    code_license_spdx: "GPL-3.0-or-later",
+    cover_license_spdx: null,
+    developer_name: "Example Dev",
+    developer_url: "https://example.test/dev",
+    id: "99999999-9999-4999-8999-999999999999",
+    import_status: "needs_review",
+    license_url: "https://example.test/license",
+    original_release_url: "https://example.test/demo-snes",
+    platform_id: "snes",
+    review_notes: null,
+    runtime_id: "bsnes",
+    runtime_kind: "libretro",
+    source_kind: "curated_licensed_rom",
+    source_commit: "cccccccccccccccccccccccccccccccccccccccc",
+    source_entry_path: "curated/snes.json#demo.sfc",
+    source_repo_url: "https://github.com/example/curated-roms",
+    title: "Demo SNES",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "curated reviewed" },
+    url: "/admin/catalog-candidates/99999999-9999-4999-8999-999999999999",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.games.length, 1);
+  assert.equal(db.rows.games[0]?.rom_filename, "demo.sfc");
+  assert.match(
+    String(db.rows.games[0]?.rom_url),
+    /^https:\/\/storage\.example\.test\/catalog_artifacts\/curated-roms\//,
+  );
+  assert.equal(db.rows.game_builds.length, 1);
+  assert.equal(db.rows.game_builds[0]?.runtime_id, "bsnes");
+  assert.equal(db.rows.game_builds[0]?.platform_id, "snes");
+  assert.equal(db.rows.game_builds[0]?.artifact_filename, "demo.sfc");
+  assert.match(
+    String(db.rows.game_builds[0]?.artifact_url),
+    /^https:\/\/storage\.example\.test\/catalog_artifacts\/curated-roms\//,
+  );
+  assert.equal(db.uploadedStorageObjects.length, 2);
+  assert.match(
+    db.uploadedStorageObjects[0]?.path || "",
+    /^curated-roms\/cccccccccccccccccccccccccccccccccccccccc\/snes\//,
+  );
+  assert.match(
+    db.uploadedStorageObjects[1]?.path || "",
+    /^covers\/cccccccccccccccccccccccccccccccccccccccc\/snes\//,
+  );
+  assert.equal(
+    db.rows.game_rights[0]?.source_url,
+    "https://github.com/example/curated-roms/blob/cccccccccccccccccccccccccccccccccccccccc/curated/snes.json#demo.sfc",
+  );
+  assert.equal(
+    db.rows.catalog_ingestion_candidates[0]?.import_status,
+    "promoted",
+  );
+  await app.close();
+});
+
 test("admin can promote a Debian native candidate without mirroring a ROM artifact", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
@@ -808,6 +881,7 @@ test("admin can promote a Debian native candidate without mirroring a ROM artifa
     review_notes: null,
     runtime_id: "debian-native-v1",
     runtime_kind: "native_linux",
+    source_kind: "debian_main_games",
     source_commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     source_entry_path: "trixie/main/games/frozen-bubble/2.212-13+b1",
     source_repo_url: "https://tracker.debian.org/pkg/frozen-bubble",
