@@ -2,6 +2,7 @@ import { Heart, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useFavorite } from "../../features/favorites/useFavorite";
+import { GameArtworkFallback } from "./GameArtworkFallback";
 
 interface GameCardProps {
   id: string;
@@ -16,6 +17,7 @@ export default function GameCard({
   title,
   coverUrl,
 }: GameCardProps) {
+  const [coverFailed, setCoverFailed] = useState(false);
   const [favoriteError, setFavoriteError] = useState("");
   const {
     isFavorited,
@@ -43,11 +45,19 @@ export default function GameCard({
       className="group relative block overflow-hidden rounded-lg border border-synth-border bg-synth-surface transition-colors hover:bg-synth-elevated"
     >
       <div className="overflow-hidden bg-synth-bg">
-        <img
-          src={coverUrl}
-          alt={title}
-          className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] md:h-72"
-        />
+        {coverUrl && !coverFailed ? (
+          <img
+            src={coverUrl}
+            alt={title}
+            onError={() => setCoverFailed(true)}
+            className="h-64 w-full object-cover transition-transform duration-300 group-hover:scale-[1.03] md:h-72"
+          />
+        ) : (
+          <GameArtworkFallback
+            className="h-64 transition-transform duration-300 group-hover:scale-[1.03] md:h-72"
+            title={title}
+          />
+        )}
       </div>
 
       <button

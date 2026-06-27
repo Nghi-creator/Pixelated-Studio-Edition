@@ -1,5 +1,7 @@
 import { Play } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useState } from "react";
+import { GameArtworkFallback } from "../../components/user/GameArtworkFallback";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import type { ApiGame } from "../../lib/api/apiTypes";
@@ -17,6 +19,8 @@ const multiplayerBackState = {
 };
 
 export function CloudGameCard({ game }: { game: ApiGame }) {
+  const [coverFailed, setCoverFailed] = useState(false);
+
   return (
     <Link
       className="group overflow-hidden rounded-lg border border-synth-border bg-synth-bg transition-colors hover:bg-synth-surface"
@@ -24,11 +28,19 @@ export function CloudGameCard({ game }: { game: ApiGame }) {
       to={`/play/${game.id}`}
     >
       <div className="aspect-[4/5] overflow-hidden bg-synth-bg">
-        <img
-          alt={game.title}
-          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-          src={game.cover_url}
-        />
+        {game.cover_url && !coverFailed ? (
+          <img
+            alt={game.title}
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            onError={() => setCoverFailed(true)}
+            src={game.cover_url}
+          />
+        ) : (
+          <GameArtworkFallback
+            className="transition-transform duration-300 group-hover:scale-[1.03]"
+            title={game.title}
+          />
+        )}
       </div>
       <div className="flex min-h-20 flex-col justify-between gap-3 border-t border-synth-border p-3">
         <p className="line-clamp-2 text-sm font-bold text-white">

@@ -9,6 +9,7 @@ import {
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useFavorite } from "../../features/favorites/useFavorite";
+import { GameArtworkFallback } from "./GameArtworkFallback";
 
 interface Game {
   id: string;
@@ -23,6 +24,9 @@ interface HeroBannerProps {
 
 export default function HeroBanner({ featuredGames }: HeroBannerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [failedArtworkIds, setFailedArtworkIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [favoriteError, setFavoriteError] = useState("");
   const navigate = useNavigate();
   const safeCurrentIndex = Math.min(
@@ -66,6 +70,14 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
     setCurrentIndex((prev) => (prev + 1) % featuredGames.length);
   };
 
+  const markArtworkFailed = (gameId: string) => {
+    setFailedArtworkIds((current) => {
+      const next = new Set(current);
+      next.add(gameId);
+      return next;
+    });
+  };
+
   if (!featuredGames || featuredGames.length === 0) {
     return (
       <div className="w-full h-[360px] md:h-[440px] bg-synth-bg animate-pulse" />
@@ -74,14 +86,29 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
 
   return (
     <div className="relative h-[380px] w-full overflow-hidden border-b border-synth-border bg-synth-bg transition-all duration-700 group md:h-[460px]">
-      {featuredGames.map((game, index) => (
-        <img
-          key={game.id}
-          className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-1000 ${index === safeCurrentIndex ? "opacity-70" : "opacity-0"}`}
-          src={game.backdrop_url || game.cover_url}
-          alt={game.title}
-        />
-      ))}
+      {featuredGames.map((game, index) => {
+        const artworkUrl = game.backdrop_url || game.cover_url;
+        const isActive = index === safeCurrentIndex;
+        const artworkFailed = failedArtworkIds.has(game.id);
+
+        return artworkUrl && !artworkFailed ? (
+          <img
+            key={game.id}
+            className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-1000 ${isActive ? "opacity-70" : "opacity-0"}`}
+            src={artworkUrl}
+            alt={game.title}
+            onError={() => markArtworkFailed(game.id)}
+          />
+        ) : (
+          <GameArtworkFallback
+            key={game.id}
+            className={`absolute inset-0 transition-opacity duration-1000 ${isActive ? "opacity-70" : "opacity-0"}`}
+            label="Featured game"
+            title={game.title}
+            variant="backdrop"
+          />
+        );
+      })}
       <div className="absolute inset-0 bg-black/52" />
       <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-synth-bg via-synth-bg/80 to-transparent md:w-3/4" />
 
