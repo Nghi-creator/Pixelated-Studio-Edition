@@ -509,6 +509,16 @@ catalog storage, generates legal fallback artwork, and creates the reviewed
 game/build/rights records. Phase 5 remains open until at least one real
 redistribution-safe SNES source is added and smoke-tested end-to-end.
 
+Progress note — 2026-06-27: added the third Phase 5 slice for curator
+operations. The curated ROM importer now produces an accepted/skipped report,
+explains why entries were skipped, and supports `--strict` so incomplete or
+unsupported manifest entries can fail an import before they reach review.
+Added `.context/curated-rom-manifest-guide.md` and a validated
+`.context/curated-rom-manifest-template.json` so future legal sources can be
+turned into review candidates through a repeatable checklist instead of
+hand-written database rows. Phase 5 remains open until a real
+redistribution-safe source is added and smoke-tested.
+
 ## Security boundaries
 
 - Runtime IDs and launch manifests are allowlisted in the engine image.

@@ -19,6 +19,13 @@ type CuratedRomManifestEntry = {
   title?: unknown;
 };
 
+export type CuratedRomSkippedEntry = {
+  artifactFilename: string | null;
+  index: number;
+  reasons: string[];
+  title: string | null;
+};
+
 export type CuratedRomManifest = {
   entries: CuratedRomManifestEntry[];
   manifestPath: string;
@@ -86,10 +93,18 @@ function assertHttpsUrl(value: string, label: string) {
 
 function getPlatform(filename: string) {
   const extension = path.extname(filename).toLowerCase();
-  if (extension === ".nes") return { platformId: "nes" as const, runtimeId: "mesen" as const };
-  if (extension === ".gb") return { platformId: "gb" as const, runtimeId: "mgba" as const };
-  if (extension === ".gbc") return { platformId: "gbc" as const, runtimeId: "mgba" as const };
-  if (extension === ".gba") return { platformId: "gba" as const, runtimeId: "mgba" as const };
+  if (extension === ".nes") {
+    return { platformId: "nes" as const, runtimeId: "mesen" as const };
+  }
+  if (extension === ".gb") {
+    return { platformId: "gb" as const, runtimeId: "mgba" as const };
+  }
+  if (extension === ".gbc") {
+    return { platformId: "gbc" as const, runtimeId: "mgba" as const };
+  }
+  if (extension === ".gba") {
+    return { platformId: "gba" as const, runtimeId: "mgba" as const };
+  }
   if (extension === ".sfc" || extension === ".smc") {
     return { platformId: "snes" as const, runtimeId: "bsnes" as const };
   }
@@ -131,12 +146,31 @@ function artifactUrlFor(manifest: CuratedRomManifest, sourceEntryPath: string) {
   return `${manifest.rawBaseUrl.replace(/\/$/, "")}/${manifest.sourceCommit}/${sourceEntryPath.replace(/^\/+/, "")}`;
 }
 
-export function collectCuratedRomCandidates(
-  manifest: CuratedRomManifest,
-): CuratedRomCandidate[] {
-  return manifest.entries.flatMap((entry, index) => {
-    if (!isPlainObject(entry)) return [];
+function skippedEntry(
+  entry: unknown,
+  index: number,
+  reasons: string[],
+): CuratedRomSkippedEntry {
+  const record = isPlainObject(entry) ? entry : {};
+  return {
+    artifactFilename: nullableString(record.artifactFilename),
+    index,
+    reasons,
+    title: nullableString(record.title),
+  };
+}
 
+export function collectCuratedRomCandidateReport(manifest: CuratedRomManifest) {
+  const candidates: CuratedRomCandidate[] = [];
+  const skipped: CuratedRomSkippedEntry[] = [];
+
+  manifest.entries.forEach((entry, index) => {
+    if (!isPlainObject(entry)) {
+      skipped.push(skippedEntry(entry, index, ["entry is not an object"]));
+      return;
+    }
+
+    const reasons: string[] = [];
     const title = stringValue(entry.title);
     const artifactFilename = stringValue(entry.artifactFilename);
     const sourceEntryPath = stringValue(entry.sourceEntryPath);
@@ -146,51 +180,83 @@ export function collectCuratedRomCandidates(
     const platform = getPlatform(artifactFilename);
     const slug = stringValue(entry.slug) || artifactFilename || String(index);
 
-    if (
-      !title ||
-      !artifactFilename ||
-      !sourceEntryPath ||
-      !platform ||
-      !codeLicenseSpdx ||
-      !/^[a-f0-9]{64}$/.test(artifactSha256) ||
-      !Number.isSafeInteger(artifactSize) ||
-      artifactSize <= 0
-    ) {
-      return [];
+    if (!title) reasons.push("missing title");
+    if (!artifactFilename) reasons.push("missing artifactFilename");
+    if (!sourceEntryPath) reasons.push("missing sourceEntryPath");
+    if (artifactFilename && !platform) {
+      reasons.push("unsupported artifact extension");
+    }
+    if (!codeLicenseSpdx) reasons.push("missing codeLicenseSpdx");
+    if (!/^[a-f0-9]{64}$/.test(artifactSha256)) {
+      reasons.push("artifactSha256 must be 64 lowercase hex characters");
+    }
+    if (!Number.isSafeInteger(artifactSize) || artifactSize <= 0) {
+      reasons.push("artifactSize must be a positive safe integer");
+    }
+
+    if (reasons.length > 0 || !platform) {
+      skipped.push(skippedEntry(entry, index, reasons));
+      return;
     }
 
     const artifactUrl =
       stringValue(entry.artifactUrl) || artifactUrlFor(manifest, sourceEntryPath);
-    assertHttpsUrl(artifactUrl, "artifactUrl");
+    try {
+      assertHttpsUrl(artifactUrl, "artifactUrl");
+    } catch (error) {
+      skipped.push(
+        skippedEntry(entry, index, [
+          error instanceof Error ? error.message : String(error),
+        ]),
+      );
+      return;
+    }
 
     const licenseUrl = nullableString(entry.licenseUrl);
-    if (licenseUrl) assertHttpsUrl(licenseUrl, "licenseUrl");
+    if (licenseUrl) {
+      try {
+        assertHttpsUrl(licenseUrl, "licenseUrl");
+      } catch (error) {
+        skipped.push(
+          skippedEntry(entry, index, [
+            error instanceof Error ? error.message : String(error),
+          ]),
+        );
+        return;
+      }
+    }
 
-    return [
-      {
-        artifactFilename,
-        artifactSha256,
-        artifactSize,
-        artifactUrl,
-        assetLicenseSpdx: nullableString(entry.assetLicenseSpdx),
-        attributionText:
-          stringValue(entry.attributionText) ||
-          `${title}. License: ${codeLicenseSpdx}. Source evidence: ${manifest.repoUrl}/blob/${manifest.sourceCommit}/${manifest.manifestPath}.`,
-        codeLicenseSpdx,
-        developerName: nullableString(entry.developerName),
-        developerUrl: nullableString(entry.developerUrl),
-        licenseUrl,
-        originalReleaseUrl: nullableString(entry.originalReleaseUrl),
-        platformId: platform.platformId,
-        rightsWarnings: stringArray(entry.rightsWarnings),
-        runtimeId: platform.runtimeId,
-        sourceCommit: manifest.sourceCommit,
-        sourceEntryPath: `${manifest.manifestPath}#${slug}`,
-        sourceKind: "curated_licensed_rom",
-        sourceMetadata: entry,
-        sourceRepoUrl: manifest.repoUrl,
-        title,
-      },
-    ];
+    candidates.push({
+      artifactFilename,
+      artifactSha256,
+      artifactSize,
+      artifactUrl,
+      assetLicenseSpdx: nullableString(entry.assetLicenseSpdx),
+      attributionText:
+        stringValue(entry.attributionText) ||
+        `${title}. License: ${codeLicenseSpdx}. Source evidence: ${manifest.repoUrl}/blob/${manifest.sourceCommit}/${manifest.manifestPath}.`,
+      codeLicenseSpdx,
+      developerName: nullableString(entry.developerName),
+      developerUrl: nullableString(entry.developerUrl),
+      licenseUrl,
+      originalReleaseUrl: nullableString(entry.originalReleaseUrl),
+      platformId: platform.platformId,
+      rightsWarnings: stringArray(entry.rightsWarnings),
+      runtimeId: platform.runtimeId,
+      sourceCommit: manifest.sourceCommit,
+      sourceEntryPath: `${manifest.manifestPath}#${slug}`,
+      sourceKind: "curated_licensed_rom",
+      sourceMetadata: entry,
+      sourceRepoUrl: manifest.repoUrl,
+      title,
+    });
   });
+
+  return { candidates, skipped };
+}
+
+export function collectCuratedRomCandidates(
+  manifest: CuratedRomManifest,
+): CuratedRomCandidate[] {
+  return collectCuratedRomCandidateReport(manifest).candidates;
 }

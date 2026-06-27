@@ -1,8 +1,10 @@
 import process from "node:process";
+import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import {
   collectCuratedRomCandidates,
+  collectCuratedRomCandidateReport,
   readCuratedRomManifest,
 } from "../src/modules/catalog/ingestion/curatedRomManifestImporter.js";
 
@@ -15,6 +17,11 @@ function hasArg(name: string) {
 function getArgValue(name: string) {
   const index = process.argv.indexOf(name);
   return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+function resolveManifestPath(manifestPath: string) {
+  if (path.isAbsolute(manifestPath)) return manifestPath;
+  return path.resolve(process.env.INIT_CWD || process.cwd(), manifestPath);
 }
 
 function toDatabaseRow(
@@ -49,6 +56,7 @@ function toDatabaseRow(
 
 async function main() {
   const dryRun = hasArg("--dry-run") || hasArg("--json");
+  const strict = hasArg("--strict");
   const manifestPath =
     getArgValue("--manifest") || process.env.CURATED_ROM_MANIFEST;
   if (!manifestPath) {
@@ -57,8 +65,25 @@ async function main() {
     );
   }
 
-  const manifest = readCuratedRomManifest(manifestPath);
-  const rows = collectCuratedRomCandidates(manifest).map(toDatabaseRow);
+  const manifest = readCuratedRomManifest(resolveManifestPath(manifestPath));
+  const report = collectCuratedRomCandidateReport(manifest);
+  const rows = report.candidates.map(toDatabaseRow);
+
+  if (report.skipped.length > 0) {
+    const summary = report.skipped
+      .map((entry) => {
+        const name = entry.title || entry.artifactFilename || `entry ${entry.index}`;
+        return `- ${name}: ${entry.reasons.join(", ")}`;
+      })
+      .join("\n");
+    const message = `Skipped ${report.skipped.length} curated ROM manifest entr${
+      report.skipped.length === 1 ? "y" : "ies"
+    }:\n${summary}`;
+    if (strict) {
+      throw new Error(message);
+    }
+    process.stderr.write(`${message}\n`);
+  }
 
   if (dryRun) {
     process.stdout.write(`${JSON.stringify(rows, null, 2)}\n`);

@@ -5,6 +5,7 @@ import path from "node:path";
 import test from "node:test";
 import {
   collectCuratedRomCandidates,
+  collectCuratedRomCandidateReport,
   readCuratedRomManifest,
 } from "../../src/modules/catalog/ingestion/curatedRomManifestImporter.js";
 
@@ -73,4 +74,54 @@ test("curated ROM manifest requires pinned repository metadata", () => {
       ),
     /sourceCommit/,
   );
+});
+
+test("curated ROM manifest report explains skipped entries", () => {
+  const manifest = readCuratedRomManifest(
+    writeManifest({
+      entries: [
+        {
+          artifactFilename: "demo.sfc",
+          artifactSha256:
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          artifactSize: 65536,
+          codeLicenseSpdx: "GPL-3.0-or-later",
+          sourceEntryPath: "roms/demo.sfc",
+          title: "Demo SNES",
+        },
+        {
+          artifactFilename: "fan-game.sfc",
+          artifactSha256: "not-a-sha",
+          artifactSize: 65536,
+          sourceEntryPath: "roms/fan-game.sfc",
+          title: "Fan Game",
+        },
+        {
+          artifactFilename: "manual.pdf",
+          artifactSha256:
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          artifactSize: 100,
+          codeLicenseSpdx: "MIT",
+          sourceEntryPath: "docs/manual.pdf",
+          title: "Manual",
+        },
+      ],
+      manifestPath: "curated/snes.json",
+      rawBaseUrl: "https://raw.githubusercontent.com/example/curated-roms",
+      repoUrl: "https://github.com/example/curated-roms",
+      sourceCommit: "1111111111111111111111111111111111111111",
+    }),
+  );
+
+  const report = collectCuratedRomCandidateReport(manifest);
+
+  assert.equal(report.candidates.length, 1);
+  assert.equal(report.skipped.length, 2);
+  assert.deepEqual(report.skipped[0]?.reasons, [
+    "missing codeLicenseSpdx",
+    "artifactSha256 must be 64 lowercase hex characters",
+  ]);
+  assert.deepEqual(report.skipped[1]?.reasons, [
+    "unsupported artifact extension",
+  ]);
 });
