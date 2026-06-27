@@ -21,7 +21,7 @@ license evidence, source link, attribution, and immutable checksum.
 - [x] Phase 2 — Automated licensed-ROM candidates
 - [x] Phase 3 — Debian native proof of concept
 - [x] Phase 4 — Native catalog operations
-- [ ] Phase 5 — Additional libretro platforms
+- [x] Phase 5 — Additional libretro platforms
 
 When a phase meets every acceptance criterion in this plan, change its checkbox
 to `[x]` and add a short completion note beneath the corresponding phase.
