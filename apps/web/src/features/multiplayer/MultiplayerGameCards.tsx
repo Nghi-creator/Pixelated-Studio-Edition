@@ -3,8 +3,8 @@ import { Link } from "react-router-dom";
 import { useState } from "react";
 import {
   GameArtworkFallback,
-  isGeneratedCatalogArtworkUrl,
 } from "../../components/user/GameArtworkFallback";
+import { isGeneratedCatalogArtworkUrl } from "../../components/user/gameArtworkUtils";
 import { Skeleton } from "../../components/ui/Skeleton";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import type { ApiGame } from "../../lib/api/apiTypes";
