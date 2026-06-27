@@ -61,7 +61,7 @@ export function GameArtworkFallback({
           </span>
           <PixelIcon
             className={`relative text-white/90 ${compact ? "h-10 w-10" : "h-12 w-12"}`}
-            name="cartridge"
+            name="gamepad"
           />
         </div>
 
