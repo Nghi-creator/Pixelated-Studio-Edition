@@ -1,17 +1,17 @@
 import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { getCachedUserRole } from "../../modules/auth/roleCache.js";
+import { getCachedUserRole } from "../../auth/roleCache.js";
 import {
   assertCandidateArtifactHeader,
   assertCandidateRuntimeAllowed,
   CandidateValidationError,
-} from "../../modules/catalog/ingestion/catalogCandidateValidation.js";
+} from "../ingestion/catalogCandidateValidation.js";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../modules/auth/supabaseAuth.js";
-import { logTiming, timed } from "../../modules/observability/timing.js";
+} from "../../auth/supabaseAuth.js";
+import { logTiming, timed } from "../../observability/timing.js";
 
 const candidateQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

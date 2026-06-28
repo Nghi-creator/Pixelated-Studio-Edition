@@ -3,7 +3,7 @@ import crypto from "node:crypto";
 import test from "node:test";
 import Fastify from "fastify";
 import type { FastifyRequest } from "fastify";
-import { registerWebRTCRoutes, testExports } from "../../src/routes/multiplayer/webrtc.js";
+import { registerWebRTCRoutes, testExports } from "../../src/modules/multiplayer/http/webrtcRoutes.js";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 
