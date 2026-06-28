@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
+  attachOptionalSupabaseUser,
   requireSupabaseUser,
   supabaseService,
 } from "../supabaseAuth.js";
@@ -32,12 +33,13 @@ type BackendSessionRow = {
   id: string;
   mode: "cloud" | "local";
   session_token_hash: string;
-  user_id: string;
+  user_id: string | null;
 };
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
 type SessionRouteOptions = {
+  optionalUser?: typeof attachOptionalSupabaseUser;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
 };
@@ -104,6 +106,7 @@ export async function registerSessionRoutes(
   app: FastifyInstance,
   options: SessionRouteOptions = {},
 ) {
+  const optionalUser = options.optionalUser || attachOptionalSupabaseUser;
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
   const verificationIpLimiter = createRateLimiter({
@@ -119,12 +122,9 @@ export async function registerSessionRoutes(
 
   app.post(
     "/sessions",
-    { preHandler: requireUser },
+    { preHandler: optionalUser },
     async (request, reply) => {
       const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
 
       if (!service) {
         return reply.status(503).send({
@@ -197,7 +197,7 @@ export async function registerSessionRoutes(
           id: sessionId,
           mode: parsedBody.data.mode,
           session_token_hash: hashSessionToken(sessionToken),
-          user_id: user.id,
+          user_id: user?.id || null,
         });
 
       if (sessionError) {
@@ -217,7 +217,7 @@ export async function registerSessionRoutes(
         sessionId,
         sessionToken,
         user: {
-          id: user.id,
+          id: user?.id || null,
         },
       };
     },
