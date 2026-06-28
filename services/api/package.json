@@ -14,6 +14,7 @@
     "import:curated-rom-candidates": "tsx scripts/importCuratedRomCandidates.ts",
     "import:homebrew-candidates": "tsx scripts/importHomebrewHubCandidates.ts",
     "lint": "eslint .",
+    "mirror:catalog-artifacts": "tsx scripts/mirrorCatalogArtifacts.ts",
     "predeploy:hosted": "npm run check:access-log-schema && npm run check:submission-cleanup-policy && npm run typecheck && npm run lint && npm run build",
     "smoke:staging": "tsx scripts/stagingSmoke.ts",
     "test": "node --import tsx --test \"tests/**/*.test.ts\"",
