@@ -13,7 +13,7 @@ fi
 
 runtime_id="${PIXELATED_CAPTURE_RUNTIME_ID:-mesen}"
 engine_image="${PIXELATED_ENGINE_IMAGE:-pixelated-engine}"
-delay_seconds="${PIXELATED_CAPTURE_DELAY_SECONDS:-6}"
+delay_seconds="${PIXELATED_CAPTURE_DELAY_SECONDS:-35}"
 rom_path="$(cd "$(dirname "${PIXELATED_CAPTURE_ROM_PATH}")" && pwd)/$(basename "${PIXELATED_CAPTURE_ROM_PATH}")"
 output_dir="$(mkdir -p "$(dirname "${PIXELATED_CAPTURE_OUTPUT_PATH}")" && cd "$(dirname "${PIXELATED_CAPTURE_OUTPUT_PATH}")" && pwd)"
 output_file="$(basename "${PIXELATED_CAPTURE_OUTPUT_PATH}")"
@@ -66,9 +66,16 @@ EOF
     retroarch -f -L "${CAPTURE_CORE_PATH}" --appendconfig /tmp/retroarch-capture.cfg /capture/input.rom >/tmp/retroarch.log 2>&1 &
     retroarch_pid="$!"
 
-    sleep "${CAPTURE_DELAY_SECONDS}"
-    xdotool key Return >/dev/null 2>&1 || true
-    xdotool key space >/dev/null 2>&1 || true
+    sleep 2
+    xdotool search --onlyvisible --class retroarch windowactivate >/dev/null 2>&1 || true
+    for _ in $(seq 1 "${CAPTURE_DELAY_SECONDS}"); do
+      xdotool key Return >/dev/null 2>&1 || true
+      xdotool key space >/dev/null 2>&1 || true
+      xdotool key z >/dev/null 2>&1 || true
+      xdotool key x >/dev/null 2>&1 || true
+      sleep 1
+    done
+    sleep 2
     sleep 1
 
     gst-launch-1.0 -q \
