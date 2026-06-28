@@ -5,7 +5,7 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
 dotenv.config();
@@ -34,6 +34,8 @@ type CaptureTarget = {
   build: BuildRow;
   game: GameRow;
 };
+
+type CatalogSupabaseClient = SupabaseClient<any, "public", any, any, any>;
 
 type CaptureResult =
   | {
@@ -257,7 +259,15 @@ function runCaptureCommand(
     romPath: string;
   },
 ) {
-  const timeoutMs = Number(process.env.CATALOG_ARTWORK_CAPTURE_TIMEOUT_MS || 45_000);
+  const captureDelaySeconds = Number(
+    process.env.PIXELATED_CAPTURE_DELAY_SECONDS || 35,
+  );
+  const defaultTimeoutMs =
+    (Number.isFinite(captureDelaySeconds) ? captureDelaySeconds : 35) * 1000 +
+    90_000;
+  const timeoutMs = Number(
+    process.env.CATALOG_ARTWORK_CAPTURE_TIMEOUT_MS || defaultTimeoutMs,
+  );
 
   return new Promise<void>((resolve, reject) => {
     const child = spawn(command, {
@@ -350,7 +360,7 @@ async function captureArtwork(
 }
 
 async function uploadObject(
-  service: ReturnType<typeof createClient>,
+  service: CatalogSupabaseClient,
   objectPath: string,
   bytes: Buffer,
   contentType: string,
@@ -373,7 +383,11 @@ async function uploadObject(
   };
 }
 
-function createCoverSvg(target: CaptureTarget, backdropUrl: string) {
+function createImageDataUri(bytes: Buffer, contentType: string) {
+  return `data:${contentType};base64,${bytes.toString("base64")}`;
+}
+
+function createCoverSvg(target: CaptureTarget, screenshotDataUri: string) {
   const titleLines = wrapSvgTitle(target.game.title);
   const titleText = titleLines
     .map(
@@ -383,28 +397,24 @@ function createCoverSvg(target: CaptureTarget, backdropUrl: string) {
     .join("");
   const platform = escapeSvgText((target.build.platform_id || "game").toUpperCase());
   const title = escapeSvgText(target.game.title);
-  const imageUrl = escapeSvgText(backdropUrl);
+  const imageUrl = escapeSvgText(screenshotDataUri);
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1080" viewBox="0 0 720 1080" role="img" aria-labelledby="title desc">
   <title id="title">${title}</title>
   <desc id="desc">Generated gameplay cover for ${title}</desc>
   <defs>
-    <linearGradient id="fade" x1="0" x2="0" y1="0" y2="1">
-      <stop offset="0%" stop-color="#050505" stop-opacity="0.18"/>
-      <stop offset="46%" stop-color="#14070D" stop-opacity="0.38"/>
-      <stop offset="100%" stop-color="#050505" stop-opacity="0.92"/>
-    </linearGradient>
-    <linearGradient id="tint" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0%" stop-color="#6d3148" stop-opacity="0.24"/>
-      <stop offset="100%" stop-color="#9b0048" stop-opacity="0.20"/>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#351522"/>
+      <stop offset="52%" stop-color="#14070D"/>
+      <stop offset="100%" stop-color="#050505"/>
     </linearGradient>
   </defs>
-  <rect width="720" height="1080" fill="#050505"/>
-  <image href="${imageUrl}" x="0" y="0" width="720" height="1080" preserveAspectRatio="xMidYMid slice"/>
-  <rect width="720" height="1080" fill="url(#tint)"/>
-  <rect width="720" height="1080" fill="url(#fade)"/>
+  <rect width="720" height="1080" fill="url(#bg)"/>
+  <rect width="720" height="1080" fill="#5a263b" opacity="0.18"/>
+  <rect x="40" y="84" width="640" height="520" rx="28" fill="#050505" stroke="#d8a4b5" stroke-opacity="0.58" stroke-width="3"/>
+  <image href="${imageUrl}" x="40" y="104" width="640" height="480" preserveAspectRatio="xMidYMid meet" style="image-rendering:pixelated;image-rendering:crisp-edges"/>
   <rect x="32" y="32" width="656" height="1016" rx="34" fill="none" stroke="#d8a4b5" stroke-opacity="0.58" stroke-width="3"/>
-  <g transform="translate(48 746)">
+  <g transform="translate(48 734)">
     <rect x="0" y="-54" width="${Math.max(132, platform.length * 22)}" height="42" rx="21" fill="#5a263b" fill-opacity="0.92" stroke="#d8a4b5" stroke-opacity="0.55"/>
     <text x="24" y="-26" fill="#f3c4d4" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="900" letter-spacing="5">${platform}</text>
     <text x="0" y="42" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="54" font-weight="900" letter-spacing="-1">${titleText}</text>
@@ -413,7 +423,7 @@ function createCoverSvg(target: CaptureTarget, backdropUrl: string) {
 }
 
 async function uploadArtwork(
-  service: ReturnType<typeof createClient>,
+  service: CatalogSupabaseClient,
   target: CaptureTarget,
   imagePath: string,
 ) {
@@ -424,13 +434,17 @@ async function uploadArtwork(
   const coverObjectPath = `${rootPath}/${assetKey}-cover.svg`;
 
   const backdropBytes = await fsp.readFile(imagePath);
+  const backdropContentType = contentTypeFor(imagePath);
   const backdrop = await uploadObject(
     service,
     backdropObjectPath,
     backdropBytes,
-    contentTypeFor(imagePath),
+    backdropContentType,
   );
-  const coverSvg = createCoverSvg(target, backdrop.publicUrl);
+  const coverSvg = createCoverSvg(
+    target,
+    createImageDataUri(backdropBytes, backdropContentType),
+  );
   const cover = await uploadObject(
     service,
     coverObjectPath,
@@ -454,7 +468,7 @@ async function uploadArtwork(
 }
 
 async function loadTargets(
-  service: ReturnType<typeof createClient>,
+  service: CatalogSupabaseClient,
   options: {
     force: boolean;
     gameId: string | null;
@@ -535,7 +549,7 @@ async function main() {
     throw new Error("--apply requires --artwork-dir or --capture-command.");
   }
 
-  const service = createClient(supabaseUrl, serviceRoleKey, {
+  const service: CatalogSupabaseClient = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false },
   });
   const targets = await loadTargets(service, options);
