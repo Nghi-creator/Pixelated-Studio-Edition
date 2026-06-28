@@ -6,6 +6,10 @@ type InputTargetLike = EventTarget & {
   tagName?: string;
 };
 
+type IgnoreGameInputOptions = {
+  respectDefaultPrevented?: boolean;
+};
+
 const keyToGameAction: Record<string, string> = {
   ArrowDown: "dpad_down",
   ArrowLeft: "dpad_left",
@@ -24,12 +28,32 @@ const keyToGameAction: Record<string, string> = {
   Z: "face_south",
 };
 
-export function getGameActionForKey(key: string) {
-  return keyToGameAction[key] || "";
+const codeToGameAction: Record<string, string> = {
+  ArrowDown: "dpad_down",
+  ArrowLeft: "dpad_left",
+  ArrowRight: "dpad_right",
+  ArrowUp: "dpad_up",
+  Enter: "start",
+  KeyA: "shoulder_left",
+  KeyS: "shoulder_right",
+  KeyX: "face_east",
+  KeyZ: "face_south",
+  ShiftLeft: "select",
+  ShiftRight: "select",
+  Space: "select",
+};
+
+export function getGameActionForKey(key: string, code = "") {
+  return keyToGameAction[key] || codeToGameAction[code] || "";
 }
 
-export function shouldIgnoreGameInput(event: KeyboardEvent) {
-  if (event.defaultPrevented) return true;
+export function shouldIgnoreGameInput(
+  event: KeyboardEvent,
+  options: IgnoreGameInputOptions = {},
+) {
+  if (options.respectDefaultPrevented !== false && event.defaultPrevented) {
+    return true;
+  }
 
   const target = event.target as InputTargetLike | null;
   if (!target || typeof target !== "object") return false;
@@ -51,17 +75,17 @@ export const attachEngineInput = (
   playerIndex = 1,
 ) => {
   const handleKeyDown = (event: KeyboardEvent) => {
-    if (shouldIgnoreGameInput(event)) return;
+    if (shouldIgnoreGameInput(event, { respectDefaultPrevented: false })) return;
     if (event.repeat) return;
-    const gameAction = getGameActionForKey(event.key);
+    const gameAction = getGameActionForKey(event.key, event.code);
     if (!gameAction) return;
     socket.emit("keydown", { sessionId, playerIndex, gameAction });
     event.preventDefault();
   };
 
   const handleKeyUp = (event: KeyboardEvent) => {
-    if (shouldIgnoreGameInput(event)) return;
-    const gameAction = getGameActionForKey(event.key);
+    if (shouldIgnoreGameInput(event, { respectDefaultPrevented: false })) return;
+    const gameAction = getGameActionForKey(event.key, event.code);
     if (!gameAction) return;
     socket.emit("keyup", { sessionId, playerIndex, gameAction });
     event.preventDefault();

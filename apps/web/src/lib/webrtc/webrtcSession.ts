@@ -44,12 +44,19 @@ export const resolveGameBootTarget = async (
 
   const backendSession = await api.createSession(gameId, clientSessionId);
   const requiredRuntimeKind = backendSession.boot.runtimeKind || "libretro";
-  const activeRuntimeKind = await loadEngineRuntimeKind();
+  let activeRuntimeKind = await loadEngineRuntimeKind();
   if (requiredRuntimeKind !== activeRuntimeKind) {
     const switchResult = await requestEngineRuntimeSwitch(requiredRuntimeKind).catch(
-      () => ({ status: "unavailable" as const }),
+      () => ({
+        error:
+          "Pixelated Desktop could not switch runtimes automatically. Open the app from Pixelated Desktop or pair this browser with the local engine, then try again.",
+        status: "unavailable" as const,
+      }),
     );
     if (switchResult.status === "blocked") {
+      throw new Error(switchResult.error);
+    }
+    if (switchResult.status === "unavailable") {
       throw new Error(switchResult.error);
     }
     if (switchResult.status === "restarting") {
@@ -59,6 +66,7 @@ export const resolveGameBootTarget = async (
           : "Pixelated Desktop is switching to the libretro engine. Wait for the desktop engine to show ready, then press Play again.",
       );
     }
+    activeRuntimeKind = await loadEngineRuntimeKind();
   }
   assertEngineRuntimeKindMatches(requiredRuntimeKind, activeRuntimeKind);
   const romFilename = backendSession.boot.launchManifestId

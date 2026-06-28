@@ -45,17 +45,82 @@ test("game input respects explicit ignore containers and prevented events", () =
     } as unknown as KeyboardEvent),
     true,
   );
+  assert.equal(
+    __testing.shouldIgnoreGameInput(
+      {
+        defaultPrevented: true,
+        target: { tagName: "DIV" },
+      } as unknown as KeyboardEvent,
+      { respectDefaultPrevented: false },
+    ),
+    false,
+  );
 });
 
 test("game input maps browser keys to normalized game actions", () => {
   assert.equal(__testing.getGameActionForKey("ArrowUp"), "dpad_up");
+  assert.equal(__testing.getGameActionForKey("", "ArrowUp"), "dpad_up");
   assert.equal(__testing.getGameActionForKey("z"), "face_south");
+  assert.equal(__testing.getGameActionForKey("", "KeyZ"), "face_south");
   assert.equal(__testing.getGameActionForKey("x"), "face_east");
+  assert.equal(__testing.getGameActionForKey("", "KeyX"), "face_east");
   assert.equal(__testing.getGameActionForKey("a"), "shoulder_left");
   assert.equal(__testing.getGameActionForKey("s"), "shoulder_right");
   assert.equal(__testing.getGameActionForKey("Enter"), "start");
   assert.equal(__testing.getGameActionForKey("Shift"), "select");
   assert.equal(__testing.getGameActionForKey("q"), "");
+});
+
+test("attached engine input still emits when gameplay keys already prevented page scroll", () => {
+  const originalWindow = globalThis.window;
+  const listeners = new Map<string, (event: KeyboardEvent) => void>();
+  const emitted: Array<{ event: string; payload: unknown }> = [];
+  const socket = {
+    emit: (event: string, payload: unknown) => {
+      emitted.push({ event, payload });
+    },
+  };
+
+  Object.defineProperty(globalThis, "window", {
+    configurable: true,
+    value: {
+      addEventListener: (event: string, handler: (event: KeyboardEvent) => void) => {
+        listeners.set(event, handler);
+      },
+      removeEventListener: (event: string) => {
+        listeners.delete(event);
+      },
+    },
+  });
+
+  try {
+    const detach = attachEngineInput(socket as never, "session-1", 1);
+    listeners.get("keydown")?.({
+      code: "ArrowUp",
+      defaultPrevented: true,
+      key: "ArrowUp",
+      preventDefault: () => undefined,
+      repeat: false,
+      target: { tagName: "DIV" },
+    } as unknown as KeyboardEvent);
+
+    assert.deepEqual(emitted, [
+      {
+        event: "keydown",
+        payload: {
+          gameAction: "dpad_up",
+          playerIndex: 1,
+          sessionId: "session-1",
+        },
+      },
+    ]);
+    detach();
+  } finally {
+    Object.defineProperty(globalThis, "window", {
+      configurable: true,
+      value: originalWindow,
+    });
+  }
 });
 
 test("attached engine input emits normalized actions", () => {
