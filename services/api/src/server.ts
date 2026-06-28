@@ -4,22 +4,22 @@ import { scheduleControlPlaneCleanup } from "./modules/maintenance/controlPlaneC
 import { createLoggerOptions } from "./plugins/logger.js";
 import { registerCors } from "./plugins/cors.js";
 import { registerGlobalRateLimit } from "./plugins/rateLimit.js";
-import { registerAccessLogRoutes } from "./routes/admin/accessLogs.js";
-import { registerAdminUserRoutes } from "./routes/admin/adminUsers.js";
-import { registerCatalogCandidateRoutes } from "./routes/admin/catalogCandidates.js";
+import { registerAccessLogRoutes } from "./modules/observability/http/accessLogRoutes.js";
+import { registerAdminUserRoutes } from "./modules/users/http/adminUserRoutes.js";
+import { registerCatalogCandidateRoutes } from "./modules/catalog/http/catalogCandidateRoutes.js";
 import { registerModerationRoutes } from "./modules/moderation/http/registerModerationRoutes.js";
-import { registerAuthMethodsRoutes } from "./routes/auth/authMethods.js";
-import { registerMeRoutes } from "./routes/auth/me.js";
-import { registerSessionRoutes } from "./routes/auth/sessions.js";
+import { registerAuthMethodsRoutes } from "./modules/auth/http/authMethodsRoutes.js";
+import { registerMeRoutes } from "./modules/auth/http/meRoutes.js";
+import { registerSessionRoutes } from "./modules/auth/http/sessionRoutes.js";
 import { registerCatalogRoutes } from "./modules/catalog/http/registerCatalogRoutes.js";
 import { registerPlayCountRoutes } from "./modules/catalog/http/playCountRoutes.js";
 import { registerSubmissionRoutes } from "./modules/catalog/http/registerSubmissionRoutes.js";
-import { registerLocalPairingRoutes } from "./routes/multiplayer/localPairings.js";
-import { registerMultiplayerRoutes } from "./routes/multiplayer/multiplayer.js";
-import { registerWebRTCRoutes } from "./routes/multiplayer/webrtc.js";
-import { registerHealthRoutes } from "./routes/system/health.js";
-import { registerMetricRoutes } from "./routes/system/metrics.js";
-import { registerProfileRoutes } from "./routes/users/profiles.js";
+import { registerLocalPairingRoutes } from "./modules/multiplayer/http/localPairingRoutes.js";
+import { registerMultiplayerRoutes } from "./modules/multiplayer/http/multiplayerRoutes.js";
+import { registerWebRTCRoutes } from "./modules/multiplayer/http/webrtcRoutes.js";
+import { registerHealthRoutes } from "./modules/system/http/healthRoutes.js";
+import { registerMetricRoutes } from "./modules/observability/http/metricRoutes.js";
+import { registerProfileRoutes } from "./modules/users/http/profileRoutes.js";
 
 export async function buildServer() {
   const app = Fastify({

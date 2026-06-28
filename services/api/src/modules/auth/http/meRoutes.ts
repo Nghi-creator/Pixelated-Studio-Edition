@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../modules/auth/supabaseAuth.js";
+} from "../supabaseAuth.js";
 
 type ProfilePermissions = {
   avatar_url: string | null;

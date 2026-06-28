@@ -3,12 +3,12 @@ import { z } from "zod";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../modules/auth/supabaseAuth.js";
+} from "../../auth/supabaseAuth.js";
 import {
   clearCachedUserRole,
   getCachedUserRole,
-} from "../../modules/auth/roleCache.js";
-import { logTiming, timed } from "../../modules/observability/timing.js";
+} from "../../auth/roleCache.js";
+import { logTiming, timed } from "../../observability/timing.js";
 
 const usersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),

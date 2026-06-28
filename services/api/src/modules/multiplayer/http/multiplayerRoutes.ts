@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../modules/auth/supabaseAuth.js";
+} from "../../auth/supabaseAuth.js";
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
