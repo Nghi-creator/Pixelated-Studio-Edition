@@ -144,5 +144,14 @@ export async function requestEngineRuntimeSwitch(
     };
   }
 
-  return { status: "unavailable" as const };
+  const payload = (await response.json().catch(() => ({}))) as {
+    error?: unknown;
+  };
+  return {
+    error:
+      typeof payload.error === "string"
+        ? payload.error
+        : "Pixelated Desktop could not switch runtimes automatically. Open the app from Pixelated Desktop or pair this browser with the local engine, then try again.",
+    status: "unavailable" as const,
+  };
 }
