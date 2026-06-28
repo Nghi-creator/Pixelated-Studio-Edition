@@ -342,6 +342,7 @@ function seedPublishedGame(
 async function createTestApp(db: FakeSupabase, userId = USER_ID) {
   const app = Fastify({ logger: false });
   const options = {
+    optionalUser: requireUser(userId),
     requireUser: requireUser(userId),
     supabase: db as never,
   };
@@ -418,6 +419,59 @@ test("sessions persist hashed tokens and verify approved boot targets", async ()
   });
 
   assert.equal(badVerifyResponse.statusCode, 401);
+  await app.close();
+});
+
+test("anonymous users can create playable cloud sessions", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGame(db, {
+    id: GAME_ID,
+    rom_filename: "public.gb",
+    rom_url: "https://pxksbsloksyfwiqyfkrz.supabase.co/public.gb",
+  });
+  const build = db.gameBuilds.get(`${GAME_ID}-build`);
+  if (build) {
+    build.artifact_filename = "public.gb";
+    build.platform_id = "gb";
+    build.runtime_id = "mgba";
+  }
+  const app = Fastify({ logger: false });
+  await registerSessionRoutes(app, {
+    optionalUser: async () => undefined,
+    requireUser: requireUser(USER_ID),
+    supabase: db as never,
+  });
+
+  const createResponse = await app.inject({
+    method: "POST",
+    payload: { clientSessionId: "anonymous-session", gameId: GAME_ID },
+    url: "/sessions",
+  });
+
+  assert.equal(createResponse.statusCode, 200);
+  const created = createResponse.json<{
+    sessionId: string;
+    sessionToken: string;
+    user: { id: string | null };
+  }>();
+  assert.equal(created.user.id, null);
+  assert.equal(db.sessions.get("anonymous-session")?.user_id, null);
+
+  const verifyResponse = await app.inject({
+    method: "POST",
+    payload: { sessionToken: created.sessionToken },
+    url: `/sessions/${created.sessionId}/verify`,
+  });
+
+  assert.equal(verifyResponse.statusCode, 200);
+  assert.equal(
+    verifyResponse.json<{ boot: { runtimeId: string } }>().boot.runtimeId,
+    "mgba",
+  );
+  assert.equal(
+    verifyResponse.json<{ user: { id: string | null } }>().user.id,
+    null,
+  );
   await app.close();
 });
 

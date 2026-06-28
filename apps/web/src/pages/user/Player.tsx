@@ -64,6 +64,9 @@ export default function Player() {
   const invitedRole =
     lobbySearch.get("role") === "player" ? "player" : "spectator";
   const playerMode = invitedSessionId ? "guest" : "host";
+  const isLocalGame = /\.(nes|gb|gbc|gba|sfc|smc|md|gen|sms|gg)$/i.test(
+    id || "",
+  );
   const profileUsername =
     profileIdentity && profileIdentity.userId === currentUser?.id
       ? profileIdentity.username
@@ -201,9 +204,6 @@ export default function Player() {
       window.removeEventListener("keydown", preventScroll, { capture: true });
   }, []);
 
-  const isLocalGame = /\.(nes|gb|gbc|gba|sfc|smc|md|gen|sms|gg)$/i.test(
-    id || "",
-  );
   const fallbackBackRoute = isLocalGame ? "/local" : "/";
   const fallbackBackText = isLocalGame
     ? "Back to Local Vault"

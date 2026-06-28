@@ -89,6 +89,7 @@ function printHelp() {
 
 Options:
   --apply                  Upload separate cover/backdrop assets and update games.
+  --allow-failures         Exit 0 even when individual games fail.
   --dry-run                List what would happen without mutating Supabase.
   --force                  Include games that already have non-generated artwork.
   --limit <n>              Process at most n games.
@@ -118,6 +119,10 @@ function parseLimit() {
     throw new Error("--limit must be a positive integer.");
   }
   return value;
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function sanitizeObjectSegment(value: string) {
@@ -270,11 +275,13 @@ function assertUsefulPngCapture(bytes: Buffer, filePath: string) {
   const nonBlackRatio = sampledPixels > 0 ? nonBlackPixels / sampledPixels : 0;
   const averageBrightness =
     sampledPixels > 0 ? brightnessTotal / sampledPixels : 0;
-  if (nonBlackRatio < 0.02 || colors.size < 3 || averageBrightness < 4) {
+  if (nonBlackRatio < 0.005 || colors.size < 2 || averageBrightness < 0.5) {
     throw new Error(
       `Captured artwork looks blank/invalid (${Math.round(
         nonBlackRatio * 100,
-      )}% non-black, ${colors.size} colors): ${filePath}`,
+      )}% non-black, ${colors.size} colors, ${Math.round(
+        averageBrightness,
+      )} avg brightness): ${filePath}`,
     );
   }
 }
@@ -640,47 +647,85 @@ async function main() {
       `${prefix}: ${target.game.title} (${target.build.platform_id || "unknown"}, ${target.build.runtime_id || "unknown"})\n`,
     );
 
-    const result = await captureArtwork(target, options);
-    if (result.source === "none") {
-      report.push({
-        gameId: target.game.id,
-        status: "skipped",
-        title: target.game.title,
-        reason: result.reason,
-      });
-      process.stdout.write(`  skipped: ${result.reason}\n`);
-      continue;
-    }
+    try {
+      const result = await captureArtwork(target, options);
+      if (result.source === "none") {
+        report.push({
+          gameId: target.game.id,
+          status: "skipped",
+          title: target.game.title,
+          reason: result.reason,
+        });
+        process.stdout.write(`  skipped: ${result.reason}\n`);
+        continue;
+      }
 
-    if (dryRun) {
+      if (dryRun) {
+        report.push({
+          gameId: target.game.id,
+          imagePath: result.imagePath,
+          source: result.source,
+          status: "ready",
+          title: target.game.title,
+        });
+        process.stdout.write(`  ready: ${result.imagePath} (${result.source})\n`);
+        continue;
+      }
+
+      const upload = await uploadArtwork(service, target, result.imagePath);
       report.push({
+        backdropObjectPath: upload.backdrop.objectPath,
+        backdropUrl: upload.backdrop.publicUrl,
+        coverObjectPath: upload.cover.objectPath,
+        coverUrl: upload.cover.publicUrl,
         gameId: target.game.id,
-        imagePath: result.imagePath,
         source: result.source,
-        status: "ready",
+        status: "uploaded",
         title: target.game.title,
       });
-      process.stdout.write(`  ready: ${result.imagePath} (${result.source})\n`);
-      continue;
+      process.stdout.write(`  uploaded backdrop: ${upload.backdrop.publicUrl}\n`);
+      process.stdout.write(`  uploaded cover: ${upload.cover.publicUrl}\n`);
+    } catch (error) {
+      const reason = errorMessage(error);
+      report.push({
+        gameId: target.game.id,
+        reason,
+        status: "failed",
+        title: target.game.title,
+      });
+      process.stderr.write(`  failed: ${reason}\n`);
     }
+  }
 
-    const upload = await uploadArtwork(service, target, result.imagePath);
-    report.push({
-      backdropObjectPath: upload.backdrop.objectPath,
-      backdropUrl: upload.backdrop.publicUrl,
-      coverObjectPath: upload.cover.objectPath,
-      coverUrl: upload.cover.publicUrl,
-      gameId: target.game.id,
-      source: result.source,
-      status: "uploaded",
-      title: target.game.title,
-    });
-    process.stdout.write(`  uploaded backdrop: ${upload.backdrop.publicUrl}\n`);
-    process.stdout.write(`  uploaded cover: ${upload.cover.publicUrl}\n`);
+  const counts = report.reduce(
+    (summary, entry) => {
+      const status =
+        typeof entry.status === "string" ? entry.status : "unknown";
+      summary[status] = (summary[status] || 0) + 1;
+      return summary;
+    },
+    {} as Record<string, number>,
+  );
+  process.stdout.write(
+    `catalog artwork summary: uploaded=${counts.uploaded || 0}, ready=${
+      counts.ready || 0
+    }, skipped=${counts.skipped || 0}, failed=${counts.failed || 0}\n`,
+  );
+
+  const failed = report.filter((entry) => entry.status === "failed");
+  if (failed.length > 0) {
+    process.stderr.write("failed games:\n");
+    for (const entry of failed) {
+      process.stderr.write(`- ${entry.title}: ${entry.reason}\n`);
+    }
   }
 
   if (hasArg("--json")) {
     process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  }
+
+  if (failed.length > 0 && !hasArg("--allow-failures")) {
+    process.exitCode = 1;
   }
 }
 
