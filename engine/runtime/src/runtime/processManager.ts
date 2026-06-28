@@ -83,7 +83,27 @@ export function createProcessManager(options: ProcessManagerOptions) {
         'input_libretro_device_p1 = "1"\n' +
         'input_libretro_device_p2 = "1"\n' +
         'input_libretro_device_p3 = "1"\n' +
-        'input_libretro_device_p4 = "1"\n',
+        'input_libretro_device_p4 = "1"\n' +
+        'input_player1_up = "up"\n' +
+        'input_player1_down = "down"\n' +
+        'input_player1_left = "left"\n' +
+        'input_player1_right = "right"\n' +
+        'input_player1_b = "z"\n' +
+        'input_player1_a = "x"\n' +
+        'input_player1_l = "a"\n' +
+        'input_player1_r = "s"\n' +
+        'input_player1_start = "enter"\n' +
+        'input_player1_select = "rshift"\n' +
+        'input_player2_up = "w"\n' +
+        'input_player2_down = "s"\n' +
+        'input_player2_left = "a"\n' +
+        'input_player2_right = "d"\n' +
+        'input_player2_b = "f"\n' +
+        'input_player2_a = "g"\n' +
+        'input_player2_l = "q"\n' +
+        'input_player2_r = "e"\n' +
+        'input_player2_start = "r"\n' +
+        'input_player2_select = "t"\n',
     );
     gamepads.start();
   }

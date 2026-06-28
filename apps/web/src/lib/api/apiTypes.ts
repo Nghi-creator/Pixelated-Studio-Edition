@@ -42,7 +42,7 @@ export type ApiSessionResponse = {
   sessionId: string;
   sessionToken: string;
   user: {
-    id: string;
+    id: string | null;
   };
 };
 

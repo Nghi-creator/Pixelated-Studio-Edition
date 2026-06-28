@@ -62,3 +62,28 @@ export async function requireSupabaseUser(
 
   request.user = data.user;
 }
+
+export async function attachOptionalSupabaseUser(
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  if (!supabaseAnon) {
+    return reply.status(503).send({
+      error: "Supabase auth is not configured for the API service.",
+    });
+  }
+
+  const token = getBearerToken(request);
+  if (!token) {
+    return undefined;
+  }
+
+  const { data, error } = await supabaseAnon.auth.getUser(token);
+
+  if (error || !data.user) {
+    return reply.status(401).send({ error: "Invalid bearer token" });
+  }
+
+  request.user = data.user;
+  return undefined;
+}
