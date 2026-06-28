@@ -5,6 +5,7 @@ import fsp from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import process from "node:process";
+import zlib from "node:zlib";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 
@@ -156,23 +157,8 @@ function escapeSvgText(value: string) {
     .replaceAll('"', "&quot;");
 }
 
-function wrapSvgTitle(title: string) {
-  const words = title.trim().split(/\s+/).filter(Boolean);
-  const lines: string[] = [];
-  let current = "";
-
-  for (const word of words) {
-    const next = current ? `${current} ${word}` : word;
-    if (next.length > 16 && current) {
-      lines.push(current);
-      current = word;
-    } else {
-      current = next;
-    }
-  }
-
-  if (current) lines.push(current);
-  return lines.slice(0, 3);
+function createImageDataUri(bytes: Buffer, contentType: string) {
+  return `data:${contentType};base64,${bytes.toString("base64")}`;
 }
 
 async function fileExists(filePath: string) {
@@ -181,6 +167,115 @@ async function fileExists(filePath: string) {
     return stat.isFile();
   } catch {
     return false;
+  }
+}
+
+function readUInt32(bytes: Buffer, offset: number) {
+  return bytes.readUInt32BE(offset);
+}
+
+function paethPredictor(left: number, above: number, upperLeft: number) {
+  const estimate = left + above - upperLeft;
+  const leftDistance = Math.abs(estimate - left);
+  const aboveDistance = Math.abs(estimate - above);
+  const upperLeftDistance = Math.abs(estimate - upperLeft);
+  if (leftDistance <= aboveDistance && leftDistance <= upperLeftDistance) {
+    return left;
+  }
+  return aboveDistance <= upperLeftDistance ? above : upperLeft;
+}
+
+function assertUsefulPngCapture(bytes: Buffer, filePath: string) {
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let bitDepth = 0;
+  let colorType = 0;
+  const idatChunks: Buffer[] = [];
+
+  while (offset + 12 <= bytes.length) {
+    const length = readUInt32(bytes, offset);
+    const type = bytes.subarray(offset + 4, offset + 8).toString("ascii");
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    if (dataEnd + 4 > bytes.length) break;
+
+    const data = bytes.subarray(dataStart, dataEnd);
+    if (type === "IHDR") {
+      width = readUInt32(data, 0);
+      height = readUInt32(data, 4);
+      bitDepth = data[8] || 0;
+      colorType = data[9] || 0;
+    } else if (type === "IDAT") {
+      idatChunks.push(data);
+    } else if (type === "IEND") {
+      break;
+    }
+
+    offset = dataEnd + 4;
+  }
+
+  if (!width || !height || bitDepth !== 8 || ![2, 6].includes(colorType)) {
+    return;
+  }
+
+  const bytesPerPixel = colorType === 6 ? 4 : 3;
+  const rowLength = width * bytesPerPixel;
+  const inflated = zlib.inflateSync(Buffer.concat(idatChunks));
+  const previous = Buffer.alloc(rowLength);
+  const current = Buffer.alloc(rowLength);
+  let nonBlackPixels = 0;
+  let sampledPixels = 0;
+  let brightnessTotal = 0;
+  const colors = new Set<string>();
+  let inflatedOffset = 0;
+
+  for (let y = 0; y < height; y += 1) {
+    const filter = inflated[inflatedOffset];
+    inflatedOffset += 1;
+    inflated.copy(current, 0, inflatedOffset, inflatedOffset + rowLength);
+    inflatedOffset += rowLength;
+
+    for (let x = 0; x < rowLength; x += 1) {
+      const left = x >= bytesPerPixel ? current[x - bytesPerPixel] || 0 : 0;
+      const above = previous[x] || 0;
+      const upperLeft =
+        x >= bytesPerPixel ? previous[x - bytesPerPixel] || 0 : 0;
+
+      if (filter === 1) {
+        current[x] = (current[x] + left) & 0xff;
+      } else if (filter === 2) {
+        current[x] = (current[x] + above) & 0xff;
+      } else if (filter === 3) {
+        current[x] = (current[x] + Math.floor((left + above) / 2)) & 0xff;
+      } else if (filter === 4) {
+        current[x] = (current[x] + paethPredictor(left, above, upperLeft)) & 0xff;
+      }
+    }
+
+    for (let x = 0; x < rowLength; x += bytesPerPixel * 8) {
+      const r = current[x] || 0;
+      const g = current[x + 1] || 0;
+      const b = current[x + 2] || 0;
+      const brightness = (r + g + b) / 3;
+      sampledPixels += 1;
+      brightnessTotal += brightness;
+      if (brightness > 18) nonBlackPixels += 1;
+      colors.add(`${r >> 4}-${g >> 4}-${b >> 4}`);
+    }
+
+    current.copy(previous);
+  }
+
+  const nonBlackRatio = sampledPixels > 0 ? nonBlackPixels / sampledPixels : 0;
+  const averageBrightness =
+    sampledPixels > 0 ? brightnessTotal / sampledPixels : 0;
+  if (nonBlackRatio < 0.02 || colors.size < 3 || averageBrightness < 4) {
+    throw new Error(
+      `Captured artwork looks blank/invalid (${Math.round(
+        nonBlackRatio * 100,
+      )}% non-black, ${colors.size} colors): ${filePath}`,
+    );
   }
 }
 
@@ -201,6 +296,8 @@ async function assertReadableImage(filePath: string) {
   if (!isPng && !isJpeg && !isWebp) {
     throw new Error(`Captured artwork must be PNG, JPEG, or WebP: ${filePath}`);
   }
+
+  if (isPng) assertUsefulPngCapture(bytes, filePath);
 }
 
 async function findLocalArtwork(target: CaptureTarget, artworkDir: string | null) {
@@ -383,73 +480,50 @@ async function uploadObject(
   };
 }
 
-function createImageDataUri(bytes: Buffer, contentType: string) {
-  return `data:${contentType};base64,${bytes.toString("base64")}`;
-}
-
-function createCoverSvg(target: CaptureTarget, screenshotDataUri: string) {
-  const titleLines = wrapSvgTitle(target.game.title);
-  const titleText = titleLines
-    .map(
-      (line, index) =>
-        `<tspan x="48" dy="${index === 0 ? 0 : 58}">${escapeSvgText(line)}</tspan>`,
-    )
-    .join("");
-  const platform = escapeSvgText((target.build.platform_id || "game").toUpperCase());
-  const title = escapeSvgText(target.game.title);
-  const imageUrl = escapeSvgText(screenshotDataUri);
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="720" height="1080" viewBox="0 0 720 1080" role="img" aria-labelledby="title desc">
-  <title id="title">${title}</title>
-  <desc id="desc">Generated gameplay cover for ${title}</desc>
-  <defs>
-    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0%" stop-color="#351522"/>
-      <stop offset="52%" stop-color="#14070D"/>
-      <stop offset="100%" stop-color="#050505"/>
-    </linearGradient>
-  </defs>
-  <rect width="720" height="1080" fill="url(#bg)"/>
-  <rect width="720" height="1080" fill="#5a263b" opacity="0.18"/>
-  <rect x="40" y="84" width="640" height="520" rx="28" fill="#050505" stroke="#d8a4b5" stroke-opacity="0.58" stroke-width="3"/>
-  <image href="${imageUrl}" x="40" y="104" width="640" height="480" preserveAspectRatio="xMidYMid meet" style="image-rendering:pixelated;image-rendering:crisp-edges"/>
-  <rect x="32" y="32" width="656" height="1016" rx="34" fill="none" stroke="#d8a4b5" stroke-opacity="0.58" stroke-width="3"/>
-  <g transform="translate(48 734)">
-    <rect x="0" y="-54" width="${Math.max(132, platform.length * 22)}" height="42" rx="21" fill="#5a263b" fill-opacity="0.92" stroke="#d8a4b5" stroke-opacity="0.55"/>
-    <text x="24" y="-26" fill="#f3c4d4" font-family="Inter, Arial, sans-serif" font-size="20" font-weight="900" letter-spacing="5">${platform}</text>
-    <text x="0" y="42" fill="#ffffff" font-family="Inter, Arial, sans-serif" font-size="54" font-weight="900" letter-spacing="-1">${titleText}</text>
-  </g>
-</svg>`;
-}
-
 async function uploadArtwork(
   service: CatalogSupabaseClient,
   target: CaptureTarget,
   imagePath: string,
 ) {
   const extension = path.extname(imagePath).toLowerCase() || ".png";
-  const assetKey = sanitizeObjectSegment(target.build.artifact_sha256 || target.build.id);
+  const imageBytes = await fsp.readFile(imagePath);
+  const imageSha256 = crypto.createHash("sha256").update(imageBytes).digest("hex");
+  const assetKey = sanitizeObjectSegment(
+    `${target.build.artifact_sha256 || target.build.id}-${imageSha256.slice(0, 12)}`,
+  );
   const rootPath = ["gameplay-captures", sanitizeObjectSegment(target.game.id)].join("/");
-  const backdropObjectPath = `${rootPath}/${assetKey}-backdrop${extension}`;
-  const coverObjectPath = `${rootPath}/${assetKey}-cover.svg`;
+  const backdropObjectPath = `${rootPath}/${assetKey}-backdrop.svg`;
+  const coverObjectPath = `${rootPath}/${assetKey}-cover${extension}`;
 
-  const backdropBytes = await fsp.readFile(imagePath);
   const backdropContentType = contentTypeFor(imagePath);
+  const imageDataUri = createImageDataUri(imageBytes, backdropContentType);
+  const backdropSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600" role="img" aria-label="${escapeSvgText(target.game.title)} gameplay backdrop">
+  <defs>
+    <filter id="blur" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="22"/>
+    </filter>
+    <linearGradient id="shade" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0%" stop-color="#050505" stop-opacity="0.92"/>
+      <stop offset="42%" stop-color="#050505" stop-opacity="0.46"/>
+      <stop offset="100%" stop-color="#050505" stop-opacity="0.86"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="600" fill="#050505"/>
+  <image href="${imageDataUri}" x="-80" y="-160" width="1760" height="920" preserveAspectRatio="xMidYMid slice" filter="url(#blur)" opacity="0.72"/>
+  <rect width="1600" height="600" fill="url(#shade)"/>
+  <image href="${imageDataUri}" x="820" y="60" width="640" height="480" preserveAspectRatio="xMidYMid meet" style="image-rendering:pixelated;image-rendering:crisp-edges"/>
+</svg>`;
   const backdrop = await uploadObject(
     service,
     backdropObjectPath,
-    backdropBytes,
-    backdropContentType,
-  );
-  const coverSvg = createCoverSvg(
-    target,
-    createImageDataUri(backdropBytes, backdropContentType),
+    Buffer.from(backdropSvg),
+    "image/svg+xml",
   );
   const cover = await uploadObject(
     service,
     coverObjectPath,
-    Buffer.from(coverSvg),
-    "image/svg+xml",
+    imageBytes,
+    backdropContentType,
   );
 
   const { error: updateError } = await service
