@@ -112,11 +112,15 @@ async function startCompanion(
       preserveSecurityState: launchContext.preserveCompanionSecurity,
     });
     const hostedInviteUrls = launchContext.companionUrls.map(createHostedInviteUrl);
+    const localControlUrl = `http://localhost:${companion.httpPort}`;
     activeCompanion = {
       advertisedUrls: launchContext.advertisedUrls,
       certPath: companion.certPath,
       exposureMode: launchContext.exposureMode,
-      launchUrl: `https://localhost:${companion.port}`,
+      launchUrl:
+        launchContext.exposureMode === "local"
+          ? localControlUrl
+          : `https://localhost:${companion.port}`,
       urls: hostedInviteUrls,
     };
     if (launchContext.exposureMode === "lan" && launchContext.inviteExpiresAt) {
@@ -137,7 +141,7 @@ async function startCompanion(
     }
     event.reply(
       "server-log",
-      `Desktop companion HTTPS server ready on port ${companion.port}.`,
+      `Desktop companion servers ready on ports ${companion.port} (HTTPS) and ${companion.httpPort} (local HTTP).`,
     );
   } catch (err) {
     const message = getErrorMessage(err);

@@ -74,10 +74,12 @@ export type CompanionServerOptions = {
 };
 
 export type CompanionServerResult = CertificatePaths & {
+  httpPort: number;
   port: number;
 };
 
 let companionServer: https.Server | null = null;
+let companionHttpServer: http.Server | null = null;
 
 export {
   consumeCompanionLaunchTicket,
@@ -87,6 +89,48 @@ export {
   revokeCompanionInvite,
   updateCompanionInvite,
 } from "./inviteState";
+
+async function handleCompanionRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  {
+    engineToken,
+    launchAllowedOrigins,
+    onRuntimeSwitch,
+  }: {
+    engineToken: string;
+    launchAllowedOrigins: string[];
+    onRuntimeSwitch?: (
+      runtimeKind: "libretro" | "native_linux",
+    ) => Promise<RuntimeSwitchResult> | RuntimeSwitchResult;
+  },
+) {
+  if (await handleInviteRequest(req, res, launchAllowedOrigins)) {
+    return;
+  }
+
+  if (await handleLaunchRequest(req, res, launchAllowedOrigins)) {
+    return;
+  }
+
+  if (
+    await handleRuntimeSwitchRequest(
+      req,
+      res,
+      launchAllowedOrigins,
+      onRuntimeSwitch,
+    )
+  ) {
+    return;
+  }
+
+  if (shouldProxy(req.url || "")) {
+    proxyHttpRequest(req, res, engineToken);
+    return;
+  }
+
+  serveCompanionStatus(res);
+}
 
 function normalizeInviteCode(value: unknown) {
   return typeof value === "string"
@@ -521,37 +565,23 @@ export function startCompanionServer({
   }
 
   const { certPath, keyPath } = createCompanionCertificate(certDir, lanAddresses);
+  const requestOptions = {
+    engineToken,
+    launchAllowedOrigins,
+    onRuntimeSwitch,
+  };
   const server = https.createServer(
     {
       cert: fs.readFileSync(certPath),
       key: fs.readFileSync(keyPath),
     },
-    async (req, res) => {
-      if (await handleInviteRequest(req, res, launchAllowedOrigins)) {
-        return;
-      }
-
-      if (await handleLaunchRequest(req, res, launchAllowedOrigins)) {
-        return;
-      }
-
-      if (
-        await handleRuntimeSwitchRequest(
-          req,
-          res,
-          launchAllowedOrigins,
-          onRuntimeSwitch,
-        )
-      ) {
-        return;
-      }
-
-      if (shouldProxy(req.url || "")) {
-        proxyHttpRequest(req, res, engineToken);
-        return;
-      }
-
-      serveCompanionStatus(res);
+    (req, res) => {
+      void handleCompanionRequest(req, res, requestOptions);
+    },
+  );
+  const httpServer = http.createServer(
+    (req, res) => {
+      void handleCompanionRequest(req, res, requestOptions);
     },
   );
 
@@ -560,20 +590,39 @@ export function startCompanionServer({
   );
 
   return new Promise<CompanionServerResult>((resolve, reject) => {
+    let httpReady = false;
+    let httpsReady = false;
+    const httpPort = port + 1;
+
+    const maybeResolve = () => {
+      if (!httpReady || !httpsReady) return;
+      companionServer = server;
+      companionHttpServer = httpServer;
+      resolve({
+        certPath,
+        httpPort,
+        keyPath,
+        port,
+      });
+    };
+
     const handleListenError = (err: Error) => {
       server.close();
+      httpServer.close();
       reject(err);
     };
 
     server.once("error", handleListenError);
+    httpServer.once("error", handleListenError);
+    httpServer.listen(httpPort, "127.0.0.1", () => {
+      httpServer.off("error", handleListenError);
+      httpReady = true;
+      maybeResolve();
+    });
     server.listen(port, "0.0.0.0", () => {
       server.off("error", handleListenError);
-      companionServer = server;
-      resolve({
-        certPath,
-        keyPath,
-        port,
-      });
+      httpsReady = true;
+      maybeResolve();
     });
   });
 }
@@ -582,6 +631,10 @@ export function stopCompanionServer(options: { preserveSecurityState?: boolean }
   if (companionServer) {
     companionServer.close();
     companionServer = null;
+  }
+  if (companionHttpServer) {
+    companionHttpServer.close();
+    companionHttpServer = null;
   }
   if (!options.preserveSecurityState) {
     resetCompanionSecurityState();
