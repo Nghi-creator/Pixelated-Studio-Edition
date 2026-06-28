@@ -3,7 +3,7 @@ import { z } from "zod";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../modules/auth/supabaseAuth.js";
+} from "../../auth/supabaseAuth.js";
 
 const METRIC_MIN_INTERVAL_MS = 5_000;
 

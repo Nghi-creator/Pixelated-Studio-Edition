@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { env, sharedRateLimitStoreConfigured } from "../../config/env.js";
+import { env, sharedRateLimitStoreConfigured } from "../../../config/env.js";
 
 const startedAt = Date.now();
 

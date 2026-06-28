@@ -3,10 +3,10 @@ import test from "node:test";
 import Fastify from "fastify";
 import type { FastifyRequest } from "fastify";
 import { cleanupControlPlaneState } from "../../src/modules/maintenance/controlPlaneCleanup.js";
-import { registerLocalPairingRoutes } from "../../src/routes/multiplayer/localPairings.js";
-import { registerMetricRoutes } from "../../src/routes/system/metrics.js";
-import { registerMultiplayerRoutes } from "../../src/routes/multiplayer/multiplayer.js";
-import { registerSessionRoutes } from "../../src/routes/auth/sessions.js";
+import { registerLocalPairingRoutes } from "../../src/modules/multiplayer/http/localPairingRoutes.js";
+import { registerMetricRoutes } from "../../src/modules/observability/http/metricRoutes.js";
+import { registerMultiplayerRoutes } from "../../src/modules/multiplayer/http/multiplayerRoutes.js";
+import { registerSessionRoutes } from "../../src/modules/auth/http/sessionRoutes.js";
 
 const USER_ID = "11111111-1111-4111-8111-111111111111";
 const OTHER_USER_ID = "22222222-2222-4222-8222-222222222222";

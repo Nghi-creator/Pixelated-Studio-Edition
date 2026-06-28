@@ -4,9 +4,9 @@ import { z } from "zod";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../modules/auth/supabaseAuth.js";
-import { fetchPublishedGameById } from "../../modules/catalog/services/catalogService.js";
-import { createRateLimiter } from "../../modules/security/sharedRateLimiter.js";
+} from "../supabaseAuth.js";
+import { fetchPublishedGameById } from "../../catalog/services/catalogService.js";
+import { createRateLimiter } from "../../security/sharedRateLimiter.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
 

@@ -3,13 +3,13 @@ import { z } from "zod";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../modules/auth/supabaseAuth.js";
-import { clearCachedUserRole } from "../../modules/auth/roleCache.js";
-import { rejectRateLimitedRequest } from "../../modules/security/rateLimitResponse.js";
+} from "../../auth/supabaseAuth.js";
+import { clearCachedUserRole } from "../../auth/roleCache.js";
+import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import {
   createRateLimiter,
   type RateLimiter,
-} from "../../modules/security/sharedRateLimiter.js";
+} from "../../security/sharedRateLimiter.js";
 
 const profileUpdateSchema = z.object({
   avatarUrl: z.string().url().nullable().optional(),

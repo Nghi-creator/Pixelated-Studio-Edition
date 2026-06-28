@@ -5,9 +5,9 @@ import {
   requireSupabaseUser,
   supabaseAnon,
   supabaseService,
-} from "../../modules/auth/supabaseAuth.js";
-import { getCachedUserRole } from "../../modules/auth/roleCache.js";
-import { logTiming, timed } from "../../modules/observability/timing.js";
+} from "../../auth/supabaseAuth.js";
+import { getCachedUserRole } from "../../auth/roleCache.js";
+import { logTiming, timed } from "../timing.js";
 
 const accessLogBodySchema = z.object({
   path: z.string().trim().min(1).max(2048),
