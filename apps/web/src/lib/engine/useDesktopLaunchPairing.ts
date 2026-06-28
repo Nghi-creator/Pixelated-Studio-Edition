@@ -4,9 +4,10 @@ import { pairFromDesktopLaunchUrl } from "./desktopLaunchPairing";
 import {
   createCompanionEngineToken,
   engineAuthHeaders,
+  setEngineControlToken,
   setEngineToken,
 } from "./engineAuth";
-import { setEngineUrl } from "./engineConfig";
+import { setEngineControlUrl, setEngineUrl } from "./engineConfig";
 
 export function useDesktopLaunchPairing() {
   useEffect(() => {
@@ -16,6 +17,8 @@ export function useDesktopLaunchPairing() {
       fetch: window.fetch.bind(window),
       pairLocalEngine: api.pairLocalEngine,
       replaceState: (url) => window.history.replaceState({}, "", url),
+      setEngineControlToken,
+      setEngineControlUrl,
       setEngineToken,
       setEngineUrl,
     });

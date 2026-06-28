@@ -1,5 +1,5 @@
-import { engineEndpoint } from "../engine/engineConfig";
-import { engineAuthHeaders } from "../engine/engineAuth";
+import { engineEndpoint, getEngineControlUrl } from "../engine/engineConfig";
+import { engineControlAuthHeaders } from "../engine/engineAuth";
 import type { EngineRuntimeKind } from "./runtimeKind";
 import type {
   EngineInputCapabilities,
@@ -113,12 +113,12 @@ export async function loadEngineRuntimeKind() {
 export async function requestEngineRuntimeSwitch(
   runtimeKind: EngineRuntimeKind,
 ) {
-  const response = await fetch(engineEndpoint("/runtime/switch"), {
+  const response = await fetch(`${getEngineControlUrl()}/runtime/switch`, {
     body: JSON.stringify({ runtimeKind }),
     cache: "no-store",
     headers: {
       "content-type": "application/json",
-      ...engineAuthHeaders(),
+      ...engineControlAuthHeaders(),
     },
     method: "POST",
   });

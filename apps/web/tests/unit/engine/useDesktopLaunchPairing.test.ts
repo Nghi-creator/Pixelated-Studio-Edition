@@ -5,7 +5,7 @@ import { pairFromDesktopLaunchUrl } from "../../../src/lib/engine/desktopLaunchP
 test("desktop launch pairing accepts local engine URL and token query params", async () => {
   const calls: Array<{ name: string; value: unknown }> = [];
   const url = new URL(
-    "https://pixelated.example/engine?engineUrl=http%3A%2F%2Flocalhost%3A8080&engineToken=local-token&keep=1",
+    "https://pixelated.example/engine?engineUrl=http%3A%2F%2Flocalhost%3A8080&engineToken=local-token&companionUrl=https%3A%2F%2Flocalhost%3A8090&launchTicket=ticket-1&keep=1",
   );
 
   const paired = await pairFromDesktopLaunchUrl(url, {
@@ -13,6 +13,13 @@ test("desktop launch pairing accepts local engine URL and token query params", a
     engineAuthHeaders: () => ({ "X-Engine-Token": "unused" }),
     fetch: ((input, init) => {
       calls.push({ name: "fetch", value: { input, init } });
+      if (String(input).endsWith("/launch/redeem")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ companionToken: "control-token" }),
+          status: 200,
+        } as Response);
+      }
       return Promise.resolve({ ok: true, json: async () => ({}) } as Response);
     }) as typeof fetch,
     pairLocalEngine: async (engineUrl) => {
@@ -30,6 +37,12 @@ test("desktop launch pairing accepts local engine URL and token query params", a
     replaceState: (nextUrl) => {
       calls.push({ name: "replaceState", value: nextUrl.toString() });
     },
+    setEngineControlToken: (token) => {
+      calls.push({ name: "setEngineControlToken", value: token });
+    },
+    setEngineControlUrl: (engineUrl) => {
+      calls.push({ name: "setEngineControlUrl", value: engineUrl });
+    },
     setEngineToken: (token) => {
       calls.push({ name: "setEngineToken", value: token });
     },
@@ -42,6 +55,19 @@ test("desktop launch pairing accepts local engine URL and token query params", a
   assert.deepEqual(calls, [
     { name: "setEngineUrl", value: "http://localhost:8080" },
     { name: "setEngineToken", value: "local-token" },
+    {
+      name: "fetch",
+      value: {
+        input: "https://localhost:8090/launch/redeem",
+        init: {
+          body: JSON.stringify({ ticket: "ticket-1" }),
+          headers: { "content-type": "application/json" },
+          method: "POST",
+        },
+      },
+    },
+    { name: "setEngineControlUrl", value: "https://localhost:8090" },
+    { name: "setEngineControlToken", value: "control-token" },
     {
       name: "fetch",
       value: {
@@ -101,6 +127,12 @@ test("desktop launch pairing redeems companion launch tickets locally", async ()
     replaceState: (nextUrl) => {
       calls.push({ name: "replaceState", value: nextUrl.toString() });
     },
+    setEngineControlToken: (token) => {
+      calls.push({ name: "setEngineControlToken", value: token });
+    },
+    setEngineControlUrl: (engineUrl) => {
+      calls.push({ name: "setEngineControlUrl", value: engineUrl });
+    },
     setEngineToken: (token) => {
       calls.push({ name: "setEngineToken", value: token });
     },
@@ -124,6 +156,8 @@ test("desktop launch pairing redeems companion launch tickets locally", async ()
     },
     { name: "setEngineUrl", value: "https://localhost:8090" },
     { name: "setEngineToken", value: "companion:redeemed-token" },
+    { name: "setEngineControlUrl", value: "https://localhost:8090" },
+    { name: "setEngineControlToken", value: "redeemed-token" },
     {
       name: "fetch",
       value: {
