@@ -35,8 +35,6 @@ export function GameArtworkFallback({
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_18%,rgba(216,164,181,0.36),transparent_28%),radial-gradient(circle_at_80%_12%,rgba(155,0,72,0.42),transparent_30%),linear-gradient(145deg,#351522_0%,#10070D_48%,#050505_100%)]" />
       <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:18px_18px]" />
-      <div className="absolute -left-12 top-8 h-40 w-40 rotate-45 rounded-[2rem] border border-synth-primary/30" />
-      <div className="absolute bottom-10 right-8 h-24 w-24 rounded-full border border-synth-secondary/25" />
 
       <div
         className={`relative z-10 flex h-full w-full flex-col ${
