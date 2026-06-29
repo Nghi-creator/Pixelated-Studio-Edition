@@ -83,20 +83,18 @@ export function PlayerHeader({
 
   if (hideGameChrome) {
     return (
-      <div className="relative mb-2 w-full">
-        <div className={`mx-auto flex w-full flex-col ${layoutClassName}`}>
-          <div className="flex min-h-10 items-center px-1 py-1 pr-44 sm:pr-64">
-            <Link
-              to={backRoute}
-              className="inline-flex min-w-0 items-center gap-2 text-gray-400 transition-colors hover:text-white"
-            >
-              <ArrowLeft className="h-5 w-5 shrink-0" />
-              <span className="truncate">{backText}</span>
-            </Link>
-          </div>
-
-          {rightsLinks && <div className="px-1 pb-2 pr-44 sm:pr-64">{rightsLinks}</div>}
+      <div className={`relative mb-2 flex w-full flex-col ${layoutClassName}`}>
+        <div className="flex min-h-10 items-center px-1 py-1 pr-44 sm:pr-64">
+          <Link
+            to={backRoute}
+            className="inline-flex min-w-0 items-center gap-2 text-gray-400 transition-colors hover:text-white"
+          >
+            <ArrowLeft className="h-5 w-5 shrink-0" />
+            <span className="truncate">{backText}</span>
+          </Link>
         </div>
+
+        {rightsLinks && <div className="px-1 pb-2 pr-44 sm:pr-64">{rightsLinks}</div>}
 
         <div className="absolute right-1 top-0">{statusBadge}</div>
       </div>
