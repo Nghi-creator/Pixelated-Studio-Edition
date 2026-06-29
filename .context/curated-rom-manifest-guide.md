@@ -56,6 +56,55 @@ Entry fields:
 
 ## Workflow
 
+### Generator-assisted intake
+
+Use the generator when you have a pinned source repo artifact or a direct raw
+artifact URL with explicit license evidence. It fetches or reads the playable
+artifact, validates the supported platform/header, computes exact size and
+SHA-256, and writes a manifest stub for human review.
+
+Pinned GitHub raw/blob artifact URLs infer `repoUrl`, `rawBaseUrl`,
+`sourceCommit`, and `sourceEntryPath` automatically:
+
+```bash
+npm --prefix services/api run generate:curated-rom-manifest -- \
+  --artifact-url https://raw.githubusercontent.com/owner/repo/<40-char-commit>/roms/game.gba \
+  --title "Game Title" \
+  --code-license-spdx MIT \
+  --license-url https://github.com/owner/repo/blob/<40-char-commit>/LICENSE \
+  --manifest-path curation/pixelated-roms.json \
+  --out .context/my-source-manifest.json
+```
+
+For non-GitHub raw URLs, also pass `--repo-url`, `--raw-base-url`,
+`--source-commit`, and `--source-entry-path`. If you already downloaded the
+artifact, add `--artifact-file path/to/game.gba`; the manifest still records
+the canonical HTTPS `--artifact-url`.
+
+The generator is intentionally strict: it refuses missing `codeLicenseSpdx`,
+missing HTTPS `licenseUrl`, unsupported extensions, unpinned source commits, and
+artifacts whose ROM header does not match the selected platform.
+
+Then dry-run the importer in strict mode:
+
+```bash
+npm --prefix services/api run import:curated-rom-candidates -- \
+  --manifest .context/my-source-manifest.json \
+  --dry-run \
+  --strict
+```
+
+If the JSON rows look right, import to Supabase with service-role env vars:
+
+```bash
+SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
+  npm --prefix services/api run import:curated-rom-candidates -- \
+  --manifest .context/my-source-manifest.json \
+  --strict
+```
+
+### Manual intake
+
 1. Download the candidate artifact from its original source.
 2. Compute checksum and size:
 
