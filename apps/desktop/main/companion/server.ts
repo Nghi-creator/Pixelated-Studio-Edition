@@ -117,6 +117,7 @@ async function handleCompanionRequest(
     await handleRuntimeSwitchRequest(
       req,
       res,
+      engineToken,
       launchAllowedOrigins,
       onRuntimeSwitch,
     )
@@ -462,6 +463,7 @@ async function handleLaunchRequest(
 async function handleRuntimeSwitchRequest(
   req: IncomingMessage,
   res: ServerResponse,
+  engineToken: string,
   allowedOrigins: string[],
   onRuntimeSwitch?: (
     runtimeKind: "libretro" | "native_linux",
@@ -488,8 +490,9 @@ async function handleRuntimeSwitchRequest(
 
   if (req.method !== "POST") return false;
 
-  const tokenScope = getCompanionAccessTokenScope(getCompanionTokenFromRequest(req));
-  if (!tokenScope) {
+  const requestToken = getCompanionTokenFromRequest(req);
+  const tokenScope = getCompanionAccessTokenScope(requestToken);
+  if (!tokenScope && (!requestToken || requestToken !== engineToken)) {
     sendJson(res, 401, {
       code: "runtime_switch_token_invalid",
       error: "Companion token is invalid or expired",

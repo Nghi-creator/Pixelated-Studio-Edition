@@ -1,4 +1,9 @@
-import { engineEndpoint, getEngineControlUrl } from "../engine/engineConfig";
+import {
+  engineEndpoint,
+  getEngineControlUrl,
+  getEngineUrl,
+  getLocalCompanionControlUrl,
+} from "../engine/engineConfig";
 import { engineControlAuthHeaders } from "../engine/engineAuth";
 import type { EngineRuntimeKind } from "./runtimeKind";
 import type {
@@ -113,16 +118,39 @@ export async function loadEngineRuntimeKind() {
 export async function requestEngineRuntimeSwitch(
   runtimeKind: EngineRuntimeKind,
 ) {
-  const response = await fetch(`${getEngineControlUrl()}/runtime/switch`, {
-    body: JSON.stringify({ runtimeKind }),
-    cache: "no-store",
-    headers: {
-      "content-type": "application/json",
-      ...engineControlAuthHeaders(),
-    },
-    method: "POST",
+  const requestSwitch = (controlUrl: string) =>
+    fetch(`${controlUrl}/runtime/switch`, {
+      body: JSON.stringify({ runtimeKind }),
+      cache: "no-store",
+      headers: {
+        "content-type": "application/json",
+        ...engineControlAuthHeaders(),
+      },
+      method: "POST",
+    });
+
+  const primaryControlUrl = getEngineControlUrl();
+  const fallbackControlUrl =
+    primaryControlUrl === getEngineUrl()
+      ? getLocalCompanionControlUrl(primaryControlUrl)
+      : null;
+  let response = await requestSwitch(primaryControlUrl).catch((err) => {
+    if (!fallbackControlUrl) throw err;
+    return requestSwitch(fallbackControlUrl);
   });
 
+  if (
+    fallbackControlUrl &&
+    primaryControlUrl !== fallbackControlUrl &&
+    [404, 405].includes(response.status)
+  ) {
+    response = await requestSwitch(fallbackControlUrl);
+  }
+
+  return parseRuntimeSwitchResponse(response);
+}
+
+async function parseRuntimeSwitchResponse(response: Response) {
   if (response.status === 202) {
     return { status: "restarting" as const };
   }
@@ -145,13 +173,19 @@ export async function requestEngineRuntimeSwitch(
   }
 
   const payload = (await response.json().catch(() => ({}))) as {
+    code?: unknown;
     error?: unknown;
   };
+  const error =
+    typeof payload.error === "string"
+      ? payload.error
+      : "Pixelated Desktop could not switch runtimes automatically. Open the app from Pixelated Desktop or pair this browser with the local engine, then try again.";
+
   return {
     error:
-      typeof payload.error === "string"
-        ? payload.error
-        : "Pixelated Desktop could not switch runtimes automatically. Open the app from Pixelated Desktop or pair this browser with the local engine, then try again.",
+      response.status === 401
+        ? "Pixelated Desktop needs a fresh control pairing before it can switch runtimes. Open the web app from Pixelated Desktop again, then press Play."
+        : error,
     status: "unavailable" as const,
   };
 }

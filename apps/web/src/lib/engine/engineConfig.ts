@@ -16,6 +16,26 @@ export const getEngineControlUrl = () => {
   return window.localStorage.getItem(ENGINE_CONTROL_URL_STORAGE_KEY) || getEngineUrl();
 };
 
+export const getLocalCompanionControlUrl = (engineUrl = getEngineUrl()) => {
+  try {
+    const url = new URL(engineUrl);
+    const hostname = url.hostname.toLowerCase();
+    const isLocalhost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "::1" ||
+      hostname === "[::1]";
+
+    if (!isLocalhost || url.port !== "8080") return null;
+
+    url.protocol = "http:";
+    url.port = "8091";
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return null;
+  }
+};
+
 export const setEngineUrl = (url: string) => {
   window.localStorage.setItem(ENGINE_URL_STORAGE_KEY, url.replace(/\/$/, ""));
 };
