@@ -6,6 +6,7 @@ import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
 type StreamStageProps = {
   blockedMessage?: string | null;
   controls?: ReactNode;
+  fallbackFrameUrl?: string | null;
   isMuted: boolean;
   onRetry?: () => void;
   showStreamTelemetry: boolean;
@@ -17,6 +18,7 @@ type StreamStageProps = {
 export function StreamStage({
   blockedMessage,
   controls,
+  fallbackFrameUrl,
   isMuted,
   onRetry,
   status,
@@ -68,6 +70,13 @@ export function StreamStage({
           playsInline
           className="h-full w-full object-contain"
         />
+        {fallbackFrameUrl && (
+          <img
+            alt=""
+            className="absolute inset-0 h-full w-full object-contain"
+            src={fallbackFrameUrl}
+          />
+        )}
       </div>
     </div>
   );

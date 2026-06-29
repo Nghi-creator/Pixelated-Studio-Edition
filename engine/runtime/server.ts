@@ -27,6 +27,7 @@ import {
   trackHttpClient,
   trackConnectedClient,
 } from "./src/clients/connectedClients";
+import { registerDisplayFrameRoutes } from "./src/http/displayFrameRoutes";
 import { registerErrorHandlers } from "./src/http/errorHandlers";
 import { registerHealthRoutes } from "./src/http/healthRoutes";
 import { registerLocalVaultRoutes } from "./src/http/localVaultRoutes";
@@ -101,6 +102,9 @@ registerLocalVaultRoutes(app, {
 });
 registerSmokeTelemetryRoutes(app, {
   getActiveSessionId: runtime.getActiveSessionId,
+  requireEngineToken: auth.requireEngineToken,
+});
+registerDisplayFrameRoutes(app, {
   requireEngineToken: auth.requireEngineToken,
 });
 registerErrorHandlers(app);

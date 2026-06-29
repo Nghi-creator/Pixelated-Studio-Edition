@@ -12,6 +12,7 @@ const ENGINE_PORT = 8080;
 const PROXY_PREFIXES = [
   "/health",
   "/clients",
+  "/display/frame",
   "/local-games",
   "/smoke/telemetry",
   "/socket.io",

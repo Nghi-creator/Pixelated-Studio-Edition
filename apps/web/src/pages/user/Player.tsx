@@ -18,6 +18,8 @@ import { useGameMetadata } from "../../features/player/hooks/useGameMetadata";
 import { useGameReactions } from "../../features/player/hooks/useGameReactions";
 import { usePlayCount } from "../../features/player/hooks/usePlayCount";
 import { api } from "../../lib/api/apiClient";
+import { engineAuthHeaders } from "../../lib/engine/engineAuth";
+import { engineEndpoint } from "../../lib/engine/engineConfig";
 import {
   getStreamProfile,
   STREAM_PROFILES,
@@ -28,6 +30,7 @@ import { shouldIgnoreGameInput } from "../../lib/webrtc/webrtcInput";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
 
 const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
+const BLACK_VIDEO_SAMPLE_THRESHOLD = 6;
 
 type PlayerBackState = {
   backRoute?: unknown;
@@ -42,7 +45,9 @@ export default function Player() {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
+  const [fallbackFrameUrl, setFallbackFrameUrl] = useState<string | null>(null);
+  const fallbackFrameUrlRef = useRef<string | null>(null);
 
   const [streamProfileId, setStreamProfileId] = useState<StreamProfileId>(() => {
     if (typeof window === "undefined") return "balanced";
@@ -181,10 +186,98 @@ export default function Player() {
   }, [streamProfileId]);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.srcObject = stream;
+    if (!stream) return;
+
+    video.muted = isMuted;
+    video.play().catch((err) => {
+      console.warn("[WebRTC] Browser blocked stream playback:", err);
+    });
+  }, [isMuted, stream]);
+
+  useEffect(() => {
+    fallbackFrameUrlRef.current = fallbackFrameUrl;
+  }, [fallbackFrameUrl]);
+
+  useEffect(() => {
+    if (status !== "playing") {
+      setFallbackFrameUrl(null);
+      return;
     }
-  }, [stream]);
+
+    let disposed = false;
+    let blackSamples = 0;
+    let pollingFrame = false;
+    const canvas = document.createElement("canvas");
+    canvas.width = 16;
+    canvas.height = 16;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+
+    const revokeCurrentFrame = () => {
+      if (fallbackFrameUrlRef.current) {
+        URL.revokeObjectURL(fallbackFrameUrlRef.current);
+        fallbackFrameUrlRef.current = null;
+      }
+    };
+
+    const fetchFallbackFrame = async () => {
+      if (pollingFrame) return;
+      pollingFrame = true;
+      try {
+        const response = await fetch(engineEndpoint("/display/frame"), {
+          cache: "no-store",
+          headers: engineAuthHeaders(),
+        });
+        if (!response.ok || disposed) return;
+
+        const nextUrl = URL.createObjectURL(await response.blob());
+        revokeCurrentFrame();
+        fallbackFrameUrlRef.current = nextUrl;
+        setFallbackFrameUrl(nextUrl);
+      } catch (err) {
+        console.warn("[WebRTC] Could not load display fallback frame:", err);
+      } finally {
+        pollingFrame = false;
+      }
+    };
+
+    const interval = window.setInterval(() => {
+      const video = videoRef.current;
+      if (!video || !context || video.videoWidth === 0 || video.videoHeight === 0) {
+        blackSamples += 1;
+      } else {
+        try {
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          let total = 0;
+          for (let index = 0; index < pixels.length; index += 4) {
+            total += pixels[index] + pixels[index + 1] + pixels[index + 2];
+          }
+          const average = total / (pixels.length / 4) / 3;
+          blackSamples = average < BLACK_VIDEO_SAMPLE_THRESHOLD ? blackSamples + 1 : 0;
+        } catch {
+          blackSamples += 1;
+        }
+      }
+
+      if (blackSamples >= 3) {
+        void fetchFallbackFrame();
+      } else if (fallbackFrameUrlRef.current) {
+        revokeCurrentFrame();
+        setFallbackFrameUrl(null);
+      }
+    }, 750);
+
+    return () => {
+      disposed = true;
+      window.clearInterval(interval);
+      revokeCurrentFrame();
+      setFallbackFrameUrl(null);
+    };
+  }, [status]);
 
   useEffect(() => {
     const gameKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "];
@@ -297,6 +390,7 @@ export default function Player() {
               streamProfiles={STREAM_PROFILES}
             />
           }
+          fallbackFrameUrl={fallbackFrameUrl}
           isMuted={isMuted}
           onRetry={retry}
           showStreamTelemetry={showStreamTelemetry}
