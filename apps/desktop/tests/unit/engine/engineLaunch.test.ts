@@ -79,9 +79,7 @@ test("hosted web launch URL uses direct local pairing and ticketed LAN pairing",
     createHostedWebLaunchUrl({
       advertisedUrls: ["http://127.0.0.1:8080"],
       companionLaunchUrl: "https://localhost:8090",
-      createLaunchTicket: () => {
-        throw new Error("Local launch should not create a companion ticket.");
-      },
+      createLaunchTicket: () => "launch-ticket",
       engineToken: "local-token",
       exposureMode: "local",
     }),
@@ -89,8 +87,8 @@ test("hosted web launch URL uses direct local pairing and ticketed LAN pairing",
 
   assert.equal(localUrl.searchParams.get("engineUrl"), "http://127.0.0.1:8080");
   assert.equal(localUrl.searchParams.get("engineToken"), "local-token");
-  assert.equal(localUrl.searchParams.get("companionUrl"), null);
-  assert.equal(localUrl.searchParams.get("launchTicket"), null);
+  assert.equal(localUrl.searchParams.get("companionUrl"), "https://localhost:8090");
+  assert.equal(localUrl.searchParams.get("launchTicket"), "launch-ticket");
 
   const lanUrl = new URL(
     createHostedWebLaunchUrl({

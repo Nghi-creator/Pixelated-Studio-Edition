@@ -74,6 +74,8 @@ export function createHostedWebLaunchUrl({
   if (exposureMode === "local") {
     url.searchParams.set("engineUrl", advertisedUrls[0] || "http://localhost:8080");
     url.searchParams.set("engineToken", engineToken);
+    url.searchParams.set("companionUrl", companionLaunchUrl);
+    url.searchParams.set("launchTicket", createLaunchTicket());
   } else {
     url.searchParams.set("companionUrl", companionLaunchUrl);
     url.searchParams.set("launchTicket", createLaunchTicket());
