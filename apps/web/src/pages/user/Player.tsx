@@ -45,6 +45,7 @@ export default function Player() {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const degradedRecoveryRequestedRef = useRef(false);
   const [isMuted, setIsMuted] = useState(true);
   const [fallbackActive, setFallbackActive] = useState(false);
 
@@ -84,6 +85,7 @@ export default function Player() {
     lobbyState,
     kickParticipant,
     localParticipant,
+    recoverDegradedNetwork,
     releasePlayerSlot,
     requestPlayerSlot,
     retry,
@@ -200,6 +202,7 @@ export default function Player() {
   useEffect(() => {
     if (status !== "playing") {
       setFallbackActive(false);
+      degradedRecoveryRequestedRef.current = false;
       return;
     }
 
@@ -239,6 +242,10 @@ export default function Player() {
 
       if (blackSamples >= FALLBACK_BAD_SAMPLE_COUNT) {
         setFallbackActive(true);
+        if (!degradedRecoveryRequestedRef.current) {
+          degradedRecoveryRequestedRef.current = true;
+          recoverDegradedNetwork();
+        }
       } else if (healthySamples >= FALLBACK_HEALTHY_SAMPLE_COUNT) {
         setFallbackActive(false);
       }
@@ -248,7 +255,7 @@ export default function Player() {
       window.clearInterval(interval);
       setFallbackActive(false);
     };
-  }, [status]);
+  }, [recoverDegradedNetwork, status]);
 
   useEffect(() => {
     const gameKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "];
