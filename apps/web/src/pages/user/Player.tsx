@@ -330,6 +330,9 @@ export default function Player() {
       url: url.toString(),
     };
   }, [directShareUrl, shareContext]);
+  const playerLayoutClassName = showStreamTelemetry
+    ? "max-w-7xl"
+    : "max-w-5xl";
 
   return (
     <div className="flex flex-col items-center pt-24 pb-24 px-4 min-h-screen">
@@ -339,6 +342,7 @@ export default function Player() {
         gameRights={gameRights}
         gameTitle={gameTitle}
         hideGameChrome
+        layoutClassName={playerLayoutClassName}
         onToggleTelemetry={() =>
           setShowStreamTelemetry((isVisible) => !isVisible)
         }
@@ -349,8 +353,8 @@ export default function Player() {
       <div
         className={`grid w-full gap-4 transition-[max-width,grid-template-columns] duration-300 ${
           showStreamTelemetry
-            ? "max-w-7xl xl:grid-cols-[minmax(0,1fr)_18rem]"
-            : "max-w-5xl"
+            ? `${playerLayoutClassName} xl:grid-cols-[minmax(0,1fr)_18rem]`
+            : playerLayoutClassName
         }`}
       >
         <StreamStage
@@ -390,7 +394,7 @@ export default function Player() {
         )}
       </div>
 
-      <div className="mt-3 flex w-full max-w-5xl">
+      <div className={`mt-3 flex w-full ${playerLayoutClassName}`}>
         {authorName ? (
           <p className="text-sm font-medium text-synth-primary">
             Developed by: {authorName}

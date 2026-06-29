@@ -9,6 +9,7 @@ type PlayerHeaderProps = {
   backText: string;
   gameRights?: NonNullable<ApiGame["game_rights"]>;
   gameTitle: string;
+  layoutClassName?: string;
   showStreamTelemetry: boolean;
   status: WebRTCStatus;
   onToggleTelemetry: () => void;
@@ -21,6 +22,7 @@ export function PlayerHeader({
   gameRights = [],
   gameTitle,
   hideGameChrome = false,
+  layoutClassName = "max-w-5xl",
   onToggleTelemetry,
   showStreamTelemetry,
   status,
@@ -81,13 +83,13 @@ export function PlayerHeader({
 
   return (
     <div
-      className={`flex w-full max-w-5xl flex-col ${
-        hideGameChrome ? "mb-1" : "mb-6"
+      className={`flex w-full flex-col ${layoutClassName} ${
+        hideGameChrome ? "mb-2" : "mb-6"
       }`}
     >
       <div
         className={`flex items-center gap-4 ${
-          hideGameChrome ? "justify-between px-1 py-2" : "justify-start p-4"
+          hideGameChrome ? "justify-between px-1 py-1" : "justify-start p-4"
         }`}
       >
         <Link
