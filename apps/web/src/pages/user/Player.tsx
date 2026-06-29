@@ -18,8 +18,6 @@ import { useGameMetadata } from "../../features/player/hooks/useGameMetadata";
 import { useGameReactions } from "../../features/player/hooks/useGameReactions";
 import { usePlayCount } from "../../features/player/hooks/usePlayCount";
 import { api } from "../../lib/api/apiClient";
-import { engineAuthHeaders } from "../../lib/engine/engineAuth";
-import { engineEndpoint } from "../../lib/engine/engineConfig";
 import {
   getStreamProfile,
   STREAM_PROFILES,
@@ -31,6 +29,8 @@ import { useWebRTC } from "../../lib/webrtc/useWebRTC";
 
 const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
 const BLACK_VIDEO_SAMPLE_THRESHOLD = 6;
+const FALLBACK_BAD_SAMPLE_COUNT = 3;
+const FALLBACK_HEALTHY_SAMPLE_COUNT = 4;
 
 type PlayerBackState = {
   backRoute?: unknown;
@@ -46,8 +46,7 @@ export default function Player() {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isMuted, setIsMuted] = useState(true);
-  const [fallbackFrameUrl, setFallbackFrameUrl] = useState<string | null>(null);
-  const fallbackFrameUrlRef = useRef<string | null>(null);
+  const [fallbackActive, setFallbackActive] = useState(false);
 
   const [streamProfileId, setStreamProfileId] = useState<StreamProfileId>(() => {
     if (typeof window === "undefined") return "balanced";
@@ -199,55 +198,23 @@ export default function Player() {
   }, [isMuted, stream]);
 
   useEffect(() => {
-    fallbackFrameUrlRef.current = fallbackFrameUrl;
-  }, [fallbackFrameUrl]);
-
-  useEffect(() => {
     if (status !== "playing") {
-      setFallbackFrameUrl(null);
+      setFallbackActive(false);
       return;
     }
 
-    let disposed = false;
     let blackSamples = 0;
-    let pollingFrame = false;
+    let healthySamples = 0;
     const canvas = document.createElement("canvas");
     canvas.width = 16;
     canvas.height = 16;
     const context = canvas.getContext("2d", { willReadFrequently: true });
 
-    const revokeCurrentFrame = () => {
-      if (fallbackFrameUrlRef.current) {
-        URL.revokeObjectURL(fallbackFrameUrlRef.current);
-        fallbackFrameUrlRef.current = null;
-      }
-    };
-
-    const fetchFallbackFrame = async () => {
-      if (pollingFrame) return;
-      pollingFrame = true;
-      try {
-        const response = await fetch(engineEndpoint("/display/frame"), {
-          cache: "no-store",
-          headers: engineAuthHeaders(),
-        });
-        if (!response.ok || disposed) return;
-
-        const nextUrl = URL.createObjectURL(await response.blob());
-        revokeCurrentFrame();
-        fallbackFrameUrlRef.current = nextUrl;
-        setFallbackFrameUrl(nextUrl);
-      } catch (err) {
-        console.warn("[WebRTC] Could not load display fallback frame:", err);
-      } finally {
-        pollingFrame = false;
-      }
-    };
-
     const interval = window.setInterval(() => {
       const video = videoRef.current;
       if (!video || !context || video.videoWidth === 0 || video.videoHeight === 0) {
         blackSamples += 1;
+        healthySamples = 0;
       } else {
         try {
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -257,25 +224,29 @@ export default function Player() {
             total += pixels[index] + pixels[index + 1] + pixels[index + 2];
           }
           const average = total / (pixels.length / 4) / 3;
-          blackSamples = average < BLACK_VIDEO_SAMPLE_THRESHOLD ? blackSamples + 1 : 0;
+          if (average < BLACK_VIDEO_SAMPLE_THRESHOLD) {
+            blackSamples += 1;
+            healthySamples = 0;
+          } else {
+            blackSamples = 0;
+            healthySamples += 1;
+          }
         } catch {
           blackSamples += 1;
+          healthySamples = 0;
         }
       }
 
-      if (blackSamples >= 3) {
-        void fetchFallbackFrame();
-      } else if (fallbackFrameUrlRef.current) {
-        revokeCurrentFrame();
-        setFallbackFrameUrl(null);
+      if (blackSamples >= FALLBACK_BAD_SAMPLE_COUNT) {
+        setFallbackActive(true);
+      } else if (healthySamples >= FALLBACK_HEALTHY_SAMPLE_COUNT) {
+        setFallbackActive(false);
       }
     }, 750);
 
     return () => {
-      disposed = true;
       window.clearInterval(interval);
-      revokeCurrentFrame();
-      setFallbackFrameUrl(null);
+      setFallbackActive(false);
     };
   }, [status]);
 
@@ -390,7 +361,7 @@ export default function Player() {
               streamProfiles={STREAM_PROFILES}
             />
           }
-          fallbackFrameUrl={fallbackFrameUrl}
+          fallbackActive={fallbackActive}
           isMuted={isMuted}
           onRetry={retry}
           showStreamTelemetry={showStreamTelemetry}
