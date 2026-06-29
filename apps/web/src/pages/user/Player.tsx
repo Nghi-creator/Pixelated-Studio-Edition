@@ -42,7 +42,7 @@ export default function Player() {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isMuted, setIsMuted] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
 
   const [streamProfileId, setStreamProfileId] = useState<StreamProfileId>(() => {
     if (typeof window === "undefined") return "balanced";
@@ -183,6 +183,9 @@ export default function Player() {
   useEffect(() => {
     if (videoRef.current && stream) {
       videoRef.current.srcObject = stream;
+      videoRef.current.play().catch((err) => {
+        console.warn("[WebRTC] Browser blocked stream playback:", err);
+      });
     }
   }, [stream]);
 
