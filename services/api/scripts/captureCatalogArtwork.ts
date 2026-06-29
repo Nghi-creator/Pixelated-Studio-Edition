@@ -8,6 +8,10 @@ import process from "node:process";
 import zlib from "node:zlib";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
+import {
+  isGeneratedCatalogArtworkUrl,
+  uploadGameplayArtworkFromFile,
+} from "../src/modules/catalog/ingestion/catalogArtworkCapture.js";
 
 dotenv.config();
 
@@ -48,7 +52,6 @@ type CaptureResult =
       source: "none";
     };
 
-const GENERATED_COVER_MARKER = "/storage/v1/object/public/catalog_artifacts/covers/";
 const SUPPORTED_IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp"];
 
 function hasArg(name: string) {
@@ -108,6 +111,9 @@ Capture command environment:
 
 The command is dry-run by default. Supabase writes require --apply plus
 SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
+
+Set CATALOG_ARTWORK_CAPTURE_COMMAND to the same command in the API environment
+to opportunistically replace generated covers during candidate promotion.
 `);
 }
 
@@ -137,10 +143,6 @@ function sanitizeObjectSegment(value: string) {
 
 function slugForTitle(value: string) {
   return sanitizeObjectSegment(value.toLowerCase()).toLowerCase();
-}
-
-function isGeneratedCatalogArtworkUrl(url: string | null | undefined) {
-  return Boolean(url && url.includes(GENERATED_COVER_MARKER) && url.endsWith(".svg"));
 }
 
 function needsArtwork(game: GameRow) {
@@ -492,45 +494,20 @@ async function uploadArtwork(
   target: CaptureTarget,
   imagePath: string,
 ) {
-  const extension = path.extname(imagePath).toLowerCase() || ".png";
-  const imageBytes = await fsp.readFile(imagePath);
-  const imageSha256 = crypto.createHash("sha256").update(imageBytes).digest("hex");
-  const assetKey = sanitizeObjectSegment(
-    `${target.build.artifact_sha256 || target.build.id}-${imageSha256.slice(0, 12)}`,
-  );
-  const rootPath = ["gameplay-captures", sanitizeObjectSegment(target.game.id)].join("/");
-  const backdropObjectPath = `${rootPath}/${assetKey}-backdrop.svg`;
-  const coverObjectPath = `${rootPath}/${assetKey}-cover${extension}`;
-
-  const backdropContentType = contentTypeFor(imagePath);
-  const imageDataUri = createImageDataUri(imageBytes, backdropContentType);
-  const backdropSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="600" viewBox="0 0 1600 600" role="img" aria-label="${escapeSvgText(target.game.title)} gameplay backdrop">
-  <defs>
-    <filter id="blur" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="22"/>
-    </filter>
-    <linearGradient id="shade" x1="0" x2="1" y1="0" y2="0">
-      <stop offset="0%" stop-color="#050505" stop-opacity="0.92"/>
-      <stop offset="42%" stop-color="#050505" stop-opacity="0.46"/>
-      <stop offset="100%" stop-color="#050505" stop-opacity="0.86"/>
-    </linearGradient>
-  </defs>
-  <rect width="1600" height="600" fill="#050505"/>
-  <image href="${imageDataUri}" x="-80" y="-160" width="1760" height="920" preserveAspectRatio="xMidYMid slice" filter="url(#blur)" opacity="0.72"/>
-  <rect width="1600" height="600" fill="url(#shade)"/>
-  <image href="${imageDataUri}" x="820" y="60" width="640" height="480" preserveAspectRatio="xMidYMid meet" style="image-rendering:pixelated;image-rendering:crisp-edges"/>
-</svg>`;
-  const backdrop = await uploadObject(
-    service,
-    backdropObjectPath,
-    Buffer.from(backdropSvg),
-    "image/svg+xml",
-  );
-  const cover = await uploadObject(
-    service,
-    coverObjectPath,
-    imageBytes,
-    backdropContentType,
+  const { backdrop, cover } = await uploadGameplayArtworkFromFile(
+    service as never,
+    {
+      build: {
+        artifact_filename: target.build.artifact_filename,
+        artifact_sha256: target.build.artifact_sha256,
+        id: target.build.id,
+      },
+      game: {
+        id: target.game.id,
+        title: target.game.title,
+      },
+    },
+    imagePath,
   );
 
   const { error: updateError } = await service

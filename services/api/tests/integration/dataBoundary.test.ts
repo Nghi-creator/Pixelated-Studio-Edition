@@ -571,9 +571,11 @@ async function createDataBoundaryApp(
   db: FakeSupabase,
   userId = USER_ID,
   artifactBytes = Buffer.from("test-artifact"),
+  extraOptions: RecordRow = {},
 ) {
   const app = Fastify({ logger: false });
   const options = {
+    ...extraOptions,
     fetchArtifact: async () => new Response(artifactBytes),
     requireUser: requireUser(userId),
     supabase: db as never,
@@ -890,6 +892,82 @@ test("admin can promote a curated SNES candidate into a bsnes build", async () =
   assert.equal(
     db.rows.catalog_ingestion_candidates[0]?.import_status,
     "promoted",
+  );
+  await app.close();
+});
+
+test("admin promotion replaces generated fallback with captured gameplay artwork when available", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = validNesRom();
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "capture-demo.nes",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/curated-roms/capture-demo.nes",
+    asset_license_spdx: "MIT",
+    attribution_text: "Capture Demo attribution",
+    code_license_spdx: "MIT",
+    cover_license_spdx: null,
+    developer_name: "Capture Dev",
+    developer_url: "https://example.test/dev",
+    id: "20202020-2020-4020-8020-202020202020",
+    import_status: "needs_review",
+    license_url: "https://example.test/license",
+    original_release_url: "https://example.test/capture-demo",
+    platform_id: "nes",
+    review_notes: null,
+    runtime_id: "mesen",
+    runtime_kind: "libretro",
+    source_kind: "curated_licensed_rom",
+    source_commit: "abababababababababababababababababababab",
+    source_entry_path: "curated/nes.json#capture-demo",
+    source_repo_url: "https://github.com/example/curated-roms",
+    title: "Capture Demo",
+  });
+  const capturePng = Buffer.from([
+    0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    0x63, 0x61, 0x70, 0x74, 0x75, 0x72, 0x65, 0x64,
+  ]);
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes, {
+    captureGameplayArtwork: async ({ artifactBytes: capturedArtifactBytes }) => {
+      assert.deepEqual(capturedArtifactBytes, artifactBytes);
+      return { bytes: capturePng, extension: ".png" };
+    },
+  });
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "capture reviewed" },
+    url: "/admin/catalog-candidates/20202020-2020-4020-8020-202020202020",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.games.length, 1);
+  assert.match(
+    String(db.rows.games[0]?.cover_url),
+    /^https:\/\/storage\.example\.test\/catalog_artifacts\/gameplay-captures\//,
+  );
+  assert.match(
+    String(db.rows.games[0]?.backdrop_url),
+    /^https:\/\/storage\.example\.test\/catalog_artifacts\/gameplay-captures\//,
+  );
+  assert.equal(db.uploadedStorageObjects.length, 4);
+  assert.match(
+    db.uploadedStorageObjects[1]?.path || "",
+    /^covers\/abababababababababababababababababababab\/nes\//,
+  );
+  assert.match(
+    db.uploadedStorageObjects[2]?.path || "",
+    /^gameplay-captures\/[^/]+\/.+-backdrop\.svg$/,
+  );
+  assert.match(
+    db.uploadedStorageObjects[3]?.path || "",
+    /^gameplay-captures\/[^/]+\/.+-cover\.png$/,
+  );
+  assert.match(
+    String(db.rows.catalog_ingestion_candidates[0]?.review_notes),
+    /Gameplay cover path: catalog_artifacts\/gameplay-captures\//,
   );
   await app.close();
 });
