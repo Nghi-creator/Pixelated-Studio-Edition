@@ -28,6 +28,9 @@ import { shouldIgnoreGameInput } from "../../lib/webrtc/webrtcInput";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
 
 const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
+const BLACK_VIDEO_SAMPLE_THRESHOLD = 6;
+const FALLBACK_BAD_SAMPLE_COUNT = 3;
+const FALLBACK_HEALTHY_SAMPLE_COUNT = 4;
 
 type PlayerBackState = {
   backRoute?: unknown;
@@ -42,7 +45,9 @@ export default function Player() {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const degradedRecoveryRequestedRef = useRef(false);
   const [isMuted, setIsMuted] = useState(true);
+  const [fallbackActive, setFallbackActive] = useState(false);
 
   const [streamProfileId, setStreamProfileId] = useState<StreamProfileId>(() => {
     if (typeof window === "undefined") return "balanced";
@@ -80,6 +85,7 @@ export default function Player() {
     lobbyState,
     kickParticipant,
     localParticipant,
+    recoverDegradedNetwork,
     releasePlayerSlot,
     requestPlayerSlot,
     retry,
@@ -181,13 +187,75 @@ export default function Player() {
   }, [streamProfileId]);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-      videoRef.current.play().catch((err) => {
-        console.warn("[WebRTC] Browser blocked stream playback:", err);
-      });
+    const video = videoRef.current;
+    if (!video) return;
+
+    video.srcObject = stream;
+    if (!stream) return;
+
+    video.muted = isMuted;
+    video.play().catch((err) => {
+      console.warn("[WebRTC] Browser blocked stream playback:", err);
+    });
+  }, [isMuted, stream]);
+
+  useEffect(() => {
+    if (status !== "playing") {
+      setFallbackActive(false);
+      degradedRecoveryRequestedRef.current = false;
+      return;
     }
-  }, [stream]);
+
+    let blackSamples = 0;
+    let healthySamples = 0;
+    const canvas = document.createElement("canvas");
+    canvas.width = 16;
+    canvas.height = 16;
+    const context = canvas.getContext("2d", { willReadFrequently: true });
+
+    const interval = window.setInterval(() => {
+      const video = videoRef.current;
+      if (!video || !context || video.videoWidth === 0 || video.videoHeight === 0) {
+        blackSamples += 1;
+        healthySamples = 0;
+      } else {
+        try {
+          context.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+          let total = 0;
+          for (let index = 0; index < pixels.length; index += 4) {
+            total += pixels[index] + pixels[index + 1] + pixels[index + 2];
+          }
+          const average = total / (pixels.length / 4) / 3;
+          if (average < BLACK_VIDEO_SAMPLE_THRESHOLD) {
+            blackSamples += 1;
+            healthySamples = 0;
+          } else {
+            blackSamples = 0;
+            healthySamples += 1;
+          }
+        } catch {
+          blackSamples += 1;
+          healthySamples = 0;
+        }
+      }
+
+      if (blackSamples >= FALLBACK_BAD_SAMPLE_COUNT) {
+        setFallbackActive(true);
+        if (!degradedRecoveryRequestedRef.current) {
+          degradedRecoveryRequestedRef.current = true;
+          recoverDegradedNetwork();
+        }
+      } else if (healthySamples >= FALLBACK_HEALTHY_SAMPLE_COUNT) {
+        setFallbackActive(false);
+      }
+    }, 750);
+
+    return () => {
+      window.clearInterval(interval);
+      setFallbackActive(false);
+    };
+  }, [recoverDegradedNetwork, status]);
 
   useEffect(() => {
     const gameKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "];
@@ -262,6 +330,9 @@ export default function Player() {
       url: url.toString(),
     };
   }, [directShareUrl, shareContext]);
+  const playerLayoutClassName = showStreamTelemetry
+    ? "max-w-7xl"
+    : "max-w-5xl";
 
   return (
     <div className="flex flex-col items-center pt-24 pb-24 px-4 min-h-screen">
@@ -271,6 +342,7 @@ export default function Player() {
         gameRights={gameRights}
         gameTitle={gameTitle}
         hideGameChrome
+        layoutClassName={playerLayoutClassName}
         onToggleTelemetry={() =>
           setShowStreamTelemetry((isVisible) => !isVisible)
         }
@@ -281,8 +353,8 @@ export default function Player() {
       <div
         className={`grid w-full gap-4 transition-[max-width,grid-template-columns] duration-300 ${
           showStreamTelemetry
-            ? "max-w-7xl xl:grid-cols-[minmax(0,1fr)_18rem]"
-            : "max-w-5xl"
+            ? `${playerLayoutClassName} xl:grid-cols-[minmax(0,1fr)_18rem]`
+            : playerLayoutClassName
         }`}
       >
         <StreamStage
@@ -300,6 +372,7 @@ export default function Player() {
               streamProfiles={STREAM_PROFILES}
             />
           }
+          fallbackActive={fallbackActive}
           isMuted={isMuted}
           onRetry={retry}
           showStreamTelemetry={showStreamTelemetry}
@@ -321,7 +394,7 @@ export default function Player() {
         )}
       </div>
 
-      <div className="mt-3 flex w-full max-w-5xl">
+      <div className={`mt-3 flex w-full ${playerLayoutClassName}`}>
         {authorName ? (
           <p className="text-sm font-medium text-synth-primary">
             Developed by: {authorName}

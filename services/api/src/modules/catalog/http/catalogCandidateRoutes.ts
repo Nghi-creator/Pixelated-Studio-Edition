@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import process from "node:process";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { getCachedUserRole } from "../../auth/roleCache.js";
@@ -7,6 +8,11 @@ import {
   assertCandidateRuntimeAllowed,
   CandidateValidationError,
 } from "../ingestion/catalogCandidateValidation.js";
+import {
+  captureGameplayArtworkWithCommand,
+  uploadGameplayArtwork,
+  type CatalogArtworkImage,
+} from "../ingestion/catalogArtworkCapture.js";
 import {
   requireSupabaseUser,
   supabaseService,
@@ -90,6 +96,12 @@ type GameBuildRow = { id: string };
 type GameRightsRow = { id: string };
 
 type CatalogCandidateRouteOptions = {
+  captureGameplayArtwork?: (input: {
+    artifactBytes: Buffer;
+    build: GameBuildRow;
+    candidate: CandidateRow;
+    game: GameRow & { title: string };
+  }) => Promise<CatalogArtworkImage | null>;
   fetchArtifact?: typeof fetch;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
@@ -227,6 +239,7 @@ async function mirrorCandidateArtifact(
   }
 
   return {
+    bytes,
     objectPath,
     publicUrl: data.publicUrl,
   };
@@ -309,6 +322,7 @@ async function promoteCandidate(
   reviewerId: string,
   notes: string | null,
   fetchArtifact: typeof fetch,
+  captureGameplayArtwork?: CatalogCandidateRouteOptions["captureGameplayArtwork"],
 ) {
   const now = new Date().toISOString();
   assertCandidateRuntimeAllowed(candidate);
@@ -407,6 +421,48 @@ async function promoteCandidate(
     build = data;
   }
 
+  let gameplayArtwork: Awaited<ReturnType<typeof uploadGameplayArtwork>> | null = null;
+  let artworkCaptureNote: string | null = null;
+  if (!isNative && captureGameplayArtwork && mirroredArtifact) {
+    try {
+      const capturedImage = await captureGameplayArtwork({
+        artifactBytes: mirroredArtifact.bytes,
+        build,
+        candidate,
+        game: { ...game, title: candidate.title },
+      });
+      if (capturedImage) {
+        gameplayArtwork = await uploadGameplayArtwork(
+          service,
+          {
+            build: {
+              artifact_filename: candidate.artifact_filename,
+              artifact_sha256: candidate.artifact_sha256,
+              id: build.id,
+            },
+            game: { id: game.id, title: candidate.title },
+          },
+          capturedImage,
+        );
+        const { error: artworkUpdateError } = await service
+          .from("games")
+          .update({
+            backdrop_url: gameplayArtwork.backdrop.publicUrl,
+            cover_url: gameplayArtwork.cover.publicUrl,
+          })
+          .eq("id", game.id);
+        if (artworkUpdateError) throw artworkUpdateError;
+      } else {
+        artworkCaptureNote =
+          "Gameplay artwork capture unavailable; retained generated legal fallback cover.";
+      }
+    } catch (error) {
+      artworkCaptureNote = `Gameplay artwork capture failed; retained generated legal fallback cover: ${
+        error instanceof Error ? error.message : String(error)
+      }`;
+    }
+  }
+
   const { data: existingRights, error: existingRightsError } = await service
     .from("game_rights")
     .select("id")
@@ -456,6 +512,13 @@ async function promoteCandidate(
           ? `Mirrored artifact path: catalog_artifacts/${mirroredArtifact.objectPath}`
           : null,
         `Generated cover path: catalog_artifacts/${generatedCover.objectPath}`,
+        gameplayArtwork
+          ? `Gameplay cover path: catalog_artifacts/${gameplayArtwork.cover.objectPath}`
+          : null,
+        gameplayArtwork
+          ? `Gameplay backdrop path: catalog_artifacts/${gameplayArtwork.backdrop.objectPath}`
+          : null,
+        artworkCaptureNote,
       ].filter(Boolean).join("\n"),
       reviewed_at: now,
       reviewed_by: reviewerId,
@@ -476,6 +539,23 @@ export async function registerCatalogCandidateRoutes(
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
   const fetchArtifact = options.fetchArtifact || fetch;
+  const captureGameplayArtwork =
+    options.captureGameplayArtwork ||
+    (process.env.CATALOG_ARTWORK_CAPTURE_COMMAND
+      ? ({ artifactBytes, build, candidate, game }) =>
+          captureGameplayArtworkWithCommand(
+            String(process.env.CATALOG_ARTWORK_CAPTURE_COMMAND),
+            {
+              artifactBytes,
+              artifactFilename: candidate.artifact_filename,
+              buildId: build.id,
+              gameId: game.id,
+              platformId: candidate.platform_id,
+              runtimeId: candidate.runtime_id,
+              title: candidate.title,
+            },
+          )
+      : undefined);
 
   app.get(
     "/admin/catalog-candidates",
@@ -625,6 +705,7 @@ export async function registerCatalogCandidateRoutes(
           user.id,
           body.data.notes || null,
           fetchArtifact,
+          captureGameplayArtwork,
         );
         return promoted;
       } catch (err) {

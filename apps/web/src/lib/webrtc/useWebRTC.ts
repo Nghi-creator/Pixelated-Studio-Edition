@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { api, ApiError } from "../api/apiClient";
 import {
@@ -64,6 +64,18 @@ const DISCONNECTED_GRACE_MS = 5_000;
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
 ];
+
+function iceServerUrls(server: RTCIceServer) {
+  if (typeof server.urls === "string") return [server.urls];
+  return server.urls;
+}
+
+function hasTurnIceServer(iceServers: RTCIceServer[]) {
+  return iceServers.some((server) =>
+    iceServerUrls(server).some((url) => /^turns?:/i.test(url)),
+  );
+}
+
 async function loadIceServers() {
   try {
     const { iceServers } = await api.iceServers();
@@ -114,6 +126,11 @@ export function useWebRTC(
   const appliedStreamProfileIdRef = useRef(streamProfile.id);
   const seamlessRestartRef = useRef(false);
   const profileAutoRetriesRemainingRef = useRef(0);
+  const iceServersRef = useRef<RTCIceServer[]>(FALLBACK_ICE_SERVERS);
+  const iceTransportPolicyRef = useRef<RTCIceTransportPolicy | undefined>(
+    undefined,
+  );
+  const degradedNetworkRecoveryAttemptedRef = useRef(false);
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -253,6 +270,7 @@ export function useWebRTC(
         ]);
       if (disposed) return;
       iceServersForSession = nextIceServers;
+      iceServersRef.current = nextIceServers;
       inputCapabilitiesRef.current = nextInputCapabilities;
       shareContextRef.current = nextShareContext;
       setInputCapabilities(nextInputCapabilities);
@@ -260,6 +278,7 @@ export function useWebRTC(
 
       pc = createEnginePeerConnection({
         iceServers: iceServersForSession,
+        iceTransportPolicy: iceTransportPolicyRef.current,
         peerId,
         socket,
         sessionId,
@@ -577,9 +596,42 @@ export function useWebRTC(
     metricsDisabledRef.current = false;
     lastMetricSentAtRef.current = 0;
     seamlessRestartRef.current = false;
+    iceTransportPolicyRef.current = undefined;
+    degradedNetworkRecoveryAttemptedRef.current = false;
     profileAutoRetriesRemainingRef.current = 0;
     setRetryVersion((currentVersion) => currentVersion + 1);
   };
+
+  const recoverDegradedNetwork = useCallback(() => {
+    if (degradedNetworkRecoveryAttemptedRef.current) return false;
+    degradedNetworkRecoveryAttemptedRef.current = true;
+
+    if (!hasTurnIceServer(iceServersRef.current)) {
+      setTelemetry((currentTelemetry) => ({
+        ...currentTelemetry,
+        lastEngineError:
+          "WebRTC video stalled and no TURN relay is configured, so Pixelated is using the display fallback.",
+        lastUpdatedAt: Date.now(),
+      }));
+      return false;
+    }
+
+    const identity = createWebRTCRetryIdentity(Boolean(options.sessionId));
+    peerIdRef.current = identity.peerId;
+    if (identity.sessionId) setSessionId(identity.sessionId);
+    metricsDisabledRef.current = false;
+    lastMetricSentAtRef.current = 0;
+    iceTransportPolicyRef.current = "relay";
+    seamlessRestartRef.current = true;
+    profileAutoRetriesRemainingRef.current = 0;
+    setTelemetry((currentTelemetry) => ({
+      ...currentTelemetry,
+      lastEngineError: "WebRTC video stalled. Retrying through relay ICE.",
+      lastUpdatedAt: Date.now(),
+    }));
+    setRetryVersion((currentVersion) => currentVersion + 1);
+    return true;
+  }, [options.sessionId]);
 
   const requestPlayerSlot = (playerIndex: number) => {
     const supportedPlayerCount =
@@ -621,6 +673,7 @@ export function useWebRTC(
     localParticipant,
     releasePlayerSlot,
     requestPlayerSlot,
+    recoverDegradedNetwork,
     retry,
     sessionId,
     shareContext,

@@ -10,6 +10,7 @@
     "check:access-log-schema": "tsx scripts/stagingSmoke.ts --access-log-schema-only",
     "check:submission-cleanup-policy": "tsx scripts/stagingSmoke.ts --submission-cleanup-policy-only",
     "capture:catalog-artwork": "tsx scripts/captureCatalogArtwork.ts",
+    "generate:curated-rom-manifest": "tsx scripts/generateCuratedRomManifest.ts",
     "import:debian-native-candidates": "tsx scripts/importDebianNativeCandidates.ts",
     "import:curated-rom-candidates": "tsx scripts/importCuratedRomCandidates.ts",
     "import:homebrew-candidates": "tsx scripts/importHomebrewHubCandidates.ts",

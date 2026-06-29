@@ -9,6 +9,7 @@ type PlayerHeaderProps = {
   backText: string;
   gameRights?: NonNullable<ApiGame["game_rights"]>;
   gameTitle: string;
+  layoutClassName?: string;
   showStreamTelemetry: boolean;
   status: WebRTCStatus;
   onToggleTelemetry: () => void;
@@ -21,6 +22,7 @@ export function PlayerHeader({
   gameRights = [],
   gameTitle,
   hideGameChrome = false,
+  layoutClassName = "max-w-5xl",
   onToggleTelemetry,
   showStreamTelemetry,
   status,
@@ -79,17 +81,29 @@ export function PlayerHeader({
     </div>
   ) : null;
 
+  if (hideGameChrome) {
+    return (
+      <div className={`relative mb-2 flex w-full flex-col ${layoutClassName}`}>
+        <div className="flex min-h-10 items-center px-1 py-1 pr-44 sm:pr-64">
+          <Link
+            to={backRoute}
+            className="inline-flex min-w-0 items-center gap-2 text-gray-400 transition-colors hover:text-white"
+          >
+            <ArrowLeft className="h-5 w-5 shrink-0" />
+            <span className="truncate">{backText}</span>
+          </Link>
+        </div>
+
+        {rightsLinks && <div className="px-1 pb-2 pr-44 sm:pr-64">{rightsLinks}</div>}
+
+        <div className="absolute right-1 top-0">{statusBadge}</div>
+      </div>
+    );
+  }
+
   return (
-    <div
-      className={`flex w-full max-w-5xl flex-col ${
-        hideGameChrome ? "mb-1" : "mb-6"
-      }`}
-    >
-      <div
-        className={`flex items-center gap-4 ${
-          hideGameChrome ? "justify-between px-1 py-2" : "justify-start p-4"
-        }`}
-      >
+    <div className={`mb-6 flex w-full flex-col ${layoutClassName}`}>
+      <div className="flex items-center gap-4 justify-start p-4">
         <Link
           to={backRoute}
           className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
@@ -97,14 +111,8 @@ export function PlayerHeader({
           <ArrowLeft className="w-5 h-5" />
           {backText}
         </Link>
-        {hideGameChrome && statusBadge}
       </div>
 
-      {hideGameChrome && rightsLinks && (
-        <div className="px-1 pb-2">{rightsLinks}</div>
-      )}
-
-      {!hideGameChrome && (
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <h1 className="text-3xl font-extrabold tracking-tight text-white">
@@ -131,7 +139,6 @@ export function PlayerHeader({
           {statusBadge}
         </div>
       </div>
-      )}
     </div>
   );
 }

@@ -1,11 +1,13 @@
 import { AlertTriangle, LoaderCircle, RotateCcw } from "lucide-react";
 import type { ReactNode, RefObject } from "react";
+import { FallbackFrameCanvas } from "./FallbackFrameCanvas";
 import type { WebRTCStatus } from "../../../lib/webrtc/webrtcSession";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
 
 type StreamStageProps = {
   blockedMessage?: string | null;
   controls?: ReactNode;
+  fallbackActive?: boolean;
   isMuted: boolean;
   onRetry?: () => void;
   showStreamTelemetry: boolean;
@@ -17,6 +19,7 @@ type StreamStageProps = {
 export function StreamStage({
   blockedMessage,
   controls,
+  fallbackActive = false,
   isMuted,
   onRetry,
   status,
@@ -66,8 +69,11 @@ export function StreamStage({
           autoPlay
           muted={isMuted}
           playsInline
-          className="h-full w-full object-contain"
+          className={`h-full w-full object-contain ${
+            fallbackActive ? "opacity-0" : ""
+          }`}
         />
+        <FallbackFrameCanvas active={fallbackActive} />
       </div>
     </div>
   );
