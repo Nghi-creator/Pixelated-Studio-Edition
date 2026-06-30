@@ -2,7 +2,6 @@ import type { Socket } from "socket.io-client";
 
 type PeerConnectionOptions = {
   iceServers?: RTCIceServer[];
-  iceTransportPolicy?: RTCIceTransportPolicy;
   peerId: string;
   socket: Socket;
   sessionId: string;
@@ -11,19 +10,15 @@ type PeerConnectionOptions = {
 
 export const createEnginePeerConnection = ({
   iceServers,
-  iceTransportPolicy,
   peerId,
   socket,
   sessionId,
   onTrack,
 }: PeerConnectionOptions) => {
   const peerConnection = new RTCPeerConnection({
-    bundlePolicy: "max-bundle",
     iceServers: iceServers?.length
       ? iceServers
       : [{ urls: "stun:stun.l.google.com:19302" }],
-    iceTransportPolicy,
-    rtcpMuxPolicy: "require",
   });
 
   peerConnection.ontrack = (event) => {
