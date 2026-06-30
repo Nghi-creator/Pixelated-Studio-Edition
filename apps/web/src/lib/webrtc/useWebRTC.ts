@@ -211,6 +211,7 @@ export function useWebRTC(
     let heartbeatIntervalId: number | null = null;
     let disposed = false;
     let automaticRecoveryQueued = false;
+    let offerSent = false;
     let incomingStream: MediaStream | null = null;
     let iceServersForSession: RTCIceServer[] = FALLBACK_ICE_SERVERS;
 
@@ -380,7 +381,10 @@ export function useWebRTC(
     socket.on(
       "webrtc-answer",
       (answer: RTCSessionDescriptionInit & { peerId?: string }) => {
-        if (answer.peerId && answer.peerId !== peerId) return;
+        if (answer.peerId !== peerId) {
+          console.warn("[WebRTC] Ignoring answer without matching peer id.");
+          return;
+        }
 
         if (!pc || pc.signalingState !== "have-local-offer") {
           console.warn(
@@ -403,7 +407,7 @@ export function useWebRTC(
     socket.on(
       "webrtc-ice-candidate-backend",
       (candidate: RTCIceCandidateInit & { peerId?: string }) => {
-        if (candidate.peerId && candidate.peerId !== peerId) return;
+        if (candidate.peerId !== peerId) return;
         pc?.addIceCandidate(new RTCIceCandidate(candidate)).catch((err) => {
           console.warn("[WebRTC] Failed to add ICE candidate:", err);
         });
@@ -527,9 +531,21 @@ export function useWebRTC(
         }
       });
       if (pc) {
+        if (offerSent) {
+          console.warn("[WebRTC] Ignoring duplicate python-ready for active peer.");
+          return;
+        }
+        if (pc.signalingState !== "stable") {
+          console.warn(
+            `[WebRTC] Ignoring python-ready while signalingState is ${pc.signalingState}.`,
+          );
+          return;
+        }
+        offerSent = true;
         try {
           await createAndSendOffer(pc, socket, sessionId, peerId);
         } catch (err) {
+          offerSent = false;
           console.error("[WebRTC] Failed to create stream offer:", err);
           failStream(getErrorMessage(err, STREAM_OFFER_ERROR_MESSAGE));
         }

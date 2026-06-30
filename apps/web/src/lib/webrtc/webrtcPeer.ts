@@ -50,6 +50,12 @@ export const createAndSendOffer = async (
   sessionId: string,
   peerId: string,
 ) => {
+  if (peerConnection.signalingState !== "stable") {
+    throw new Error(
+      `Cannot create WebRTC offer while signalingState is ${peerConnection.signalingState}.`,
+    );
+  }
+
   const transceivers = peerConnection.getTransceivers();
   if (!transceivers.some((entry) => entry.receiver.track?.kind === "video")) {
     peerConnection.addTransceiver("video", { direction: "recvonly" });
