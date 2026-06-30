@@ -1,22 +1,13 @@
--- Move the public catalog eligibility gate into Postgres so API reads do not
--- fetch all published games and then fan out to builds/rights in app memory.
+-- Add server-side search support to the public catalog RPC without mutating
+-- the already-created base migration.
 
-CREATE INDEX IF NOT EXISTS games_public_catalog_title_idx
-ON public.games (lower(title), id)
-WHERE publication_status = 'published';
-
-CREATE INDEX IF NOT EXISTS games_public_catalog_play_count_idx
-ON public.games (play_count DESC NULLS LAST, id)
-WHERE publication_status = 'published';
-
-CREATE INDEX IF NOT EXISTS game_builds_enabled_game_idx
-ON public.game_builds (game_id, id)
-WHERE enabled = true;
+DROP FUNCTION IF EXISTS public.published_catalog_games(uuid, integer, text);
 
 CREATE OR REPLACE FUNCTION public.published_catalog_games(
   p_game_id uuid DEFAULT NULL,
   p_limit integer DEFAULT 1000,
-  p_order text DEFAULT 'title'
+  p_order text DEFAULT 'title',
+  p_search text DEFAULT NULL
 )
 RETURNS TABLE (
   id uuid,
@@ -60,6 +51,18 @@ AS $$
       ON verified_builds.game_id = games.id
     WHERE games.publication_status = 'published'
       AND (p_game_id IS NULL OR games.id = p_game_id)
+      AND (
+        NULLIF(trim(COALESCE(p_search, '')), '') IS NULL
+        OR NOT EXISTS (
+          SELECT 1
+          FROM regexp_split_to_table(lower(trim(p_search)), '\s+') AS search_terms(term)
+          WHERE lower(
+            COALESCE(games.title, '') || ' ' ||
+            COALESCE(games.author_name, '') || ' ' ||
+            COALESCE(games.developer_name, '')
+          ) NOT LIKE '%' || search_terms.term || '%'
+        )
+      )
     GROUP BY games.id
     HAVING count(verified_builds.id) = 1
   )
@@ -133,8 +136,8 @@ AS $$
     CASE WHEN p_order = 'play_count_desc' THEN games.play_count END DESC NULLS LAST,
     CASE WHEN p_order = 'title' THEN lower(games.title) END ASC NULLS LAST,
     games.id
-  LIMIT greatest(0, least(coalesce(p_limit, 1000), 1000));
+  LIMIT greatest(0, least(coalesce(p_limit, 1000), 5000));
 $$;
 
-GRANT EXECUTE ON FUNCTION public.published_catalog_games(uuid, integer, text)
+GRANT EXECUTE ON FUNCTION public.published_catalog_games(uuid, integer, text, text)
 TO anon, authenticated, service_role;
