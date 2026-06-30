@@ -42,3 +42,11 @@ test("native lock manifest matches allowlisted launch manifests and Docker pins"
     assert.match(dockerfile, new RegExp(`${pkg.packageName}=${pkg.packageVersion.replaceAll("+", "\\+")}`));
   }
 });
+
+test("native runtime image ships the Python camera socket client", () => {
+  const dockerfilePath = path.resolve(__dirname, "../../../Dockerfile.native");
+  const dockerfile = fs.readFileSync(dockerfilePath, "utf8");
+
+  assert.match(dockerfile, /python-socketio\[client\]/);
+  assert.match(dockerfile, /PYTHONPATH=\/usr\/local\/lib\/pixelated-python/);
+});
