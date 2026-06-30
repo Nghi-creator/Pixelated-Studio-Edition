@@ -249,7 +249,63 @@ class FakeSupabase {
       };
     }
 
+    if (fn === "published_catalog_games") {
+      const gameId =
+        typeof params.p_game_id === "string" ? params.p_game_id : null;
+      const limit = Math.min(1000, Math.max(0, Number(params.p_limit || 1000)));
+      const order =
+        params.p_order === "play_count_desc" ? "play_count_desc" : "title";
+      const rows = this.getPublishedCatalogGameRows(gameId, order).slice(
+        0,
+        limit,
+      );
+      return { data: rows, error: null };
+    }
+
     return { data: null, error: null };
+  }
+
+  private getPublishedCatalogGameRows(
+    gameId: string | null,
+    order: "play_count_desc" | "title",
+  ) {
+    return this.rows.games
+      .filter(
+        (game) =>
+          game.publication_status === "published" &&
+          (!gameId || game.id === gameId),
+      )
+      .map((game) => {
+        const verifiedBuilds = this.rows.game_builds.filter((build) => {
+          if (build.game_id !== game.id || build.enabled !== true) return false;
+          return this.rows.game_rights.some(
+            (rights) =>
+              rights.game_id === game.id &&
+              rights.verified_at &&
+              (!rights.game_build_id || rights.game_build_id === build.id),
+          );
+        });
+
+        if (verifiedBuilds.length !== 1) return null;
+
+        return {
+          ...game,
+          game_builds: verifiedBuilds,
+          game_rights: this.rows.game_rights.filter(
+            (rights) => rights.game_id === game.id && rights.verified_at,
+          ),
+        };
+      })
+      .filter((game): game is RecordRow => Boolean(game))
+      .sort((left, right) => {
+        if (order === "play_count_desc") {
+          const playDiff =
+            Number(right.play_count || 0) - Number(left.play_count || 0);
+          if (playDiff !== 0) return playDiff;
+        }
+
+        return String(left.title || "").localeCompare(String(right.title || ""));
+      });
   }
 
   private setReaction(
@@ -653,6 +709,10 @@ test("catalog and favorites are served through backend routes", async () => {
   const gamesResponse = await app.inject({ method: "GET", url: "/games" });
   assert.equal(gamesResponse.statusCode, 200);
   assert.equal(gamesResponse.json<{ games: unknown[] }>().games.length, 1);
+  assert.equal(
+    db.rpcCalls.some((call) => call.fn === "published_catalog_games"),
+    true,
+  );
 
   const favoriteResponse = await app.inject({
     method: "GET",
