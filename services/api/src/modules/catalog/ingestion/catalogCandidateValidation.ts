@@ -30,6 +30,8 @@ const LIBRETRO_CANDIDATE_RULES = [
   { extensions: [".gg"], platformId: "game_gear", runtimeId: "picodrive" },
 ];
 
+const NATIVE_LINUX_MANIFEST_IDS = ["frozen-bubble", "neverball"];
+
 const GB_NINTENDO_LOGO_PREFIX = Buffer.from([
   0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b,
 ]);
@@ -50,7 +52,8 @@ export function assertCandidateRuntimeAllowed(
     if (
       candidate.runtime_id !== "debian-native-v1" ||
       candidate.platform_id !== "linux" ||
-      !candidate.launch_manifest_id
+      !candidate.launch_manifest_id ||
+      !NATIVE_LINUX_MANIFEST_IDS.includes(candidate.launch_manifest_id)
     ) {
       throw new CandidateValidationError(
         "Candidate native runtime/platform is not allowlisted.",

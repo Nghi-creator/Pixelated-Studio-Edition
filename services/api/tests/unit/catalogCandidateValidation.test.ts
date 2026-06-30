@@ -87,6 +87,17 @@ test("candidate runtime allowlist rejects mismatched runtime/platform/extension"
       }),
     /extension .sfc is not allowlisted/,
   );
+  assert.throws(
+    () =>
+      assertCandidateRuntimeAllowed({
+        artifact_filename: null,
+        launch_manifest_id: "unknown-game",
+        platform_id: "linux",
+        runtime_id: "debian-native-v1",
+        runtime_kind: "native_linux",
+      }),
+    /not allowlisted/,
+  );
 });
 
 test("candidate artifact headers validate supported ROM families", () => {
