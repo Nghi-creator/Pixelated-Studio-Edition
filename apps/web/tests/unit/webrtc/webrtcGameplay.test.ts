@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { buildMultiplayerLobbyPayload } from "../../../src/lib/webrtc/lobbyMetadata.ts";
 import {
+  formatEngineLaunchFailure,
   getErrorMessage,
   STREAM_BOOT_ERROR_MESSAGE,
 } from "../../../src/lib/webrtc/streamErrors.ts";
@@ -74,5 +75,31 @@ test("stream error messages preserve useful errors and fall back safely", () => 
   assert.equal(
     getErrorMessage({ message: "not an Error instance" }, STREAM_BOOT_ERROR_MESSAGE),
     STREAM_BOOT_ERROR_MESSAGE,
+  );
+});
+
+test("engine launch diagnostics format recent process output", () => {
+  assert.equal(
+    formatEngineLaunchFailure({
+      checks: {
+        runtime: {
+          lastLaunchFailure: {
+            label: "Native game frozen-bubble",
+            message: "Native game frozen-bubble exited unexpectedly.",
+            runtimeId: "debian-native-v1",
+            sessionId: "session-1",
+            stderrTail: "failed to initialize SDL video output\n",
+          },
+        },
+      },
+    }),
+    "Native game frozen-bubble exited unexpectedly. Last output: failed to initialize SDL video output",
+  );
+
+  assert.equal(
+    formatEngineLaunchFailure({
+      checks: { runtime: { lastLaunchFailure: null } },
+    }),
+    null,
   );
 });

@@ -32,6 +32,7 @@ import type { StreamProfile } from "../engine/streamProfiles";
 import {
   CHECKING_INPUT_CAPABILITIES,
   loadEngineInputCapabilities,
+  loadEngineLaunchFailureMessage,
   loadEngineShareContext,
 } from "./engineContext";
 import { buildMultiplayerLobbyPayload } from "./lobbyMetadata";
@@ -459,9 +460,12 @@ export function useWebRTC(
         }
         bootReadyTimeoutId = window.setTimeout(() => {
           bootReadyTimeoutId = null;
-          failStream(
-            "The engine started the game but the video bridge did not become ready. Retry the stream; if this is a native Linux game, check the desktop runtime log for launch errors.",
-          );
+          loadEngineLaunchFailureMessage().then((diagnosticMessage) => {
+            failStream(
+              diagnosticMessage ||
+                "The engine started the game but the video bridge did not become ready. Retry the stream; if this is a native Linux game, check the desktop runtime log for launch errors.",
+            );
+          });
         }, STREAM_BOOT_READY_TIMEOUT_MS);
       } catch (err) {
         console.error("Failed to boot game:", err);

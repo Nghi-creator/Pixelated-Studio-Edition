@@ -10,6 +10,7 @@ import type {
   EngineInputCapabilities,
   EngineShareContext,
 } from "./types";
+import { formatEngineLaunchFailure } from "./streamErrors";
 
 const KEYBOARD_FALLBACK_PLAYER_COUNT = 2;
 const VIRTUAL_GAMEPAD_PLAYER_COUNT = 4;
@@ -22,6 +23,19 @@ type EngineHealthPayload = {
       fileExists?: boolean;
       ready?: boolean;
       uinputAvailable?: boolean;
+    };
+    runtime?: {
+      lastLaunchFailure?: {
+        exitCode?: number | null;
+        label?: string;
+        message?: string;
+        occurredAt?: string;
+        runtimeId?: string;
+        sessionId?: string;
+        signal?: string | null;
+        stderrTail?: string;
+        stdoutTail?: string;
+      } | null;
     };
   };
   exposureMode?: "local" | "lan";
@@ -113,6 +127,18 @@ export async function loadEngineRuntimeKind() {
   if (!response.ok) throw new Error("Engine health check failed.");
   const health = (await response.json()) as EngineHealthPayload;
   return health.runtimeKind || "libretro";
+}
+
+export async function loadEngineLaunchFailureMessage() {
+  try {
+    const response = await fetch(engineEndpoint("/health"), { cache: "no-store" });
+    if (!response.ok) return null;
+    const health = (await response.json()) as EngineHealthPayload;
+    return formatEngineLaunchFailure(health);
+  } catch (err) {
+    console.warn("[WebRTC] Could not load engine launch diagnostics:", err);
+    return null;
+  }
 }
 
 export async function requestEngineRuntimeSwitch(
