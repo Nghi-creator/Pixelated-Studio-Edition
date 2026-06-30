@@ -50,6 +50,15 @@ export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
     validation: DownloadValidationOptions,
   ): Promise<void> {
     const parsedUrl = validateCloudRomUrl(romUrl);
+    if (
+      typeof validation.expectedSizeBytes === "number" &&
+      Number.isFinite(validation.expectedSizeBytes) &&
+      validation.expectedSizeBytes > maxCloudRomSizeBytes
+    ) {
+      throw new Error(
+        `Cloud ROM is too large. Max size is ${maxCloudRomSizeBytes} bytes.`,
+      );
+    }
 
     return new Promise((resolve, reject) => {
       const file = fs.createWriteStream(destinationPath);

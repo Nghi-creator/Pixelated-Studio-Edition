@@ -3,6 +3,7 @@ import fs from "fs";
 import { createGamepadBridge } from "../input/gamepadBridge";
 import { injectKey, type KeyAction } from "../input/injectKey";
 import { translateKey } from "../input/translateKey";
+import { validateGameArtifact } from "../roms/artifactValidation";
 import { removeFileIfExists } from "../roms/cloudRomDownloader";
 import type { StreamProfile } from "../signaling/startGameHandlers";
 import { getNativeLaunchManifest } from "./nativeLaunchManifests";
@@ -186,17 +187,16 @@ export function createProcessManager(options: ProcessManagerOptions) {
       throw new Error(`Unsupported runtime: ${runtimeId}`);
     }
 
-    if (retroarchProcess) retroarchProcess.kill();
-    if (cameraProcess) cameraProcess.kill();
-    if (activeCloudRomPath) removeFileIfExists(activeCloudRomPath);
-
-    activeSessionId = null;
-    activeCloudRomPath = null;
+    cleanupActiveSession(activeSessionId);
 
     if (runtime.kind === "libretro") {
       if (!runtime.corePath) {
         throw new Error(`Unsupported runtime: ${runtimeId}`);
       }
+      validateGameArtifact(absoluteRomPath, {
+        fileLabel: "Game artifact",
+        runtimeId,
+      });
 
       activeSessionId = sessionId;
       activeCloudRomPath = bootOptions.isCloudRom ? absoluteRomPath : null;

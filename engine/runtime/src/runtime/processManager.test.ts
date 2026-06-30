@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import { createProcessManager } from "./processManager";
 
@@ -37,6 +40,56 @@ function createManager(options: {
     spawned,
   };
 }
+
+function writeTempFile(filename: string, bytes: Buffer) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pixelated-runtime-"));
+  const filePath = path.join(tempDir, filename);
+  fs.writeFileSync(filePath, bytes);
+  return filePath;
+}
+
+function writeValidNesFile() {
+  return writeTempFile(
+    "game.nes",
+    Buffer.concat([Buffer.from([0x4e, 0x45, 0x53, 0x1a]), Buffer.alloc(32)]),
+  );
+}
+
+test("libretro boot validates artifacts before spawning RetroArch", () => {
+  const { manager, spawned } = createManager();
+  const invalidRomPath = writeTempFile("broken.nes", Buffer.alloc(32));
+
+  assert.throws(
+    () =>
+      manager.bootGame(invalidRomPath, "session-invalid", {
+        runtimeId: "mesen",
+      }),
+    /Invalid NES ROM header/,
+  );
+
+  assert.equal(manager.getActiveSessionId(), null);
+  assert.deepEqual(spawned, []);
+});
+
+test("libretro boot uses the selected registry core", () => {
+  const { manager, spawned } = createManager();
+  const romPath = writeValidNesFile();
+
+  manager.bootGame(romPath, "session-nes", {
+    runtimeId: "mesen",
+  });
+
+  assert.equal(manager.getActiveSessionId(), "session-nes");
+  assert.equal(spawned[0]?.command, "retroarch");
+  assert.deepEqual(spawned[0]?.args.slice(0, 4), [
+    "-f",
+    "-L",
+    "/cores/mesen_libretro.so",
+    "--appendconfig",
+  ]);
+
+  manager.cleanupActiveSession("session-nes");
+});
 
 test("native boot fails fast when the allowlisted executable is missing", () => {
   const { manager, spawned } = createManager({
