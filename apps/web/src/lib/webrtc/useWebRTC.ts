@@ -60,6 +60,7 @@ export type {
 
 const STREAM_METRIC_SEND_INTERVAL_MS = 5_000;
 const CLIENT_HEARTBEAT_INTERVAL_MS = 20_000;
+const STREAM_BOOT_READY_TIMEOUT_MS = 45_000;
 const DISCONNECTED_GRACE_MS = 5_000;
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
@@ -193,6 +194,7 @@ export function useWebRTC(
     let detachEngineInput: () => void = () => undefined;
     let disconnectedTimeoutId: number | null = null;
     let heartbeatIntervalId: number | null = null;
+    let bootReadyTimeoutId: number | null = null;
     let disposed = false;
     let automaticRecoveryQueued = false;
     let offerSent = false;
@@ -201,6 +203,10 @@ export function useWebRTC(
 
     const failStream = (message: string) => {
       if (disposed) return;
+      if (bootReadyTimeoutId !== null) {
+        window.clearTimeout(bootReadyTimeoutId);
+        bootReadyTimeoutId = null;
+      }
       if (
         seamlessRestart &&
         !automaticRecoveryQueued &&
@@ -448,6 +454,15 @@ export function useWebRTC(
           },
           ...bootTarget,
         });
+        if (bootReadyTimeoutId !== null) {
+          window.clearTimeout(bootReadyTimeoutId);
+        }
+        bootReadyTimeoutId = window.setTimeout(() => {
+          bootReadyTimeoutId = null;
+          failStream(
+            "The engine started the game but the video bridge did not become ready. Retry the stream; if this is a native Linux game, check the desktop runtime log for launch errors.",
+          );
+        }, STREAM_BOOT_READY_TIMEOUT_MS);
       } catch (err) {
         console.error("Failed to boot game:", err);
         failStream(getErrorMessage(err, STREAM_BOOT_ERROR_MESSAGE));
@@ -499,6 +514,10 @@ export function useWebRTC(
     });
 
     socket.on("python-ready", async () => {
+      if (bootReadyTimeoutId !== null) {
+        window.clearTimeout(bootReadyTimeoutId);
+        bootReadyTimeoutId = null;
+      }
       console.log("[WebRTC] Python is awake! Generating and sending Offer...");
       loadEngineInputCapabilities().then((nextInputCapabilities) => {
         if (!disposed) {
@@ -547,6 +566,9 @@ export function useWebRTC(
       }
       if (heartbeatIntervalId !== null) {
         window.clearInterval(heartbeatIntervalId);
+      }
+      if (bootReadyTimeoutId !== null) {
+        window.clearTimeout(bootReadyTimeoutId);
       }
 
       if (pc) {

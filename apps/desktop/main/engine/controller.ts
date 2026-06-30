@@ -248,6 +248,13 @@ async function getEngineHealth() {
   return requestEngineControl<EngineHealthPayload>("/health");
 }
 
+async function stopActiveEngineSession() {
+  return requestEngineControl<{ sessionId?: string; stopped: boolean }>(
+    "/session/stop-active",
+    { method: "POST" },
+  );
+}
+
 export async function revokeEngineClient(clientId: string) {
   return requestEngineControl<{ disconnected: number }>(
     `/clients/${encodeURIComponent(clientId)}/revoke`,
@@ -416,12 +423,22 @@ async function requestEngineRuntimeSwitch(
   }
 
   try {
-    const health = await getEngineHealth();
+    let health = await getEngineHealth();
     if (health.runtimeKind === runtimeKind) {
       return {
         runtimeKind,
         status: "unchanged" as const,
       };
+    }
+
+    const activeSessionId = health.checks?.runtime?.activeSessionId;
+    if (activeSessionId) {
+      event.reply(
+        "server-log",
+        `Stopping active game session ${activeSessionId} before switching runtime...`,
+      );
+      await stopActiveEngineSession();
+      health = await getEngineHealth();
     }
 
     const blocker = getRuntimeSwitchBlocker(
