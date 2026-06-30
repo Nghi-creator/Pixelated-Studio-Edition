@@ -23,6 +23,11 @@ type HarnessOverrides = {
       runtimeId: string;
     },
   ) => Promise<void>;
+  bootGame?: (
+    romPath: string,
+    sessionId: string,
+    options: RuntimeBootOptions,
+  ) => void;
   verifyBackendSession?: (options: {
     apiUrl: string;
     sessionId: string;
@@ -78,6 +83,10 @@ function createHarness(overrides: HarnessOverrides = {}) {
       }),
     runtime: {
       bootGame: (romPath, sessionId, options) => {
+        if (overrides.bootGame) {
+          overrides.bootGame(romPath, sessionId, options);
+          return;
+        }
         booted.push({ options, romPath, sessionId });
       },
     },
@@ -290,6 +299,28 @@ test("local vault starts infer PicoDrive for Sega 8-bit files", async () => {
   assert.equal(calls.verify, 0);
   assert.equal(booted[0]?.romPath, "/roms/local-user/master.sms");
   assert.equal(booted[0]?.options.runtimeId, "picodrive");
+});
+
+test("local vault boot failures emit a user-visible engine error", async () => {
+  const { booted, socket } = createHarness({
+    bootGame: () => {
+      throw new Error("Invalid GBA cartridge header.");
+    },
+  });
+
+  socket.emit("start-game", {
+    mode: "local",
+    romFilename: "broken.gba",
+    sessionId: "session-broken-local",
+    userId: "local-user",
+  });
+  await flushStartGame();
+
+  assert.deepEqual(booted, []);
+  assert.equal(
+    getErrorMessage(socket),
+    "Local Vault game failed to launch: Invalid GBA cartridge header.",
+  );
 });
 
 test("stream profiles are clamped before reaching the runtime", () => {

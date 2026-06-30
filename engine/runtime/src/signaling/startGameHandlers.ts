@@ -289,15 +289,21 @@ export function registerStartGameHandler(
         });
         return;
       }
-      runtime.bootGame(
-        path.join("/roms", safeUserId, safeRomFile),
-        sessionId,
-        {
+      try {
+        runtime.bootGame(path.join("/roms", safeUserId, safeRomFile), sessionId, {
           ...(iceServers.length > 0 ? { iceServers } : {}),
           runtimeId: registryRuntime.id,
           streamProfile,
-        },
-      );
+        });
+      } catch (err) {
+        console.error("[Engine] Failed to launch Local Vault game:", err);
+        socket.emit("engine-error", {
+          message:
+            err instanceof Error
+              ? `Local Vault game failed to launch: ${err.message}`
+              : "Local Vault game failed to launch.",
+        });
+      }
     }
   });
 }
