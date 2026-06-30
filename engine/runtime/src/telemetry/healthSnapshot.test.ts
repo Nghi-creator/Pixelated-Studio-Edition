@@ -69,4 +69,50 @@ describe("engine health snapshot", () => {
     assert.equal(snapshot.runtimeKind, "native_linux");
     assert.equal(snapshot.checks.retroarch.binaryExists, false);
   });
+
+  it("includes recent runtime launch diagnostics", () => {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pixelated-health-"));
+    const existingFile = path.join(tempDir, "ready");
+    fs.writeFileSync(existingFile, "");
+
+    const getHealthSnapshot = createHealthSnapshot({
+      getRuntimeState: () => ({
+        lastLaunchFailure: {
+          exitCode: 1,
+          label: "Native game frozen-bubble",
+          message: "Native game frozen-bubble exited unexpectedly.",
+          occurredAt: "2026-07-01T00:00:00.000Z",
+          runtimeId: "debian-native-v1",
+          sessionId: "session-native",
+          stderrTail: "failed to initialize SDL video output\n",
+        },
+        pulseAudioProcess: { exitCode: null },
+        virtualDisplayProcess: { exitCode: null },
+      }),
+      healthPaths: {
+        cameraBridge: existingFile,
+        cameraPeerState: existingFile,
+        gamepadBridge: existingFile,
+        gstreamerBinary: existingFile,
+        libretroCores: [existingFile],
+        pythonBinary: existingFile,
+        retroarchBinary: existingFile,
+        retroarchConfig: existingFile,
+        roms: tempDir,
+        xvfbSocket: existingFile,
+      },
+      runtimeKind: "native_linux",
+    });
+
+    const snapshot = getHealthSnapshot();
+    assert.deepEqual(snapshot.checks.runtime.lastLaunchFailure, {
+      exitCode: 1,
+      label: "Native game frozen-bubble",
+      message: "Native game frozen-bubble exited unexpectedly.",
+      occurredAt: "2026-07-01T00:00:00.000Z",
+      runtimeId: "debian-native-v1",
+      sessionId: "session-native",
+      stderrTail: "failed to initialize SDL video output\n",
+    });
+  });
 });

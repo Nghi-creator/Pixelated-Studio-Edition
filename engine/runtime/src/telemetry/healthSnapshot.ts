@@ -12,6 +12,7 @@ type RuntimeState = {
   cameraPeerStatePath?: string | null;
   cameraProcess?: ProcessRef;
   gamepads?: Record<string, unknown>;
+  lastLaunchFailure?: Record<string, unknown> | null;
   pulseAudioProcess?: ProcessRef;
   retroarchProcess?: ProcessRef;
   virtualDisplayProcess?: ProcessRef;
@@ -111,6 +112,7 @@ export function createHealthSnapshot(options: HealthSnapshotOptions) {
             runtimeState.cameraProcess.exitCode === null,
         ),
         activeCloudRomPath: runtimeState.activeCloudRomPath,
+        lastLaunchFailure: runtimeState.lastLaunchFailure || null,
       },
       resources: createResourceSnapshot(runtimeState),
     };

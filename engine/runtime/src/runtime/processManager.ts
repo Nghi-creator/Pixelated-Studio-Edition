@@ -32,16 +32,31 @@ type BootOptions = {
   streamProfile?: StreamProfile;
 };
 
+type LaunchFailure = {
+  exitCode?: number | null;
+  label: string;
+  message: string;
+  occurredAt: string;
+  runtimeId: string;
+  sessionId: string;
+  signal?: NodeJS.Signals | null;
+  stderrTail?: string;
+  stdoutTail?: string;
+};
+
 type RuntimeState = {
   activeCloudRomPath: string | null;
   activeSessionId: string | null;
   cameraPeerStatePath: string;
   cameraProcess: ChildProcess | null;
   gamepads: ReturnType<ReturnType<typeof createGamepadBridge>["getState"]>;
+  lastLaunchFailure: LaunchFailure | null;
   pulseAudioProcess: ChildProcess | null;
   retroarchProcess: ChildProcess | null;
   virtualDisplayProcess: ChildProcess | null;
 };
+
+const PROCESS_OUTPUT_TAIL_BYTES = 4096;
 
 export function createProcessManager(options: ProcessManagerOptions) {
   const { cameraPath, cameraPeerStatePath, engineToken, gamepadBridgePath } =
@@ -56,6 +71,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
   let activeSessionId: string | null = null;
   let activeCloudRomPath: string | null = null;
   let cameraStartTimer: NodeJS.Timeout | null = null;
+  let lastLaunchFailure: LaunchFailure | null = null;
 
   function startVirtualDisplay(): void {
     console.log("Booting Virtual Display (Xvfb) and PulseAudio...");
@@ -144,9 +160,18 @@ export function createProcessManager(options: ProcessManagerOptions) {
     child: ChildProcess,
     sessionId: string,
     label: string,
+    runtimeId: string,
   ) {
+    const output = bindProcessOutputTail(child, label);
     child.on("error", (err) => {
       console.error(`[Engine] ${label} failed to start: ${err.message}`);
+      recordLaunchFailure({
+        label,
+        message: err.message,
+        runtimeId,
+        sessionId,
+        ...output.getTail(),
+      });
       cleanupActiveSession(sessionId);
     });
     child.on("exit", (code, signal) => {
@@ -156,8 +181,51 @@ export function createProcessManager(options: ProcessManagerOptions) {
           signal ? `signal ${signal}` : `code ${code}`
         }`,
       );
+      if (code !== 0 || signal) {
+        recordLaunchFailure({
+          exitCode: code,
+          label,
+          message: `${label} exited unexpectedly.`,
+          runtimeId,
+          sessionId,
+          signal,
+          ...output.getTail(),
+        });
+      }
       cleanupActiveSession(sessionId);
     });
+  }
+
+  function bindProcessOutputTail(child: ChildProcess, label: string) {
+    let stdoutTail = "";
+    let stderrTail = "";
+    const appendTail = (current: string, chunk: Buffer) =>
+      (current + chunk.toString("utf8")).slice(-PROCESS_OUTPUT_TAIL_BYTES);
+
+    child.stdout?.on("data", (data: Buffer) => {
+      stdoutTail = appendTail(stdoutTail, data);
+      console.log(`[${label}] ${data}`);
+    });
+    child.stderr?.on("data", (data: Buffer) => {
+      stderrTail = appendTail(stderrTail, data);
+      console.error(`[${label} Error] ${data}`);
+    });
+
+    return {
+      getTail: () => ({
+        ...(stderrTail ? { stderrTail } : {}),
+        ...(stdoutTail ? { stdoutTail } : {}),
+      }),
+    };
+  }
+
+  function recordLaunchFailure(
+    failure: Omit<LaunchFailure, "occurredAt">,
+  ): void {
+    lastLaunchFailure = {
+      ...failure,
+      occurredAt: new Date().toISOString(),
+    };
   }
 
   function sendInput(
@@ -188,6 +256,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
     }
 
     cleanupActiveSession(activeSessionId);
+    lastLaunchFailure = null;
 
     if (runtime.kind === "libretro") {
       if (!runtime.corePath) {
@@ -217,7 +286,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
         ],
         { env: { ...process.env, DISPLAY: ":99", PULSE_SERVER: "127.0.0.1" } },
       );
-      bindGameProcessLifecycle(retroarchProcess, sessionId, "RetroArch");
+      bindGameProcessLifecycle(retroarchProcess, sessionId, "RetroArch", runtimeId);
     } else {
       const manifest = getNativeLaunchManifest(absoluteRomPath);
       if (!manifest || !runtime.launchManifestIds?.includes(manifest.id)) {
@@ -248,6 +317,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
         retroarchProcess,
         sessionId,
         `Native game ${manifest.id}`,
+        runtimeId,
       );
     }
 
@@ -269,12 +339,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
         },
       });
 
-      cameraProcess.stdout?.on("data", (data: Buffer) =>
-        console.log(`[Camera] ${data}`),
-      );
-      cameraProcess.stderr?.on("data", (data: Buffer) =>
-        console.error(`[Camera Error] ${data}`),
-      );
+      bindGameProcessLifecycle(cameraProcess, sessionId, "Camera bridge", runtimeId);
     }, 1000);
   }
 
@@ -292,6 +357,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
       virtualDisplayProcess,
       gamepads: gamepads.getState(),
       cameraPeerStatePath,
+      lastLaunchFailure,
     };
   }
 

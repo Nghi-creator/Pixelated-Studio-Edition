@@ -122,3 +122,25 @@ test("native process exit clears active session before camera startup", () => {
   assert.equal(manager.getActiveSessionId(), null);
   assert.equal(spawned.some((entry) => entry.command === "python3"), false);
 });
+
+test("native process failures expose recent launch diagnostics", () => {
+  const child = new FakeChildProcess();
+  const { manager } = createManager({ spawnChild: child });
+
+  manager.bootGame("frozen-bubble", "session-native", {
+    runtimeId: "debian-native-v1",
+  });
+
+  child.stderr.emit(
+    "data",
+    Buffer.from("failed to initialize SDL video output\n"),
+  );
+  child.emit("exit", 1, null);
+
+  const failure = manager.getRuntimeState().lastLaunchFailure;
+  assert.equal(failure?.sessionId, "session-native");
+  assert.equal(failure?.runtimeId, "debian-native-v1");
+  assert.equal(failure?.label, "Native game frozen-bubble");
+  assert.equal(failure?.exitCode, 1);
+  assert.match(failure?.stderrTail || "", /SDL video output/);
+});
