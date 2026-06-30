@@ -14,6 +14,7 @@ const PROXY_PREFIXES = [
   "/clients",
   "/display/frame",
   "/local-games",
+  "/session/stop-active",
   "/smoke/telemetry",
   "/socket.io",
   "/upload",

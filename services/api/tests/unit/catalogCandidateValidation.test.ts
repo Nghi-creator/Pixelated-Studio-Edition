@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import test from "node:test";
 import {
   assertCandidateArtifactHeader,
   assertCandidateRuntimeAllowed,
   CandidateValidationError,
+  getNativeRuntimeManifestIds,
 } from "../../src/modules/catalog/ingestion/catalogCandidateValidation.js";
 
 function validNesRom() {
@@ -86,6 +89,32 @@ test("candidate runtime allowlist rejects mismatched runtime/platform/extension"
         runtime_kind: "libretro",
       }),
     /extension .sfc is not allowlisted/,
+  );
+  assert.throws(
+    () =>
+      assertCandidateRuntimeAllowed({
+        artifact_filename: null,
+        launch_manifest_id: "unknown-game",
+        platform_id: "linux",
+        runtime_id: "debian-native-v1",
+        runtime_kind: "native_linux",
+      }),
+    /not allowlisted/,
+  );
+});
+
+test("native runtime allowlist stays in sync with the engine lock manifest", () => {
+  const lockPath = path.resolve(
+    process.cwd(),
+    "../../engine/runtime/native-runtime.lock.json",
+  );
+  const lock = JSON.parse(fs.readFileSync(lockPath, "utf8")) as {
+    packages: { manifestId: string }[];
+  };
+
+  assert.deepEqual(
+    getNativeRuntimeManifestIds(),
+    lock.packages.map((entry) => entry.manifestId).sort(),
   );
 });
 

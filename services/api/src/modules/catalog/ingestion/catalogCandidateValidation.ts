@@ -1,4 +1,8 @@
 import path from "node:path";
+import {
+  readDebianNativeLockManifest,
+  type DebianNativeLockManifest,
+} from "./debianNativeImporter.js";
 
 export type CandidateValidationInput = {
   artifact_filename: string | null;
@@ -30,6 +34,8 @@ const LIBRETRO_CANDIDATE_RULES = [
   { extensions: [".gg"], platformId: "game_gear", runtimeId: "picodrive" },
 ];
 
+let nativeRuntimeLockCache: DebianNativeLockManifest | null | undefined;
+
 const GB_NINTENDO_LOGO_PREFIX = Buffer.from([
   0xce, 0xed, 0x66, 0x66, 0xcc, 0x0d, 0x00, 0x0b,
 ]);
@@ -47,10 +53,12 @@ export function assertCandidateRuntimeAllowed(
   candidate: CandidateValidationInput,
 ) {
   if (candidate.runtime_kind === "native_linux") {
+    const nativeManifestIds = getNativeRuntimeManifestIds();
     if (
       candidate.runtime_id !== "debian-native-v1" ||
       candidate.platform_id !== "linux" ||
-      !candidate.launch_manifest_id
+      !candidate.launch_manifest_id ||
+      !nativeManifestIds.includes(candidate.launch_manifest_id)
     ) {
       throw new CandidateValidationError(
         "Candidate native runtime/platform is not allowlisted.",
@@ -80,6 +88,35 @@ export function assertCandidateRuntimeAllowed(
       `Candidate artifact extension ${extension || "(none)"} is not allowlisted for ${candidate.platform_id}/${candidate.runtime_id}.`,
     );
   }
+}
+
+function getNativeRuntimeLockPathCandidates() {
+  return [
+    process.env.PIXELATED_NATIVE_RUNTIME_LOCK_PATH,
+    path.resolve(process.cwd(), "../../engine/runtime/native-runtime.lock.json"),
+    path.resolve(process.cwd(), "engine/runtime/native-runtime.lock.json"),
+  ].filter((entry): entry is string => Boolean(entry));
+}
+
+export function readNativeRuntimeLockForValidation() {
+  if (nativeRuntimeLockCache !== undefined) return nativeRuntimeLockCache;
+
+  for (const manifestPath of getNativeRuntimeLockPathCandidates()) {
+    try {
+      nativeRuntimeLockCache = readDebianNativeLockManifest(manifestPath);
+      return nativeRuntimeLockCache;
+    } catch {
+      // Try the next common workspace/deployment location.
+    }
+  }
+
+  nativeRuntimeLockCache = null;
+  return nativeRuntimeLockCache;
+}
+
+export function getNativeRuntimeManifestIds() {
+  const manifest = readNativeRuntimeLockForValidation();
+  return manifest?.packages.map((entry) => entry.manifestId).sort() || [];
 }
 
 function hasValidSnesHeader(bytes: Buffer) {

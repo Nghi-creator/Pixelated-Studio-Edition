@@ -12,6 +12,7 @@ import {
   getRuntimeDefinition,
   getRuntimeExtensionForTarget,
 } from "../runtime/runtimeRegistry";
+import { removeFileIfExists } from "../roms/cloudRomDownloader";
 
 type IceServer = {
   credential?: string;
@@ -275,7 +276,8 @@ export function registerStartGameHandler(
           streamProfile,
         });
       } catch (err) {
-        console.error("[Engine] Failed to download cloud ROM:", err);
+        console.error("[Engine] Failed to prepare cloud ROM:", err);
+        removeFileIfExists(tmpPath);
         socket.emit("engine-error", {
           message: err instanceof Error ? err.message : "Cloud ROM failed",
         });
@@ -289,15 +291,21 @@ export function registerStartGameHandler(
         });
         return;
       }
-      runtime.bootGame(
-        path.join("/roms", safeUserId, safeRomFile),
-        sessionId,
-        {
+      try {
+        runtime.bootGame(path.join("/roms", safeUserId, safeRomFile), sessionId, {
           ...(iceServers.length > 0 ? { iceServers } : {}),
           runtimeId: registryRuntime.id,
           streamProfile,
-        },
-      );
+        });
+      } catch (err) {
+        console.error("[Engine] Failed to launch Local Vault game:", err);
+        socket.emit("engine-error", {
+          message:
+            err instanceof Error
+              ? `Local Vault game failed to launch: ${err.message}`
+              : "Local Vault game failed to launch.",
+        });
+      }
     }
   });
 }

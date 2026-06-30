@@ -45,8 +45,7 @@ export default function Player() {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const degradedRecoveryRequestedRef = useRef(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [fallbackActive, setFallbackActive] = useState(false);
 
   const [streamProfileId, setStreamProfileId] = useState<StreamProfileId>(() => {
@@ -85,7 +84,6 @@ export default function Player() {
     lobbyState,
     kickParticipant,
     localParticipant,
-    recoverDegradedNetwork,
     releasePlayerSlot,
     requestPlayerSlot,
     retry,
@@ -196,13 +194,19 @@ export default function Player() {
     video.muted = isMuted;
     video.play().catch((err) => {
       console.warn("[WebRTC] Browser blocked stream playback:", err);
+      if (!isMuted) {
+        video.muted = true;
+        setIsMuted(true);
+        video.play().catch((retryErr) => {
+          console.warn("[WebRTC] Muted stream playback retry failed:", retryErr);
+        });
+      }
     });
   }, [isMuted, stream]);
 
   useEffect(() => {
     if (status !== "playing") {
       setFallbackActive(false);
-      degradedRecoveryRequestedRef.current = false;
       return;
     }
 
@@ -242,10 +246,6 @@ export default function Player() {
 
       if (blackSamples >= FALLBACK_BAD_SAMPLE_COUNT) {
         setFallbackActive(true);
-        if (!degradedRecoveryRequestedRef.current) {
-          degradedRecoveryRequestedRef.current = true;
-          recoverDegradedNetwork();
-        }
       } else if (healthySamples >= FALLBACK_HEALTHY_SAMPLE_COUNT) {
         setFallbackActive(false);
       }
@@ -255,7 +255,7 @@ export default function Player() {
       window.clearInterval(interval);
       setFallbackActive(false);
     };
-  }, [recoverDegradedNetwork, status]);
+  }, [status]);
 
   useEffect(() => {
     const gameKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "];

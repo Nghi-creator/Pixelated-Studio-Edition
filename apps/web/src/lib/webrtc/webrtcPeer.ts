@@ -2,7 +2,6 @@ import type { Socket } from "socket.io-client";
 
 type PeerConnectionOptions = {
   iceServers?: RTCIceServer[];
-  iceTransportPolicy?: RTCIceTransportPolicy;
   peerId: string;
   socket: Socket;
   sessionId: string;
@@ -11,19 +10,15 @@ type PeerConnectionOptions = {
 
 export const createEnginePeerConnection = ({
   iceServers,
-  iceTransportPolicy,
   peerId,
   socket,
   sessionId,
   onTrack,
 }: PeerConnectionOptions) => {
   const peerConnection = new RTCPeerConnection({
-    bundlePolicy: "max-bundle",
     iceServers: iceServers?.length
       ? iceServers
       : [{ urls: "stun:stun.l.google.com:19302" }],
-    iceTransportPolicy,
-    rtcpMuxPolicy: "require",
   });
 
   peerConnection.ontrack = (event) => {
@@ -50,8 +45,19 @@ export const createAndSendOffer = async (
   sessionId: string,
   peerId: string,
 ) => {
-  peerConnection.addTransceiver("video", { direction: "recvonly" });
-  peerConnection.addTransceiver("audio", { direction: "recvonly" });
+  if (peerConnection.signalingState !== "stable") {
+    throw new Error(
+      `Cannot create WebRTC offer while signalingState is ${peerConnection.signalingState}.`,
+    );
+  }
+
+  const transceivers = peerConnection.getTransceivers();
+  if (!transceivers.some((entry) => entry.receiver.track?.kind === "video")) {
+    peerConnection.addTransceiver("video", { direction: "recvonly" });
+  }
+  if (!transceivers.some((entry) => entry.receiver.track?.kind === "audio")) {
+    peerConnection.addTransceiver("audio", { direction: "recvonly" });
+  }
 
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);

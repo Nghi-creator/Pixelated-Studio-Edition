@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { io } from "socket.io-client";
 import { api, ApiError } from "../api/apiClient";
 import {
@@ -32,6 +32,7 @@ import type { StreamProfile } from "../engine/streamProfiles";
 import {
   CHECKING_INPUT_CAPABILITIES,
   loadEngineInputCapabilities,
+  loadEngineLaunchFailureMessage,
   loadEngineShareContext,
 } from "./engineContext";
 import { buildMultiplayerLobbyPayload } from "./lobbyMetadata";
@@ -60,21 +61,11 @@ export type {
 
 const STREAM_METRIC_SEND_INTERVAL_MS = 5_000;
 const CLIENT_HEARTBEAT_INTERVAL_MS = 20_000;
+const STREAM_BOOT_READY_TIMEOUT_MS = 45_000;
 const DISCONNECTED_GRACE_MS = 5_000;
 const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
   { urls: "stun:stun.l.google.com:19302" },
 ];
-
-function iceServerUrls(server: RTCIceServer) {
-  if (typeof server.urls === "string") return [server.urls];
-  return server.urls;
-}
-
-function hasTurnIceServer(iceServers: RTCIceServer[]) {
-  return iceServers.some((server) =>
-    iceServerUrls(server).some((url) => /^turns?:/i.test(url)),
-  );
-}
 
 async function loadIceServers() {
   try {
@@ -126,11 +117,6 @@ export function useWebRTC(
   const appliedStreamProfileIdRef = useRef(streamProfile.id);
   const seamlessRestartRef = useRef(false);
   const profileAutoRetriesRemainingRef = useRef(0);
-  const iceServersRef = useRef<RTCIceServer[]>(FALLBACK_ICE_SERVERS);
-  const iceTransportPolicyRef = useRef<RTCIceTransportPolicy | undefined>(
-    undefined,
-  );
-  const degradedNetworkRecoveryAttemptedRef = useRef(false);
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -209,13 +195,19 @@ export function useWebRTC(
     let detachEngineInput: () => void = () => undefined;
     let disconnectedTimeoutId: number | null = null;
     let heartbeatIntervalId: number | null = null;
+    let bootReadyTimeoutId: number | null = null;
     let disposed = false;
     let automaticRecoveryQueued = false;
+    let offerSent = false;
     let incomingStream: MediaStream | null = null;
     let iceServersForSession: RTCIceServer[] = FALLBACK_ICE_SERVERS;
 
     const failStream = (message: string) => {
       if (disposed) return;
+      if (bootReadyTimeoutId !== null) {
+        window.clearTimeout(bootReadyTimeoutId);
+        bootReadyTimeoutId = null;
+      }
       if (
         seamlessRestart &&
         !automaticRecoveryQueued &&
@@ -270,7 +262,6 @@ export function useWebRTC(
         ]);
       if (disposed) return;
       iceServersForSession = nextIceServers;
-      iceServersRef.current = nextIceServers;
       inputCapabilitiesRef.current = nextInputCapabilities;
       shareContextRef.current = nextShareContext;
       setInputCapabilities(nextInputCapabilities);
@@ -278,7 +269,6 @@ export function useWebRTC(
 
       pc = createEnginePeerConnection({
         iceServers: iceServersForSession,
-        iceTransportPolicy: iceTransportPolicyRef.current,
         peerId,
         socket,
         sessionId,
@@ -380,9 +370,20 @@ export function useWebRTC(
     socket.on(
       "webrtc-answer",
       (answer: RTCSessionDescriptionInit & { peerId?: string }) => {
-        if (answer.peerId && answer.peerId !== peerId) return;
+        if (answer.peerId !== peerId) {
+          console.warn("[WebRTC] Ignoring answer without matching peer id.");
+          return;
+        }
+
+        if (!pc || pc.signalingState !== "have-local-offer") {
+          console.warn(
+            `[WebRTC] Ignoring answer for peer ${peerId} while signalingState is ${pc?.signalingState || "closed"}.`,
+          );
+          return;
+        }
+
         pc
-          ?.setRemoteDescription(new RTCSessionDescription(answer))
+          .setRemoteDescription(new RTCSessionDescription(answer))
           .catch((err) => {
             console.error("[WebRTC] Failed to apply answer:", err);
             failStream(
@@ -395,7 +396,7 @@ export function useWebRTC(
     socket.on(
       "webrtc-ice-candidate-backend",
       (candidate: RTCIceCandidateInit & { peerId?: string }) => {
-        if (candidate.peerId && candidate.peerId !== peerId) return;
+        if (candidate.peerId !== peerId) return;
         pc?.addIceCandidate(new RTCIceCandidate(candidate)).catch((err) => {
           console.warn("[WebRTC] Failed to add ICE candidate:", err);
         });
@@ -454,6 +455,18 @@ export function useWebRTC(
           },
           ...bootTarget,
         });
+        if (bootReadyTimeoutId !== null) {
+          window.clearTimeout(bootReadyTimeoutId);
+        }
+        bootReadyTimeoutId = window.setTimeout(() => {
+          bootReadyTimeoutId = null;
+          loadEngineLaunchFailureMessage().then((diagnosticMessage) => {
+            failStream(
+              diagnosticMessage ||
+                "The engine started the game but the video bridge did not become ready. Retry the stream; if this is a native Linux game, check the desktop runtime log for launch errors.",
+            );
+          });
+        }, STREAM_BOOT_READY_TIMEOUT_MS);
       } catch (err) {
         console.error("Failed to boot game:", err);
         failStream(getErrorMessage(err, STREAM_BOOT_ERROR_MESSAGE));
@@ -505,6 +518,10 @@ export function useWebRTC(
     });
 
     socket.on("python-ready", async () => {
+      if (bootReadyTimeoutId !== null) {
+        window.clearTimeout(bootReadyTimeoutId);
+        bootReadyTimeoutId = null;
+      }
       console.log("[WebRTC] Python is awake! Generating and sending Offer...");
       loadEngineInputCapabilities().then((nextInputCapabilities) => {
         if (!disposed) {
@@ -519,9 +536,21 @@ export function useWebRTC(
         }
       });
       if (pc) {
+        if (offerSent) {
+          console.warn("[WebRTC] Ignoring duplicate python-ready for active peer.");
+          return;
+        }
+        if (pc.signalingState !== "stable") {
+          console.warn(
+            `[WebRTC] Ignoring python-ready while signalingState is ${pc.signalingState}.`,
+          );
+          return;
+        }
+        offerSent = true;
         try {
           await createAndSendOffer(pc, socket, sessionId, peerId);
         } catch (err) {
+          offerSent = false;
           console.error("[WebRTC] Failed to create stream offer:", err);
           failStream(getErrorMessage(err, STREAM_OFFER_ERROR_MESSAGE));
         }
@@ -541,6 +570,9 @@ export function useWebRTC(
       }
       if (heartbeatIntervalId !== null) {
         window.clearInterval(heartbeatIntervalId);
+      }
+      if (bootReadyTimeoutId !== null) {
+        window.clearTimeout(bootReadyTimeoutId);
       }
 
       if (pc) {
@@ -596,42 +628,9 @@ export function useWebRTC(
     metricsDisabledRef.current = false;
     lastMetricSentAtRef.current = 0;
     seamlessRestartRef.current = false;
-    iceTransportPolicyRef.current = undefined;
-    degradedNetworkRecoveryAttemptedRef.current = false;
     profileAutoRetriesRemainingRef.current = 0;
     setRetryVersion((currentVersion) => currentVersion + 1);
   };
-
-  const recoverDegradedNetwork = useCallback(() => {
-    if (degradedNetworkRecoveryAttemptedRef.current) return false;
-    degradedNetworkRecoveryAttemptedRef.current = true;
-
-    if (!hasTurnIceServer(iceServersRef.current)) {
-      setTelemetry((currentTelemetry) => ({
-        ...currentTelemetry,
-        lastEngineError:
-          "WebRTC video stalled and no TURN relay is configured, so Pixelated is using the display fallback.",
-        lastUpdatedAt: Date.now(),
-      }));
-      return false;
-    }
-
-    const identity = createWebRTCRetryIdentity(Boolean(options.sessionId));
-    peerIdRef.current = identity.peerId;
-    if (identity.sessionId) setSessionId(identity.sessionId);
-    metricsDisabledRef.current = false;
-    lastMetricSentAtRef.current = 0;
-    iceTransportPolicyRef.current = "relay";
-    seamlessRestartRef.current = true;
-    profileAutoRetriesRemainingRef.current = 0;
-    setTelemetry((currentTelemetry) => ({
-      ...currentTelemetry,
-      lastEngineError: "WebRTC video stalled. Retrying through relay ICE.",
-      lastUpdatedAt: Date.now(),
-    }));
-    setRetryVersion((currentVersion) => currentVersion + 1);
-    return true;
-  }, [options.sessionId]);
 
   const requestPlayerSlot = (playerIndex: number) => {
     const supportedPlayerCount =
@@ -673,7 +672,6 @@ export function useWebRTC(
     localParticipant,
     releasePlayerSlot,
     requestPlayerSlot,
-    recoverDegradedNetwork,
     retry,
     sessionId,
     shareContext,

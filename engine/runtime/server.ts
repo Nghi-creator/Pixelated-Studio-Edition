@@ -31,6 +31,7 @@ import { registerDisplayFrameRoutes } from "./src/http/displayFrameRoutes";
 import { registerErrorHandlers } from "./src/http/errorHandlers";
 import { registerHealthRoutes } from "./src/http/healthRoutes";
 import { registerLocalVaultRoutes } from "./src/http/localVaultRoutes";
+import { registerSessionControlRoutes } from "./src/http/sessionControlRoutes";
 import { registerSmokeTelemetryRoutes } from "./src/http/smokeTelemetryRoutes";
 import { createCloudRomDownloader } from "./src/roms/cloudRomDownloader";
 import { createProcessManager } from "./src/runtime/processManager";
@@ -105,6 +106,11 @@ registerSmokeTelemetryRoutes(app, {
   requireEngineToken: auth.requireEngineToken,
 });
 registerDisplayFrameRoutes(app, {
+  requireEngineToken: auth.requireEngineToken,
+});
+registerSessionControlRoutes(app, {
+  cleanupActiveSession: runtime.cleanupActiveSession,
+  getActiveSessionId: runtime.getActiveSessionId,
   requireEngineToken: auth.requireEngineToken,
 });
 registerErrorHandlers(app);

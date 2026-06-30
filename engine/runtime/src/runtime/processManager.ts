@@ -5,8 +5,11 @@ import { injectKey, type KeyAction } from "../input/injectKey";
 import { translateKey } from "../input/translateKey";
 import { removeFileIfExists } from "../roms/cloudRomDownloader";
 import type { StreamProfile } from "../signaling/startGameHandlers";
-import { getNativeLaunchManifest } from "./nativeLaunchManifests";
-import { pulseAudioArgs } from "./processCommands";
+import { launchCameraBridge } from "./cameraLauncher";
+import { launchLibretroGame } from "./libretroLauncher";
+import { launchNativeGame } from "./nativeLauncher";
+import { bindManagedProcessLifecycle } from "./processLifecycle";
+import { startRuntimeHostProcesses } from "./runtimeHostProcesses";
 import { getRuntimeDefinition } from "./runtimeRegistry";
 
 type IceServer = {
@@ -19,7 +22,9 @@ type ProcessManagerOptions = {
   cameraPath: string;
   cameraPeerStatePath: string;
   engineToken: string;
+  fileExists?: (path: string) => boolean;
   gamepadBridgePath: string;
+  spawnProcess?: typeof spawn;
 };
 
 type BootOptions = {
@@ -29,12 +34,25 @@ type BootOptions = {
   streamProfile?: StreamProfile;
 };
 
+type LaunchFailure = {
+  exitCode?: number | null;
+  label: string;
+  message: string;
+  occurredAt: string;
+  runtimeId: string;
+  sessionId: string;
+  signal?: NodeJS.Signals | null;
+  stderrTail?: string;
+  stdoutTail?: string;
+};
+
 type RuntimeState = {
   activeCloudRomPath: string | null;
   activeSessionId: string | null;
   cameraPeerStatePath: string;
   cameraProcess: ChildProcess | null;
   gamepads: ReturnType<ReturnType<typeof createGamepadBridge>["getState"]>;
+  lastLaunchFailure: LaunchFailure | null;
   pulseAudioProcess: ChildProcess | null;
   retroarchProcess: ChildProcess | null;
   virtualDisplayProcess: ChildProcess | null;
@@ -43,6 +61,8 @@ type RuntimeState = {
 export function createProcessManager(options: ProcessManagerOptions) {
   const { cameraPath, cameraPeerStatePath, engineToken, gamepadBridgePath } =
     options;
+  const fileExists = options.fileExists || fs.existsSync;
+  const spawnProcess = options.spawnProcess || spawn;
   const gamepads = createGamepadBridge({ gamepadBridgePath });
   let retroarchProcess: ChildProcess | null = null;
   let cameraProcess: ChildProcess | null = null;
@@ -50,66 +70,23 @@ export function createProcessManager(options: ProcessManagerOptions) {
   let virtualDisplayProcess: ChildProcess | null = null;
   let activeSessionId: string | null = null;
   let activeCloudRomPath: string | null = null;
+  let cameraStartTimer: NodeJS.Timeout | null = null;
+  let lastLaunchFailure: LaunchFailure | null = null;
 
   function startVirtualDisplay(): void {
-    console.log("Booting Virtual Display (Xvfb) and PulseAudio...");
-
-    if (fs.existsSync("/tmp/.X99-lock")) {
-      fs.rmSync("/tmp/.X99-lock", { force: true });
-    }
-    if (fs.existsSync("/tmp/.X11-unix/X99")) {
-      fs.rmSync("/tmp/.X11-unix/X99", { force: true, recursive: true });
-    }
-
-    virtualDisplayProcess = spawn("Xvfb", [
-      ":99",
-      "-screen",
-      "0",
-      "640x480x24",
-    ]);
-    pulseAudioProcess = spawn("pulseaudio", pulseAudioArgs);
-    pulseAudioProcess.on("error", (err) => {
-      console.error(`[Engine] PulseAudio failed to start: ${err.message}`);
-    });
-
-    fs.writeFileSync(
-      "/app/retroarch.cfg",
-      'audio_driver = "pulse"\n' +
-        'audio_sync = "true"\n' +
-        'video_vsync = "false"\n' +
-        'input_driver = "udev"\n' +
-        'joypad_driver = "udev"\n' +
-        'input_autodetect_enable = "true"\n' +
-        'input_libretro_device_p1 = "1"\n' +
-        'input_libretro_device_p2 = "1"\n' +
-        'input_libretro_device_p3 = "1"\n' +
-        'input_libretro_device_p4 = "1"\n' +
-        'input_player1_up = "up"\n' +
-        'input_player1_down = "down"\n' +
-        'input_player1_left = "left"\n' +
-        'input_player1_right = "right"\n' +
-        'input_player1_b = "z"\n' +
-        'input_player1_a = "x"\n' +
-        'input_player1_l = "a"\n' +
-        'input_player1_r = "s"\n' +
-        'input_player1_start = "enter"\n' +
-        'input_player1_select = "rshift"\n' +
-        'input_player2_up = "w"\n' +
-        'input_player2_down = "s"\n' +
-        'input_player2_left = "a"\n' +
-        'input_player2_right = "d"\n' +
-        'input_player2_b = "f"\n' +
-        'input_player2_a = "g"\n' +
-        'input_player2_l = "q"\n' +
-        'input_player2_r = "e"\n' +
-        'input_player2_start = "r"\n' +
-        'input_player2_select = "t"\n',
-    );
+    const hostProcesses = startRuntimeHostProcesses(spawnProcess);
+    virtualDisplayProcess = hostProcesses.virtualDisplayProcess;
+    pulseAudioProcess = hostProcesses.pulseAudioProcess;
     gamepads.start();
   }
 
   function cleanupActiveSession(sessionId?: string | null): void {
     if (sessionId && activeSessionId && sessionId !== activeSessionId) return;
+
+    if (cameraStartTimer) {
+      clearTimeout(cameraStartTimer);
+      cameraStartTimer = null;
+    }
 
     if (retroarchProcess) {
       retroarchProcess.kill();
@@ -127,6 +104,32 @@ export function createProcessManager(options: ProcessManagerOptions) {
     }
 
     activeSessionId = null;
+  }
+
+  function bindGameProcessLifecycle(
+    child: ChildProcess,
+    sessionId: string,
+    label: string,
+    runtimeId: string,
+  ) {
+    bindManagedProcessLifecycle({
+      child,
+      getActiveSessionId: () => activeSessionId,
+      label,
+      onCleanupSession: cleanupActiveSession,
+      onLaunchFailure: recordLaunchFailure,
+      runtimeId,
+      sessionId,
+    });
+  }
+
+  function recordLaunchFailure(
+    failure: Omit<LaunchFailure, "occurredAt">,
+  ): void {
+    lastLaunchFailure = {
+      ...failure,
+      occurredAt: new Date().toISOString(),
+    };
   }
 
   function sendInput(
@@ -156,76 +159,46 @@ export function createProcessManager(options: ProcessManagerOptions) {
       throw new Error(`Unsupported runtime: ${runtimeId}`);
     }
 
-    if (retroarchProcess) retroarchProcess.kill();
-    if (cameraProcess) cameraProcess.kill();
-    if (activeCloudRomPath) removeFileIfExists(activeCloudRomPath);
+    cleanupActiveSession(activeSessionId);
+    lastLaunchFailure = null;
+
+    const launch =
+      runtime.kind === "libretro"
+        ? launchLibretroGame({
+            absoluteRomPath,
+            isCloudRom: bootOptions.isCloudRom,
+            runtime,
+            runtimeId,
+            sessionId,
+            spawnProcess,
+          })
+        : launchNativeGame({
+            fileExists,
+            launchManifestId: absoluteRomPath,
+            runtime,
+            sessionId,
+            spawnProcess,
+          });
 
     activeSessionId = sessionId;
-    activeCloudRomPath = bootOptions.isCloudRom ? absoluteRomPath : null;
+    activeCloudRomPath = launch.activeCloudRomPath;
+    retroarchProcess = launch.child;
+    bindGameProcessLifecycle(retroarchProcess, sessionId, launch.label, runtimeId);
 
-    if (runtime.kind === "libretro") {
-      if (!runtime.corePath) {
-        throw new Error(`Unsupported runtime: ${runtimeId}`);
-      }
-
-      console.log(
-        `[Engine] Mounting ${runtime.id} content for session ${sessionId}: ${absoluteRomPath}`,
-      );
-
-      retroarchProcess = spawn(
-        "retroarch",
-        [
-          "-f",
-          "-L",
-          runtime.corePath,
-          "--appendconfig",
-          "/app/retroarch.cfg",
-          absoluteRomPath,
-        ],
-        { env: { ...process.env, DISPLAY: ":99", PULSE_SERVER: "127.0.0.1" } },
-      );
-    } else {
-      const manifest = getNativeLaunchManifest(absoluteRomPath);
-      if (!manifest || !runtime.launchManifestIds?.includes(manifest.id)) {
-        throw new Error(`Unsupported native launch manifest: ${absoluteRomPath}`);
-      }
-
-      console.log(
-        `[Engine] Launching native manifest ${manifest.id} for session ${sessionId}`,
-      );
-
-      retroarchProcess = spawn(manifest.executable, manifest.args, {
-        env: {
-          ...process.env,
-          DISPLAY: ":99",
-          PULSE_SERVER: "127.0.0.1",
-          SDL_AUDIODRIVER: process.env.SDL_AUDIODRIVER || "dummy",
-        },
-      });
-    }
-
-    setTimeout(() => {
-      console.log("[Engine] Starting Python WebRTC Camera Bridge...");
-      cameraProcess = spawn("python3", ["-u", cameraPath], {
-        env: {
-          ...process.env,
-          PULSE_SERVER: "127.0.0.1",
-          PIXELATED_SESSION_ID: sessionId,
-          PIXELATED_ENGINE_TOKEN: engineToken,
-          PIXELATED_CAMERA_PEER_STATE_PATH: cameraPeerStatePath,
-          PIXELATED_ICE_SERVERS: JSON.stringify(bootOptions.iceServers || []),
-          PIXELATED_STREAM_PROFILE: JSON.stringify(
-            bootOptions.streamProfile || {},
-          ),
-        },
+    cameraStartTimer = setTimeout(() => {
+      cameraStartTimer = null;
+      if (activeSessionId !== sessionId || !retroarchProcess) return;
+      cameraProcess = launchCameraBridge({
+        cameraPath,
+        cameraPeerStatePath,
+        engineToken,
+        iceServers: bootOptions.iceServers,
+        sessionId,
+        spawnProcess,
+        streamProfile: bootOptions.streamProfile,
       });
 
-      cameraProcess.stdout?.on("data", (data: Buffer) =>
-        console.log(`[Camera] ${data}`),
-      );
-      cameraProcess.stderr?.on("data", (data: Buffer) =>
-        console.error(`[Camera Error] ${data}`),
-      );
+      bindGameProcessLifecycle(cameraProcess, sessionId, "Camera bridge", runtimeId);
     }, 1000);
   }
 
@@ -243,6 +216,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
       virtualDisplayProcess,
       gamepads: gamepads.getState(),
       cameraPeerStatePath,
+      lastLaunchFailure,
     };
   }
 

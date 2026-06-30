@@ -14,9 +14,21 @@ COPY server.ts tsconfig.json ./
 COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
-FROM ${DEBIAN_IMAGE} AS runtime
+FROM ${DEBIAN_IMAGE} AS python-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-pip \
+    && pip3 install --break-system-packages --no-cache-dir --target /out "python-socketio[client]" \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM ${DEBIAN_IMAGE} AS runtime
+
+ARG NATIVE_RUNTIME_ID=debian-native-v1
+ARG NATIVE_RUNTIME_LOCK_SHA256=unknown
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONPATH=/usr/local/lib/pixelated-python
 LABEL com.pixelated.runtime.kind="native_linux" \
       com.pixelated.runtime.id="${NATIVE_RUNTIME_ID}" \
       com.pixelated.runtime.lock_sha256="${NATIVE_RUNTIME_LOCK_SHA256}"
@@ -45,6 +57,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=app-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=app-builder /app/dist /app/dist
 COPY --from=app-builder /app/node_modules /app/node_modules
+COPY --from=python-builder /out /usr/local/lib/pixelated-python
 COPY camera.py input_gamepad.py /app/
 COPY native-runtime.lock.json /app/native-runtime.lock.json
 

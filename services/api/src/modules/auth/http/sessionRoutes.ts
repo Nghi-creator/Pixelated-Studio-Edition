@@ -7,6 +7,10 @@ import {
   supabaseService,
 } from "../supabaseAuth.js";
 import { fetchPublishedGameById } from "../../catalog/services/catalogService.js";
+import {
+  assertCandidateRuntimeAllowed,
+  CandidateValidationError,
+} from "../../catalog/ingestion/catalogCandidateValidation.js";
 import { createRateLimiter } from "../../security/sharedRateLimiter.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
@@ -81,6 +85,52 @@ function mapBoot(row: BackendSessionRow) {
   };
 }
 
+function assertBuildBootable(build: {
+  artifact_filename: string | null;
+  artifact_sha256?: string | null;
+  artifact_size?: number | null;
+  artifact_url: string | null;
+  launch_manifest_id?: string | null;
+  platform_id: string;
+  runtime_id: string;
+  runtime_kind: "libretro" | "native_linux";
+}) {
+  assertCandidateRuntimeAllowed({
+    artifact_filename: build.artifact_filename,
+    launch_manifest_id: build.launch_manifest_id || null,
+    platform_id: build.platform_id,
+    runtime_id: build.runtime_id,
+    runtime_kind: build.runtime_kind,
+  });
+
+  if (build.runtime_kind === "libretro") {
+    if (!build.artifact_url && !build.artifact_filename) {
+      throw new CandidateValidationError("Game has no ROM target.");
+    }
+    if (
+      typeof build.artifact_size !== "number" ||
+      !Number.isFinite(build.artifact_size) ||
+      build.artifact_size <= 0
+    ) {
+      throw new CandidateValidationError(
+        "Game build is missing a verified artifact size.",
+      );
+    }
+    if (!/^[a-f0-9]{64}$/i.test(build.artifact_sha256 || "")) {
+      throw new CandidateValidationError(
+        "Game build is missing a verified artifact checksum.",
+      );
+    }
+    return;
+  }
+
+  if (build.artifact_url || build.artifact_filename) {
+    throw new CandidateValidationError(
+      "Native game builds must not define ROM artifacts.",
+    );
+  }
+}
+
 async function getLiveSession(
   service: SupabaseServiceLike | null,
   sessionId: string,
@@ -153,14 +203,19 @@ export async function registerSessionRoutes(
       if (!build) {
         return reply.status(422).send({ error: "Game has no approved build" });
       }
-      const romTarget = build?.artifact_url || build?.artifact_filename;
+      try {
+        assertBuildBootable(build);
+      } catch (err) {
+        if (err instanceof CandidateValidationError) {
+          request.log.warn(
+            { err, gameId: parsedBody.data.gameId },
+            "Rejected unbootable game build",
+          );
+          return reply.status(422).send({ error: err.message });
+        }
+        throw err;
+      }
       const launchManifestId = build.launch_manifest_id || null;
-      if (build.runtime_kind === "libretro" && !romTarget) {
-        return reply.status(422).send({ error: "Game has no ROM target" });
-      }
-      if (build.runtime_kind === "native_linux" && !launchManifestId) {
-        return reply.status(422).send({ error: "Game has no launch manifest" });
-      }
 
       const sessionId = createSessionId(parsedBody.data.clientSessionId);
       const existingSession = await getLiveSession(service, sessionId);

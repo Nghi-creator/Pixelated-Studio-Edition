@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import fs from "node:fs";
 import test from "node:test";
 import {
   normalizeStreamProfile,
@@ -23,6 +24,11 @@ type HarnessOverrides = {
       runtimeId: string;
     },
   ) => Promise<void>;
+  bootGame?: (
+    romPath: string,
+    sessionId: string,
+    options: RuntimeBootOptions,
+  ) => void;
   verifyBackendSession?: (options: {
     apiUrl: string;
     sessionId: string;
@@ -78,6 +84,10 @@ function createHarness(overrides: HarnessOverrides = {}) {
       }),
     runtime: {
       bootGame: (romPath, sessionId, options) => {
+        if (overrides.bootGame) {
+          overrides.bootGame(romPath, sessionId, options);
+          return;
+        }
         booted.push({ options, romPath, sessionId });
       },
     },
@@ -170,6 +180,32 @@ test("verified mGBA cloud sessions use a matching temporary extension", async ()
   assert.match(downloads[0]?.destinationPath || "", /\.gba$/);
   assert.equal(downloads[0]?.validation.runtimeId, "mgba");
   assert.equal(booted[0]?.options.runtimeId, "mgba");
+});
+
+test("cloud temporary ROM is removed when launch fails after download", async () => {
+  let downloadedPath = "";
+  const { socket } = createHarness({
+    bootGame: () => {
+      throw new Error("RetroArch launch failed.");
+    },
+    downloadCloudRom: (_romUrl, destinationPath) => {
+      downloadedPath = destinationPath;
+      fs.writeFileSync(destinationPath, "temporary-rom");
+      return Promise.resolve();
+    },
+  });
+
+  socket.emit("start-game", {
+    mode: "cloud",
+    romFilename: "https://attacker.example.test/game.nes",
+    sessionId: "session-cloud-launch-fail",
+    sessionToken: "token",
+  });
+  await flushStartGame();
+
+  assert.ok(downloadedPath);
+  assert.equal(fs.existsSync(downloadedPath), false);
+  assert.equal(getErrorMessage(socket), "RetroArch launch failed.");
 });
 
 test("verified native sessions boot an allowlisted launch manifest without download", async () => {
@@ -290,6 +326,28 @@ test("local vault starts infer PicoDrive for Sega 8-bit files", async () => {
   assert.equal(calls.verify, 0);
   assert.equal(booted[0]?.romPath, "/roms/local-user/master.sms");
   assert.equal(booted[0]?.options.runtimeId, "picodrive");
+});
+
+test("local vault boot failures emit a user-visible engine error", async () => {
+  const { booted, socket } = createHarness({
+    bootGame: () => {
+      throw new Error("Invalid GBA cartridge header.");
+    },
+  });
+
+  socket.emit("start-game", {
+    mode: "local",
+    romFilename: "broken.gba",
+    sessionId: "session-broken-local",
+    userId: "local-user",
+  });
+  await flushStartGame();
+
+  assert.deepEqual(booted, []);
+  assert.equal(
+    getErrorMessage(socket),
+    "Local Vault game failed to launch: Invalid GBA cartridge header.",
+  );
 });
 
 test("stream profiles are clamped before reaching the runtime", () => {

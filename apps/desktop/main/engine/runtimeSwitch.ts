@@ -13,11 +13,16 @@ export type RuntimeSwitchBlocker = {
 
 export function getRuntimeSwitchBlocker(
   clients: RuntimeSwitchClient[],
+  activeRuntimeSessionId?: string | null,
 ): RuntimeSwitchBlocker | null {
+  if (activeRuntimeSessionId === null) return null;
+
   const activeSessionClients = clients.filter((client) => {
     return (
       client.role !== "camera" &&
       client.sessionId &&
+      (activeRuntimeSessionId === undefined ||
+        client.sessionId === activeRuntimeSessionId) &&
       client.socketCount > 0
     );
   });

@@ -10,6 +10,7 @@ import type {
   EngineInputCapabilities,
   EngineShareContext,
 } from "./types";
+import { formatEngineLaunchFailure } from "./streamErrors";
 
 const KEYBOARD_FALLBACK_PLAYER_COUNT = 2;
 const VIRTUAL_GAMEPAD_PLAYER_COUNT = 4;
@@ -22,6 +23,19 @@ type EngineHealthPayload = {
       fileExists?: boolean;
       ready?: boolean;
       uinputAvailable?: boolean;
+    };
+    runtime?: {
+      lastLaunchFailure?: {
+        exitCode?: number | null;
+        label?: string;
+        message?: string;
+        occurredAt?: string;
+        runtimeId?: string;
+        sessionId?: string;
+        signal?: string | null;
+        stderrTail?: string;
+        stdoutTail?: string;
+      } | null;
     };
   };
   exposureMode?: "local" | "lan";
@@ -115,6 +129,18 @@ export async function loadEngineRuntimeKind() {
   return health.runtimeKind || "libretro";
 }
 
+export async function loadEngineLaunchFailureMessage() {
+  try {
+    const response = await fetch(engineEndpoint("/health"), { cache: "no-store" });
+    if (!response.ok) return null;
+    const health = (await response.json()) as EngineHealthPayload;
+    return formatEngineLaunchFailure(health);
+  } catch (err) {
+    console.warn("[WebRTC] Could not load engine launch diagnostics:", err);
+    return null;
+  }
+}
+
 export async function requestEngineRuntimeSwitch(
   runtimeKind: EngineRuntimeKind,
 ) {
@@ -148,6 +174,39 @@ export async function requestEngineRuntimeSwitch(
   }
 
   return parseRuntimeSwitchResponse(response);
+}
+
+export async function stopActiveEngineSession() {
+  const requestStop = (controlUrl: string) =>
+    fetch(`${controlUrl}/session/stop-active`, {
+      cache: "no-store",
+      headers: {
+        ...engineControlAuthHeaders(),
+      },
+      method: "POST",
+    });
+
+  const primaryControlUrl = getEngineControlUrl();
+  const fallbackControlUrl =
+    primaryControlUrl === getEngineUrl()
+      ? getLocalCompanionControlUrl(primaryControlUrl)
+      : null;
+  let response = await requestStop(primaryControlUrl).catch((err) => {
+    if (!fallbackControlUrl) throw err;
+    return requestStop(fallbackControlUrl);
+  });
+
+  if (
+    fallbackControlUrl &&
+    primaryControlUrl !== fallbackControlUrl &&
+    [404, 405].includes(response.status)
+  ) {
+    response = await requestStop(fallbackControlUrl);
+  }
+
+  if (!response.ok) {
+    throw new Error("Could not stop active engine session.");
+  }
 }
 
 async function parseRuntimeSwitchResponse(response: Response) {

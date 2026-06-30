@@ -47,7 +47,21 @@ function bufferStartsWith(buffer: Buffer, prefix: Buffer, offset = 0) {
 }
 
 function getSha256(filePath: string) {
-  return crypto.createHash("sha256").update(fs.readFileSync(filePath)).digest("hex");
+  const hash = crypto.createHash("sha256");
+  const fd = fs.openSync(filePath, "r");
+  const buffer = Buffer.allocUnsafe(1024 * 1024);
+
+  try {
+    let bytesRead = 0;
+    do {
+      bytesRead = fs.readSync(fd, buffer, 0, buffer.length, null);
+      if (bytesRead > 0) hash.update(buffer.subarray(0, bytesRead));
+    } while (bytesRead > 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+
+  return hash.digest("hex");
 }
 
 function validateHeader(filePath: string, extension: string) {

@@ -67,6 +67,11 @@ export type EngineClientPayload = {
 };
 
 type EngineHealthPayload = {
+  checks?: {
+    runtime?: {
+      activeSessionId?: string | null;
+    };
+  };
   runtimeKind?: EngineRuntimeKind;
 };
 
@@ -243,6 +248,13 @@ async function getEngineHealth() {
   return requestEngineControl<EngineHealthPayload>("/health");
 }
 
+async function stopActiveEngineSession() {
+  return requestEngineControl<{ sessionId?: string; stopped: boolean }>(
+    "/session/stop-active",
+    { method: "POST" },
+  );
+}
+
 export async function revokeEngineClient(clientId: string) {
   return requestEngineControl<{ disconnected: number }>(
     `/clients/${encodeURIComponent(clientId)}/revoke`,
@@ -411,7 +423,7 @@ async function requestEngineRuntimeSwitch(
   }
 
   try {
-    const health = await getEngineHealth();
+    let health = await getEngineHealth();
     if (health.runtimeKind === runtimeKind) {
       return {
         runtimeKind,
@@ -419,7 +431,20 @@ async function requestEngineRuntimeSwitch(
       };
     }
 
-    const blocker = getRuntimeSwitchBlocker((await listEngineClients()).clients);
+    const activeSessionId = health.checks?.runtime?.activeSessionId;
+    if (activeSessionId) {
+      event.reply(
+        "server-log",
+        `Stopping active game session ${activeSessionId} before switching runtime...`,
+      );
+      await stopActiveEngineSession();
+      health = await getEngineHealth();
+    }
+
+    const blocker = getRuntimeSwitchBlocker(
+      (await listEngineClients()).clients,
+      health.checks?.runtime?.activeSessionId,
+    );
     if (blocker) {
       event.reply(
         "server-log",
@@ -457,6 +482,7 @@ async function requestEngineRuntimeSwitch(
         startEngine(event, {
           exposureMode,
           preserveCompanionSecurity: true,
+          preserveEngineToken: true,
           runtimeKind,
         });
       });
@@ -485,7 +511,9 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
   const attempt = ++activeStartupAttempt;
   startupInProgress = true;
 
-  engineToken = crypto.randomBytes(24).toString("base64url");
+  if (options.preserveEngineToken !== true || !engineToken) {
+    engineToken = crypto.randomBytes(24).toString("base64url");
+  }
   stopCompanionServer({
     preserveSecurityState: launchContext.preserveCompanionSecurity,
   });
