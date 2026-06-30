@@ -15,7 +15,11 @@ type DownloadValidationOptions = {
 };
 
 export function removeFileIfExists(filePath: string): void {
-  fs.unlink(filePath, () => {});
+  try {
+    fs.rmSync(filePath, { force: true });
+  } catch {
+    // Best-effort cleanup only.
+  }
 }
 
 export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {

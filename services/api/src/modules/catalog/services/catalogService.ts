@@ -132,6 +132,7 @@ async function fetchPublishedCatalogGamesFromRpc(
     gameId?: string;
     limit: number;
     order: "play_count_desc" | "title";
+    search?: string;
     timingKey: string;
   },
 ) {
@@ -146,6 +147,7 @@ async function fetchPublishedCatalogGamesFromRpc(
       p_game_id: options.gameId || null,
       p_limit: options.limit,
       p_order: options.order,
+      p_search: options.search?.trim() || null,
     }),
   );
 
@@ -277,14 +279,16 @@ export async function fetchFeaturedGames(
 export async function fetchPublishedCatalogGames(
   service: CatalogService,
   timings: TimingFields,
+  search?: string,
 ) {
   const { data, error } = await timed(timings, "games_query_ms", async () => {
     const rpcGames = await fetchPublishedCatalogGamesFromRpc(
       service,
       timings,
       {
-        limit: 1000,
+        limit: search?.trim() ? 5000 : 1000,
         order: "title",
+        search,
         timingKey: "games_rpc_ms",
       },
     );

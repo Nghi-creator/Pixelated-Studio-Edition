@@ -57,7 +57,7 @@ export function registerGamesCatalogRoutes(
     const { end, start } = getPageRange(page, pageSize);
     let data: PublishedCatalogGame[] = [];
     try {
-      data = await fetchPublishedCatalogGames(service, timings);
+      data = await fetchPublishedCatalogGames(service, timings, search);
     } catch (err) {
       request.log.error({ err }, "Failed to load games");
       return reply.status(500).send({ error: "Failed to load games" });

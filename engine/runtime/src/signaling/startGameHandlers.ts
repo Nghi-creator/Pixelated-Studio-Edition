@@ -12,6 +12,7 @@ import {
   getRuntimeDefinition,
   getRuntimeExtensionForTarget,
 } from "../runtime/runtimeRegistry";
+import { removeFileIfExists } from "../roms/cloudRomDownloader";
 
 type IceServer = {
   credential?: string;
@@ -275,7 +276,8 @@ export function registerStartGameHandler(
           streamProfile,
         });
       } catch (err) {
-        console.error("[Engine] Failed to download cloud ROM:", err);
+        console.error("[Engine] Failed to prepare cloud ROM:", err);
+        removeFileIfExists(tmpPath);
         socket.emit("engine-error", {
           message: err instanceof Error ? err.message : "Cloud ROM failed",
         });

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import fs from "node:fs";
 import test from "node:test";
 import {
   normalizeStreamProfile,
@@ -179,6 +180,32 @@ test("verified mGBA cloud sessions use a matching temporary extension", async ()
   assert.match(downloads[0]?.destinationPath || "", /\.gba$/);
   assert.equal(downloads[0]?.validation.runtimeId, "mgba");
   assert.equal(booted[0]?.options.runtimeId, "mgba");
+});
+
+test("cloud temporary ROM is removed when launch fails after download", async () => {
+  let downloadedPath = "";
+  const { socket } = createHarness({
+    bootGame: () => {
+      throw new Error("RetroArch launch failed.");
+    },
+    downloadCloudRom: (_romUrl, destinationPath) => {
+      downloadedPath = destinationPath;
+      fs.writeFileSync(destinationPath, "temporary-rom");
+      return Promise.resolve();
+    },
+  });
+
+  socket.emit("start-game", {
+    mode: "cloud",
+    romFilename: "https://attacker.example.test/game.nes",
+    sessionId: "session-cloud-launch-fail",
+    sessionToken: "token",
+  });
+  await flushStartGame();
+
+  assert.ok(downloadedPath);
+  assert.equal(fs.existsSync(downloadedPath), false);
+  assert.equal(getErrorMessage(socket), "RetroArch launch failed.");
 });
 
 test("verified native sessions boot an allowlisted launch manifest without download", async () => {

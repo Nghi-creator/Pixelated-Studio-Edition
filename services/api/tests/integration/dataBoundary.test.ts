@@ -252,10 +252,12 @@ class FakeSupabase {
     if (fn === "published_catalog_games") {
       const gameId =
         typeof params.p_game_id === "string" ? params.p_game_id : null;
-      const limit = Math.min(1000, Math.max(0, Number(params.p_limit || 1000)));
+      const limit = Math.min(5000, Math.max(0, Number(params.p_limit || 1000)));
       const order =
         params.p_order === "play_count_desc" ? "play_count_desc" : "title";
-      const rows = this.getPublishedCatalogGameRows(gameId, order).slice(
+      const search =
+        typeof params.p_search === "string" ? params.p_search.trim() : "";
+      const rows = this.getPublishedCatalogGameRows(gameId, order, search).slice(
         0,
         limit,
       );
@@ -268,12 +270,21 @@ class FakeSupabase {
   private getPublishedCatalogGameRows(
     gameId: string | null,
     order: "play_count_desc" | "title",
+    search: string,
   ) {
+    const searchTokens = search.toLowerCase().split(/\s+/).filter(Boolean);
     return this.rows.games
       .filter(
         (game) =>
           game.publication_status === "published" &&
-          (!gameId || game.id === gameId),
+          (!gameId || game.id === gameId) &&
+          searchTokens.every((token) =>
+            [
+              game.title,
+              game.author_name,
+              game.developer_name,
+            ].some((value) => String(value || "").toLowerCase().includes(token)),
+          ),
       )
       .map((game) => {
         const verifiedBuilds = this.rows.game_builds.filter((build) => {
@@ -798,6 +809,38 @@ test("catalog route paginates, searches, and returns featured games", async () =
   assert.equal(body.pageSize, 2);
   assert.equal(body.total, 3);
   assert.equal(body.totalPages, 2);
+  await app.close();
+});
+
+test("catalog search is pushed into the published catalog RPC", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGames(
+    db,
+    ...Array.from({ length: 1005 }, (_, index) => ({
+      id: `filler-${index.toString().padStart(4, "0")}`,
+      title: `Filler ${index.toString().padStart(4, "0")}`,
+    })),
+    { id: "omega-hidden", title: "Omega Hidden Quest" },
+  );
+  const app = await createDataBoundaryApp(db);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/games?search=omega&pageSize=5",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(
+    response.json<{ games: { id: string }[] }>().games.map((game) => game.id),
+    ["omega-hidden"],
+  );
+  assert.equal(
+    db.rpcCalls.some(
+      (call) =>
+        call.fn === "published_catalog_games" && call.params.p_search === "omega",
+    ),
+    true,
+  );
   await app.close();
 });
 
