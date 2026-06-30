@@ -45,7 +45,7 @@ export default function Player() {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [fallbackActive, setFallbackActive] = useState(false);
 
   const [streamProfileId, setStreamProfileId] = useState<StreamProfileId>(() => {
@@ -194,6 +194,13 @@ export default function Player() {
     video.muted = isMuted;
     video.play().catch((err) => {
       console.warn("[WebRTC] Browser blocked stream playback:", err);
+      if (!isMuted) {
+        video.muted = true;
+        setIsMuted(true);
+        video.play().catch((retryErr) => {
+          console.warn("[WebRTC] Muted stream playback retry failed:", retryErr);
+        });
+      }
     });
   }, [isMuted, stream]);
 
