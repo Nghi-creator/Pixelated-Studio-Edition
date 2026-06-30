@@ -381,8 +381,16 @@ export function useWebRTC(
       "webrtc-answer",
       (answer: RTCSessionDescriptionInit & { peerId?: string }) => {
         if (answer.peerId && answer.peerId !== peerId) return;
+
+        if (!pc || pc.signalingState !== "have-local-offer") {
+          console.warn(
+            `[WebRTC] Ignoring answer for peer ${peerId} while signalingState is ${pc?.signalingState || "closed"}.`,
+          );
+          return;
+        }
+
         pc
-          ?.setRemoteDescription(new RTCSessionDescription(answer))
+          .setRemoteDescription(new RTCSessionDescription(answer))
           .catch((err) => {
             console.error("[WebRTC] Failed to apply answer:", err);
             failStream(

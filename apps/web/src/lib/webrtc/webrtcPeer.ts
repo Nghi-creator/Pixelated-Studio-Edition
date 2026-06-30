@@ -50,8 +50,13 @@ export const createAndSendOffer = async (
   sessionId: string,
   peerId: string,
 ) => {
-  peerConnection.addTransceiver("video", { direction: "recvonly" });
-  peerConnection.addTransceiver("audio", { direction: "recvonly" });
+  const transceivers = peerConnection.getTransceivers();
+  if (!transceivers.some((entry) => entry.receiver.track?.kind === "video")) {
+    peerConnection.addTransceiver("video", { direction: "recvonly" });
+  }
+  if (!transceivers.some((entry) => entry.receiver.track?.kind === "audio")) {
+    peerConnection.addTransceiver("audio", { direction: "recvonly" });
+  }
 
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
