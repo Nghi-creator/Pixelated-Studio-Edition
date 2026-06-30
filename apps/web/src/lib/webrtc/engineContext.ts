@@ -150,6 +150,20 @@ export async function requestEngineRuntimeSwitch(
   return parseRuntimeSwitchResponse(response);
 }
 
+export async function stopActiveEngineSession() {
+  const response = await fetch(engineEndpoint("/session/stop-active"), {
+    cache: "no-store",
+    headers: {
+      ...engineControlAuthHeaders(),
+    },
+    method: "POST",
+  });
+
+  if (!response.ok) {
+    throw new Error("Could not stop active engine session.");
+  }
+}
+
 async function parseRuntimeSwitchResponse(response: Response) {
   if (response.status === 202) {
     return { status: "restarting" as const };

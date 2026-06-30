@@ -24,3 +24,27 @@ test("runtime switches are blocked while active session clients are connected", 
   assert.equal(blocker?.activeClientCount, 3);
   assert.equal(blocker?.activeSessionCount, 2);
 });
+
+test("runtime switches ignore stale clients after the active session stops", () => {
+  assert.equal(
+    getRuntimeSwitchBlocker(
+      [
+        { role: "host", sessionId: "session-1", socketCount: 1 },
+        { role: "spectator", sessionId: "session-1", socketCount: 1 },
+      ],
+      null,
+    ),
+    null,
+  );
+
+  const blocker = getRuntimeSwitchBlocker(
+    [
+      { role: "host", sessionId: "session-1", socketCount: 1 },
+      { role: "spectator", sessionId: "session-2", socketCount: 1 },
+    ],
+    "session-2",
+  );
+
+  assert.equal(blocker?.activeClientCount, 1);
+  assert.equal(blocker?.activeSessionCount, 1);
+});

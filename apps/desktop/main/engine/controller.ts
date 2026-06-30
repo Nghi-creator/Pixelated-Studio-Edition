@@ -67,6 +67,11 @@ export type EngineClientPayload = {
 };
 
 type EngineHealthPayload = {
+  checks?: {
+    runtime?: {
+      activeSessionId?: string | null;
+    };
+  };
   runtimeKind?: EngineRuntimeKind;
 };
 
@@ -419,7 +424,10 @@ async function requestEngineRuntimeSwitch(
       };
     }
 
-    const blocker = getRuntimeSwitchBlocker((await listEngineClients()).clients);
+    const blocker = getRuntimeSwitchBlocker(
+      (await listEngineClients()).clients,
+      health.checks?.runtime?.activeSessionId,
+    );
     if (blocker) {
       event.reply(
         "server-log",

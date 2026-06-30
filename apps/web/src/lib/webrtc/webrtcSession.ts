@@ -2,6 +2,7 @@ import { api, getAuthSession } from "../api/apiClient";
 import {
   loadEngineRuntimeKind,
   requestEngineRuntimeSwitch,
+  stopActiveEngineSession,
 } from "./engineContext";
 import { assertEngineRuntimeKindMatches } from "./runtimeKind";
 export { createWebRTCSessionId } from "./webrtcIdentity";
@@ -46,6 +47,9 @@ export const resolveGameBootTarget = async (
   const requiredRuntimeKind = backendSession.boot.runtimeKind || "libretro";
   let activeRuntimeKind = await loadEngineRuntimeKind();
   if (requiredRuntimeKind !== activeRuntimeKind) {
+    await stopActiveEngineSession().catch((err) => {
+      console.warn("[WebRTC] Could not pre-stop active session:", err);
+    });
     const switchResult = await requestEngineRuntimeSwitch(requiredRuntimeKind).catch(
       () => ({
         error:
