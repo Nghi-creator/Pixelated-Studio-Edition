@@ -22,6 +22,7 @@ const INVITE_CODE_TTL_MS = 10 * 60 * 1000;
 
 export type StartEngineOptions = {
   exposureMode?: unknown;
+  preserveEngineToken?: unknown;
   preserveCompanionSecurity?: unknown;
   runtimeKind?: unknown;
 };

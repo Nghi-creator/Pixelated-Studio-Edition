@@ -9,6 +9,9 @@ export { createWebRTCSessionId } from "./webrtcIdentity";
 
 export type WebRTCStatus = "idle" | "connecting" | "playing" | "error";
 
+const RUNTIME_SWITCH_WAIT_MS = 120_000;
+const RUNTIME_SWITCH_POLL_MS = 1_000;
+
 const LOCAL_VAULT_EXTENSIONS = [
   ".nes",
   ".gb",
@@ -26,6 +29,29 @@ function isLocalVaultGameId(gameId: string) {
   const lowerGameId = gameId.toLowerCase();
   return LOCAL_VAULT_EXTENSIONS.some((extension) =>
     lowerGameId.endsWith(extension),
+  );
+}
+
+async function waitForEngineRuntimeKind(requiredRuntimeKind: string) {
+  const deadline = Date.now() + RUNTIME_SWITCH_WAIT_MS;
+  let lastError: unknown = null;
+
+  while (Date.now() < deadline) {
+    try {
+      const activeRuntimeKind = await loadEngineRuntimeKind();
+      if (activeRuntimeKind === requiredRuntimeKind) return activeRuntimeKind;
+    } catch (err) {
+      lastError = err;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, RUNTIME_SWITCH_POLL_MS));
+  }
+
+  console.warn("[WebRTC] Runtime switch wait timed out:", lastError);
+  throw new Error(
+    requiredRuntimeKind === "native_linux"
+      ? "Pixelated Desktop is still switching to the native Linux engine. Wait for the desktop engine to show ready, then press Play again."
+      : "Pixelated Desktop is still switching to the libretro engine. Wait for the desktop engine to show ready, then press Play again.",
   );
 }
 
@@ -64,13 +90,10 @@ export const resolveGameBootTarget = async (
       throw new Error(switchResult.error);
     }
     if (switchResult.status === "restarting") {
-      throw new Error(
-        requiredRuntimeKind === "native_linux"
-          ? "Pixelated Desktop is switching to the native Linux engine. Wait for the desktop engine to show ready, then press Play again."
-          : "Pixelated Desktop is switching to the libretro engine. Wait for the desktop engine to show ready, then press Play again.",
-      );
+      activeRuntimeKind = await waitForEngineRuntimeKind(requiredRuntimeKind);
+    } else {
+      activeRuntimeKind = await loadEngineRuntimeKind();
     }
-    activeRuntimeKind = await loadEngineRuntimeKind();
   }
   assertEngineRuntimeKindMatches(requiredRuntimeKind, activeRuntimeKind);
   const romFilename = backendSession.boot.launchManifestId

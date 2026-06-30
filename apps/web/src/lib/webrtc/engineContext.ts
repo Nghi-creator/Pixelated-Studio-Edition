@@ -151,13 +151,32 @@ export async function requestEngineRuntimeSwitch(
 }
 
 export async function stopActiveEngineSession() {
-  const response = await fetch(engineEndpoint("/session/stop-active"), {
-    cache: "no-store",
-    headers: {
-      ...engineControlAuthHeaders(),
-    },
-    method: "POST",
+  const requestStop = (controlUrl: string) =>
+    fetch(`${controlUrl}/session/stop-active`, {
+      cache: "no-store",
+      headers: {
+        ...engineControlAuthHeaders(),
+      },
+      method: "POST",
+    });
+
+  const primaryControlUrl = getEngineControlUrl();
+  const fallbackControlUrl =
+    primaryControlUrl === getEngineUrl()
+      ? getLocalCompanionControlUrl(primaryControlUrl)
+      : null;
+  let response = await requestStop(primaryControlUrl).catch((err) => {
+    if (!fallbackControlUrl) throw err;
+    return requestStop(fallbackControlUrl);
   });
+
+  if (
+    fallbackControlUrl &&
+    primaryControlUrl !== fallbackControlUrl &&
+    [404, 405].includes(response.status)
+  ) {
+    response = await requestStop(fallbackControlUrl);
+  }
 
   if (!response.ok) {
     throw new Error("Could not stop active engine session.");

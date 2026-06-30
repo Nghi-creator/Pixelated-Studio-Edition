@@ -465,6 +465,7 @@ async function requestEngineRuntimeSwitch(
         startEngine(event, {
           exposureMode,
           preserveCompanionSecurity: true,
+          preserveEngineToken: true,
           runtimeKind,
         });
       });
@@ -493,7 +494,9 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
   const attempt = ++activeStartupAttempt;
   startupInProgress = true;
 
-  engineToken = crypto.randomBytes(24).toString("base64url");
+  if (options.preserveEngineToken !== true || !engineToken) {
+    engineToken = crypto.randomBytes(24).toString("base64url");
+  }
   stopCompanionServer({
     preserveSecurityState: launchContext.preserveCompanionSecurity,
   });
