@@ -1,6 +1,6 @@
 # Current Infrastructure Snapshot
 
-Last reviewed: 2026-06-17
+Last reviewed: 2026-07-01
 
 This is the compact source of truth for the current deployed/local system.
 Implementation history and stale audit detail belong in Git history.
@@ -100,16 +100,22 @@ Owns:
 - Express HTTP routes and Socket.IO signaling.
 - `/health`, Local Vault upload/list/delete, telemetry routes.
 - Cloud ROM download after backend session verification.
-- RetroArch/camera process lifecycle.
+- Runtime process lifecycle for libretro/native game launch and camera bridge.
 - WebRTC signaling relay and ICE forwarding.
 - Input routing and lobby/session rooms.
 - Revoked browser client/access identity enforcement.
 
 Runtime pieces:
 
-- Xvfb, PulseAudio, RetroArch, Mesen core, GStreamer/Python bridge, Node 20.
+- Xvfb, PulseAudio, RetroArch, libretro cores, GStreamer/Python bridge, Node 20.
+- Optional native Linux runtime manifests for allowlisted Debian-packaged games.
 - Docker volume `pixelated-roms` stores Local Vault ROMs.
 - Default Docker publish is loopback-only; LAN publish is explicit desktop mode.
+
+Repository shape:
+
+- Production code lives under `engine/runtime/src/`.
+- Runtime tests live under `engine/runtime/tests/` and compile to `dist/tests`.
 
 ## Supabase
 
@@ -119,10 +125,11 @@ Owns:
 - Submission Storage bucket policies.
 - Hosted schema/policy state checked by predeploy gates.
 
-Current known deployment-sensitive migration:
+Apply pending migrations through the Supabase CLI before depending on newly
+added schema/RPC behavior in hosted environments.
 
-```txt
-supabase/migrations/20260614153000_allow_own_submission_cleanup.sql
+```sh
+supabase db push
 ```
 
 ## CI/CD
@@ -143,3 +150,6 @@ Important scripts:
 - `npm --prefix apps/desktop run smoke:release`
 
 Provider auto-deploys should not bypass GitHub deploy gates.
+
+Generated smoke artifacts should stay under `.artifacts/` or another transient
+path unless explicitly preserved.

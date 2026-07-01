@@ -53,7 +53,7 @@ const vercelBaselineHtmlSha256 =
 const runId = `hosted-pairing-${new Date().toISOString().replaceAll(":", "-")}`;
 const runDir = path.resolve(
   process.env.HOSTED_SMOKE_ARTIFACT_DIR ||
-    path.join(rootDir, ".context", "hosted-pairing-smoke", runId),
+    path.join(rootDir, ".artifacts", "hosted-pairing-smoke", runId),
 );
 const reportPath = path.join(runDir, "hosted-pairing-report.json");
 const summaryPath = path.join(runDir, "failure-summary.md");
