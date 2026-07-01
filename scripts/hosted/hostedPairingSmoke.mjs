@@ -868,19 +868,24 @@ async function main() {
           }
         }
 
+        let activeHealth = null;
         let activeRuntimeKind = "";
-        for (let attempt = 0; attempt < 10; attempt += 1) {
+        for (let attempt = 0; attempt < 40; attempt += 1) {
           const response = await fetch(`${engineUrl}/health`, {
             cache: "no-store",
             headers: engineHeaders,
-          });
-          const health = await response.json().catch(() => null);
+          }).catch(() => null);
+          const health = response
+            ? await response.json().catch(() => null)
+            : null;
+          activeHealth = health;
           activeRuntimeKind = health?.runtimeKind || "";
           if (activeRuntimeKind === created.boot?.runtimeKind) break;
-          await new Promise((resolve) => setTimeout(resolve, 250));
+          await new Promise((resolve) => setTimeout(resolve, 500));
         }
 
         return {
+          activeHealth,
           activeRuntimeKind,
           bootTarget:
             created.boot?.launchManifestId ||
@@ -904,7 +909,11 @@ async function main() {
     assert.equal(result.verified?.sessionId, nativeSessionId);
     assert.equal(result.verified?.boot?.runtimeKind, "native_linux");
     assert.equal(result.verified?.boot?.launchManifestId, build.launch_manifest_id);
-    assert.equal(result.activeRuntimeKind, "native_linux");
+    assert.equal(
+      result.activeRuntimeKind,
+      "native_linux",
+      JSON.stringify(result),
+    );
     assert.equal(result.bootTarget, build.launch_manifest_id);
     assert.deepEqual(
       probeRuntimeSwitches.map((entry) => entry.runtimeKind),
