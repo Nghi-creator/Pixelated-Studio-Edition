@@ -367,7 +367,7 @@ export function useProfileSettings() {
     setCrop,
     setCurrentPassword,
     setDeleteInput,
-    setLoadAttempt: (_?: unknown) => {
+    setLoadAttempt: () => {
       void sessionQuery.refetch();
       void profileQuery.refetch();
     },

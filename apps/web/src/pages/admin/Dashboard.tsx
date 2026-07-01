@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Filter } from "lucide-react";
 import ReportCard, { type Report } from "../../components/admin/ReportCard";
@@ -28,8 +28,6 @@ type FilterType = AdminTargetRoleFilter;
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
-  const [reports, setReports] = useState<Report[]>([]);
-  const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [filter, setFilter] = useState<FilterType>("all");
   const [page, setPage] = useState(1);
   const [actionError, setActionError] = useState("");
@@ -47,6 +45,7 @@ export default function Dashboard() {
     queryKey: queryKeys.permissions(),
     queryFn: api.permissions,
   });
+  const currentUserRole = permissionsQuery.data?.profile.role || "";
   const canModerate =
     currentUserRole === "admin" || currentUserRole === "super_admin";
   const currentUserId = sessionQuery.data?.user?.id || "";
@@ -55,21 +54,6 @@ export default function Dashboard() {
     queryKey: queryKeys.adminReports(page, REPORTS_PER_PAGE, filter),
     queryFn: () => api.adminReports<Report>(page, REPORTS_PER_PAGE, filter),
   });
-
-  useEffect(() => {
-    if (permissionsQuery.data) {
-      setCurrentUserRole(permissionsQuery.data.profile.role);
-    }
-  }, [permissionsQuery.data]);
-
-  useEffect(() => {
-    if (reportsQuery.data) {
-      setReports(reportsQuery.data.reports);
-      if (page > reportsQuery.data.totalPages) {
-        setPage(reportsQuery.data.totalPages);
-      }
-    }
-  }, [page, reportsQuery.data]);
 
   const resolveReportMutation = useMutation({
     mutationFn: ({
@@ -90,10 +74,31 @@ export default function Dashboard() {
     },
     onSuccess: async (result, { action }) => {
       const nextTotal = Math.max(0, totalReports - 1);
-      setReports((prev) =>
-        action === "ignore"
-          ? prev.filter((report) => report.id !== result.reportId)
-          : prev.filter((report) => report.comments?.id !== result.commentId),
+      queryClient.setQueryData(
+        queryKeys.adminReports(page, REPORTS_PER_PAGE, filter),
+        (
+          current:
+            | {
+                reports: Report[];
+                total: number;
+                totalPages: number;
+              }
+            | undefined,
+        ) =>
+          current
+            ? {
+                ...current,
+                reports:
+                  action === "ignore"
+                    ? current.reports.filter(
+                        (report) => report.id !== result.reportId,
+                      )
+                    : current.reports.filter(
+                        (report) => report.comments?.id !== result.commentId,
+                      ),
+                total: nextTotal,
+              }
+            : current,
       );
       setPage(
         getPageAfterRemoval({
@@ -156,8 +161,10 @@ export default function Dashboard() {
     : reportsQuery.isError
       ? "Could not load reports. Try again."
       : "";
+  const reports = reportsQuery.data?.reports || [];
   const totalReports = reportsQuery.data?.total || reports.length;
   const totalPages = reportsQuery.data?.totalPages || 1;
+  const safePage = Math.min(page, totalPages);
 
   if (loading) {
     return <ModerationQueueSkeleton />;
@@ -165,7 +172,7 @@ export default function Dashboard() {
 
   const pageLabel = getPageRangeLabel({
     currentCount: reports.length,
-    page,
+    page: safePage,
     pageSize: REPORTS_PER_PAGE,
     total: totalReports,
   });
@@ -260,7 +267,7 @@ export default function Dashboard() {
           {filter !== "all" && " for this filter"}
         </p>
         <Pagination
-          currentPage={page}
+          currentPage={safePage}
           disabled={loading}
           onPageChange={setPage}
           totalPages={totalPages}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, getAuthSession } from "../../lib/api/apiClient";
 import { queryKeys } from "../../lib/api/queryClient";
@@ -20,10 +20,8 @@ export interface AdminUserProfile {
 }
 
 export function useAdminUsers() {
-  const [users, setUsers] = useState<AdminUserProfile[]>([]);
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
-  const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<
@@ -58,36 +56,9 @@ export function useAdminUsers() {
       }),
   });
 
-  useEffect(() => {
-    if (usersQuery.data) {
-      setUsers(usersQuery.data.users);
-      if (page > usersQuery.data.totalPages) {
-        setPage(usersQuery.data.totalPages);
-      }
-    }
-  }, [page, usersQuery.data]);
-
-  useEffect(() => {
-    if (permissionsQuery.isError) {
-      setLoadError("Could not verify user-management permissions.");
-      return;
-    }
-
-    if (usersQuery.isError) {
-      setLoadError(
-        getAdminApiErrorMessage(usersQuery.error, "Could not load users."),
-      );
-    }
-  }, [
-    permissionsQuery.isError,
-    usersQuery.error,
-    usersQuery.isError,
-  ]);
-
   const handleSearchChange = (nextSearchQuery: string) => {
     setSearchQuery(nextSearchQuery);
     setPage(1);
-    setLoadError("");
   };
 
   const retryLoad = () => {
@@ -136,10 +107,27 @@ export function useAdminUsers() {
       setActionError(getAdminApiErrorMessage(error, "User update failed."));
     },
     onSuccess: async ({ user }) => {
-      setUsers((prev) =>
-        prev.map((currentUser) =>
-          currentUser.id === user.id ? { ...currentUser, ...user } : currentUser,
-        ),
+      queryClient.setQueryData(
+        queryKeys.adminUsers(page, USERS_PER_PAGE, searchQuery),
+        (
+          current:
+            | {
+                total: number;
+                totalPages: number;
+                users: AdminUserProfile[];
+              }
+            | undefined,
+        ) =>
+          current
+            ? {
+                ...current,
+                users: current.users.map((currentUser) =>
+                  currentUser.id === user.id
+                    ? { ...currentUser, ...user }
+                    : currentUser,
+                ),
+              }
+            : current,
       );
       setConfirmation(null);
       await queryClient.invalidateQueries({
@@ -159,6 +147,13 @@ export function useAdminUsers() {
 
   const totalUsers = usersQuery.data?.total || 0;
   const totalPages = usersQuery.data?.totalPages || 1;
+  const safePage = Math.min(page, totalPages);
+  const users = usersQuery.data?.users || [];
+  const loadError = permissionsQuery.isError
+    ? "Could not verify user-management permissions."
+    : usersQuery.isError
+      ? getAdminApiErrorMessage(usersQuery.error, "Could not load users.")
+      : "";
   const loading =
     sessionQuery.isLoading ||
     permissionsQuery.isLoading ||
@@ -175,10 +170,10 @@ export function useAdminUsers() {
     handleToggleRole,
     loadError,
     loading,
-    page,
+    page: safePage,
     pageLabel: getPageRangeLabel({
       currentCount: users.length,
-      page,
+      page: safePage,
       pageSize: USERS_PER_PAGE,
       total: totalUsers,
     }),

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "../../lib/api/apiClient";
 import { queryKeys } from "../../lib/api/queryClient";
@@ -61,15 +61,11 @@ export default function AccessLogs() {
     ? getAccessLogsErrorMessage(accessLogsQuery.error)
     : "";
 
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
+  const safePage = Math.min(page, totalPages);
 
   const pageLabel = getPageRangeLabel({
     currentCount: logs.length,
-    page,
+    page: safePage,
     pageSize: LOGS_PER_PAGE,
     total: totalLogs,
   });
@@ -160,7 +156,7 @@ export default function AccessLogs() {
           {pageLabel}
         </p>
         <Pagination
-          currentPage={page}
+          currentPage={safePage}
           disabled={loading}
           onPageChange={setPage}
           totalPages={totalPages}

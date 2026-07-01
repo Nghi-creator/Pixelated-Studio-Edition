@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
@@ -32,7 +32,10 @@ export default function Favorites() {
       return api.listFavorites<SavedGame>();
     },
   });
-  const favorites = favoritesQuery.data?.favorites || [];
+  const favorites = useMemo(
+    () => favoritesQuery.data?.favorites || [],
+    [favoritesQuery.data?.favorites],
+  );
   const loading = favoritesQuery.isLoading;
   const loadError = favoritesQuery.isError
     ? "Could not load your library. Try again."

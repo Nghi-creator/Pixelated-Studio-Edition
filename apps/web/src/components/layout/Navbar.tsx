@@ -16,13 +16,9 @@ import { PixelIcon } from "../ui/PixelIcon";
 
 export default function Navbar() {
   const [user, setUser] = useState<User | null>(null);
-  const [dbUsername, setDbUsername] = useState<string | null>(null);
-  const [dbAvatarUrl, setDbAvatarUrl] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [isDeveloper, setIsDeveloper] = useState<boolean>(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
-  const [isIdentityLoading, setIsIdentityLoading] = useState(true);
+  const [isSessionLoading, setIsSessionLoading] = useState(true);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -33,15 +29,8 @@ export default function Navbar() {
 
   useEffect(() => {
     const syncUser = (sessionUser: User | null) => {
-      setIsIdentityLoading(true);
       setUser(sessionUser);
-      if (!sessionUser) {
-        setDbUsername(null);
-        setDbAvatarUrl(null);
-        setUserRole(null);
-        setIsDeveloper(false);
-        setIsIdentityLoading(false);
-      }
+      setIsSessionLoading(false);
     };
 
     getAuthSession().then((session) => {
@@ -81,19 +70,7 @@ export default function Navbar() {
       });
       return;
     }
-
-    setDbUsername(data.profile.username);
-    setDbAvatarUrl(data.profile.avatar_url);
-    setUserRole(data.profile.role);
-    setIsDeveloper(data.profile.is_developer || false);
-    setIsIdentityLoading(false);
   }, [permissionsQuery.data, user]);
-
-  useEffect(() => {
-    if (permissionsQuery.isError) {
-      setIsIdentityLoading(false);
-    }
-  }, [permissionsQuery.isError]);
 
   useEffect(() => {
     const refreshEnginePairing = () => setIsEnginePaired(hasEngineToken());
@@ -134,6 +111,13 @@ export default function Navbar() {
   const isLocalPage = location.pathname === "/local";
   const isMultiplayerPage = location.pathname === "/multiplayer";
   const isPublishPage = location.pathname === "/publish";
+  const profile = permissionsQuery.data?.profile;
+  const dbUsername = profile?.username || null;
+  const dbAvatarUrl = profile?.avatar_url || null;
+  const userRole = profile?.role || null;
+  const isDeveloper = Boolean(profile?.is_developer);
+  const isIdentityLoading =
+    isSessionLoading || (Boolean(user) && permissionsQuery.isLoading);
   const getNavIconClass = (isActive: boolean) =>
     `inline-flex h-10 w-10 items-center justify-center rounded-md border transition-colors ${
       isActive

@@ -19,7 +19,7 @@ export function useStreamPlayback({
   stream: MediaStream | null;
   videoRef: RefObject<HTMLVideoElement | null>;
 }) {
-  const [fallbackActive, setFallbackActive] = useState(false);
+  const [sampledFallbackActive, setSampledFallbackActive] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -43,7 +43,6 @@ export function useStreamPlayback({
 
   useEffect(() => {
     if (status !== "playing") {
-      setFallbackActive(false);
       return;
     }
 
@@ -92,17 +91,16 @@ export function useStreamPlayback({
       }
 
       if (blackSamples >= FALLBACK_BAD_SAMPLE_COUNT) {
-        setFallbackActive(true);
+        setSampledFallbackActive(true);
       } else if (healthySamples >= FALLBACK_HEALTHY_SAMPLE_COUNT) {
-        setFallbackActive(false);
+        setSampledFallbackActive(false);
       }
     }, 750);
 
     return () => {
       window.clearInterval(interval);
-      setFallbackActive(false);
     };
   }, [status, videoRef]);
 
-  return fallbackActive;
+  return status === "playing" && sampledFallbackActive;
 }

@@ -42,31 +42,19 @@ function CatalogRefreshPanel({ label }: { label: string }) {
 
 export default function Landing() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
-  const [isSearchPending, setIsSearchPending] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-
-  useEffect(() => {
-    setIsSearchPending(Boolean(searchQuery));
-    const timeout = window.setTimeout(() => {
-      setDebouncedSearchQuery(searchQuery);
-      setIsSearchPending(false);
-    }, searchQuery ? 250 : 0);
-
-    return () => window.clearTimeout(timeout);
-  }, [searchQuery]);
 
   const catalogQuery = useQuery({
     queryKey: queryKeys.gameCatalog(
       currentPage,
       GAMES_PER_PAGE,
-      debouncedSearchQuery,
+      searchQuery,
     ),
     queryFn: () =>
       api.games({
         page: currentPage,
         pageSize: GAMES_PER_PAGE,
-        search: debouncedSearchQuery,
+        search: searchQuery,
       }),
   });
   const featuredQuery = useQuery({
@@ -75,42 +63,37 @@ export default function Landing() {
   });
 
   const games = (catalogQuery.data?.games || []) as Game[];
-  const featuredGames =
-    featuredQuery.data?.featuredGames.length
-      ? (featuredQuery.data.featuredGames as Game[])
-      : ((catalogQuery.data?.featuredGames || []) as Game[]);
+  const featuredGames = featuredQuery.data?.featuredGames.length
+    ? (featuredQuery.data.featuredGames as Game[])
+    : ((catalogQuery.data?.featuredGames || []) as Game[]);
   const loading = catalogQuery.isLoading;
   const loadError = catalogQuery.isError
     ? "Could not load the game library. Check the API connection."
     : "";
   const totalGames = catalogQuery.data?.total || 0;
   const totalPages = catalogQuery.data?.totalPages || 1;
+  const shouldRefreshFeatured = hasOnlyZeroPlayCounts(featuredGames);
+  const refetchFeaturedGames = featuredQuery.refetch;
 
   useEffect(() => {
-    if (!hasOnlyZeroPlayCounts(featuredGames)) return;
+    if (!shouldRefreshFeatured) return;
 
     const interval = window.setInterval(() => {
-      void featuredQuery.refetch();
+      void refetchFeaturedGames();
     }, ZERO_PLAY_FEATURED_REFRESH_MS);
 
     return () => window.clearInterval(interval);
-  }, [featuredGames, featuredQuery]);
+  }, [refetchFeaturedGames, shouldRefreshFeatured]);
 
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStart = (safeCurrentPage - 1) * GAMES_PER_PAGE;
   const showInitialCatalogSkeleton = loading && games.length === 0 && !searchQuery;
   const showCatalogRefreshPanel =
-    (catalogQuery.isFetching || isSearchPending) &&
+    catalogQuery.isFetching &&
     (games.length > 0 || Boolean(searchQuery));
   const catalogRefreshLabel = searchQuery
     ? "Searching games..."
     : "Loading games...";
-
-  useEffect(() => {
-    if (currentPage > totalPages) {
-      setCurrentPage(totalPages);
-    }
-  }, [currentPage, totalPages]);
 
   const changePage = (page: number) => {
     setCurrentPage(page);
@@ -168,7 +151,7 @@ export default function Landing() {
               Retry
             </button>
           </div>
-        ) : games.length === 0 && !loading && !isSearchPending ? (
+        ) : games.length === 0 && !loading && !catalogQuery.isFetching ? (
           <div className="text-center py-20 text-gray-500">
             <Search className="w-12 h-12 mx-auto mb-4 opacity-20" />
             <p className="text-xl">No games found matching "{searchQuery}"</p>
