@@ -113,12 +113,12 @@ export function useGameCommentsQuery<TComment>(
 ) {
   return useInfiniteQuery({
     enabled: Boolean(gameId),
-    initialPageParam: 0,
+    initialPageParam: 1,
     queryKey: queryKeys.gameComments(gameId),
     queryFn: ({ pageParam }) =>
       api.gameComments<TComment>(gameId!, pageParam),
     getNextPageParam: (lastPage, allPages) =>
-      lastPage.hasMore ? allPages.length : undefined,
+      lastPage.hasMore ? allPages.length + 1 : undefined,
   });
 }
 

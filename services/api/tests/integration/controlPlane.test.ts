@@ -668,6 +668,28 @@ test("session ownership protects authenticated lookup", async () => {
   await app.close();
 });
 
+test("session lookup and verification report missing service configuration", async () => {
+  const app = Fastify({ logger: false });
+  await registerSessionRoutes(app, {
+    requireUser: requireUser(USER_ID),
+    supabase: null,
+  });
+
+  const lookupResponse = await app.inject({
+    method: "GET",
+    url: "/sessions/session-owned",
+  });
+  assert.equal(lookupResponse.statusCode, 503);
+
+  const verifyResponse = await app.inject({
+    method: "POST",
+    payload: { sessionToken: "definitely-long-enough-token" },
+    url: "/sessions/session-owned/verify",
+  });
+  assert.equal(verifyResponse.statusCode, 503);
+  await app.close();
+});
+
 test("session creation cannot overwrite another user's active session", async () => {
   const db = new FakeSupabase();
   seedPublishedGame(db, {

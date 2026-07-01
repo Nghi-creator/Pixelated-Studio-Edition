@@ -8,7 +8,8 @@ export const gamesQuerySchema = z.object({
 });
 export const commentParamsSchema = z.object({ commentId: z.string().uuid() });
 export const commentsQuerySchema = z.object({
-  page: z.coerce.number().int().min(0).default(0),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(50).default(10),
 });
 export const commentBodySchema = z.object({
   content: z.string().trim().min(1).max(2000),

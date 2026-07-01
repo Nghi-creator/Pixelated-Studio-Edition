@@ -64,3 +64,35 @@ test("engine runtime config can be resolved per requested startup", () => {
   assert.match(native.engineImage, /^pixelated-engine-native/);
   assert.equal(native.nativeRuntimeLock?.runtimeId, "debian-native-v1");
 });
+
+test("engine image overrides stay scoped to the requested runtime", () => {
+  const previousLibretroImage = process.env.PIXELATED_ENGINE_IMAGE;
+  const previousNativeImage = process.env.PIXELATED_ENGINE_NATIVE_IMAGE;
+  try {
+    process.env.PIXELATED_ENGINE_IMAGE = "custom-libretro-image";
+    delete process.env.PIXELATED_ENGINE_NATIVE_IMAGE;
+
+    const libretro = resolveEngineRuntimeConfig("libretro");
+    assert.equal(libretro.engineImage, "custom-libretro-image");
+
+    const native = resolveEngineRuntimeConfig("native_linux");
+    assert.match(native.engineImage, /^pixelated-engine-native/);
+
+    process.env.PIXELATED_ENGINE_NATIVE_IMAGE = "custom-native-image";
+    assert.equal(
+      resolveEngineRuntimeConfig("native_linux").engineImage,
+      "custom-native-image",
+    );
+  } finally {
+    if (previousLibretroImage === undefined) {
+      delete process.env.PIXELATED_ENGINE_IMAGE;
+    } else {
+      process.env.PIXELATED_ENGINE_IMAGE = previousLibretroImage;
+    }
+    if (previousNativeImage === undefined) {
+      delete process.env.PIXELATED_ENGINE_NATIVE_IMAGE;
+    } else {
+      process.env.PIXELATED_ENGINE_NATIVE_IMAGE = previousNativeImage;
+    }
+  }
+});

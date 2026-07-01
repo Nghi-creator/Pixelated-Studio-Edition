@@ -43,10 +43,19 @@ test("native lock manifest matches allowlisted launch manifests and Docker pins"
   }
 });
 
-test("native runtime image ships the Python camera socket client", () => {
+test("native runtime image ships the Python camera WebRTC dependencies", () => {
   const dockerfilePath = path.resolve(__dirname, "../../../Dockerfile.native");
+  const smokePath = path.resolve(
+    __dirname,
+    "../../../scripts/smokeNativeRuntime.mjs",
+  );
   const dockerfile = fs.readFileSync(dockerfilePath, "utf8");
+  const smoke = fs.readFileSync(smokePath, "utf8");
 
+  assert.match(dockerfile, /gir1\.2-gst-plugins-bad-1\.0/);
+  assert.match(dockerfile, /gir1\.2-gst-plugins-base-1\.0/);
   assert.match(dockerfile, /python-socketio\[client\]/);
   assert.match(dockerfile, /PYTHONPATH=\/usr\/local\/lib\/pixelated-python/);
+  assert.match(smoke, /GstWebRTC/);
+  assert.match(smoke, /GstSdp/);
 });

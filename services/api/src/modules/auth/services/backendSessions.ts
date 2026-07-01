@@ -19,11 +19,9 @@ export type BackendSessionRow = {
 };
 
 export async function getLiveSession(
-  service: SupabaseServiceLike | null,
+  service: SupabaseServiceLike,
   sessionId: string,
 ) {
-  if (!service) return null;
-
   const { data, error } = await service
     .from("backend_sessions")
     .select(
