@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { allowedOrigins, corsOptions, normalizeOrigin } from "../config.js";
+import { allowedOrigins, corsOptions, normalizeOrigin } from "../../src/config.js";
 
 function checkOrigin(origin: string) {
   return new Promise<boolean>((resolve, reject) => {

@@ -6,10 +6,10 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:native": "node scripts/buildNativeRuntime.mjs",
-    "check": "npm run check:source && npm run build && node --check dist/server.js && find dist/src -name '*.js' -exec node --check {} \\;",
-    "check:source": "test -z \"$(find src -name '*.js' -print -quit)\"",
+    "check": "npm run check:source && npm run build && node --check dist/server.js && find dist/src dist/tests -name '*.js' -exec node --check {} \\;",
+    "check:source": "test -z \"$(find src tests -name '*.js' -print -quit)\"",
     "smoke:native": "node scripts/smokeNativeRuntime.mjs",
-    "test": "npm run build && node --test dist/src/**/*.test.js",
+    "test": "npm run build && node --test dist/tests/**/*.test.js",
     "start": "node dist/server.js"
   },
   "dependencies": {

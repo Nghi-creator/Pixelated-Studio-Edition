@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { pulseAudioArgs, xdotoolArgs } from "./processCommands";
+import { pulseAudioArgs, xdotoolArgs } from "../../src/runtime/processCommands";
 
 test("process commands keep values as literal arguments", () => {
   assert.deepEqual(xdotoolArgs("keydown", "semicolon;still-a-key"), [

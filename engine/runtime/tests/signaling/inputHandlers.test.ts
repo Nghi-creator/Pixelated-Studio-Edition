@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
-import { createLobbyManager } from "./lobby";
-import { registerInputHandlers } from "./inputHandlers";
+import { createLobbyManager } from "../../src/signaling/lobby";
+import { registerInputHandlers } from "../../src/signaling/inputHandlers";
 
 class FakeSocket extends EventEmitter {
   data: Record<string, unknown> = {};
