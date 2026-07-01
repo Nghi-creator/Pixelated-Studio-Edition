@@ -8,10 +8,25 @@ import {
 } from "lucide-react";
 import { FaGithub, FaGoogle } from "react-icons/fa";
 import { PASSWORD_MIN_LENGTH, PASSWORD_POLICY_HINT } from "../../lib/auth/passwordPolicy";
+import { getPublicAppUrl } from "../../lib/navigation/appUrl";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import { useAuthForm } from "../../features/auth/useAuthForm";
 
 export default function Auth() {
+  const signupPendingMessage =
+    "Check your email for the next step. Existing accounts were not changed.";
+  const hostedAuthOptions = {
+    oauthRedirectTo: getPublicAppUrl(),
+    resetPasswordRedirectTo: `${getPublicAppUrl()}/reset-password`,
+    resetPasswordRequest: {
+      redirectTo: `${getPublicAppUrl()}/reset-password`,
+    },
+    signUp: {
+      emailRedirectTo: getPublicAppUrl(),
+    },
+    signUpEmailRedirectTo: getPublicAppUrl(),
+    signupPendingMessage,
+  };
   const {
     confirmPassword,
     email,
@@ -39,7 +54,7 @@ export default function Auth() {
     showSignIn,
     toggleAuthMode,
     verificationPendingEmail,
-  } = useAuthForm();
+  } = useAuthForm(hostedAuthOptions);
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4">

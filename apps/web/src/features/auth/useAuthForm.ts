@@ -5,6 +5,13 @@ import { supabase } from "../../lib/auth/supabaseClient";
 import { getPublicAppUrl } from "../../lib/navigation/appUrl";
 import { getPasswordPolicyError } from "../../lib/auth/passwordPolicy";
 
+export type HostedAuthOptions = {
+  oauthRedirectTo?: string;
+  resetPasswordRedirectTo?: string;
+  signUpEmailRedirectTo?: string;
+  signupPendingMessage?: string;
+};
+
 const getAuthErrorMessage = (error: Error) => {
   if (error.message.toLowerCase().includes("email rate limit exceeded")) {
     return "Supabase's email limit has been reached. Wait before requesting another verification email.";
@@ -13,7 +20,12 @@ const getAuthErrorMessage = (error: Error) => {
   return error.message;
 };
 
-export function useAuthForm() {
+export function useAuthForm({
+  oauthRedirectTo = getPublicAppUrl(),
+  resetPasswordRedirectTo = `${getPublicAppUrl()}/reset-password`,
+  signUpEmailRedirectTo = getPublicAppUrl(),
+  signupPendingMessage = "Check your email for the next step. Existing accounts were not changed.",
+}: HostedAuthOptions = {}) {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
@@ -88,15 +100,13 @@ export function useAuthForm() {
           email,
           password,
           options: {
-            emailRedirectTo: getPublicAppUrl(),
+            emailRedirectTo: signUpEmailRedirectTo,
           },
         });
         if (error) throw error;
         setVerificationPendingEmail(email);
         setResendCooldown(60);
-        setMessage(
-          "Check your email for the next step. Existing accounts were not changed.",
-        );
+        setMessage(signupPendingMessage);
       }
     } catch (err: unknown) {
       if (err instanceof Error) {
@@ -119,7 +129,7 @@ export function useAuthForm() {
         type: "signup",
         email: verificationPendingEmail,
         options: {
-          emailRedirectTo: getPublicAppUrl(),
+          emailRedirectTo: signUpEmailRedirectTo,
         },
       });
       if (error) throw error;
@@ -144,7 +154,7 @@ export function useAuthForm() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${getPublicAppUrl()}/reset-password`,
+        redirectTo: resetPasswordRedirectTo,
       });
       if (error) throw error;
       setMessage(
@@ -165,7 +175,7 @@ export function useAuthForm() {
     setLoading(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider,
-      options: { redirectTo: getPublicAppUrl() },
+      options: { redirectTo: oauthRedirectTo },
     });
     if (error) setError(error.message);
     setLoading(false);
