@@ -1,14 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { io } from "socket.io-client";
-import { api, ApiError } from "../api/apiClient";
 import {
   clearEngineToken,
   ENGINE_PAIRING_EVENT,
   ensureEngineToken,
-  getCompanionAccessToken,
 } from "../engine/engineAuth";
-import { getEngineClientId } from "../engine/engineClient";
-import { getEngineUrl } from "../engine/engineConfig";
 import { attachEngineInput } from "./webrtcInput";
 import {
   createAndSendOffer,
@@ -28,6 +23,15 @@ import {
   startWebRTCTelemetry,
   type WebRTCTelemetry,
 } from "./webrtcTelemetry";
+import {
+  CLIENT_HEARTBEAT_INTERVAL_MS,
+  DISCONNECTED_GRACE_MS,
+  FALLBACK_ICE_SERVERS,
+  loadIceServers,
+  STREAM_BOOT_READY_TIMEOUT_MS,
+  STREAM_METRIC_SEND_INTERVAL_MS,
+} from "./webrtcConfig";
+import { publishStreamMetric } from "./webrtcMetricPublisher";
 import type { StreamProfile } from "../engine/streamProfiles";
 import {
   CHECKING_INPUT_CAPABILITIES,
@@ -35,7 +39,11 @@ import {
   loadEngineLaunchFailureMessage,
   loadEngineShareContext,
 } from "./engineContext";
-import { buildMultiplayerLobbyPayload } from "./lobbyMetadata";
+import {
+  endSyncedMultiplayerLobby,
+  syncMultiplayerLobby,
+} from "./webrtcLobbySync";
+import { createEngineSocket, type EngineSocket } from "./webrtcSocket";
 import {
   getErrorMessage,
   STREAM_BOOT_ERROR_MESSAGE,
@@ -58,24 +66,6 @@ export type {
   LobbyState,
   WebRTCMode,
 } from "./types";
-
-const STREAM_METRIC_SEND_INTERVAL_MS = 5_000;
-const CLIENT_HEARTBEAT_INTERVAL_MS = 20_000;
-const STREAM_BOOT_READY_TIMEOUT_MS = 45_000;
-const DISCONNECTED_GRACE_MS = 5_000;
-const FALLBACK_ICE_SERVERS: RTCIceServer[] = [
-  { urls: "stun:stun.l.google.com:19302" },
-];
-
-async function loadIceServers() {
-  try {
-    const { iceServers } = await api.iceServers();
-    return iceServers.length ? iceServers : FALLBACK_ICE_SERVERS;
-  } catch (err) {
-    console.warn("[WebRTC] Falling back to default STUN config:", err);
-    return FALLBACK_ICE_SERVERS;
-  }
-}
 
 export function useWebRTC(
   gameId: string,
@@ -107,7 +97,7 @@ export function useWebRTC(
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const peerIdRef = useRef(createWebRTCSessionId());
   const sessionIdRef = useRef(sessionId);
-  const socketRef = useRef<ReturnType<typeof io> | null>(null);
+  const socketRef = useRef<EngineSocket | null>(null);
   const localParticipantRef = useRef<LobbyParticipant | null>(null);
   const inputCapabilitiesRef = useRef(inputCapabilities);
   const shareContextRef = useRef(shareContext);
@@ -178,18 +168,8 @@ export function useWebRTC(
       return;
     }
 
-    const companionAccessToken = getCompanionAccessToken(engineToken);
-    const engineClientId = getEngineClientId();
-    const socket = io(getEngineUrl(), {
-      autoConnect: false,
-      query: companionAccessToken
-        ? { companionToken: companionAccessToken, pixelatedClientId: engineClientId }
-        : undefined,
-    });
+    const socket = createEngineSocket(engineToken);
     socketRef.current = socket;
-    socket.auth = companionAccessToken
-      ? { clientId: engineClientId }
-      : { clientId: engineClientId, token: engineToken };
     let pc: RTCPeerConnection | null = null;
     let stopTelemetry: () => void = () => undefined;
     let detachEngineInput: () => void = () => undefined;
@@ -253,6 +233,7 @@ export function useWebRTC(
         setTelemetry(INITIAL_WEBRTC_TELEMETRY);
       }
       lastMetricSentAtRef.current = 0;
+      metricsDisabledRef.current = false;
 
       const [nextIceServers, nextInputCapabilities, nextShareContext] =
         await Promise.all([
@@ -321,47 +302,18 @@ export function useWebRTC(
       pc.addEventListener("iceconnectionstatechange", handlePeerStateChange);
 
       stopTelemetry = startWebRTCTelemetry(pc, (nextTelemetry) => {
-        const metricSnapshot = {
-          ...INITIAL_WEBRTC_TELEMETRY,
-          ...nextTelemetry,
-        };
-
         setTelemetry((currentTelemetry) => ({
           ...currentTelemetry,
           ...nextTelemetry,
         }));
 
-        const now = Date.now();
-        const metricTimestamp = nextTelemetry.lastUpdatedAt;
-
-        if (
-          metricsDisabledRef.current ||
-          !metricTimestamp ||
-          now - lastMetricSentAtRef.current < STREAM_METRIC_SEND_INTERVAL_MS
-        ) {
-          return;
-        }
-
-        lastMetricSentAtRef.current = now;
-        api
-          .streamMetric({
-            bitrateKbps: metricSnapshot.bitrateKbps,
-            connectionState: metricSnapshot.connectionState,
-            fps: metricSnapshot.fps,
-            iceConnectionState: metricSnapshot.iceConnectionState,
-            jitterMs: metricSnapshot.jitterMs,
-            packetsLost: metricSnapshot.packetsLost,
-            sessionId,
-            timestamp: new Date(metricTimestamp).toISOString(),
-          })
-          .catch((err) => {
-            if (err instanceof ApiError && [401, 503].includes(err.status)) {
-              metricsDisabledRef.current = true;
-              return;
-            }
-
-            console.warn("[WebRTC] Failed to send stream metric:", err);
-          });
+        publishStreamMetric({
+          lastMetricSentAtRef,
+          metric: nextTelemetry,
+          metricsDisabledRef,
+          sendIntervalMs: STREAM_METRIC_SEND_INTERVAL_MS,
+          sessionId,
+        });
       });
 
       socket.connect();
@@ -492,24 +444,13 @@ export function useWebRTC(
       }
 
       if (participant?.role === "host") {
-        api
-          .multiplayerLobby(
-            sessionId,
-            buildMultiplayerLobbyPayload({
-              engineUrl: getEngineUrl(),
-              gameId,
-              inputCapabilities: inputCapabilitiesRef.current,
-              lobbyState: nextLobbyState,
-              shareContext: shareContextRef.current,
-            }),
-          )
-          .catch((err) => {
-            if (err instanceof ApiError && [401, 503].includes(err.status)) {
-              return;
-            }
-
-            console.warn("[WebRTC] Failed to save multiplayer lobby:", err);
-          });
+        syncMultiplayerLobby({
+          gameId,
+          inputCapabilities: inputCapabilitiesRef.current,
+          lobbyState: nextLobbyState,
+          sessionId,
+          shareContext: shareContextRef.current,
+        });
       }
     });
 
@@ -584,13 +525,7 @@ export function useWebRTC(
         !preserveActiveSession &&
         localParticipantRef.current?.role === "host"
       ) {
-        api.endMultiplayerLobby(sessionId).catch((err) => {
-          if (err instanceof ApiError && [401, 503].includes(err.status)) {
-            return;
-          }
-
-          console.warn("[WebRTC] Failed to end multiplayer lobby:", err);
-        });
+        endSyncedMultiplayerLobby(sessionId);
         socket.emit("stop-session", { sessionId });
       }
       socket.disconnect();

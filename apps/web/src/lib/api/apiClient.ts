@@ -5,25 +5,14 @@ import {
   withTimeout,
 } from "./requestLifecycle";
 import { clearAuthScopedCache } from "../auth/authCache";
-import type {
-  ApiAdminReportAction,
-  ApiAdminReportActionResponse,
-  ApiFeaturedGamesResponse,
-  ApiGame,
-  ApiGameSubmissionPayload,
-  ApiIceServersResponse,
-  ApiLocalPairingResponse,
-  ApiMeResponse,
-  ApiMultiplayerLobbyPayload,
-  ApiPaginatedAccessLogsResponse,
-  ApiPaginatedGamesResponse,
-  ApiPaginatedReportsResponse,
-  ApiPaginatedUsersResponse,
-  ApiPermissionsResponse,
-  ApiProfile,
-  ApiSessionResponse,
-  ApiStreamMetricPayload,
-} from "./apiTypes";
+import type { ApiPermissionsResponse } from "./apiTypes";
+import { createAdminApi } from "./adminApi";
+import { createCatalogApi } from "./catalogApi";
+import { createEngineApi } from "./engineApi";
+import { createProfileApi } from "./profileApi";
+import { createSessionApi } from "./sessionApi";
+import { createSocialApi } from "./socialApi";
+import { createTelemetryApi } from "./telemetryApi";
 
 export type * from "./apiTypes";
 
@@ -105,11 +94,11 @@ function isCacheFresh(cache: { expiresAt: number } | null) {
   return Boolean(cache && cache.expiresAt > Date.now());
 }
 
-function clearFavoritesCache() {
+export function clearFavoritesCache() {
   authScopedCache.favorites = null;
 }
 
-function clearPermissionsCache() {
+export function clearPermissionsCache() {
   authScopedCache.permissions = null;
 }
 
@@ -179,7 +168,7 @@ export async function apiRequest<T>(
   return payload as T;
 }
 
-async function getCachedPermissions(): Promise<ApiPermissionsResponse> {
+export async function getCachedPermissions(): Promise<ApiPermissionsResponse> {
   if (isCacheFresh(authScopedCache.permissions) && authScopedCache.permissions) {
     if (authScopedCache.permissions.value) return authScopedCache.permissions.value;
     return authScopedCache.permissions.promise;
@@ -229,209 +218,19 @@ async function getFavoriteIds(): Promise<Set<string>> {
 }
 
 export const api = {
-  accessLogs: <TLog>(page = 1, pageSize = 25) =>
-    apiRequest<ApiPaginatedAccessLogsResponse<TLog>>(
-      `/admin/access-logs?page=${page}&pageSize=${pageSize}`,
-    ),
-  adminReports: <TReport>(
-    page = 1,
-    pageSize = 25,
-    targetRole: "all" | "users" | "admins" = "all",
-  ) => {
-    const params = new URLSearchParams({
-      page: String(page),
-      pageSize: String(pageSize),
-      targetRole,
-    });
-
-    return apiRequest<ApiPaginatedReportsResponse<TReport>>(
-      `/admin/reports?${params}`,
-    );
-  },
-  adminReportAction: (reportId: string, action: ApiAdminReportAction) =>
-    apiRequest<ApiAdminReportActionResponse>(
-      `/admin/reports/${reportId}/action`,
-      {
-        body: JSON.stringify({ action }),
-        method: "POST",
-      },
-    ),
-  clearLocalPairing: () =>
-    apiRequest<void>("/local-pairings/current", {
-      method: "DELETE",
-    }),
-  countPlay: (gameId: string) =>
-    apiRequest<{ success: true }>(`/games/${gameId}/play-count`, {
-      method: "POST",
-    }),
-  createSession: (gameId: string, clientSessionId: string) =>
-    apiRequest<ApiSessionResponse>("/sessions", {
-      body: JSON.stringify({
-        clientSessionId,
-        gameId,
-        mode: "cloud",
-      }),
-      method: "POST",
-    }),
-  deleteAccount: () =>
-    apiRequest<void>("/me/account", {
-      body: JSON.stringify({ confirmation: "DELETE" }),
-      method: "DELETE",
-    }),
-  deleteComment: (commentId: string) =>
-    apiRequest<void>(`/comments/${commentId}`, {
-      method: "DELETE",
-    }),
-  favoriteIds: () => getFavoriteIds(),
-  games: ({
-    page = 1,
-    pageSize = 15,
-    search = "",
-  }: {
-    page?: number;
-    pageSize?: number;
-    search?: string;
-  } = {}) => {
-    const params = new URLSearchParams({
-      page: String(page),
-      pageSize: String(pageSize),
-    });
-    if (search.trim()) params.set("search", search.trim());
-
-    return apiRequest<ApiPaginatedGamesResponse>(`/games?${params}`, {
-      authenticated: false,
-    });
-  },
-  featuredGames: () =>
-    apiRequest<ApiFeaturedGamesResponse>("/games/featured", {
-      authenticated: false,
-      cache: "no-store",
-    }),
-  game: (gameId: string) =>
-    apiRequest<{ game: ApiGame }>(`/games/${gameId}`, { authenticated: false }),
-  gameComments: <TComment>(gameId: string, page: number) =>
-    apiRequest<{ comments: TComment[]; hasMore: boolean }>(
-      `/games/${gameId}/comments?page=${page}`,
-      { authenticated: false },
-    ),
-  gameReactions: (gameId: string) =>
-    apiRequest<{ reactions: { is_like: boolean; user_id: string }[] }>(
-      `/games/${gameId}/reactions`,
-      { authenticated: false },
-    ),
-  iceServers: () => apiRequest<ApiIceServersResponse>("/webrtc/ice-servers"),
-  listFavorites: <TFavorite>() => apiRequest<{ favorites: TFavorite[] }>("/favorites"),
-  localPairing: () =>
-    apiRequest<ApiLocalPairingResponse>("/local-pairings/current"),
-  health: () =>
-    apiRequest<{
-      environment: string;
-      ok: boolean;
-      service: string;
-      uptimeSeconds: number;
-    }>("/health", { authenticated: false }),
-  logAccess: (path: string, sessionId: string) =>
-    apiRequest<{ success: true }>("/access-logs", {
-      body: JSON.stringify({ path, sessionId }),
-      method: "POST",
-    }),
-  me: () => apiRequest<ApiMeResponse>("/me"),
-  multiplayerLobby: (sessionId: string, payload: ApiMultiplayerLobbyPayload) =>
-    apiRequest<{ lobby: unknown }>(`/multiplayer/lobbies/${sessionId}`, {
-      body: JSON.stringify(payload),
-      method: "PUT",
-    }),
-  endMultiplayerLobby: (sessionId: string) =>
-    apiRequest<void>(`/multiplayer/lobbies/${sessionId}`, {
-      method: "DELETE",
-    }),
-  pairLocalEngine: (engineUrl: string) =>
-    apiRequest<ApiLocalPairingResponse>("/local-pairings", {
-      body: JSON.stringify({ engineUrl }),
-      method: "POST",
-    }),
-  permissions: () => getCachedPermissions(),
-  postComment: (gameId: string, content: string) =>
-    apiRequest<{ success: true }>(`/games/${gameId}/comments`, {
-      body: JSON.stringify({ content }),
-      method: "POST",
-    }),
-  profile: () => apiRequest<{ profile: ApiProfile | null }>("/profile"),
-  reportComment: (commentId: string, reason: string) =>
-    apiRequest<{ success: true }>(`/moderation/comments/${commentId}/report`, {
-      body: JSON.stringify({ reason }),
-      method: "POST",
-    }),
-  saveFavorite: async (gameId: string) => {
-    const result = await apiRequest<{ favorited: true }>(`/favorites/${gameId}`, {
-      method: "PUT",
-    });
-    clearFavoritesCache();
-    return result;
-  },
-  setCommentReaction: (commentId: string, isLike: boolean | null) =>
-    apiRequest<{ reactions: { is_like: boolean; user_id: string }[] }>(
-      `/comments/${commentId}/reaction`,
-      {
-        body: JSON.stringify({ isLike }),
-        method: "PUT",
-      },
-    ),
-  setGameReaction: (gameId: string, isLike: boolean | null) =>
-    apiRequest<{ success: true }>(`/games/${gameId}/reaction`, {
-      body: JSON.stringify({ isLike }),
-      method: "PUT",
-    }),
-  submitGame: (payload: ApiGameSubmissionPayload) =>
-    apiRequest<{ submission: { id: string; status: "pending" } }>(
-      "/submissions/games",
-      {
-        body: JSON.stringify(payload),
-        method: "POST",
-      },
-    ),
-  streamMetric: (metric: ApiStreamMetricPayload) =>
-    apiRequest<{ accepted: boolean; reason?: string }>("/metrics/stream", {
-      body: JSON.stringify(metric),
-      method: "POST",
-    }),
-  removeFavorite: async (gameId: string) => {
-    const result = await apiRequest<void>(`/favorites/${gameId}`, {
-      method: "DELETE",
-    });
-    clearFavoritesCache();
-    return result;
-  },
-  updateAdminUser: (userId: string, patch: Partial<Pick<ApiProfile, "is_banned" | "role">>) =>
-    apiRequest<{ user: ApiProfile }>(`/admin/users/${userId}`, {
-      body: JSON.stringify(patch),
-      method: "PATCH",
-    }),
-  updateProfile: async (payload: { avatarUrl: string | null; username: string }) => {
-    const result = await apiRequest<{ success: true }>("/profile", {
-      body: JSON.stringify(payload),
-      method: "PATCH",
-    });
-    clearPermissionsCache();
-    return result;
-  },
-  users: <TUser = Required<ApiProfile>>({
-    page = 1,
-    pageSize = 25,
-    search = "",
-  }: {
-    page?: number;
-    pageSize?: number;
-    search?: string;
-  } = {}) => {
-    const params = new URLSearchParams({
-      page: String(page),
-      pageSize: String(pageSize),
-    });
-    if (search.trim()) params.set("search", search.trim());
-
-    return apiRequest<ApiPaginatedUsersResponse<TUser>>(
-      `/admin/users?${params}`,
-    );
-  },
+  ...createAdminApi({ apiRequest }),
+  ...createCatalogApi({
+    apiRequest,
+    clearFavoritesCache,
+    getFavoriteIds,
+  }),
+  ...createEngineApi({ apiRequest }),
+  ...createProfileApi({
+    apiRequest,
+    clearPermissionsCache,
+    getCachedPermissions,
+  }),
+  ...createSessionApi({ apiRequest }),
+  ...createSocialApi({ apiRequest }),
+  ...createTelemetryApi({ apiRequest }),
 };
