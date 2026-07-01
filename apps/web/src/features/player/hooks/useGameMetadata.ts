@@ -1,5 +1,6 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { api, type ApiGame } from "../../../lib/api/apiClient";
+import { queryKeys } from "../../../lib/api/queryClient";
 
 type GameRights = NonNullable<ApiGame["game_rights"]>[number];
 
@@ -7,27 +8,17 @@ const formatFallbackTitle = (gameId: string) =>
   gameId.replace(/-/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 
 export function useGameMetadata(gameId: string | undefined) {
-  const [gameTitle, setGameTitle] = useState("");
-  const [authorName, setAuthorName] = useState<string | null>(null);
-  const [gameRights, setGameRights] = useState<GameRights[]>([]);
+  const { data, isError } = useQuery({
+    enabled: Boolean(gameId),
+    queryKey: queryKeys.game(gameId),
+    queryFn: () => api.game(gameId!),
+  });
 
-  useEffect(() => {
-    const fetchGameDetails = async () => {
-      if (!gameId) return;
-
-      try {
-        const data = await api.game(gameId);
-        if (data.game.title) setGameTitle(data.game.title);
-        if (data.game.author_name) setAuthorName(data.game.author_name);
-        setGameRights(data.game.game_rights || []);
-      } catch {
-        setGameTitle(formatFallbackTitle(gameId));
-        setGameRights([]);
-      }
-    };
-
-    fetchGameDetails();
-  }, [gameId]);
+  const game = data?.game;
+  const gameTitle =
+    game?.title || (isError && gameId ? formatFallbackTitle(gameId) : "");
+  const authorName = game?.author_name || null;
+  const gameRights = (game?.game_rights || []) as GameRights[];
 
   return { authorName, gameRights, gameTitle };
 }

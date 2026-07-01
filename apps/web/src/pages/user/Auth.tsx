@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   Eye,
@@ -9,160 +7,54 @@ import {
   Mail,
 } from "lucide-react";
 import { FaGithub, FaGoogle } from "react-icons/fa";
-import { supabase } from "../../lib/auth/supabaseClient";
+import { PASSWORD_MIN_LENGTH, PASSWORD_POLICY_HINT } from "../../lib/auth/passwordPolicy";
 import { getPublicAppUrl } from "../../lib/navigation/appUrl";
-import {
-  getPasswordPolicyError,
-  PASSWORD_MIN_LENGTH,
-  PASSWORD_POLICY_HINT,
-} from "../../lib/auth/passwordPolicy";
 import { PixelIcon } from "../../components/ui/PixelIcon";
-
-const getAuthErrorMessage = (error: Error) => {
-  if (error.message.toLowerCase().includes("email rate limit exceeded")) {
-    return "Supabase's email limit has been reached. Wait before requesting another verification email.";
-  }
-
-  return error.message;
-};
+import { useAuthForm } from "../../features/auth/useAuthForm";
 
 export default function Auth() {
-  const navigate = useNavigate();
-  const [isLogin, setIsLogin] = useState(true);
-  const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [verificationPendingEmail, setVerificationPendingEmail] = useState("");
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [resendLoading, setResendLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-
-    const timeout = window.setTimeout(
-      () => setResendCooldown((seconds) => Math.max(0, seconds - 1)),
-      1_000,
-    );
-    return () => window.clearTimeout(timeout);
-  }, [resendCooldown]);
-
-  const handleEmailAuth = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
-        navigate("/");
-      } else {
-        const passwordPolicyError = getPasswordPolicyError(password);
-        if (passwordPolicyError) {
-          throw new Error(passwordPolicyError);
-        }
-
-        if (password !== confirmPassword) {
-          throw new Error("Passwords do not match.");
-        }
-
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: getPublicAppUrl(),
-          },
-        });
-        if (error) throw error;
-        setVerificationPendingEmail(email);
-        setResendCooldown(60);
-        setMessage(
-          "Check your email for the next step. Existing accounts were not changed.",
-        );
-      }
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(getAuthErrorMessage(err));
-      } else {
-        setError("An unexpected error occurred.");
-      }
-    } finally {
-      setLoading(false);
-    }
+  const signupPendingMessage =
+    "Check your email for the next step. Existing accounts were not changed.";
+  const hostedAuthOptions = {
+    oauthRedirectTo: getPublicAppUrl(),
+    resetPasswordRedirectTo: `${getPublicAppUrl()}/reset-password`,
+    resetPasswordRequest: {
+      redirectTo: `${getPublicAppUrl()}/reset-password`,
+    },
+    signUp: {
+      emailRedirectTo: getPublicAppUrl(),
+    },
+    signUpEmailRedirectTo: getPublicAppUrl(),
+    signupPendingMessage,
   };
-
-  const handleResendConfirmation = async () => {
-    if (!verificationPendingEmail || resendCooldown > 0) return;
-
-    setResendLoading(true);
-    setError(null);
-    try {
-      const { error } = await supabase.auth.resend({
-        type: "signup",
-        email: verificationPendingEmail,
-        options: {
-          emailRedirectTo: getPublicAppUrl(),
-        },
-      });
-      if (error) throw error;
-
-      setResendCooldown(60);
-      setMessage("A fresh verification email was sent. It expires in 5 minutes.");
-    } catch (err: unknown) {
-      setError(
-        err instanceof Error
-          ? getAuthErrorMessage(err)
-          : "Failed to resend the verification email.",
-      );
-    } finally {
-      setResendLoading(false);
-    }
-  };
-
-  const handleResetPassword = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setMessage(null);
-
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${getPublicAppUrl()}/reset-password`,
-      });
-      if (error) throw error;
-      setMessage(
-        "If this account supports password reset, a link will arrive shortly.",
-      );
-    } catch (err: unknown) {
-      if (err instanceof Error) {
-        setError(getAuthErrorMessage(err));
-      } else {
-        setError("Failed to send reset email.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleOAuth = async (provider: "google" | "github") => {
-    setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: getPublicAppUrl() },
-    });
-    if (error) setError(error.message);
-    setLoading(false);
-  };
+  const {
+    confirmPassword,
+    email,
+    error,
+    handleEmailAuth,
+    handleOAuth,
+    handleResendConfirmation,
+    handleResetPassword,
+    isForgotPassword,
+    isLogin,
+    loading,
+    message,
+    navigate,
+    password,
+    resendCooldown,
+    resendLoading,
+    setConfirmPassword,
+    setEmail,
+    setPassword,
+    setShowConfirmPassword,
+    setShowPassword,
+    showConfirmPassword,
+    showForgotPassword,
+    showPassword,
+    showSignIn,
+    toggleAuthMode,
+    verificationPendingEmail,
+  } = useAuthForm(hostedAuthOptions);
 
   return (
     <div className="min-h-[85vh] flex items-center justify-center p-4">
@@ -242,11 +134,7 @@ export default function Auth() {
 
             <button
               type="button"
-              onClick={() => {
-                setIsForgotPassword(false);
-                setError(null);
-                setMessage(null);
-              }}
+              onClick={showSignIn}
               className="w-full text-gray-400 hover:text-white text-sm transition-colors flex items-center justify-center gap-2 mt-4"
             >
               <ArrowLeft className="w-4 h-4" /> Back to Sign In
@@ -346,11 +234,7 @@ export default function Auth() {
                 <div className="flex justify-end">
                   <button
                     type="button"
-                    onClick={() => {
-                      setIsForgotPassword(true);
-                      setError(null);
-                      setMessage(null);
-                    }}
+                    onClick={showForgotPassword}
                     className="text-synth-secondary hover:text-white text-sm transition-colors"
                   >
                     Forgot Password?
@@ -402,13 +286,7 @@ export default function Auth() {
             <div className="text-center space-y-4">
               <button
                 type="button"
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                  setConfirmPassword("");
-                  setShowConfirmPassword(false);
-                  setError(null);
-                  setMessage(null);
-                }}
+                onClick={toggleAuthMode}
                 className="text-gray-400 hover:text-white text-sm transition-colors"
               >
                 {isLogin

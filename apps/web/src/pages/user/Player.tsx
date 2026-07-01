@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CommentsPanel } from "../../features/player/comments/components/CommentsPanel";
 import { LobbyPanel } from "../../features/player/components/LobbyPanel";
@@ -15,70 +15,41 @@ import { StreamStage } from "../../features/player/components/StreamStage";
 import { StreamTelemetryPanel } from "../../features/player/components/StreamTelemetryPanel";
 import { useAuthUser } from "../../features/player/hooks/useAuthUser";
 import { useGameMetadata } from "../../features/player/hooks/useGameMetadata";
+import { usePlayerIdentity } from "../../features/player/hooks/usePlayerIdentity";
+import { usePlayerNavigation } from "../../features/player/hooks/usePlayerNavigation";
+import { usePlayerShareInvite } from "../../features/player/hooks/usePlayerShareInvite";
+import { usePlayerStreamSettings } from "../../features/player/hooks/usePlayerStreamSettings";
 import { useGameReactions } from "../../features/player/hooks/useGameReactions";
 import { usePlayCount } from "../../features/player/hooks/usePlayCount";
-import { api } from "../../lib/api/apiClient";
-import {
-  getStreamProfile,
-  STREAM_PROFILES,
-  STREAM_PROFILE_STORAGE_KEY,
-  type StreamProfileId,
-} from "../../lib/engine/streamProfiles";
+import { useStreamPlayback } from "../../features/player/hooks/useStreamPlayback";
+import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
 import { shouldIgnoreGameInput } from "../../lib/webrtc/webrtcInput";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
-
-const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
-const BLACK_VIDEO_SAMPLE_THRESHOLD = 6;
-const FALLBACK_BAD_SAMPLE_COUNT = 3;
-const FALLBACK_HEALTHY_SAMPLE_COUNT = 4;
-
-type PlayerBackState = {
-  backRoute?: unknown;
-  backText?: unknown;
-};
-
-const isPlayerBackState = (state: unknown): state is PlayerBackState =>
-  typeof state === "object" && state !== null;
 
 export default function Player() {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isMuted, setIsMuted] = useState(false);
-  const [fallbackActive, setFallbackActive] = useState(false);
-
-  const [streamProfileId, setStreamProfileId] = useState<StreamProfileId>(() => {
-    if (typeof window === "undefined") return "balanced";
-    return getStreamProfile(
-      window.localStorage.getItem(STREAM_PROFILE_STORAGE_KEY),
-    ).id;
-  });
-  const streamProfile = getStreamProfile(streamProfileId);
   const currentUser = useAuthUser();
-  const [profileIdentity, setProfileIdentity] = useState<{
-    userId: string;
-    username: string | null;
-  } | null>(null);
-  const lobbySearch = useMemo(
-    () => new URLSearchParams(location.search),
-    [location.search],
+  const { backRoute, backText, lobbySearch } = usePlayerNavigation(
+    location,
+    id,
   );
   const invitedSessionId = lobbySearch.get("session");
   const invitedRole =
     lobbySearch.get("role") === "player" ? "player" : "spectator";
   const playerMode = invitedSessionId ? "guest" : "host";
-  const isLocalGame = /\.(nes|gb|gbc|gba|sfc|smc|md|gen|sms|gg)$/i.test(
-    id || "",
-  );
-  const profileUsername =
-    profileIdentity && profileIdentity.userId === currentUser?.id
-      ? profileIdentity.username
-      : null;
-  const displayName =
-    profileUsername ||
-    currentUser?.email?.split("@")[0] ||
-    (playerMode === "host" ? "Host" : "Guest");
+  const displayName = usePlayerIdentity(currentUser, playerMode);
+  const {
+    isMuted,
+    setIsMuted,
+    setShowStreamTelemetry,
+    setStreamProfileId,
+    showStreamTelemetry,
+    streamProfile,
+    streamProfileId,
+  } = usePlayerStreamSettings();
   const {
     inputCapabilities,
     lobbyState,
@@ -99,41 +70,6 @@ export default function Player() {
     sessionId: invitedSessionId,
   });
   const { authorName, gameRights, gameTitle } = useGameMetadata(id);
-
-  useEffect(() => {
-    if (!currentUser) {
-      return;
-    }
-
-    let isMounted = true;
-    api
-      .permissions()
-      .then(({ profile }) => {
-        if (isMounted) {
-          setProfileIdentity({
-            userId: currentUser.id,
-            username: profile.username,
-          });
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setProfileIdentity({
-            userId: currentUser.id,
-            username: null,
-          });
-        }
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [currentUser]);
-
-  const [showStreamTelemetry, setShowStreamTelemetry] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return window.localStorage.getItem(STREAM_TELEMETRY_VISIBILITY_KEY) === "1";
-  });
   const {
     dislikes,
     handleReaction,
@@ -172,90 +108,13 @@ export default function Player() {
   } = useCommentReporting(currentUser);
 
   usePlayCount(id);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      STREAM_TELEMETRY_VISIBILITY_KEY,
-      showStreamTelemetry ? "1" : "0",
-    );
-  }, [showStreamTelemetry]);
-
-  useEffect(() => {
-    window.localStorage.setItem(STREAM_PROFILE_STORAGE_KEY, streamProfileId);
-  }, [streamProfileId]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-
-    video.srcObject = stream;
-    if (!stream) return;
-
-    video.muted = isMuted;
-    video.play().catch((err) => {
-      console.warn("[WebRTC] Browser blocked stream playback:", err);
-      if (!isMuted) {
-        video.muted = true;
-        setIsMuted(true);
-        video.play().catch((retryErr) => {
-          console.warn("[WebRTC] Muted stream playback retry failed:", retryErr);
-        });
-      }
-    });
-  }, [isMuted, stream]);
-
-  useEffect(() => {
-    if (status !== "playing") {
-      setFallbackActive(false);
-      return;
-    }
-
-    let blackSamples = 0;
-    let healthySamples = 0;
-    const canvas = document.createElement("canvas");
-    canvas.width = 16;
-    canvas.height = 16;
-    const context = canvas.getContext("2d", { willReadFrequently: true });
-
-    const interval = window.setInterval(() => {
-      const video = videoRef.current;
-      if (!video || !context || video.videoWidth === 0 || video.videoHeight === 0) {
-        blackSamples += 1;
-        healthySamples = 0;
-      } else {
-        try {
-          context.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
-          let total = 0;
-          for (let index = 0; index < pixels.length; index += 4) {
-            total += pixels[index] + pixels[index + 1] + pixels[index + 2];
-          }
-          const average = total / (pixels.length / 4) / 3;
-          if (average < BLACK_VIDEO_SAMPLE_THRESHOLD) {
-            blackSamples += 1;
-            healthySamples = 0;
-          } else {
-            blackSamples = 0;
-            healthySamples += 1;
-          }
-        } catch {
-          blackSamples += 1;
-          healthySamples = 0;
-        }
-      }
-
-      if (blackSamples >= FALLBACK_BAD_SAMPLE_COUNT) {
-        setFallbackActive(true);
-      } else if (healthySamples >= FALLBACK_HEALTHY_SAMPLE_COUNT) {
-        setFallbackActive(false);
-      }
-    }, 750);
-
-    return () => {
-      window.clearInterval(interval);
-      setFallbackActive(false);
-    };
-  }, [status]);
+  const fallbackActive = useStreamPlayback({
+    isMuted,
+    setIsMuted,
+    status,
+    stream,
+    videoRef,
+  });
 
   useEffect(() => {
     const gameKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "];
@@ -275,61 +134,11 @@ export default function Player() {
       window.removeEventListener("keydown", preventScroll, { capture: true });
   }, []);
 
-  const fallbackBackRoute = isLocalGame ? "/local" : "/";
-  const fallbackBackText = isLocalGame
-    ? "Back to Local Vault"
-    : "Back to Cloud Library";
-  const backState = isPlayerBackState(location.state) ? location.state : null;
-  const backRoute =
-    typeof backState?.backRoute === "string"
-      ? backState.backRoute
-      : fallbackBackRoute;
-  const backText =
-    typeof backState?.backText === "string"
-      ? backState.backText
-      : fallbackBackText;
-  const directShareUrl = useMemo(() => {
-    const nextSearch = new URLSearchParams(location.search);
-    nextSearch.set("session", sessionId);
-    nextSearch.set("role", "spectator");
-    return `${window.location.origin}${location.pathname}?${nextSearch.toString()}`;
-  }, [location.pathname, location.search, sessionId]);
-  const shareInvite = useMemo(() => {
-    const companionUrl = shareContext.companionUrls[0];
-    if (shareContext.exposureMode !== "lan" || !companionUrl) {
-      return {
-        guidance: null,
-        text: directShareUrl,
-        url: directShareUrl,
-      };
-    }
-
-    let url: URL;
-    try {
-      const companionOrigin = new URL(companionUrl);
-      if (companionOrigin.protocol !== "https:") {
-        throw new Error("LAN companion URL must use HTTPS.");
-      }
-      url = new URL(directShareUrl);
-      url.protocol = companionOrigin.protocol;
-      url.host = companionOrigin.host;
-    } catch {
-      return {
-        guidance: null,
-        text: directShareUrl,
-        url: directShareUrl,
-      };
-    }
-
-    const guidance =
-      "Open this HTTPS join link, then enter the short-lived invite code shown in the host's Pixelated Desktop app.";
-
-    return {
-      guidance,
-      text: `${url.toString()}\n\n${guidance}`,
-      url: url.toString(),
-    };
-  }, [directShareUrl, shareContext]);
+  const shareInvite = usePlayerShareInvite({
+    location,
+    sessionId,
+    shareContext,
+  });
   const playerLayoutClassName = showStreamTelemetry
     ? "max-w-7xl"
     : "max-w-5xl";

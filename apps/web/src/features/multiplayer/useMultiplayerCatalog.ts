@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, getAuthSession, type ApiGame } from "../../lib/api/apiClient";
+import { useQuery } from "@tanstack/react-query";
+import { api, getAuthSession } from "../../lib/api/apiClient";
+import { queryKeys } from "../../lib/api/queryClient";
 import {
   clearEngineToken,
   engineAuthHeaders,
@@ -29,60 +31,45 @@ export function useMultiplayerCatalog() {
   const [mode, setMode] = useState<MultiplayerMode>("host");
   const [gameSource, setGameSource] = useState<GameSource>("cloud");
   const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
-  const [cloudGames, setCloudGames] = useState<ApiGame[]>([]);
   const [localGames, setLocalGames] = useState<LocalGame[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
   const [localMessage, setLocalMessage] = useState("");
-  const [cloudLoading, setCloudLoading] = useState(true);
-  const [cloudLoadError, setCloudLoadError] = useState("");
   const [cloudPage, setCloudPage] = useState(1);
-  const [cloudTotal, setCloudTotal] = useState(0);
-  const [cloudTotalPages, setCloudTotalPages] = useState(1);
   const [localLoading, setLocalLoading] = useState(false);
   const [localPage, setLocalPage] = useState(1);
 
   useEffect(() => {
-    if (mode !== "host" || gameSource !== "cloud") return;
-
-    let isCurrentRequest = true;
     const timeout = window.setTimeout(
-      () => {
-        setCloudLoading(true);
-        setCloudLoadError("");
-
-        api
-          .games({
-            page: cloudPage,
-            pageSize: CLOUD_GAMES_PER_PAGE,
-            search: searchQuery,
-          })
-          .then(({ games, total, totalPages }) => {
-            if (!isCurrentRequest) return;
-            setCloudGames(games);
-            setCloudTotal(total);
-            setCloudTotalPages(totalPages);
-          })
-          .catch((error) => {
-            console.error("Failed to load multiplayer cloud games:", error);
-            if (isCurrentRequest) {
-              setCloudLoadError(
-                "Could not load cloud games. Check the API connection and try again.",
-              );
-            }
-          })
-          .finally(() => {
-            if (isCurrentRequest) setCloudLoading(false);
-          });
-      },
+      () => setDebouncedSearchQuery(searchQuery),
       searchQuery ? 250 : 0,
     );
 
-    return () => {
-      isCurrentRequest = false;
-      window.clearTimeout(timeout);
-    };
-  }, [cloudPage, gameSource, mode, searchQuery]);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
+
+  const cloudGamesQuery = useQuery({
+    enabled: mode === "host" && gameSource === "cloud",
+    queryKey: queryKeys.gameCatalog(
+      cloudPage,
+      CLOUD_GAMES_PER_PAGE,
+      debouncedSearchQuery,
+    ),
+    queryFn: () =>
+      api.games({
+        page: cloudPage,
+        pageSize: CLOUD_GAMES_PER_PAGE,
+        search: debouncedSearchQuery,
+      }),
+  });
+  const cloudGames = cloudGamesQuery.data?.games || [];
+  const cloudTotal = cloudGamesQuery.data?.total || 0;
+  const cloudTotalPages = cloudGamesQuery.data?.totalPages || 1;
+  const cloudLoading = cloudGamesQuery.isLoading || cloudGamesQuery.isFetching;
+  const cloudLoadError = cloudGamesQuery.isError
+    ? "Could not load cloud games. Check the API connection and try again."
+    : "";
 
   useEffect(() => {
     const refreshEnginePairing = () => {

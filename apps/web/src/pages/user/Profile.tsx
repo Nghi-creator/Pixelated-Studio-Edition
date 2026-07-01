@@ -75,7 +75,7 @@ export default function Profile() {
           <p className="mb-6 text-sm text-gray-400">{loadError}</p>
           <button
             className="mx-auto flex items-center gap-2 rounded-lg bg-synth-primary px-5 py-2.5 font-bold text-white"
-            onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+            onClick={() => setLoadAttempt()}
             type="button"
           >
             Retry

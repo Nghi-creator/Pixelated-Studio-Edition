@@ -1,93 +1,89 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
+import {
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import type { User } from "@supabase/supabase-js";
 import { api } from "../../../../lib/api/apiClient";
+import { queryKeys } from "../../../../lib/api/queryClient";
 import type { GameComment } from "../../types";
 import { getSocialErrorMessage } from "../../socialFeedback";
-import { mergeCommentPage } from "../utils/commentPages";
 
 export function useComments(gameId: string | undefined, currentUser: User | null) {
-  const [comments, setComments] = useState<GameComment[]>([]);
+  const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState("");
-  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-  const [isLoadingComments, setIsLoadingComments] = useState(true);
-  const [isLoadingMoreComments, setIsLoadingMoreComments] = useState(false);
   const [commentsError, setCommentsError] = useState("");
   const [pendingCommentIds, setPendingCommentIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [page, setPage] = useState(0);
-  const [hasMoreComments, setHasMoreComments] = useState(true);
-  const [loadedGameId, setLoadedGameId] = useState<string | undefined>();
-  const activeGameIdRef = useRef(gameId);
-  const loadingPagesRef = useRef(new Set<string>());
   const pendingCommentIdsRef = useRef(new Set<string>());
-  const postingCommentRef = useRef(false);
 
-  activeGameIdRef.current = gameId;
+  const commentsQuery = useInfiniteQuery({
+    enabled: Boolean(gameId),
+    initialPageParam: 0,
+    queryKey: queryKeys.gameComments(gameId),
+    queryFn: ({ pageParam }) =>
+      api.gameComments<GameComment>(gameId!, pageParam),
+    getNextPageParam: (lastPage, allPages) =>
+      lastPage.hasMore ? allPages.length : undefined,
+  });
+  const comments =
+    commentsQuery.data?.pages.flatMap((page) => page.comments) || [];
+  const hasMoreComments = Boolean(commentsQuery.hasNextPage);
 
-  const fetchComments = useCallback(
-    async (pageNum: number, isInitial = false) => {
-      if (!gameId) return;
-      const pageKey = `${gameId}:${pageNum}`;
-      if (loadingPagesRef.current.has(pageKey)) return;
+  const invalidateComments = () =>
+    queryClient.invalidateQueries({
+      queryKey: queryKeys.gameComments(gameId),
+    });
 
-      loadingPagesRef.current.add(pageKey);
-      setCommentsError("");
-      if (isInitial) setIsLoadingComments(true);
-      else setIsLoadingMoreComments(true);
-
-      try {
-        const data = await api.gameComments<GameComment>(gameId, pageNum);
-        if (activeGameIdRef.current !== gameId) return;
-
-        setHasMoreComments(data.hasMore);
-        setLoadedGameId(gameId);
-        setPage(pageNum);
-        setComments((current) =>
-          mergeCommentPage(current, data.comments, isInitial),
-        );
-      } catch (error) {
-        if (activeGameIdRef.current === gameId) {
-          setCommentsError(
-            getSocialErrorMessage(error, "Could not load comments. Try again."),
-          );
-        }
-      } finally {
-        loadingPagesRef.current.delete(pageKey);
-        if (activeGameIdRef.current === gameId) {
-          if (isInitial) setIsLoadingComments(false);
-          else setIsLoadingMoreComments(false);
-        }
-      }
-    },
-    [gameId],
-  );
-
-  useEffect(() => {
-    loadingPagesRef.current.clear();
-    void fetchComments(0, true);
-  }, [fetchComments]);
-
-  const handlePostComment = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!currentUser || !newComment.trim() || !gameId) return;
-    if (postingCommentRef.current) return;
-
-    postingCommentRef.current = true;
-    setIsSubmittingComment(true);
-    try {
-      await api.postComment(gameId, newComment.trim());
-      setNewComment("");
-      await fetchComments(0, true);
-    } catch (err) {
+  const postCommentMutation = useMutation({
+    mutationFn: (content: string) => api.postComment(gameId!, content),
+    onError: (err) => {
       console.error(err);
       setCommentsError(
         getSocialErrorMessage(err, "Failed to post comment. Try again."),
       );
-    } finally {
-      postingCommentRef.current = false;
-      setIsSubmittingComment(false);
-    }
+    },
+    onSuccess: async () => {
+      setNewComment("");
+      await invalidateComments();
+    },
+  });
+
+  const deleteCommentMutation = useMutation({
+    mutationFn: (commentId: string) => api.deleteComment(commentId),
+    onError: (err) => {
+      console.error(err);
+      setCommentsError(
+        getSocialErrorMessage(err, "Failed to delete comment. Try again."),
+      );
+    },
+    onSuccess: invalidateComments,
+  });
+
+  const commentReactionMutation = useMutation({
+    mutationFn: ({
+      commentId,
+      isLike,
+    }: {
+      commentId: string;
+      isLike: boolean | null;
+    }) => api.setCommentReaction(commentId, isLike),
+    onError: (err) => {
+      console.error(err);
+      setCommentsError(
+        getSocialErrorMessage(err, "Failed to update reaction. Try again."),
+      );
+    },
+    onSuccess: invalidateComments,
+  });
+
+  const handlePostComment = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!currentUser || !newComment.trim() || !gameId) return;
+
+    await postCommentMutation.mutateAsync(newComment.trim());
   };
 
   const handleDeleteComment = async (commentId: string) => {
@@ -100,13 +96,7 @@ export function useComments(gameId: string | undefined, currentUser: User | null
     setPendingCommentIds(new Set(pendingCommentIdsRef.current));
     setCommentsError("");
     try {
-      await api.deleteComment(commentId);
-      setComments((prev) => prev.filter((comment) => comment.id !== commentId));
-    } catch (err) {
-      console.error(err);
-      setCommentsError(
-        getSocialErrorMessage(err, "Failed to delete comment. Try again."),
-      );
+      await deleteCommentMutation.mutateAsync(commentId);
     } finally {
       pendingCommentIdsRef.current.delete(commentId);
       setPendingCommentIds(new Set(pendingCommentIdsRef.current));
@@ -132,22 +122,10 @@ export function useComments(gameId: string | undefined, currentUser: User | null
         (reaction) => reaction.user_id === currentUser.id,
       );
 
-      const data = await api.setCommentReaction(
+      await commentReactionMutation.mutateAsync({
         commentId,
-        existingReaction?.is_like === isLike ? null : isLike,
-      );
-      setComments((prev) =>
-        prev.map((comment) =>
-          comment.id === commentId
-            ? { ...comment, comment_likes: data.reactions }
-            : comment,
-        ),
-      );
-    } catch (err) {
-      console.error(err);
-      setCommentsError(
-        getSocialErrorMessage(err, "Failed to update reaction. Try again."),
-      );
+        isLike: existingReaction?.is_like === isLike ? null : isLike,
+      });
     } finally {
       pendingCommentIdsRef.current.delete(commentId);
       setPendingCommentIds(new Set(pendingCommentIdsRef.current));
@@ -155,24 +133,31 @@ export function useComments(gameId: string | undefined, currentUser: User | null
   };
 
   const loadMoreComments = () => {
-    if (isLoadingMoreComments || !hasMoreComments) return;
-    void fetchComments(page + 1, false);
+    if (commentsQuery.isFetchingNextPage || !hasMoreComments) return;
+    void commentsQuery.fetchNextPage();
   };
 
   return {
-    comments: loadedGameId === gameId ? comments : [],
+    comments: gameId ? comments : [],
     handleCommentReaction,
     handleDeleteComment,
     handlePostComment,
     hasMoreComments,
-    commentsError,
-    isLoadingComments: isLoadingComments || loadedGameId !== gameId,
-    isLoadingMoreComments,
-    isSubmittingComment,
+    commentsError:
+      commentsError ||
+      (commentsQuery.isError
+        ? getSocialErrorMessage(
+            commentsQuery.error,
+            "Could not load comments. Try again.",
+          )
+        : ""),
+    isLoadingComments: commentsQuery.isLoading,
+    isLoadingMoreComments: commentsQuery.isFetchingNextPage,
+    isSubmittingComment: postCommentMutation.isPending,
     loadMoreComments,
     newComment,
     pendingCommentIds,
-    retryComments: () => void fetchComments(0, true),
+    retryComments: () => void commentsQuery.refetch(),
     setNewComment,
   };
 }
