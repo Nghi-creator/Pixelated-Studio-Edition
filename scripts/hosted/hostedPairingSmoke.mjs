@@ -752,6 +752,8 @@ async function main() {
           return "";
         })();
         const engineUrl = window.localStorage.getItem("pixelated_engine_url");
+        const engineControlUrl =
+          window.localStorage.getItem("pixelated_engine_control_url") || engineUrl;
         const engineTokenValue =
           window.localStorage.getItem("pixelated_engine_control_token") ||
           window.localStorage.getItem("pixelated_engine_token") ||
@@ -762,6 +764,51 @@ async function main() {
         const engineHeaders = {
           "X-Engine-Token": companionToken,
           "X-Pixelated-Client-Id": "hosted-native-smoke",
+        };
+        const getLocalCompanionControlUrl = (target) => {
+          try {
+            const url = new URL(target);
+            const hostname = url.hostname.toLowerCase();
+            const isLocalhost =
+              hostname === "localhost" ||
+              hostname === "127.0.0.1" ||
+              hostname === "::1" ||
+              hostname === "[::1]";
+            if (!isLocalhost || url.port !== "8080") return null;
+            url.protocol = "http:";
+            url.port = "8091";
+            return url.toString().replace(/\/$/, "");
+          } catch {
+            return null;
+          }
+        };
+        const fallbackControlUrl =
+          engineControlUrl === engineUrl
+            ? getLocalCompanionControlUrl(engineControlUrl)
+            : null;
+        const postEngineControl = async (path, body) => {
+          const request = (controlUrl) =>
+            fetch(`${controlUrl}${path}`, {
+              body: body ? JSON.stringify(body) : undefined,
+              cache: "no-store",
+              headers: {
+                ...engineHeaders,
+                ...(body ? { "content-type": "application/json" } : {}),
+              },
+              method: "POST",
+            });
+          let response = await request(engineControlUrl).catch((error) => {
+            if (!fallbackControlUrl) throw error;
+            return request(fallbackControlUrl);
+          });
+          if (
+            fallbackControlUrl &&
+            engineControlUrl !== fallbackControlUrl &&
+            [404, 405].includes(response.status)
+          ) {
+            response = await request(fallbackControlUrl);
+          }
+          return response;
         };
 
         const createResponse = await fetch(`${apiBaseUrl}/sessions`, {
@@ -806,19 +853,9 @@ async function main() {
         });
         const beforeHealth = await beforeHealthResponse.json().catch(() => null);
         if (created.boot?.runtimeKind !== beforeHealth?.runtimeKind) {
-          await fetch(`${engineUrl}/session/stop-active`, {
-            cache: "no-store",
-            headers: engineHeaders,
-            method: "POST",
-          });
-          const switchResponse = await fetch(`${engineUrl}/runtime/switch`, {
-            body: JSON.stringify({ runtimeKind: created.boot?.runtimeKind }),
-            cache: "no-store",
-            headers: {
-              ...engineHeaders,
-              "content-type": "application/json",
-            },
-            method: "POST",
+          await postEngineControl("/session/stop-active");
+          const switchResponse = await postEngineControl("/runtime/switch", {
+            runtimeKind: created.boot?.runtimeKind,
           });
           const switchPayload = await switchResponse.json().catch(() => null);
           if (![200, 202].includes(switchResponse.status)) {
