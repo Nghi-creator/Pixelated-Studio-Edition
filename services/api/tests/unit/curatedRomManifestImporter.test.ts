@@ -165,7 +165,10 @@ test("curated ROM manifest report explains skipped entries", () => {
 
 test("phase 5 curated ROM manifest imports the pinned PicoDrive candidate", () => {
   const manifest = readCuratedRomManifest(
-    path.resolve(process.cwd(), "../..", ".context/phase5-curated-roms.json"),
+    path.resolve(
+      process.cwd(),
+      "tests/unit/fixtures/curated-roms/phase5-curated-roms.json",
+    ),
   );
 
   const report = collectCuratedRomCandidateReport(manifest);
