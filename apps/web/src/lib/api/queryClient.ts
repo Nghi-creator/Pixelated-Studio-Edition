@@ -1,4 +1,4 @@
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, type QueryClient as QueryClientInstance } from "@tanstack/react-query";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,8 +18,11 @@ export const queryKeys = {
     pageSize: number,
     targetRole: "all" | "users" | "admins",
   ) => ["adminReports", page, pageSize, targetRole] as const,
+  adminReportsRoot: () => ["adminReports"] as const,
   adminUsers: (page: number, pageSize: number, search: string) =>
     ["adminUsers", page, pageSize, search] as const,
+  adminUsersRoot: () => ["adminUsers"] as const,
+  authSession: () => ["authSession"] as const,
   featuredGames: () => ["featuredGames"] as const,
   favorites: () => ["favorites"] as const,
   favoriteIds: () => ["favoriteIds"] as const,
@@ -31,4 +34,34 @@ export const queryKeys = {
     ["gameReactions", gameId] as const,
   permissions: () => ["permissions"] as const,
   profile: () => ["profile"] as const,
+};
+
+export const invalidateAdminReportsQueries = (client: QueryClientInstance) =>
+  client.invalidateQueries({ queryKey: queryKeys.adminReportsRoot() });
+
+export const invalidateAdminUsersQueries = (client: QueryClientInstance) =>
+  client.invalidateQueries({ queryKey: queryKeys.adminUsersRoot() });
+
+export const invalidateFavoriteQueries = async (client: QueryClientInstance) => {
+  await Promise.all([
+    client.invalidateQueries({ queryKey: queryKeys.favoriteIds() }),
+    client.invalidateQueries({ queryKey: queryKeys.favorites() }),
+  ]);
+};
+
+export const invalidateGameCommentsQuery = (
+  client: QueryClientInstance,
+  gameId: string | undefined,
+) => client.invalidateQueries({ queryKey: queryKeys.gameComments(gameId) });
+
+export const invalidateGameReactionsQuery = (
+  client: QueryClientInstance,
+  gameId: string | undefined,
+) => client.invalidateQueries({ queryKey: queryKeys.gameReactions(gameId) });
+
+export const invalidateProfileQueries = async (client: QueryClientInstance) => {
+  await Promise.all([
+    client.invalidateQueries({ queryKey: queryKeys.profile() }),
+    client.invalidateQueries({ queryKey: queryKeys.permissions() }),
+  ]);
 };

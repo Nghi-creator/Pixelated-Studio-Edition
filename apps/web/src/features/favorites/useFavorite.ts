@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { api, getAuthSession } from "../../lib/api/apiClient";
-import { queryKeys } from "../../lib/api/queryClient";
+import { useFavoriteIdsQuery } from "../../lib/api/apiQueries";
+import { invalidateFavoriteQueries } from "../../lib/api/queryClient";
 import { supabase } from "../../lib/auth/supabaseClient";
 import {
   getFavoriteSnapshot,
@@ -24,14 +25,7 @@ export function useFavorite(gameId: string) {
     getFavoriteSnapshot,
     getFavoriteSnapshot,
   );
-  const favoriteIdsQuery = useQuery({
-    queryKey: queryKeys.favoriteIds(),
-    queryFn: async () => {
-      const session = await getAuthSession();
-      if (!session) return new Set<string>();
-      return api.favoriteIds();
-    },
-  });
+  const favoriteIdsQuery = useFavoriteIdsQuery();
 
   useEffect(() => {
     if (favoriteIdsQuery.data) {
@@ -50,8 +44,7 @@ export function useFavorite(gameId: string) {
     const result = await mutateFavorite(gameId, !favorited, () =>
       favorited ? api.removeFavorite(gameId) : api.saveFavorite(gameId),
     );
-    await queryClient.invalidateQueries({ queryKey: queryKeys.favoriteIds() });
-    await queryClient.invalidateQueries({ queryKey: queryKeys.favorites() });
+    await invalidateFavoriteQueries(queryClient);
     return result;
   }, [gameId, navigate, queryClient, snapshot.ids]);
 

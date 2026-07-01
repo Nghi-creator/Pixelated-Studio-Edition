@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import type { ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
-import { ApiError, api, getAuthSession } from "../../lib/api/apiClient";
-import { queryKeys } from "../../lib/api/queryClient";
+import { ApiError, api } from "../../lib/api/apiClient";
+import {
+  useAuthSessionQuery,
+  useProfileQuery,
+} from "../../lib/api/apiQueries";
+import { invalidateProfileQueries } from "../../lib/api/queryClient";
 import { supabase } from "../../lib/auth/supabaseClient";
 import { getPasswordPolicyError } from "../../lib/auth/passwordPolicy";
 import { createCroppedAvatar, type CropArea } from "./avatarCrop";
@@ -59,14 +63,9 @@ export function useProfileSettings() {
   const hasPassword = user?.app_metadata?.providers?.includes("email");
   const displayAvatar = previewUrl || avatarUrl;
 
-  const sessionQuery = useQuery({
-    queryKey: ["authSession"],
-    queryFn: getAuthSession,
-  });
-  const profileQuery = useQuery({
+  const sessionQuery = useAuthSessionQuery();
+  const profileQuery = useProfileQuery({
     enabled: Boolean(sessionQuery.data),
-    queryKey: queryKeys.profile(),
-    queryFn: api.profile,
   });
 
   useEffect(() => {
@@ -208,10 +207,7 @@ export function useProfileSettings() {
             avatarUrl: finalAvatarUrl,
             username: finalUsername,
           });
-          await queryClient.invalidateQueries({ queryKey: queryKeys.profile() });
-          await queryClient.invalidateQueries({
-            queryKey: queryKeys.permissions(),
-          });
+          await invalidateProfileQueries(queryClient);
         },
         uploadAvatar: async (file, path) => {
           const { error } = await supabase.storage

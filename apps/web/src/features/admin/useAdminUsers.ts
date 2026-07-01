@@ -1,7 +1,15 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, getAuthSession } from "../../lib/api/apiClient";
-import { queryKeys } from "../../lib/api/queryClient";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { api } from "../../lib/api/apiClient";
+import {
+  useAdminUsersQuery,
+  useAuthSessionQuery,
+  usePermissionsQuery,
+} from "../../lib/api/apiQueries";
+import {
+  invalidateAdminUsersQueries,
+  queryKeys,
+} from "../../lib/api/queryClient";
 import type { AdminConfirmation } from "../../components/admin/AdminConfirmDialog";
 import {
   getAdminApiErrorMessage,
@@ -32,28 +40,19 @@ export function useAdminUsers() {
   >(null);
   const queryClient = useQueryClient();
 
-  const sessionQuery = useQuery({
-    queryKey: ["authSession"],
-    queryFn: getAuthSession,
-  });
-  const permissionsQuery = useQuery({
+  const sessionQuery = useAuthSessionQuery();
+  const permissionsQuery = usePermissionsQuery({
     enabled: Boolean(sessionQuery.data?.user),
-    queryKey: queryKeys.permissions(),
-    queryFn: api.permissions,
   });
   const currentUserId = sessionQuery.data?.user?.id || "";
   const currentUserRole = permissionsQuery.data?.profile.role || "";
   const canManageUsers = currentUserRole === "super_admin";
 
-  const usersQuery = useQuery({
+  const usersQuery = useAdminUsersQuery<AdminUserProfile>({
     enabled: canManageUsers,
-    queryKey: queryKeys.adminUsers(page, USERS_PER_PAGE, searchQuery),
-    queryFn: () =>
-      api.users<AdminUserProfile>({
-        page,
-        pageSize: USERS_PER_PAGE,
-        search: searchQuery,
-      }),
+    page,
+    pageSize: USERS_PER_PAGE,
+    search: searchQuery,
   });
 
   const handleSearchChange = (nextSearchQuery: string) => {
@@ -130,9 +129,7 @@ export function useAdminUsers() {
             : current,
       );
       setConfirmation(null);
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.adminUsers(page, USERS_PER_PAGE, searchQuery),
-      });
+      await invalidateAdminUsersQueries(queryClient);
     },
     onSettled: () => setPendingUserId(null),
   });

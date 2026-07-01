@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { api, getAuthSession } from "../../lib/api/apiClient";
-import { queryKeys } from "../../lib/api/queryClient";
+import { getAuthSession } from "../../lib/api/apiClient";
+import { useGameCatalogQuery } from "../../lib/api/apiQueries";
 import {
   clearEngineToken,
   engineAuthHeaders,
@@ -49,19 +48,11 @@ export function useMultiplayerCatalog() {
     return () => window.clearTimeout(timeout);
   }, [searchQuery]);
 
-  const cloudGamesQuery = useQuery({
+  const cloudGamesQuery = useGameCatalogQuery({
     enabled: mode === "host" && gameSource === "cloud",
-    queryKey: queryKeys.gameCatalog(
-      cloudPage,
-      CLOUD_GAMES_PER_PAGE,
-      debouncedSearchQuery,
-    ),
-    queryFn: () =>
-      api.games({
-        page: cloudPage,
-        pageSize: CLOUD_GAMES_PER_PAGE,
-        search: debouncedSearchQuery,
-      }),
+    page: cloudPage,
+    pageSize: CLOUD_GAMES_PER_PAGE,
+    search: debouncedSearchQuery,
   });
   const cloudGames = cloudGamesQuery.data?.games || [];
   const cloudTotal = cloudGamesQuery.data?.total || 0;

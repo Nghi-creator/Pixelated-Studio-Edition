@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Filter } from "lucide-react";
 import ReportCard, { type Report } from "../../components/admin/ReportCard";
 import {
@@ -8,10 +8,17 @@ import {
 } from "../../components/admin/AdminConfirmDialog";
 import {
   api,
-  getAuthSession,
   type ApiAdminReportAction,
 } from "../../lib/api/apiClient";
-import { queryKeys } from "../../lib/api/queryClient";
+import {
+  useAdminReportsQuery,
+  useAuthSessionQuery,
+  usePermissionsQuery,
+} from "../../lib/api/apiQueries";
+import {
+  invalidateAdminReportsQueries,
+  queryKeys,
+} from "../../lib/api/queryClient";
 import { ModerationQueueSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
 import { PixelIcon } from "../../components/ui/PixelIcon";
@@ -36,24 +43,23 @@ export default function Dashboard() {
     (AdminConfirmation & { action: ApiAdminReportAction }) | null
   >(null);
 
-  const sessionQuery = useQuery({
-    queryKey: ["authSession"],
-    queryFn: getAuthSession,
-  });
-  const permissionsQuery = useQuery({
+  const sessionQuery = useAuthSessionQuery();
+  const permissionsQuery = usePermissionsQuery({
     enabled: Boolean(sessionQuery.data?.user),
-    queryKey: queryKeys.permissions(),
-    queryFn: api.permissions,
   });
   const currentUserRole = permissionsQuery.data?.profile.role || "";
   const canModerate =
     currentUserRole === "admin" || currentUserRole === "super_admin";
   const currentUserId = sessionQuery.data?.user?.id || "";
-  const reportsQuery = useQuery({
-    enabled: canModerate,
-    queryKey: queryKeys.adminReports(page, REPORTS_PER_PAGE, filter),
-    queryFn: () => api.adminReports<Report>(page, REPORTS_PER_PAGE, filter),
-  });
+  const reportsQuery = useAdminReportsQuery<Report>(
+    page,
+    REPORTS_PER_PAGE,
+    filter,
+    { enabled: canModerate },
+  );
+  const reportsData = canModerate ? reportsQuery.data : undefined;
+  const reportsLoading = canModerate && reportsQuery.isLoading;
+  const reportsError = canModerate && reportsQuery.isError;
 
   const resolveReportMutation = useMutation({
     mutationFn: ({
@@ -107,9 +113,7 @@ export default function Dashboard() {
           totalAfterRemoval: nextTotal,
         }),
       );
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.adminReports(page, REPORTS_PER_PAGE, filter),
-      });
+      await invalidateAdminReportsQueries(queryClient);
     },
     onSettled: () => setPendingReportId(null),
   });
@@ -155,15 +159,15 @@ export default function Dashboard() {
   const loading =
     sessionQuery.isLoading ||
     permissionsQuery.isLoading ||
-    (canModerate && reportsQuery.isLoading);
+    reportsLoading;
   const loadError = permissionsQuery.isError
     ? "Could not verify moderation permissions. Try again."
-    : reportsQuery.isError
+    : reportsError
       ? "Could not load reports. Try again."
       : "";
-  const reports = reportsQuery.data?.reports || [];
-  const totalReports = reportsQuery.data?.total || reports.length;
-  const totalPages = reportsQuery.data?.totalPages || 1;
+  const reports = reportsData?.reports || [];
+  const totalReports = reportsData?.total || reports.length;
+  const totalPages = reportsData?.totalPages || 1;
   const safePage = Math.min(page, totalPages);
 
   if (loading) {

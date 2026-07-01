@@ -1,19 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@supabase/supabase-js";
 import { api } from "../../../lib/api/apiClient";
-import { queryKeys } from "../../../lib/api/queryClient";
+import { useGameReactionsQuery } from "../../../lib/api/apiQueries";
+import { invalidateGameReactionsQuery } from "../../../lib/api/queryClient";
 import { getSocialErrorMessage } from "../socialFeedback";
 
 export function useGameReactions(gameId: string | undefined, currentUser: User | null) {
   const queryClient = useQueryClient();
   const [reactionError, setReactionError] = useState("");
 
-  const reactionsQuery = useQuery({
-    enabled: Boolean(gameId),
-    queryKey: queryKeys.gameReactions(gameId),
-    queryFn: () => api.gameReactions(gameId!),
-  });
+  const reactionsQuery = useGameReactionsQuery(gameId);
   const reactionSummary = useMemo(() => {
     let likeCount = 0;
     let dislikeCount = 0;
@@ -40,9 +37,7 @@ export function useGameReactions(gameId: string | undefined, currentUser: User |
       );
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.gameReactions(gameId),
-      });
+      await invalidateGameReactionsQuery(queryClient, gameId);
     },
   });
 

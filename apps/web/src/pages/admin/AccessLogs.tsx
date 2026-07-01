@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { api, ApiError } from "../../lib/api/apiClient";
-import { queryKeys } from "../../lib/api/queryClient";
+import { ApiError } from "../../lib/api/apiClient";
+import { useAccessLogsQuery } from "../../lib/api/apiQueries";
 import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
 import { getPageRangeLabel } from "../../features/admin/adminState";
@@ -49,10 +48,7 @@ function getAccessLogsErrorMessage(error: unknown) {
 
 export default function AccessLogs() {
   const [page, setPage] = useState(1);
-  const accessLogsQuery = useQuery({
-    queryKey: queryKeys.accessLogs(page, LOGS_PER_PAGE),
-    queryFn: () => api.accessLogs<AccessLog>(page, LOGS_PER_PAGE),
-  });
+  const accessLogsQuery = useAccessLogsQuery<AccessLog>(page, LOGS_PER_PAGE);
   const logs = accessLogsQuery.data?.logs || [];
   const totalLogs = accessLogsQuery.data?.total || 0;
   const totalPages = accessLogsQuery.data?.totalPages || 1;

@@ -1,5 +1,4 @@
 import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -9,21 +8,18 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
-import { api, getAuthSession } from "../../lib/api/apiClient";
-import { queryKeys } from "../../lib/api/queryClient";
+import {
+  useAuthSessionQuery,
+  usePermissionsQuery,
+} from "../../lib/api/apiQueries";
 import { PixelIcon } from "../ui/PixelIcon";
 
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const sessionQuery = useQuery({
-    queryKey: ["authSession"],
-    queryFn: getAuthSession,
-  });
-  const permissionsQuery = useQuery({
+  const sessionQuery = useAuthSessionQuery();
+  const permissionsQuery = usePermissionsQuery({
     enabled: Boolean(sessionQuery.data?.user),
-    queryKey: queryKeys.permissions(),
-    queryFn: api.permissions,
   });
 
   useEffect(() => {

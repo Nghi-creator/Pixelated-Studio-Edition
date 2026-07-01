@@ -1,12 +1,12 @@
 import { useRef, useState } from "react";
 import {
-  useInfiniteQuery,
   useMutation,
   useQueryClient,
 } from "@tanstack/react-query";
 import type { User } from "@supabase/supabase-js";
 import { api } from "../../../../lib/api/apiClient";
-import { queryKeys } from "../../../../lib/api/queryClient";
+import { useGameCommentsQuery } from "../../../../lib/api/apiQueries";
+import { invalidateGameCommentsQuery } from "../../../../lib/api/queryClient";
 import type { GameComment } from "../../types";
 import { getSocialErrorMessage } from "../../socialFeedback";
 
@@ -19,23 +19,13 @@ export function useComments(gameId: string | undefined, currentUser: User | null
   );
   const pendingCommentIdsRef = useRef(new Set<string>());
 
-  const commentsQuery = useInfiniteQuery({
-    enabled: Boolean(gameId),
-    initialPageParam: 0,
-    queryKey: queryKeys.gameComments(gameId),
-    queryFn: ({ pageParam }) =>
-      api.gameComments<GameComment>(gameId!, pageParam),
-    getNextPageParam: (lastPage, allPages) =>
-      lastPage.hasMore ? allPages.length : undefined,
-  });
+  const commentsQuery = useGameCommentsQuery<GameComment>(gameId);
   const comments =
     commentsQuery.data?.pages.flatMap((page) => page.comments) || [];
   const hasMoreComments = Boolean(commentsQuery.hasNextPage);
 
   const invalidateComments = () =>
-    queryClient.invalidateQueries({
-      queryKey: queryKeys.gameComments(gameId),
-    });
+    invalidateGameCommentsQuery(queryClient, gameId);
 
   const postCommentMutation = useMutation({
     mutationFn: (content: string) => api.postComment(gameId!, content),
