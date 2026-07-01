@@ -39,6 +39,8 @@ export DISPLAY=:99
 export SDL_AUDIODRIVER="${process.env.SDL_AUDIODRIVER || "dummy"}"
 sleep 1
 
+python3 -c 'import gi; gi.require_version("Gst", "1.0"); gi.require_version("GstWebRTC", "1.0"); gi.require_version("GstSdp", "1.0"); from gi.repository import Gst, GstWebRTC, GstSdp; Gst.init(None); print("native-camera-gst-imports:ok")'
+
 node -e '
 const fs = require("fs");
 const packages = JSON.parse(process.argv[1]);

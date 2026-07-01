@@ -35,6 +35,8 @@ LABEL com.pixelated.runtime.kind="native_linux" \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     frozen-bubble=2.212-13+b1 \
+    gir1.2-gst-plugins-bad-1.0 \
+    gir1.2-gst-plugins-base-1.0 \
     gstreamer1.0-nice \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-base \

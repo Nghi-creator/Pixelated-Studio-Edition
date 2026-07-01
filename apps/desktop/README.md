@@ -88,8 +88,8 @@ With no explicit image override, the launcher derives the native image tag from
 `engine-runtime/native-runtime.lock.json`, for example
 `pixelated-engine-native:debian-native-v1-46d11e8650c8`, builds
 `Dockerfile.native`, and passes the lock SHA-256 into image labels. Use
-`PIXELATED_ENGINE_NATIVE_IMAGE` or `PIXELATED_ENGINE_IMAGE` to override that
-tag for prebuilt native runtime images.
+`PIXELATED_ENGINE_NATIVE_IMAGE` to override that tag for prebuilt native runtime
+images. `PIXELATED_ENGINE_IMAGE` only overrides the libretro runtime image.
 
 The desktop UI reports structured startup states: checking Docker, pulling or
 building the image, removing stale containers, starting the container, waiting

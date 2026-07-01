@@ -111,10 +111,9 @@ export const companionPort = Number(process.env.PIXELATED_COMPANION_PORT || 8090
 export const nativeEngineImage =
   process.env.PIXELATED_ENGINE_NATIVE_IMAGE || defaultNativeEngineImage;
 export const engineImage =
-  process.env.PIXELATED_ENGINE_IMAGE ||
-  (engineRuntimeKind === "native_linux"
+  engineRuntimeKind === "native_linux"
     ? nativeEngineImage
-    : defaultLibretroEngineImage);
+    : process.env.PIXELATED_ENGINE_IMAGE || defaultLibretroEngineImage;
 export const nativeRuntimeLock =
   engineRuntimeKind === "native_linux" ? readNativeRuntimeLock() : null;
 export const pullEngineImage = shouldPullEngineImage({
@@ -144,10 +143,9 @@ export function resolveEngineRuntimeConfig(
   const resolvedNativeEngineImage =
     process.env.PIXELATED_ENGINE_NATIVE_IMAGE || defaultNativeEngineImage;
   const resolvedEngineImage =
-    process.env.PIXELATED_ENGINE_IMAGE ||
-    (resolvedRuntimeKind === "native_linux"
+    resolvedRuntimeKind === "native_linux"
       ? resolvedNativeEngineImage
-      : defaultLibretroEngineImage);
+      : process.env.PIXELATED_ENGINE_IMAGE || defaultLibretroEngineImage;
   const resolvedNativeRuntimeLock =
     resolvedRuntimeKind === "native_linux" ? readNativeRuntimeLock() : null;
 
