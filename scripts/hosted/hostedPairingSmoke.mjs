@@ -42,6 +42,8 @@ const companionUrl = "https://localhost:8090";
 const engineToken = `hosted-smoke-engine-${Date.now()}`;
 const hostedPairingBuildMarker =
   "Desktop launch pairing registration v1 failed after local redemption.";
+const hostedRuntimeSwitchBuildMarker =
+  "Pixelated Desktop is still switching to the native Linux engine.";
 const hostedPublishTimeoutMs = Number(
   process.env.HOSTED_SMOKE_PUBLISH_TIMEOUT_MS || 10 * 60 * 1000,
 );
@@ -70,6 +72,9 @@ let companion;
 let bearerToken = "";
 let previousPairing = null;
 let createdSessionId = "";
+const createdSessionIds = [];
+let probeRuntimeKind = "libretro";
+const probeRuntimeSwitches = [];
 
 function normalizeUrl(value) {
   return value.replace(/\/+$/, "");
@@ -115,13 +120,20 @@ async function getHostedWebBuild() {
     ([, source]) => new URL(source, webUrl).toString(),
   );
 
+  let hasLaunchPairing = html.includes(hostedPairingBuildMarker);
+  let hasRuntimeSwitch = html.includes(hostedRuntimeSwitchBuildMarker);
   for (const script of scripts) {
     const asset = await fetch(script, { cache: "no-store" });
-    if (asset.ok && (await asset.text()).includes(hostedPairingBuildMarker)) {
-      return { hasLaunchPairing: true, htmlSha256 };
+    if (!asset.ok) continue;
+    const source = await asset.text();
+    if (source.includes(hostedPairingBuildMarker)) {
+      hasLaunchPairing = true;
+    }
+    if (source.includes(hostedRuntimeSwitchBuildMarker)) {
+      hasRuntimeSwitch = true;
     }
   }
-  return { hasLaunchPairing: false, htmlSha256 };
+  return { hasLaunchPairing, hasRuntimeSwitch, htmlSha256 };
 }
 
 async function waitForRenderApiDeploy() {
@@ -173,8 +185,8 @@ async function waitForHostedWebPairingBundle() {
       const isNewBuild =
         !vercelBaselineHtmlSha256 ||
         build.htmlSha256 !== vercelBaselineHtmlSha256;
-      if (build.hasLaunchPairing && isNewBuild) return;
-      lastError = `htmlSha256=${build.htmlSha256} baseline=${vercelBaselineHtmlSha256 || "none"} pairingMarker=${build.hasLaunchPairing}`;
+      if (build.hasLaunchPairing && build.hasRuntimeSwitch && isNewBuild) return;
+      lastError = `htmlSha256=${build.htmlSha256} baseline=${vercelBaselineHtmlSha256 || "none"} pairingMarker=${build.hasLaunchPairing} runtimeSwitchMarker=${build.hasRuntimeSwitch}`;
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
     }
@@ -187,6 +199,8 @@ async function waitForHostedWebPairingBundle() {
 }
 
 function startEngineProbe() {
+  probeRuntimeKind = "libretro";
+  probeRuntimeSwitches.length = 0;
   engineServer = http.createServer((request, response) => {
     const origin = request.headers.origin;
     if (origin === new URL(webUrl).origin) {
@@ -215,8 +229,15 @@ function startEngineProbe() {
           engineTokenRequired: true,
           exposureMode: "local",
           ok: true,
+          runtimeKind: probeRuntimeKind,
         }),
       );
+      return;
+    }
+
+    if (request.url?.startsWith("/session/stop-active")) {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.end(JSON.stringify({ stopped: false }));
       return;
     }
 
@@ -237,6 +258,18 @@ function startEngineProbe() {
     engineServer.once("error", reject);
     engineServer.listen(8080, "127.0.0.1", resolve);
   });
+}
+
+async function requestProbeRuntimeSwitch(runtimeKind) {
+  probeRuntimeSwitches.push({
+    runtimeKind,
+    timestamp: new Date().toISOString(),
+  });
+  if (probeRuntimeKind === runtimeKind) {
+    return { runtimeKind, status: "unchanged" };
+  }
+  probeRuntimeKind = runtimeKind;
+  return { runtimeKind, status: "restarting" };
 }
 
 async function apiRequest(pathname, options = {}) {
@@ -287,6 +320,45 @@ async function findCloudGameId() {
   return game.id;
 }
 
+async function findDebianNativeGame() {
+  let pageNumber = 1;
+  let lastPayload = null;
+
+  while (pageNumber <= 10) {
+    const payload = await apiRequest(`/games?page=${pageNumber}&pageSize=50`, {
+      auth: false,
+    });
+    lastPayload = payload;
+    const game = payload.games?.find((candidate) =>
+      candidate.game_builds?.some(
+        (build) =>
+          build.runtime_kind === "native_linux" &&
+          build.runtime_id === "debian-native-v1" &&
+          typeof build.launch_manifest_id === "string" &&
+          build.launch_manifest_id.length > 0,
+      ),
+    );
+    if (game) {
+      return {
+        build: game.game_builds.find(
+          (candidate) => candidate.runtime_kind === "native_linux",
+        ),
+        game,
+      };
+    }
+    if (!payload.totalPages || pageNumber >= payload.totalPages) break;
+    pageNumber += 1;
+  }
+
+  throw new Error(
+    `Hosted catalog has no published Debian native game with a launch manifest. lastPage=${JSON.stringify({
+      page: lastPayload?.page,
+      total: lastPayload?.total,
+      totalPages: lastPayload?.totalPages,
+    })}`,
+  );
+}
+
 async function restorePreviousPairing() {
   if (!bearerToken) return;
   if (previousPairing?.engineUrl) {
@@ -326,11 +398,13 @@ async function waitForRenderPairingRegistration() {
 }
 
 async function cleanup() {
-  if (createdSessionId && bearerToken) {
-    await apiRequest(`/sessions/${createdSessionId}`, {
-      expected: 204,
-      method: "DELETE",
-    }).catch(() => undefined);
+  if (bearerToken) {
+    for (const sessionId of createdSessionIds) {
+      await apiRequest(`/sessions/${sessionId}`, {
+        expected: 204,
+        method: "DELETE",
+      }).catch(() => undefined);
+    }
   }
   await browser?.close().catch(() => undefined);
   await restorePreviousPairing().catch(() => undefined);
@@ -404,6 +478,10 @@ function assertHostedPairingContract() {
     path.join(rootDir, "apps", "web", "src", "pages", "user", "Auth.tsx"),
     "utf8",
   );
+  const webRtcSession = fs.readFileSync(
+    path.join(rootDir, "apps", "web", "src", "lib", "webrtc", "webrtcSession.ts"),
+    "utf8",
+  );
 
   assert.match(desktopController, /createHostedWebLaunchUrl/);
   assert.match(desktopController, /createCompanionLaunchTicket/);
@@ -416,6 +494,12 @@ function assertHostedPairingContract() {
   assert.match(launchPairing, /createCompanionEngineToken\(payload\.companionToken\)/);
   assert.match(launchPairing, /Desktop launch pairing registration v1 failed/);
   assert.match(launchPairing, /pairLocalEngine/);
+  assert.match(
+    webRtcSession,
+    /requestEngineRuntimeSwitch\(requiredRuntimeKind\)[\s\S]*waitForEngineRuntimeKind\(requiredRuntimeKind\)[\s\S]*launchManifestId/,
+  );
+  assert.match(desktopCompanion, /RUNTIME_SWITCH_PATH/);
+  assert.match(desktopCompanion, /onRuntimeSwitch/);
   assert.match(enginePairingPanel, /Engine URL/);
   assert.match(authSource, /Sign In/);
 }
@@ -461,6 +545,7 @@ async function main() {
       engineToken,
       lanAddresses: [],
       launchAllowedOrigins: [new URL(webUrl).origin],
+      onRuntimeSwitch: requestProbeRuntimeSwitch,
       port: 8090,
     }),
   );
@@ -630,6 +715,7 @@ async function main() {
   await step("create and verify Render cloud session", async () => {
     const gameId = await findCloudGameId();
     createdSessionId = `hosted-browser-smoke-${Date.now()}`;
+    createdSessionIds.push(createdSessionId);
     const created = await apiRequest("/sessions", {
       body: { clientSessionId: createdSessionId, gameId, mode: "cloud" },
       method: "POST",
@@ -643,6 +729,150 @@ async function main() {
     });
     assert.equal(verified.sessionId, createdSessionId);
     assert.ok(verified.boot?.romUrl || verified.boot?.romFilename);
+  });
+
+  await step("switch hosted pairing to native Linux and resolve Debian-native boot", async () => {
+    const { build, game } = await findDebianNativeGame();
+    const nativeSessionId = `hosted-native-smoke-${Date.now()}`;
+    createdSessionIds.push(nativeSessionId);
+    const result = await page.evaluate(
+      async ({ apiUrl: apiBaseUrl, gameId, sessionId }) => {
+        const authToken = (() => {
+          for (const [key, value] of Object.entries(window.localStorage)) {
+            if (!key.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
+            try {
+              const parsed = JSON.parse(value);
+              if (typeof parsed?.access_token === "string") {
+                return parsed.access_token;
+              }
+            } catch {
+              // Ignore unrelated local storage entries.
+            }
+          }
+          return "";
+        })();
+        const engineUrl = window.localStorage.getItem("pixelated_engine_url");
+        const engineTokenValue =
+          window.localStorage.getItem("pixelated_engine_control_token") ||
+          window.localStorage.getItem("pixelated_engine_token") ||
+          "";
+        const companionToken = engineTokenValue.startsWith("companion:")
+          ? engineTokenValue.slice("companion:".length)
+          : engineTokenValue;
+        const engineHeaders = {
+          "X-Engine-Token": companionToken,
+          "X-Pixelated-Client-Id": "hosted-native-smoke",
+        };
+
+        const createResponse = await fetch(`${apiBaseUrl}/sessions`, {
+          body: JSON.stringify({
+            clientSessionId: sessionId,
+            gameId,
+            mode: "cloud",
+          }),
+          headers: {
+            authorization: `Bearer ${authToken}`,
+            "content-type": "application/json",
+          },
+          method: "POST",
+        });
+        const created = await createResponse.json().catch(() => null);
+        if (!createResponse.ok) {
+          return {
+            created,
+            error: `session create returned ${createResponse.status}`,
+          };
+        }
+        const verifyResponse = await fetch(
+          `${apiBaseUrl}/sessions/${sessionId}/verify`,
+          {
+            body: JSON.stringify({ sessionToken: created.sessionToken }),
+            headers: { "content-type": "application/json" },
+            method: "POST",
+          },
+        );
+        const verified = await verifyResponse.json().catch(() => null);
+        if (!verifyResponse.ok) {
+          return {
+            created,
+            error: `session verify returned ${verifyResponse.status}`,
+            verified,
+          };
+        }
+
+        const beforeHealthResponse = await fetch(`${engineUrl}/health`, {
+          cache: "no-store",
+          headers: engineHeaders,
+        });
+        const beforeHealth = await beforeHealthResponse.json().catch(() => null);
+        if (created.boot?.runtimeKind !== beforeHealth?.runtimeKind) {
+          await fetch(`${engineUrl}/session/stop-active`, {
+            cache: "no-store",
+            headers: engineHeaders,
+            method: "POST",
+          });
+          const switchResponse = await fetch(`${engineUrl}/runtime/switch`, {
+            body: JSON.stringify({ runtimeKind: created.boot?.runtimeKind }),
+            cache: "no-store",
+            headers: {
+              ...engineHeaders,
+              "content-type": "application/json",
+            },
+            method: "POST",
+          });
+          const switchPayload = await switchResponse.json().catch(() => null);
+          if (![200, 202].includes(switchResponse.status)) {
+            return {
+              beforeHealth,
+              created,
+              error: `runtime switch returned ${switchResponse.status}`,
+              switchPayload,
+            };
+          }
+        }
+
+        let activeRuntimeKind = "";
+        for (let attempt = 0; attempt < 10; attempt += 1) {
+          const response = await fetch(`${engineUrl}/health`, {
+            cache: "no-store",
+            headers: engineHeaders,
+          });
+          const health = await response.json().catch(() => null);
+          activeRuntimeKind = health?.runtimeKind || "";
+          if (activeRuntimeKind === created.boot?.runtimeKind) break;
+          await new Promise((resolve) => setTimeout(resolve, 250));
+        }
+
+        return {
+          activeRuntimeKind,
+          bootTarget:
+            created.boot?.launchManifestId ||
+            created.boot?.romUrl ||
+            created.boot?.romFilename ||
+            null,
+          created,
+          verified,
+        };
+      },
+      { apiUrl, gameId: game.id, sessionId: nativeSessionId },
+    );
+
+    assert.equal(result.error, undefined, JSON.stringify(result));
+    assert.equal(result.created?.sessionId, nativeSessionId);
+    assert.equal(result.created?.boot?.runtimeKind, "native_linux");
+    assert.equal(result.created?.boot?.runtimeId, "debian-native-v1");
+    assert.equal(result.created?.boot?.launchManifestId, build.launch_manifest_id);
+    assert.equal(result.created?.boot?.romUrl, null);
+    assert.equal(result.created?.boot?.romFilename, null);
+    assert.equal(result.verified?.sessionId, nativeSessionId);
+    assert.equal(result.verified?.boot?.runtimeKind, "native_linux");
+    assert.equal(result.verified?.boot?.launchManifestId, build.launch_manifest_id);
+    assert.equal(result.activeRuntimeKind, "native_linux");
+    assert.equal(result.bootTarget, build.launch_manifest_id);
+    assert.deepEqual(
+      probeRuntimeSwitches.map((entry) => entry.runtimeKind),
+      ["native_linux"],
+    );
   });
 }
 

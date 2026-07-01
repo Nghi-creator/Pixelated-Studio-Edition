@@ -216,6 +216,7 @@ jobs:
     timeout-minutes: 20
     env:
       HOSTED_API_URL: ${{ vars.HOSTED_API_URL }}
+      HOSTED_SMOKE_ARTIFACT_DIR: .context/hosted-pairing-smoke/run
       HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS: ${{ needs.deploy-render-api.outputs.baseline_started_at_seconds }}
       HOSTED_SMOKE_EMAIL: ${{ secrets.HOSTED_SMOKE_EMAIL }}
       HOSTED_SMOKE_PASSWORD: ${{ secrets.HOSTED_SMOKE_PASSWORD }}
