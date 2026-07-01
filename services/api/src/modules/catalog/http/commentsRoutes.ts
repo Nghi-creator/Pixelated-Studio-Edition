@@ -29,8 +29,9 @@ export function registerCommentRoutes(
       return reply.status(400).send({ error: "Invalid comments request" });
     }
 
-    const start = query.data.page * 10;
-    const end = start + 10;
+    const { page, pageSize } = query.data;
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize;
     const { data, error } = await service
       .from("comments")
       .select(
@@ -44,8 +45,8 @@ export function registerCommentRoutes(
       return reply.status(500).send({ error: "Failed to load comments" });
     }
     return {
-      comments: (data || []).slice(0, 10),
-      hasMore: (data || []).length > 10,
+      comments: (data || []).slice(0, pageSize),
+      hasMore: (data || []).length > pageSize,
     };
   });
 

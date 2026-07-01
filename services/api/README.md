@@ -226,8 +226,8 @@ npm run test
 Tests are grouped under `services/api/tests/unit`, `integration`, and `smoke`.
 The route-level integration tests use Fastify injection and a fake Supabase
 service, so they do not require local database access. HTTP routes mirror their
-domains under `src/routes/admin`, `auth`, `catalog`, `multiplayer`, `system`,
-and `users`.
+domains under `src/modules/*/http`, with domain and service logic kept alongside
+the owning feature module.
 
 ## Staging Smoke
 

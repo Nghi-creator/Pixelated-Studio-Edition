@@ -1603,6 +1603,63 @@ test("comment reactions reject self-reactions and replace atomically", async () 
   await selfApp.close();
 });
 
+test("comments use one-based pagination with configurable page size", async () => {
+  const db = new FakeSupabase();
+  for (let index = 0; index < 5; index += 1) {
+    db.rows.comments.push({
+      content: `comment ${index}`,
+      created_at: new Date(Date.UTC(2026, 0, index + 1)).toISOString(),
+      game_id: GAME_ID,
+      id: `66666666-6666-4666-8666-66666666666${index}`,
+      user_id: USER_ID,
+    });
+  }
+  const app = await createDataBoundaryApp(db);
+
+  const firstResponse = await app.inject({
+    method: "GET",
+    url: `/games/${GAME_ID}/comments?page=1&pageSize=2`,
+  });
+  assert.equal(firstResponse.statusCode, 200);
+  assert.deepEqual(
+    firstResponse
+      .json<{ comments: { content: string }[]; hasMore: boolean }>()
+      .comments.map((comment) => comment.content),
+    ["comment 4", "comment 3"],
+  );
+  assert.equal(
+    firstResponse.json<{ hasMore: boolean }>().hasMore,
+    true,
+  );
+
+  const secondResponse = await app.inject({
+    method: "GET",
+    url: `/games/${GAME_ID}/comments?page=2&pageSize=2`,
+  });
+  assert.equal(secondResponse.statusCode, 200);
+  assert.deepEqual(
+    secondResponse
+      .json<{ comments: { content: string }[]; hasMore: boolean }>()
+      .comments.map((comment) => comment.content),
+    ["comment 2", "comment 1"],
+  );
+  assert.equal(secondResponse.json<{ hasMore: boolean }>().hasMore, true);
+
+  const thirdResponse = await app.inject({
+    method: "GET",
+    url: `/games/${GAME_ID}/comments?page=3&pageSize=2`,
+  });
+  assert.equal(thirdResponse.statusCode, 200);
+  assert.deepEqual(
+    thirdResponse
+      .json<{ comments: { content: string }[]; hasMore: boolean }>()
+      .comments.map((comment) => comment.content),
+    ["comment 0"],
+  );
+  assert.equal(thirdResponse.json<{ hasMore: boolean }>().hasMore, false);
+  await app.close();
+});
+
 test("write-heavy social and play routes are rate limited per user", async () => {
   const commentsDb = new FakeSupabase();
   const commentsApp = await createDataBoundaryApp(commentsDb, USER_ID);

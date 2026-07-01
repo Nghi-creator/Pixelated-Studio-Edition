@@ -175,6 +175,12 @@ export async function registerSessionRoutes(
         return reply.status(400).send({ error: "Invalid session id" });
       }
 
+      if (!service) {
+        return reply.status(503).send({
+          error: "Supabase service client is not configured for the API.",
+        });
+      }
+
       const session = await getLiveSession(service, params.data.sessionId);
       if (!session) {
         return reply.status(404).send({ error: "Session not found" });
@@ -241,6 +247,12 @@ export async function registerSessionRoutes(
 
     if (!body.success) {
       return reply.status(400).send({ error: "Invalid session token" });
+    }
+
+    if (!service) {
+      return reply.status(503).send({
+        error: "Supabase service client is not configured for the API.",
+      });
     }
 
     const rateLimits = await Promise.all([
