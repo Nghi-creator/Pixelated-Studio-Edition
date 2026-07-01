@@ -1,22 +1,13 @@
 import type { Socket } from "socket.io";
+import {
+  createLobbyStateStore,
+  type LobbyParticipant,
+  type LobbyRole,
+  type LobbyState,
+} from "./lobbyState";
 import { getSessionRoom, normalizeSessionId } from "./sessionRooms";
 
-export type LobbyRole = "host" | "player" | "spectator";
-
-export type LobbyParticipant = {
-  connectedAt: string;
-  displayName: string;
-  playerIndex: number | null;
-  role: LobbyRole;
-  socketId: string;
-};
-
-export type LobbyState = {
-  hostSocketId: string | null;
-  maxPlayers: number;
-  participants: LobbyParticipant[];
-  sessionId: string;
-};
+export type { LobbyParticipant, LobbyRole, LobbyState };
 
 type JoinLobbyPayload = {
   displayName?: unknown;
@@ -57,102 +48,17 @@ function normalizePlayerIndex(value: unknown, maxPlayers: number) {
     : null;
 }
 
-function makeParticipant(
-  socket: LobbySocket,
-  role: LobbyRole,
-  displayName: string,
-  playerIndex: number | null,
-): LobbyParticipant {
-  return {
-    connectedAt: new Date().toISOString(),
-    displayName,
-    playerIndex,
-    role,
-    socketId: socket.id,
-  };
-}
-
 export function createLobbyManager(maxPlayers = 4) {
-  const sessions = new Map<string, Map<string, LobbyParticipant>>();
+  const lobbyState = createLobbyStateStore(maxPlayers);
 
-  function getParticipants(sessionId: string) {
-    let participants = sessions.get(sessionId);
-    if (!participants) {
-      participants = new Map();
-      sessions.set(sessionId, participants);
-    }
-    return participants;
-  }
-
-  function getLobbyState(sessionId: string): LobbyState {
-    const participants = [...getParticipants(sessionId).values()];
-    const host = participants.find((participant) => participant.role === "host");
-
-    return {
-      hostSocketId: host?.socketId || null,
-      maxPlayers,
-      participants,
-      sessionId,
-    };
-  }
-
-  function getParticipant(socket: LobbySocket, sessionId: string) {
-    return getParticipants(sessionId).get(socket.id) || null;
-  }
-
-  function getOpenPlayerIndex(sessionId: string) {
-    const usedSlots = new Set(
-      [...getParticipants(sessionId).values()]
-        .map((participant) => participant.playerIndex)
-        .filter((playerIndex): playerIndex is number => playerIndex !== null),
-    );
-
-    for (let playerIndex = 1; playerIndex <= maxPlayers; playerIndex += 1) {
-      if (!usedSlots.has(playerIndex)) return playerIndex;
-    }
-
-    return null;
-  }
-
-  function assignParticipant(
-    socket: LobbySocket,
-    sessionId: string,
-    requestedRole: LobbyRole,
-    displayName: string,
-  ) {
-    const participants = getParticipants(sessionId);
-    const existing = participants.get(socket.id);
-    const hasHost = [...participants.values()].some(
-      (participant) =>
-        participant.role === "host" && participant.socketId !== socket.id,
-    );
-
-    let role = requestedRole;
-    let playerIndex: number | null = existing?.playerIndex || null;
-
-    if (role === "host" && hasHost) {
-      role = "spectator";
-      playerIndex = null;
-    } else if (!hasHost && !existing) {
-      role = "host";
-      playerIndex = 1;
-    } else if (role === "player") {
-      playerIndex = playerIndex || getOpenPlayerIndex(sessionId);
-      if (!playerIndex) role = "spectator";
-    } else if (role === "spectator") {
-      playerIndex = null;
-    }
-
-    const participant = makeParticipant(socket, role, displayName, playerIndex);
-    participants.set(socket.id, participant);
+  function syncSocketParticipant(socket: LobbySocket, participant: LobbyParticipant) {
     socket.data.lobbyRole = participant.role;
     socket.data.playerIndex = participant.playerIndex;
-
     return participant;
   }
 
   function emitLobbyState(ioSocket: LobbySocket, sessionId: string) {
-    const state = getLobbyState(sessionId);
+    const state = lobbyState.getLobbyState(sessionId);
     ioSocket.emit("lobby-state", state);
     ioSocket.to(getSessionRoom(sessionId)).emit("lobby-state", state);
     return state;
@@ -172,12 +78,13 @@ export function createLobbyManager(maxPlayers = 4) {
       `Player ${socket.id.slice(0, 4)}`,
     );
     const requestedRole = normalizeRole(payload.requestedRole);
-    const participant = assignParticipant(
-      socket,
+    const participant = lobbyState.assignParticipant(
+      socket.id,
       sessionId,
       requestedRole,
       displayName,
     );
+    syncSocketParticipant(socket, participant);
     emitLobbyState(socket, sessionId);
     return participant;
   }
@@ -191,35 +98,23 @@ export function createLobbyManager(maxPlayers = 4) {
     }
 
     const requestedSlot = normalizePlayerIndex(payload.playerIndex, maxPlayers);
-    const participant = getParticipant(socket, sessionId);
+    const participant = lobbyState.getParticipant(socket.id, sessionId);
     if (!participant) {
       socket.emit("lobby-error", { message: "Join the lobby first." });
       return null;
     }
 
-    const participants = getParticipants(sessionId);
-    const slotTaken = requestedSlot
-      ? [...participants.values()].some(
-          (entry) =>
-            entry.socketId !== socket.id && entry.playerIndex === requestedSlot,
-        )
-      : false;
-    const playerIndex =
-      requestedSlot && !slotTaken ? requestedSlot : getOpenPlayerIndex(sessionId);
-
-    if (!playerIndex) {
+    const updated = lobbyState.requestPlayerSlot(
+      socket.id,
+      sessionId,
+      requestedSlot,
+    );
+    if (!updated) {
       socket.emit("lobby-error", { message: "No player slots are available." });
       return null;
     }
 
-    const updated = {
-      ...participant,
-      playerIndex,
-      role: participant.role === "host" ? "host" : ("player" as LobbyRole),
-    };
-    participants.set(socket.id, updated);
-    socket.data.lobbyRole = updated.role;
-    socket.data.playerIndex = updated.playerIndex;
+    syncSocketParticipant(socket, updated);
     emitLobbyState(socket, sessionId);
     return updated;
   }
@@ -229,26 +124,19 @@ export function createLobbyManager(maxPlayers = 4) {
       normalizeSessionId(payload.sessionId) || socket.data.sessionId;
     if (!sessionId) return null;
 
-    const participant = getParticipant(socket, sessionId);
+    const participant = lobbyState.getParticipant(socket.id, sessionId);
     if (!participant || participant.role === "host") return participant;
 
-    const updated = {
-      ...participant,
-      playerIndex: null,
-      role: "spectator" as LobbyRole,
-    };
-    getParticipants(sessionId).set(socket.id, updated);
-    socket.data.lobbyRole = updated.role;
-    socket.data.playerIndex = updated.playerIndex;
+    const updated = lobbyState.releasePlayerSlot(socket.id, sessionId);
+    if (!updated) return null;
+
+    syncSocketParticipant(socket, updated);
     emitLobbyState(socket, sessionId);
     return updated;
   }
 
   function canControlSession(socket: LobbySocket, sessionId: string | null) {
-    if (!sessionId) return false;
-    const participants = getParticipants(sessionId);
-    if (participants.size === 0) return true;
-    return participants.get(socket.id)?.role === "host";
+    return lobbyState.canControlSession(socket.id, sessionId);
   }
 
   function canSendInput(
@@ -256,15 +144,7 @@ export function createLobbyManager(maxPlayers = 4) {
     sessionId: string | null,
     playerIndex: number,
   ) {
-    if (!sessionId || !Number.isInteger(playerIndex)) return false;
-    const participants = sessions.get(sessionId);
-    if (!participants || participants.size === 0) return true;
-
-    const participant = participants.get(socket.id);
-    return (
-      (participant?.role === "host" || participant?.role === "player") &&
-      participant.playerIndex === playerIndex
-    );
+    return lobbyState.canSendInput(socket.id, sessionId, playerIndex);
   }
 
   function kickParticipant(socket: LobbySocket, payload: KickPayload = {}) {
@@ -278,19 +158,16 @@ export function createLobbyManager(maxPlayers = 4) {
       return false;
     }
 
-    if (!canControlSession(socket, sessionId)) {
-      socket.emit("lobby-error", { message: "Only the host can kick players." });
+    const result = lobbyState.kickParticipant(
+      socket.id,
+      sessionId,
+      targetSocketId,
+    );
+    if (!result.ok) {
+      socket.emit("lobby-error", { message: result.reason });
       return false;
     }
 
-    const participants = getParticipants(sessionId);
-    const target = participants.get(targetSocketId);
-    if (!target || target.role === "host") {
-      socket.emit("lobby-error", { message: "Cannot kick that participant." });
-      return false;
-    }
-
-    participants.delete(targetSocketId);
     socket.to(targetSocketId).emit("lobby-kicked", { sessionId });
     emitLobbyState(socket, sessionId);
     return true;
@@ -301,27 +178,9 @@ export function createLobbyManager(maxPlayers = 4) {
       normalizeSessionId(sessionId) || socket.data.sessionId || null;
     if (!safeSessionId) return;
 
-    const participants = sessions.get(safeSessionId);
-    if (!participants) return;
-
-    const wasHost = participants.get(socket.id)?.role === "host";
-    participants.delete(socket.id);
-
-    if (participants.size === 0) {
-      sessions.delete(safeSessionId);
-      return;
+    if (lobbyState.leaveLobby(socket.id, safeSessionId)) {
+      emitLobbyState(socket, safeSessionId);
     }
-
-    if (wasHost) {
-      const nextHost = [...participants.values()][0];
-      participants.set(nextHost.socketId, {
-        ...nextHost,
-        playerIndex: 1,
-        role: "host",
-      });
-    }
-
-    emitLobbyState(socket, safeSessionId);
   }
 
   function registerLobbyHandlers(socket: Socket) {
@@ -349,7 +208,7 @@ export function createLobbyManager(maxPlayers = 4) {
   return {
     canControlSession,
     canSendInput,
-    getLobbyState,
+    getLobbyState: lobbyState.getLobbyState,
     joinLobby,
     kickParticipant,
     leaveLobby,
