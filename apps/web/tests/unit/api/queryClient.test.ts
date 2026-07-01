@@ -29,6 +29,7 @@ test("query keys are stable and scoped by API concern", () => {
   ]);
   assert.deepEqual(queryKeys.adminUsersRoot(), ["adminUsers"]);
   assert.deepEqual(queryKeys.adminReportsRoot(), ["adminReports"]);
+  assert.deepEqual(queryKeys.localMultiplayerGames(), ["localMultiplayerGames"]);
 });
 
 test("shared invalidation helpers target exact and root query scopes", async () => {

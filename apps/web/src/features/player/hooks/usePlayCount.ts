@@ -1,19 +1,21 @@
 import { useEffect } from "react";
-import { api } from "../../../lib/api/apiClient";
+import { useCountPlayMutation } from "../../../lib/api/apiMutations";
 
 export function usePlayCount(gameId: string | undefined) {
+  const { mutate } = useCountPlayMutation({
+    onError: (err) => {
+      console.error("Failed to count play:", err);
+    },
+    onSuccess: () => {
+      console.log("Play successfully counted!");
+    },
+  });
+
   useEffect(() => {
     if (!gameId) return;
 
-    const timer = setTimeout(async () => {
-      try {
-        await api.countPlay(gameId);
-        console.log("Play successfully counted!");
-      } catch (err) {
-        console.error("Failed to count play:", err);
-      }
-    }, 30000);
+    const timer = setTimeout(() => mutate(gameId), 30000);
 
     return () => clearTimeout(timer);
-  }, [gameId]);
+  }, [gameId, mutate]);
 }

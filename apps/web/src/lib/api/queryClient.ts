@@ -32,6 +32,7 @@ export const queryKeys = {
   gameComments: (gameId: string | undefined) => ["gameComments", gameId] as const,
   gameReactions: (gameId: string | undefined) =>
     ["gameReactions", gameId] as const,
+  localMultiplayerGames: () => ["localMultiplayerGames"] as const,
   permissions: () => ["permissions"] as const,
   profile: () => ["profile"] as const,
 };

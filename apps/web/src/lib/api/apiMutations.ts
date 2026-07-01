@@ -224,3 +224,17 @@ export function useReportCommentMutation({
     onSuccess,
   });
 }
+
+export function useCountPlayMutation({
+  onError,
+  onSuccess,
+}: {
+  onError?: (error: unknown) => void;
+  onSuccess?: () => void;
+} = {}) {
+  return useMutation({
+    mutationFn: (gameId: string) => api.countPlay(gameId),
+    onError,
+    onSuccess,
+  });
+}

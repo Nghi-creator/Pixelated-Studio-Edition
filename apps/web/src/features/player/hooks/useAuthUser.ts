@@ -1,15 +1,5 @@
-import { useEffect, useState } from "react";
-import type { User } from "@supabase/supabase-js";
-import { getAuthSession } from "../../../lib/api/apiClient";
+import { useAuthSessionQuery } from "../../../lib/api/apiQueries";
 
 export function useAuthUser() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    getAuthSession().then((session) => {
-      setCurrentUser(session?.user ?? null);
-    });
-  }, []);
-
-  return currentUser;
+  return useAuthSessionQuery().data?.user ?? null;
 }

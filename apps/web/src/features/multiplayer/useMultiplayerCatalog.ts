@@ -1,25 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { getAuthSession } from "../../lib/api/apiClient";
 import { useGameCatalogQuery } from "../../lib/api/apiQueries";
 import {
-  clearEngineToken,
-  engineAuthHeaders,
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
 } from "../../lib/engine/engineAuth";
-import { engineEndpoint } from "../../lib/engine/engineConfig";
-import {
-  INVALID_ENGINE_TOKEN_MESSAGE,
-  normalizeLocalGameFilenames,
-  toLocalVaultGames,
-} from "../local-vault/localVaultClient";
+import { getLocalVaultErrorMessage } from "../local-vault/localVaultClient";
 import { getPageSlice } from "../../components/ui/paginationUtils";
 import { searchAndRankGames } from "../search/gameSearch";
 import {
   getJoinInvite,
   getSessionFromInvite,
 } from "./inviteUtils";
-import type { GameSource, LocalGame } from "./MultiplayerGameCards";
+import type { GameSource } from "./MultiplayerGameCards";
+import { useLocalMultiplayerGamesQuery } from "./useLocalMultiplayerGamesQuery";
 
 export type MultiplayerMode = "host" | "join";
 
@@ -30,13 +23,10 @@ export function useMultiplayerCatalog() {
   const [mode, setMode] = useState<MultiplayerMode>("host");
   const [gameSource, setGameSource] = useState<GameSource>("cloud");
   const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
-  const [localGames, setLocalGames] = useState<LocalGame[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
-  const [localMessage, setLocalMessage] = useState("");
   const [cloudPage, setCloudPage] = useState(1);
-  const [localLoading, setLocalLoading] = useState(false);
   const [localPage, setLocalPage] = useState(1);
 
   useEffect(() => {
@@ -61,6 +51,20 @@ export function useMultiplayerCatalog() {
   const cloudLoadError = cloudGamesQuery.isError
     ? "Could not load cloud games. Check the API connection and try again."
     : "";
+  const localGamesQuery = useLocalMultiplayerGamesQuery({
+    enabled: mode === "host" && gameSource === "local" && isEnginePaired,
+  });
+  const localGames = useMemo(
+    () => localGamesQuery.data || [],
+    [localGamesQuery.data],
+  );
+  const localLoading = localGamesQuery.isLoading || localGamesQuery.isFetching;
+  const localMessage = localGamesQuery.isError
+    ? getLocalVaultErrorMessage(
+        localGamesQuery.error,
+        "Could not load Local Vault games. Confirm the desktop engine is running and paired.",
+      )
+    : "";
 
   useEffect(() => {
     const refreshEnginePairing = () => {
@@ -72,58 +76,6 @@ export function useMultiplayerCatalog() {
       window.removeEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
   }, []);
 
-  const fetchLocalGames = async () => {
-    if (!hasEngineToken()) {
-      setLocalGames([]);
-      return;
-    }
-
-    setLocalLoading(true);
-    setLocalMessage("");
-
-    try {
-      const session = await getAuthSession();
-      const userId = session?.user?.id || "anonymous";
-      const response = await fetch(engineEndpoint("/local-games"), {
-        headers: { "X-User-Id": userId, ...engineAuthHeaders() },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          clearEngineToken();
-          setIsEnginePaired(false);
-          throw new Error(INVALID_ENGINE_TOKEN_MESSAGE);
-        }
-        throw new Error("Local engine did not return games.");
-      }
-
-      setLocalGames(
-        toLocalVaultGames(normalizeLocalGameFilenames(await response.json())),
-      );
-    } catch (error) {
-      console.error("Failed to load local multiplayer games:", error);
-      setLocalMessage(
-        error instanceof Error && error.message
-          ? error.message
-          : "Could not load Local Vault games. Confirm the desktop engine is running and paired.",
-      );
-    } finally {
-      setLocalLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (mode === "host" && gameSource === "local" && isEnginePaired) {
-      fetchLocalGames();
-    }
-  }, [gameSource, isEnginePaired, mode]);
-
-  useEffect(() => {
-    if (cloudPage > cloudTotalPages) {
-      setCloudPage(cloudTotalPages);
-    }
-  }, [cloudPage, cloudTotalPages]);
-
   const filteredLocalGames = useMemo(
     () => searchAndRankGames(localGames, searchQuery),
     [localGames, searchQuery],
@@ -132,12 +84,6 @@ export function useMultiplayerCatalog() {
     () => getPageSlice(filteredLocalGames, localPage, LOCAL_GAMES_PER_PAGE),
     [filteredLocalGames, localPage],
   );
-
-  useEffect(() => {
-    if (localPage !== localPageSlice.safeCurrentPage) {
-      setLocalPage(localPageSlice.safeCurrentPage);
-    }
-  }, [localPage, localPageSlice.safeCurrentPage]);
 
   const joinInvite = getJoinInvite(inviteUrl);
   const inviteSessionId = getSessionFromInvite(inviteUrl);
