@@ -10,15 +10,16 @@ const packageJson = JSON.parse(
   readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
 ) as PackageJson;
 
-test("hosted predeploy fails fast on missing submission cleanup storage policy", () => {
+test("hosted predeploy fails fast on hosted Supabase schema drift", () => {
   const scripts = packageJson.scripts || {};
 
   assert.match(
     scripts["check:submission-cleanup-policy"] || "",
     /--submission-cleanup-policy-only/,
   );
+  assert.match(scripts["check:catalog-rpc"] || "", /--catalog-rpc-only/);
   assert.match(
     scripts["predeploy:hosted"] || "",
-    /check:access-log-schema && npm run check:submission-cleanup-policy && npm run typecheck/,
+    /check:access-log-schema && npm run check:submission-cleanup-policy && npm run check:catalog-rpc && npm run typecheck/,
   );
 });
