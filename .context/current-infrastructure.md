@@ -153,3 +153,17 @@ Provider auto-deploys should not bypass GitHub deploy gates.
 
 Generated smoke artifacts should stay under `.artifacts/` or another transient
 path unless explicitly preserved.
+
+## Durable Architecture Principles
+
+- Keep the web app as presentation plus client orchestration; route sensitive
+  data decisions through `services/api`.
+- Keep the desktop local-first and explicit about LAN exposure.
+- Never share raw host-local engine tokens with LAN guests.
+- Treat companion credentials as revocable browser access, not durable account
+  secrets.
+- Prefer small ownership-oriented modules over generic file-type folders.
+- Add a shared contract/types package only when duplication across web, API, and
+  engine becomes costly enough to justify the package.
+- Revisit hosted engine/node allocation only after local/LAN stream reliability
+  and TURN fallback are proven.

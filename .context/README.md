@@ -9,10 +9,10 @@ runbooks, and test fixtures that are intentionally checked in.
 - `current-infrastructure.md`: deployed and local architecture, runtime
   boundaries, and operational behavior.
 - `agent-rules.md`: persistent agent/Git ownership rules for this repository.
+- `ci-rules.md`: GitHub Actions map, local verification commands, and known CI
+  tripwires for agents.
 - `project-flows.md`: compact runtime flow map for boot, pairing, gameplay,
   multiplayer, submissions, and hosted deploys.
-- `target-architecture-refurbishment.md`: durable ownership boundaries and
-  architectural direction.
 
 ## Active Operational Checklists
 
@@ -27,9 +27,9 @@ runbooks, and test fixtures that are intentionally checked in.
 - `curated-rom-manifest-guide.md`: human workflow for legally reviewed ROM
   intake.
 - `curated-rom-manifest-template.json`: template for curated ROM manifests.
-- `phase1-libretro-smoke-catalog.json`: libretro smoke catalog fixture used by
-  engine runtime tests.
-- `phase5-curated-roms.json`: curated import fixture used by API tests.
+
+Test-only catalog fixtures live with the tests that consume them, not in
+`.context`.
 
 ## What Does Not Belong Here
 

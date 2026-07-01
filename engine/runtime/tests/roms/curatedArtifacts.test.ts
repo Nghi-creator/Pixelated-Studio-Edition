@@ -21,7 +21,7 @@ type SmokeCatalog = {
 
 const fixturePath = path.resolve(
   process.cwd(),
-  "../../.context/phase1-libretro-smoke-catalog.json",
+  "tests/roms/fixtures/phase1-libretro-smoke-catalog.json",
 );
 
 function readSmokeCatalog(): SmokeCatalog | null {

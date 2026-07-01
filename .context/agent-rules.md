@@ -23,6 +23,7 @@ for that exact action in the current message:
 After making changes, agents should:
 
 1. Run the relevant tests, builds, lint checks, and packaging commands.
+   Use `ci-rules.md` to map touched paths to GitHub Actions checks.
 2. Report which checks passed or failed.
 3. Leave all changed files unstaged.
 4. Tell the user how to manually test the behavior.
