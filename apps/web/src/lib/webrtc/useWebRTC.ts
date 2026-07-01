@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   clearEngineToken,
   ENGINE_PAIRING_EVENT,
@@ -57,6 +57,9 @@ import type {
   LobbyState,
   UseWebRTCOptions,
 } from "./types";
+
+const BLACK_FRAME_STALL_MESSAGE =
+  "The stream connected, but the video stayed black. Retry the stream; if this only happens on cellular data, configure a TURN relay or use Wi-Fi.";
 
 export type {
   EngineInputCapabilities,
@@ -567,6 +570,17 @@ export function useWebRTC(
     setRetryVersion((currentVersion) => currentVersion + 1);
   };
 
+  const reportBlackFrameStall = useCallback(() => {
+    loadEngineLaunchFailureMessage().then((diagnosticMessage) => {
+      setTelemetry((currentTelemetry) => ({
+        ...currentTelemetry,
+        lastEngineError: diagnosticMessage || BLACK_FRAME_STALL_MESSAGE,
+        lastUpdatedAt: Date.now(),
+      }));
+      setStatus("error");
+    });
+  }, []);
+
   const requestPlayerSlot = (playerIndex: number) => {
     const supportedPlayerCount =
       inputCapabilitiesRef.current.supportedPlayerCount;
@@ -608,6 +622,7 @@ export function useWebRTC(
     releasePlayerSlot,
     requestPlayerSlot,
     retry,
+    reportBlackFrameStall,
     sessionId,
     shareContext,
     stream,

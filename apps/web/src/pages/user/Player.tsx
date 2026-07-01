@@ -58,6 +58,7 @@ export default function Player() {
     releasePlayerSlot,
     requestPlayerSlot,
     retry,
+    reportBlackFrameStall,
     sessionId,
     shareContext,
     stream,
@@ -110,6 +111,7 @@ export default function Player() {
   usePlayCount(id);
   const fallbackActive = useStreamPlayback({
     isMuted,
+    onBlackFrameStall: reportBlackFrameStall,
     setIsMuted,
     status,
     stream,

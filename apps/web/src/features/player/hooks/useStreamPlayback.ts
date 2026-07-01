@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
 import type { RefObject } from "react";
 import type { WebRTCStatus } from "../../../lib/webrtc/webrtcSession";
-
-const BLACK_VIDEO_SAMPLE_THRESHOLD = 6;
-const FALLBACK_BAD_SAMPLE_COUNT = 3;
-const FALLBACK_HEALTHY_SAMPLE_COUNT = 4;
+import {
+  BLACK_VIDEO_SAMPLE_THRESHOLD,
+  createStreamPlaybackSampleTracker,
+} from "./streamPlaybackSamples";
 
 export function useStreamPlayback({
   isMuted,
+  onBlackFrameStall,
   setIsMuted,
   status,
   stream,
   videoRef,
 }: {
   isMuted: boolean;
+  onBlackFrameStall?: () => void;
   setIsMuted: (isMuted: boolean) => void;
   status: WebRTCStatus;
   stream: MediaStream | null;
@@ -46,12 +48,19 @@ export function useStreamPlayback({
       return;
     }
 
-    let blackSamples = 0;
-    let healthySamples = 0;
+    const tracker = createStreamPlaybackSampleTracker();
     const canvas = document.createElement("canvas");
     canvas.width = 16;
     canvas.height = 16;
     const context = canvas.getContext("2d", { willReadFrequently: true });
+
+    const recordSample = (isBlackSample: boolean) => {
+      const result = tracker.recordSample(isBlackSample);
+      setSampledFallbackActive(result.fallbackActive);
+      if (result.shouldReportStall) {
+        onBlackFrameStall?.();
+      }
+    };
 
     const interval = window.setInterval(() => {
       const video = videoRef.current;
@@ -61,8 +70,7 @@ export function useStreamPlayback({
         video.videoWidth === 0 ||
         video.videoHeight === 0
       ) {
-        blackSamples += 1;
-        healthySamples = 0;
+        recordSample(true);
       } else {
         try {
           context.drawImage(video, 0, 0, canvas.width, canvas.height);
@@ -77,30 +85,17 @@ export function useStreamPlayback({
             total += pixels[index] + pixels[index + 1] + pixels[index + 2];
           }
           const average = total / (pixels.length / 4) / 3;
-          if (average < BLACK_VIDEO_SAMPLE_THRESHOLD) {
-            blackSamples += 1;
-            healthySamples = 0;
-          } else {
-            blackSamples = 0;
-            healthySamples += 1;
-          }
+          recordSample(average < BLACK_VIDEO_SAMPLE_THRESHOLD);
         } catch {
-          blackSamples += 1;
-          healthySamples = 0;
+          recordSample(true);
         }
-      }
-
-      if (blackSamples >= FALLBACK_BAD_SAMPLE_COUNT) {
-        setSampledFallbackActive(true);
-      } else if (healthySamples >= FALLBACK_HEALTHY_SAMPLE_COUNT) {
-        setSampledFallbackActive(false);
       }
     }, 750);
 
     return () => {
       window.clearInterval(interval);
     };
-  }, [status, videoRef]);
+  }, [onBlackFrameStall, status, videoRef]);
 
   return status === "playing" && sampledFallbackActive;
 }
