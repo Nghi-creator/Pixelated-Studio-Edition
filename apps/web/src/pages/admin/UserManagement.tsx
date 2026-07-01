@@ -1,184 +1,34 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, RefreshCw, Search } from "lucide-react";
-import { api, getAuthSession } from "../../lib/api/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
 import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
 import { PixelIcon } from "../../components/ui/PixelIcon";
-import {
-  AdminConfirmDialog,
-  type AdminConfirmation,
-} from "../../components/admin/AdminConfirmDialog";
-import {
-  getAdminApiErrorMessage,
-  getPageRangeLabel,
-} from "../../features/admin/adminState";
-
-const USERS_PER_PAGE = 25;
-
-interface Profile {
-  id: string;
-  username: string | null;
-  avatar_url: string | null;
-  role: string;
-  is_banned: boolean;
-  created_at: string;
-}
+import { AdminConfirmDialog } from "../../components/admin/AdminConfirmDialog";
+import { useAdminUsers } from "../../features/admin/useAdminUsers";
 
 export default function UserManagement() {
-  const [users, setUsers] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [currentUserRole, setCurrentUserRole] = useState<string>("");
-  const [page, setPage] = useState(1);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalUsers, setTotalUsers] = useState(0);
-  const [loadError, setLoadError] = useState("");
-  const [actionError, setActionError] = useState("");
-  const [reloadKey, setReloadKey] = useState(0);
-  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
-  const [confirmation, setConfirmation] = useState<
-    | (AdminConfirmation & {
-        patch: Partial<Pick<Profile, "is_banned" | "role">>;
-      })
-    | null
-  >(null);
-  const pendingUserIdRef = useRef<string | null>(null);
-  const requestIdRef = useRef(0);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchCurrentUser = async () => {
-      const session = await getAuthSession();
-
-      if (session?.user && isMounted) {
-        setCurrentUserId(session.user.id);
-        try {
-          const data = await api.permissions();
-          if (isMounted) {
-            setCurrentUserRole(data.profile.role);
-            if (data.profile.role !== "super_admin") setLoading(false);
-          }
-        } catch (error) {
-          console.error("Error checking admin permissions:", error);
-          if (isMounted) {
-            setLoadError("Could not verify user-management permissions.");
-            setLoading(false);
-          }
-        }
-      } else if (isMounted) {
-        setLoading(false);
-      }
-    };
-
-    fetchCurrentUser();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const fetchUsers = useCallback(
-    async (isMounted = true) => {
-      if (currentUserRole !== "super_admin") return;
-
-      const requestId = requestIdRef.current + 1;
-      requestIdRef.current = requestId;
-
-      try {
-        setLoading(true);
-        setLoadError("");
-        const data = await api.users<Profile>({
-          page,
-          pageSize: USERS_PER_PAGE,
-          search: searchQuery,
-        });
-        if (!isMounted || requestId !== requestIdRef.current) return;
-
-        setUsers(data.users);
-        setTotalUsers(data.total);
-        setTotalPages(data.totalPages);
-        if (page > data.totalPages) {
-          setPage(data.totalPages);
-        }
-      } catch (error) {
-        console.error("Error fetching users:", error);
-        if (!isMounted || requestId !== requestIdRef.current) return;
-        setLoadError(getAdminApiErrorMessage(error, "Could not load users."));
-      } finally {
-        if (isMounted && requestId === requestIdRef.current) setLoading(false);
-      }
-    },
-    [currentUserRole, page, searchQuery],
-  );
-
-  useEffect(() => {
-    let isMounted = true;
-    const timeout = window.setTimeout(() => {
-      fetchUsers(isMounted);
-    }, searchQuery ? 250 : 0);
-
-    return () => {
-      isMounted = false;
-      window.clearTimeout(timeout);
-    };
-  }, [fetchUsers, reloadKey, searchQuery]);
-
-  // --- TOGGLE ROLE ---
-  const handleToggleRole = async (userId: string, currentRole: string) => {
-    const newRole = currentRole === "admin" ? "user" : "admin";
-    setConfirmation({
-      body:
-        newRole === "admin"
-          ? "This gives the user moderator access to reports and admin areas."
-          : "This removes moderator access from the selected admin account.",
-      confirmLabel: newRole === "admin" ? "Make Admin" : "Demote Admin",
-      id: userId,
-      intent: newRole === "admin" ? "warning" : "danger",
-      patch: { role: newRole },
-      title: newRole === "admin" ? "Promote user?" : "Demote admin?",
-    });
-  };
-
-  // --- TOGGLE BAN ---
-  const handleToggleBan = async (userId: string, currentBanStatus: boolean) => {
-    const newBanStatus = !currentBanStatus;
-    setConfirmation({
-      body: newBanStatus
-        ? "This blocks the user from signing in and using the product."
-        : "This restores the user's access to the product.",
-      confirmLabel: newBanStatus ? "Ban User" : "Unban User",
-      id: userId,
-      intent: newBanStatus ? "danger" : "warning",
-      patch: { is_banned: newBanStatus },
-      title: newBanStatus ? "Ban user?" : "Unban user?",
-    });
-  };
-
-  const applyConfirmedAction = async () => {
-    if (!confirmation || pendingUserIdRef.current) return;
-    const { id, patch } = confirmation;
-    pendingUserIdRef.current = id;
-    setPendingUserId(id);
-    setActionError("");
-    try {
-      const { user } = await api.updateAdminUser(id, patch);
-      setUsers((prev) =>
-        prev.map((currentUser) =>
-          currentUser.id === id ? { ...currentUser, ...user } : currentUser,
-        ),
-      );
-      setConfirmation(null);
-    } catch (error) {
-      console.error(error);
-      setActionError(getAdminApiErrorMessage(error, "User update failed."));
-    } finally {
-      pendingUserIdRef.current = null;
-      setPendingUserId(null);
-    }
-  };
+  const {
+    actionError,
+    applyConfirmedAction,
+    confirmation,
+    currentUserId,
+    currentUserRole,
+    handleSearchChange,
+    handleToggleBan,
+    handleToggleRole,
+    loadError,
+    loading,
+    page,
+    pageLabel,
+    pendingUserId,
+    retryLoad,
+    searchQuery,
+    setConfirmation,
+    setPage,
+    totalPages,
+    totalUsers,
+    users,
+  } = useAdminUsers();
 
   if (loading) {
     return <AdminTablePageSkeleton hasSearch />;
@@ -195,13 +45,6 @@ export default function UserManagement() {
       </div>
     );
   }
-
-  const pageLabel = getPageRangeLabel({
-    currentCount: users.length,
-    page,
-    pageSize: USERS_PER_PAGE,
-    total: totalUsers,
-  });
 
   return (
     <div className="space-y-6">
@@ -228,11 +71,7 @@ export default function UserManagement() {
               type="text"
               placeholder="Search username..."
               value={searchQuery}
-              onChange={(event) => {
-                setSearchQuery(event.target.value);
-                setPage(1);
-                setLoadError("");
-              }}
+              onChange={(event) => handleSearchChange(event.target.value)}
               className="block w-full rounded-lg border border-synth-border bg-synth-surface py-2 pl-10 pr-3 text-sm text-gray-300 placeholder-gray-500 shadow-inner transition-colors focus:border-synth-secondary focus:outline-none"
             />
           </div>
@@ -271,7 +110,7 @@ export default function UserManagement() {
                       <span>{loadError}</span>
                       <button
                         className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-400/40 bg-red-500/10 px-4 text-sm font-semibold text-red-200 transition-colors hover:border-red-300 hover:bg-red-500/20"
-                        onClick={() => setReloadKey((key) => key + 1)}
+                        onClick={retryLoad}
                         type="button"
                       >
                         <RefreshCw className="h-4 w-4" /> Retry
