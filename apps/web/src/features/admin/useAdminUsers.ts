@@ -1,15 +1,10 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { api } from "../../lib/api/apiClient";
+import { useUpdateAdminUserMutation } from "../../lib/api/apiMutations";
 import {
   useAdminUsersQuery,
   useAuthSessionQuery,
   usePermissionsQuery,
 } from "../../lib/api/apiQueries";
-import {
-  invalidateAdminUsersQueries,
-  queryKeys,
-} from "../../lib/api/queryClient";
 import type { AdminConfirmation } from "../../components/admin/AdminConfirmDialog";
 import {
   getAdminApiErrorMessage,
@@ -38,7 +33,6 @@ export function useAdminUsers() {
       })
     | null
   >(null);
-  const queryClient = useQueryClient();
 
   const sessionQuery = useAuthSessionQuery();
   const permissionsQuery = usePermissionsQuery({
@@ -93,45 +87,17 @@ export function useAdminUsers() {
     });
   };
 
-  const updateUserMutation = useMutation({
-    mutationFn: ({
-      id,
-      patch,
-    }: {
-      id: string;
-      patch: Partial<Pick<AdminUserProfile, "is_banned" | "role">>;
-    }) => api.updateAdminUser(id, patch),
+  const updateUserMutation = useUpdateAdminUserMutation<AdminUserProfile>({
+    page,
+    pageSize: USERS_PER_PAGE,
+    search: searchQuery,
     onError: (error) => {
       console.error(error);
       setActionError(getAdminApiErrorMessage(error, "User update failed."));
     },
-    onSuccess: async ({ user }) => {
-      queryClient.setQueryData(
-        queryKeys.adminUsers(page, USERS_PER_PAGE, searchQuery),
-        (
-          current:
-            | {
-                total: number;
-                totalPages: number;
-                users: AdminUserProfile[];
-              }
-            | undefined,
-        ) =>
-          current
-            ? {
-                ...current,
-                users: current.users.map((currentUser) =>
-                  currentUser.id === user.id
-                    ? { ...currentUser, ...user }
-                    : currentUser,
-                ),
-              }
-            : current,
-      );
+    onSuccess: () => {
       setConfirmation(null);
-      await invalidateAdminUsersQueries(queryClient);
     },
-    onSettled: () => setPendingUserId(null),
   });
 
   const applyConfirmedAction = async () => {
@@ -139,7 +105,10 @@ export function useAdminUsers() {
     const { id, patch } = confirmation;
     setPendingUserId(id);
     setActionError("");
-    await updateUserMutation.mutateAsync({ id, patch }).catch(() => undefined);
+    await updateUserMutation
+      .mutateAsync({ id, patch })
+      .catch(() => undefined)
+      .finally(() => setPendingUserId(null));
   };
 
   const totalUsers = usersQuery.data?.total || 0;

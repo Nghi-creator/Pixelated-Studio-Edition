@@ -1,24 +1,17 @@
 import { useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, Filter } from "lucide-react";
 import ReportCard, { type Report } from "../../components/admin/ReportCard";
 import {
   AdminConfirmDialog,
   type AdminConfirmation,
 } from "../../components/admin/AdminConfirmDialog";
-import {
-  api,
-  type ApiAdminReportAction,
-} from "../../lib/api/apiClient";
+import type { ApiAdminReportAction } from "../../lib/api/apiClient";
+import { useResolveAdminReportMutation } from "../../lib/api/apiMutations";
 import {
   useAdminReportsQuery,
   useAuthSessionQuery,
   usePermissionsQuery,
 } from "../../lib/api/apiQueries";
-import {
-  invalidateAdminReportsQueries,
-  queryKeys,
-} from "../../lib/api/queryClient";
 import { ModerationQueueSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
 import { PixelIcon } from "../../components/ui/PixelIcon";
@@ -34,7 +27,6 @@ const REPORTS_PER_PAGE = 25;
 type FilterType = AdminTargetRoleFilter;
 
 export default function Dashboard() {
-  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<FilterType>("all");
   const [page, setPage] = useState(1);
   const [actionError, setActionError] = useState("");
@@ -60,15 +52,16 @@ export default function Dashboard() {
   const reportsData = canModerate ? reportsQuery.data : undefined;
   const reportsLoading = canModerate && reportsQuery.isLoading;
   const reportsError = canModerate && reportsQuery.isError;
+  const reports = reportsData?.reports || [];
+  const totalReports = reportsData?.total || reports.length;
+  const totalPages = reportsData?.totalPages || 1;
+  const safePage = Math.min(page, totalPages);
 
-  const resolveReportMutation = useMutation({
-    mutationFn: ({
-      action,
-      reportId,
-    }: {
-      action: ApiAdminReportAction;
-      reportId: string;
-    }) => api.adminReportAction(reportId, action),
+  const resolveReportMutation = useResolveAdminReportMutation<Report>({
+    page,
+    pageSize: REPORTS_PER_PAGE,
+    targetRole: filter,
+    totalReports,
     onError: (err) => {
       console.error("Failed to resolve report:", err);
       setActionError(
@@ -78,34 +71,7 @@ export default function Dashboard() {
         ),
       );
     },
-    onSuccess: async (result, { action }) => {
-      const nextTotal = Math.max(0, totalReports - 1);
-      queryClient.setQueryData(
-        queryKeys.adminReports(page, REPORTS_PER_PAGE, filter),
-        (
-          current:
-            | {
-                reports: Report[];
-                total: number;
-                totalPages: number;
-              }
-            | undefined,
-        ) =>
-          current
-            ? {
-                ...current,
-                reports:
-                  action === "ignore"
-                    ? current.reports.filter(
-                        (report) => report.id !== result.reportId,
-                      )
-                    : current.reports.filter(
-                        (report) => report.comments?.id !== result.commentId,
-                      ),
-                total: nextTotal,
-              }
-            : current,
-      );
+    onResolved: ({ nextTotal }) => {
       setPage(
         getPageAfterRemoval({
           currentPage: page,
@@ -113,9 +79,7 @@ export default function Dashboard() {
           totalAfterRemoval: nextTotal,
         }),
       );
-      await invalidateAdminReportsQueries(queryClient);
     },
-    onSettled: () => setPendingReportId(null),
   });
 
   const resolveReport = async (
@@ -127,7 +91,8 @@ export default function Dashboard() {
     setActionError("");
     await resolveReportMutation
       .mutateAsync({ action, reportId })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setPendingReportId(null));
   };
 
   const handleIgnore = async (reportId: string) => {
@@ -165,10 +130,6 @@ export default function Dashboard() {
     : reportsError
       ? "Could not load reports. Try again."
       : "";
-  const reports = reportsData?.reports || [];
-  const totalReports = reportsData?.total || reports.length;
-  const totalPages = reportsData?.totalPages || 1;
-  const safePage = Math.min(page, totalPages);
 
   if (loading) {
     return <ModerationQueueSkeleton />;

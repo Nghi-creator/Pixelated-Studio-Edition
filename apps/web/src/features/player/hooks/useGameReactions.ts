@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { User } from "@supabase/supabase-js";
-import { api } from "../../../lib/api/apiClient";
+import { useSetGameReactionMutation } from "../../../lib/api/apiMutations";
 import { useGameReactionsQuery } from "../../../lib/api/apiQueries";
-import { invalidateGameReactionsQuery } from "../../../lib/api/queryClient";
 import { getSocialErrorMessage } from "../socialFeedback";
 
 export function useGameReactions(gameId: string | undefined, currentUser: User | null) {
-  const queryClient = useQueryClient();
   const [reactionError, setReactionError] = useState("");
 
   const reactionsQuery = useGameReactionsQuery(gameId);
@@ -28,16 +25,12 @@ export function useGameReactions(gameId: string | undefined, currentUser: User |
     return { dislikeCount, likeCount, userReaction: currentUserReaction };
   }, [currentUser, reactionsQuery.data]);
 
-  const reactionMutation = useMutation({
-    mutationFn: (isLike: boolean | null) => api.setGameReaction(gameId!, isLike),
+  const reactionMutation = useSetGameReactionMutation(gameId, {
     onError: (err) => {
       console.error(err);
       setReactionError(
         getSocialErrorMessage(err, "Failed to update reaction. Try again."),
       );
-    },
-    onSuccess: async () => {
-      await invalidateGameReactionsQuery(queryClient, gameId);
     },
   });
 

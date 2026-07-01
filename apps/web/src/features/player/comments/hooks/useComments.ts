@@ -1,17 +1,15 @@
 import { useRef, useState } from "react";
-import {
-  useMutation,
-  useQueryClient,
-} from "@tanstack/react-query";
 import type { User } from "@supabase/supabase-js";
-import { api } from "../../../../lib/api/apiClient";
+import {
+  useDeleteCommentMutation,
+  usePostCommentMutation,
+  useSetCommentReactionMutation,
+} from "../../../../lib/api/apiMutations";
 import { useGameCommentsQuery } from "../../../../lib/api/apiQueries";
-import { invalidateGameCommentsQuery } from "../../../../lib/api/queryClient";
 import type { GameComment } from "../../types";
 import { getSocialErrorMessage } from "../../socialFeedback";
 
 export function useComments(gameId: string | undefined, currentUser: User | null) {
-  const queryClient = useQueryClient();
   const [newComment, setNewComment] = useState("");
   const [commentsError, setCommentsError] = useState("");
   const [pendingCommentIds, setPendingCommentIds] = useState<Set<string>>(
@@ -24,49 +22,34 @@ export function useComments(gameId: string | undefined, currentUser: User | null
     commentsQuery.data?.pages.flatMap((page) => page.comments) || [];
   const hasMoreComments = Boolean(commentsQuery.hasNextPage);
 
-  const invalidateComments = () =>
-    invalidateGameCommentsQuery(queryClient, gameId);
-
-  const postCommentMutation = useMutation({
-    mutationFn: (content: string) => api.postComment(gameId!, content),
+  const postCommentMutation = usePostCommentMutation(gameId, {
     onError: (err) => {
       console.error(err);
       setCommentsError(
         getSocialErrorMessage(err, "Failed to post comment. Try again."),
       );
     },
-    onSuccess: async () => {
+    onSuccess: () => {
       setNewComment("");
-      await invalidateComments();
     },
   });
 
-  const deleteCommentMutation = useMutation({
-    mutationFn: (commentId: string) => api.deleteComment(commentId),
+  const deleteCommentMutation = useDeleteCommentMutation(gameId, {
     onError: (err) => {
       console.error(err);
       setCommentsError(
         getSocialErrorMessage(err, "Failed to delete comment. Try again."),
       );
     },
-    onSuccess: invalidateComments,
   });
 
-  const commentReactionMutation = useMutation({
-    mutationFn: ({
-      commentId,
-      isLike,
-    }: {
-      commentId: string;
-      isLike: boolean | null;
-    }) => api.setCommentReaction(commentId, isLike),
+  const commentReactionMutation = useSetCommentReactionMutation(gameId, {
     onError: (err) => {
       console.error(err);
       setCommentsError(
         getSocialErrorMessage(err, "Failed to update reaction. Try again."),
       );
     },
-    onSuccess: invalidateComments,
   });
 
   const handlePostComment = async (event: React.FormEvent<HTMLFormElement>) => {
