@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import GameCard from "../../components/user/GameCard";
 import { api, getAuthSession } from "../../lib/api/apiClient";
+import { queryKeys } from "../../lib/api/queryClient";
 import { FavoritesPageSkeleton } from "../../components/ui/Skeleton";
 import { replaceFavoriteIds } from "../../features/favorites/favoriteState";
 import { PixelIcon } from "../../components/ui/PixelIcon";
@@ -14,47 +16,31 @@ interface SavedGame {
 }
 
 export default function Favorites() {
-  const [favorites, setFavorites] = useState<SavedGame[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
-  const requestIdRef = useRef(0);
+  const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const fetchFavorites = useCallback(async () => {
-    const requestId = ++requestIdRef.current;
-    setLoading(true);
-    setLoadError("");
-    try {
+  const favoritesQuery = useQuery({
+    queryKey: queryKeys.favorites(),
+    queryFn: async () => {
       const session = await getAuthSession();
 
       if (!session) {
         navigate("/login");
-        return;
+        return { favorites: [] as SavedGame[] };
       }
 
-      const data = await api.listFavorites<SavedGame>();
-      if (requestId === requestIdRef.current) {
-        setFavorites(data.favorites);
-        replaceFavoriteIds(new Set(data.favorites.map((game) => game.id)));
-      }
-    } catch (error) {
-      console.error("Error fetching favorites:", error);
-      if (requestId === requestIdRef.current) {
-        setLoadError("Could not load your library. Try again.");
-      }
-    } finally {
-      if (requestId === requestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [navigate]);
+      return api.listFavorites<SavedGame>();
+    },
+  });
+  const favorites = favoritesQuery.data?.favorites || [];
+  const loading = favoritesQuery.isLoading;
+  const loadError = favoritesQuery.isError
+    ? "Could not load your library. Try again."
+    : "";
 
   useEffect(() => {
-    void fetchFavorites();
-    return () => {
-      requestIdRef.current += 1;
-    };
-  }, [fetchFavorites]);
+    replaceFavoriteIds(new Set(favorites.map((game) => game.id)));
+  }, [favorites]);
 
   if (loading) {
     return <FavoritesPageSkeleton />;
@@ -82,7 +68,7 @@ export default function Favorites() {
             <p>{loadError}</p>
             <button
               className="mt-4 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
-              onClick={() => void fetchFavorites()}
+              onClick={() => void favoritesQuery.refetch()}
               type="button"
             >
               Retry
@@ -116,8 +102,14 @@ export default function Favorites() {
                 id={game.id}
                 onFavoriteChange={(favorited) => {
                   if (!favorited) {
-                    setFavorites((current) =>
-                      current.filter((favorite) => favorite.id !== game.id),
+                    queryClient.setQueryData<{ favorites: SavedGame[] }>(
+                      queryKeys.favorites(),
+                      (current) => ({
+                        favorites:
+                          current?.favorites.filter(
+                            (favorite) => favorite.id !== game.id,
+                          ) || [],
+                      }),
                     );
                   }
                 }}

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ChangeEvent, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { ApiError, api, getAuthSession } from "../../lib/api/apiClient";
+import { queryKeys } from "../../lib/api/queryClient";
 import { supabase } from "../../lib/auth/supabaseClient";
 import { getPasswordPolicyError } from "../../lib/auth/passwordPolicy";
 import { createCroppedAvatar, type CropArea } from "./avatarCrop";
@@ -20,6 +22,7 @@ type PasswordMessage = {
 
 export function useProfileSettings() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const profileMutationRef = useRef(false);
   const passwordMutationRef = useRef(false);
@@ -27,9 +30,7 @@ export function useProfileSettings() {
 
   const [user, setUser] = useState<SupabaseUser | null>(null);
   const [userRole, setUserRole] = useState<string>("user");
-  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [loadAttempt, setLoadAttempt] = useState(0);
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [profileMessage, setProfileMessage] = useState<ProfileMessage | null>(
@@ -58,47 +59,54 @@ export function useProfileSettings() {
   const hasPassword = user?.app_metadata?.providers?.includes("email");
   const displayAvatar = previewUrl || avatarUrl;
 
+  const sessionQuery = useQuery({
+    queryKey: ["authSession"],
+    queryFn: getAuthSession,
+  });
+  const profileQuery = useQuery({
+    enabled: Boolean(sessionQuery.data),
+    queryKey: queryKeys.profile(),
+    queryFn: api.profile,
+  });
+
   useEffect(() => {
-    let isMounted = true;
-    const fetchProfile = async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const session = await getAuthSession();
-        if (!isMounted) return;
-        if (!session) {
-          navigate("/login");
-          return;
-        }
-        setUser(session.user);
+    if (sessionQuery.isLoading) return;
+    if (!sessionQuery.data) {
+      navigate("/login");
+      return;
+    }
 
-        const { profile } = await api.profile();
-        if (!isMounted) return;
+    setUser(sessionQuery.data.user);
+  }, [navigate, sessionQuery.data, sessionQuery.isLoading]);
 
-        if (profile) {
-          setUsername(profile.username || "");
-          setAvatarUrl(profile.avatar_url || "");
-          setUserRole(profile.role || "user");
-        }
-      } catch (error) {
-        console.error("Error loading profile", error);
-        if (isMounted) {
-          setLoadError(
-            error instanceof Error
-              ? error.message
-              : "Failed to load account settings.",
-          );
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
+  useEffect(() => {
+    const profile = profileQuery.data?.profile;
+    if (profile) {
+      setUsername(profile.username || "");
+      setAvatarUrl(profile.avatar_url || "");
+      setUserRole(profile.role || "user");
+    }
+  }, [profileQuery.data]);
 
-    void fetchProfile();
-    return () => {
-      isMounted = false;
-    };
-  }, [loadAttempt, navigate]);
+  useEffect(() => {
+    if (sessionQuery.isError || profileQuery.isError) {
+      const error = sessionQuery.error || profileQuery.error;
+      console.error("Error loading profile", error);
+      setLoadError(
+        error instanceof Error
+          ? error.message
+          : "Failed to load account settings.",
+      );
+      return;
+    }
+
+    setLoadError(null);
+  }, [
+    profileQuery.error,
+    profileQuery.isError,
+    sessionQuery.error,
+    sessionQuery.isError,
+  ]);
 
   useEffect(
     () => () => {
@@ -199,6 +207,10 @@ export function useProfileSettings() {
           await api.updateProfile({
             avatarUrl: finalAvatarUrl,
             username: finalUsername,
+          });
+          await queryClient.invalidateQueries({ queryKey: queryKeys.profile() });
+          await queryClient.invalidateQueries({
+            queryKey: queryKeys.permissions(),
           });
         },
         uploadAvatar: async (file, path) => {
@@ -344,7 +356,7 @@ export function useProfileSettings() {
     isCropping,
     isDeleting,
     loadError,
-    loading,
+    loading: sessionQuery.isLoading || profileQuery.isLoading,
     navigate,
     newPassword,
     onCropComplete,
@@ -355,7 +367,10 @@ export function useProfileSettings() {
     setCrop,
     setCurrentPassword,
     setDeleteInput,
-    setLoadAttempt,
+    setLoadAttempt: (_?: unknown) => {
+      void sessionQuery.refetch();
+      void profileQuery.refetch();
+    },
     setNewPassword,
     setShowCropper,
     setShowDeleteModal,

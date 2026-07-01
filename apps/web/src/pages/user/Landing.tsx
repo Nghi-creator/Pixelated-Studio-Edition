@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Loader2, Search } from "lucide-react";
 import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
 import { api } from "../../lib/api/apiClient";
+import { queryKeys } from "../../lib/api/queryClient";
 import {
   GameGridSkeleton,
   GamesCatalogSkeleton,
@@ -39,114 +41,67 @@ function CatalogRefreshPanel({ label }: { label: string }) {
 }
 
 export default function Landing() {
-  const [games, setGames] = useState<Game[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [featuredGames, setFeaturedGames] = useState<Game[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [isSearchPending, setIsSearchPending] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalGames, setTotalGames] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const catalogRequestIdRef = useRef(0);
-  const featuredRequestIdRef = useRef(0);
-
-  const fetchFeaturedGames = useCallback(async (isMounted = true) => {
-    const requestId = ++featuredRequestIdRef.current;
-    try {
-      const data = await api.featuredGames();
-      if (
-        isMounted &&
-        requestId === featuredRequestIdRef.current &&
-        data.featuredGames.length > 0
-      ) {
-        setFeaturedGames(data.featuredGames);
-      }
-    } catch (error) {
-      console.error("Error fetching featured games:", error);
-    }
-  }, []);
-
-  const fetchGames = useCallback(async (isMounted = true) => {
-    const requestId = ++catalogRequestIdRef.current;
-    try {
-      setLoadError("");
-      setLoading(true);
-      const data = await api.games({
-        page: currentPage,
-        pageSize: GAMES_PER_PAGE,
-        search: searchQuery,
-      });
-      if (isMounted && requestId === catalogRequestIdRef.current) {
-        setGames(data.games);
-        setFeaturedGames((currentFeaturedGames) =>
-          currentFeaturedGames.length > 0
-            ? currentFeaturedGames
-            : data.featuredGames,
-        );
-        setTotalGames(data.total);
-        setTotalPages(data.totalPages);
-        setIsSearchPending(false);
-      }
-    } catch (error) {
-      console.error("Error fetching games:", error);
-      if (isMounted && requestId === catalogRequestIdRef.current) {
-        setLoadError("Could not load the game library. Check the API connection.");
-        setIsSearchPending(false);
-      }
-    } finally {
-      if (isMounted && requestId === catalogRequestIdRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [currentPage, searchQuery]);
 
   useEffect(() => {
-    let isMounted = true;
-    catalogRequestIdRef.current += 1;
-    if (searchQuery) {
-      setIsSearchPending(true);
-    } else {
-      setIsSearchPending(false);
-    }
+    setIsSearchPending(Boolean(searchQuery));
     const timeout = window.setTimeout(() => {
-      fetchGames(isMounted);
+      setDebouncedSearchQuery(searchQuery);
+      setIsSearchPending(false);
     }, searchQuery ? 250 : 0);
 
-    return () => {
-      isMounted = false;
-      window.clearTimeout(timeout);
-    };
-  }, [fetchGames, searchQuery]);
+    return () => window.clearTimeout(timeout);
+  }, [searchQuery]);
 
-  useEffect(() => {
-    let isMounted = true;
-    fetchFeaturedGames(isMounted);
+  const catalogQuery = useQuery({
+    queryKey: queryKeys.gameCatalog(
+      currentPage,
+      GAMES_PER_PAGE,
+      debouncedSearchQuery,
+    ),
+    queryFn: () =>
+      api.games({
+        page: currentPage,
+        pageSize: GAMES_PER_PAGE,
+        search: debouncedSearchQuery,
+      }),
+  });
+  const featuredQuery = useQuery({
+    queryKey: queryKeys.featuredGames(),
+    queryFn: api.featuredGames,
+  });
 
-    return () => {
-      isMounted = false;
-    };
-  }, [fetchFeaturedGames]);
+  const games = (catalogQuery.data?.games || []) as Game[];
+  const featuredGames =
+    featuredQuery.data?.featuredGames.length
+      ? (featuredQuery.data.featuredGames as Game[])
+      : ((catalogQuery.data?.featuredGames || []) as Game[]);
+  const loading = catalogQuery.isLoading;
+  const loadError = catalogQuery.isError
+    ? "Could not load the game library. Check the API connection."
+    : "";
+  const totalGames = catalogQuery.data?.total || 0;
+  const totalPages = catalogQuery.data?.totalPages || 1;
 
   useEffect(() => {
     if (!hasOnlyZeroPlayCounts(featuredGames)) return;
 
-    let isMounted = true;
     const interval = window.setInterval(() => {
-      fetchFeaturedGames(isMounted);
+      void featuredQuery.refetch();
     }, ZERO_PLAY_FEATURED_REFRESH_MS);
 
-    return () => {
-      isMounted = false;
-      window.clearInterval(interval);
-    };
-  }, [featuredGames, fetchFeaturedGames]);
+    return () => window.clearInterval(interval);
+  }, [featuredGames, featuredQuery]);
 
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStart = (safeCurrentPage - 1) * GAMES_PER_PAGE;
   const showInitialCatalogSkeleton = loading && games.length === 0 && !searchQuery;
   const showCatalogRefreshPanel =
-    (loading || isSearchPending) && (games.length > 0 || Boolean(searchQuery));
+    (catalogQuery.isFetching || isSearchPending) &&
+    (games.length > 0 || Boolean(searchQuery));
   const catalogRefreshLabel = searchQuery
     ? "Searching games..."
     : "Loading games...";
@@ -207,7 +162,7 @@ export default function Landing() {
             <p>{loadError}</p>
             <button
               className="mt-4 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
-              onClick={() => void fetchGames()}
+              onClick={() => void catalogQuery.refetch()}
               type="button"
             >
               Retry

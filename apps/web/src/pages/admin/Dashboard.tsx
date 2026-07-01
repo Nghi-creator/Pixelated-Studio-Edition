@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Filter } from "lucide-react";
 import ReportCard, { type Report } from "../../components/admin/ReportCard";
 import {
@@ -10,6 +11,7 @@ import {
   getAuthSession,
   type ApiAdminReportAction,
 } from "../../lib/api/apiClient";
+import { queryKeys } from "../../lib/api/queryClient";
 import { ModerationQueueSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
 import { PixelIcon } from "../../components/ui/PixelIcon";
@@ -25,120 +27,59 @@ const REPORTS_PER_PAGE = 25;
 type FilterType = AdminTargetRoleFilter;
 
 export default function Dashboard() {
+  const queryClient = useQueryClient();
   const [reports, setReports] = useState<Report[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState<string>("");
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [filter, setFilter] = useState<FilterType>("all");
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalReports, setTotalReports] = useState(0);
-  const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
   const [pendingReportId, setPendingReportId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<
     (AdminConfirmation & { action: ApiAdminReportAction }) | null
   >(null);
-  const pendingReportIdRef = useRef<string | null>(null);
+
+  const sessionQuery = useQuery({
+    queryKey: ["authSession"],
+    queryFn: getAuthSession,
+  });
+  const permissionsQuery = useQuery({
+    enabled: Boolean(sessionQuery.data?.user),
+    queryKey: queryKeys.permissions(),
+    queryFn: api.permissions,
+  });
+  const canModerate =
+    currentUserRole === "admin" || currentUserRole === "super_admin";
+  const currentUserId = sessionQuery.data?.user?.id || "";
+  const reportsQuery = useQuery({
+    enabled: canModerate,
+    queryKey: queryKeys.adminReports(page, REPORTS_PER_PAGE, filter),
+    queryFn: () => api.adminReports<Report>(page, REPORTS_PER_PAGE, filter),
+  });
 
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchCurrentUser = async () => {
-      const session = await getAuthSession();
-      if (session?.user) {
-        if (isMounted) setCurrentUserId(session.user.id);
-
-        try {
-          const data = await api.permissions();
-          if (isMounted) setCurrentUserRole(data.profile.role);
-        } catch (error) {
-          console.error("Error checking moderation permissions:", error);
-          if (isMounted) {
-            setLoadError("Could not verify moderation permissions. Try again.");
-            setLoading(false);
-          }
-        }
-      } else if (isMounted) {
-        setLoading(false);
-      }
-    };
-
-    fetchCurrentUser();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const fetchReports = useCallback(
-    async (isMounted = true) => {
-      if (currentUserRole !== "admin" && currentUserRole !== "super_admin") {
-        if (currentUserRole) setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        setLoadError("");
-        const data = await api.adminReports<Report>(
-          page,
-          REPORTS_PER_PAGE,
-          filter,
-        );
-        if (!isMounted) return;
-
-        setReports(data.reports);
-        setTotalReports(data.total);
-        setTotalPages(data.totalPages);
-        if (page > data.totalPages) {
-          setPage(data.totalPages);
-        }
-      } catch (error) {
-        console.error("Error fetching reports:", error);
-        if (isMounted) setLoadError("Could not load reports. Try again.");
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    },
-    [currentUserRole, filter, page],
-  );
+    if (permissionsQuery.data) {
+      setCurrentUserRole(permissionsQuery.data.profile.role);
+    }
+  }, [permissionsQuery.data]);
 
   useEffect(() => {
-    let isMounted = true;
-    fetchReports(isMounted);
+    if (reportsQuery.data) {
+      setReports(reportsQuery.data.reports);
+      if (page > reportsQuery.data.totalPages) {
+        setPage(reportsQuery.data.totalPages);
+      }
+    }
+  }, [page, reportsQuery.data]);
 
-    return () => {
-      isMounted = false;
-    };
-  }, [fetchReports]);
-
-  const resolveReport = async (
-    reportId: string,
-    action: ApiAdminReportAction,
-  ) => {
-    if (pendingReportIdRef.current) return;
-    pendingReportIdRef.current = reportId;
-    setPendingReportId(reportId);
-    setActionError("");
-    try {
-      const result = await api.adminReportAction(reportId, action);
-      const nextTotal = Math.max(0, totalReports - 1);
-      setReports((prev) =>
-        action === "ignore"
-          ? prev.filter((report) => report.id !== result.reportId)
-          : prev.filter((report) => report.comments?.id !== result.commentId),
-      );
-      setTotalReports(nextTotal);
-      setPage(
-        getPageAfterRemoval({
-          currentPage: page,
-          pageSize: REPORTS_PER_PAGE,
-          totalAfterRemoval: nextTotal,
-        }),
-      );
-      await fetchReports(true);
-    } catch (err) {
+  const resolveReportMutation = useMutation({
+    mutationFn: ({
+      action,
+      reportId,
+    }: {
+      action: ApiAdminReportAction;
+      reportId: string;
+    }) => api.adminReportAction(reportId, action),
+    onError: (err) => {
       console.error("Failed to resolve report:", err);
       setActionError(
         getAdminApiErrorMessage(
@@ -146,10 +87,38 @@ export default function Dashboard() {
           "Failed to resolve report. Please try again.",
         ),
       );
-    } finally {
-      pendingReportIdRef.current = null;
-      setPendingReportId(null);
-    }
+    },
+    onSuccess: async (result, { action }) => {
+      const nextTotal = Math.max(0, totalReports - 1);
+      setReports((prev) =>
+        action === "ignore"
+          ? prev.filter((report) => report.id !== result.reportId)
+          : prev.filter((report) => report.comments?.id !== result.commentId),
+      );
+      setPage(
+        getPageAfterRemoval({
+          currentPage: page,
+          pageSize: REPORTS_PER_PAGE,
+          totalAfterRemoval: nextTotal,
+        }),
+      );
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminReports(page, REPORTS_PER_PAGE, filter),
+      });
+    },
+    onSettled: () => setPendingReportId(null),
+  });
+
+  const resolveReport = async (
+    reportId: string,
+    action: ApiAdminReportAction,
+  ) => {
+    if (pendingReportId) return;
+    setPendingReportId(reportId);
+    setActionError("");
+    await resolveReportMutation
+      .mutateAsync({ action, reportId })
+      .catch(() => undefined);
   };
 
   const handleIgnore = async (reportId: string) => {
@@ -177,6 +146,18 @@ export default function Dashboard() {
     setConfirmation(null);
     await resolveReport(id, action);
   };
+
+  const loading =
+    sessionQuery.isLoading ||
+    permissionsQuery.isLoading ||
+    (canModerate && reportsQuery.isLoading);
+  const loadError = permissionsQuery.isError
+    ? "Could not verify moderation permissions. Try again."
+    : reportsQuery.isError
+      ? "Could not load reports. Try again."
+      : "";
+  const totalReports = reportsQuery.data?.total || reports.length;
+  const totalPages = reportsQuery.data?.totalPages || 1;
 
   if (loading) {
     return <ModerationQueueSkeleton />;
@@ -242,7 +223,7 @@ export default function Dashboard() {
           <p>{loadError}</p>
           <button
             className="mt-4 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
-            onClick={() => void fetchReports()}
+            onClick={() => void reportsQuery.refetch()}
             type="button"
           >
             Retry

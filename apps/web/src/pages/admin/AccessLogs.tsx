@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { api, ApiError } from "../../lib/api/apiClient";
+import { queryKeys } from "../../lib/api/queryClient";
 import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
 import { getPageRangeLabel } from "../../features/admin/adminState";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 
 const LOGS_PER_PAGE = 25;
-const ACCESS_LOGS_TIMEOUT_MS = 10_000;
 
 interface AccessLog {
   first_seen_at: string;
@@ -47,56 +48,24 @@ function getAccessLogsErrorMessage(error: unknown) {
 }
 
 export default function AccessLogs() {
-  const [logs, setLogs] = useState<AccessLog[]>([]);
-  const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
-  const [loadError, setLoadError] = useState("");
-  const [reloadKey, setReloadKey] = useState(0);
-  const [totalLogs, setTotalLogs] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
+  const accessLogsQuery = useQuery({
+    queryKey: queryKeys.accessLogs(page, LOGS_PER_PAGE),
+    queryFn: () => api.accessLogs<AccessLog>(page, LOGS_PER_PAGE),
+  });
+  const logs = accessLogsQuery.data?.logs || [];
+  const totalLogs = accessLogsQuery.data?.total || 0;
+  const totalPages = accessLogsQuery.data?.totalPages || 1;
+  const loading = accessLogsQuery.isLoading;
+  const loadError = accessLogsQuery.isError
+    ? getAccessLogsErrorMessage(accessLogsQuery.error)
+    : "";
 
   useEffect(() => {
-    let isMounted = true;
-    const watchdog = window.setTimeout(() => {
-      if (!isMounted) return;
-
-      setLoadError(
-        "Access logs are taking too long to load. Make sure the local API is running on http://127.0.0.1:4000, then retry.",
-      );
-      setLoading(false);
-    }, ACCESS_LOGS_TIMEOUT_MS);
-
-    const fetchLogs = async () => {
-      try {
-        setLoading(true);
-        setLoadError("");
-        const data = await api.accessLogs<AccessLog>(page, LOGS_PER_PAGE);
-        if (!isMounted) return;
-
-        setLogs(data.logs);
-        setTotalLogs(data.total);
-        setTotalPages(data.totalPages);
-        if (page > data.totalPages) {
-          setPage(data.totalPages);
-        }
-      } catch (error) {
-        console.error("Error fetching access logs:", error);
-        if (!isMounted) return;
-
-        setLoadError(getAccessLogsErrorMessage(error));
-      } finally {
-        window.clearTimeout(watchdog);
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    fetchLogs();
-
-    return () => {
-      isMounted = false;
-      window.clearTimeout(watchdog);
-    };
-  }, [page, reloadKey]);
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
 
   const pageLabel = getPageRangeLabel({
     currentCount: logs.length,
@@ -140,7 +109,7 @@ export default function AccessLogs() {
                       <span>{loadError}</span>
                       <button
                         type="button"
-                        onClick={() => setReloadKey((key) => key + 1)}
+                        onClick={() => void accessLogsQuery.refetch()}
                         className="h-10 rounded-lg border border-red-400/40 bg-red-500/10 px-4 text-sm font-semibold text-red-200 transition-colors hover:border-red-300 hover:bg-red-500/20"
                       >
                         Retry

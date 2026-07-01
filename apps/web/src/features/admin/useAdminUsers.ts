@@ -1,5 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, getAuthSession } from "../../lib/api/apiClient";
+import { queryKeys } from "../../lib/api/queryClient";
 import type { AdminConfirmation } from "../../components/admin/AdminConfirmDialog";
 import {
   getAdminApiErrorMessage,
@@ -19,16 +21,10 @@ export interface AdminUserProfile {
 
 export function useAdminUsers() {
   const [users, setUsers] = useState<AdminUserProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [currentUserId, setCurrentUserId] = useState<string>("");
-  const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalUsers, setTotalUsers] = useState(0);
   const [loadError, setLoadError] = useState("");
   const [actionError, setActionError] = useState("");
-  const [reloadKey, setReloadKey] = useState(0);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<
     | (AdminConfirmation & {
@@ -36,87 +32,57 @@ export function useAdminUsers() {
       })
     | null
   >(null);
-  const pendingUserIdRef = useRef<string | null>(null);
-  const requestIdRef = useRef(0);
+  const queryClient = useQueryClient();
+
+  const sessionQuery = useQuery({
+    queryKey: ["authSession"],
+    queryFn: getAuthSession,
+  });
+  const permissionsQuery = useQuery({
+    enabled: Boolean(sessionQuery.data?.user),
+    queryKey: queryKeys.permissions(),
+    queryFn: api.permissions,
+  });
+  const currentUserId = sessionQuery.data?.user?.id || "";
+  const currentUserRole = permissionsQuery.data?.profile.role || "";
+  const canManageUsers = currentUserRole === "super_admin";
+
+  const usersQuery = useQuery({
+    enabled: canManageUsers,
+    queryKey: queryKeys.adminUsers(page, USERS_PER_PAGE, searchQuery),
+    queryFn: () =>
+      api.users<AdminUserProfile>({
+        page,
+        pageSize: USERS_PER_PAGE,
+        search: searchQuery,
+      }),
+  });
 
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchCurrentUser = async () => {
-      const session = await getAuthSession();
-
-      if (session?.user && isMounted) {
-        setCurrentUserId(session.user.id);
-        try {
-          const data = await api.permissions();
-          if (isMounted) {
-            setCurrentUserRole(data.profile.role);
-            if (data.profile.role !== "super_admin") setLoading(false);
-          }
-        } catch (error) {
-          console.error("Error checking admin permissions:", error);
-          if (isMounted) {
-            setLoadError("Could not verify user-management permissions.");
-            setLoading(false);
-          }
-        }
-      } else if (isMounted) {
-        setLoading(false);
+    if (usersQuery.data) {
+      setUsers(usersQuery.data.users);
+      if (page > usersQuery.data.totalPages) {
+        setPage(usersQuery.data.totalPages);
       }
-    };
-
-    fetchCurrentUser();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
-
-  const fetchUsers = useCallback(
-    async (isMounted = true) => {
-      if (currentUserRole !== "super_admin") return;
-
-      const requestId = requestIdRef.current + 1;
-      requestIdRef.current = requestId;
-
-      try {
-        setLoading(true);
-        setLoadError("");
-        const data = await api.users<AdminUserProfile>({
-          page,
-          pageSize: USERS_PER_PAGE,
-          search: searchQuery,
-        });
-        if (!isMounted || requestId !== requestIdRef.current) return;
-
-        setUsers(data.users);
-        setTotalUsers(data.total);
-        setTotalPages(data.totalPages);
-        if (page > data.totalPages) {
-          setPage(data.totalPages);
-        }
-      } catch (error) {
-        console.error("Error fetching users:", error);
-        if (!isMounted || requestId !== requestIdRef.current) return;
-        setLoadError(getAdminApiErrorMessage(error, "Could not load users."));
-      } finally {
-        if (isMounted && requestId === requestIdRef.current) setLoading(false);
-      }
-    },
-    [currentUserRole, page, searchQuery],
-  );
+    }
+  }, [page, usersQuery.data]);
 
   useEffect(() => {
-    let isMounted = true;
-    const timeout = window.setTimeout(() => {
-      fetchUsers(isMounted);
-    }, searchQuery ? 250 : 0);
+    if (permissionsQuery.isError) {
+      setLoadError("Could not verify user-management permissions.");
+      return;
+    }
 
-    return () => {
-      isMounted = false;
-      window.clearTimeout(timeout);
-    };
-  }, [fetchUsers, reloadKey, searchQuery]);
+    if (usersQuery.isError) {
+      setLoadError(
+        getAdminApiErrorMessage(usersQuery.error, "Could not load users."),
+      );
+    }
+  }, [
+    permissionsQuery.isError,
+    usersQuery.error,
+    usersQuery.isError,
+  ]);
 
   const handleSearchChange = (nextSearchQuery: string) => {
     setSearchQuery(nextSearchQuery);
@@ -124,7 +90,9 @@ export function useAdminUsers() {
     setLoadError("");
   };
 
-  const retryLoad = () => setReloadKey((key) => key + 1);
+  const retryLoad = () => {
+    void usersQuery.refetch();
+  };
 
   const handleToggleRole = (userId: string, currentRole: string) => {
     const newRole = currentRole === "admin" ? "user" : "admin";
@@ -155,28 +123,46 @@ export function useAdminUsers() {
     });
   };
 
-  const applyConfirmedAction = async () => {
-    if (!confirmation || pendingUserIdRef.current) return;
-    const { id, patch } = confirmation;
-    pendingUserIdRef.current = id;
-    setPendingUserId(id);
-    setActionError("");
-    try {
-      const { user } = await api.updateAdminUser(id, patch);
+  const updateUserMutation = useMutation({
+    mutationFn: ({
+      id,
+      patch,
+    }: {
+      id: string;
+      patch: Partial<Pick<AdminUserProfile, "is_banned" | "role">>;
+    }) => api.updateAdminUser(id, patch),
+    onError: (error) => {
+      console.error(error);
+      setActionError(getAdminApiErrorMessage(error, "User update failed."));
+    },
+    onSuccess: async ({ user }) => {
       setUsers((prev) =>
         prev.map((currentUser) =>
-          currentUser.id === id ? { ...currentUser, ...user } : currentUser,
+          currentUser.id === user.id ? { ...currentUser, ...user } : currentUser,
         ),
       );
       setConfirmation(null);
-    } catch (error) {
-      console.error(error);
-      setActionError(getAdminApiErrorMessage(error, "User update failed."));
-    } finally {
-      pendingUserIdRef.current = null;
-      setPendingUserId(null);
-    }
+      await queryClient.invalidateQueries({
+        queryKey: queryKeys.adminUsers(page, USERS_PER_PAGE, searchQuery),
+      });
+    },
+    onSettled: () => setPendingUserId(null),
+  });
+
+  const applyConfirmedAction = async () => {
+    if (!confirmation || pendingUserId) return;
+    const { id, patch } = confirmation;
+    setPendingUserId(id);
+    setActionError("");
+    await updateUserMutation.mutateAsync({ id, patch }).catch(() => undefined);
   };
+
+  const totalUsers = usersQuery.data?.total || 0;
+  const totalPages = usersQuery.data?.totalPages || 1;
+  const loading =
+    sessionQuery.isLoading ||
+    permissionsQuery.isLoading ||
+    (canManageUsers && usersQuery.isLoading);
 
   return {
     actionError,

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -9,50 +10,38 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import { api, getAuthSession } from "../../lib/api/apiClient";
+import { queryKeys } from "../../lib/api/queryClient";
 import { PixelIcon } from "../ui/PixelIcon";
 
 export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [roleChecked, setRoleChecked] = useState(false);
-  const [accessError, setAccessError] = useState("");
-  const [retryKey, setRetryKey] = useState(0);
+  const sessionQuery = useQuery({
+    queryKey: ["authSession"],
+    queryFn: getAuthSession,
+  });
+  const permissionsQuery = useQuery({
+    enabled: Boolean(sessionQuery.data?.user),
+    queryKey: queryKeys.permissions(),
+    queryFn: api.permissions,
+  });
 
   useEffect(() => {
-    let isMounted = true;
-    const checkAccess = async () => {
-      setAccessError("");
-      try {
-        const session = await getAuthSession();
+    if (sessionQuery.isLoading) return;
+    if (!sessionQuery.data?.user) {
+      navigate("/login");
+    }
+  }, [navigate, sessionQuery.data, sessionQuery.isLoading]);
 
-        if (!session?.user) {
-          navigate("/login");
-          return;
-        }
-
-        const data = await api.permissions();
-        if (
-          data.profile.role !== "admin" &&
-          data.profile.role !== "super_admin"
-        ) {
-          navigate("/");
-          return;
-        }
-
-        if (isMounted) setRoleChecked(true);
-      } catch (error) {
-        console.error("Error checking admin access:", error);
-        if (isMounted) {
-          setAccessError("Could not verify admin access. Try again.");
-        }
-      }
-    };
-
-    void checkAccess();
-    return () => {
-      isMounted = false;
-    };
-  }, [navigate, retryKey]);
+  useEffect(() => {
+    if (!permissionsQuery.data) return;
+    if (
+      permissionsQuery.data.profile.role !== "admin" &&
+      permissionsQuery.data.profile.role !== "super_admin"
+    ) {
+      navigate("/");
+    }
+  }, [navigate, permissionsQuery.data]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -65,6 +54,14 @@ export default function AdminLayout() {
     { name: "Access Logs", path: "/admin/logs", icon: "logs" as const },
   ];
 
+  const roleChecked = Boolean(
+    permissionsQuery.data &&
+      ["admin", "super_admin"].includes(permissionsQuery.data.profile.role),
+  );
+  const accessError = permissionsQuery.isError
+    ? "Could not verify admin access. Try again."
+    : "";
+
   if (!roleChecked) {
     return (
       <div className="h-screen bg-synth-bg flex items-center justify-center">
@@ -74,7 +71,7 @@ export default function AdminLayout() {
             <p className="mb-5 text-sm">{accessError}</p>
             <button
               className="mx-auto flex items-center gap-2 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
-              onClick={() => setRetryKey((key) => key + 1)}
+              onClick={() => void permissionsQuery.refetch()}
               type="button"
             >
               <RefreshCw className="h-4 w-4" /> Retry

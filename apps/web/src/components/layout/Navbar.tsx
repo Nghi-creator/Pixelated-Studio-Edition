@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LogOut,
@@ -8,6 +9,7 @@ import {
 import { supabase } from "../../lib/auth/supabaseClient";
 import type { User } from "@supabase/supabase-js";
 import { api, getAuthSession } from "../../lib/api/apiClient";
+import { queryKeys } from "../../lib/api/queryClient";
 import { Avatar } from "../ui/Avatar";
 import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engine/engineAuth";
 import { PixelIcon } from "../ui/PixelIcon";
@@ -25,58 +27,73 @@ export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   const isKickingOut = useRef(false);
 
   useEffect(() => {
-    const fetchUserAndProfile = async (sessionUser: User | null) => {
+    const syncUser = (sessionUser: User | null) => {
       setIsIdentityLoading(true);
-
-      try {
-        setUser(sessionUser);
-        if (sessionUser) {
-          const data = await api.permissions();
-
-          if (data.profile.is_banned) {
-            if (isKickingOut.current) return;
-            isKickingOut.current = true;
-
-            await supabase.auth.signOut();
-            setUser(null);
-            alert("Your account has been permanently suspended.");
-            if (window.location.pathname !== "/login") {
-              window.location.href = "/login";
-            }
-            return;
-          }
-
-          setDbUsername(data.profile.username);
-          setDbAvatarUrl(data.profile.avatar_url);
-          setUserRole(data.profile.role);
-          setIsDeveloper(data.profile.is_developer || false);
-        } else {
-          setDbUsername(null);
-          setDbAvatarUrl(null);
-          setUserRole(null);
-          setIsDeveloper(false);
-        }
-      } finally {
+      setUser(sessionUser);
+      if (!sessionUser) {
+        setDbUsername(null);
+        setDbAvatarUrl(null);
+        setUserRole(null);
+        setIsDeveloper(false);
         setIsIdentityLoading(false);
       }
     };
 
     getAuthSession().then((session) => {
-      fetchUserAndProfile(session?.user ?? null);
+      syncUser(session?.user ?? null);
     });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      fetchUserAndProfile(session?.user ?? null);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.permissions() });
+      syncUser(session?.user ?? null);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [queryClient]);
+
+  const permissionsQuery = useQuery({
+    enabled: Boolean(user),
+    queryKey: queryKeys.permissions(),
+    queryFn: api.permissions,
+  });
+
+  useEffect(() => {
+    const data = permissionsQuery.data;
+    if (!user || !data) return;
+
+    if (data.profile.is_banned) {
+      if (isKickingOut.current) return;
+      isKickingOut.current = true;
+
+      supabase.auth.signOut().then(() => {
+        setUser(null);
+        alert("Your account has been permanently suspended.");
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
+      });
+      return;
+    }
+
+    setDbUsername(data.profile.username);
+    setDbAvatarUrl(data.profile.avatar_url);
+    setUserRole(data.profile.role);
+    setIsDeveloper(data.profile.is_developer || false);
+    setIsIdentityLoading(false);
+  }, [permissionsQuery.data, user]);
+
+  useEffect(() => {
+    if (permissionsQuery.isError) {
+      setIsIdentityLoading(false);
+    }
+  }, [permissionsQuery.isError]);
 
   useEffect(() => {
     const refreshEnginePairing = () => setIsEnginePaired(hasEngineToken());
