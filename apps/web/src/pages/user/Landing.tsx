@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { Loader2, Search } from "lucide-react";
 import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
-import { api } from "../../lib/api/apiClient";
-import { queryKeys } from "../../lib/api/queryClient";
+import {
+  useFeaturedGamesQuery,
+  useGameCatalogQuery,
+} from "../../lib/api/apiQueries";
 import {
   GameGridSkeleton,
   GamesCatalogSkeleton,
@@ -44,23 +45,12 @@ export default function Landing() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
 
-  const catalogQuery = useQuery({
-    queryKey: queryKeys.gameCatalog(
-      currentPage,
-      GAMES_PER_PAGE,
-      searchQuery,
-    ),
-    queryFn: () =>
-      api.games({
-        page: currentPage,
-        pageSize: GAMES_PER_PAGE,
-        search: searchQuery,
-      }),
+  const catalogQuery = useGameCatalogQuery({
+    page: currentPage,
+    pageSize: GAMES_PER_PAGE,
+    search: searchQuery,
   });
-  const featuredQuery = useQuery({
-    queryKey: queryKeys.featuredGames(),
-    queryFn: api.featuredGames,
-  });
+  const featuredQuery = useFeaturedGamesQuery();
 
   const games = (catalogQuery.data?.games || []) as Game[];
   const featuredGames = featuredQuery.data?.featuredGames.length

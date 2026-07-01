@@ -1,9 +1,9 @@
 import { useEffect, useMemo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import GameCard from "../../components/user/GameCard";
-import { api, getAuthSession } from "../../lib/api/apiClient";
+import { useFavoritesQuery } from "../../lib/api/apiQueries";
 import { queryKeys } from "../../lib/api/queryClient";
 import { FavoritesPageSkeleton } from "../../components/ui/Skeleton";
 import { replaceFavoriteIds } from "../../features/favorites/favoriteState";
@@ -19,18 +19,8 @@ export default function Favorites() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const favoritesQuery = useQuery({
-    queryKey: queryKeys.favorites(),
-    queryFn: async () => {
-      const session = await getAuthSession();
-
-      if (!session) {
-        navigate("/login");
-        return { favorites: [] as SavedGame[] };
-      }
-
-      return api.listFavorites<SavedGame>();
-    },
+  const favoritesQuery = useFavoritesQuery<SavedGame>({
+    onMissingSession: () => navigate("/login"),
   });
   const favorites = useMemo(
     () => favoritesQuery.data?.favorites || [],

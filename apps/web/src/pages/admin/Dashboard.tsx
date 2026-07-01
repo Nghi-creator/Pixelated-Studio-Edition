@@ -1,17 +1,17 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, Filter } from "lucide-react";
 import ReportCard, { type Report } from "../../components/admin/ReportCard";
 import {
   AdminConfirmDialog,
   type AdminConfirmation,
 } from "../../components/admin/AdminConfirmDialog";
+import type { ApiAdminReportAction } from "../../lib/api/apiClient";
+import { useResolveAdminReportMutation } from "../../lib/api/apiMutations";
 import {
-  api,
-  getAuthSession,
-  type ApiAdminReportAction,
-} from "../../lib/api/apiClient";
-import { queryKeys } from "../../lib/api/queryClient";
+  useAdminReportsQuery,
+  useAuthSessionQuery,
+  usePermissionsQuery,
+} from "../../lib/api/apiQueries";
 import { ModerationQueueSkeleton } from "../../components/ui/Skeleton";
 import { Pagination } from "../../components/ui/Pagination";
 import { PixelIcon } from "../../components/ui/PixelIcon";
@@ -27,7 +27,6 @@ const REPORTS_PER_PAGE = 25;
 type FilterType = AdminTargetRoleFilter;
 
 export default function Dashboard() {
-  const queryClient = useQueryClient();
   const [filter, setFilter] = useState<FilterType>("all");
   const [page, setPage] = useState(1);
   const [actionError, setActionError] = useState("");
@@ -36,33 +35,33 @@ export default function Dashboard() {
     (AdminConfirmation & { action: ApiAdminReportAction }) | null
   >(null);
 
-  const sessionQuery = useQuery({
-    queryKey: ["authSession"],
-    queryFn: getAuthSession,
-  });
-  const permissionsQuery = useQuery({
+  const sessionQuery = useAuthSessionQuery();
+  const permissionsQuery = usePermissionsQuery({
     enabled: Boolean(sessionQuery.data?.user),
-    queryKey: queryKeys.permissions(),
-    queryFn: api.permissions,
   });
   const currentUserRole = permissionsQuery.data?.profile.role || "";
   const canModerate =
     currentUserRole === "admin" || currentUserRole === "super_admin";
   const currentUserId = sessionQuery.data?.user?.id || "";
-  const reportsQuery = useQuery({
-    enabled: canModerate,
-    queryKey: queryKeys.adminReports(page, REPORTS_PER_PAGE, filter),
-    queryFn: () => api.adminReports<Report>(page, REPORTS_PER_PAGE, filter),
-  });
+  const reportsQuery = useAdminReportsQuery<Report>(
+    page,
+    REPORTS_PER_PAGE,
+    filter,
+    { enabled: canModerate },
+  );
+  const reportsData = canModerate ? reportsQuery.data : undefined;
+  const reportsLoading = canModerate && reportsQuery.isLoading;
+  const reportsError = canModerate && reportsQuery.isError;
+  const reports = reportsData?.reports || [];
+  const totalReports = reportsData?.total || reports.length;
+  const totalPages = reportsData?.totalPages || 1;
+  const safePage = Math.min(page, totalPages);
 
-  const resolveReportMutation = useMutation({
-    mutationFn: ({
-      action,
-      reportId,
-    }: {
-      action: ApiAdminReportAction;
-      reportId: string;
-    }) => api.adminReportAction(reportId, action),
+  const resolveReportMutation = useResolveAdminReportMutation<Report>({
+    page,
+    pageSize: REPORTS_PER_PAGE,
+    targetRole: filter,
+    totalReports,
     onError: (err) => {
       console.error("Failed to resolve report:", err);
       setActionError(
@@ -72,34 +71,7 @@ export default function Dashboard() {
         ),
       );
     },
-    onSuccess: async (result, { action }) => {
-      const nextTotal = Math.max(0, totalReports - 1);
-      queryClient.setQueryData(
-        queryKeys.adminReports(page, REPORTS_PER_PAGE, filter),
-        (
-          current:
-            | {
-                reports: Report[];
-                total: number;
-                totalPages: number;
-              }
-            | undefined,
-        ) =>
-          current
-            ? {
-                ...current,
-                reports:
-                  action === "ignore"
-                    ? current.reports.filter(
-                        (report) => report.id !== result.reportId,
-                      )
-                    : current.reports.filter(
-                        (report) => report.comments?.id !== result.commentId,
-                      ),
-                total: nextTotal,
-              }
-            : current,
-      );
+    onResolved: ({ nextTotal }) => {
       setPage(
         getPageAfterRemoval({
           currentPage: page,
@@ -107,11 +79,7 @@ export default function Dashboard() {
           totalAfterRemoval: nextTotal,
         }),
       );
-      await queryClient.invalidateQueries({
-        queryKey: queryKeys.adminReports(page, REPORTS_PER_PAGE, filter),
-      });
     },
-    onSettled: () => setPendingReportId(null),
   });
 
   const resolveReport = async (
@@ -123,7 +91,8 @@ export default function Dashboard() {
     setActionError("");
     await resolveReportMutation
       .mutateAsync({ action, reportId })
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setPendingReportId(null));
   };
 
   const handleIgnore = async (reportId: string) => {
@@ -155,16 +124,12 @@ export default function Dashboard() {
   const loading =
     sessionQuery.isLoading ||
     permissionsQuery.isLoading ||
-    (canModerate && reportsQuery.isLoading);
+    reportsLoading;
   const loadError = permissionsQuery.isError
     ? "Could not verify moderation permissions. Try again."
-    : reportsQuery.isError
+    : reportsError
       ? "Could not load reports. Try again."
       : "";
-  const reports = reportsQuery.data?.reports || [];
-  const totalReports = reportsQuery.data?.total || reports.length;
-  const totalPages = reportsQuery.data?.totalPages || 1;
-  const safePage = Math.min(page, totalPages);
 
   if (loading) {
     return <ModerationQueueSkeleton />;

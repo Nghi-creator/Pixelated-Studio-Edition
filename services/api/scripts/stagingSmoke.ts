@@ -15,7 +15,11 @@ type AccessLogErrorPayload = {
   migrations?: string[];
 };
 
-type SmokeMode = "access-log-schema" | "full" | "submission-cleanup-policy";
+type SmokeMode =
+  | "access-log-schema"
+  | "catalog-rpc"
+  | "full"
+  | "submission-cleanup-policy";
 
 const mode = parseArgs(process.argv.slice(2));
 const apiUrl = normalizeBaseUrl(
@@ -43,9 +47,12 @@ function parseArgs(args: string[]): SmokeMode {
   if (args.length === 1 && args[0] === "--submission-cleanup-policy-only") {
     return "submission-cleanup-policy";
   }
+  if (args.length === 1 && args[0] === "--catalog-rpc-only") {
+    return "catalog-rpc";
+  }
 
   fail(
-    `Unknown arguments: ${args.join(" ")}. Supported options: --access-log-schema-only, --submission-cleanup-policy-only`,
+    `Unknown arguments: ${args.join(" ")}. Supported options: --access-log-schema-only, --submission-cleanup-policy-only, --catalog-rpc-only`,
   );
 }
 
@@ -214,6 +221,74 @@ async function smokeCatalogCaching() {
   assert.equal(Array.isArray(featured.payload.featuredGames), true);
   assertHeader(featured.response, "Cache-Control", "no-store");
   assertHeader(featured.response, "X-Pixelated-Cache", null);
+}
+
+function formatCatalogRpcError(error: unknown) {
+  if (!error) return "<empty>";
+  if (error instanceof Error) return error.message;
+  if (typeof error !== "object") return String(error);
+
+  const record = error as {
+    code?: unknown;
+    details?: unknown;
+    hint?: unknown;
+    message?: unknown;
+  };
+  const summary = [
+    typeof record.code === "string" ? `code=${record.code}` : null,
+    typeof record.message === "string" ? `message=${record.message}` : null,
+    typeof record.details === "string" ? `details=${record.details}` : null,
+    typeof record.hint === "string" ? `hint=${record.hint}` : null,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return summary || JSON.stringify(record);
+}
+
+async function predeployCatalogRpcCheck() {
+  if (!stagingSupabaseUrl || !stagingSupabaseAnonKey) {
+    fail(
+      "Missing Supabase configuration for published catalog RPC check. " +
+        "Provide STAGING_SUPABASE_URL and STAGING_SUPABASE_ANON_KEY.",
+    );
+  }
+
+  const supabase = createClient(stagingSupabaseUrl, stagingSupabaseAnonKey, {
+    auth: {
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+      persistSession: false,
+    },
+  });
+
+  logStep("checking hosted published_catalog_games RPC search signature");
+  const probeSearch = uniqueId("catalog-rpc-signature");
+  const { data, error } = await supabase.rpc("published_catalog_games", {
+    p_game_id: null,
+    p_limit: 1,
+    p_order: "title",
+    p_search: probeSearch,
+  });
+  if (error) {
+    throw new Error(
+      "Hosted Supabase is missing the current public.published_catalog_games(uuid, integer, text, text) RPC signature. " +
+        "Apply migrations supabase/migrations/20260701100000_published_catalog_games_rpc.sql and " +
+        "supabase/migrations/20260701103000_update_published_catalog_games_search.sql before deploying. " +
+        `details=${formatCatalogRpcError(error)}`,
+    );
+  }
+
+  assert.equal(
+    Array.isArray(data),
+    true,
+    "published_catalog_games RPC should return an array",
+  );
+  assert.equal(
+    data.length,
+    0,
+    "unique published_catalog_games search probe should not match catalog rows",
+  );
 }
 
 async function findSmokeGameId() {
@@ -596,6 +671,12 @@ async function smokeSessionAndMetrics(gameId: string) {
 
 async function main() {
   console.log(`staging smoke target: ${apiUrl}`);
+  if (mode === "catalog-rpc") {
+    await predeployCatalogRpcCheck();
+    console.log("hosted published catalog RPC predeploy check passed");
+    return;
+  }
+
   bearerToken = await resolveBearerToken();
   authHeaders = {
     Authorization: `Bearer ${bearerToken}`,
@@ -611,7 +692,6 @@ async function main() {
     console.log("hosted submission cleanup policy predeploy check passed");
     return;
   }
-
   await smokeCatalogCaching();
   const permissions = await smokeIdentity();
   await smokeAccessLogStorage(permissions.abilities?.canAccessAdmin === true);

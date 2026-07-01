@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import {
   LogOut,
@@ -8,7 +8,8 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import type { User } from "@supabase/supabase-js";
-import { api, getAuthSession } from "../../lib/api/apiClient";
+import { getAuthSession } from "../../lib/api/apiClient";
+import { usePermissionsQuery } from "../../lib/api/apiQueries";
 import { queryKeys } from "../../lib/api/queryClient";
 import { Avatar } from "../ui/Avatar";
 import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engine/engineAuth";
@@ -47,10 +48,8 @@ export default function Navbar() {
     return () => subscription.unsubscribe();
   }, [queryClient]);
 
-  const permissionsQuery = useQuery({
+  const permissionsQuery = usePermissionsQuery({
     enabled: Boolean(user),
-    queryKey: queryKeys.permissions(),
-    queryFn: api.permissions,
   });
 
   useEffect(() => {
