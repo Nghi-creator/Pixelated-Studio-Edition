@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
-import { registerSignalingRelayHandlers } from "./signalingRelay";
+import { registerSignalingRelayHandlers } from "../../src/signaling/signalingRelay";
 
 class FakeSocket extends EventEmitter {
   data: Record<string, unknown> = {};

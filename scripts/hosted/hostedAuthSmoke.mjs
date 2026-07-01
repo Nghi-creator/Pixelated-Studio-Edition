@@ -33,7 +33,7 @@ const signupPendingMessage =
 const runId = `hosted-auth-${new Date().toISOString().replaceAll(":", "-")}`;
 const runDir = path.resolve(
   process.env.HOSTED_AUTH_SMOKE_ARTIFACT_DIR ||
-    path.join(rootDir, ".context", "hosted-auth-smoke", runId),
+    path.join(rootDir, ".artifacts", "hosted-auth-smoke", runId),
 );
 const reportPath = path.join(runDir, "hosted-auth-report.json");
 const summaryPath = path.join(runDir, "failure-summary.md");

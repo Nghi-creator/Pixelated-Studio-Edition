@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { getHttpErrorResponse } from "./errorHandlers";
+import { getHttpErrorResponse } from "../../src/http/errorHandlers";
 
 describe("engine HTTP error responses", () => {
   it("reports rejected origins as forbidden rather than server failures", () => {

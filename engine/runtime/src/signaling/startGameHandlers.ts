@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import path from "path";
 import type { Socket } from "socket.io";
 import {
   getSessionRoom,
@@ -8,130 +7,39 @@ import {
 } from "./sessionRooms";
 import { sanitizeUserId } from "../roms/localRomStore";
 import {
-  findRuntimeByExtension,
   getRuntimeDefinition,
-  getRuntimeExtensionForTarget,
 } from "../runtime/runtimeRegistry";
-import { removeFileIfExists } from "../roms/cloudRomDownloader";
+import {
+  launchCloudRomSession,
+  launchLocalVaultSession,
+  launchNativeSession,
+  type DownloadCloudRom,
+  type Runtime,
+} from "./startGameLaunch";
+import {
+  hasCloudSessionIntent,
+  normalizeIceServers,
+  normalizeStreamProfile,
+  resolveVerifiedCloudBoot,
+  type StartGamePayload,
+  type StreamProfile,
+  type VerifyBackendSession,
+} from "./startGameRequest";
 
-type IceServer = {
-  credential?: string;
-  urls: string | string[];
-  username?: string;
-};
-
-export type StreamProfile = {
-  bitrateKbps: number;
-  fps: number;
-  id: string;
-};
-
-type StartGamePayload = {
-  iceServers?: unknown;
-  mode?: unknown;
-  romFilename?: unknown;
-  sessionId?: unknown;
-  sessionToken?: unknown;
-  streamProfile?: unknown;
-  userId?: unknown;
-};
-
-type VerifiedBackendSession = {
-  expectedSha256?: string | null;
-  expectedSizeBytes?: number | null;
-  launchManifestId?: string | null;
-  mode: string;
-  romTarget?: string | null;
-  runtimeId?: string | null;
-  userId?: string | null;
-};
-
-type RuntimeBootOptions = {
-  iceServers?: IceServer[];
-  isCloudRom?: boolean;
-  runtimeId: string;
-  streamProfile: StreamProfile;
-};
-
-type Runtime = {
-  bootGame(romPath: string, sessionId: string, options: RuntimeBootOptions): void;
+export {
+  hasCloudSessionIntent,
+  normalizeIceServers,
+  normalizeStreamProfile,
+  type StreamProfile,
 };
 
 type RegisterStartGameOptions = {
   apiUrl: string;
   canStartGame?: (socket: Socket, sessionId: string) => boolean;
-  downloadCloudRom(
-    romUrl: string,
-    destinationPath: string,
-    validation: {
-      expectedSha256?: string | null;
-      expectedSizeBytes?: number | null;
-      runtimeId: string;
-    },
-  ): Promise<void>;
+  downloadCloudRom: DownloadCloudRom;
   runtime: Runtime;
-  verifyBackendSession(options: {
-    apiUrl: string;
-    sessionId: string;
-    sessionToken: string;
-  }): Promise<VerifiedBackendSession>;
+  verifyBackendSession: VerifyBackendSession;
 };
-
-function normalizeStartMode(mode: unknown) {
-  return typeof mode === "string" ? mode.trim().toLowerCase() : "";
-}
-
-export function hasCloudSessionIntent(payload: StartGamePayload) {
-  return (
-    normalizeStartMode(payload.mode) === "cloud" || Boolean(payload.sessionToken)
-  );
-}
-
-export function normalizeIceServers(value: unknown): IceServer[] {
-  return Array.isArray(value)
-    ? value
-        .map((server): IceServer | null => {
-          if (!server || typeof server !== "object") return null;
-          const rawServer = server as Record<string, unknown>;
-          const urls = Array.isArray(rawServer.urls)
-            ? rawServer.urls.filter((url): url is string => typeof url === "string")
-            : typeof rawServer.urls === "string"
-              ? rawServer.urls
-              : null;
-          if (!urls || (Array.isArray(urls) && urls.length === 0)) return null;
-          const normalized: IceServer = {
-            credential:
-              typeof rawServer.credential === "string"
-                ? rawServer.credential
-                : undefined,
-            urls,
-            username:
-              typeof rawServer.username === "string"
-                ? rawServer.username
-                : undefined,
-          };
-          return normalized;
-        })
-        .filter((server): server is IceServer => Boolean(server))
-    : [];
-}
-
-export function normalizeStreamProfile(value: unknown): StreamProfile {
-  const profile = value && typeof value === "object" ? value : {};
-  const rawProfile = profile as Record<string, unknown>;
-  const fps = Number(rawProfile.fps);
-  const bitrateKbps = Number(rawProfile.bitrateKbps);
-  const id = typeof rawProfile.id === "string" ? rawProfile.id : "balanced";
-
-  return {
-    bitrateKbps:
-      Number.isFinite(bitrateKbps) && bitrateKbps >= 500 && bitrateKbps <= 2500
-        ? Math.round(bitrateKbps)
-        : 1000,
-    fps: Number.isFinite(fps) && fps >= 24 && fps <= 60 ? Math.round(fps) : 60,
-    id: /^[a-z0-9_-]{1,40}$/i.test(id) ? id : "balanced",
-  };
-}
 
 export function registerStartGameHandler(
   socket: Socket,
@@ -187,32 +95,19 @@ export function registerStartGameHandler(
       }
 
       try {
-        const verifiedSession = await verifyBackendSession({
+        const verifiedBoot = await resolveVerifiedCloudBoot({
           apiUrl,
+          safeUserId,
           sessionId,
           sessionToken: payload.sessionToken,
+          verifyBackendSession,
         });
-
-        if (verifiedSession.mode !== "cloud") {
-          throw new Error("Backend session is not approved for cloud boot.");
-        }
-
-        romFileOrUrl = verifiedSession.romTarget || "";
-        runtimeId = verifiedSession.runtimeId || "";
-        const verifiedRuntime = getRuntimeDefinition(runtimeId);
-        if (!verifiedRuntime) {
-          throw new Error("Backend session selected an unsupported runtime.");
-        }
-        launchManifestId = verifiedSession.launchManifestId;
-        if (verifiedRuntime.kind === "libretro" && !romFileOrUrl) {
-          throw new Error("Backend session did not provide a ROM target.");
-        }
-        if (verifiedRuntime.kind === "native_linux" && !launchManifestId) {
-          throw new Error("Backend session did not provide a launch manifest.");
-        }
-        expectedSha256 = verifiedSession.expectedSha256;
-        expectedSizeBytes = verifiedSession.expectedSizeBytes;
-        safeUserId = sanitizeUserId(verifiedSession.userId || safeUserId);
+        romFileOrUrl = verifiedBoot.romFileOrUrl;
+        runtimeId = verifiedBoot.runtimeId;
+        launchManifestId = verifiedBoot.launchManifestId;
+        expectedSha256 = verifiedBoot.expectedSha256;
+        expectedSizeBytes = verifiedBoot.expectedSizeBytes;
+        safeUserId = verifiedBoot.safeUserId;
       } catch (err) {
         console.error("[Engine] Cloud session verification failed:", err);
         socket.emit("engine-error", {
@@ -233,10 +128,12 @@ export function registerStartGameHandler(
     const verifiedRuntime = getRuntimeDefinition(runtimeId);
     if (verifiedRuntime?.kind === "native_linux") {
       try {
-        runtime.bootGame(launchManifestId || "", sessionId, {
-          ...(iceServers.length > 0 ? { iceServers } : {}),
-          isCloudRom: false,
+        launchNativeSession({
+          iceServers,
+          launchManifestId,
+          runtime,
           runtimeId,
+          sessionId,
           streamProfile,
         });
       } catch (err) {
@@ -246,59 +143,43 @@ export function registerStartGameHandler(
         });
       }
     } else if (romFileOrUrl?.startsWith("http")) {
-      const registryRuntime = getRuntimeDefinition(runtimeId);
-      if (!registryRuntime) {
-        socket.emit("engine-error", {
-          message: "Cloud session selected an unsupported runtime.",
-        });
-        return;
-      }
-      const extension = getRuntimeExtensionForTarget(
-        romFileOrUrl,
-        registryRuntime,
-      );
-      const tmpPath = `/tmp/cloud_game_${crypto.randomUUID()}${extension}`;
-      console.log(
-        "[Engine] Cloud URL detected. Downloading ROM to temporary storage...",
-      );
-
       try {
-        await downloadCloudRom(romFileOrUrl, tmpPath, {
+        await launchCloudRomSession({
+          downloadCloudRom,
           expectedSha256,
           expectedSizeBytes,
+          iceServers,
+          romFileOrUrl,
+          runtime,
           runtimeId,
-        });
-        console.log("[Engine] Download complete. Booting Cloud Game.");
-        runtime.bootGame(tmpPath, sessionId, {
-          ...(iceServers.length > 0 ? { iceServers } : {}),
-          isCloudRom: true,
-          runtimeId,
+          sessionId,
           streamProfile,
         });
       } catch (err) {
         console.error("[Engine] Failed to prepare cloud ROM:", err);
-        removeFileIfExists(tmpPath);
         socket.emit("engine-error", {
           message: err instanceof Error ? err.message : "Cloud ROM failed",
         });
       }
     } else if (romFileOrUrl) {
-      const safeRomFile = path.basename(romFileOrUrl);
-      const registryRuntime = findRuntimeByExtension(safeRomFile);
-      if (!registryRuntime) {
-        socket.emit("engine-error", {
-          message: "Unsupported local game file type.",
-        });
-        return;
-      }
       try {
-        runtime.bootGame(path.join("/roms", safeUserId, safeRomFile), sessionId, {
-          ...(iceServers.length > 0 ? { iceServers } : {}),
-          runtimeId: registryRuntime.id,
+        launchLocalVaultSession({
+          iceServers,
+          romFileOrUrl,
+          runtime,
+          safeUserId,
+          sessionId,
           streamProfile,
         });
       } catch (err) {
         console.error("[Engine] Failed to launch Local Vault game:", err);
+        if (
+          err instanceof Error &&
+          err.message === "Unsupported local game file type."
+        ) {
+          socket.emit("engine-error", { message: err.message });
+          return;
+        }
         socket.emit("engine-error", {
           message:
             err instanceof Error

@@ -2,8 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-import { getNativeLaunchManifest } from "./nativeLaunchManifests";
-import { getRuntimeDefinition } from "./runtimeRegistry";
+import { getNativeLaunchManifest } from "../../src/runtime/nativeLaunchManifests";
+import { getRuntimeDefinition } from "../../src/runtime/runtimeRegistry";
 
 test("debian native runtime exposes only allowlisted launch manifests", () => {
   const runtime = getRuntimeDefinition("debian-native-v1");

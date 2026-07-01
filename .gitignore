@@ -12,6 +12,7 @@ __pycache__/
 *.py[cod]
 supabase/.temp/
 .vercel
+.artifacts/
 .context/hosted-pairing-smoke/
 .context/hosted-auth-smoke/
 THESIS_RESEARCH_PLAN.md

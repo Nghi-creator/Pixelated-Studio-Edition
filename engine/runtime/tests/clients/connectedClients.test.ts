@@ -5,7 +5,7 @@ import {
   listConnectedClients,
   revokeConnectedClient,
   trackHttpClient,
-} from "./connectedClients";
+} from "../../src/clients/connectedClients";
 
 function requestFor(clientId: string) {
   return {

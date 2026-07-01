@@ -1,4 +1,3 @@
-import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
@@ -6,11 +5,19 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../supabaseAuth.js";
-import { fetchPublishedGameById } from "../../catalog/services/catalogService.js";
+import { assertBuildBootable, mapBoot } from "../domain/sessionBoot.js";
 import {
-  assertCandidateRuntimeAllowed,
-  CandidateValidationError,
-} from "../../catalog/ingestion/catalogCandidateValidation.js";
+  createSessionId,
+  createSessionToken,
+  hashSessionToken,
+  sessionTokenMatches,
+} from "../domain/sessionTokens.js";
+import {
+  getLiveSession,
+  type SupabaseServiceLike,
+} from "../services/backendSessions.js";
+import { fetchPublishedGameById } from "../../catalog/services/catalogService.js";
+import { CandidateValidationError } from "../../catalog/ingestion/catalogCandidateValidation.js";
 import { createRateLimiter } from "../../security/sharedRateLimiter.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
@@ -24,133 +31,11 @@ const createSessionBodySchema = z.object({
   mode: z.enum(["cloud", "local"]).default("cloud"),
 });
 
-type BackendSessionRow = {
-  boot_artifact_sha256: string | null;
-  boot_artifact_size: number | null;
-  boot_launch_manifest_id: string | null;
-  boot_rom_filename: string | null;
-  boot_rom_url: string | null;
-  boot_runtime_id: string;
-  deleted_at: string | null;
-  expires_at: string;
-  game_id: string;
-  id: string;
-  mode: "cloud" | "local";
-  session_token_hash: string;
-  user_id: string | null;
-};
-
-type SupabaseServiceLike = NonNullable<typeof supabaseService>;
-
 type SessionRouteOptions = {
   optionalUser?: typeof attachOptionalSupabaseUser;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
 };
-
-function createSessionToken() {
-  return crypto.randomBytes(32).toString("base64url");
-}
-
-function createSessionId(clientSessionId?: string) {
-  return clientSessionId || crypto.randomUUID();
-}
-
-function hashSessionToken(sessionToken: string) {
-  return crypto.createHash("sha256").update(sessionToken).digest("hex");
-}
-
-function sessionTokenMatches(storedHash: string, sessionToken: string) {
-  const candidateHash = hashSessionToken(sessionToken);
-  const stored = Buffer.from(storedHash, "hex");
-  const candidate = Buffer.from(candidateHash, "hex");
-
-  return (
-    stored.length === candidate.length && crypto.timingSafeEqual(stored, candidate)
-  );
-}
-
-function mapBoot(row: BackendSessionRow) {
-  return {
-    artifactSha256: row.boot_artifact_sha256,
-    artifactSize: row.boot_artifact_size,
-    launchManifestId: row.boot_launch_manifest_id,
-    romFilename: row.boot_rom_filename,
-    romUrl: row.boot_rom_url,
-    runtimeId: row.boot_runtime_id,
-    runtimeKind:
-      row.boot_launch_manifest_id && !row.boot_rom_url && !row.boot_rom_filename
-        ? "native_linux"
-        : "libretro",
-  };
-}
-
-function assertBuildBootable(build: {
-  artifact_filename: string | null;
-  artifact_sha256?: string | null;
-  artifact_size?: number | null;
-  artifact_url: string | null;
-  launch_manifest_id?: string | null;
-  platform_id: string;
-  runtime_id: string;
-  runtime_kind: "libretro" | "native_linux";
-}) {
-  assertCandidateRuntimeAllowed({
-    artifact_filename: build.artifact_filename,
-    launch_manifest_id: build.launch_manifest_id || null,
-    platform_id: build.platform_id,
-    runtime_id: build.runtime_id,
-    runtime_kind: build.runtime_kind,
-  });
-
-  if (build.runtime_kind === "libretro") {
-    if (!build.artifact_url && !build.artifact_filename) {
-      throw new CandidateValidationError("Game has no ROM target.");
-    }
-    if (
-      typeof build.artifact_size !== "number" ||
-      !Number.isFinite(build.artifact_size) ||
-      build.artifact_size <= 0
-    ) {
-      throw new CandidateValidationError(
-        "Game build is missing a verified artifact size.",
-      );
-    }
-    if (!/^[a-f0-9]{64}$/i.test(build.artifact_sha256 || "")) {
-      throw new CandidateValidationError(
-        "Game build is missing a verified artifact checksum.",
-      );
-    }
-    return;
-  }
-
-  if (build.artifact_url || build.artifact_filename) {
-    throw new CandidateValidationError(
-      "Native game builds must not define ROM artifacts.",
-    );
-  }
-}
-
-async function getLiveSession(
-  service: SupabaseServiceLike | null,
-  sessionId: string,
-) {
-  if (!service) return null;
-
-  const { data, error } = await service
-    .from("backend_sessions")
-    .select(
-      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,boot_runtime_id,boot_artifact_size,boot_artifact_sha256,boot_launch_manifest_id,expires_at,deleted_at",
-    )
-    .eq("id", sessionId)
-    .is("deleted_at", null)
-    .gt("expires_at", new Date().toISOString())
-    .maybeSingle<BackendSessionRow>();
-
-  if (error || !data) return null;
-
-  return data;
-}
 
 export async function registerSessionRoutes(
   app: FastifyInstance,
