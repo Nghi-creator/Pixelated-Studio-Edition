@@ -1,348 +1,60 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
 import { AlertOctagon } from "lucide-react";
-import { supabase } from "../../lib/auth/supabaseClient";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
-import { api, ApiError, getAuthSession } from "../../lib/api/apiClient";
 import { Avatar } from "../../components/ui/Avatar";
 import { ProfileSkeleton } from "../../components/ui/Skeleton";
-import {
-  createCroppedAvatar,
-  type CropArea,
-} from "../../features/profile/avatarCrop";
 import {
   AvatarCropModal,
   DeleteAccountModal,
 } from "../../features/profile/ProfileModals";
 import {
-  saveProfile,
-  validateAvatarFile,
-} from "../../features/profile/profileMutations";
-import {
-  getPasswordPolicyError,
   PASSWORD_MIN_LENGTH,
   PASSWORD_POLICY_HINT,
 } from "../../lib/auth/passwordPolicy";
+import { useProfileSettings } from "../../features/profile/useProfileSettings";
+
 export default function Profile() {
-  const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const profileMutationRef = useRef(false);
-  const passwordMutationRef = useRef(false);
-  const deleteMutationRef = useRef(false);
-
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [userRole, setUserRole] = useState<string>("user");
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [loadAttempt, setLoadAttempt] = useState(0);
-  const [savingProfile, setSavingProfile] = useState(false);
-  const [savingPassword, setSavingPassword] = useState(false);
-
-  // Split messages
-  const [profileMessage, setProfileMessage] = useState<{
-    type: "success" | "warning" | "error";
-    text: string;
-  } | null>(null);
-  const [passwordMessage, setPasswordMessage] = useState<{
-    type: "success" | "error";
-    text: string;
-  } | null>(null);
-
-  // Profile Form State
-  const [username, setUsername] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-
-  // Cropper Modal State
-  const [showCropper, setShowCropper] = useState(false);
-  const [imageSrc, setImageSrc] = useState<string | null>(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [croppedAreaPixels, setCroppedAreaPixels] =
-    useState<CropArea | null>(null);
-  const [isCropping, setIsCropping] = useState(false);
-
-  // Password Form State
-  const [currentPassword, setCurrentPassword] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-
-  // Account Deletion State
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [deleteInput, setDeleteInput] = useState("");
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-
-  const hasPassword = user?.app_metadata?.providers?.includes("email");
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchProfile = async () => {
-      setLoading(true);
-      setLoadError(null);
-      try {
-        const session = await getAuthSession();
-        if (!isMounted) return;
-        if (!session) {
-          navigate("/login");
-          return;
-        }
-        setUser(session.user);
-
-        const { profile } = await api.profile();
-        if (!isMounted) return;
-
-        if (profile) {
-          setUsername(profile.username || "");
-          setAvatarUrl(profile.avatar_url || "");
-          setUserRole(profile.role || "user");
-        }
-      } catch (error) {
-        console.error("Error loading profile", error);
-        if (isMounted) {
-          setLoadError(
-            error instanceof Error
-              ? error.message
-              : "Failed to load account settings.",
-          );
-        }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    void fetchProfile();
-    return () => {
-      isMounted = false;
-    };
-  }, [loadAttempt, navigate]);
-
-  useEffect(
-    () => () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-    },
-    [previewUrl],
-  );
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      const validationError = validateAvatarFile(file);
-      if (validationError) {
-        setProfileMessage({ type: "error", text: validationError });
-        e.target.value = "";
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = () => {
-        setImageSrc(reader.result as string);
-        setCroppedAreaPixels(null);
-        setCrop({ x: 0, y: 0 });
-        setZoom(1);
-        setShowCropper(true);
-      };
-      reader.onerror = () => {
-        setProfileMessage({
-          type: "error",
-          text: "The selected image could not be read.",
-        });
-      };
-      reader.readAsDataURL(file);
-
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  const onCropComplete = useCallback(
-    (_croppedArea: CropArea, croppedAreaPixels: CropArea) => {
-      setCroppedAreaPixels(croppedAreaPixels);
-    },
-    [],
-  );
-
-  const handleCropConfirm = async () => {
-    if (isCropping) return;
-    setIsCropping(true);
-    try {
-      if (!imageSrc || !croppedAreaPixels) return;
-      const croppedFile = await createCroppedAvatar(imageSrc, croppedAreaPixels);
-
-      setAvatarFile(croppedFile);
-      setPreviewUrl((current) => {
-        if (current) URL.revokeObjectURL(current);
-        return URL.createObjectURL(croppedFile);
-      });
-      setShowCropper(false);
-    } catch (error) {
-      console.error(error);
-      setProfileMessage({
-        type: "error",
-        text: "Failed to crop the selected image.",
-      });
-    } finally {
-      setIsCropping(false);
-    }
-  };
-
-  const updateProfile = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!user || profileMutationRef.current) return;
-    profileMutationRef.current = true;
-    setSavingProfile(true);
-    setProfileMessage(null);
-
-    try {
-      const result = await saveProfile({
-        avatarFile,
-        currentAvatarUrl: avatarUrl,
-        removeAvatar: async (path) => {
-          const { error } = await supabase.storage.from("avatars").remove([path]);
-          if (error) throw error;
-        },
-        updateAuthMetadata: async (finalAvatarUrl, finalUsername) => {
-          const { error } = await supabase.auth.updateUser({
-            data: { avatar_url: finalAvatarUrl, username: finalUsername },
-          });
-          if (error) throw error;
-        },
-        updateProfile: async (finalAvatarUrl, finalUsername) => {
-          await api.updateProfile({
-            avatarUrl: finalAvatarUrl,
-            username: finalUsername,
-          });
-        },
-        uploadAvatar: async (file, path) => {
-          const { error } = await supabase.storage
-            .from("avatars")
-            .upload(path, file, { contentType: "image/jpeg" });
-          if (error) throw error;
-
-          const {
-            data: { publicUrl },
-          } = supabase.storage.from("avatars").getPublicUrl(path);
-          return publicUrl;
-        },
-        userId: user.id,
-        username,
-      });
-      setUsername(username.trim());
-      setAvatarUrl(result.avatarUrl);
-      setAvatarFile(null);
-      setPreviewUrl(null);
-      setProfileMessage({
-        type: result.warnings.length ? "warning" : "success",
-        text: result.warnings.length
-          ? result.warnings.join(" ")
-          : "Profile updated successfully.",
-      });
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setProfileMessage({ type: "error", text: error.message });
-      } else {
-        setProfileMessage({ type: "error", text: "Failed to update profile." });
-      }
-    } finally {
-      profileMutationRef.current = false;
-      setSavingProfile(false);
-    }
-  };
-
-  const updatePassword = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!user?.email || passwordMutationRef.current) return;
-    passwordMutationRef.current = true;
-    setSavingPassword(true);
-    setPasswordMessage(null);
-
-    try {
-      const policyError = getPasswordPolicyError(newPassword);
-      if (policyError) throw new Error(policyError);
-
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
-      });
-      if (verifyError) throw new Error("Current password is incorrect.");
-
-      const { error: updateError } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (updateError) throw updateError;
-
-      setPasswordMessage({
-        type: "success",
-        text: "Password updated successfully.",
-      });
-      setCurrentPassword("");
-      setNewPassword("");
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        setPasswordMessage({ type: "error", text: error.message });
-      } else {
-        setPasswordMessage({
-          type: "error",
-          text: "Failed to update password.",
-        });
-      }
-    } finally {
-      passwordMutationRef.current = false;
-      setSavingPassword(false);
-    }
-  };
-
-  const handleDeleteAccount = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!user || deleteMutationRef.current) return;
-    deleteMutationRef.current = true;
-    setIsDeleting(true);
-    setDeleteError(null);
-
-    try {
-      if (hasPassword) {
-        // 1A. Email Users: Verify Password
-        const { error: verifyError } = await supabase.auth.signInWithPassword({
-          email: user.email!,
-          password: deleteInput,
-        });
-        if (verifyError) throw new Error("Incorrect password.");
-      } else {
-        // OAuth users confirm intent here; the API also requires a recent sign-in.
-        if (deleteInput !== "DELETE") {
-          throw new Error("You must type exactly 'DELETE' to confirm.");
-        }
-      }
-
-      await api.deleteAccount();
-
-      // The account is already gone at this point; local sign-out is best effort.
-      try {
-        const { error: signOutError } = await supabase.auth.signOut();
-        if (signOutError) console.warn("Failed to clear deleted account session");
-      } catch {
-        console.warn("Failed to clear deleted account session");
-      }
-      navigate("/", { replace: true });
-    } catch (error: unknown) {
-      if (
-        error instanceof ApiError &&
-        typeof error.payload === "object" &&
-        error.payload &&
-        "error" in error.payload &&
-        typeof error.payload.error === "string"
-      ) {
-        setDeleteError(error.payload.error);
-      } else if (error instanceof Error) {
-        setDeleteError(error.message);
-      } else {
-        setDeleteError(
-          "An unexpected error occurred while deleting your account.",
-        );
-      }
-      deleteMutationRef.current = false;
-      setIsDeleting(false);
-    }
-  };
+  const profile = useProfileSettings();
+  const {
+    closeDeleteModal,
+    crop,
+    currentPassword,
+    deleteError,
+    deleteInput,
+    displayAvatar,
+    fileInputRef,
+    handleCropConfirm,
+    handleDeleteAccount,
+    handleFileSelect,
+    hasPassword,
+    imageSrc,
+    isCropping,
+    isDeleting,
+    loadError,
+    loading,
+    navigate,
+    newPassword,
+    onCropComplete,
+    passwordMessage,
+    profileMessage,
+    savingPassword,
+    savingProfile,
+    setCrop,
+    setCurrentPassword,
+    setDeleteInput,
+    setLoadAttempt,
+    setNewPassword,
+    setShowCropper,
+    setShowDeleteModal,
+    setUsername,
+    setZoom,
+    showCropper,
+    showDeleteModal,
+    updatePassword,
+    updateProfile,
+    user,
+    userRole,
+    username,
+    zoom,
+  } = profile;
 
   if (loading) {
     return (
@@ -373,8 +85,6 @@ export default function Profile() {
     );
   }
 
-  const displayAvatar = previewUrl || avatarUrl;
-
   return (
     <div className="flex flex-col min-h-screen">
       {showCropper && imageSrc && (
@@ -397,11 +107,7 @@ export default function Profile() {
           deleteInput={deleteInput}
           hasPassword={Boolean(hasPassword)}
           isDeleting={isDeleting}
-          onCancel={() => {
-            setShowDeleteModal(false);
-            setDeleteError(null);
-            setDeleteInput("");
-          }}
+          onCancel={closeDeleteModal}
           onDeleteInputChange={setDeleteInput}
           onSubmit={handleDeleteAccount}
         />

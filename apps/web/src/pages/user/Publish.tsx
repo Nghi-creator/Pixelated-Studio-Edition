@@ -1,4 +1,3 @@
-import React, { useState } from "react";
 import {
   Send,
   ArrowLeft,
@@ -7,145 +6,33 @@ import {
   Image as ImageIcon,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import { supabase } from "../../lib/auth/supabaseClient";
-import { api, getAuthSession } from "../../lib/api/apiClient";
-import {
-  getPublishErrorMessage,
-  submitGameForReview,
-  validateRomFile,
-  validateSubmissionImageFile,
-} from "../../features/publish/publishSubmission";
 import { PixelIcon } from "../../components/ui/PixelIcon";
-
-type FileErrorKey = "banner" | "cover" | "rom";
+import { PublishFileField } from "../../features/publish/PublishFileField";
+import { usePublishSubmissionForm } from "../../features/publish/usePublishSubmissionForm";
 
 export default function Publish() {
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const [fileErrors, setFileErrors] = useState<
-    Partial<Record<FileErrorKey, string>>
-  >({});
-
-  // Form State
-  const [authorName, setAuthorName] = useState("");
-  const [email, setEmail] = useState("");
-  const [gameTitle, setGameTitle] = useState("");
-  const [description, setDescription] = useState("");
-
-  // File State
-  const [romFile, setRomFile] = useState<File | null>(null);
-  const [coverFile, setCoverFile] = useState<File | null>(null);
-  const [bannerFile, setBannerFile] = useState<File | null>(null);
-
-  const handleRomChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const error = validateRomFile(file);
-      if (error) {
-        setRomFile(null);
-        setFileErrors((current) => ({ ...current, rom: error }));
-        e.target.value = "";
-        return;
-      }
-      setFileErrors((current) => ({ ...current, rom: undefined }));
-      setFormError(null);
-      setRomFile(file);
-    }
-  };
-
-  const handleImageChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    errorKey: Exclude<FileErrorKey, "rom">,
-    setter: React.Dispatch<React.SetStateAction<File | null>>,
-  ) => {
-    if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-      const error = validateSubmissionImageFile(file);
-      if (error) {
-        setter(null);
-        setFileErrors((current) => ({ ...current, [errorKey]: error }));
-        e.target.value = "";
-        return;
-      }
-      setFileErrors((current) => ({ ...current, [errorKey]: undefined }));
-      setFormError(null);
-      setter(file);
-    }
-  };
-
-  const uploadToSupabase = async (
-    file: File,
-    path: string,
-  ) => {
-    const { error } = await supabase.storage
-      .from("submissions")
-      .upload(path, file);
-    if (error) throw error;
-
-    const { data } = supabase.storage
-      .from("submissions")
-      .getPublicUrl(path);
-    return data.publicUrl;
-  };
-
-  const removeSubmissionFiles = async (paths: string[]) => {
-    const { error } = await supabase.storage.from("submissions").remove(paths);
-    if (error) throw error;
-  };
-
-  const handleSubmit = async (e: React.SubmitEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (isSubmitting) return;
-
-    const romError = validateRomFile(romFile);
-    if (romError) {
-      setFileErrors((current) => ({ ...current, rom: romError }));
-      return;
-    }
-
-    setIsSubmitting(true);
-    setFormError(null);
-
-    try {
-      const session = await getAuthSession();
-
-      if (!session) {
-        setFormError("Please sign in before submitting a game.");
-        return;
-      }
-
-      await submitGameForReview({
-        createSubmission: api.submitGame,
-        fields: {
-          authorName,
-          description,
-          email,
-          gameTitle,
-        },
-        files: {
-          bannerFile,
-          coverFile,
-          romFile,
-        },
-        removeFiles: removeSubmissionFiles,
-        uploadFile: uploadToSupabase,
-        userId: session.user.id,
-      });
-
-      setIsSuccess(true);
-    } catch (error: unknown) {
-      console.error("Submission error:", error);
-      setFormError(
-        getPublishErrorMessage(
-          error,
-          "Failed to submit game. Check the highlighted files and try again.",
-        ),
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const {
+    authorName,
+    bannerFile,
+    coverFile,
+    description,
+    email,
+    fileErrors,
+    formError,
+    gameTitle,
+    handleImageChange,
+    handleRomChange,
+    handleSubmit,
+    isSubmitting,
+    isSuccess,
+    romFile,
+    setAuthorName,
+    setBannerFile,
+    setCoverFile,
+    setDescription,
+    setEmail,
+    setGameTitle,
+  } = usePublishSubmissionForm();
 
   if (isSuccess) {
     return (
@@ -272,158 +159,91 @@ export default function Publish() {
             />
           </div>
 
-          <div>
-            <label
-              className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
-              htmlFor="publish-rom"
-            >
-              ROM File (.nes) <span className="text-synth-secondary ml-1">*</span>
-            </label>
-            <div
-              className={`relative w-full h-14 bg-synth-bg border-2 border-dashed rounded-xl flex items-center justify-center transition-colors group cursor-pointer overflow-hidden ${
-                fileErrors.rom
-                  ? "border-red-400"
-                  : romFile
-                    ? "border-synth-primary"
-                    : "border-synth-border hover:border-synth-secondary"
-              }`}
-            >
-              <input
-                id="publish-rom"
-                type="file"
-                accept=".nes"
-                onChange={handleRomChange}
-                required
-                disabled={isSubmitting}
-                aria-describedby={fileErrors.rom ? "publish-rom-error" : undefined}
-                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-              />
-              <div
-                className={`flex items-center gap-2 transition-colors ${romFile ? "text-synth-secondary" : "text-gray-400 group-hover:text-synth-secondary"}`}
-              >
-                {romFile ? (
-                  <CheckCircle className="w-5 h-5" />
-                ) : (
-                  <PixelIcon className="h-5 w-5" name="upload" />
-                )}
-                <span className="font-medium text-sm">
-                  {romFile ? romFile.name : "Click to attach .nes file"}
-                </span>
-              </div>
-            </div>
-            {fileErrors.rom && (
-              <p id="publish-rom-error" className="mt-2 text-sm text-red-300">
-                {fileErrors.rom}
-              </p>
-            )}
-          </div>
+          <PublishFileField
+            accept=".nes"
+            describedBy={fileErrors.rom ? "publish-rom-error" : undefined}
+            disabled={isSubmitting}
+            error={fileErrors.rom}
+            file={romFile}
+            icon={
+              romFile ? (
+                <CheckCircle className="w-5 h-5" />
+              ) : (
+                <PixelIcon className="h-5 w-5" name="upload" />
+              )
+            }
+            id="publish-rom"
+            label={
+              <>
+                ROM File (.nes){" "}
+                <span className="text-synth-secondary ml-1">*</span>
+              </>
+            }
+            onChange={handleRomChange}
+            placeholder="Click to attach .nes file"
+            required
+            selectedBorderClass="border-synth-primary"
+          />
 
           {/* OPTIONAL ART UPLOADS */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label
-                className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
-                htmlFor="publish-cover"
-              >
-                Cover Art{" "}
-                <span className="text-gray-500 font-normal lowercase">
-                  (optional)
-                </span>
-              </label>
-              <div
-                className={`relative w-full h-14 bg-synth-bg border-2 border-dashed rounded-xl flex items-center justify-center transition-colors group cursor-pointer overflow-hidden ${
-                  fileErrors.cover
-                    ? "border-red-400"
-                    : coverFile
-                      ? "border-synth-secondary"
-                      : "border-synth-border hover:border-synth-secondary"
-                }`}
-              >
-                <input
-                  id="publish-cover"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => handleImageChange(e, "cover", setCoverFile)}
-                  disabled={isSubmitting}
-                  aria-describedby={
-                    fileErrors.cover ? "publish-cover-error" : undefined
-                  }
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
-                <div
-                  className={`flex items-center gap-2 transition-colors ${coverFile ? "text-synth-secondary" : "text-gray-500 group-hover:text-synth-secondary"}`}
-                >
-                  {coverFile ? (
-                    <CheckCircle className="w-4 h-4" />
-                  ) : (
-                    <ImageIcon className="w-4 h-4" />
-                  )}
-                  <span className="font-medium text-sm truncate px-2">
-                    {coverFile ? coverFile.name : "Upload Cover Image"}
+            <PublishFileField
+              accept="image/*"
+              describedBy={
+                fileErrors.cover ? "publish-cover-error" : undefined
+              }
+              disabled={isSubmitting}
+              error={fileErrors.cover}
+              file={coverFile}
+              icon={
+                coverFile ? (
+                  <CheckCircle className="w-4 h-4" />
+                ) : (
+                  <ImageIcon className="w-4 h-4" />
+                )
+              }
+              id="publish-cover"
+              label={
+                <>
+                  Cover Art{" "}
+                  <span className="text-gray-500 font-normal lowercase">
+                    (optional)
                   </span>
-                </div>
-              </div>
-              {fileErrors.cover && (
-                <p id="publish-cover-error" className="mt-2 text-sm text-red-300">
-                  {fileErrors.cover}
-                </p>
-              )}
-            </div>
+                </>
+              }
+              onChange={(e) => handleImageChange(e, "cover", setCoverFile)}
+              placeholder="Upload Cover Image"
+              selectedBorderClass="border-synth-secondary"
+            />
 
-            <div>
-              <label
-                className="block text-sm font-bold text-gray-400 mb-2 uppercase tracking-wide"
-                htmlFor="publish-banner"
-              >
-                Banner Art{" "}
-                <span className="text-gray-500 font-normal lowercase">
-                  (optional)
-                </span>
-              </label>
-              <div
-                className={`relative w-full h-14 bg-synth-bg border-2 border-dashed rounded-xl flex items-center justify-center transition-colors group cursor-pointer overflow-hidden ${
-                  fileErrors.banner
-                    ? "border-red-400"
-                    : bannerFile
-                      ? "border-synth-secondary"
-                      : "border-synth-border hover:border-synth-secondary"
-                }`}
-              >
-                <input
-                  id="publish-banner"
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) =>
-                    handleImageChange(e, "banner", setBannerFile)
-                  }
-                  disabled={isSubmitting}
-                  aria-describedby={
-                    fileErrors.banner ? "publish-banner-error" : undefined
-                  }
-                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                />
-                <div
-                  className={`flex items-center gap-2 transition-colors ${bannerFile ? "text-synth-secondary" : "text-gray-500 group-hover:text-synth-secondary"}`}
-                >
-                  {bannerFile ? (
-                    <CheckCircle className="w-4 h-4" />
-                  ) : (
-                    <ImageIcon className="w-4 h-4" />
-                  )}
-                  <span className="font-medium text-sm truncate px-2">
-                    {bannerFile ? bannerFile.name : "Upload Banner Image"}
+            <PublishFileField
+              accept="image/*"
+              describedBy={
+                fileErrors.banner ? "publish-banner-error" : undefined
+              }
+              disabled={isSubmitting}
+              error={fileErrors.banner}
+              file={bannerFile}
+              icon={
+                bannerFile ? (
+                  <CheckCircle className="w-4 h-4" />
+                ) : (
+                  <ImageIcon className="w-4 h-4" />
+                )
+              }
+              id="publish-banner"
+              label={
+                <>
+                  Banner Art{" "}
+                  <span className="text-gray-500 font-normal lowercase">
+                    (optional)
                   </span>
-                </div>
-              </div>
-              {fileErrors.banner && (
-                <p
-                  id="publish-banner-error"
-                  className="mt-2 text-sm text-red-300"
-                >
-                  {fileErrors.banner}
-                </p>
-              )}
-            </div>
+                </>
+              }
+              onChange={(e) => handleImageChange(e, "banner", setBannerFile)}
+              placeholder="Upload Banner Image"
+              selectedBorderClass="border-synth-secondary"
+            />
           </div>
 
           <div>
