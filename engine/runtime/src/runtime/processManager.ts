@@ -34,6 +34,11 @@ type BootOptions = {
   streamProfile?: StreamProfile;
 };
 
+type RestartStreamOptions = {
+  iceServers?: IceServer[];
+  streamProfile?: StreamProfile;
+};
+
 type LaunchFailure = {
   exitCode?: number | null;
   label: string;
@@ -70,6 +75,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
   let virtualDisplayProcess: ChildProcess | null = null;
   let activeSessionId: string | null = null;
   let activeCloudRomPath: string | null = null;
+  let activeRuntimeId: string | null = null;
   let cameraStartTimer: NodeJS.Timeout | null = null;
   let lastLaunchFailure: LaunchFailure | null = null;
 
@@ -104,6 +110,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
     }
 
     activeSessionId = null;
+    activeRuntimeId = null;
   }
 
   function bindGameProcessLifecycle(
@@ -116,6 +123,23 @@ export function createProcessManager(options: ProcessManagerOptions) {
       child,
       getActiveSessionId: () => activeSessionId,
       label,
+      onCleanupSession: cleanupActiveSession,
+      onLaunchFailure: recordLaunchFailure,
+      runtimeId,
+      sessionId,
+    });
+  }
+
+  function bindCameraProcessLifecycle(
+    child: ChildProcess,
+    sessionId: string,
+    runtimeId: string,
+  ) {
+    bindManagedProcessLifecycle({
+      child,
+      getActiveSessionId: () =>
+        cameraProcess === child ? activeSessionId : null,
+      label: "Camera bridge",
       onCleanupSession: cleanupActiveSession,
       onLaunchFailure: recordLaunchFailure,
       runtimeId,
@@ -181,6 +205,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
           });
 
     activeSessionId = sessionId;
+    activeRuntimeId = runtimeId;
     activeCloudRomPath = launch.activeCloudRomPath;
     retroarchProcess = launch.child;
     bindGameProcessLifecycle(retroarchProcess, sessionId, launch.label, runtimeId);
@@ -198,8 +223,41 @@ export function createProcessManager(options: ProcessManagerOptions) {
         streamProfile: bootOptions.streamProfile,
       });
 
-      bindGameProcessLifecycle(cameraProcess, sessionId, "Camera bridge", runtimeId);
+      bindCameraProcessLifecycle(cameraProcess, sessionId, runtimeId);
     }, 1000);
+  }
+
+  function restartStream(
+    sessionId: string,
+    restartOptions: RestartStreamOptions = {},
+  ): void {
+    if (!activeSessionId || activeSessionId !== sessionId || !retroarchProcess) {
+      throw new Error("No active game session is available for stream restart.");
+    }
+
+    const runtimeId = activeRuntimeId || "mesen";
+
+    if (cameraStartTimer) {
+      clearTimeout(cameraStartTimer);
+      cameraStartTimer = null;
+    }
+
+    if (cameraProcess) {
+      const oldCameraProcess = cameraProcess;
+      cameraProcess = null;
+      oldCameraProcess.kill();
+    }
+
+    cameraProcess = launchCameraBridge({
+      cameraPath,
+      cameraPeerStatePath,
+      engineToken,
+      iceServers: restartOptions.iceServers,
+      sessionId,
+      spawnProcess,
+      streamProfile: restartOptions.streamProfile,
+    });
+    bindCameraProcessLifecycle(cameraProcess, sessionId, runtimeId);
   }
 
   function getActiveSessionId(): string | null {
@@ -225,6 +283,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
     cleanupActiveSession,
     getActiveSessionId,
     getRuntimeState,
+    restartStream,
     sendInput,
     startVirtualDisplay,
   };

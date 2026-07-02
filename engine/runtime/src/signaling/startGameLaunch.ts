@@ -15,8 +15,14 @@ type RuntimeBootOptions = {
   streamProfile: StreamProfile;
 };
 
+export type RuntimeStreamRestartOptions = {
+  iceServers?: IceServer[];
+  streamProfile: StreamProfile;
+};
+
 export type Runtime = {
   bootGame(romPath: string, sessionId: string, options: RuntimeBootOptions): void;
+  restartStream(sessionId: string, options: RuntimeStreamRestartOptions): void;
 };
 
 export type DownloadCloudRom = (
