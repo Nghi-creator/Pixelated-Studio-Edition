@@ -44,6 +44,10 @@ export function getLocalGameTitle(filename: string) {
   return filename.replace(/\.(nes|gb|gbc|gba|sfc|smc|md|gen|sms|gg)$/i, "");
 }
 
+export function getLocalGamePlayPath(filename: string) {
+  return `/play/${encodeURIComponent(filename)}`;
+}
+
 export function normalizeLocalGameFilenames(payload: unknown) {
   if (!Array.isArray(payload)) return [];
 

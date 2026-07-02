@@ -17,6 +17,7 @@ import {
 } from "../../lib/engine/engineAuth";
 import {
   deleteLocalVaultGame,
+  getLocalGamePlayPath,
   fetchLocalVaultFilenames,
   getLocalGameTitle,
   getLocalVaultErrorMessage,
@@ -337,7 +338,7 @@ export default function LocalVault() {
           {localGames.map((filename) => (
             <Link
               key={filename}
-              to={`/play/${filename}`}
+              to={getLocalGamePlayPath(filename)}
               className="group relative flex h-64 flex-col justify-between overflow-hidden rounded-lg border border-synth-border bg-synth-surface p-4 transition-colors hover:bg-synth-elevated"
             >
               <div>

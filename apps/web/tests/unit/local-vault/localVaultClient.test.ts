@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  getLocalGamePlayPath,
   getLocalGameTitle,
   getLocalVaultErrorMessage,
   InvalidEngineTokenError,
@@ -76,6 +77,13 @@ test("local vault filenames normalize to playable local game cards", () => {
     { id: "gear.gg", title: "gear" },
     { id: "OLDER.NES", title: "OLDER" },
   ]);
+});
+
+test("local vault play paths encode route-sensitive filenames", () => {
+  assert.equal(
+    getLocalGamePlayPath("demo #1?rev=2%.gba"),
+    "/play/demo%20%231%3Frev%3D2%25.gba",
+  );
 });
 
 test("local vault errors preserve invalid-token recovery guidance", () => {
