@@ -16,6 +16,25 @@ on:
       - "apps/web/**"
       - "engine/runtime/**"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: GitHub release tag to create or update. Leave blank to validate only.
+        required: false
+        type: string
+      release_name:
+        description: Optional GitHub release title.
+        required: false
+        type: string
+      release_draft:
+        description: Create the release as a draft when it does not already exist.
+        required: false
+        type: boolean
+        default: true
+      release_prerelease:
+        description: Mark the release as a prerelease when it does not already exist.
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
   group: desktop-release-validation-${{ github.ref }}
@@ -79,3 +98,57 @@ jobs:
             apps/desktop/release/*.exe
             apps/desktop/release/*.AppImage
           retention-days: 14
+
+  publish-github-release:
+    name: Publish GitHub release assets
+    if: github.event_name == 'workflow_dispatch' && inputs.release_tag != ''
+    needs: native-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - name: Download validated desktop artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: .context/desktop-release-assets
+          pattern: pixelated-desktop-*-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Publish desktop installers to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_DRAFT: ${{ inputs.release_draft }}
+          RELEASE_NAME: ${{ inputs.release_name }}
+          RELEASE_PRERELEASE: ${{ inputs.release_prerelease }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          assets=(
+            .context/desktop-release-assets/*.dmg
+            .context/desktop-release-assets/*.exe
+            .context/desktop-release-assets/*.AppImage
+          )
+          if [ "${#assets[@]}" -ne 3 ]; then
+            printf 'Expected 3 desktop release assets (.dmg, .exe, .AppImage), found %s.\n' "${#assets[@]}" >&2
+            find .context/desktop-release-assets -maxdepth 1 -type f -print >&2
+            exit 1
+          fi
+
+          title="${RELEASE_NAME:-$RELEASE_TAG}"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
+            exit 0
+          fi
+
+          args=(release create "$RELEASE_TAG" "${assets[@]}" --target "$GITHUB_SHA" --title "$title")
+          if [ "$RELEASE_DRAFT" = "true" ]; then
+            args+=(--draft)
+          fi
+          if [ "$RELEASE_PRERELEASE" = "true" ]; then
+            args+=(--prerelease)
+          fi
+
+          gh "${args[@]}"

@@ -95,6 +95,11 @@ describe("desktop package config", () => {
     assert.match(workflow, /apps\/desktop\/release\/\*\.dmg/);
     assert.match(workflow, /apps\/desktop\/release\/\*\.exe/);
     assert.match(workflow, /apps\/desktop\/release\/\*\.AppImage/);
+    assert.match(workflow, /release_tag:/);
+    assert.match(workflow, /publish-github-release:/);
+    assert.match(workflow, /actions\/download-artifact@v4/);
+    assert.match(workflow, /gh release upload "\$RELEASE_TAG" "\$\{assets\[@\]\}" --clobber/);
+    assert.match(workflow, /gh "\$\{args\[@\]\}"/);
   });
 
   it("ships the QR encoder used by the preload bridge", () => {
