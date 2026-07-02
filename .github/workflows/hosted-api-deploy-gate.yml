@@ -43,6 +43,9 @@ jobs:
       - name: Install API dependencies
         run: npm ci --prefix services/api
 
+      - name: Validate catalog candidate imports
+        run: npm --prefix services/api run check:catalog-candidate-imports
+
       - name: Verify API contract
         run: npm run verify:api
 
