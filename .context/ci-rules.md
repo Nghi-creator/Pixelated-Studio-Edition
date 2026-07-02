@@ -7,6 +7,11 @@ GitHub Actions. Read this before touching hosted deploys, API contracts, web
 boot/session flows, desktop companion/runtime code, smoke scripts, or workflow
 files.
 
+For large, cross-package, workflow, deploy, smoke-test, lockfile, or PR-scale
+changes, agents must check the GitHub Actions pipeline after local verification
+when a pushed branch or PR exists. Do not treat local checks as a substitute for
+CI on these changes; report both local results and the current pipeline state.
+
 ## Workflow Map
 
 ### Hosted API Deploy Gate
@@ -116,6 +121,28 @@ If you touch these files, run at least these checks before final response:
 | `.github/workflows/**` | Run the command(s) named by the edited workflow locally where possible |
 | root/package lockfiles or dependency scripts | Run the affected workflow-level command, not just a package-local test |
 
+## Checking GitHub Actions After Large Changes
+
+Use this after large changes, changes that span multiple touched areas in the
+risk matrix, workflow edits, lockfile/dependency updates, deploy/smoke script
+edits, or any fix made specifically because CI failed.
+
+1. Run the local workflow-level command(s) from the risk matrix first.
+2. If the branch is already pushed or a PR exists, inspect the actual pipeline:
+
+```bash
+gh pr checks --watch
+gh run list --branch "$(git branch --show-current)" --limit 5
+gh run view <run-id> --log-failed
+```
+
+3. If there is no pushed branch or PR to inspect, say that clearly in the final
+   response and name the local checks that were run instead.
+4. If any CI job fails, read the failed job logs, fix the issue, rerun the
+   relevant local checks, then check the pipeline again when possible.
+5. If checking CI is blocked by missing `gh` auth, network restrictions, or lack
+   of a pushed branch, report the blocker explicitly. Do not imply CI passed.
+
 ## Known Tripwires
 
 - Hosted pairing production smoke is timing-sensitive. Runtime switching from
@@ -153,11 +180,14 @@ If you touch these files, run at least these checks before final response:
 1. Identify which workflow(s) the changed paths trigger.
 2. Run the closest local workflow command, or explain clearly why it could not
    be run.
-3. For hosted smoke/script changes, run `node --check` and the relevant
+3. For large or PR-scale changes, check GitHub Actions/PR checks when a pushed
+   branch or PR exists, or state why the pipeline could not be inspected.
+4. For hosted smoke/script changes, run `node --check` and the relevant
    `--contract-only` mode when available.
-4. For production-only behavior that cannot be fully local, add diagnostics to
+5. For production-only behavior that cannot be fully local, add diagnostics to
    failure output instead of relying on terse assertions.
-5. Report exact commands run and results.
+6. Report exact commands run and results, including CI pipeline state when it
+   was inspected.
 
 When in doubt, favor the workflow-level command:
 
@@ -165,4 +195,3 @@ When in doubt, favor the workflow-level command:
 npm run verify:api
 npm run verify:hosted-contract
 ```
-
