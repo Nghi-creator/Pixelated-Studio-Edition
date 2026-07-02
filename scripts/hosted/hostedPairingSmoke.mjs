@@ -786,6 +786,43 @@ async function main() {
           engineControlUrl === engineUrl
             ? getLocalCompanionControlUrl(engineControlUrl)
             : null;
+        const healthUrls = [
+          engineControlUrl,
+          engineUrl,
+          fallbackControlUrl,
+        ].filter((entry, index, entries) => entry && entries.indexOf(entry) === index);
+        const healthAttempts = [];
+        const getEngineHealth = async () => {
+          for (const healthUrl of healthUrls) {
+            const response = await fetch(`${healthUrl}/health`, {
+              cache: "no-store",
+              headers: engineHeaders,
+            }).catch((error) => {
+              healthAttempts.push({
+                error: error instanceof Error ? error.message : String(error),
+                url: healthUrl,
+              });
+              return null;
+            });
+            if (!response) continue;
+            const health = await response.json().catch((error) => {
+              healthAttempts.push({
+                error: error instanceof Error ? error.message : String(error),
+                status: response.status,
+                url: healthUrl,
+              });
+              return null;
+            });
+            healthAttempts.push({
+              ok: response.ok,
+              runtimeKind: health?.runtimeKind || "",
+              status: response.status,
+              url: healthUrl,
+            });
+            if (response.ok && health) return health;
+          }
+          return null;
+        };
         const postEngineControl = async (path, body) => {
           const request = (controlUrl) =>
             fetch(`${controlUrl}${path}`, {
@@ -847,11 +884,7 @@ async function main() {
           };
         }
 
-        const beforeHealthResponse = await fetch(`${engineUrl}/health`, {
-          cache: "no-store",
-          headers: engineHeaders,
-        });
-        const beforeHealth = await beforeHealthResponse.json().catch(() => null);
+        const beforeHealth = await getEngineHealth();
         if (created.boot?.runtimeKind !== beforeHealth?.runtimeKind) {
           await postEngineControl("/session/stop-active");
           const switchResponse = await postEngineControl("/runtime/switch", {
@@ -871,13 +904,7 @@ async function main() {
         let activeHealth = null;
         let activeRuntimeKind = "";
         for (let attempt = 0; attempt < 40; attempt += 1) {
-          const response = await fetch(`${engineUrl}/health`, {
-            cache: "no-store",
-            headers: engineHeaders,
-          }).catch(() => null);
-          const health = response
-            ? await response.json().catch(() => null)
-            : null;
+          const health = await getEngineHealth();
           activeHealth = health;
           activeRuntimeKind = health?.runtimeKind || "";
           if (activeRuntimeKind === created.boot?.runtimeKind) break;
@@ -887,6 +914,7 @@ async function main() {
         return {
           activeHealth,
           activeRuntimeKind,
+          healthAttempts: healthAttempts.slice(-20),
           bootTarget:
             created.boot?.launchManifestId ||
             created.boot?.romUrl ||
