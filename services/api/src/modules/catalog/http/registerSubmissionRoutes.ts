@@ -32,6 +32,9 @@ const SUPPORTED_SUBMISSION_ROM_EXTENSIONS = [
 ];
 const SUPPORTED_SUBMISSION_ROM_LABEL =
   ".nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, or .gg";
+const SUBMISSION_REVIEW_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+type SubmissionPayload = z.infer<typeof submissionBodySchema>;
 
 function normalizeOptionalUrl(value: string | null | undefined) {
   return value || null;
@@ -77,7 +80,7 @@ function getSubmissionRomExtension(url: string) {
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
 type SubmissionRouteOptions = {
-  notifySubmission?: (submission: z.infer<typeof submissionBodySchema>) => Promise<void>;
+  notifySubmission?: (submission: SubmissionPayload) => Promise<void>;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
 };
@@ -97,9 +100,7 @@ async function getSubmitterRole(
   return data?.role || "user";
 }
 
-async function defaultNotifySubmission(
-  submission: z.infer<typeof submissionBodySchema>,
-) {
+async function defaultNotifySubmission(submission: SubmissionPayload) {
   if (!env.FORMSPREE_SUBMISSION_URL) return;
 
   const response = await fetch(env.FORMSPREE_SUBMISSION_URL, {
@@ -123,6 +124,41 @@ async function defaultNotifySubmission(
   if (!response.ok) {
     throw new Error(`Formspree notification failed with ${response.status}`);
   }
+}
+
+async function createSignedSubmissionUrl(
+  service: SupabaseServiceLike,
+  url: string | null | undefined,
+) {
+  if (!url) return null;
+
+  const objectPath = getSubmissionObjectPath(url);
+  if (!objectPath) return url;
+
+  const { data, error } = await service.storage
+    .from("submissions")
+    .createSignedUrl(objectPath, SUBMISSION_REVIEW_URL_TTL_SECONDS);
+  if (error || !data?.signedUrl) throw error || new Error("Missing signed URL");
+
+  return data.signedUrl;
+}
+
+async function createReviewNotificationSubmission(
+  service: SupabaseServiceLike,
+  submission: SubmissionPayload,
+): Promise<SubmissionPayload> {
+  const [romUrl, coverUrl, bannerUrl] = await Promise.all([
+    createSignedSubmissionUrl(service, submission.romUrl),
+    createSignedSubmissionUrl(service, submission.coverUrl),
+    createSignedSubmissionUrl(service, submission.bannerUrl),
+  ]);
+
+  return {
+    ...submission,
+    bannerUrl,
+    coverUrl,
+    romUrl: romUrl || submission.romUrl,
+  };
 }
 
 export async function registerSubmissionRoutes(
@@ -227,7 +263,11 @@ export async function registerSubmissionRoutes(
       }
 
       try {
-        await notifySubmission(submission);
+        const reviewSubmission = await createReviewNotificationSubmission(
+          service,
+          submission,
+        );
+        await notifySubmission(reviewSubmission);
       } catch (err) {
         request.log.warn({ err }, "Failed to send submission notification");
       }
