@@ -27,6 +27,7 @@ test("curated ROM manifest importer maps supported entries to runtime review can
           artifactSize: 65536,
           codeLicenseSpdx: "GPL-3.0-or-later",
           licenseUrl: "https://example.test/license",
+          nonCommercialHostingAllowed: true,
           sourceEntryPath: "roms/demo.sfc",
           title: "Demo SNES",
         },
@@ -36,6 +37,8 @@ test("curated ROM manifest importer maps supported entries to runtime review can
             "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
           artifactSize: 524288,
           codeLicenseSpdx: "MIT",
+          licenseUrl: "https://example.test/drive-license",
+          nonCommercialHostingAllowed: true,
           sourceEntryPath: "roms/drive.md",
           title: "Drive Demo",
         },
@@ -45,6 +48,8 @@ test("curated ROM manifest importer maps supported entries to runtime review can
             "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd",
           artifactSize: 131072,
           codeLicenseSpdx: "MIT",
+          licenseUrl: "https://example.test/master-license",
+          nonCommercialHostingAllowed: true,
           sourceEntryPath: "roms/master.sms",
           title: "Master Demo",
         },
@@ -54,6 +59,8 @@ test("curated ROM manifest importer maps supported entries to runtime review can
             "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
           artifactSize: 131072,
           codeLicenseSpdx: "MIT",
+          licenseUrl: "https://example.test/gear-license",
+          nonCommercialHostingAllowed: true,
           sourceEntryPath: "roms/gear.gg",
           title: "Gear Demo",
         },
@@ -63,6 +70,8 @@ test("curated ROM manifest importer maps supported entries to runtime review can
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           artifactSize: 20,
           codeLicenseSpdx: "MIT",
+          licenseUrl: "https://example.test/manual-license",
+          nonCommercialHostingAllowed: true,
           sourceEntryPath: "roms/notes.txt",
           title: "Not A ROM",
         },
@@ -123,6 +132,8 @@ test("curated ROM manifest report explains skipped entries", () => {
             "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
           artifactSize: 65536,
           codeLicenseSpdx: "GPL-3.0-or-later",
+          licenseUrl: "https://example.test/demo-license",
+          nonCommercialHostingAllowed: true,
           sourceEntryPath: "roms/demo.sfc",
           title: "Demo SNES",
         },
@@ -139,6 +150,8 @@ test("curated ROM manifest report explains skipped entries", () => {
             "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
           artifactSize: 100,
           codeLicenseSpdx: "MIT",
+          licenseUrl: "https://example.test/manual-license",
+          nonCommercialHostingAllowed: true,
           sourceEntryPath: "docs/manual.pdf",
           title: "Manual",
         },
@@ -156,6 +169,8 @@ test("curated ROM manifest report explains skipped entries", () => {
   assert.equal(report.skipped.length, 2);
   assert.deepEqual(report.skipped[0]?.reasons, [
     "missing codeLicenseSpdx",
+    "missing licenseUrl",
+    "nonCommercialHostingAllowed must be true",
     "artifactSha256 must be 64 lowercase hex characters",
   ]);
   assert.deepEqual(report.skipped[1]?.reasons, [
@@ -190,8 +205,10 @@ test("phase 5 curated ROM manifest imports the pinned PicoDrive candidate", () =
     developerUrl: "https://github.com/moon-watcher",
     licenseUrl:
       "https://github.com/moon-watcher/Scorpion-Illuminati-Core/blob/08728404021f9a34afdbe74d1a22fbfdebc00867/LICENSE.md",
+    nonCommercialHostingAllowed: true,
     originalReleaseUrl:
       "https://github.com/moon-watcher/Scorpion-Illuminati-Core",
+    permissionEvidenceUrl: null,
     platformId: "genesis",
     rightsWarnings: [
       "README describes the game as open source under the Artistic license; reviewer should preserve LICENSE.md attribution with any publication.",
@@ -214,6 +231,7 @@ test("phase 5 curated ROM manifest imports the pinned PicoDrive candidate", () =
       developerUrl: "https://github.com/moon-watcher",
       licenseUrl:
         "https://github.com/moon-watcher/Scorpion-Illuminati-Core/blob/08728404021f9a34afdbe74d1a22fbfdebc00867/LICENSE.md",
+      nonCommercialHostingAllowed: true,
       originalReleaseUrl:
         "https://github.com/moon-watcher/Scorpion-Illuminati-Core",
       rightsWarnings: [

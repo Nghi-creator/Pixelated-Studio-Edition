@@ -40,6 +40,11 @@ test("Debian native importer creates review candidates from locked main/games pa
   assert.equal(candidate.packageComponent, "main");
   assert.equal(candidate.packageName, "frozen-bubble");
   assert.equal(candidate.codeLicenseSpdx, "Debian-main");
+  assert.equal(candidate.nonCommercialHostingAllowed, true);
+  assert.equal(
+    candidate.permissionEvidenceUrl,
+    "https://metadata.ftp-master.debian.org/changelogs/main/f/frozen-bubble/frozen-bubble_2.212-13_copyright",
+  );
   assert.match(candidate.sourceCommit, /^[a-f0-9]{40}$/);
   assert.match(candidate.attributionText, /Copyright evidence/);
 });

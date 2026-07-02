@@ -12,7 +12,9 @@ type CuratedRomManifestEntry = {
   developerName?: unknown;
   developerUrl?: unknown;
   licenseUrl?: unknown;
+  nonCommercialHostingAllowed?: unknown;
   originalReleaseUrl?: unknown;
+  permissionEvidenceUrl?: unknown;
   rightsWarnings?: unknown;
   slug?: unknown;
   sourceEntryPath?: unknown;
@@ -45,7 +47,9 @@ export type CuratedRomCandidate = {
   developerName: string | null;
   developerUrl: string | null;
   licenseUrl: string | null;
+  nonCommercialHostingAllowed: true;
   originalReleaseUrl: string | null;
+  permissionEvidenceUrl: string | null;
   platformId:
     | "nes"
     | "gb"
@@ -204,6 +208,10 @@ export function collectCuratedRomCandidateReport(manifest: CuratedRomManifest) {
       reasons.push("unsupported artifact extension");
     }
     if (!codeLicenseSpdx) reasons.push("missing codeLicenseSpdx");
+    if (!nullableString(entry.licenseUrl)) reasons.push("missing licenseUrl");
+    if (entry.nonCommercialHostingAllowed !== true) {
+      reasons.push("nonCommercialHostingAllowed must be true");
+    }
     if (!/^[a-f0-9]{64}$/.test(artifactSha256)) {
       reasons.push("artifactSha256 must be 64 lowercase hex characters");
     }
@@ -230,17 +238,19 @@ export function collectCuratedRomCandidateReport(manifest: CuratedRomManifest) {
     }
 
     const licenseUrl = nullableString(entry.licenseUrl);
-    if (licenseUrl) {
-      try {
-        assertHttpsUrl(licenseUrl, "licenseUrl");
-      } catch (error) {
-        skipped.push(
-          skippedEntry(entry, index, [
-            error instanceof Error ? error.message : String(error),
-          ]),
-        );
-        return;
+    const permissionEvidenceUrl = nullableString(entry.permissionEvidenceUrl);
+    try {
+      assertHttpsUrl(licenseUrl || "", "licenseUrl");
+      if (permissionEvidenceUrl) {
+        assertHttpsUrl(permissionEvidenceUrl, "permissionEvidenceUrl");
       }
+    } catch (error) {
+      skipped.push(
+        skippedEntry(entry, index, [
+          error instanceof Error ? error.message : String(error),
+        ]),
+      );
+      return;
     }
 
     candidates.push({
@@ -256,7 +266,9 @@ export function collectCuratedRomCandidateReport(manifest: CuratedRomManifest) {
       developerName: nullableString(entry.developerName),
       developerUrl: nullableString(entry.developerUrl),
       licenseUrl,
+      nonCommercialHostingAllowed: true,
       originalReleaseUrl: nullableString(entry.originalReleaseUrl),
+      permissionEvidenceUrl,
       platformId: platform.platformId,
       rightsWarnings: stringArray(entry.rightsWarnings),
       runtimeId: platform.runtimeId,
