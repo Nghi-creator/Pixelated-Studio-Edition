@@ -4,6 +4,7 @@ import path from "path";
 import {
   type EngineRuntimeKind,
   companionPort,
+  engineRuntimeDir,
   hostedWebUrl,
 } from "../runtime/config";
 import {
@@ -75,11 +76,22 @@ type EngineHealthPayload = {
   runtimeKind?: EngineRuntimeKind;
 };
 
+type ImageRecoveryPayload = {
+  detail: string;
+  engineImage: string;
+  guidance: string;
+  runtimeDir: string;
+  runtimeKind: EngineRuntimeKind;
+  summary: string;
+  title: string;
+};
+
 let engineToken: string | null = null;
 let activeCompanion: ActiveCompanion | null = null;
 let activeStartupAttempt = 0;
 let startupInProgress = false;
 let recoveryInProgress = false;
+const IMAGE_RECOVERY_HANDLED = Symbol("image-recovery-handled");
 
 function rejectInvalidImage(event: IpcMainEvent) {
   setCurrentEnginePhase("image");
@@ -342,6 +354,53 @@ function handleStartupFailure(
     });
 }
 
+function createImageRecoveryPayload(
+  launchContext: EngineLaunchContext,
+  detail: string,
+): ImageRecoveryPayload {
+  const runtimeLabel =
+    launchContext.runtimeConfig.engineRuntimeKind === "native_linux"
+      ? "native Linux"
+      : "libretro";
+  const title = "Engine image is not ready";
+  const guidance =
+    `Build the local ${runtimeLabel} Docker image, then retry engine initialization.`;
+  return {
+    detail,
+    engineImage: launchContext.runtimeConfig.engineImage,
+    guidance,
+    runtimeDir: engineRuntimeDir,
+    runtimeKind: launchContext.runtimeConfig.engineRuntimeKind,
+    summary: [
+      "Pixelated Studio engine image recovery",
+      `Status: ${title}`,
+      `Image: ${launchContext.runtimeConfig.engineImage}`,
+      `Runtime: ${launchContext.runtimeConfig.engineRuntimeKind}`,
+      `Runtime dir: ${engineRuntimeDir}`,
+      `Next step: ${guidance}`,
+      detail ? `Detail: ${detail}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    title,
+  };
+}
+
+function emitImageRecovery(
+  event: IpcMainEvent,
+  launchContext: EngineLaunchContext,
+  err: unknown,
+) {
+  const message = getErrorMessage(err);
+  emitEngineState(event, "FAILED", message);
+  event.reply("engine-image-recovery", createImageRecoveryPayload(launchContext, message));
+  event.reply(
+    "server-log",
+    `<span class="text-red-500">ERROR: Engine image preparation failed: ${message}</span>`,
+  );
+  event.reply("engine-stopped");
+}
+
 function emitDockerDiagnostic(event: IpcMainEvent, diagnostic: DockerDiagnostic) {
   emitEngineState(event, "FAILED", diagnostic.title);
   event.reply("docker-diagnostic", diagnostic);
@@ -364,11 +423,21 @@ function continueEngineStartup(
   safeEnv: NodeJS.ProcessEnv,
   launchContext: EngineLaunchContext,
   attempt: number,
+  skipImagePreparation = false,
 ) {
   if (attempt !== activeStartupAttempt) return;
   event.reply("server-log", "Docker Engine found.");
 
-  prepareEngineImage(event, safeEnv, launchContext.runtimeConfig)
+  const prepareImage = skipImagePreparation
+    ? Promise.resolve()
+    : prepareEngineImage(event, safeEnv, launchContext.runtimeConfig);
+
+  prepareImage
+    .catch((imageErr) => {
+      finishStartupAttempt(attempt);
+      emitImageRecovery(event, launchContext, imageErr);
+      throw IMAGE_RECOVERY_HANDLED;
+    })
     .then(() => {
       event.reply("server-log", "Image ready. Preparing WebRTC Node...");
       emitEngineState(event, "REMOVING_STALE", "pixelated-node");
@@ -400,6 +469,7 @@ function continueEngineStartup(
       });
     })
     .catch((startErr) => {
+      if (startErr === IMAGE_RECOVERY_HANDLED) return;
       finishStartupAttempt(attempt);
       handleStartupFailure(event, safeEnv, startErr);
     });
@@ -526,8 +596,74 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
       emitDockerDiagnostic(event, withDockerStartCapability(diagnostic));
       return;
     }
-    continueEngineStartup(event, safeEnv, launchContext, attempt);
+    continueEngineStartup(
+      event,
+      safeEnv,
+      launchContext,
+      attempt,
+      options.skipImagePreparation === true,
+    );
   });
+}
+
+export function buildEngineImageAndResume(
+  event: IpcMainEvent,
+  options: StartEngineOptions = {},
+) {
+  if (startupInProgress || recoveryInProgress) {
+    event.reply("server-log", "Engine initialization is already in progress.");
+    return;
+  }
+
+  const launchContext = createEngineLaunchContext(options);
+  if (!isSafeDockerImageRef(launchContext.runtimeConfig.engineImage)) {
+    rejectInvalidImage(event);
+    return;
+  }
+
+  const safeEnv = getSafeEnv();
+  const attempt = ++activeStartupAttempt;
+  startupInProgress = true;
+  emitEngineState(event, "CHECKING_DOCKER");
+  event.reply("engine-image-build-started");
+  event.reply("server-log", "Checking Docker daemon before rebuilding engine image...");
+
+  if (options.preserveEngineToken !== true || !engineToken) {
+    engineToken = crypto.randomBytes(24).toString("base64url");
+  }
+  stopCompanionServer({
+    preserveSecurityState: launchContext.preserveCompanionSecurity,
+  });
+  activeCompanion = null;
+
+  void diagnoseDocker(safeEnv)
+    .then((diagnostic) => {
+      if (attempt !== activeStartupAttempt) return Promise.reject(IMAGE_RECOVERY_HANDLED);
+      if (diagnostic.code !== "ready") {
+        finishStartupAttempt(attempt);
+        emitDockerDiagnostic(event, withDockerStartCapability(diagnostic));
+        return Promise.reject(IMAGE_RECOVERY_HANDLED);
+      }
+
+      event.reply("server-log", "Building engine image from the local runtime Dockerfile...");
+      return prepareEngineImage(event, safeEnv, launchContext.runtimeConfig);
+    })
+    .then(() => {
+      if (attempt !== activeStartupAttempt) return;
+      event.reply("engine-image-build-ready");
+      event.reply("server-log", "Engine image built. Resuming startup.");
+      finishStartupAttempt(attempt);
+      startEngine(event, {
+        ...options,
+        preserveEngineToken: true,
+        skipImagePreparation: true,
+      });
+    })
+    .catch((err) => {
+      if (err === IMAGE_RECOVERY_HANDLED || attempt !== activeStartupAttempt) return;
+      finishStartupAttempt(attempt);
+      emitImageRecovery(event, launchContext, err);
+    });
 }
 
 export function startDockerAndResume(

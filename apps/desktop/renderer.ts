@@ -52,6 +52,16 @@ type DockerDiagnosticPayload = {
   title: string;
 };
 
+type EngineImageRecoveryPayload = {
+  detail: string;
+  engineImage: string;
+  guidance: string;
+  runtimeDir: string;
+  runtimeKind: "libretro" | "native_linux";
+  summary: string;
+  title: string;
+};
+
 type LogController = {
   append: (message: string) => void;
   clear: () => void;
@@ -84,6 +94,7 @@ type ElectronApi = {
   revokeEngineClient: (clientId: string) => Promise<{ disconnected: number }>;
   revokeLanInvite: () => void;
   rotateEngineToken: (options: { exposureMode?: ExposureMode }) => void;
+  buildEngineImage: (options: { exposureMode?: ExposureMode }) => void;
   cancelDockerRecovery: () => void;
   startDocker: (options: { exposureMode?: ExposureMode }) => void;
   startDockerApplication: (options: { exposureMode?: ExposureMode }) => void;
@@ -106,6 +117,11 @@ type ElectronApi = {
   onDockerRecoveryStarted: (callback: (event: unknown) => void) => void;
   onDockerRecoveryReady: (callback: (event: unknown) => void) => void;
   onDockerRecoveryCancelled: (callback: (event: unknown) => void) => void;
+  onEngineImageRecovery: (
+    callback: (event: unknown, payload: EngineImageRecoveryPayload) => void,
+  ) => void;
+  onEngineImageBuildStarted: (callback: (event: unknown) => void) => void;
+  onEngineImageBuildReady: (callback: (event: unknown) => void) => void;
 };
 
 type PixelatedWindow = Window &
@@ -202,6 +218,10 @@ const dockerRecoveryTitle = requiredElement("docker-recovery-title");
 const dockerRecoveryGuidance = requiredElement("docker-recovery-guidance");
 const dockerRetryBtn = requiredElement("docker-retry", HTMLButtonElement);
 const dockerStartBtn = requiredElement("docker-start", HTMLButtonElement);
+const dockerBuildImageBtn = requiredElement(
+  "docker-build-image",
+  HTMLButtonElement,
+);
 const dockerDownloadBtn = requiredElement("docker-download", HTMLButtonElement);
 const dockerGuideBtn = requiredElement("docker-guide", HTMLButtonElement);
 const dockerCopyDiagnosticsBtn = requiredElement(
@@ -215,7 +235,9 @@ const rotateTokenBtn = requiredElement("rotate-token", HTMLButtonElement);
 let isRunning = false;
 let pendingCompanionPayload: EngineCompanionPayload | null = null;
 let dockerDiagnostic: DockerDiagnosticPayload | null = null;
+let imageRecovery: EngineImageRecoveryPayload | null = null;
 let dockerRecoveryPending = false;
+let imageBuildPending = false;
 let clientsActionPending = false;
 let clientsPollTimer: number | null = null;
 
@@ -223,6 +245,17 @@ function setDockerRecoveryPending(pending: boolean) {
   dockerRecoveryPending = pending;
   dockerStartBtn.innerText = pending ? "Cancel waiting" : "Start Docker";
   dockerRetryBtn.disabled = pending;
+  dockerBuildImageBtn.disabled = pending;
+  dockerDownloadBtn.disabled = pending;
+  dockerGuideBtn.disabled = pending;
+}
+
+function setImageBuildPending(pending: boolean) {
+  imageBuildPending = pending;
+  dockerBuildImageBtn.innerText = pending ? "Building..." : "Build image & retry";
+  dockerRetryBtn.disabled = pending;
+  dockerStartBtn.disabled = pending;
+  dockerBuildImageBtn.disabled = pending;
   dockerDownloadBtn.disabled = pending;
   dockerGuideBtn.disabled = pending;
 }
@@ -232,6 +265,7 @@ function setDockerRecoveryVisible(
   diagnostic: DockerDiagnosticPayload | null = null,
 ) {
   dockerDiagnostic = visible ? diagnostic : null;
+  imageRecovery = null;
   dockerRecovery.classList.toggle("hidden", !visible);
   startupPanel.classList.toggle("recovery-active", visible);
   if (!visible) {
@@ -242,16 +276,44 @@ function setDockerRecoveryVisible(
 
   dockerRecoveryTitle.innerText = diagnostic.title;
   dockerRecoveryGuidance.innerText = diagnostic.guidance;
+  dockerBuildImageBtn.classList.add("hidden");
   dockerDownloadBtn.classList.toggle(
     "hidden",
     diagnostic.code !== "cli_missing",
   );
+  dockerGuideBtn.classList.remove("hidden");
   dockerStartBtn.classList.toggle("hidden", !diagnostic.canStartDocker);
+  dockerCopyDiagnosticsBtn.classList.remove("hidden");
   setDockerRecoveryPending(false);
+}
+
+function setImageRecoveryVisible(
+  visible: boolean,
+  payload: EngineImageRecoveryPayload | null = null,
+) {
+  imageRecovery = visible ? payload : null;
+  dockerDiagnostic = null;
+  dockerRecovery.classList.toggle("hidden", !visible);
+  startupPanel.classList.toggle("recovery-active", visible);
+  if (!visible) {
+    desktopPanels.style.removeProperty("--startup-recovery-height");
+  }
+  requestAnimationFrame(syncPanelHeights);
+  if (!visible || !payload) return;
+
+  dockerRecoveryTitle.innerText = payload.title;
+  dockerRecoveryGuidance.innerText = payload.guidance;
+  dockerBuildImageBtn.classList.remove("hidden");
+  dockerDownloadBtn.classList.add("hidden");
+  dockerGuideBtn.classList.add("hidden");
+  dockerStartBtn.classList.add("hidden");
+  dockerCopyDiagnosticsBtn.classList.remove("hidden");
+  setImageBuildPending(false);
 }
 
 function initializeEngine() {
   setDockerRecoveryVisible(false);
+  setImageRecoveryVisible(false);
   logs.clear();
   tokenPanel.classList.add("hidden");
   tokenValue.innerText = "";
@@ -685,10 +747,20 @@ dockerStartBtn.addEventListener("click", () => {
   });
 });
 
+dockerBuildImageBtn.addEventListener("click", () => {
+  if (imageBuildPending) return;
+
+  setImageBuildPending(true);
+  pixelatedWindow.electronAPI.buildEngineImage({
+    exposureMode: exposure.getMode(),
+  });
+});
+
 async function openDockerResource(resource: "guide" | "install") {
   if (!dockerDiagnostic) return;
 
   dockerRetryBtn.disabled = true;
+  dockerBuildImageBtn.disabled = true;
   dockerDownloadBtn.disabled = true;
   dockerGuideBtn.disabled = true;
   try {
@@ -703,6 +775,7 @@ async function openDockerResource(resource: "guide" | "install") {
   } finally {
     if (!dockerRecoveryPending) {
       dockerRetryBtn.disabled = false;
+      dockerBuildImageBtn.disabled = false;
       dockerDownloadBtn.disabled = false;
       dockerGuideBtn.disabled = false;
     }
@@ -718,17 +791,18 @@ dockerGuideBtn.addEventListener("click", () => {
 });
 
 dockerCopyDiagnosticsBtn.addEventListener("click", async () => {
-  if (!dockerDiagnostic) return;
+  const summary = dockerDiagnostic?.summary || imageRecovery?.summary;
+  if (!summary) return;
 
   try {
-    await navigator.clipboard.writeText(dockerDiagnostic.summary);
+    await navigator.clipboard.writeText(summary);
     dockerCopyDiagnosticsBtn.innerText = "Copied";
     setTimeout(() => {
       dockerCopyDiagnosticsBtn.innerText = "Copy diagnostics";
     }, 1200);
   } catch {
     logs.append(
-      '<span class="text-red-400">Failed to copy the sanitized Docker diagnostic.</span>',
+      '<span class="text-red-400">Failed to copy the sanitized diagnostic.</span>',
     );
   }
 });
@@ -822,6 +896,16 @@ pixelatedWindow.electronAPI.onDockerDiagnostic((event, payload) => {
   );
 });
 
+pixelatedWindow.electronAPI.onEngineImageRecovery((event, payload) => {
+  setImageRecoveryVisible(true, payload);
+  logs.append(
+    `<span class="text-red-400">${logs.sanitize(payload.title)}</span>`,
+  );
+  logs.append(
+    `<span class="text-gray-400">Image: ${logs.sanitize(payload.engineImage)} | Runtime: ${logs.sanitize(payload.runtimeKind)}</span>`,
+  );
+});
+
 pixelatedWindow.electronAPI.onDockerRecoveryStarted(() => {
   setDockerRecoveryPending(true);
 });
@@ -832,6 +916,14 @@ pixelatedWindow.electronAPI.onDockerRecoveryReady(() => {
 
 pixelatedWindow.electronAPI.onDockerRecoveryCancelled(() => {
   setDockerRecoveryPending(false);
+});
+
+pixelatedWindow.electronAPI.onEngineImageBuildStarted(() => {
+  setImageBuildPending(true);
+});
+
+pixelatedWindow.electronAPI.onEngineImageBuildReady(() => {
+  setImageRecoveryVisible(false);
 });
 
 pixelatedWindow.electronAPI.onEngineState((event, state) => {

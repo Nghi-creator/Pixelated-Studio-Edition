@@ -25,6 +25,7 @@ export type StartEngineOptions = {
   preserveEngineToken?: unknown;
   preserveCompanionSecurity?: unknown;
   runtimeKind?: unknown;
+  skipImagePreparation?: unknown;
 };
 
 export type EngineLaunchContext = {
