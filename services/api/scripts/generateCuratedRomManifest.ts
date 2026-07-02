@@ -52,6 +52,7 @@ Optional:
   --developer-name <name>
   --developer-url <https-url>
   --original-release-url <https-url>
+  --permission-evidence-url <https-url>
   --rights-warning <text>          Repeatable
   --slug <slug>
   --out <path>                     Write JSON to a file instead of stdout
@@ -108,6 +109,7 @@ async function main() {
     licenseUrl: requiredArg("--license-url"),
     manifestPath: requiredArg("--manifest-path"),
     originalReleaseUrl: getArgValue("--original-release-url"),
+    permissionEvidenceUrl: getArgValue("--permission-evidence-url"),
     rawBaseUrl: getArgValue("--raw-base-url"),
     repoUrl: getArgValue("--repo-url"),
     rightsWarnings: getRepeatedArgValues("--rights-warning"),

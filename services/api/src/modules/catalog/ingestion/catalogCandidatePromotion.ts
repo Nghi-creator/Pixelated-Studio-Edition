@@ -1,5 +1,8 @@
 import { uploadGameplayArtwork } from "./catalogArtworkCapture.js";
-import { assertCandidateRuntimeAllowed } from "./catalogCandidateValidation.js";
+import {
+  assertCandidateRightsEvidence,
+  assertCandidateRuntimeAllowed,
+} from "./catalogCandidateValidation.js";
 import {
   createGeneratedCover,
   mirrorCandidateArtifact,
@@ -33,6 +36,7 @@ export async function promoteCandidate(
 ) {
   const now = new Date().toISOString();
   assertCandidateRuntimeAllowed(candidate);
+  assertCandidateRightsEvidence(candidate);
   const isNative = candidate.runtime_kind === "native_linux";
   const mirroredArtifact = isNative
     ? null
@@ -187,7 +191,9 @@ export async function promoteCandidate(
     game_id: game.id,
     license_url: candidate.license_url,
     modification_allowed: true,
+    noncommercial_hosting_allowed: candidate.noncommercial_hosting_allowed,
     original_release_url: candidate.original_release_url,
+    permission_evidence_url: candidate.permission_evidence_url,
     review_notes: notes || candidate.review_notes,
     source_url: isNative
       ? candidate.source_repo_url

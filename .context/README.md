@@ -6,6 +6,11 @@ runbooks, and test fixtures that are intentionally checked in.
 
 ## Current Sources Of Truth
 
+Agents should read `agent-rules.md` and `ci-rules.md` before making large,
+cross-package, workflow, deploy, smoke-test, lockfile, or PR-scale changes.
+Use `ci-rules.md` again before the final response to decide which local checks
+and GitHub Actions pipeline checks need to be reported.
+
 - `current-infrastructure.md`: deployed and local architecture, runtime
   boundaries, and operational behavior.
 - `agent-rules.md`: persistent agent/Git ownership rules for this repository.

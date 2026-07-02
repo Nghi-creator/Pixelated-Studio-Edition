@@ -57,6 +57,7 @@ test("curated ROM manifest generator outputs an importable manifest stub", () =>
   assert.equal(manifest.entries[0].artifactSize, bytes.byteLength);
   assert.match(manifest.entries[0].artifactSha256, /^[a-f0-9]{64}$/);
   assert.equal(manifest.entries[0].artifactUrl, undefined);
+  assert.equal(manifest.entries[0].nonCommercialHostingAllowed, true);
   assert.equal(manifest.entries[0].sourceEntryPath, "roms/demo.nes");
 
   const report = collectCuratedRomCandidateReport(manifest as CuratedRomManifest);
@@ -81,6 +82,26 @@ test("curated ROM manifest generator requires license evidence", () => {
         makeNesRom(),
       ),
     /licenseUrl is required/,
+  );
+});
+
+test("curated ROM manifest generator requires hosting permission", () => {
+  assert.throws(
+    () =>
+      createCuratedRomManifestStub(
+        {
+          artifactUrl:
+            "https://raw.githubusercontent.com/example/legal-roms/1111111111111111111111111111111111111111/roms/demo.nes",
+          codeLicenseSpdx: "MIT",
+          licenseUrl:
+            "https://github.com/example/legal-roms/blob/1111111111111111111111111111111111111111/LICENSE",
+          manifestPath: "curation/pixelated-roms.json",
+          nonCommercialHostingAllowed: false,
+          title: "Demo NES",
+        },
+        makeNesRom(),
+      ),
+    /nonCommercialHostingAllowed must be true/,
   );
 });
 

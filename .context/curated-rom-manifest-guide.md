@@ -49,6 +49,10 @@ Entry fields:
 - `codeLicenseSpdx`: required source/game license.
 - `assetLicenseSpdx`: use when assets have a separate license.
 - `licenseUrl`: license/evidence URL.
+- `nonCommercialHostingAllowed`: must be `true`; this records the reviewer
+  decision that Pixelated may host/stream the game non-commercially.
+- `permissionEvidenceUrl`: optional extra evidence URL when hosting permission
+  is not fully obvious from `licenseUrl`.
 - `originalReleaseUrl`: original project page.
 - `attributionText`: required public attribution/review note.
 - `rightsWarnings`: reviewer reminders, for example “verify cover art is not
@@ -82,8 +86,9 @@ artifact, add `--artifact-file path/to/game.gba`; the manifest still records
 the canonical HTTPS `--artifact-url`.
 
 The generator is intentionally strict: it refuses missing `codeLicenseSpdx`,
-missing HTTPS `licenseUrl`, unsupported extensions, unpinned source commits, and
-artifacts whose ROM header does not match the selected platform.
+missing HTTPS `licenseUrl`, denied non-commercial hosting permission,
+unsupported extensions, unpinned source commits, and artifacts whose ROM header
+does not match the selected platform.
 
 Then dry-run the importer in strict mode:
 
