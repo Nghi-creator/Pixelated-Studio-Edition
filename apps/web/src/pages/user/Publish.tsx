@@ -8,6 +8,7 @@ import {
 import { Link } from "react-router-dom";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import { PublishFileField } from "../../features/publish/PublishFileField";
+import { SUPPORTED_SUBMISSION_ROM_LABEL } from "../../features/publish/publishSubmission";
 import { usePublishSubmissionForm } from "../../features/publish/usePublishSubmissionForm";
 
 export default function Publish() {
@@ -83,7 +84,7 @@ export default function Publish() {
         <p className="text-gray-300 mb-8 leading-relaxed">
           Are you a retro developer? Test your{" "}
           <code className="text-synth-secondary bg-synth-bg px-2 py-1 rounded">
-            .nes
+            ROM
           </code>{" "}
           games in our Local Vault for free, or apply below to have them
           published to the official PIXELATED Cloud Library. Approved developers
@@ -160,7 +161,7 @@ export default function Publish() {
           </div>
 
           <PublishFileField
-            accept=".nes"
+            accept=".nes,.gb,.gbc,.gba,.sfc,.smc,.md,.gen,.sms,.gg"
             describedBy={fileErrors.rom ? "publish-rom-error" : undefined}
             disabled={isSubmitting}
             error={fileErrors.rom}
@@ -175,12 +176,12 @@ export default function Publish() {
             id="publish-rom"
             label={
               <>
-                ROM File (.nes){" "}
+                ROM File{" "}
                 <span className="text-synth-secondary ml-1">*</span>
               </>
             }
             onChange={handleRomChange}
-            placeholder="Click to attach .nes file"
+            placeholder={`Attach ${SUPPORTED_SUBMISSION_ROM_LABEL}`}
             required
             selectedBorderClass="border-synth-primary"
           />

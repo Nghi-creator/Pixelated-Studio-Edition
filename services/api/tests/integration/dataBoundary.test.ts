@@ -2213,10 +2213,10 @@ test("submissions persist metadata for the authenticated submitter", async () =>
       authorName: "Pixel Dev",
       bannerUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/banners/banner.png`,
       coverUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/covers/cover.png`,
-      description: "A small NES game",
+      description: "A small GBA game",
       email: "dev@example.com",
       gameTitle: "Tiny Quest",
-      romUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.nes`,
+      romUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.gba`,
     },
     url: "/submissions/games",
   });
@@ -2225,6 +2225,33 @@ test("submissions persist metadata for the authenticated submitter", async () =>
   assert.equal(db.rows.game_submissions.length, 1);
   assert.equal(db.rows.game_submissions[0]?.submitter_id, USER_ID);
   assert.equal(db.rows.game_submissions[0]?.game_title, "Tiny Quest");
+  await app.close();
+});
+
+test("submissions reject unsupported ROM extensions", async () => {
+  const db = new FakeSupabase();
+  const app = await createDataBoundaryApp(db, USER_ID);
+  const storageBase =
+    process.env.SUPABASE_URL?.replace(/\/+$/, "") || "https://example.com";
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      authorName: "Pixel Dev",
+      description: null,
+      email: "dev@example.com",
+      gameTitle: "Tiny Quest",
+      romUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.zip`,
+    },
+    url: "/submissions/games",
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.match(
+    response.json<{ error: string }>().error,
+    /supported game file/,
+  );
+  assert.equal(db.rows.game_submissions.length, 0);
   await app.close();
 });
 

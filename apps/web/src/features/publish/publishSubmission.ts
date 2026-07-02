@@ -1,7 +1,33 @@
 import type { ApiGameSubmissionPayload } from "../../lib/api/apiTypes";
 
-export const MAX_SUBMISSION_ROM_BYTES = 8 * 1024 * 1024;
 export const MAX_SUBMISSION_IMAGE_BYTES = 5 * 1024 * 1024;
+export const SUPPORTED_SUBMISSION_ROM_EXTENSIONS = [
+  ".nes",
+  ".gb",
+  ".gbc",
+  ".gba",
+  ".sfc",
+  ".smc",
+  ".md",
+  ".gen",
+  ".sms",
+  ".gg",
+];
+export const SUPPORTED_SUBMISSION_ROM_LABEL =
+  ".nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, or .gg";
+
+const SUBMISSION_ROM_LIMITS_BY_EXTENSION: Record<string, number> = {
+  ".nes": 8 * 1024 * 1024,
+  ".gb": 32 * 1024 * 1024,
+  ".gbc": 32 * 1024 * 1024,
+  ".gba": 32 * 1024 * 1024,
+  ".sfc": 64 * 1024 * 1024,
+  ".smc": 64 * 1024 * 1024,
+  ".md": 16 * 1024 * 1024,
+  ".gen": 16 * 1024 * 1024,
+  ".sms": 16 * 1024 * 1024,
+  ".gg": 16 * 1024 * 1024,
+};
 
 export type SubmissionFields = {
   authorName: string;
@@ -42,13 +68,28 @@ export class SubmissionCleanupError extends Error {
   }
 }
 
+function getSubmissionRomExtension(filename: string) {
+  const lowerFilename = filename.toLowerCase();
+  return (
+    SUPPORTED_SUBMISSION_ROM_EXTENSIONS.find((extension) =>
+      lowerFilename.endsWith(extension),
+    ) || null
+  );
+}
+
+function formatBytes(bytes: number) {
+  return `${Math.round(bytes / (1024 * 1024))} MB`;
+}
+
 export function validateRomFile(file: Pick<File, "name" | "size"> | null) {
-  if (!file) return "Attach your .nes ROM file before submitting.";
-  if (!file.name.toLowerCase().endsWith(".nes")) {
-    return "ROM uploads must use the .nes file extension.";
+  if (!file) return "Attach a supported ROM file before submitting.";
+  const extension = getSubmissionRomExtension(file.name);
+  if (!extension) {
+    return `ROM uploads must use one of these extensions: ${SUPPORTED_SUBMISSION_ROM_LABEL}.`;
   }
-  if (file.size > MAX_SUBMISSION_ROM_BYTES) {
-    return "ROM files must be 8 MB or smaller.";
+  const maxBytes = SUBMISSION_ROM_LIMITS_BY_EXTENSION[extension];
+  if (file.size > maxBytes) {
+    return `${extension.toUpperCase()} ROM files must be ${formatBytes(maxBytes)} or smaller.`;
   }
   return null;
 }
@@ -134,7 +175,7 @@ export async function submitGameForReview({
   const romError = validateRomFile(files.romFile);
   if (romError) throw new Error(romError);
   const romFile = files.romFile;
-  if (!romFile) throw new Error("Attach your .nes ROM file before submitting.");
+  if (!romFile) throw new Error("Attach a supported ROM file before submitting.");
 
   const coverError = validateSubmissionImageFile(files.coverFile);
   if (coverError) throw new Error(coverError);

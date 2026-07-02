@@ -18,6 +18,20 @@ const submissionBodySchema = z.object({
 
 const SUBMISSION_RATE_LIMIT = 3;
 const SUBMISSION_RATE_WINDOW_MS = 60 * 60 * 1000;
+const SUPPORTED_SUBMISSION_ROM_EXTENSIONS = [
+  ".nes",
+  ".gb",
+  ".gbc",
+  ".gba",
+  ".sfc",
+  ".smc",
+  ".md",
+  ".gen",
+  ".sms",
+  ".gg",
+];
+const SUPPORTED_SUBMISSION_ROM_LABEL =
+  ".nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, or .gg";
 
 function normalizeOptionalUrl(value: string | null | undefined) {
   return value || null;
@@ -46,6 +60,18 @@ function isSubmissionStorageUrl(url: string, userId: string) {
   if (!objectPath) return false;
 
   return objectPath.startsWith(`${userId}/`);
+}
+
+function getSubmissionRomExtension(url: string) {
+  const objectPath = getSubmissionObjectPath(url);
+  if (!objectPath) return null;
+
+  const lowerObjectPath = objectPath.toLowerCase();
+  return (
+    SUPPORTED_SUBMISSION_ROM_EXTENSIONS.find((extension) =>
+      lowerObjectPath.endsWith(extension),
+    ) || null
+  );
 }
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
@@ -148,8 +174,10 @@ export async function registerSubmissionRoutes(
         normalizeOptionalUrl(submission.bannerUrl),
       ].filter((url): url is string => Boolean(url));
 
-      if (!submission.romUrl.toLowerCase().endsWith(".nes")) {
-        return reply.status(400).send({ error: "ROM URL must point to a .nes file" });
+      if (!getSubmissionRomExtension(submission.romUrl)) {
+        return reply.status(400).send({
+          error: `ROM URL must point to a supported game file: ${SUPPORTED_SUBMISSION_ROM_LABEL}`,
+        });
       }
 
       if (!urls.every((url) => isSubmissionStorageUrl(url, user.id))) {
