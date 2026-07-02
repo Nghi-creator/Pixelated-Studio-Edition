@@ -392,9 +392,39 @@ export function useWebRTC(
         sessionId,
         displayName,
         role: requestedRole,
+        suppressReady: seamlessRestart && mode === "host",
       });
 
       if (mode !== "host") {
+        return;
+      }
+
+      const startBootReadyTimer = () => {
+        if (bootReadyTimeoutId !== null) {
+          window.clearTimeout(bootReadyTimeoutId);
+        }
+        bootReadyTimeoutId = window.setTimeout(() => {
+          bootReadyTimeoutId = null;
+          loadEngineLaunchFailureMessage().then((diagnosticMessage) => {
+            failStream(
+              diagnosticMessage ||
+                "The engine started the game but the video bridge did not become ready. Retry the stream; if this is a native Linux game, check the desktop runtime log for launch errors.",
+            );
+          });
+        }, STREAM_BOOT_READY_TIMEOUT_MS);
+      };
+
+      if (seamlessRestart) {
+        socket.emit("restart-stream", {
+          sessionId,
+          iceServers: iceServersForSession,
+          streamProfile: {
+            bitrateKbps: activeStreamProfile.bitrateKbps,
+            fps: activeStreamProfile.fps,
+            id: activeStreamProfile.id,
+          },
+        });
+        startBootReadyTimer();
         return;
       }
 
@@ -410,18 +440,7 @@ export function useWebRTC(
           },
           ...bootTarget,
         });
-        if (bootReadyTimeoutId !== null) {
-          window.clearTimeout(bootReadyTimeoutId);
-        }
-        bootReadyTimeoutId = window.setTimeout(() => {
-          bootReadyTimeoutId = null;
-          loadEngineLaunchFailureMessage().then((diagnosticMessage) => {
-            failStream(
-              diagnosticMessage ||
-                "The engine started the game but the video bridge did not become ready. Retry the stream; if this is a native Linux game, check the desktop runtime log for launch errors.",
-            );
-          });
-        }, STREAM_BOOT_READY_TIMEOUT_MS);
+        startBootReadyTimer();
       } catch (err) {
         console.error("Failed to boot game:", err);
         failStream(getErrorMessage(err, STREAM_BOOT_ERROR_MESSAGE));

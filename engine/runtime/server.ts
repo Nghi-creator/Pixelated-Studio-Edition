@@ -143,7 +143,10 @@ io.on("connection", (socket) => {
         requestedRole: role === "browser" ? "host" : role,
         sessionId,
       });
-      if (runtime.getActiveSessionId() === sessionId) {
+      if (
+        payload.suppressReady !== true &&
+        runtime.getActiveSessionId() === sessionId
+      ) {
         socket.emit("python-ready", { sessionId });
       }
     }

@@ -83,13 +83,17 @@ function assertBuiltHarnessContract(source) {
     "Cloud boot failed: the hosted API returned a game without a reachable ROM target.",
     "Local boot failed: the desktop engine could not open demo-local.nes from Local Vault.",
     "LAN Invite",
-    "ROM uploads must use the .nes file extension.",
+    "ROM uploads must use one of these extensions:",
+    ".nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, or .gg",
     localVaultSupportedRomMessage,
     "The saved pairing token was rejected. Enter the current desktop token to reconnect.",
   ];
 
   for (const marker of requiredMarkers) {
-    assert.match(source, new RegExp(marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+    assert.ok(
+      source.includes(marker),
+      `Built interaction harness is missing expected marker: ${marker}`,
+    );
   }
 }
 
@@ -414,7 +418,11 @@ async function run() {
       mimeType: "application/zip",
       name: "demo.zip",
     });
-    await page.getByText("ROM uploads must use the .nes file extension.").waitFor();
+    await page
+      .getByText(
+        "ROM uploads must use one of these extensions: .nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, or .gg.",
+      )
+      .waitFor();
     await page.getByLabel("Harness Cover").setInputFiles({
       buffer: Buffer.from("not an image"),
       mimeType: "text/plain",

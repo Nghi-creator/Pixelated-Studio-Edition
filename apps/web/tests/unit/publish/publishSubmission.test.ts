@@ -15,14 +15,32 @@ function fileLike(name: string, type: string, size: number) {
 test("submission file validation rejects invalid ROMs and oversized images", () => {
   assert.equal(
     validateRomFile(fileLike("demo.zip", "application/zip", 100)),
-    "ROM uploads must use the .nes file extension.",
+    "ROM uploads must use one of these extensions: .nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, or .gg.",
   );
   assert.equal(
     validateSubmissionImageFile(fileLike("cover.txt", "text/plain", 100)),
     "Use an image file for cover or banner art.",
   );
   assert.equal(validateRomFile(fileLike("demo.nes", "application/octet-stream", 100)), null);
+  assert.equal(validateRomFile(fileLike("demo.gba", "application/octet-stream", 100)), null);
+  assert.equal(validateRomFile(fileLike("demo.sfc", "application/octet-stream", 100)), null);
+  assert.equal(validateRomFile(fileLike("demo.md", "application/octet-stream", 100)), null);
   assert.equal(validateSubmissionImageFile(fileLike("cover.png", "image/png", 100)), null);
+});
+
+test("submission file validation uses per-runtime ROM size limits", () => {
+  assert.equal(
+    validateRomFile(fileLike("demo.nes", "application/octet-stream", 9 * 1024 * 1024)),
+    ".NES ROM files must be 8 MB or smaller.",
+  );
+  assert.equal(
+    validateRomFile(fileLike("demo.gba", "application/octet-stream", 31 * 1024 * 1024)),
+    null,
+  );
+  assert.equal(
+    validateRomFile(fileLike("demo.sfc", "application/octet-stream", 63 * 1024 * 1024)),
+    null,
+  );
 });
 
 test("submission object paths are scoped to the authenticated user", () => {
@@ -56,7 +74,7 @@ test("failed metadata submission removes uploaded submission objects", async () 
       files: {
         bannerFile: fileLike("banner.jpg", "image/jpeg", 100),
         coverFile: fileLike("cover.png", "image/png", 100),
-        romFile: fileLike("demo.nes", "application/octet-stream", 100),
+        romFile: fileLike("demo.gba", "application/octet-stream", 100),
       },
       removeFiles: async (paths) => {
         removedPaths.push(paths);
@@ -91,7 +109,7 @@ test("successful submission trims metadata and keeps uploaded objects", async ()
     files: {
       bannerFile: null,
       coverFile: null,
-      romFile: fileLike("demo.nes", "application/octet-stream", 100),
+      romFile: fileLike("demo.sfc", "application/octet-stream", 100),
     },
     removeFiles: async (paths) => {
       removedPaths.push(paths);

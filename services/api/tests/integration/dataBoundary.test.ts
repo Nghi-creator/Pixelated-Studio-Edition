@@ -58,6 +58,7 @@ class FakeSupabase {
   authUsers: User[] = [];
   deletedUsers: string[] = [];
   storageErrors = new Set<string>();
+  signedStorageUrls: { bucket: string; expiresIn: number; path: string }[] = [];
   storageObjects: Record<string, string[]> = {
     avatars: [],
     submissions: [],
@@ -170,6 +171,19 @@ class FakeSupabase {
       getPublicUrl: (path: string) => ({
         data: { publicUrl: `https://storage.example.test/${bucket}/${path}` },
       }),
+      createSignedUrl: async (path: string, expiresIn: number) => {
+        if (this.storageErrors.has(bucket)) {
+          return { data: null, error: new Error(`${bucket} storage unavailable`) };
+        }
+
+        this.signedStorageUrls.push({ bucket, expiresIn, path });
+        return {
+          data: {
+            signedUrl: `https://storage.example.test/object/sign/${bucket}/${path}?token=signed-${expiresIn}`,
+          },
+          error: null,
+        };
+      },
     }),
   };
 
@@ -662,7 +676,10 @@ async function createDataBoundaryApp(
   await registerProfileRoutes(app, options);
   await registerSubmissionRoutes(app, {
     ...options,
-    notifySubmission: async () => undefined,
+    notifySubmission:
+      typeof extraOptions.notifySubmission === "function"
+        ? (extraOptions.notifySubmission as never)
+        : async () => undefined,
   });
   return app;
 }
@@ -2203,9 +2220,15 @@ test("admin reports filter target roles before pagination", async () => {
 
 test("submissions persist metadata for the authenticated submitter", async () => {
   const db = new FakeSupabase();
-  const app = await createDataBoundaryApp(db, USER_ID);
+  let notifiedSubmission: RecordRow | null = null;
+  const app = await createDataBoundaryApp(db, USER_ID, Buffer.from("test-artifact"), {
+    notifySubmission: async (submission: RecordRow) => {
+      notifiedSubmission = submission;
+    },
+  });
   const storageBase =
     process.env.SUPABASE_URL?.replace(/\/+$/, "") || "https://example.com";
+  const romUrl = `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.gba`;
 
   const response = await app.inject({
     method: "POST",
@@ -2213,10 +2236,10 @@ test("submissions persist metadata for the authenticated submitter", async () =>
       authorName: "Pixel Dev",
       bannerUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/banners/banner.png`,
       coverUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/covers/cover.png`,
-      description: "A small NES game",
+      description: "A small GBA game",
       email: "dev@example.com",
       gameTitle: "Tiny Quest",
-      romUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.nes`,
+      romUrl,
     },
     url: "/submissions/games",
   });
@@ -2225,6 +2248,45 @@ test("submissions persist metadata for the authenticated submitter", async () =>
   assert.equal(db.rows.game_submissions.length, 1);
   assert.equal(db.rows.game_submissions[0]?.submitter_id, USER_ID);
   assert.equal(db.rows.game_submissions[0]?.game_title, "Tiny Quest");
+  assert.equal(db.rows.game_submissions[0]?.rom_url, romUrl);
+  assert.match(String(notifiedSubmission?.romUrl), /\/object\/sign\/submissions\//);
+  assert.match(String(notifiedSubmission?.coverUrl), /\/object\/sign\/submissions\//);
+  assert.match(String(notifiedSubmission?.bannerUrl), /\/object\/sign\/submissions\//);
+  assert.deepEqual(
+    db.signedStorageUrls.map(({ bucket, path }) => ({ bucket, path })),
+    [
+      { bucket: "submissions", path: `${USER_ID}/roms/tiny.gba` },
+      { bucket: "submissions", path: `${USER_ID}/covers/cover.png` },
+      { bucket: "submissions", path: `${USER_ID}/banners/banner.png` },
+    ],
+  );
+  await app.close();
+});
+
+test("submissions reject unsupported ROM extensions", async () => {
+  const db = new FakeSupabase();
+  const app = await createDataBoundaryApp(db, USER_ID);
+  const storageBase =
+    process.env.SUPABASE_URL?.replace(/\/+$/, "") || "https://example.com";
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      authorName: "Pixel Dev",
+      description: null,
+      email: "dev@example.com",
+      gameTitle: "Tiny Quest",
+      romUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.zip`,
+    },
+    url: "/submissions/games",
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.match(
+    response.json<{ error: string }>().error,
+    /supported game file/,
+  );
+  assert.equal(db.rows.game_submissions.length, 0);
   await app.close();
 });
 

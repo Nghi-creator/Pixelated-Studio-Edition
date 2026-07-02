@@ -7,6 +7,7 @@ import {
 import { engineEndpoint } from "../../lib/engine/engineConfig";
 export {
   getLocalGameTitle,
+  getLocalGamePlayPath,
   getLocalVaultErrorMessage,
   INVALID_ENGINE_TOKEN_MESSAGE,
   InvalidEngineTokenError,

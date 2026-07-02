@@ -67,6 +67,13 @@ function createHarness(overrides: HarnessOverrides = {}) {
     romPath: string;
     sessionId: string;
   }> = [];
+  const streamRestarts: Array<{
+    options: {
+      iceServers?: unknown[];
+      streamProfile: StreamProfile;
+    };
+    sessionId: string;
+  }> = [];
   const downloads: Array<{
     destinationPath: string;
     romUrl: string;
@@ -90,6 +97,9 @@ function createHarness(overrides: HarnessOverrides = {}) {
         }
         booted.push({ options, romPath, sessionId });
       },
+      restartStream: (sessionId, options) => {
+        streamRestarts.push({ options, sessionId });
+      },
     },
     verifyBackendSession:
       overrides.verifyBackendSession ||
@@ -105,7 +115,7 @@ function createHarness(overrides: HarnessOverrides = {}) {
       }),
   });
 
-  return { booted, calls, downloads, socket };
+  return { booted, calls, downloads, socket, streamRestarts };
 }
 
 function flushStartGame() {
@@ -368,4 +378,33 @@ test("stream profiles are clamped before reaching the runtime", () => {
     }),
     { bitrateKbps: 1000, fps: 60, id: "balanced" },
   );
+});
+
+test("stream restarts update the camera profile without booting the game", async () => {
+  const { booted, socket, streamRestarts } = createHarness();
+
+  socket.emit("restart-stream", {
+    sessionId: "session-profile",
+    streamProfile: {
+      bitrateKbps: 1600,
+      fps: 30,
+      id: "performance",
+    },
+  });
+  await flushStartGame();
+
+  assert.deepEqual(booted, []);
+  assert.deepEqual(streamRestarts, [
+    {
+      options: {
+        iceServers: [],
+        streamProfile: {
+          bitrateKbps: 1600,
+          fps: 30,
+          id: "performance",
+        },
+      },
+      sessionId: "session-profile",
+    },
+  ]);
 });

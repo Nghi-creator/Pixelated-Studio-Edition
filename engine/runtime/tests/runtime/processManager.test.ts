@@ -91,6 +91,25 @@ test("libretro boot uses the selected registry core", () => {
   manager.cleanupActiveSession("session-nes");
 });
 
+test("stream restart relaunches only the camera bridge", () => {
+  const { manager, spawned } = createManager();
+  const romPath = writeValidNesFile();
+
+  manager.bootGame(romPath, "session-nes", {
+    runtimeId: "mesen",
+    streamProfile: { bitrateKbps: 1000, fps: 60, id: "balanced" },
+  });
+  manager.restartStream("session-nes", {
+    streamProfile: { bitrateKbps: 700, fps: 30, id: "performance" },
+  });
+
+  assert.equal(manager.getActiveSessionId(), "session-nes");
+  assert.equal(spawned.filter((entry) => entry.command === "retroarch").length, 1);
+  assert.equal(spawned.filter((entry) => entry.command === "python3").length, 1);
+
+  manager.cleanupActiveSession("session-nes");
+});
+
 test("native boot fails fast when the allowlisted executable is missing", () => {
   const { manager, spawned } = createManager({
     fileExists: () => false,

@@ -189,4 +189,35 @@ export function registerStartGameHandler(
       }
     }
   });
+
+  socket.on("restart-stream", (payload: StartGamePayload = {}) => {
+    const sessionId =
+      normalizeSessionId(payload.sessionId) || socket.data.sessionId || null;
+    if (!sessionId) {
+      socket.emit("engine-error", {
+        message: "Missing active session for stream restart.",
+      });
+      return;
+    }
+
+    if (canStartGame && !canStartGame(socket, sessionId)) {
+      socket.emit("engine-error", {
+        message: "Only the lobby host can restart the stream.",
+      });
+      return;
+    }
+
+    try {
+      runtime.restartStream(sessionId, {
+        iceServers: normalizeIceServers(payload.iceServers),
+        streamProfile: normalizeStreamProfile(payload.streamProfile),
+      });
+    } catch (err) {
+      console.error("[Engine] Failed to restart stream:", err);
+      socket.emit("engine-error", {
+        message:
+          err instanceof Error ? err.message : "Stream restart failed.",
+      });
+    }
+  });
 }

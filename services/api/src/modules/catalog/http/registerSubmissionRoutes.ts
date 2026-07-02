@@ -18,6 +18,23 @@ const submissionBodySchema = z.object({
 
 const SUBMISSION_RATE_LIMIT = 3;
 const SUBMISSION_RATE_WINDOW_MS = 60 * 60 * 1000;
+const SUPPORTED_SUBMISSION_ROM_EXTENSIONS = [
+  ".nes",
+  ".gb",
+  ".gbc",
+  ".gba",
+  ".sfc",
+  ".smc",
+  ".md",
+  ".gen",
+  ".sms",
+  ".gg",
+];
+const SUPPORTED_SUBMISSION_ROM_LABEL =
+  ".nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, or .gg";
+const SUBMISSION_REVIEW_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+type SubmissionPayload = z.infer<typeof submissionBodySchema>;
 
 function normalizeOptionalUrl(value: string | null | undefined) {
   return value || null;
@@ -48,10 +65,22 @@ function isSubmissionStorageUrl(url: string, userId: string) {
   return objectPath.startsWith(`${userId}/`);
 }
 
+function getSubmissionRomExtension(url: string) {
+  const objectPath = getSubmissionObjectPath(url);
+  if (!objectPath) return null;
+
+  const lowerObjectPath = objectPath.toLowerCase();
+  return (
+    SUPPORTED_SUBMISSION_ROM_EXTENSIONS.find((extension) =>
+      lowerObjectPath.endsWith(extension),
+    ) || null
+  );
+}
+
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
 type SubmissionRouteOptions = {
-  notifySubmission?: (submission: z.infer<typeof submissionBodySchema>) => Promise<void>;
+  notifySubmission?: (submission: SubmissionPayload) => Promise<void>;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
 };
@@ -71,9 +100,7 @@ async function getSubmitterRole(
   return data?.role || "user";
 }
 
-async function defaultNotifySubmission(
-  submission: z.infer<typeof submissionBodySchema>,
-) {
+async function defaultNotifySubmission(submission: SubmissionPayload) {
   if (!env.FORMSPREE_SUBMISSION_URL) return;
 
   const response = await fetch(env.FORMSPREE_SUBMISSION_URL, {
@@ -97,6 +124,41 @@ async function defaultNotifySubmission(
   if (!response.ok) {
     throw new Error(`Formspree notification failed with ${response.status}`);
   }
+}
+
+async function createSignedSubmissionUrl(
+  service: SupabaseServiceLike,
+  url: string | null | undefined,
+) {
+  if (!url) return null;
+
+  const objectPath = getSubmissionObjectPath(url);
+  if (!objectPath) return url;
+
+  const { data, error } = await service.storage
+    .from("submissions")
+    .createSignedUrl(objectPath, SUBMISSION_REVIEW_URL_TTL_SECONDS);
+  if (error || !data?.signedUrl) throw error || new Error("Missing signed URL");
+
+  return data.signedUrl;
+}
+
+async function createReviewNotificationSubmission(
+  service: SupabaseServiceLike,
+  submission: SubmissionPayload,
+): Promise<SubmissionPayload> {
+  const [romUrl, coverUrl, bannerUrl] = await Promise.all([
+    createSignedSubmissionUrl(service, submission.romUrl),
+    createSignedSubmissionUrl(service, submission.coverUrl),
+    createSignedSubmissionUrl(service, submission.bannerUrl),
+  ]);
+
+  return {
+    ...submission,
+    bannerUrl,
+    coverUrl,
+    romUrl: romUrl || submission.romUrl,
+  };
 }
 
 export async function registerSubmissionRoutes(
@@ -148,8 +210,10 @@ export async function registerSubmissionRoutes(
         normalizeOptionalUrl(submission.bannerUrl),
       ].filter((url): url is string => Boolean(url));
 
-      if (!submission.romUrl.toLowerCase().endsWith(".nes")) {
-        return reply.status(400).send({ error: "ROM URL must point to a .nes file" });
+      if (!getSubmissionRomExtension(submission.romUrl)) {
+        return reply.status(400).send({
+          error: `ROM URL must point to a supported game file: ${SUPPORTED_SUBMISSION_ROM_LABEL}`,
+        });
       }
 
       if (!urls.every((url) => isSubmissionStorageUrl(url, user.id))) {
@@ -199,7 +263,11 @@ export async function registerSubmissionRoutes(
       }
 
       try {
-        await notifySubmission(submission);
+        const reviewSubmission = await createReviewNotificationSubmission(
+          service,
+          submission,
+        );
+        await notifySubmission(reviewSubmission);
       } catch (err) {
         request.log.warn({ err }, "Failed to send submission notification");
       }
