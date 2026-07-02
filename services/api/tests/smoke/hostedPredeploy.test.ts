@@ -20,6 +20,6 @@ test("hosted predeploy fails fast on hosted Supabase schema drift", () => {
   assert.match(scripts["check:catalog-rpc"] || "", /--catalog-rpc-only/);
   assert.match(
     scripts["predeploy:hosted"] || "",
-    /check:access-log-schema && npm run check:submission-cleanup-policy && npm run check:catalog-rpc && npm run typecheck/,
+    /check:access-log-schema && npm run check:submission-cleanup-policy && npm run check:catalog-rpc && npm run check:catalog-candidate-imports && npm run typecheck/,
   );
 });

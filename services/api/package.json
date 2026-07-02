@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "check:access-log-schema": "tsx scripts/stagingSmoke.ts --access-log-schema-only",
     "check:catalog-rpc": "tsx scripts/stagingSmoke.ts --catalog-rpc-only",
+    "check:catalog-candidate-imports": "tsx scripts/checkCatalogCandidateImportValidation.ts",
     "check:submission-cleanup-policy": "tsx scripts/stagingSmoke.ts --submission-cleanup-policy-only",
     "capture:catalog-artwork": "tsx scripts/captureCatalogArtwork.ts",
     "generate:curated-rom-manifest": "tsx scripts/generateCuratedRomManifest.ts",
@@ -17,7 +18,7 @@
     "import:homebrew-candidates": "tsx scripts/importHomebrewHubCandidates.ts",
     "lint": "eslint .",
     "mirror:catalog-artifacts": "tsx scripts/mirrorCatalogArtifacts.ts",
-    "predeploy:hosted": "npm run check:access-log-schema && npm run check:submission-cleanup-policy && npm run check:catalog-rpc && npm run typecheck && npm run lint && npm run build",
+    "predeploy:hosted": "npm run check:access-log-schema && npm run check:submission-cleanup-policy && npm run check:catalog-rpc && npm run check:catalog-candidate-imports && npm run typecheck && npm run lint && npm run build",
     "smoke:staging": "tsx scripts/stagingSmoke.ts",
     "test": "node --import tsx --test \"tests/**/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json --noEmit"

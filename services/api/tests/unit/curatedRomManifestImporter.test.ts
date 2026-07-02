@@ -178,6 +178,38 @@ test("curated ROM manifest report explains skipped entries", () => {
   ]);
 });
 
+test("curated ROM manifest report applies shared rights validation", () => {
+  const manifest = readCuratedRomManifest(
+    writeManifest({
+      entries: [
+        {
+          artifactFilename: "demo.nes",
+          artifactSha256:
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          artifactSize: 40960,
+          attributionText: "Demo attribution",
+          codeLicenseSpdx: "Proprietary",
+          licenseUrl: "https://example.test/demo-license",
+          nonCommercialHostingAllowed: true,
+          sourceEntryPath: "roms/demo.nes",
+          title: "Demo NES",
+        },
+      ],
+      manifestPath: "curated/nes.json",
+      rawBaseUrl: "https://raw.githubusercontent.com/example/curated-roms",
+      repoUrl: "https://github.com/example/curated-roms",
+      sourceCommit: "1111111111111111111111111111111111111111",
+    }),
+  );
+
+  const report = collectCuratedRomCandidateReport(manifest);
+
+  assert.equal(report.candidates.length, 0);
+  assert.deepEqual(report.skipped[0]?.reasons, [
+    "Candidate license Proprietary is not allowlisted for hosting.",
+  ]);
+});
+
 test("phase 5 curated ROM manifest imports the pinned PicoDrive candidate", () => {
   const manifest = readCuratedRomManifest(
     path.resolve(

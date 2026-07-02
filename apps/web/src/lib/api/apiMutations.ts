@@ -3,13 +3,24 @@ import { api } from "./apiClient";
 import type {
   ApiAdminReportAction,
   ApiAdminReportActionResponse,
+  ApiCatalogCandidateReviewAction,
+  ApiCatalogCandidateReviewResponse,
+  ApiCatalogCandidateSourceKind,
+  ApiCatalogCandidateStatus,
+  ApiGameSubmissionReviewResponse,
+  ApiGameSubmissionStatus,
+  ApiPaginatedCatalogCandidatesResponse,
+  ApiPaginatedGameSubmissionsResponse,
   ApiPaginatedReportsResponse,
   ApiPaginatedUsersResponse,
   ApiProfile,
+  ApiSubmissionCandidatePayload,
 } from "./apiTypes";
 import {
   invalidateAdminReportsQueries,
   invalidateAdminUsersQueries,
+  invalidateCatalogCandidateQueries,
+  invalidateGameSubmissionQueries,
   invalidateGameCommentsQuery,
   invalidateGameReactionsQuery,
   queryKeys,
@@ -21,6 +32,14 @@ type AdminReportCacheItem = {
 };
 
 type AdminUserCacheItem = {
+  id: string;
+};
+
+type CatalogCandidateCacheItem = {
+  id: string;
+};
+
+type GameSubmissionCacheItem = {
   id: string;
 };
 
@@ -128,6 +147,153 @@ export function useUpdateAdminUserMutation<TUser extends AdminUserCacheItem>({
 
       onSuccess?.(user);
       await invalidateAdminUsersQueries(queryClient);
+    },
+  });
+}
+
+export function useReviewCatalogCandidateMutation<
+  TCandidate extends CatalogCandidateCacheItem,
+>({
+  onError,
+  onReviewed,
+  page,
+  pageSize,
+  platformId,
+  search,
+  sourceKind,
+  status,
+  totalCandidates,
+}: {
+  onError?: (error: unknown) => void;
+  onReviewed?: ({
+    nextTotal,
+    result,
+  }: {
+    nextTotal: number;
+    result: ApiCatalogCandidateReviewResponse<TCandidate>;
+  }) => void;
+  page: number;
+  pageSize: number;
+  platformId: string;
+  search: string;
+  sourceKind: ApiCatalogCandidateSourceKind | "";
+  status: ApiCatalogCandidateStatus;
+  totalCandidates: number;
+}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      action,
+      candidateId,
+      notes,
+    }: {
+      action: ApiCatalogCandidateReviewAction;
+      candidateId: string;
+      notes: string;
+    }) => api.reviewCatalogCandidate<TCandidate>(candidateId, action, notes),
+    onError,
+    onSuccess: async (result, { candidateId }) => {
+      const nextTotal = Math.max(0, totalCandidates - 1);
+
+      queryClient.setQueryData(
+        queryKeys.catalogCandidates(
+          page,
+          pageSize,
+          status,
+          sourceKind,
+          platformId,
+          search,
+        ),
+        (
+          current:
+            | ApiPaginatedCatalogCandidatesResponse<TCandidate>
+            | undefined,
+        ) =>
+          current
+            ? {
+                ...current,
+                candidates: current.candidates.filter(
+                  (candidate) => candidate.id !== candidateId,
+                ),
+                total: nextTotal,
+              }
+            : current,
+      );
+
+      onReviewed?.({ nextTotal, result });
+      await invalidateCatalogCandidateQueries(queryClient);
+    },
+  });
+}
+
+export function useReviewGameSubmissionMutation<
+  TSubmission extends GameSubmissionCacheItem,
+>({
+  onError,
+  onReviewed,
+  page,
+  pageSize,
+  search,
+  status,
+  totalSubmissions,
+}: {
+  onError?: (error: unknown) => void;
+  onReviewed?: ({
+    nextTotal,
+    result,
+  }: {
+    nextTotal: number;
+    result: ApiGameSubmissionReviewResponse<TSubmission>;
+  }) => void;
+  page: number;
+  pageSize: number;
+  search: string;
+  status: ApiGameSubmissionStatus;
+  totalSubmissions: number;
+}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      notes,
+      payload,
+      submissionId,
+    }: {
+      notes?: string;
+      payload?: ApiSubmissionCandidatePayload;
+      submissionId: string;
+    }) =>
+      payload
+        ? api.createSubmissionCandidate<TSubmission>(submissionId, payload)
+        : api.rejectGameSubmission<TSubmission>(submissionId, notes || ""),
+    onError,
+    onSuccess: async (result, { payload, submissionId }) => {
+      const nextTotal = Math.max(0, totalSubmissions - 1);
+
+      queryClient.setQueryData(
+        queryKeys.gameSubmissions(page, pageSize, status, search),
+        (
+          current:
+            | ApiPaginatedGameSubmissionsResponse<TSubmission>
+            | undefined,
+        ) =>
+          current
+            ? {
+                ...current,
+                submissions: current.submissions.filter(
+                  (submission) => submission.id !== submissionId,
+                ),
+                total: nextTotal,
+              }
+            : current,
+      );
+
+      onReviewed?.({ nextTotal, result });
+      await Promise.all([
+        invalidateGameSubmissionQueries(queryClient),
+        payload ? invalidateCatalogCandidateQueries(queryClient) : Promise.resolve(),
+      ]);
     },
   });
 }

@@ -1,5 +1,9 @@
 import fs from "node:fs";
 import path from "node:path";
+import {
+  assertCandidateRightsEvidence,
+  assertCandidateRuntimeAllowed,
+} from "./catalogCandidateValidation.js";
 
 type CuratedRomManifestEntry = {
   artifactFilename?: unknown;
@@ -181,6 +185,10 @@ function skippedEntry(
   };
 }
 
+function validationErrorReason(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
 export function collectCuratedRomCandidateReport(manifest: CuratedRomManifest) {
   const candidates: CuratedRomCandidate[] = [];
   const skipped: CuratedRomSkippedEntry[] = [];
@@ -253,7 +261,7 @@ export function collectCuratedRomCandidateReport(manifest: CuratedRomManifest) {
       return;
     }
 
-    candidates.push({
+    const candidate: CuratedRomCandidate = {
       artifactFilename,
       artifactSha256,
       artifactSize,
@@ -278,7 +286,34 @@ export function collectCuratedRomCandidateReport(manifest: CuratedRomManifest) {
       sourceMetadata: entry,
       sourceRepoUrl: manifest.repoUrl,
       title,
-    });
+    };
+
+    try {
+      assertCandidateRuntimeAllowed({
+        artifact_filename: candidate.artifactFilename,
+        launch_manifest_id: null,
+        platform_id: candidate.platformId,
+        runtime_id: candidate.runtimeId,
+        runtime_kind: "libretro",
+      });
+      assertCandidateRightsEvidence({
+        asset_license_spdx: candidate.assetLicenseSpdx,
+        attribution_text: candidate.attributionText,
+        code_license_spdx: candidate.codeLicenseSpdx,
+        license_url: candidate.licenseUrl,
+        noncommercial_hosting_allowed: candidate.nonCommercialHostingAllowed,
+        permission_evidence_url: candidate.permissionEvidenceUrl,
+        source_commit: candidate.sourceCommit,
+        source_entry_path: candidate.sourceEntryPath,
+        source_kind: candidate.sourceKind,
+        source_repo_url: candidate.sourceRepoUrl,
+      });
+    } catch (error) {
+      skipped.push(skippedEntry(entry, index, [validationErrorReason(error)]));
+      return;
+    }
+
+    candidates.push(candidate);
   });
 
   return { candidates, skipped };
