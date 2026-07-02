@@ -46,6 +46,7 @@ export default function AdminLayout() {
 
   const navItems = [
     { name: "Moderation Queue", path: "/admin", icon: "moderation" as const },
+    { name: "Submissions", path: "/admin/submissions", icon: "publish" as const },
     {
       name: "Catalog Candidates",
       path: "/admin/catalog-candidates",

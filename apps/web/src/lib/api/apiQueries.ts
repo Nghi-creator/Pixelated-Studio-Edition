@@ -5,7 +5,9 @@ import type {
   ApiGame,
   ApiCatalogCandidateSourceKind,
   ApiCatalogCandidateStatus,
+  ApiGameSubmissionStatus,
   ApiPaginatedCatalogCandidatesResponse,
+  ApiPaginatedGameSubmissionsResponse,
   ApiPaginatedAccessLogsResponse,
   ApiPaginatedReportsResponse,
   ApiPaginatedUsersResponse,
@@ -83,6 +85,32 @@ export function useCatalogCandidatesQuery<TCandidate>({
         platformId,
         search,
         sourceKind,
+        status,
+      }),
+  });
+}
+
+export function useGameSubmissionsQuery<TSubmission>({
+  enabled = true,
+  page,
+  pageSize,
+  search,
+  status,
+}: {
+  enabled?: boolean;
+  page: number;
+  pageSize: number;
+  search: string;
+  status: ApiGameSubmissionStatus;
+}) {
+  return useQuery<ApiPaginatedGameSubmissionsResponse<TSubmission>>({
+    enabled,
+    queryKey: queryKeys.gameSubmissions(page, pageSize, status, search),
+    queryFn: () =>
+      api.gameSubmissions<TSubmission>({
+        page,
+        pageSize,
+        search,
         status,
       }),
   });

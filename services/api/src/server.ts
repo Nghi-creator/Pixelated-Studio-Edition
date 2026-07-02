@@ -6,6 +6,7 @@ import { registerCors } from "./plugins/cors.js";
 import { registerGlobalRateLimit } from "./plugins/rateLimit.js";
 import { registerAccessLogRoutes } from "./modules/observability/http/accessLogRoutes.js";
 import { registerAdminUserRoutes } from "./modules/users/http/adminUserRoutes.js";
+import { registerAdminSubmissionRoutes } from "./modules/catalog/http/adminSubmissionRoutes.js";
 import { registerCatalogCandidateRoutes } from "./modules/catalog/http/catalogCandidateRoutes.js";
 import { registerModerationRoutes } from "./modules/moderation/http/registerModerationRoutes.js";
 import { registerAuthMethodsRoutes } from "./modules/auth/http/authMethodsRoutes.js";
@@ -36,6 +37,7 @@ export async function buildServer() {
   await registerCatalogRoutes(app);
   await registerMeRoutes(app);
   await registerProfileRoutes(app);
+  await registerAdminSubmissionRoutes(app);
   await registerAdminUserRoutes(app);
   await registerLocalPairingRoutes(app);
   await registerPlayCountRoutes(app);

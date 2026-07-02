@@ -5,6 +5,7 @@ import Fastify from "fastify";
 import type { FastifyRequest } from "fastify";
 import type { User } from "@supabase/supabase-js";
 import { registerAccessLogRoutes } from "../../src/modules/observability/http/accessLogRoutes.js";
+import { registerAdminSubmissionRoutes } from "../../src/modules/catalog/http/adminSubmissionRoutes.js";
 import { registerAdminUserRoutes } from "../../src/modules/users/http/adminUserRoutes.js";
 import { registerCatalogCandidateRoutes } from "../../src/modules/catalog/http/catalogCandidateRoutes.js";
 import { registerAuthMethodsRoutes } from "../../src/modules/auth/http/authMethodsRoutes.js";
@@ -24,6 +25,7 @@ const SUPER_ADMIN_ID = "44444444-4444-4444-8444-444444444444";
 const GAME_ID = "55555555-5555-4555-8555-555555555555";
 const COMMENT_ID = "66666666-6666-4666-8666-666666666666";
 const REPORT_ID = "77777777-7777-4777-8777-777777777777";
+const SUBMISSION_ID = "88888888-8888-4888-8888-888888888888";
 
 type TableName =
   | "access_logs"
@@ -678,6 +680,7 @@ async function createDataBoundaryApp(
   await registerMetricRoutes(app, options);
   await registerModerationRoutes(app, options);
   await registerProfileRoutes(app, options);
+  await registerAdminSubmissionRoutes(app, options);
   await registerSubmissionRoutes(app, {
     ...options,
     notifySubmission:
@@ -2340,6 +2343,137 @@ test("submissions persist metadata for the authenticated submitter", async () =>
       { bucket: "submissions", path: `${USER_ID}/covers/cover.png` },
       { bucket: "submissions", path: `${USER_ID}/banners/banner.png` },
     ],
+  );
+  await app.close();
+});
+
+test("admins can list pending game submissions for intake review", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.rows.game_submissions.push(
+    {
+      author_name: "Pixel Dev",
+      created_at: "2026-07-02T10:00:00.000Z",
+      email: "dev@example.com",
+      game_title: "Tiny Quest",
+      id: SUBMISSION_ID,
+      rom_url: "https://example.com/storage/v1/object/public/submissions/user/roms/tiny.nes",
+      status: "pending",
+      submitter_id: USER_ID,
+    },
+    {
+      author_name: "Other Dev",
+      created_at: "2026-07-01T10:00:00.000Z",
+      email: "other@example.com",
+      game_title: "Reviewed Quest",
+      id: "99999999-9999-4999-8999-999999999999",
+      rom_url: "https://example.com/storage/v1/object/public/submissions/user/roms/reviewed.nes",
+      status: "candidate_created",
+      submitter_id: OTHER_USER_ID,
+    },
+  );
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/admin/submissions?status=pending",
+  });
+
+  assert.equal(response.statusCode, 200);
+  const body = response.json<{
+    submissions: { game_title: string; id: string }[];
+    total: number;
+  }>();
+  assert.equal(body.total, 1);
+  assert.deepEqual(body.submissions, [
+    { ...body.submissions[0], game_title: "Tiny Quest", id: SUBMISSION_ID },
+  ]);
+  await app.close();
+});
+
+test("admins can reject game submissions with review notes", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.rows.game_submissions.push({
+    author_name: "Pixel Dev",
+    created_at: "2026-07-02T10:00:00.000Z",
+    email: "dev@example.com",
+    game_title: "Tiny Quest",
+    id: SUBMISSION_ID,
+    rom_url: "https://example.com/storage/v1/object/public/submissions/user/roms/tiny.nes",
+    status: "pending",
+    submitter_id: USER_ID,
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "reject", notes: "Needs clearer rights evidence." },
+    url: `/admin/submissions/${SUBMISSION_ID}`,
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.game_submissions[0]?.status, "rejected");
+  assert.equal(
+    db.rows.game_submissions[0]?.review_notes,
+    "Needs clearer rights evidence.",
+  );
+  assert.equal(db.rows.game_submissions[0]?.reviewed_by, ADMIN_ID);
+  await app.close();
+});
+
+test("admins can turn a game submission into a catalog candidate", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const romBytes = validNesRom();
+  const romUrl =
+    "https://example.com/storage/v1/object/public/submissions/user/roms/tiny.nes";
+  db.rows.game_submissions.push({
+    author_name: "Pixel Dev",
+    banner_url: "https://example.com/banner.png",
+    cover_url: "https://example.com/cover.png",
+    created_at: "2026-07-02T10:00:00.000Z",
+    description: "A tiny NES game",
+    email: "dev@example.com",
+    game_title: "Tiny Quest",
+    id: SUBMISSION_ID,
+    rom_url: romUrl,
+    status: "pending",
+    submitter_id: USER_ID,
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, romBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: {
+      action: "create_candidate",
+      asset_license_spdx: "MIT",
+      attribution_text: "Tiny Quest by Pixel Dev. Used with permission.",
+      code_license_spdx: "MIT",
+      license_url: "https://example.com/license",
+      noncommercial_hosting_allowed: true,
+      notes: "Ready for final candidate review.",
+      permission_evidence_url: "https://example.com/permission",
+      rights_warnings: ["Confirm submitted art can be used as cover art."],
+      source_repo_url: "https://example.com/tiny-quest",
+    },
+    url: `/admin/submissions/${SUBMISSION_ID}`,
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.catalog_ingestion_candidates.length, 1);
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.source_kind, "user_submission");
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.title, "Tiny Quest");
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.runtime_id, "mesen");
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.platform_id, "nes");
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.artifact_size, romBytes.length);
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.artifact_sha256, sha256(romBytes));
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.code_license_spdx, "MIT");
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.noncommercial_hosting_allowed, true);
+  assert.equal(db.rows.game_submissions[0]?.status, "candidate_created");
+  assert.equal(
+    db.rows.game_submissions[0]?.catalog_candidate_id,
+    db.rows.catalog_ingestion_candidates[0]?.id,
   );
   await app.close();
 });

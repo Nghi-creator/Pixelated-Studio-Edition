@@ -31,6 +31,13 @@ export const queryKeys = {
       search,
     ] as const,
   catalogCandidatesRoot: () => ["catalogCandidates"] as const,
+  gameSubmissions: (
+    page: number,
+    pageSize: number,
+    status: string,
+    search: string,
+  ) => ["gameSubmissions", page, pageSize, status, search] as const,
+  gameSubmissionsRoot: () => ["gameSubmissions"] as const,
   adminReports: (
     page: number,
     pageSize: number,
@@ -63,6 +70,9 @@ export const invalidateAdminUsersQueries = (client: QueryClientInstance) =>
 
 export const invalidateCatalogCandidateQueries = (client: QueryClientInstance) =>
   client.invalidateQueries({ queryKey: queryKeys.catalogCandidatesRoot() });
+
+export const invalidateGameSubmissionQueries = (client: QueryClientInstance) =>
+  client.invalidateQueries({ queryKey: queryKeys.gameSubmissionsRoot() });
 
 export const invalidateFavoriteQueries = async (client: QueryClientInstance) => {
   await Promise.all([

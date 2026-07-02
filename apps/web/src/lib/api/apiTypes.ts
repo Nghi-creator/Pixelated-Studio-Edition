@@ -104,7 +104,12 @@ export type ApiCatalogCandidateSourceKind =
   | "debian_main_games"
   | "homebrew_hub_gb"
   | "homebrew_hub_gba"
-  | "homebrew_hub_nes";
+  | "homebrew_hub_nes"
+  | "user_submission";
+export type ApiGameSubmissionStatus =
+  | "candidate_created"
+  | "pending"
+  | "rejected";
 
 export type ApiAdminReportActionResponse = {
   action: ApiAdminReportAction;
@@ -195,6 +200,53 @@ export type ApiPaginatedCatalogCandidatesResponse<TCandidate> = {
   pageSize: number;
   total: number;
   totalPages: number;
+};
+
+export type ApiGameSubmission = {
+  author_name: string;
+  banner_url: string | null;
+  catalog_candidate_id?: string | null;
+  cover_url: string | null;
+  created_at: string;
+  description: string | null;
+  email: string;
+  game_title: string;
+  id: string;
+  review_notes?: string | null;
+  reviewed_at?: string | null;
+  reviewed_by?: string | null;
+  rom_url: string;
+  status: ApiGameSubmissionStatus | string;
+  submitter_id: string | null;
+};
+
+export type ApiPaginatedGameSubmissionsResponse<TSubmission> = {
+  page: number;
+  pageSize: number;
+  submissions: TSubmission[];
+  total: number;
+  totalPages: number;
+};
+
+export type ApiSubmissionCandidatePayload = {
+  asset_license_spdx?: string | null;
+  attribution_text: string;
+  code_license_spdx: string;
+  license_url: string;
+  noncommercial_hosting_allowed: true;
+  notes?: string;
+  original_release_url?: string | null;
+  permission_evidence_url?: string | null;
+  rights_warnings?: string[];
+  source_repo_url: string;
+};
+
+export type ApiGameSubmissionReviewResponse<
+  TSubmission,
+  TCandidate = ApiCatalogCandidate,
+> = {
+  candidate?: TCandidate;
+  submission: TSubmission;
 };
 
 export type ApiCatalogCandidateReviewResponse<TCandidate> = {

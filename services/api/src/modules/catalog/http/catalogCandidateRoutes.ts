@@ -43,6 +43,7 @@ const candidateQuerySchema = z.object({
       "homebrew_hub_nes",
       "debian_main_games",
       "curated_licensed_rom",
+      "user_submission",
     ])
     .optional(),
   status: z

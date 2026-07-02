@@ -26,6 +26,7 @@ import UserManagement from "./pages/admin/UserManagement";
 import Dashboard from "./pages/admin/Dashboard";
 import AccessLogs from "./pages/admin/AccessLogs";
 import CatalogCandidates from "./pages/admin/CatalogCandidates";
+import Submissions from "./pages/admin/Submissions";
 import LocalVault from "./pages/user/LocalVault";
 
 // 1. Define the Standard Layout
@@ -66,6 +67,7 @@ export default function App() {
         {/* ADMIN ROUTES */}
         <Route element={<AdminLayout />}>
           <Route path="/admin" element={<Dashboard />} />
+          <Route path="/admin/submissions" element={<Submissions />} />
           <Route path="/admin/catalog-candidates" element={<CatalogCandidates />} />
           <Route path="/admin/users" element={<UserManagement />} />
           <Route path="/admin/logs" element={<AccessLogs />} />

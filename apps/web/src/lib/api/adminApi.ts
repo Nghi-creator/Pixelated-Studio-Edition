@@ -5,10 +5,14 @@ import type {
   ApiCatalogCandidateReviewResponse,
   ApiCatalogCandidateSourceKind,
   ApiCatalogCandidateStatus,
+  ApiGameSubmissionReviewResponse,
+  ApiGameSubmissionStatus,
+  ApiPaginatedGameSubmissionsResponse,
   ApiPaginatedCatalogCandidatesResponse,
   ApiPaginatedAccessLogsResponse,
   ApiPaginatedReportsResponse,
   ApiPaginatedUsersResponse,
+  ApiSubmissionCandidatePayload,
   ApiProfile,
 } from "./apiTypes";
 
@@ -82,6 +86,47 @@ export function createAdminApi({ apiRequest }: AdminApiDependencies) {
         `/admin/catalog-candidates/${candidateId}`,
         {
           body: JSON.stringify({ action, notes }),
+          method: "PATCH",
+        },
+      ),
+    gameSubmissions: <TSubmission>({
+      page = 1,
+      pageSize = 25,
+      search = "",
+      status = "pending",
+    }: {
+      page?: number;
+      pageSize?: number;
+      search?: string;
+      status?: ApiGameSubmissionStatus;
+    } = {}) => {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: String(pageSize),
+        status,
+      });
+      if (search.trim()) params.set("search", search.trim());
+
+      return apiRequest<ApiPaginatedGameSubmissionsResponse<TSubmission>>(
+        `/admin/submissions?${params}`,
+      );
+    },
+    createSubmissionCandidate: <TSubmission>(
+      submissionId: string,
+      payload: ApiSubmissionCandidatePayload,
+    ) =>
+      apiRequest<ApiGameSubmissionReviewResponse<TSubmission>>(
+        `/admin/submissions/${submissionId}`,
+        {
+          body: JSON.stringify({ action: "create_candidate", ...payload }),
+          method: "PATCH",
+        },
+      ),
+    rejectGameSubmission: <TSubmission>(submissionId: string, notes: string) =>
+      apiRequest<ApiGameSubmissionReviewResponse<TSubmission>>(
+        `/admin/submissions/${submissionId}`,
+        {
+          body: JSON.stringify({ action: "reject", notes }),
           method: "PATCH",
         },
       ),

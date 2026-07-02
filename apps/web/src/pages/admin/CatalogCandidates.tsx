@@ -37,6 +37,7 @@ const SOURCE_OPTIONS: (ApiCatalogCandidateSourceKind | "")[] = [
   "homebrew_hub_gb",
   "homebrew_hub_gba",
   "homebrew_hub_nes",
+  "user_submission",
 ];
 const STATUS_OPTIONS: ApiCatalogCandidateStatus[] = [
   "needs_review",
