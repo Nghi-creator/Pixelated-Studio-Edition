@@ -33,11 +33,13 @@ export type DebianNativeCandidate = {
   developerUrl: string | null;
   licenseUrl: string;
   launchManifestId: string;
+  nonCommercialHostingAllowed: true;
   originalReleaseUrl: string;
   packageComponent: "main";
   packageName: string;
   packageVersion: string;
   platformId: "linux";
+  permissionEvidenceUrl: string;
   rightsWarnings: string[];
   runtimeId: "debian-native-v1";
   sourceCommit: string;
@@ -166,11 +168,13 @@ export function collectDebianNativeCandidates(
         developerUrl: pkg.sourceUrl,
         licenseUrl: pkg.licenseUrl,
         launchManifestId: pkg.manifestId,
+        nonCommercialHostingAllowed: true as const,
         originalReleaseUrl: pkg.packageUrl,
         packageComponent: "main" as const,
         packageName: pkg.packageName,
         packageVersion: pkg.packageVersion,
         platformId: "linux" as const,
+        permissionEvidenceUrl: pkg.licenseUrl,
         rightsWarnings: [
           "Reviewer must confirm Debian copyright file covers code, data, artwork, and audio for hosted streaming.",
           "Reviewer must confirm the native runtime image pins the same package version.",

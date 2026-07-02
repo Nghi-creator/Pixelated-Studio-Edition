@@ -4,6 +4,7 @@ import path from "node:path";
 import test from "node:test";
 import {
   assertCandidateArtifactHeader,
+  assertCandidateRightsEvidence,
   assertCandidateRuntimeAllowed,
   CandidateValidationError,
   getNativeRuntimeManifestIds,
@@ -115,6 +116,39 @@ test("native runtime allowlist stays in sync with the engine lock manifest", () 
   assert.deepEqual(
     getNativeRuntimeManifestIds(),
     lock.packages.map((entry) => entry.manifestId).sort(),
+  );
+});
+
+test("candidate rights evidence requires explicit hosting permission and allowlisted licenses", () => {
+  const baseCandidate = {
+    asset_license_spdx: "MIT",
+    attribution_text: "Demo attribution",
+    code_license_spdx: "MIT",
+    license_url: "https://example.test/license",
+    noncommercial_hosting_allowed: true,
+    permission_evidence_url: "https://example.test/permission",
+    source_commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    source_entry_path: "curated/demo.json#demo",
+    source_kind: "curated_licensed_rom",
+    source_repo_url: "https://github.com/example/demo",
+  };
+
+  assert.doesNotThrow(() => assertCandidateRightsEvidence(baseCandidate));
+  assert.throws(
+    () =>
+      assertCandidateRightsEvidence({
+        ...baseCandidate,
+        noncommercial_hosting_allowed: null,
+      }),
+    /explicitly allow non-commercial hosting/,
+  );
+  assert.throws(
+    () =>
+      assertCandidateRightsEvidence({
+        ...baseCandidate,
+        asset_license_spdx: "Proprietary",
+      }),
+    /Proprietary is not allowlisted/,
   );
 });
 

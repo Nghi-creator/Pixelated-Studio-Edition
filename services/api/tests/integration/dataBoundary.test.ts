@@ -307,6 +307,7 @@ class FakeSupabase {
             (rights) =>
               rights.game_id === game.id &&
               rights.verified_at &&
+              rights.noncommercial_hosting_allowed === true &&
               (!rights.game_build_id || rights.game_build_id === build.id),
           );
         });
@@ -317,7 +318,10 @@ class FakeSupabase {
           ...game,
           game_builds: verifiedBuilds,
           game_rights: this.rows.game_rights.filter(
-            (rights) => rights.game_id === game.id && rights.verified_at,
+            (rights) =>
+              rights.game_id === game.id &&
+              rights.verified_at &&
+              rights.noncommercial_hosting_allowed === true,
           ),
         };
       })
@@ -718,6 +722,7 @@ function seedPublishedGames(db: FakeSupabase, ...games: RecordRow[]) {
       game_build_id: buildId,
       game_id: gameId,
       license_url: "https://example.test/license",
+      noncommercial_hosting_allowed: true,
       source_url: "https://example.test/source",
       verified_at: new Date().toISOString(),
     });
@@ -885,7 +890,9 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
     id: "88888888-8888-4888-8888-888888888888",
     import_status: "needs_review",
     license_url: "https://www.gnu.org/licenses/gpl-3.0.html",
+    noncommercial_hosting_allowed: true,
     original_release_url: null,
+    permission_evidence_url: "https://www.gnu.org/licenses/gpl-3.0.html",
     platform_id: "nes",
     review_notes: null,
     runtime_id: "mesen",
@@ -932,6 +939,11 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
   assert.equal(db.rows.game_rights.length, 1);
   assert.equal(db.rows.game_rights[0]?.game_id, GAME_ID);
   assert.equal(db.rows.game_rights[0]?.cover_license_spdx, "CC0-1.0");
+  assert.equal(db.rows.game_rights[0]?.noncommercial_hosting_allowed, true);
+  assert.equal(
+    db.rows.game_rights[0]?.permission_evidence_url,
+    "https://www.gnu.org/licenses/gpl-3.0.html",
+  );
   assert.equal(
     db.rows.game_rights[0]?.source_url,
     "https://github.com/nesdev-org/homebrew-db/blob/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb/entries/novathesquirrel/game.json",
@@ -962,7 +974,9 @@ test("admin can promote a curated SNES candidate into a bsnes build", async () =
     id: "99999999-9999-4999-8999-999999999999",
     import_status: "needs_review",
     license_url: "https://example.test/license",
+    noncommercial_hosting_allowed: true,
     original_release_url: "https://example.test/demo-snes",
+    permission_evidence_url: "https://example.test/license",
     platform_id: "snes",
     review_notes: null,
     runtime_id: "bsnes",
@@ -1034,7 +1048,9 @@ test("admin promotion replaces generated fallback with captured gameplay artwork
     id: "20202020-2020-4020-8020-202020202020",
     import_status: "needs_review",
     license_url: "https://example.test/license",
+    noncommercial_hosting_allowed: true,
     original_release_url: "https://example.test/capture-demo",
+    permission_evidence_url: "https://example.test/license",
     platform_id: "nes",
     review_notes: null,
     runtime_id: "mesen",
@@ -1092,6 +1108,60 @@ test("admin promotion replaces generated fallback with captured gameplay artwork
   await app.close();
 });
 
+test("admin promotion rejects candidates without explicit hosting permission", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = validNesRom();
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "missing-rights.nes",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/curated-roms/missing-rights.nes",
+    asset_license_spdx: "MIT",
+    attribution_text: "Missing Rights attribution",
+    code_license_spdx: "MIT",
+    cover_license_spdx: null,
+    developer_name: "Example Dev",
+    developer_url: "https://example.test/dev",
+    id: "30303030-3030-4030-8030-303030303030",
+    import_status: "needs_review",
+    license_url: "https://example.test/license",
+    noncommercial_hosting_allowed: null,
+    original_release_url: "https://example.test/missing-rights",
+    permission_evidence_url: "https://example.test/license",
+    platform_id: "nes",
+    review_notes: null,
+    runtime_id: "mesen",
+    runtime_kind: "libretro",
+    source_kind: "curated_licensed_rom",
+    source_commit: "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+    source_entry_path: "curated/nes.json#missing-rights",
+    source_repo_url: "https://github.com/example/curated-roms",
+    title: "Missing Rights Demo",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote", notes: "should fail" },
+    url: "/admin/catalog-candidates/30303030-3030-4030-8030-303030303030",
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.json(), {
+    error: "Candidate rights must explicitly allow non-commercial hosting.",
+  });
+  assert.equal(db.rows.games.length, 0);
+  assert.equal(db.rows.game_builds.length, 0);
+  assert.equal(db.rows.game_rights.length, 0);
+  assert.equal(db.uploadedStorageObjects.length, 0);
+  assert.equal(
+    db.rows.catalog_ingestion_candidates[0]?.import_status,
+    "needs_review",
+  );
+  await app.close();
+});
+
 test("admin can promote a curated Game Gear candidate into a PicoDrive build", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
@@ -1110,7 +1180,9 @@ test("admin can promote a curated Game Gear candidate into a PicoDrive build", a
     id: "10101010-1010-4010-8010-101010101010",
     import_status: "needs_review",
     license_url: "https://example.test/license",
+    noncommercial_hosting_allowed: true,
     original_release_url: "https://example.test/gear",
+    permission_evidence_url: "https://example.test/license",
     platform_id: "game_gear",
     review_notes: null,
     runtime_id: "picodrive",
@@ -1173,7 +1245,9 @@ test("admin promotion rejects unallowlisted candidate runtime/platform pairs", a
     id: "11111111-1111-4111-8111-111111111111",
     import_status: "needs_review",
     license_url: "https://example.test/license",
+    noncommercial_hosting_allowed: true,
     original_release_url: null,
+    permission_evidence_url: "https://example.test/license",
     platform_id: "genesis",
     review_notes: null,
     runtime_id: "bsnes",
@@ -1225,7 +1299,9 @@ test("admin promotion rejects candidates with invalid cartridge headers", async 
     id: "12121212-1212-4121-8121-121212121212",
     import_status: "needs_review",
     license_url: "https://example.test/license",
+    noncommercial_hosting_allowed: true,
     original_release_url: null,
+    permission_evidence_url: "https://example.test/license",
     platform_id: "genesis",
     review_notes: null,
     runtime_id: "picodrive",
@@ -1279,10 +1355,13 @@ test("admin can promote a Debian native candidate without mirroring a ROM artifa
     launch_manifest_id: "frozen-bubble",
     license_url:
       "https://metadata.ftp-master.debian.org/changelogs/main/f/frozen-bubble/frozen-bubble_2.212-13_copyright",
+    noncommercial_hosting_allowed: true,
     original_release_url: "https://packages.debian.org/trixie/frozen-bubble",
     package_component: "main",
     package_name: "frozen-bubble",
     package_version: "2.212-13+b1",
+    permission_evidence_url:
+      "https://metadata.ftp-master.debian.org/changelogs/main/f/frozen-bubble/frozen-bubble_2.212-13_copyright",
     platform_id: "linux",
     review_notes: null,
     runtime_id: "debian-native-v1",
@@ -1337,7 +1416,9 @@ test("catalog candidate review requires admin access", async () => {
     id: "99999999-9999-4999-8999-999999999999",
     import_status: "needs_review",
     license_url: "https://opensource.org/license/mit",
+    noncommercial_hosting_allowed: true,
     original_release_url: null,
+    permission_evidence_url: "https://opensource.org/license/mit",
     platform_id: "gb",
     review_notes: null,
     runtime_id: "mgba",

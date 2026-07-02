@@ -41,6 +41,7 @@ export type GameRightsRow = {
   id?: string;
   license_url?: string | null;
   modification_allowed?: boolean | null;
+  noncommercial_hosting_allowed?: boolean | null;
   original_release_url?: string | null;
   permission_evidence_url?: string | null;
   review_notes?: string | null;
@@ -100,6 +101,7 @@ export const VERIFIED_RIGHTS_COLUMNS = [
   "attribution_text",
   "commercial_use_allowed",
   "modification_allowed",
+  "noncommercial_hosting_allowed",
   "review_notes",
   "verified_at",
 ].join(",");

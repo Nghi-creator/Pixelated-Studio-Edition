@@ -178,6 +178,7 @@ export type ApiGame = {
     id?: string;
     license_url?: string | null;
     modification_allowed?: boolean | null;
+    noncommercial_hosting_allowed?: boolean | null;
     original_release_url?: string | null;
     permission_evidence_url?: string | null;
     review_notes?: string | null;

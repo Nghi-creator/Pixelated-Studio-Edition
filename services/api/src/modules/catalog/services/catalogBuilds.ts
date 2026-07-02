@@ -51,12 +51,16 @@ export async function attachPublishedBuilds(
 
   const verifiedRights = new Set(
     (rights || [])
-      .filter((row) => Boolean(row.verified_at))
+      .filter(
+        (row) =>
+          Boolean(row.verified_at) &&
+          row.noncommercial_hosting_allowed === true,
+      )
       .map((row) => rightsKey(row.game_id, row.game_build_id)),
   );
   const rightsByGame = new Map<string, GameRightsRow[]>();
   for (const row of rights || []) {
-    if (!row.verified_at) continue;
+    if (!row.verified_at || row.noncommercial_hosting_allowed !== true) continue;
     const gameRights = rightsByGame.get(row.game_id) || [];
     gameRights.push(row);
     rightsByGame.set(row.game_id, gameRights);

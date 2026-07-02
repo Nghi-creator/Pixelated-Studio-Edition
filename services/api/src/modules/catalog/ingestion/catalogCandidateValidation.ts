@@ -12,6 +12,19 @@ export type CandidateValidationInput = {
   runtime_kind: "libretro" | "native_linux";
 };
 
+export type CandidateRightsValidationInput = {
+  asset_license_spdx: string | null;
+  attribution_text: string | null;
+  code_license_spdx: string | null;
+  license_url: string | null;
+  noncommercial_hosting_allowed: boolean | null;
+  permission_evidence_url: string | null;
+  source_commit: string;
+  source_entry_path: string;
+  source_kind: string;
+  source_repo_url: string;
+};
+
 export class CandidateValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -43,6 +56,26 @@ const GBA_NINTENDO_LOGO_PREFIX = Buffer.from([
   0x24, 0xff, 0xae, 0x51, 0x69, 0x9a, 0xa2, 0x21,
 ]);
 const SEGA_8BIT_HEADER = Buffer.from("TMR SEGA");
+
+const REDISTRIBUTABLE_LICENSES = new Set([
+  "0BSD",
+  "Apache-2.0",
+  "Artistic-2.0",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "CC-BY-4.0",
+  "CC-BY-SA-4.0",
+  "GPL-2.0-or-later",
+  "GPL-3.0",
+  "GPL-3.0-only",
+  "GPL-3.0-or-later",
+  "MIT",
+  "MPL-2.0",
+  "Unlicense",
+  "WTFPL-2.0",
+  "Zlib",
+  "Debian-main",
+]);
 
 function bufferStartsWith(buffer: Buffer, prefix: Buffer, offset = 0) {
   if (buffer.length < offset + prefix.length) return false;
@@ -87,6 +120,78 @@ export function assertCandidateRuntimeAllowed(
     throw new CandidateValidationError(
       `Candidate artifact extension ${extension || "(none)"} is not allowlisted for ${candidate.platform_id}/${candidate.runtime_id}.`,
     );
+  }
+}
+
+function assertHttpsUrl(value: string | null, label: string) {
+  if (!value) {
+    throw new CandidateValidationError(`${label} is required.`);
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new CandidateValidationError(`${label} must be a valid URL.`);
+  }
+
+  if (parsed.protocol !== "https:") {
+    throw new CandidateValidationError(`${label} must use HTTPS.`);
+  }
+}
+
+export function assertCandidateRightsEvidence(
+  candidate: CandidateRightsValidationInput,
+) {
+  if (candidate.noncommercial_hosting_allowed !== true) {
+    throw new CandidateValidationError(
+      "Candidate rights must explicitly allow non-commercial hosting.",
+    );
+  }
+
+  assertHttpsUrl(candidate.license_url, "Candidate license_url");
+  if (candidate.permission_evidence_url) {
+    assertHttpsUrl(
+      candidate.permission_evidence_url,
+      "Candidate permission_evidence_url",
+    );
+  }
+
+  if (!candidate.attribution_text?.trim()) {
+    throw new CandidateValidationError(
+      "Candidate rights are missing attribution text.",
+    );
+  }
+
+  const licenses = [
+    candidate.code_license_spdx?.trim(),
+    candidate.asset_license_spdx?.trim(),
+  ].filter((license): license is string => Boolean(license));
+  if (licenses.length === 0 && !candidate.permission_evidence_url) {
+    throw new CandidateValidationError(
+      "Candidate rights require a license SPDX value or permission evidence.",
+    );
+  }
+  for (const license of licenses) {
+    if (!REDISTRIBUTABLE_LICENSES.has(license)) {
+      throw new CandidateValidationError(
+        `Candidate license ${license} is not allowlisted for hosting.`,
+      );
+    }
+  }
+
+  assertHttpsUrl(candidate.source_repo_url, "Candidate source_repo_url");
+  if (candidate.source_kind !== "debian_main_games") {
+    if (!/^[a-f0-9]{40}$/.test(candidate.source_commit)) {
+      throw new CandidateValidationError(
+        "Candidate source_commit must be a 40-character SHA-1.",
+      );
+    }
+    if (!candidate.source_entry_path.trim()) {
+      throw new CandidateValidationError(
+        "Candidate source_entry_path is required.",
+      );
+    }
   }
 }
 

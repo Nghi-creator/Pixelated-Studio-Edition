@@ -27,7 +27,9 @@ export type HomebrewHubCandidate = {
   developerName: string | null;
   developerUrl: string | null;
   licenseUrl: string | null;
+  nonCommercialHostingAllowed: true;
   originalReleaseUrl: string | null;
+  permissionEvidenceUrl: string | null;
   platformId: "nes" | "gb" | "gbc" | "gba";
   rightsWarnings: string[];
   runtimeId: "mesen" | "mgba";
@@ -75,7 +77,7 @@ const LICENSE_URLS: Record<string, string> = {
   MIT: "https://opensource.org/license/mit",
   "MPL-2.0": "https://www.mozilla.org/en-US/MPL/2.0/",
   Unlicense: "https://unlicense.org/",
-  "WTFPL-2.0": "http://www.wtfpl.net/",
+  "WTFPL-2.0": "https://www.wtfpl.net/",
   Zlib: "https://www.zlib.net/zlib_license.html",
 };
 
@@ -230,7 +232,9 @@ function artifactCandidatesForEntry(
         developerName: author,
         developerUrl: metadata.website || metadata.source || null,
         licenseUrl: license.licenseUrl,
+        nonCommercialHostingAllowed: true,
         originalReleaseUrl: metadata.website || null,
+        permissionEvidenceUrl: license.licenseUrl,
         platformId: platform.platformId,
         rightsWarnings,
         runtimeId: platform.runtimeId,

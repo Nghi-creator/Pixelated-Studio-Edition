@@ -18,10 +18,12 @@ export type CandidateRow = {
   import_status: string;
   launch_manifest_id: string | null;
   license_url: string | null;
+  noncommercial_hosting_allowed: boolean | null;
   original_release_url: string | null;
   package_component: string | null;
   package_name: string | null;
   package_version: string | null;
+  permission_evidence_url: string | null;
   platform_id: string;
   review_notes: string | null;
   runtime_id: string;
@@ -68,6 +70,8 @@ export const CANDIDATE_COLUMNS = [
   "asset_license_spdx",
   "cover_license_spdx",
   "license_url",
+  "permission_evidence_url",
+  "noncommercial_hosting_allowed",
   "original_release_url",
   "attribution_text",
   "rights_warnings",

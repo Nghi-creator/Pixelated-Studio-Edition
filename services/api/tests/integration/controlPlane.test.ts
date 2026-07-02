@@ -338,6 +338,7 @@ function seedPublishedGame(
     game_build_id: buildId,
     game_id: game.id,
     id: `${game.id}-rights`,
+    noncommercial_hosting_allowed: true,
     verified_at: new Date().toISOString(),
   });
 }

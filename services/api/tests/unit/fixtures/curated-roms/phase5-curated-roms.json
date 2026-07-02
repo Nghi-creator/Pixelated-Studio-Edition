@@ -16,6 +16,7 @@
       "codeLicenseSpdx": "Artistic-2.0",
       "assetLicenseSpdx": "Artistic-2.0",
       "licenseUrl": "https://github.com/moon-watcher/Scorpion-Illuminati-Core/blob/08728404021f9a34afdbe74d1a22fbfdebc00867/LICENSE.md",
+      "nonCommercialHostingAllowed": true,
       "originalReleaseUrl": "https://github.com/moon-watcher/Scorpion-Illuminati-Core",
       "attributionText": "Scorpion Illuminati by moon-watcher. Licensed under Artistic-2.0; source, built ROM, and license evidence are pinned at commit 08728404021f9a34afdbe74d1a22fbfdebc00867.",
       "rightsWarnings": [

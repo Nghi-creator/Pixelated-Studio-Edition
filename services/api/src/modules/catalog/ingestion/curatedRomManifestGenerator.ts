@@ -11,8 +11,10 @@ export type CuratedRomManifestStubOptions = {
   developerName?: string;
   developerUrl?: string;
   licenseUrl: string;
+  nonCommercialHostingAllowed?: boolean;
   manifestPath: string;
   originalReleaseUrl?: string;
+  permissionEvidenceUrl?: string;
   rawBaseUrl?: string;
   repoUrl?: string;
   rightsWarnings?: string[];
@@ -35,7 +37,9 @@ export type CuratedRomManifestStub = {
       developerName?: string;
       developerUrl?: string;
       licenseUrl: string;
+      nonCommercialHostingAllowed: true;
       originalReleaseUrl?: string;
+      permissionEvidenceUrl?: string;
       rightsWarnings: string[];
       slug: string;
       sourceEntryPath: string;
@@ -235,6 +239,13 @@ export function createCuratedRomManifestStub(
   }
   const licenseUrl = optionalHttpsUrl(options.licenseUrl, "licenseUrl");
   if (!licenseUrl) throw new Error("licenseUrl is required as license evidence.");
+  if (options.nonCommercialHostingAllowed === false) {
+    throw new Error("nonCommercialHostingAllowed must be true.");
+  }
+  const permissionEvidenceUrl = optionalHttpsUrl(
+    options.permissionEvidenceUrl,
+    "permissionEvidenceUrl",
+  );
 
   const manifestPath = trim(options.manifestPath);
   if (!manifestPath) throw new Error("manifestPath is required.");
@@ -278,9 +289,11 @@ export function createCuratedRomManifestStub(
           ? { developerUrl: trim(options.developerUrl) }
           : {}),
         licenseUrl,
+        nonCommercialHostingAllowed: true,
         ...(optionalHttpsUrl(options.originalReleaseUrl, "originalReleaseUrl")
           ? { originalReleaseUrl: trim(options.originalReleaseUrl) }
           : {}),
+        ...(permissionEvidenceUrl ? { permissionEvidenceUrl } : {}),
         rightsWarnings: options.rightsWarnings ?? [
           "Review playable artifact, source, license evidence, and cover-art rights before publication.",
         ],

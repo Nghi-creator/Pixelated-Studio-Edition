@@ -82,6 +82,8 @@ test("Homebrew Hub importer filters to playable supported files with allowlisted
   assert.equal(candidates[0]?.runtimeId, "mgba");
   assert.equal(candidates[0]?.codeLicenseSpdx, "MIT");
   assert.equal(candidates[0]?.assetLicenseSpdx, "MIT");
+  assert.equal(candidates[0]?.nonCommercialHostingAllowed, true);
+  assert.equal(candidates[0]?.permissionEvidenceUrl, "https://opensource.org/license/mit");
   assert.match(candidates[0]?.artifactSha256 || "", /^[a-f0-9]{64}$/);
 });
 
@@ -115,6 +117,7 @@ test("Homebrew Hub importer marks generic license fields for reviewer confirmati
   assert.equal(candidates[0]?.runtimeId, "mesen");
   assert.equal(candidates[0]?.codeLicenseSpdx, "Zlib");
   assert.equal(candidates[0]?.assetLicenseSpdx, null);
+  assert.equal(candidates[0]?.nonCommercialHostingAllowed, true);
   assert.deepEqual(candidates[0]?.rightsWarnings, [
     "Entry uses a generic license field; reviewer must confirm it covers complete game assets and ROM redistribution.",
   ]);
