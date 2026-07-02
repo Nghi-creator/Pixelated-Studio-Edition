@@ -13,6 +13,24 @@ export const queryClient = new QueryClient({
 export const queryKeys = {
   accessLogs: (page: number, pageSize: number) =>
     ["accessLogs", page, pageSize] as const,
+  catalogCandidates: (
+    page: number,
+    pageSize: number,
+    status: string,
+    sourceKind: string,
+    platformId: string,
+    search: string,
+  ) =>
+    [
+      "catalogCandidates",
+      page,
+      pageSize,
+      status,
+      sourceKind,
+      platformId,
+      search,
+    ] as const,
+  catalogCandidatesRoot: () => ["catalogCandidates"] as const,
   adminReports: (
     page: number,
     pageSize: number,
@@ -42,6 +60,9 @@ export const invalidateAdminReportsQueries = (client: QueryClientInstance) =>
 
 export const invalidateAdminUsersQueries = (client: QueryClientInstance) =>
   client.invalidateQueries({ queryKey: queryKeys.adminUsersRoot() });
+
+export const invalidateCatalogCandidateQueries = (client: QueryClientInstance) =>
+  client.invalidateQueries({ queryKey: queryKeys.catalogCandidatesRoot() });
 
 export const invalidateFavoriteQueries = async (client: QueryClientInstance) => {
   await Promise.all([

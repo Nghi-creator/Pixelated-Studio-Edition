@@ -93,6 +93,18 @@ export type ApiMultiplayerLobbyPayload = {
 };
 
 export type ApiAdminReportAction = "ban_user" | "delete_comment" | "ignore";
+export type ApiCatalogCandidateReviewAction = "promote" | "reject";
+export type ApiCatalogCandidateStatus =
+  | "approved"
+  | "needs_review"
+  | "promoted"
+  | "rejected";
+export type ApiCatalogCandidateSourceKind =
+  | "curated_licensed_rom"
+  | "debian_main_games"
+  | "homebrew_hub_gb"
+  | "homebrew_hub_gba"
+  | "homebrew_hub_nes";
 
 export type ApiAdminReportActionResponse = {
   action: ApiAdminReportAction;
@@ -138,6 +150,58 @@ export type ApiPaginatedReportsResponse<TReport> = {
   targetRole?: "all" | "users" | "admins";
   total: number;
   totalPages: number;
+};
+
+export type ApiCatalogCandidate = {
+  artifact_filename: string | null;
+  artifact_sha256: string | null;
+  artifact_size: number | null;
+  artifact_url: string | null;
+  asset_license_spdx: string | null;
+  attribution_text: string | null;
+  code_license_spdx: string | null;
+  cover_license_spdx?: string | null;
+  developer_name: string | null;
+  developer_url: string | null;
+  first_seen_at?: string | null;
+  id: string;
+  import_status: ApiCatalogCandidateStatus | string;
+  last_seen_at?: string | null;
+  launch_manifest_id: string | null;
+  license_url: string | null;
+  noncommercial_hosting_allowed: boolean | null;
+  original_release_url: string | null;
+  package_component: string | null;
+  package_name: string | null;
+  package_version: string | null;
+  permission_evidence_url: string | null;
+  platform_id: string;
+  promoted_build_id?: string | null;
+  promoted_game_id?: string | null;
+  review_notes: string | null;
+  rights_warnings?: string[] | null;
+  runtime_id: string;
+  runtime_kind: "libretro" | "native_linux";
+  source_commit: string;
+  source_entry_path: string;
+  source_kind: ApiCatalogCandidateSourceKind | string;
+  source_repo_url: string;
+  title: string;
+};
+
+export type ApiPaginatedCatalogCandidatesResponse<TCandidate> = {
+  candidates: TCandidate[];
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
+};
+
+export type ApiCatalogCandidateReviewResponse<TCandidate> = {
+  candidate?: TCandidate;
+  build?: { id: string };
+  game?: { id: string };
+  rights?: { id: string };
 };
 
 export type ApiGameSubmissionPayload = {

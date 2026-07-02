@@ -3,6 +3,9 @@ import { getAuthSession, api } from "./apiClient";
 import { queryKeys } from "./queryClient";
 import type {
   ApiGame,
+  ApiCatalogCandidateSourceKind,
+  ApiCatalogCandidateStatus,
+  ApiPaginatedCatalogCandidatesResponse,
   ApiPaginatedAccessLogsResponse,
   ApiPaginatedReportsResponse,
   ApiPaginatedUsersResponse,
@@ -43,6 +46,45 @@ export function useAdminUsersQuery<TUser>({
     enabled,
     queryKey: queryKeys.adminUsers(page, pageSize, search),
     queryFn: () => api.users<TUser>({ page, pageSize, search }),
+  });
+}
+
+export function useCatalogCandidatesQuery<TCandidate>({
+  enabled = true,
+  page,
+  pageSize,
+  platformId,
+  search,
+  sourceKind,
+  status,
+}: {
+  enabled?: boolean;
+  page: number;
+  pageSize: number;
+  platformId: string;
+  search: string;
+  sourceKind: ApiCatalogCandidateSourceKind | "";
+  status: ApiCatalogCandidateStatus;
+}) {
+  return useQuery<ApiPaginatedCatalogCandidatesResponse<TCandidate>>({
+    enabled,
+    queryKey: queryKeys.catalogCandidates(
+      page,
+      pageSize,
+      status,
+      sourceKind,
+      platformId,
+      search,
+    ),
+    queryFn: () =>
+      api.catalogCandidates<TCandidate>({
+        page,
+        pageSize,
+        platformId,
+        search,
+        sourceKind,
+        status,
+      }),
   });
 }
 

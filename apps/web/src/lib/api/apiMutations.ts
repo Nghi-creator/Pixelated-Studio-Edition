@@ -3,6 +3,11 @@ import { api } from "./apiClient";
 import type {
   ApiAdminReportAction,
   ApiAdminReportActionResponse,
+  ApiCatalogCandidateReviewAction,
+  ApiCatalogCandidateReviewResponse,
+  ApiCatalogCandidateSourceKind,
+  ApiCatalogCandidateStatus,
+  ApiPaginatedCatalogCandidatesResponse,
   ApiPaginatedReportsResponse,
   ApiPaginatedUsersResponse,
   ApiProfile,
@@ -10,6 +15,7 @@ import type {
 import {
   invalidateAdminReportsQueries,
   invalidateAdminUsersQueries,
+  invalidateCatalogCandidateQueries,
   invalidateGameCommentsQuery,
   invalidateGameReactionsQuery,
   queryKeys,
@@ -21,6 +27,10 @@ type AdminReportCacheItem = {
 };
 
 type AdminUserCacheItem = {
+  id: string;
+};
+
+type CatalogCandidateCacheItem = {
   id: string;
 };
 
@@ -128,6 +138,82 @@ export function useUpdateAdminUserMutation<TUser extends AdminUserCacheItem>({
 
       onSuccess?.(user);
       await invalidateAdminUsersQueries(queryClient);
+    },
+  });
+}
+
+export function useReviewCatalogCandidateMutation<
+  TCandidate extends CatalogCandidateCacheItem,
+>({
+  onError,
+  onReviewed,
+  page,
+  pageSize,
+  platformId,
+  search,
+  sourceKind,
+  status,
+  totalCandidates,
+}: {
+  onError?: (error: unknown) => void;
+  onReviewed?: ({
+    nextTotal,
+    result,
+  }: {
+    nextTotal: number;
+    result: ApiCatalogCandidateReviewResponse<TCandidate>;
+  }) => void;
+  page: number;
+  pageSize: number;
+  platformId: string;
+  search: string;
+  sourceKind: ApiCatalogCandidateSourceKind | "";
+  status: ApiCatalogCandidateStatus;
+  totalCandidates: number;
+}) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      action,
+      candidateId,
+      notes,
+    }: {
+      action: ApiCatalogCandidateReviewAction;
+      candidateId: string;
+      notes: string;
+    }) => api.reviewCatalogCandidate<TCandidate>(candidateId, action, notes),
+    onError,
+    onSuccess: async (result, { candidateId }) => {
+      const nextTotal = Math.max(0, totalCandidates - 1);
+
+      queryClient.setQueryData(
+        queryKeys.catalogCandidates(
+          page,
+          pageSize,
+          status,
+          sourceKind,
+          platformId,
+          search,
+        ),
+        (
+          current:
+            | ApiPaginatedCatalogCandidatesResponse<TCandidate>
+            | undefined,
+        ) =>
+          current
+            ? {
+                ...current,
+                candidates: current.candidates.filter(
+                  (candidate) => candidate.id !== candidateId,
+                ),
+                total: nextTotal,
+              }
+            : current,
+      );
+
+      onReviewed?.({ nextTotal, result });
+      await invalidateCatalogCandidateQueries(queryClient);
     },
   });
 }
