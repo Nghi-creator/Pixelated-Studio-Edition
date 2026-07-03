@@ -4,6 +4,7 @@ import path from "path";
 import {
   type EngineRuntimeKind,
   companionPort,
+  engineRuntimeDir,
   hostedWebUrl,
 } from "../runtime/config";
 import {
@@ -75,11 +76,58 @@ type EngineHealthPayload = {
   runtimeKind?: EngineRuntimeKind;
 };
 
+type ImageRecoveryPayload = {
+  detail: string;
+  engineImage: string;
+  guidance: string;
+  runtimeDir: string;
+  runtimeKind: EngineRuntimeKind;
+  summary: string;
+  title: string;
+};
+
+type EngineControllerDependencies = {
+  diagnoseDocker: typeof diagnoseDocker;
+  execFileCommand: typeof execFileCommand;
+  getSafeEnv: typeof getSafeEnv;
+  getUserDataPath: () => string;
+  prepareEngineImage: typeof prepareEngineImage;
+  startCompanionServer: typeof startCompanionServer;
+  stopCompanionServer: typeof stopCompanionServer;
+  waitForEngineHealth: typeof waitForEngineHealth;
+};
+
 let engineToken: string | null = null;
 let activeCompanion: ActiveCompanion | null = null;
 let activeStartupAttempt = 0;
 let startupInProgress = false;
 let recoveryInProgress = false;
+const IMAGE_RECOVERY_HANDLED = Symbol("image-recovery-handled");
+const defaultDependencies: EngineControllerDependencies = {
+  diagnoseDocker,
+  execFileCommand,
+  getSafeEnv,
+  getUserDataPath: () => app.getPath("userData"),
+  prepareEngineImage,
+  startCompanionServer,
+  stopCompanionServer,
+  waitForEngineHealth,
+};
+let dependencies = defaultDependencies;
+
+export function resetEngineControllerForTest(
+  overrides: Partial<EngineControllerDependencies> = {},
+) {
+  engineToken = null;
+  activeCompanion = null;
+  activeStartupAttempt = 0;
+  startupInProgress = false;
+  recoveryInProgress = false;
+  dependencies = {
+    ...defaultDependencies,
+    ...overrides,
+  };
+}
 
 function rejectInvalidImage(event: IpcMainEvent) {
   setCurrentEnginePhase("image");
@@ -100,8 +148,8 @@ async function startCompanion(
   }
 
   try {
-    const companion: CompanionServerResult = await startCompanionServer({
-      certDir: path.join(app.getPath("userData"), "certificates"),
+    const companion: CompanionServerResult = await dependencies.startCompanionServer({
+      certDir: path.join(dependencies.getUserDataPath(), "certificates"),
       engineToken,
       inviteCode: launchContext.inviteCode,
       inviteExpiresAt: launchContext.inviteExpiresAt,
@@ -312,7 +360,7 @@ function startContainer(
     `Starting WebRTC Node in ${launchContext.exposureMode.toUpperCase()} mode...`,
   );
 
-  return execFileCommand(
+  return dependencies.execFileCommand(
     "docker",
     getDockerRunArgs({
       ...launchContext,
@@ -327,7 +375,7 @@ function handleStartupFailure(
   safeEnv: NodeJS.ProcessEnv,
   startErr: unknown,
 ) {
-  stopCompanionServer();
+  dependencies.stopCompanionServer();
   activeCompanion = null;
   const message = getErrorMessage(startErr);
   emitEngineState(event, "FAILED", message);
@@ -335,11 +383,58 @@ function handleStartupFailure(
     "server-log",
     `<span class="text-red-500">ERROR: ${message}</span>`,
   );
-  void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+  void dependencies.execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
     .catch(() => undefined)
     .finally(() => {
       event.reply("engine-stopped");
     });
+}
+
+export function createImageRecoveryPayload(
+  launchContext: EngineLaunchContext,
+  detail: string,
+): ImageRecoveryPayload {
+  const runtimeLabel =
+    launchContext.runtimeConfig.engineRuntimeKind === "native_linux"
+      ? "native Linux"
+      : "libretro";
+  const title = "Engine image is not ready";
+  const guidance =
+    `Build the local ${runtimeLabel} Docker image, then retry engine initialization.`;
+  return {
+    detail,
+    engineImage: launchContext.runtimeConfig.engineImage,
+    guidance,
+    runtimeDir: engineRuntimeDir,
+    runtimeKind: launchContext.runtimeConfig.engineRuntimeKind,
+    summary: [
+      "Pixelated Studio engine image recovery",
+      `Status: ${title}`,
+      `Image: ${launchContext.runtimeConfig.engineImage}`,
+      `Runtime: ${launchContext.runtimeConfig.engineRuntimeKind}`,
+      `Runtime dir: ${engineRuntimeDir}`,
+      `Next step: ${guidance}`,
+      detail ? `Detail: ${detail}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    title,
+  };
+}
+
+function emitImageRecovery(
+  event: IpcMainEvent,
+  launchContext: EngineLaunchContext,
+  err: unknown,
+) {
+  const message = getErrorMessage(err);
+  emitEngineState(event, "FAILED", message);
+  event.reply("engine-image-recovery", createImageRecoveryPayload(launchContext, message));
+  event.reply(
+    "server-log",
+    `<span class="text-red-500">ERROR: Engine image preparation failed: ${message}</span>`,
+  );
+  event.reply("engine-stopped");
 }
 
 function emitDockerDiagnostic(event: IpcMainEvent, diagnostic: DockerDiagnostic) {
@@ -364,16 +459,26 @@ function continueEngineStartup(
   safeEnv: NodeJS.ProcessEnv,
   launchContext: EngineLaunchContext,
   attempt: number,
+  skipImagePreparation = false,
 ) {
   if (attempt !== activeStartupAttempt) return;
   event.reply("server-log", "Docker Engine found.");
 
-  prepareEngineImage(event, safeEnv, launchContext.runtimeConfig)
+  const prepareImage = skipImagePreparation
+    ? Promise.resolve()
+    : dependencies.prepareEngineImage(event, safeEnv, launchContext.runtimeConfig);
+
+  prepareImage
+    .catch((imageErr) => {
+      finishStartupAttempt(attempt);
+      emitImageRecovery(event, launchContext, imageErr);
+      throw IMAGE_RECOVERY_HANDLED;
+    })
     .then(() => {
       event.reply("server-log", "Image ready. Preparing WebRTC Node...");
       emitEngineState(event, "REMOVING_STALE", "pixelated-node");
 
-      return execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv }).catch(
+      return dependencies.execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv }).catch(
         () => undefined,
       );
     })
@@ -381,7 +486,7 @@ function continueEngineStartup(
     .then(() => {
       emitEngineState(event, "WAITING_HEALTH", "30 attempts / 1s interval");
       event.reply("server-log", "Waiting for engine health check...");
-      return waitForEngineHealth();
+      return dependencies.waitForEngineHealth();
     })
     .then(() => {
       return startCompanion(event, launchContext).then(() => {
@@ -400,6 +505,7 @@ function continueEngineStartup(
       });
     })
     .catch((startErr) => {
+      if (startErr === IMAGE_RECOVERY_HANDLED) return;
       finishStartupAttempt(attempt);
       handleStartupFailure(event, safeEnv, startErr);
     });
@@ -472,11 +578,11 @@ async function requestEngineRuntimeSwitch(
       "server-log",
       `Switching engine runtime to ${runtimeKind}. Restarting container...`,
     );
-    const safeEnv = getSafeEnv();
-    stopCompanionServer({ preserveSecurityState: true });
+    const safeEnv = dependencies.getSafeEnv();
+    dependencies.stopCompanionServer({ preserveSecurityState: true });
     activeCompanion = null;
 
-    void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+    void dependencies.execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
       .catch(() => undefined)
       .finally(() => {
         startEngine(event, {
@@ -507,27 +613,93 @@ export function startEngine(event: IpcMainEvent, options: StartEngineOptions = {
 
   emitEngineState(event, "CHECKING_DOCKER");
   event.reply("server-log", "Checking Docker daemon...");
-  const safeEnv = getSafeEnv();
+  const safeEnv = dependencies.getSafeEnv();
   const attempt = ++activeStartupAttempt;
   startupInProgress = true;
 
   if (options.preserveEngineToken !== true || !engineToken) {
     engineToken = crypto.randomBytes(24).toString("base64url");
   }
-  stopCompanionServer({
+  dependencies.stopCompanionServer({
     preserveSecurityState: launchContext.preserveCompanionSecurity,
   });
   activeCompanion = null;
 
-  void diagnoseDocker(safeEnv).then((diagnostic) => {
+  void dependencies.diagnoseDocker(safeEnv).then((diagnostic) => {
     if (attempt !== activeStartupAttempt) return;
     if (diagnostic.code !== "ready") {
       finishStartupAttempt(attempt);
       emitDockerDiagnostic(event, withDockerStartCapability(diagnostic));
       return;
     }
-    continueEngineStartup(event, safeEnv, launchContext, attempt);
+    continueEngineStartup(
+      event,
+      safeEnv,
+      launchContext,
+      attempt,
+      options.skipImagePreparation === true,
+    );
   });
+}
+
+export function buildEngineImageAndResume(
+  event: IpcMainEvent,
+  options: StartEngineOptions = {},
+) {
+  if (startupInProgress || recoveryInProgress) {
+    event.reply("server-log", "Engine initialization is already in progress.");
+    return;
+  }
+
+  const launchContext = createEngineLaunchContext(options);
+  if (!isSafeDockerImageRef(launchContext.runtimeConfig.engineImage)) {
+    rejectInvalidImage(event);
+    return;
+  }
+
+  const safeEnv = dependencies.getSafeEnv();
+  const attempt = ++activeStartupAttempt;
+  startupInProgress = true;
+  emitEngineState(event, "CHECKING_DOCKER");
+  event.reply("engine-image-build-started");
+  event.reply("server-log", "Checking Docker daemon before rebuilding engine image...");
+
+  if (options.preserveEngineToken !== true || !engineToken) {
+    engineToken = crypto.randomBytes(24).toString("base64url");
+  }
+  dependencies.stopCompanionServer({
+    preserveSecurityState: launchContext.preserveCompanionSecurity,
+  });
+  activeCompanion = null;
+
+  void dependencies.diagnoseDocker(safeEnv)
+    .then((diagnostic) => {
+      if (attempt !== activeStartupAttempt) return Promise.reject(IMAGE_RECOVERY_HANDLED);
+      if (diagnostic.code !== "ready") {
+        finishStartupAttempt(attempt);
+        emitDockerDiagnostic(event, withDockerStartCapability(diagnostic));
+        return Promise.reject(IMAGE_RECOVERY_HANDLED);
+      }
+
+      event.reply("server-log", "Building engine image from the local runtime Dockerfile...");
+      return dependencies.prepareEngineImage(event, safeEnv, launchContext.runtimeConfig);
+    })
+    .then(() => {
+      if (attempt !== activeStartupAttempt) return;
+      event.reply("engine-image-build-ready");
+      event.reply("server-log", "Engine image built. Resuming startup.");
+      finishStartupAttempt(attempt);
+      startEngine(event, {
+        ...options,
+        preserveEngineToken: true,
+        skipImagePreparation: true,
+      });
+    })
+    .catch((err) => {
+      if (err === IMAGE_RECOVERY_HANDLED || attempt !== activeStartupAttempt) return;
+      finishStartupAttempt(attempt);
+      emitImageRecovery(event, launchContext, err);
+    });
 }
 
 export function startDockerAndResume(
@@ -561,7 +733,7 @@ export function startDockerAndResume(
   void executeDockerStartPlan(startPlan, (targetPath) => shell.openPath(targetPath))
     .then(() => {
       event.reply("server-log", "Waiting for Docker Desktop to become ready...");
-      return waitForDockerReady(getSafeEnv(), {
+      return waitForDockerReady(dependencies.getSafeEnv(), {
         isCancelled: () => attempt !== activeStartupAttempt,
       });
     })
@@ -604,11 +776,11 @@ export function stopEngine(event: IpcMainEvent) {
   recoveryInProgress = false;
   emitEngineState(event, "STOPPING");
   event.reply("server-log", "Initiating shutdown sequence...");
-  const safeEnv = getSafeEnv();
-  stopCompanionServer();
+  const safeEnv = dependencies.getSafeEnv();
+  dependencies.stopCompanionServer();
   activeCompanion = null;
 
-  void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+  void dependencies.execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
     .then(() => {
       event.reply("server-log", "Engine successfully terminated.");
     })
@@ -638,11 +810,11 @@ export function rotateEngineToken(
   recoveryInProgress = false;
   emitEngineState(event, "STOPPING", "Rotating pairing token");
   event.reply("server-log", "Rotating host-local pairing token...");
-  const safeEnv = getSafeEnv();
-  stopCompanionServer();
+  const safeEnv = dependencies.getSafeEnv();
+  dependencies.stopCompanionServer();
   activeCompanion = null;
 
-  void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+  void dependencies.execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
     .catch(() => undefined)
     .finally(() => {
       event.reply("server-log", "Restarting engine with a fresh pairing token.");
@@ -654,10 +826,10 @@ export function cleanupEngine() {
   activeStartupAttempt += 1;
   startupInProgress = false;
   recoveryInProgress = false;
-  const safeEnv = getSafeEnv();
-  stopCompanionServer();
+  const safeEnv = dependencies.getSafeEnv();
+  dependencies.stopCompanionServer();
   activeCompanion = null;
-  void execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv }).catch(
+  void dependencies.execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv }).catch(
     () => undefined,
   );
 }

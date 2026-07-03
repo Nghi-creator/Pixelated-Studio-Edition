@@ -1,13 +1,16 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
+  AlertCircle,
   CheckCircle2,
   ExternalLink,
-  FileArchive,
   RefreshCw,
+  X,
   XCircle,
 } from "lucide-react";
 import { Pagination } from "../../components/ui/Pagination";
-import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
+import { PixelIcon } from "../../components/ui/PixelIcon";
+import { AdminSelect } from "../../components/ui/AdminSelect";
+import { AdminReviewPageSkeleton } from "../../components/ui/Skeleton";
 import {
   getAdminApiErrorMessage,
   getPageAfterRemoval,
@@ -32,6 +35,16 @@ const STATUS_OPTIONS: ApiGameSubmissionStatus[] = [
   "candidate_created",
   "rejected",
 ];
+const STATUS_FILTER_OPTIONS = STATUS_OPTIONS.map((option) => ({
+  label: option,
+  value: option,
+}));
+const inputClassName =
+  "h-11 w-full rounded-lg border border-synth-secondary/40 bg-synth-bg px-3 text-sm font-semibold text-white outline-none placeholder:text-gray-400 focus:border-synth-secondary";
+const textareaClassName =
+  "h-full min-h-0 w-full resize-none rounded-lg border border-synth-secondary/40 bg-synth-bg px-3 py-2 text-sm font-semibold text-white outline-none placeholder:text-gray-400 focus:border-synth-secondary";
+const disabledTooltipClassName =
+  "pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max max-w-xs -translate-x-1/2 rounded-md border border-synth-secondary/60 bg-synth-bg px-3 py-2 text-xs font-bold text-white shadow-xl group-hover:block group-focus-within:block";
 
 type SubmissionFormState = {
   assetLicense: string;
@@ -46,16 +59,30 @@ type SubmissionFormState = {
 };
 
 function initialFormState(submission: ApiGameSubmission): SubmissionFormState {
+  const rightsWarnings = [
+    submission.rights_notes,
+    submission.third_party_content && submission.third_party_content !== "no"
+      ? `Third-party content: ${submission.third_party_content}`
+      : "",
+    submission.no_release_url_explanation
+      ? `No release URL: ${submission.no_release_url_explanation}`
+      : "",
+  ].filter(Boolean);
+
   return {
-    assetLicense: "",
-    attribution: getDefaultSubmissionAttribution(submission),
-    codeLicense: "",
-    licenseUrl: "",
+    assetLicense: submission.asset_license_spdx || "",
+    attribution:
+      submission.attribution_text || getDefaultSubmissionAttribution(submission),
+    codeLicense: submission.code_license_spdx || "",
+    licenseUrl: submission.license_url || "",
     notes: "",
-    originalReleaseUrl: "",
-    permissionEvidenceUrl: "",
-    rightsWarnings: "Confirm submitted ROM, code, art, and audio can be hosted.",
-    sourceRepoUrl: "",
+    originalReleaseUrl: submission.original_release_url || "",
+    permissionEvidenceUrl: submission.permission_evidence_url || "",
+    rightsWarnings:
+      rightsWarnings.join("\n") ||
+      "Confirm submitted ROM, code, art, and audio can be hosted.",
+    sourceRepoUrl:
+      submission.source_repo_url || submission.original_release_url || "",
   };
 }
 
@@ -72,7 +99,7 @@ export default function Submissions() {
   const [status, setStatus] = useState<ApiGameSubmissionStatus>("pending");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
-  const [actionError, setActionError] = useState("");
+  const [toastMessage, setToastMessage] = useState("");
   const [pendingSubmissionId, setPendingSubmissionId] = useState<string | null>(null);
   const [formsBySubmission, setFormsBySubmission] = useState<
     Record<string, SubmissionFormState>
@@ -96,7 +123,7 @@ export default function Submissions() {
     status,
     totalSubmissions,
     onError: (error) => {
-      setActionError(
+      setToastMessage(
         getAdminApiErrorMessage(error, "Failed to review submission."),
       );
     },
@@ -110,6 +137,12 @@ export default function Submissions() {
       );
     },
   });
+
+  useEffect(() => {
+    if (!toastMessage) return undefined;
+    const timeout = window.setTimeout(() => setToastMessage(""), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [toastMessage]);
 
   const formFor = (submission: ApiGameSubmission) =>
     formsBySubmission[submission.id] || initialFormState(submission);
@@ -126,8 +159,12 @@ export default function Submissions() {
   const rejectSubmission = async (submission: ApiGameSubmission) => {
     if (pendingSubmissionId) return;
     const form = formFor(submission);
+    if (!form.notes.trim()) {
+      setToastMessage("Add review notes before rejecting this submission.");
+      return;
+    }
     setPendingSubmissionId(submission.id);
-    setActionError("");
+    setToastMessage("");
     await reviewMutation
       .mutateAsync({ notes: form.notes, submissionId: submission.id })
       .catch(() => undefined)
@@ -137,6 +174,12 @@ export default function Submissions() {
   const createCandidate = async (submission: ApiGameSubmission) => {
     if (pendingSubmissionId) return;
     const form = formFor(submission);
+    if (!canCreateCandidate(form)) {
+      setToastMessage(
+        "Add code license, license URL, source URL, and attribution before creating a candidate.",
+      );
+      return;
+    }
     const payload: ApiSubmissionCandidatePayload = {
       asset_license_spdx: form.assetLicense.trim() || null,
       attribution_text: form.attribution.trim(),
@@ -151,7 +194,7 @@ export default function Submissions() {
     };
 
     setPendingSubmissionId(submission.id);
-    setActionError("");
+    setToastMessage("");
     await reviewMutation
       .mutateAsync({ payload, submissionId: submission.id })
       .catch(() => undefined)
@@ -165,7 +208,7 @@ export default function Submissions() {
     total: totalSubmissions,
   });
 
-  if (submissionsQuery.isLoading) return <AdminTablePageSkeleton />;
+  if (submissionsQuery.isLoading) return <AdminReviewPageSkeleton filterCount={1} />;
 
   const loadError = submissionsQuery.isError
     ? getAdminApiErrorMessage(
@@ -176,33 +219,48 @@ export default function Submissions() {
 
   return (
     <div className="space-y-6">
+      {toastMessage && (
+        <div
+          className="fixed right-6 top-6 z-50 flex max-w-md items-start gap-3 rounded-lg border border-red-300/70 bg-[#2B0F16] px-4 py-3 text-sm font-semibold text-red-50 shadow-2xl"
+          role="alert"
+        >
+          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-200" />
+          <p className="min-w-0 flex-1 leading-6">{toastMessage}</p>
+          <button
+            aria-label="Dismiss notification"
+            className="rounded p-1 text-red-100 hover:bg-red-500/20 hover:text-white"
+            onClick={() => setToastMessage("")}
+            type="button"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <h1 className="flex items-center gap-3 text-3xl font-bold text-white">
-          <FileArchive className="h-8 w-8 text-synth-secondary" />
+          <PixelIcon className="h-8 w-8 text-synth-secondary" name="publish" />
           Game Submissions
         </h1>
-        <span className="w-fit rounded-full border border-synth-secondary/30 bg-synth-secondary/15 px-4 py-2 text-sm font-semibold text-synth-secondary">
-          {totalSubmissions} Matching
+        <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-synth-secondary/80 bg-synth-secondary/25 px-4 py-2 text-sm font-extrabold text-white">
+          <span>{totalSubmissions.toLocaleString()}</span>
+          <span>Matching</span>
         </span>
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-synth-border bg-[#2B1720] p-4 shadow-card sm:flex-row sm:items-center">
-        <select
-          className="h-10 rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none focus:border-synth-secondary"
-          onChange={(event) => {
-            setStatus(event.target.value as ApiGameSubmissionStatus);
+      <div className="flex flex-col gap-3 rounded-lg border border-synth-secondary/35 bg-[#2B1720] p-4 shadow-card sm:flex-row sm:items-center">
+        <AdminSelect
+          ariaLabel="Submission status"
+          className="sm:w-44"
+          onChange={(value) => {
+            setStatus(value);
             setPage(1);
           }}
+          options={STATUS_FILTER_OPTIONS}
           value={status}
-        >
-          {STATUS_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
+        />
         <input
-          className="h-10 min-w-0 flex-1 rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-synth-secondary"
+          className="h-10 min-w-0 flex-1 rounded-lg border border-synth-secondary/40 bg-synth-bg px-3 text-sm font-semibold text-white outline-none placeholder:text-gray-400 focus:border-synth-secondary"
           onChange={(event) => {
             setSearch(event.target.value);
             setPage(1);
@@ -212,12 +270,6 @@ export default function Submissions() {
           value={search}
         />
       </div>
-
-      {actionError && (
-        <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {actionError}
-        </div>
-      )}
 
       {loadError ? (
         <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-8 text-center text-red-200">
@@ -232,10 +284,10 @@ export default function Submissions() {
           </button>
         </div>
       ) : submissions.length === 0 ? (
-        <div className="rounded-lg border border-synth-border bg-[#2B1720] p-12 text-center text-gray-400 shadow-card">
-          <FileArchive className="mx-auto mb-4 h-12 w-12 text-synth-secondary opacity-70" />
+        <div className="rounded-lg border border-synth-secondary/35 bg-[#2B1720] p-12 text-center text-gray-200 shadow-card">
+          <PixelIcon className="mx-auto mb-4 h-12 w-12 text-synth-secondary" name="publish" />
           <p className="text-xl text-white">No submissions found.</p>
-          <p className="mt-2 text-sm">The current server filters are empty.</p>
+          <p className="mt-2 text-sm font-medium">The current server filters are empty.</p>
         </div>
       ) : (
         <div className="space-y-4">
@@ -245,7 +297,7 @@ export default function Submissions() {
             const candidateReady = canCreateCandidate(form);
             return (
               <article
-                className="rounded-lg border border-synth-border bg-[#2B1720] p-5 shadow-card"
+                className="rounded-lg border border-synth-secondary/35 bg-[#2B1720] p-5 shadow-card"
                 key={submission.id}
               >
                 <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -254,30 +306,47 @@ export default function Submissions() {
                       <h2 className="text-xl font-bold text-white">
                         {submission.game_title}
                       </h2>
-                      <span className="rounded-full border border-synth-border px-3 py-1 text-xs font-bold text-gray-300">
+                      <span className="rounded-full border border-[#ff5ca8]/90 bg-[#9B0048]/45 px-3 py-1 text-xs font-extrabold text-white">
                         {submission.status}
                       </span>
                     </div>
-                    <p className="mt-2 text-sm text-gray-400">
+                    <p className="mt-2 text-sm font-medium text-gray-200">
                       {submission.author_name} · {submission.email}
                     </p>
-                    <p className="mt-3 max-w-3xl text-sm leading-6 text-gray-300">
+                    <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-gray-200">
                       {submission.description || "No description provided."}
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {submission.ownership_status && (
+                        <span className="rounded-full border border-[#ff5ca8]/80 bg-[#9B0048]/35 px-3 py-1 text-xs font-extrabold text-white">
+                          {submission.ownership_status}
+                        </span>
+                      )}
+                      {submission.hosting_permission && (
+                        <span className="rounded-full border border-emerald-300/70 bg-emerald-500/20 px-3 py-1 text-xs font-extrabold text-emerald-50">
+                          {submission.hosting_permission}
+                        </span>
+                      )}
+                      {submission.public_license_scope && (
+                        <span className="rounded-full border border-amber-300/70 bg-amber-500/20 px-3 py-1 text-xs font-extrabold text-amber-50">
+                          {submission.public_license_scope}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm font-semibold text-gray-200">
                     {new Date(submission.created_at).toLocaleString()}
                   </div>
                 </div>
 
                 <div className="mt-5 grid gap-3 lg:grid-cols-3">
                   <a
-                    className="rounded-lg border border-synth-border bg-synth-bg/60 p-3 text-sm text-synth-secondary hover:text-white"
+                    className="rounded-lg border border-synth-secondary/40 bg-synth-bg/80 p-3 text-sm font-semibold text-white hover:border-synth-secondary"
                     href={submission.rom_url}
                     rel="noreferrer"
                     target="_blank"
                   >
-                    <span className="block text-[11px] font-bold uppercase text-gray-500">
+                    <span className="block text-[11px] font-extrabold uppercase text-white">
                       ROM
                     </span>
                     <span className="mt-1 inline-flex items-center gap-1 break-all font-semibold">
@@ -287,12 +356,12 @@ export default function Submissions() {
                   </a>
                   {submission.cover_url && (
                     <a
-                      className="rounded-lg border border-synth-border bg-synth-bg/60 p-3 text-sm text-synth-secondary hover:text-white"
+                      className="rounded-lg border border-synth-secondary/40 bg-synth-bg/80 p-3 text-sm font-semibold text-white hover:border-synth-secondary"
                       href={submission.cover_url}
                       rel="noreferrer"
                       target="_blank"
                     >
-                      <span className="block text-[11px] font-bold uppercase text-gray-500">
+                      <span className="block text-[11px] font-extrabold uppercase text-white">
                         Cover
                       </span>
                       Open artwork <ExternalLink className="inline h-3.5 w-3.5" />
@@ -300,12 +369,12 @@ export default function Submissions() {
                   )}
                   {submission.banner_url && (
                     <a
-                      className="rounded-lg border border-synth-border bg-synth-bg/60 p-3 text-sm text-synth-secondary hover:text-white"
+                      className="rounded-lg border border-synth-secondary/40 bg-synth-bg/80 p-3 text-sm font-semibold text-white hover:border-synth-secondary"
                       href={submission.banner_url}
                       rel="noreferrer"
                       target="_blank"
                     >
-                      <span className="block text-[11px] font-bold uppercase text-gray-500">
+                      <span className="block text-[11px] font-extrabold uppercase text-white">
                         Banner
                       </span>
                       Open artwork <ExternalLink className="inline h-3.5 w-3.5" />
@@ -314,11 +383,11 @@ export default function Submissions() {
                 </div>
 
                 {submission.status === "pending" && (
-                  <div className="mt-5 grid gap-4 xl:grid-cols-2">
-                    <div className="space-y-3">
+                  <div className="mt-5 grid items-stretch gap-4 xl:grid-cols-2">
+                    <div className="grid grid-rows-[44px_44px_44px_44px_44px] gap-3">
                       <div className="grid gap-3 sm:grid-cols-2">
                         <input
-                          className="h-10 rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-synth-secondary"
+                          className={inputClassName}
                           onChange={(event) =>
                             updateForm(submission, {
                               codeLicense: event.target.value,
@@ -328,7 +397,7 @@ export default function Submissions() {
                           value={form.codeLicense}
                         />
                         <input
-                          className="h-10 rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-synth-secondary"
+                          className={inputClassName}
                           onChange={(event) =>
                             updateForm(submission, {
                               assetLicense: event.target.value,
@@ -339,7 +408,7 @@ export default function Submissions() {
                         />
                       </div>
                       <input
-                        className="h-10 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-synth-secondary"
+                        className={inputClassName}
                         onChange={(event) =>
                           updateForm(submission, { licenseUrl: event.target.value })
                         }
@@ -347,7 +416,7 @@ export default function Submissions() {
                         value={form.licenseUrl}
                       />
                       <input
-                        className="h-10 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-synth-secondary"
+                        className={inputClassName}
                         onChange={(event) =>
                           updateForm(submission, {
                             sourceRepoUrl: event.target.value,
@@ -357,7 +426,7 @@ export default function Submissions() {
                         value={form.sourceRepoUrl}
                       />
                       <input
-                        className="h-10 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-synth-secondary"
+                        className={inputClassName}
                         onChange={(event) =>
                           updateForm(submission, {
                             permissionEvidenceUrl: event.target.value,
@@ -367,7 +436,7 @@ export default function Submissions() {
                         value={form.permissionEvidenceUrl}
                       />
                       <input
-                        className="h-10 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none placeholder:text-gray-600 focus:border-synth-secondary"
+                        className={inputClassName}
                         onChange={(event) =>
                           updateForm(submission, {
                             originalReleaseUrl: event.target.value,
@@ -378,9 +447,9 @@ export default function Submissions() {
                       />
                     </div>
 
-                    <div className="space-y-3">
+                    <div className="grid grid-rows-[44px_44px_44px_44px_44px] gap-3">
                       <textarea
-                        className="min-h-24 w-full resize-y rounded-lg border border-synth-border bg-synth-bg px-3 py-2 text-sm text-white outline-none placeholder:text-gray-600 focus:border-synth-secondary"
+                        className={`${textareaClassName} row-span-2`}
                         onChange={(event) =>
                           updateForm(submission, {
                             attribution: event.target.value,
@@ -390,7 +459,7 @@ export default function Submissions() {
                         value={form.attribution}
                       />
                       <textarea
-                        className="min-h-20 w-full resize-y rounded-lg border border-synth-border bg-synth-bg px-3 py-2 text-sm text-white outline-none placeholder:text-gray-600 focus:border-synth-secondary"
+                        className={`${textareaClassName} row-span-2`}
                         onChange={(event) =>
                           updateForm(submission, {
                             rightsWarnings: event.target.value,
@@ -400,7 +469,7 @@ export default function Submissions() {
                         value={form.rightsWarnings}
                       />
                       <textarea
-                        className="min-h-20 w-full resize-y rounded-lg border border-synth-border bg-synth-bg px-3 py-2 text-sm text-white outline-none placeholder:text-gray-600 focus:border-synth-secondary"
+                        className={textareaClassName}
                         onChange={(event) =>
                           updateForm(submission, { notes: event.target.value })
                         }
@@ -410,24 +479,48 @@ export default function Submissions() {
                     </div>
 
                     <div className="flex flex-wrap gap-2 xl:col-span-2">
-                      <button
-                        className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-4 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={pending || !candidateReady}
-                        onClick={() => void createCandidate(submission)}
-                        type="button"
+                      <span
+                        className={`group relative inline-flex ${
+                          candidateReady ? "" : "cursor-not-allowed"
+                        }`}
+                        tabIndex={candidateReady ? undefined : 0}
                       >
-                        <CheckCircle2 className="h-4 w-4" />
-                        Create Candidate
-                      </button>
-                      <button
-                        className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-400/40 bg-red-500/10 px-4 text-sm font-bold text-red-100 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled={pending || form.notes.trim().length === 0}
-                        onClick={() => void rejectSubmission(submission)}
-                        type="button"
+                        <button
+                          className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-4 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/20 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={pending || !candidateReady}
+                          onClick={() => void createCandidate(submission)}
+                          type="button"
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          Create Candidate
+                        </button>
+                        {!candidateReady && (
+                          <span className={disabledTooltipClassName}>
+                            Add code license, license URL, source URL, and attribution.
+                          </span>
+                        )}
+                      </span>
+                      <span
+                        className={`group relative inline-flex ${
+                          form.notes.trim() ? "" : "cursor-not-allowed"
+                        }`}
+                        tabIndex={form.notes.trim() ? undefined : 0}
                       >
-                        <XCircle className="h-4 w-4" />
-                        Reject
-                      </button>
+                        <button
+                          className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-400/40 bg-red-500/10 px-4 text-sm font-bold text-red-100 transition-colors hover:bg-red-500/20 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled={pending || form.notes.trim().length === 0}
+                          onClick={() => void rejectSubmission(submission)}
+                          type="button"
+                        >
+                          <XCircle className="h-4 w-4" />
+                          Reject
+                        </button>
+                        {!form.notes.trim() && (
+                          <span className={disabledTooltipClassName}>
+                            Add review notes before rejecting.
+                          </span>
+                        )}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -438,7 +531,7 @@ export default function Submissions() {
       )}
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm text-gray-500">{pageLabel}</p>
+        <p className="text-sm font-semibold text-gray-200">{pageLabel}</p>
         <Pagination
           currentPage={safePage}
           disabled={submissionsQuery.isFetching}

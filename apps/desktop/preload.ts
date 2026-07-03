@@ -57,6 +57,16 @@ type DockerDiagnosticPayload = {
   title: string;
 };
 
+type EngineImageRecoveryPayload = {
+  detail: string;
+  engineImage: string;
+  guidance: string;
+  runtimeDir: string;
+  runtimeKind: "libretro" | "native_linux";
+  summary: string;
+  title: string;
+};
+
 type IpcCallback<TArgs extends unknown[] = []> = (
   event: IpcRendererEvent,
   ...args: TArgs
@@ -80,6 +90,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.send("start-docker", options),
   startDockerApplication: (options: StartDockerOptions) =>
     ipcRenderer.send("start-docker-application", options),
+  buildEngineImage: (options: StartDockerOptions) =>
+    ipcRenderer.send("build-engine-image", options),
   cancelDockerRecovery: () => ipcRenderer.send("cancel-docker-recovery"),
   stopDocker: () => ipcRenderer.send("stop-docker"),
   regenerateLanInvite: () => ipcRenderer.send("regenerate-lan-invite"),
@@ -110,4 +122,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
     ipcRenderer.on("docker-recovery-ready", callback),
   onDockerRecoveryCancelled: (callback: IpcCallback) =>
     ipcRenderer.on("docker-recovery-cancelled", callback),
+  onEngineImageRecovery: (callback: IpcCallback<[EngineImageRecoveryPayload]>) =>
+    ipcRenderer.on("engine-image-recovery", callback),
+  onEngineImageBuildStarted: (callback: IpcCallback) =>
+    ipcRenderer.on("engine-image-build-started", callback),
+  onEngineImageBuildReady: (callback: IpcCallback) =>
+    ipcRenderer.on("engine-image-build-ready", callback),
 });

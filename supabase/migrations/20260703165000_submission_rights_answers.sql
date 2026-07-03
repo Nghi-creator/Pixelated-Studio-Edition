@@ -1,0 +1,17 @@
+ALTER TABLE public.game_submissions
+  ADD COLUMN IF NOT EXISTS ownership_status text,
+  ADD COLUMN IF NOT EXISTS hosting_permission text,
+  ADD COLUMN IF NOT EXISTS third_party_content text,
+  ADD COLUMN IF NOT EXISTS public_license_scope text,
+  ADD COLUMN IF NOT EXISTS attribution_text text,
+  ADD COLUMN IF NOT EXISTS original_release_url text,
+  ADD COLUMN IF NOT EXISTS no_release_url_explanation text,
+  ADD COLUMN IF NOT EXISTS source_repo_url text,
+  ADD COLUMN IF NOT EXISTS license_url text,
+  ADD COLUMN IF NOT EXISTS code_license_spdx text,
+  ADD COLUMN IF NOT EXISTS asset_license_spdx text,
+  ADD COLUMN IF NOT EXISTS permission_evidence_url text,
+  ADD COLUMN IF NOT EXISTS rights_notes text,
+  ADD COLUMN IF NOT EXISTS ownership_confirmed boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS hosting_confirmed boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS rights_confirmed boolean NOT NULL DEFAULT false;

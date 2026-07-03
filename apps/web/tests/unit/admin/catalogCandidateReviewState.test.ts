@@ -75,7 +75,7 @@ test("catalog candidate rights details flag missing hosting permission", () => {
   });
 
   assert.deepEqual(details, [
-    { label: "Code License", tone: "danger", value: "Missing" },
+    { label: "Code License", tone: "warning", value: "Missing" },
     { label: "Asset License", tone: "warning", value: "Not provided" },
     { label: "Hosting", tone: "danger", value: "Hosting permission missing" },
   ]);

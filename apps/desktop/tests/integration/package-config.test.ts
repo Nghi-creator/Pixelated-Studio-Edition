@@ -96,8 +96,12 @@ describe("desktop package config", () => {
     assert.match(workflow, /apps\/desktop\/release\/\*\.exe/);
     assert.match(workflow, /apps\/desktop\/release\/\*\.AppImage/);
     assert.match(workflow, /release_tag:/);
+    assert.match(workflow, /release_body_path:/);
+    assert.match(workflow, /docs\/releases\/v1\.0\.1\.md/);
     assert.match(workflow, /publish-github-release:/);
     assert.match(workflow, /actions\/download-artifact@v4/);
+    assert.match(workflow, /--notes-file "\$RELEASE_BODY_PATH"/);
+    assert.match(workflow, /gh release edit "\$RELEASE_TAG" --title "\$title" "\$\{notes_args\[@\]\}"/);
     assert.match(workflow, /gh release upload "\$RELEASE_TAG" "\$\{assets\[@\]\}" --clobber/);
     assert.match(workflow, /gh "\$\{args\[@\]\}"/);
   });
@@ -122,6 +126,29 @@ describe("desktop package config", () => {
     assert.doesNotMatch(rendererHelper, /\bexports\b/);
     assert.doesNotMatch(rendererHelper, /\.innerHTML\s*[+]?=/);
     assert.match(rendererHelper, /createTextNode/);
+  });
+
+  it("ships the image build recovery bridge and renderer action states", () => {
+    const preloadPath = path.resolve(__dirname, "../../preload.js");
+    const rendererPath = path.resolve(__dirname, "../../renderer.js");
+    const preload = fs.readFileSync(preloadPath, "utf8");
+    const renderer = fs.readFileSync(rendererPath, "utf8");
+
+    assert.match(preload, /buildEngineImage/);
+    assert.match(preload, /build-engine-image/);
+    assert.match(preload, /onEngineImageRecovery/);
+    assert.match(preload, /engine-image-recovery/);
+    assert.match(preload, /onEngineImageBuildStarted/);
+    assert.match(preload, /engine-image-build-started/);
+    assert.match(preload, /onEngineImageBuildReady/);
+    assert.match(preload, /engine-image-build-ready/);
+
+    assert.match(renderer, /createImageRecoveryActionState/);
+    assert.match(renderer, /Build image & retry/);
+    assert.match(renderer, /Building\.\.\./);
+    assert.match(renderer, /setImageRecoveryVisible\(true, payload\)/);
+    assert.match(renderer, /setImageBuildPending\(true\)/);
+    assert.match(renderer, /setImageRecoveryVisible\(false\)/);
   });
 
   it("runs the packaged release smoke as part of npm run dist", () => {

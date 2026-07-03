@@ -203,21 +203,37 @@ export type ApiPaginatedCatalogCandidatesResponse<TCandidate> = {
 };
 
 export type ApiGameSubmission = {
+  asset_license_spdx?: string | null;
   author_name: string;
   banner_url: string | null;
   catalog_candidate_id?: string | null;
+  code_license_spdx?: string | null;
   cover_url: string | null;
   created_at: string;
   description: string | null;
   email: string;
   game_title: string;
+  hosting_confirmed?: boolean | null;
+  hosting_permission?: string | null;
   id: string;
+  license_url?: string | null;
+  no_release_url_explanation?: string | null;
+  original_release_url?: string | null;
+  ownership_confirmed?: boolean | null;
+  ownership_status?: string | null;
+  permission_evidence_url?: string | null;
+  public_license_scope?: string | null;
   review_notes?: string | null;
   reviewed_at?: string | null;
   reviewed_by?: string | null;
   rom_url: string;
+  rights_confirmed?: boolean | null;
+  rights_notes?: string | null;
+  source_repo_url?: string | null;
   status: ApiGameSubmissionStatus | string;
   submitter_id: string | null;
+  third_party_content?: string | null;
+  attribution_text?: string | null;
 };
 
 export type ApiPaginatedGameSubmissionsResponse<TSubmission> = {
@@ -257,13 +273,29 @@ export type ApiCatalogCandidateReviewResponse<TCandidate> = {
 };
 
 export type ApiGameSubmissionPayload = {
+  assetLicenseSpdx: string | null;
+  attributionText: string;
   authorName: string;
   bannerUrl: string | null;
+  codeLicenseSpdx: string | null;
   coverUrl: string | null;
   description: string | null;
   email: string;
   gameTitle: string;
+  hostingConfirmed: boolean;
+  hostingPermission: string;
+  licenseUrl: string | null;
+  noReleaseUrlExplanation: string | null;
+  originalReleaseUrl: string | null;
+  ownershipConfirmed: boolean;
+  ownershipStatus: string;
+  permissionEvidenceUrl: string | null;
+  publicLicenseScope: string;
   romUrl: string;
+  rightsConfirmed: boolean;
+  rightsNotes: string | null;
+  sourceRepoUrl: string | null;
+  thirdPartyContent: string;
 };
 
 export type ApiGame = {

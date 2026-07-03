@@ -1,6 +1,7 @@
 import { app, BrowserWindow, ipcMain, shell, type IpcMainEvent } from "electron";
 import path from "path";
 import {
+  buildEngineImageAndResume,
   cancelDockerRecovery,
   cleanupEngine,
   createWebLaunchUrl,
@@ -47,6 +48,10 @@ ipcMain.on("stop-docker", (event: IpcMainEvent) => {
 
 ipcMain.on("start-docker-application", (event: IpcMainEvent, options = {}) => {
   startDockerAndResume(event, options);
+});
+
+ipcMain.on("build-engine-image", (event: IpcMainEvent, options = {}) => {
+  buildEngineImageAndResume(event, options);
 });
 
 ipcMain.on("cancel-docker-recovery", (event: IpcMainEvent) => {

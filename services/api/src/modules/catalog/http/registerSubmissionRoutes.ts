@@ -7,13 +7,96 @@ import {
 } from "../../auth/supabaseAuth.js";
 
 const submissionBodySchema = z.object({
+  assetLicenseSpdx: z.string().trim().max(80).nullable().optional(),
+  attributionText: z.string().trim().min(1).max(2000),
   authorName: z.string().trim().min(1).max(120),
   bannerUrl: z.string().url().nullable().optional(),
+  codeLicenseSpdx: z.string().trim().max(80).nullable().optional(),
   coverUrl: z.string().url().nullable().optional(),
   description: z.string().trim().max(4000).nullable().optional(),
   email: z.string().trim().email().max(254),
   gameTitle: z.string().trim().min(1).max(160),
+  hostingConfirmed: z.literal(true),
+  hostingPermission: z.enum(["creator_permission", "license_allows"]),
+  licenseUrl: z.string().url().nullable().optional(),
+  noReleaseUrlExplanation: z.string().trim().max(1000).nullable().optional(),
+  originalReleaseUrl: z.string().url().nullable().optional(),
+  ownershipConfirmed: z.literal(true),
+  ownershipStatus: z.enum(["creator", "permission", "public_project", "other"]),
+  permissionEvidenceUrl: z.string().url().nullable().optional(),
+  publicLicenseScope: z.enum([
+    "none_owned",
+    "code",
+    "assets",
+    "everything",
+    "not_sure",
+  ]),
   romUrl: z.string().url(),
+  rightsConfirmed: z.literal(true),
+  rightsNotes: z.string().trim().max(2000).nullable().optional(),
+  sourceRepoUrl: z.string().url().nullable().optional(),
+  thirdPartyContent: z.enum(["no", "yes", "not_sure"]),
+}).superRefine((submission, ctx) => {
+  if (!submission.originalReleaseUrl && !submission.noReleaseUrlExplanation) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Original release URL or explanation is required",
+      path: ["originalReleaseUrl"],
+    });
+  }
+  if (
+    submission.ownershipStatus === "permission" &&
+    !submission.permissionEvidenceUrl
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Permission evidence URL is required",
+      path: ["permissionEvidenceUrl"],
+    });
+  }
+  if (
+    (submission.ownershipStatus === "public_project" ||
+      submission.hostingPermission === "license_allows" ||
+      !["none_owned", "not_sure"].includes(submission.publicLicenseScope)) &&
+    !submission.sourceRepoUrl
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Source or evidence URL is required",
+      path: ["sourceRepoUrl"],
+    });
+  }
+  if (
+    ["code", "everything"].includes(submission.publicLicenseScope) &&
+    !submission.codeLicenseSpdx
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Code license SPDX is required",
+      path: ["codeLicenseSpdx"],
+    });
+  }
+  if (
+    ["assets", "everything"].includes(submission.publicLicenseScope) &&
+    !submission.assetLicenseSpdx
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Asset license SPDX is required",
+      path: ["assetLicenseSpdx"],
+    });
+  }
+  if (
+    ["yes", "not_sure"].includes(submission.thirdPartyContent) &&
+    !submission.rightsNotes &&
+    !submission.permissionEvidenceUrl
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Third-party content needs notes or evidence",
+      path: ["rightsNotes"],
+    });
+  }
 });
 
 const SUBMISSION_RATE_LIMIT = 3;
@@ -118,6 +201,20 @@ async function defaultNotifySubmission(submission: SubmissionPayload) {
       rom_download: submission.romUrl,
       cover_art: submission.coverUrl || "None provided",
       banner_art: submission.bannerUrl || "None provided",
+      rights: {
+        asset_license_spdx: submission.assetLicenseSpdx || null,
+        attribution_text: submission.attributionText,
+        code_license_spdx: submission.codeLicenseSpdx || null,
+        hosting_permission: submission.hostingPermission,
+        license_url: submission.licenseUrl || null,
+        original_release_url: submission.originalReleaseUrl || null,
+        ownership_status: submission.ownershipStatus,
+        permission_evidence_url: submission.permissionEvidenceUrl || null,
+        public_license_scope: submission.publicLicenseScope,
+        rights_notes: submission.rightsNotes || null,
+        source_repo_url: submission.sourceRepoUrl || null,
+        third_party_content: submission.thirdPartyContent,
+      },
     }),
   });
 
@@ -245,14 +342,35 @@ export async function registerSubmissionRoutes(
       const { data, error } = await service
         .from("game_submissions")
         .insert({
+          asset_license_spdx: submission.assetLicenseSpdx || null,
+          attribution_text: submission.attributionText,
           author_name: submission.authorName,
           banner_url: normalizeOptionalUrl(submission.bannerUrl),
+          code_license_spdx: submission.codeLicenseSpdx || null,
           cover_url: normalizeOptionalUrl(submission.coverUrl),
           description: submission.description || null,
           email: submission.email,
           game_title: submission.gameTitle,
+          hosting_confirmed: submission.hostingConfirmed,
+          hosting_permission: submission.hostingPermission,
+          license_url: normalizeOptionalUrl(submission.licenseUrl),
+          no_release_url_explanation:
+            submission.noReleaseUrlExplanation || null,
+          original_release_url: normalizeOptionalUrl(
+            submission.originalReleaseUrl,
+          ),
+          ownership_confirmed: submission.ownershipConfirmed,
+          ownership_status: submission.ownershipStatus,
+          permission_evidence_url: normalizeOptionalUrl(
+            submission.permissionEvidenceUrl,
+          ),
+          public_license_scope: submission.publicLicenseScope,
           rom_url: submission.romUrl,
+          rights_confirmed: submission.rightsConfirmed,
+          rights_notes: submission.rightsNotes || null,
+          source_repo_url: normalizeOptionalUrl(submission.sourceRepoUrl),
           submitter_id: user.id,
+          third_party_content: submission.thirdPartyContent,
         })
         .select("id")
         .single<{ id: string }>();

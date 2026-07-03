@@ -73,7 +73,7 @@ export function getCatalogCandidateRightsDetails(
   const details: CatalogCandidateReviewDetail[] = [
     {
       label: "Code License",
-      tone: candidate.code_license_spdx ? "success" : "danger",
+      tone: candidate.code_license_spdx ? "success" : "warning",
       value: candidate.code_license_spdx || "Missing",
     },
     {
