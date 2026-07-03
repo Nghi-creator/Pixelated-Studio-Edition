@@ -241,6 +241,19 @@ let imageBuildPending = false;
 let clientsActionPending = false;
 let clientsPollTimer: number | null = null;
 
+function createImageRecoveryActionState(pending: boolean) {
+  return {
+    buildDisabled: pending,
+    buildHidden: false,
+    buildText: pending ? "Building..." : "Build image & retry",
+    downloadHidden: true,
+    guideHidden: true,
+    retryDisabled: pending,
+    startDisabled: pending,
+    startHidden: true,
+  };
+}
+
 function setDockerRecoveryPending(pending: boolean) {
   dockerRecoveryPending = pending;
   dockerStartBtn.innerText = pending ? "Cancel waiting" : "Start Docker";
@@ -252,10 +265,11 @@ function setDockerRecoveryPending(pending: boolean) {
 
 function setImageBuildPending(pending: boolean) {
   imageBuildPending = pending;
-  dockerBuildImageBtn.innerText = pending ? "Building..." : "Build image & retry";
-  dockerRetryBtn.disabled = pending;
-  dockerStartBtn.disabled = pending;
-  dockerBuildImageBtn.disabled = pending;
+  const state = createImageRecoveryActionState(pending);
+  dockerBuildImageBtn.innerText = state.buildText;
+  dockerRetryBtn.disabled = state.retryDisabled;
+  dockerStartBtn.disabled = state.startDisabled;
+  dockerBuildImageBtn.disabled = state.buildDisabled;
   dockerDownloadBtn.disabled = pending;
   dockerGuideBtn.disabled = pending;
 }
@@ -303,10 +317,11 @@ function setImageRecoveryVisible(
 
   dockerRecoveryTitle.innerText = payload.title;
   dockerRecoveryGuidance.innerText = payload.guidance;
-  dockerBuildImageBtn.classList.remove("hidden");
-  dockerDownloadBtn.classList.add("hidden");
-  dockerGuideBtn.classList.add("hidden");
-  dockerStartBtn.classList.add("hidden");
+  const actionState = createImageRecoveryActionState(false);
+  dockerBuildImageBtn.classList.toggle("hidden", actionState.buildHidden);
+  dockerDownloadBtn.classList.toggle("hidden", actionState.downloadHidden);
+  dockerGuideBtn.classList.toggle("hidden", actionState.guideHidden);
+  dockerStartBtn.classList.toggle("hidden", actionState.startHidden);
   dockerCopyDiagnosticsBtn.classList.remove("hidden");
   setImageBuildPending(false);
 }

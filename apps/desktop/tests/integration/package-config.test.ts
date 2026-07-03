@@ -124,6 +124,29 @@ describe("desktop package config", () => {
     assert.match(rendererHelper, /createTextNode/);
   });
 
+  it("ships the image build recovery bridge and renderer action states", () => {
+    const preloadPath = path.resolve(__dirname, "../../preload.js");
+    const rendererPath = path.resolve(__dirname, "../../renderer.js");
+    const preload = fs.readFileSync(preloadPath, "utf8");
+    const renderer = fs.readFileSync(rendererPath, "utf8");
+
+    assert.match(preload, /buildEngineImage/);
+    assert.match(preload, /build-engine-image/);
+    assert.match(preload, /onEngineImageRecovery/);
+    assert.match(preload, /engine-image-recovery/);
+    assert.match(preload, /onEngineImageBuildStarted/);
+    assert.match(preload, /engine-image-build-started/);
+    assert.match(preload, /onEngineImageBuildReady/);
+    assert.match(preload, /engine-image-build-ready/);
+
+    assert.match(renderer, /createImageRecoveryActionState/);
+    assert.match(renderer, /Build image & retry/);
+    assert.match(renderer, /Building\.\.\./);
+    assert.match(renderer, /setImageRecoveryVisible\(true, payload\)/);
+    assert.match(renderer, /setImageBuildPending\(true\)/);
+    assert.match(renderer, /setImageRecoveryVisible\(false\)/);
+  });
+
   it("runs the packaged release smoke as part of npm run dist", () => {
     const packageJson = readPackageJson();
 
