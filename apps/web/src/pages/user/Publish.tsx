@@ -784,7 +784,10 @@ export default function Publish() {
           </section>
         )}
 
-        <div className="mt-10 flex flex-col gap-3 border-t border-synth-border pt-8 sm:flex-row sm:items-center sm:justify-between">
+        <div
+          className="mt-10 flex flex-col gap-3 border-t pt-8 sm:flex-row sm:items-center sm:justify-between"
+          style={{ borderTopColor: "#C02066" }}
+        >
           <PublishActionButton
             disabled={backDisabled}
             onClick={goBack}
