@@ -186,6 +186,86 @@ export function AdminTablePageSkeleton({
   );
 }
 
+export function AdminReviewPageSkeleton({
+  filterCount = 1,
+}: {
+  filterCount?: number;
+}) {
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex items-center gap-3">
+          <Skeleton className="h-8 w-8 rounded-lg" />
+          <Skeleton className="h-9 w-72 max-w-[65vw]" />
+        </div>
+        <Skeleton className="h-10 w-36 rounded-full" />
+      </div>
+
+      <div className="flex flex-col gap-3 rounded-lg border border-synth-secondary/35 bg-[#2B1720] p-4 shadow-card xl:flex-row xl:items-center">
+        {Array.from({ length: filterCount }, (_, index) => (
+          <Skeleton
+            className={index === 1 ? "h-10 w-56 rounded-lg" : "h-10 w-44 rounded-lg"}
+            key={index}
+          />
+        ))}
+        <Skeleton className="h-10 min-w-0 flex-1 rounded-lg" />
+      </div>
+
+      <section className="rounded-lg border border-synth-secondary/35 bg-[#2B1720] p-5 shadow-card">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0 space-y-3">
+            <div className="flex items-center gap-3">
+              <Skeleton className="h-7 w-40" />
+              <Skeleton className="h-7 w-28 rounded-full" />
+            </div>
+            <Skeleton className="h-4 w-72 max-w-full" />
+            <Skeleton className="h-4 w-96 max-w-full" />
+          </div>
+          <Skeleton className="h-4 w-36" />
+        </div>
+
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+          <Skeleton className="h-20 rounded-lg" />
+          <Skeleton className="h-20 rounded-lg" />
+          <Skeleton className="h-20 rounded-lg" />
+        </div>
+
+        <div className="mt-5 grid items-stretch gap-4 xl:grid-cols-2">
+          <div className="grid grid-rows-[44px_44px_44px_44px_44px] gap-3">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Skeleton className="h-11 rounded-lg" />
+              <Skeleton className="h-11 rounded-lg" />
+            </div>
+            <Skeleton className="h-11 rounded-lg" />
+            <Skeleton className="h-11 rounded-lg" />
+            <Skeleton className="h-11 rounded-lg" />
+            <Skeleton className="h-11 rounded-lg" />
+          </div>
+          <div className="grid grid-rows-[44px_44px_44px_44px_44px] gap-3">
+            <Skeleton className="row-span-2 h-full rounded-lg" />
+            <Skeleton className="row-span-2 h-full rounded-lg" />
+            <Skeleton className="h-11 rounded-lg" />
+          </div>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          <Skeleton className="h-10 w-44 rounded-lg" />
+          <Skeleton className="h-10 w-28 rounded-lg" />
+        </div>
+      </section>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <Skeleton className="h-4 w-32" />
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-10 w-10 rounded-full" />
+          <Skeleton className="h-10 w-10 rounded-full" />
+          <Skeleton className="h-10 w-10 rounded-full" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function ModerationQueueSkeleton() {
   return (
     <div className="space-y-8">
