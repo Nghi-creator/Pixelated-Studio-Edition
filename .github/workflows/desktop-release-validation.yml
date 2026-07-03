@@ -21,10 +21,17 @@ on:
         description: GitHub release tag to create or update. Leave blank to validate only.
         required: false
         type: string
+        default: v1.0.1
       release_name:
         description: Optional GitHub release title.
         required: false
         type: string
+        default: Pixelated Studio v1.0.1
+      release_body_path:
+        description: Markdown file to use as the GitHub release body.
+        required: false
+        type: string
+        default: docs/releases/v1.0.1.md
       release_draft:
         description: Create the release as a draft when it does not already exist.
         required: false
@@ -108,6 +115,9 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Check out release notes
+        uses: actions/checkout@v4
+
       - name: Download validated desktop artifacts
         uses: actions/download-artifact@v4
         with:
@@ -118,6 +128,7 @@ jobs:
       - name: Publish desktop installers to GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_BODY_PATH: ${{ inputs.release_body_path }}
           RELEASE_DRAFT: ${{ inputs.release_draft }}
           RELEASE_NAME: ${{ inputs.release_name }}
           RELEASE_PRERELEASE: ${{ inputs.release_prerelease }}
@@ -138,7 +149,19 @@ jobs:
           fi
 
           title="${RELEASE_NAME:-$RELEASE_TAG}"
+          notes_args=()
+          if [ -n "$RELEASE_BODY_PATH" ]; then
+            if [ ! -f "$RELEASE_BODY_PATH" ]; then
+              printf 'Release body file not found: %s\n' "$RELEASE_BODY_PATH" >&2
+              exit 1
+            fi
+            notes_args=(--notes-file "$RELEASE_BODY_PATH")
+          fi
+
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            if [ "${#notes_args[@]}" -gt 0 ]; then
+              gh release edit "$RELEASE_TAG" --title "$title" "${notes_args[@]}"
+            fi
             gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
             exit 0
           fi
@@ -150,5 +173,6 @@ jobs:
           if [ "$RELEASE_PRERELEASE" = "true" ]; then
             args+=(--prerelease)
           fi
+          args+=("${notes_args[@]}")
 
           gh "${args[@]}"
