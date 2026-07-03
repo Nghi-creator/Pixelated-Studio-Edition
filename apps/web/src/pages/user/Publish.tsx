@@ -23,14 +23,93 @@ const inputClassName =
   "w-full rounded-lg border border-synth-border bg-synth-bg px-4 py-3 text-white outline-none transition-colors placeholder:text-gray-500 focus:border-synth-secondary disabled:opacity-60";
 const labelClassName =
   "mb-2 block text-sm font-extrabold uppercase tracking-wide text-white";
-const dustyPink = "#BC7490";
-const dustyPinkBorder = "#E0A3BB";
+const publishColor = {
+  active: "#BC7490",
+  activeBorder: "#E0A3BB",
+  disabled: "#6B364A",
+  disabledBorder: "#7A4257",
+  disabledText: "#D7C3CB",
+} as const;
 
 type ChoiceOption = {
   description: string;
   label: string;
   value: string;
 };
+
+type PublishActionButtonProps = {
+  children: ReactNode;
+  disabled: boolean;
+  onClick?: () => void;
+  type: "button" | "submit";
+};
+
+function publishButtonStyle(disabled: boolean) {
+  return {
+    backgroundColor: disabled ? publishColor.disabled : publishColor.active,
+    borderColor: disabled ? publishColor.disabledBorder : publishColor.activeBorder,
+    color: disabled ? publishColor.disabledText : "#FFFFFF",
+  };
+}
+
+function PublishActionButton({
+  children,
+  disabled,
+  onClick,
+  type,
+}: PublishActionButtonProps) {
+  return (
+    <button
+      className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border px-6 font-bold transition-colors disabled:pointer-events-none disabled:cursor-default"
+      disabled={disabled}
+      onClick={onClick}
+      style={publishButtonStyle(disabled)}
+      type={type}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PublishProgress({ step }: { step: number }) {
+  return (
+    <div className="mb-6 rounded-lg border border-synth-border bg-synth-surface p-4 shadow-card">
+      <div className="mb-3 h-2 overflow-hidden rounded-full bg-synth-bg">
+        <div
+          aria-hidden
+          className="h-full rounded-full transition-all"
+          style={{
+            backgroundColor: publishColor.active,
+            width: `${((step + 1) / steps.length) * 100}%`,
+          }}
+        />
+      </div>
+      <div className="grid gap-2 sm:grid-cols-4">
+        {steps.map((name, index) => {
+          const isReached = index <= step;
+          return (
+            <div
+              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-extrabold ${
+                isReached ? "text-white" : "text-gray-500"
+              }`}
+              key={name}
+              style={
+                isReached
+                  ? {
+                      backgroundColor: publishColor.active,
+                    }
+                  : undefined
+              }
+            >
+              {index < step && <CheckCircle className="h-4 w-4 flex-shrink-0" />}
+              {name}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function FieldLabel({
   children,
@@ -85,8 +164,8 @@ function ChoiceGroup({
               style={
                 selected
                   ? {
-                      backgroundColor: dustyPink,
-                      borderColor: dustyPinkBorder,
+                      backgroundColor: publishColor.active,
+                      borderColor: publishColor.activeBorder,
                     }
                   : undefined
               }
@@ -244,11 +323,6 @@ export default function Publish() {
   const canSubmit = !validateStep(3) && !form.isSubmitting;
   const visibleError = currentStepError ? stepError : form.formError || "";
   const backDisabled = step === 0 || form.isSubmitting;
-  const buttonStyleFor = (disabled: boolean) => ({
-    backgroundColor: disabled ? "#6B364A" : dustyPink,
-    borderColor: disabled ? "#7A4257" : dustyPinkBorder,
-    color: disabled ? "#D7C3CB" : "#FFFFFF",
-  });
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-5xl px-4 py-24 sm:px-6 lg:px-8">
@@ -277,38 +351,7 @@ export default function Publish() {
         </div>
       </div>
 
-      <div className="mb-6 rounded-lg border border-synth-border bg-synth-surface p-4 shadow-card">
-        <div className="mb-3 h-2 overflow-hidden rounded-full bg-synth-bg">
-          <div
-            aria-hidden
-            className="h-full rounded-full transition-all"
-            style={{
-              backgroundColor: dustyPink,
-              width: `${((step + 1) / steps.length) * 100}%`,
-            }}
-          />
-        </div>
-        <div className="grid gap-2 sm:grid-cols-4">
-          {steps.map((name, index) => (
-            <div
-              className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-extrabold ${
-                index <= step ? "text-white" : "text-gray-500"
-              }`}
-              key={name}
-              style={
-                index <= step
-                  ? {
-                      backgroundColor: dustyPink,
-                    }
-                  : undefined
-              }
-            >
-              {index < step && <CheckCircle className="h-4 w-4 flex-shrink-0" />}
-              {name}
-            </div>
-          ))}
-        </div>
-      </div>
+      <PublishProgress step={step} />
 
       <form
         className="rounded-lg border border-synth-border bg-synth-surface p-6 shadow-card md:p-8"
@@ -742,35 +785,26 @@ export default function Publish() {
         )}
 
         <div className="mt-10 flex flex-col gap-3 border-t border-synth-border pt-8 sm:flex-row sm:items-center sm:justify-between">
-          <button
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border px-5 font-bold transition-colors disabled:pointer-events-none disabled:cursor-default"
+          <PublishActionButton
             disabled={backDisabled}
             onClick={goBack}
-            style={buttonStyleFor(backDisabled)}
             type="button"
           >
             <ChevronLeft className="h-5 w-5" />
             Back
-          </button>
+          </PublishActionButton>
           {step < steps.length - 1 ? (
-            <button
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border px-6 font-bold transition-colors disabled:pointer-events-none disabled:cursor-default"
+            <PublishActionButton
               disabled={!canContinue}
               onClick={goNext}
-              style={buttonStyleFor(!canContinue)}
               type="button"
             >
               {!canContinue && <XCircle className="h-5 w-5" />}
               Continue
               <ChevronRight className="h-5 w-5" />
-            </button>
+            </PublishActionButton>
           ) : (
-            <button
-              className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border px-6 font-bold transition-all active:scale-[0.98] disabled:pointer-events-none disabled:cursor-default"
-              disabled={!canSubmit}
-              style={buttonStyleFor(!canSubmit)}
-              type="submit"
-            >
+            <PublishActionButton disabled={!canSubmit} type="submit">
               {form.isSubmitting ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -787,7 +821,7 @@ export default function Publish() {
                   Submit for Review
                 </>
               )}
-            </button>
+            </PublishActionButton>
           )}
         </div>
       </form>
