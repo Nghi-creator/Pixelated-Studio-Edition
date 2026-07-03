@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   createSubmissionObjectPath,
   getPublishErrorMessage,
+  getSubmissionRightsErrors,
   submitGameForReview,
   validateRomFile,
   validateSubmissionImageFile,
@@ -10,6 +11,31 @@ import {
 
 function fileLike(name: string, type: string, size: number) {
   return { name, size, type } as File;
+}
+
+function rightsFields() {
+  return {
+    assetLicenseSpdx: "",
+    attributionText: "Demo by Creator",
+    authorName: "Creator",
+    codeLicenseSpdx: "",
+    description: "",
+    email: "creator@example.com",
+    gameTitle: "Demo",
+    hostingConfirmed: true,
+    hostingPermission: "creator_permission",
+    licenseUrl: "",
+    noReleaseUrlExplanation: "",
+    originalReleaseUrl: "https://example.test/demo",
+    ownershipConfirmed: true,
+    ownershipStatus: "creator",
+    permissionEvidenceUrl: "",
+    publicLicenseScope: "none_owned",
+    rightsConfirmed: true,
+    rightsNotes: "",
+    sourceRepoUrl: "",
+    thirdPartyContent: "no",
+  };
 }
 
 test("submission file validation rejects invalid ROMs and oversized images", () => {
@@ -66,6 +92,7 @@ test("failed metadata submission removes uploaded submission objects", async () 
         throw new Error("metadata failed");
       },
       fields: {
+        ...rightsFields(),
         authorName: "Creator",
         description: "  Demo game  ",
         email: "creator@example.com",
@@ -100,10 +127,12 @@ test("successful submission trims metadata and keeps uploaded objects", async ()
     createSubmission: async (payload) => {
       submittedPayload = payload;
     },
-    fields: {
-      authorName: " Creator ",
-      description: "  ",
-      email: " creator@example.com ",
+      fields: {
+        ...rightsFields(),
+        attributionText: "  Demo by Creator  ",
+        authorName: " Creator ",
+        description: "  ",
+        email: " creator@example.com ",
       gameTitle: " Demo ",
     },
     files: {
@@ -121,17 +150,54 @@ test("successful submission trims metadata and keeps uploaded objects", async ()
   const payload = submittedPayload as { romUrl: string };
   assert.deepEqual(removedPaths, []);
   assert.deepEqual(submittedPayload, {
+    assetLicenseSpdx: null,
+    attributionText: "Demo by Creator",
     authorName: "Creator",
     bannerUrl: null,
+    codeLicenseSpdx: null,
     coverUrl: null,
     description: null,
     email: "creator@example.com",
     gameTitle: "Demo",
+    hostingConfirmed: true,
+    hostingPermission: "creator_permission",
+    licenseUrl: null,
+    noReleaseUrlExplanation: null,
+    originalReleaseUrl: "https://example.test/demo",
+    ownershipConfirmed: true,
+    ownershipStatus: "creator",
+    permissionEvidenceUrl: null,
+    publicLicenseScope: "none_owned",
     romUrl: payload.romUrl,
+    rightsConfirmed: true,
+    rightsNotes: null,
+    sourceRepoUrl: null,
+    thirdPartyContent: "no",
   });
   assert.match(
     payload.romUrl,
     /^https:\/\/storage\.example\/submissions\/user-1\/roms\//,
+  );
+});
+
+test("rights validation follows guided conditional answers", () => {
+  assert.deepEqual(getSubmissionRightsErrors(rightsFields()), []);
+  assert.deepEqual(
+    getSubmissionRightsErrors({
+      ...rightsFields(),
+      codeLicenseSpdx: "",
+      publicLicenseScope: "code",
+      sourceRepoUrl: "https://example.test/source",
+    }),
+    ["Add the code license SPDX ID."],
+  );
+  assert.deepEqual(
+    getSubmissionRightsErrors({
+      ...rightsFields(),
+      ownershipStatus: "permission",
+      permissionEvidenceUrl: "",
+    }),
+    ["Add a permission evidence URL."],
   );
 });
 

@@ -59,16 +59,30 @@ type SubmissionFormState = {
 };
 
 function initialFormState(submission: ApiGameSubmission): SubmissionFormState {
+  const rightsWarnings = [
+    submission.rights_notes,
+    submission.third_party_content && submission.third_party_content !== "no"
+      ? `Third-party content: ${submission.third_party_content}`
+      : "",
+    submission.no_release_url_explanation
+      ? `No release URL: ${submission.no_release_url_explanation}`
+      : "",
+  ].filter(Boolean);
+
   return {
-    assetLicense: "",
-    attribution: getDefaultSubmissionAttribution(submission),
-    codeLicense: "",
-    licenseUrl: "",
+    assetLicense: submission.asset_license_spdx || "",
+    attribution:
+      submission.attribution_text || getDefaultSubmissionAttribution(submission),
+    codeLicense: submission.code_license_spdx || "",
+    licenseUrl: submission.license_url || "",
     notes: "",
-    originalReleaseUrl: "",
-    permissionEvidenceUrl: "",
-    rightsWarnings: "Confirm submitted ROM, code, art, and audio can be hosted.",
-    sourceRepoUrl: "",
+    originalReleaseUrl: submission.original_release_url || "",
+    permissionEvidenceUrl: submission.permission_evidence_url || "",
+    rightsWarnings:
+      rightsWarnings.join("\n") ||
+      "Confirm submitted ROM, code, art, and audio can be hosted.",
+    sourceRepoUrl:
+      submission.source_repo_url || submission.original_release_url || "",
   };
 }
 
@@ -302,6 +316,23 @@ export default function Submissions() {
                     <p className="mt-3 max-w-3xl text-sm font-medium leading-6 text-gray-200">
                       {submission.description || "No description provided."}
                     </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {submission.ownership_status && (
+                        <span className="rounded-full border border-[#ff5ca8]/80 bg-[#9B0048]/35 px-3 py-1 text-xs font-extrabold text-white">
+                          {submission.ownership_status}
+                        </span>
+                      )}
+                      {submission.hosting_permission && (
+                        <span className="rounded-full border border-emerald-300/70 bg-emerald-500/20 px-3 py-1 text-xs font-extrabold text-emerald-50">
+                          {submission.hosting_permission}
+                        </span>
+                      )}
+                      {submission.public_license_scope && (
+                        <span className="rounded-full border border-amber-300/70 bg-amber-500/20 px-3 py-1 text-xs font-extrabold text-amber-50">
+                          {submission.public_license_scope}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <div className="text-sm font-semibold text-gray-200">
                     {new Date(submission.created_at).toLocaleString()}

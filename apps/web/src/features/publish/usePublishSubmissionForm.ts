@@ -22,6 +22,22 @@ export function usePublishSubmissionForm() {
   const [email, setEmail] = useState("");
   const [gameTitle, setGameTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [assetLicenseSpdx, setAssetLicenseSpdx] = useState("");
+  const [attributionText, setAttributionText] = useState("");
+  const [codeLicenseSpdx, setCodeLicenseSpdx] = useState("");
+  const [hostingConfirmed, setHostingConfirmed] = useState(false);
+  const [hostingPermission, setHostingPermission] = useState("");
+  const [licenseUrl, setLicenseUrl] = useState("");
+  const [noReleaseUrlExplanation, setNoReleaseUrlExplanation] = useState("");
+  const [originalReleaseUrl, setOriginalReleaseUrl] = useState("");
+  const [ownershipConfirmed, setOwnershipConfirmed] = useState(false);
+  const [ownershipStatus, setOwnershipStatus] = useState("");
+  const [permissionEvidenceUrl, setPermissionEvidenceUrl] = useState("");
+  const [publicLicenseScope, setPublicLicenseScope] = useState("");
+  const [rightsConfirmed, setRightsConfirmed] = useState(false);
+  const [rightsNotes, setRightsNotes] = useState("");
+  const [sourceRepoUrl, setSourceRepoUrl] = useState("");
+  const [thirdPartyContent, setThirdPartyContent] = useState("");
   const [romFile, setRomFile] = useState<File | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [bannerFile, setBannerFile] = useState<File | null>(null);
@@ -102,9 +118,25 @@ export function usePublishSubmissionForm() {
         createSubmission: api.submitGame,
         fields: {
           authorName,
+          assetLicenseSpdx,
+          attributionText,
+          codeLicenseSpdx,
           description,
           email,
           gameTitle,
+          hostingConfirmed,
+          hostingPermission,
+          licenseUrl,
+          noReleaseUrlExplanation,
+          originalReleaseUrl,
+          ownershipConfirmed,
+          ownershipStatus,
+          permissionEvidenceUrl,
+          publicLicenseScope,
+          rightsConfirmed,
+          rightsNotes,
+          sourceRepoUrl,
+          thirdPartyContent,
         },
         files: {
           bannerFile,
@@ -132,7 +164,10 @@ export function usePublishSubmissionForm() {
 
   return {
     authorName,
+    assetLicenseSpdx,
+    attributionText,
     bannerFile,
+    codeLicenseSpdx,
     coverFile,
     description,
     email,
@@ -142,14 +177,43 @@ export function usePublishSubmissionForm() {
     handleImageChange,
     handleRomChange,
     handleSubmit,
+    hostingConfirmed,
+    hostingPermission,
     isSubmitting,
     isSuccess,
+    licenseUrl,
+    noReleaseUrlExplanation,
+    originalReleaseUrl,
+    ownershipConfirmed,
+    ownershipStatus,
+    permissionEvidenceUrl,
+    publicLicenseScope,
+    rightsConfirmed,
+    rightsNotes,
     romFile,
+    setAssetLicenseSpdx,
+    setAttributionText,
     setAuthorName,
     setBannerFile,
+    setCodeLicenseSpdx,
     setCoverFile,
     setDescription,
     setEmail,
     setGameTitle,
+    setHostingConfirmed,
+    setHostingPermission,
+    setLicenseUrl,
+    setNoReleaseUrlExplanation,
+    setOriginalReleaseUrl,
+    setOwnershipConfirmed,
+    setOwnershipStatus,
+    setPermissionEvidenceUrl,
+    setPublicLicenseScope,
+    setRightsConfirmed,
+    setRightsNotes,
+    setSourceRepoUrl,
+    setThirdPartyContent,
+    sourceRepoUrl,
+    thirdPartyContent,
   };
 }

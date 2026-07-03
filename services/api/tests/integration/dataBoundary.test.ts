@@ -732,6 +732,34 @@ function seedPublishedGames(db: FakeSupabase, ...games: RecordRow[]) {
   }
 }
 
+function validSubmissionPayload(overrides: RecordRow = {}) {
+  return {
+    assetLicenseSpdx: null,
+    attributionText: "Tiny Quest by Pixel Dev",
+    authorName: "Pixel Dev",
+    bannerUrl: null,
+    codeLicenseSpdx: null,
+    coverUrl: null,
+    description: "A small GBA game",
+    email: "dev@example.com",
+    gameTitle: "Tiny Quest",
+    hostingConfirmed: true,
+    hostingPermission: "creator_permission",
+    licenseUrl: null,
+    noReleaseUrlExplanation: null,
+    originalReleaseUrl: "https://example.com/tiny-quest",
+    ownershipConfirmed: true,
+    ownershipStatus: "creator",
+    permissionEvidenceUrl: null,
+    publicLicenseScope: "none_owned",
+    rightsConfirmed: true,
+    rightsNotes: null,
+    sourceRepoUrl: null,
+    thirdPartyContent: "no",
+    ...overrides,
+  };
+}
+
 test("catalog and favorites are served through backend routes", async () => {
   const db = new FakeSupabase();
   seedPublishedGames(db, { id: GAME_ID, title: "Zeta" });
@@ -2316,15 +2344,11 @@ test("submissions persist metadata for the authenticated submitter", async () =>
 
   const response = await app.inject({
     method: "POST",
-    payload: {
-      authorName: "Pixel Dev",
+    payload: validSubmissionPayload({
       bannerUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/banners/banner.png`,
       coverUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/covers/cover.png`,
-      description: "A small GBA game",
-      email: "dev@example.com",
-      gameTitle: "Tiny Quest",
       romUrl,
-    },
+    }),
     url: "/submissions/games",
   });
 
@@ -2332,6 +2356,9 @@ test("submissions persist metadata for the authenticated submitter", async () =>
   assert.equal(db.rows.game_submissions.length, 1);
   assert.equal(db.rows.game_submissions[0]?.submitter_id, USER_ID);
   assert.equal(db.rows.game_submissions[0]?.game_title, "Tiny Quest");
+  assert.equal(db.rows.game_submissions[0]?.attribution_text, "Tiny Quest by Pixel Dev");
+  assert.equal(db.rows.game_submissions[0]?.ownership_status, "creator");
+  assert.equal(db.rows.game_submissions[0]?.hosting_confirmed, true);
   assert.equal(db.rows.game_submissions[0]?.rom_url, romUrl);
   assert.match(String(notifiedSubmission?.romUrl), /\/object\/sign\/submissions\//);
   assert.match(String(notifiedSubmission?.coverUrl), /\/object\/sign\/submissions\//);
@@ -2486,13 +2513,9 @@ test("submissions reject unsupported ROM extensions", async () => {
 
   const response = await app.inject({
     method: "POST",
-    payload: {
-      authorName: "Pixel Dev",
-      description: null,
-      email: "dev@example.com",
-      gameTitle: "Tiny Quest",
+    payload: validSubmissionPayload({
       romUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.zip`,
-    },
+    }),
     url: "/submissions/games",
   });
 
@@ -2514,13 +2537,12 @@ test("super admins cannot submit games for review", async () => {
 
   const response = await app.inject({
     method: "POST",
-    payload: {
+    payload: validSubmissionPayload({
       authorName: "Root",
-      description: null,
       email: "root@example.com",
       gameTitle: "Root Quest",
       romUrl: `${storageBase}/storage/v1/object/public/submissions/${SUPER_ADMIN_ID}/roms/root.nes`,
-    },
+    }),
     url: "/submissions/games",
   });
 
@@ -2537,13 +2559,9 @@ test("submissions reject files outside the authenticated user's folder", async (
 
   const response = await app.inject({
     method: "POST",
-    payload: {
-      authorName: "Pixel Dev",
-      description: null,
-      email: "dev@example.com",
-      gameTitle: "Tiny Quest",
+    payload: validSubmissionPayload({
       romUrl: `${storageBase}/storage/v1/object/public/submissions/${OTHER_USER_ID}/roms/tiny.nes`,
-    },
+    }),
     url: "/submissions/games",
   });
 
@@ -2567,13 +2585,9 @@ test("submissions are rate limited per authenticated user", async () => {
 
   const response = await app.inject({
     method: "POST",
-    payload: {
-      authorName: "Pixel Dev",
-      description: null,
-      email: "dev@example.com",
-      gameTitle: "Tiny Quest",
+    payload: validSubmissionPayload({
       romUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.nes`,
-    },
+    }),
     url: "/submissions/games",
   });
 
