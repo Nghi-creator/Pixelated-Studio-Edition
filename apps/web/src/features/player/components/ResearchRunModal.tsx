@@ -7,6 +7,11 @@ import {
   type ResearchRunEvent,
 } from "../researchRunEvents";
 import {
+  createResearchRunSummary,
+  createResearchRunSummaryFilename,
+  researchRunSummaryToJson,
+} from "../researchRunSummary";
+import {
   createResearchRunMetadata,
   createResearchRunMetadataFilename,
   RESEARCH_RUN_SCHEMA_VERSION,
@@ -14,6 +19,7 @@ import {
   type ResearchRunMetadataForm,
   type ResearchRunScenario,
 } from "../researchRunMetadata";
+import type { StreamTelemetryCsvSample } from "../streamTelemetryExport";
 
 const SCENARIO_OPTIONS: Array<{
   label: string;
@@ -45,6 +51,7 @@ export function ResearchRunModal({
   onClose,
   onFormChange,
   playerMode,
+  recordedCsvSamples,
   runId,
   sessionId,
   shareUrl,
@@ -58,6 +65,7 @@ export function ResearchRunModal({
   onClose: () => void;
   onFormChange: (form: ResearchRunMetadataForm) => void;
   playerMode: "guest" | "host";
+  recordedCsvSamples: StreamTelemetryCsvSample[];
   runId: string;
   sessionId: string;
   shareUrl: string;
@@ -103,12 +111,31 @@ export function ResearchRunModal({
     );
   };
 
+  const createSummary = (generatedAt = new Date()) =>
+    createResearchRunSummary({
+      events,
+      generatedAt,
+      runId,
+      samples: recordedCsvSamples,
+      sessionId,
+    });
+
+  const exportSummary = () => {
+    const generatedAt = new Date();
+    downloadText(
+      createResearchRunSummaryFilename({ gameId, recordedAt: generatedAt, runId }),
+      researchRunSummaryToJson(createSummary(generatedAt)),
+      "application/json;charset=utf-8",
+    );
+  };
+
   const firstFrameElapsedMs = findFirstEventElapsedMs(
     events,
     "first_non_black_frame",
   );
   const pythonReadyElapsedMs = findFirstEventElapsedMs(events, "python_ready");
   const startGameElapsedMs = findFirstEventElapsedMs(events, "start_game_emitted");
+  const summary = createSummary();
 
   return (
     <div
@@ -229,6 +256,12 @@ export function ResearchRunModal({
             <div className="mt-1 font-bold text-white">{events.length}</div>
           </div>
           <div>
+            <div className="font-semibold uppercase text-gray-500">Samples</div>
+            <div className="mt-1 font-bold text-white">
+              {recordedCsvSamples.length}
+            </div>
+          </div>
+          <div>
             <div className="font-semibold uppercase text-gray-500">
               First frame
             </div>
@@ -252,6 +285,36 @@ export function ResearchRunModal({
               {pythonReadyElapsedMs === null ? "--" : `${pythonReadyElapsedMs} ms`}
             </div>
           </div>
+          <div>
+            <div className="font-semibold uppercase text-gray-500">
+              Median FPS
+            </div>
+            <div className="mt-1 font-bold text-white">
+              {summary.metrics.fps.median === null
+                ? "--"
+                : summary.metrics.fps.median}
+            </div>
+          </div>
+          <div>
+            <div className="font-semibold uppercase text-gray-500">
+              P95 jitter
+            </div>
+            <div className="mt-1 font-bold text-white">
+              {summary.metrics.jitterMs.p95 === null
+                ? "--"
+                : `${summary.metrics.jitterMs.p95} ms`}
+            </div>
+          </div>
+          <div>
+            <div className="font-semibold uppercase text-gray-500">
+              Loss/min
+            </div>
+            <div className="mt-1 font-bold text-white">
+              {summary.packetLoss.lossPerMinute === null
+                ? "--"
+                : summary.packetLoss.lossPerMinute}
+            </div>
+          </div>
         </div>
 
         <div className="mt-4 flex flex-wrap justify-end gap-2">
@@ -270,6 +333,15 @@ export function ResearchRunModal({
           >
             <Download className="h-4 w-4" />
             Events CSV
+          </button>
+          <button
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-synth-border bg-synth-bg px-3 text-sm font-semibold text-gray-300 transition hover:bg-synth-elevated hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={events.length === 0 && recordedCsvSamples.length === 0}
+            onClick={exportSummary}
+            type="button"
+          >
+            <Download className="h-4 w-4" />
+            Summary JSON
           </button>
           <button
             className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-synth-primary/70 bg-synth-primary px-3 text-sm font-bold text-white transition hover:border-synth-primary hover:bg-synth-primary/80"

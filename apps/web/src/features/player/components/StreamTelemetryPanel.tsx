@@ -166,6 +166,7 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
           onClose={() => setIsResearchModalOpen(false)}
           onFormChange={onResearchMetadataFormChange}
           playerMode={props.playerMode}
+          recordedCsvSamples={recordedCsvSamples}
           runId={researchRunId}
           sessionId={sessionId}
           shareUrl={shareUrl}
