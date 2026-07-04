@@ -52,7 +52,11 @@ export function createResearchRunId(recordedAt = new Date()) {
   const randomPart =
     typeof crypto !== "undefined" && "randomUUID" in crypto
       ? crypto.randomUUID().slice(0, 8)
-      : Math.random().toString(36).slice(2, 10);
+      : typeof crypto !== "undefined" && "getRandomValues" in crypto
+        ? Array.from(crypto.getRandomValues(new Uint8Array(4)))
+            .map((byte) => byte.toString(16).padStart(2, "0"))
+            .join("")
+        : recordedAt.getTime().toString(16).slice(-8).padStart(8, "0");
   const timestamp = recordedAt.toISOString().replace(/[:.]/g, "-");
 
   return `edge-run-${timestamp}-${randomPart}`;
