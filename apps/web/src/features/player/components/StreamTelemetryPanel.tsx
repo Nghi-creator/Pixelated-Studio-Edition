@@ -1,8 +1,12 @@
+import { useState } from "react";
 import { X } from "lucide-react";
+import type { StreamProfile } from "../../../lib/engine/streamProfiles";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
 import { useStreamTelemetryExportActions } from "../hooks/useStreamTelemetryExportActions";
 import { useStreamTelemetryHistory } from "../hooks/useStreamTelemetryHistory";
+import type { ResearchRunMetadataForm } from "../researchRunMetadata";
 import type { StreamTelemetryCsvSample } from "../streamTelemetryExport";
+import { ResearchRunModal } from "./ResearchRunModal";
 import { StreamTelemetryControls } from "./StreamTelemetryControls";
 import { StreamTelemetryHistoryChart } from "./StreamTelemetryHistoryChart";
 import { StreamTelemetrySummary } from "./StreamTelemetrySummary";
@@ -12,13 +16,17 @@ type StreamTelemetryPanelProps = {
   gameTitle: string;
   isRecordingCsv: boolean;
   playerMode: "guest" | "host";
+  researchMetadataForm: ResearchRunMetadataForm;
+  researchRunId: string;
   recordedCsvSamples: StreamTelemetryCsvSample[];
   sessionId: string;
   shareUrl: string;
   status: string;
+  streamProfile: StreamProfile;
   telemetry: WebRTCTelemetry;
   onClearTelemetryCsv: () => void;
   onClose: () => void;
+  onResearchMetadataFormChange: (form: ResearchRunMetadataForm) => void;
   onResetTelemetryData: () => void;
   onToggleCsvRecording: () => void;
 };
@@ -30,14 +38,19 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
     isRecordingCsv,
     onClearTelemetryCsv,
     onClose,
+    onResearchMetadataFormChange,
     onResetTelemetryData,
     onToggleCsvRecording,
+    researchMetadataForm,
+    researchRunId,
     recordedCsvSamples,
     sessionId,
     shareUrl,
     status,
+    streamProfile,
     telemetry,
   } = props;
+  const [isResearchModalOpen, setIsResearchModalOpen] = useState(false);
   const {
     displayedPacketsLost,
     history,
@@ -112,6 +125,7 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
           void exportTelemetryCsv();
         }}
         onExportTelemetryGraph={exportTelemetryGraph}
+        onOpenResearch={() => setIsResearchModalOpen(true)}
         onResetTelemetryData={resetTelemetryData}
         onToggleCsvRecording={toggleCsvRecording}
         recordedCsvSampleCount={recordedCsvSamples.length}
@@ -139,6 +153,22 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
           secondaryValues={history.map((sample) => sample.packetsLost)}
         />
       </div>
+
+      {isResearchModalOpen && (
+        <ResearchRunModal
+          form={researchMetadataForm}
+          gameId={gameId}
+          gameTitle={gameTitle}
+          onClose={() => setIsResearchModalOpen(false)}
+          onFormChange={onResearchMetadataFormChange}
+          playerMode={props.playerMode}
+          runId={researchRunId}
+          sessionId={sessionId}
+          shareUrl={shareUrl}
+          status={status}
+          streamProfile={streamProfile}
+        />
+      )}
     </section>
   );
 }

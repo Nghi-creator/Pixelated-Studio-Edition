@@ -1,6 +1,7 @@
 import {
   Clipboard,
   Download,
+  FlaskConical,
   ImageDown,
   Radio,
   RotateCcw,
@@ -19,6 +20,7 @@ export function StreamTelemetryControls({
   onCopyTelemetry,
   onExportTelemetryCsv,
   onExportTelemetryGraph,
+  onOpenResearch,
   onResetTelemetryData,
   onToggleCsvRecording,
 }: {
@@ -32,6 +34,7 @@ export function StreamTelemetryControls({
   onCopyTelemetry: () => void;
   onExportTelemetryCsv: () => void;
   onExportTelemetryGraph: () => void;
+  onOpenResearch: () => void;
   onResetTelemetryData: () => void;
   onToggleCsvRecording: () => void;
 }) {
@@ -64,6 +67,16 @@ export function StreamTelemetryControls({
                 ? "Failed"
                 : "Copy"}
         </span>
+      </button>
+      <button
+        aria-label="Open research run metadata"
+        className="inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md border border-synth-border bg-synth-bg px-2 text-xs font-semibold text-gray-300 transition hover:bg-synth-elevated hover:text-white"
+        onClick={onOpenResearch}
+        title="Open research run metadata"
+        type="button"
+      >
+        <FlaskConical className="h-3.5 w-3.5 shrink-0" />
+        <span className="truncate">Research</span>
       </button>
       <button
         aria-label={

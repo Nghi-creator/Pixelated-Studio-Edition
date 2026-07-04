@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CommentsPanel } from "../../features/player/comments/components/CommentsPanel";
 import { LobbyPanel } from "../../features/player/components/LobbyPanel";
@@ -23,6 +23,10 @@ import { useGameReactions } from "../../features/player/hooks/useGameReactions";
 import { usePlayCount } from "../../features/player/hooks/usePlayCount";
 import { useStreamPlayback } from "../../features/player/hooks/useStreamPlayback";
 import { useStreamTelemetryRecording } from "../../features/player/hooks/useStreamTelemetryRecording";
+import {
+  createResearchRunId,
+  type ResearchRunMetadataForm,
+} from "../../features/player/researchRunMetadata";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
 import { shouldIgnoreGameInput } from "../../lib/webrtc/webrtcInput";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
@@ -32,6 +36,14 @@ export default function Player() {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [researchRunId] = useState(() => createResearchRunId());
+  const [researchMetadataForm, setResearchMetadataForm] =
+    useState<ResearchRunMetadataForm>({
+      coldStart: false,
+      networkType: "",
+      notes: "",
+      scenario: "localhost",
+    });
   const currentUser = useAuthUser();
   const { backRoute, backText, lobbySearch } = usePlayerNavigation(
     location,
@@ -214,13 +226,17 @@ export default function Player() {
             isRecordingCsv={isRecordingCsv}
             onClearTelemetryCsv={clearTelemetryCsv}
             onClose={() => setShowStreamTelemetry(false)}
+            onResearchMetadataFormChange={setResearchMetadataForm}
             onResetTelemetryData={clearTelemetryCsv}
             onToggleCsvRecording={toggleCsvRecording}
             playerMode={playerMode}
+            researchMetadataForm={researchMetadataForm}
+            researchRunId={researchRunId}
             recordedCsvSamples={recordedCsvSamples}
             sessionId={sessionId}
             shareUrl={shareInvite.url}
             status={status}
+            streamProfile={streamProfile}
             telemetry={telemetry}
           />
         )}

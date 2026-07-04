@@ -29,6 +29,7 @@ import {
 } from "../../src/lib/webrtc/webrtcTelemetry";
 import type { WebRTCStatus } from "../../src/lib/webrtc/webrtcSession";
 import {
+  DEFAULT_STREAM_PROFILE,
   STREAM_PROFILES,
   type StreamProfileId,
 } from "../../src/lib/engine/streamProfiles";
@@ -322,12 +323,21 @@ export function AdminHarness() {
               setShowTelemetry(false);
             }}
             onResetTelemetryData={() => record("telemetry-reset")}
+            onResearchMetadataFormChange={() => record("research-form-change")}
             onToggleCsvRecording={() => record("telemetry-csv-toggle")}
             playerMode="host"
+            researchMetadataForm={{
+              coldStart: false,
+              networkType: "",
+              notes: "",
+              scenario: "localhost",
+            }}
+            researchRunId="edge-run-harness"
             recordedCsvSamples={[]}
             sessionId="session-1"
             shareUrl="https://engine.local/play/demo?session=session-1"
             status="error"
+            streamProfile={DEFAULT_STREAM_PROFILE}
             telemetry={streamTelemetry}
           />
         )}
