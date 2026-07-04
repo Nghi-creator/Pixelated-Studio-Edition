@@ -33,6 +33,33 @@ type SaveFilePickerWindow = Window &
     }>;
   };
 
+function downloadBlob(filename: string, blob: Blob) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.rel = "noopener";
+  link.style.display = "none";
+  document.body.append(link);
+  link.click();
+  window.setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 0);
+}
+
+function dataUrlToBlob(dataUrl: string) {
+  const [metadata = "", base64 = ""] = dataUrl.split(",");
+  const mimeType =
+    metadata.match(/^data:([^;]+);base64$/)?.[1] || "application/octet-stream";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return new Blob([bytes], { type: mimeType });
+}
+
 function buildTelemetrySnapshot({
   gameId,
   playerMode,
@@ -164,12 +191,7 @@ export function useStreamTelemetryExportActions({
         return;
       }
 
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = suggestedName;
-      link.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(suggestedName, blob);
       setCsvState("exported");
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
@@ -209,10 +231,10 @@ export function useStreamTelemetryExportActions({
       return;
     }
 
-    const link = document.createElement("a");
-    link.href = dataUrl;
-    link.download = createStreamTelemetryGraphFilename({ gameId, sessionId });
-    link.click();
+    downloadBlob(
+      createStreamTelemetryGraphFilename({ gameId, sessionId }),
+      dataUrlToBlob(dataUrl),
+    );
     setGraphState("exported");
     window.setTimeout(() => setGraphState("idle"), 1600);
   };

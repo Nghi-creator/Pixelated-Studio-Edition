@@ -18,10 +18,14 @@ type StreamTelemetryPanelProps = {
   gameTitle: string;
   isRecordingCsv: boolean;
   playerMode: "guest" | "host";
-  researchBaselineForm: ResearchBaselineForm;
-  researchEvents: ResearchRunEvent[];
-  researchMetadataForm: ResearchRunMetadataForm;
-  researchRunId: string;
+  researchRun: {
+    baselineForm: ResearchBaselineForm;
+    events: ResearchRunEvent[];
+    metadataForm: ResearchRunMetadataForm;
+    onBaselineFormChange: (form: ResearchBaselineForm) => void;
+    onMetadataFormChange: (form: ResearchRunMetadataForm) => void;
+    runId: string;
+  };
   recordedCsvSamples: StreamTelemetryCsvSample[];
   sessionId: string;
   shareUrl: string;
@@ -30,8 +34,6 @@ type StreamTelemetryPanelProps = {
   telemetry: WebRTCTelemetry;
   onClearTelemetryCsv: () => void;
   onClose: () => void;
-  onResearchBaselineFormChange: (form: ResearchBaselineForm) => void;
-  onResearchMetadataFormChange: (form: ResearchRunMetadataForm) => void;
   onResetTelemetryData: () => void;
   onToggleCsvRecording: () => void;
 };
@@ -43,14 +45,9 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
     isRecordingCsv,
     onClearTelemetryCsv,
     onClose,
-    onResearchBaselineFormChange,
-    onResearchMetadataFormChange,
     onResetTelemetryData,
     onToggleCsvRecording,
-    researchBaselineForm,
-    researchEvents,
-    researchMetadataForm,
-    researchRunId,
+    researchRun,
     recordedCsvSamples,
     sessionId,
     shareUrl,
@@ -164,17 +161,17 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
 
       {isResearchModalOpen && (
         <ResearchRunModal
-          events={researchEvents}
-          baselineForm={researchBaselineForm}
-          form={researchMetadataForm}
+          events={researchRun.events}
+          baselineForm={researchRun.baselineForm}
+          form={researchRun.metadataForm}
           gameId={gameId}
           gameTitle={gameTitle}
           onClose={() => setIsResearchModalOpen(false)}
-          onBaselineFormChange={onResearchBaselineFormChange}
-          onFormChange={onResearchMetadataFormChange}
+          onBaselineFormChange={researchRun.onBaselineFormChange}
+          onFormChange={researchRun.onMetadataFormChange}
           playerMode={props.playerMode}
           recordedCsvSamples={recordedCsvSamples}
-          runId={researchRunId}
+          runId={researchRun.runId}
           sessionId={sessionId}
           shareUrl={shareUrl}
           status={status}

@@ -264,21 +264,23 @@ export default function Player() {
             isRecordingCsv={isRecordingCsv}
             onClearTelemetryCsv={clearTelemetryCsv}
             onClose={() => setShowStreamTelemetry(false)}
-            onResearchMetadataFormChange={setResearchMetadataForm}
             onResetTelemetryData={resetTelemetryData}
             onToggleCsvRecording={toggleCsvRecording}
             playerMode={playerMode}
-            researchBaselineForm={researchBaselineForm}
-            researchEvents={researchEvents}
-            researchMetadataForm={researchMetadataForm}
-            researchRunId={researchRunId}
+            researchRun={{
+              baselineForm: researchBaselineForm,
+              events: researchEvents,
+              metadataForm: researchMetadataForm,
+              onBaselineFormChange: setResearchBaselineForm,
+              onMetadataFormChange: setResearchMetadataForm,
+              runId: researchRunId,
+            }}
             recordedCsvSamples={recordedCsvSamples}
             sessionId={sessionId}
             shareUrl={shareInvite.url}
             status={status}
             streamProfile={streamProfile}
             telemetry={telemetry}
-            onResearchBaselineFormChange={setResearchBaselineForm}
           />
         )}
       </div>

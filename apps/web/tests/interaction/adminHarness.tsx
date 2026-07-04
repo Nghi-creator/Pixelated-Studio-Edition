@@ -322,27 +322,29 @@ export function AdminHarness() {
               record("telemetry-hidden");
               setShowTelemetry(false);
             }}
-            onResearchBaselineFormChange={() => record("baseline-form-change")}
             onResetTelemetryData={() => record("telemetry-reset")}
-            onResearchMetadataFormChange={() => record("research-form-change")}
             onToggleCsvRecording={() => record("telemetry-csv-toggle")}
             playerMode="host"
-            researchBaselineForm={{
-              browserMemoryMb: "",
-              cpuNotes: "",
-              deviceNotes: "",
-              emulatorId: "",
-              fps: "",
-              startupMs: "",
+            researchRun={{
+              baselineForm: {
+                browserMemoryMb: "",
+                cpuNotes: "",
+                deviceNotes: "",
+                emulatorId: "",
+                fps: "",
+                startupMs: "",
+              },
+              events: [],
+              metadataForm: {
+                coldStart: false,
+                networkType: "",
+                notes: "",
+                scenario: "localhost",
+              },
+              onBaselineFormChange: () => record("baseline-form-change"),
+              onMetadataFormChange: () => record("research-form-change"),
+              runId: "edge-run-harness",
             }}
-            researchEvents={[]}
-            researchMetadataForm={{
-              coldStart: false,
-              networkType: "",
-              notes: "",
-              scenario: "localhost",
-            }}
-            researchRunId="edge-run-harness"
             recordedCsvSamples={[]}
             sessionId="session-1"
             shareUrl="https://engine.local/play/demo?session=session-1"

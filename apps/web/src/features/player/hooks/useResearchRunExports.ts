@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from "react";
 import type { StreamProfile } from "../../../lib/engine/streamProfiles";
 import {
   createResearchBaseline,
@@ -41,8 +42,14 @@ function downloadBlob(filename: string, blob: Blob) {
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
+  link.rel = "noopener";
+  link.style.display = "none";
+  document.body.append(link);
   link.click();
-  URL.revokeObjectURL(url);
+  window.setTimeout(() => {
+    link.remove();
+    URL.revokeObjectURL(url);
+  }, 0);
 }
 
 function downloadText(filename: string, text: string, type: string) {
@@ -88,7 +95,7 @@ export function useResearchRunExports({
 }) {
   const isBrowserBaseline = form.scenario === "browser_only_baseline";
 
-  const createMetadata = (capturedAt: Date) =>
+  const createMetadata = useCallback((capturedAt: Date) =>
     createResearchRunMetadata({
       capturedAt,
       form,
@@ -101,34 +108,50 @@ export function useResearchRunExports({
       status,
       streamProfile,
       userAgent: navigator.userAgent,
-    });
+    }), [
+      form,
+      gameId,
+      gameTitle,
+      playerMode,
+      runId,
+      sessionId,
+      shareUrl,
+      status,
+      streamProfile,
+    ]);
 
-  const buildMetadataJson = (capturedAt: Date) =>
-    researchRunMetadataToJson(createMetadata(capturedAt));
+  const buildMetadataJson = useCallback(
+    (capturedAt: Date) => researchRunMetadataToJson(createMetadata(capturedAt)),
+    [createMetadata],
+  );
 
-  const buildBaselineJson = (capturedAt: Date) =>
-    researchBaselineToJson(
+  const buildBaselineJson = useCallback(
+    (capturedAt: Date) => researchBaselineToJson(
       createResearchBaseline({
         capturedAt,
         form: baselineForm,
         metadata: createMetadata(capturedAt),
         userAgent: navigator.userAgent,
       }),
-    );
+    ),
+    [baselineForm, createMetadata],
+  );
 
-  const createSummary = (generatedAt = new Date()) =>
+  const createSummary = useCallback((generatedAt = new Date()) =>
     createResearchRunSummary({
       events,
       generatedAt,
       runId,
       samples: recordedCsvSamples,
       sessionId,
-    });
+    }), [events, recordedCsvSamples, runId, sessionId]);
 
-  const buildSummaryJson = (generatedAt: Date) =>
-    researchRunSummaryToJson(createSummary(generatedAt));
+  const buildSummaryJson = useCallback(
+    (generatedAt: Date) => researchRunSummaryToJson(createSummary(generatedAt)),
+    [createSummary],
+  );
 
-  const buildGraphPng = () => {
+  const buildGraphPng = useCallback(() => {
     const graphSamples = latestStreamTelemetryGraphSamples(
       addPacketLossDeltas(recordedCsvSamples),
     );
@@ -141,45 +164,47 @@ export function useResearchRunExports({
     });
 
     return dataUrl ? dataUrlToBytes(dataUrl) : null;
-  };
+  }, [gameTitle, playerMode, recordedCsvSamples, status]);
 
-  const exportMetadata = () => {
+  const summary = useMemo(() => createSummary(), [createSummary]);
+
+  const exportMetadata = useCallback(() => {
     const capturedAt = new Date();
     downloadText(
       createResearchRunMetadataFilename({ gameId, recordedAt: capturedAt, runId }),
       buildMetadataJson(capturedAt),
       "application/json;charset=utf-8",
     );
-  };
+  }, [buildMetadataJson, gameId, runId]);
 
-  const exportEvents = () => {
+  const exportEvents = useCallback(() => {
     const capturedAt = new Date();
     downloadText(
       createResearchRunEventsFilename({ gameId, recordedAt: capturedAt, runId }),
       researchRunEventsToCsv(events),
       "text/csv;charset=utf-8",
     );
-  };
+  }, [events, gameId, runId]);
 
-  const exportSummary = () => {
+  const exportSummary = useCallback(() => {
     const generatedAt = new Date();
     downloadText(
       createResearchRunSummaryFilename({ gameId, recordedAt: generatedAt, runId }),
       buildSummaryJson(generatedAt),
       "application/json;charset=utf-8",
     );
-  };
+  }, [buildSummaryJson, gameId, runId]);
 
-  const exportBaseline = () => {
+  const exportBaseline = useCallback(() => {
     const capturedAt = new Date();
     downloadText(
       createResearchBaselineFilename({ gameId, recordedAt: capturedAt, runId }),
       buildBaselineJson(capturedAt),
       "application/json;charset=utf-8",
     );
-  };
+  }, [buildBaselineJson, gameId, runId]);
 
-  const exportBundle = () => {
+  const exportBundle = useCallback(() => {
     const recordedAt = new Date();
     const files: ResearchRunBundleFile[] = [
       {
@@ -221,7 +246,17 @@ export function useResearchRunExports({
         type: "application/x-tar",
       }),
     );
-  };
+  }, [
+    buildBaselineJson,
+    buildGraphPng,
+    buildMetadataJson,
+    buildSummaryJson,
+    events,
+    gameId,
+    isBrowserBaseline,
+    recordedCsvSamples,
+    runId,
+  ]);
 
   return {
     canExportBundle:
@@ -240,6 +275,6 @@ export function useResearchRunExports({
     isBrowserBaseline,
     pythonReadyElapsedMs: findFirstEventElapsedMs(events, "python_ready"),
     startGameElapsedMs: findFirstEventElapsedMs(events, "start_game_emitted"),
-    summary: createSummary(),
+    summary,
   };
 }
