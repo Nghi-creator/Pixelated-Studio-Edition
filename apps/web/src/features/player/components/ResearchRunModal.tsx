@@ -1,6 +1,11 @@
 import { Download, X } from "lucide-react";
 import type { StreamProfile } from "../../../lib/engine/streamProfiles";
 import {
+  createResearchRunBundleFilename,
+  createResearchRunBundleTar,
+  type ResearchRunBundleFile,
+} from "../researchRunBundle";
+import {
   createResearchRunEventsFilename,
   findFirstEventElapsedMs,
   researchRunEventsToCsv,
@@ -19,7 +24,14 @@ import {
   type ResearchRunMetadataForm,
   type ResearchRunScenario,
 } from "../researchRunMetadata";
-import type { StreamTelemetryCsvSample } from "../streamTelemetryExport";
+import { renderStreamTelemetryGraphPng } from "../streamTelemetryGraphPng";
+import {
+  addPacketLossDeltas,
+  latestStreamTelemetryGraphSamples,
+  STREAM_TELEMETRY_GRAPH_WINDOW_MS,
+  streamTelemetrySamplesToCsv,
+  type StreamTelemetryCsvSample,
+} from "../streamTelemetryExport";
 
 const SCENARIO_OPTIONS: Array<{
   label: string;
@@ -35,12 +47,26 @@ const NETWORK_OPTIONS = ["", "Ethernet", "Wi-Fi", "Mobile hotspot", "Custom"];
 
 function downloadText(filename: string, text: string, type: string) {
   const blob = new Blob([text], { type });
+  downloadBlob(filename, blob);
+}
+
+function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function dataUrlToBytes(dataUrl: string) {
+  const [, base64 = ""] = dataUrl.split(",");
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
 }
 
 export function ResearchRunModal({
@@ -126,6 +152,77 @@ export function ResearchRunModal({
       createResearchRunSummaryFilename({ gameId, recordedAt: generatedAt, runId }),
       researchRunSummaryToJson(createSummary(generatedAt)),
       "application/json;charset=utf-8",
+    );
+  };
+
+  const buildMetadataJson = (capturedAt: Date) =>
+    researchRunMetadataToJson(
+      createResearchRunMetadata({
+        capturedAt,
+        form,
+        gameId,
+        gameTitle,
+        playerMode,
+        runId,
+        sessionId,
+        shareUrl,
+        status,
+        streamProfile,
+        userAgent: navigator.userAgent,
+      }),
+    );
+
+  const buildSummaryJson = (generatedAt: Date) =>
+    researchRunSummaryToJson(createSummary(generatedAt));
+
+  const buildGraphPng = () => {
+    const graphSamples = latestStreamTelemetryGraphSamples(
+      addPacketLossDeltas(recordedCsvSamples),
+    );
+    const dataUrl = renderStreamTelemetryGraphPng(graphSamples, {
+      gameTitle,
+      graphWindowSeconds: STREAM_TELEMETRY_GRAPH_WINDOW_MS / 1000,
+      playerMode,
+      sampleCount: graphSamples.length,
+      status,
+    });
+
+    return dataUrl ? dataUrlToBytes(dataUrl) : null;
+  };
+
+  const exportBundle = () => {
+    const recordedAt = new Date();
+    const files: ResearchRunBundleFile[] = [
+      {
+        data: buildMetadataJson(recordedAt),
+        name: "run-metadata.json",
+      },
+      {
+        data: streamTelemetrySamplesToCsv(recordedCsvSamples),
+        name: "stream-telemetry.csv",
+      },
+      {
+        data: researchRunEventsToCsv(events),
+        name: "stream-events.csv",
+      },
+      {
+        data: buildSummaryJson(recordedAt),
+        name: "summary.json",
+      },
+    ];
+    const graphPng = buildGraphPng();
+    if (graphPng) {
+      files.push({
+        data: graphPng,
+        name: "performance-network.png",
+      });
+    }
+
+    downloadBlob(
+      createResearchRunBundleFilename({ gameId, recordedAt, runId }),
+      new Blob([createResearchRunBundleTar(files, recordedAt)], {
+        type: "application/x-tar",
+      }),
     );
   };
 
@@ -342,6 +439,15 @@ export function ResearchRunModal({
           >
             <Download className="h-4 w-4" />
             Summary JSON
+          </button>
+          <button
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-synth-border bg-synth-bg px-3 text-sm font-semibold text-gray-300 transition hover:bg-synth-elevated hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={events.length === 0 && recordedCsvSamples.length === 0}
+            onClick={exportBundle}
+            type="button"
+          >
+            <Download className="h-4 w-4" />
+            Bundle
           </button>
           <button
             className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-synth-primary/70 bg-synth-primary px-3 text-sm font-bold text-white transition hover:border-synth-primary hover:bg-synth-primary/80"
