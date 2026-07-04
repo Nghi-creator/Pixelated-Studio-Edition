@@ -2,6 +2,7 @@ import { useState } from "react";
 import { engineAuthHeaders } from "../../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../../lib/engine/engineConfig";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
+import { downloadBlob } from "../downloadFile";
 import { createStreamTelemetryGraphPngBlob } from "../streamTelemetryGraphPng";
 import {
   addPacketLossDeltas,
@@ -30,21 +31,6 @@ type SaveFilePickerWindow = Window &
       createWritable: () => Promise<FileSystemWritable>;
     }>;
   };
-
-function downloadBlob(filename: string, blob: Blob) {
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  link.rel = "noopener";
-  link.style.display = "none";
-  document.body.append(link);
-  link.click();
-  window.setTimeout(() => {
-    link.remove();
-    URL.revokeObjectURL(url);
-  }, 0);
-}
 
 function buildTelemetrySnapshot({
   gameId,
