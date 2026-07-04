@@ -4,6 +4,7 @@ import type { StreamProfile } from "../../../lib/engine/streamProfiles";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
 import { useStreamTelemetryExportActions } from "../hooks/useStreamTelemetryExportActions";
 import { useStreamTelemetryHistory } from "../hooks/useStreamTelemetryHistory";
+import type { ResearchBaselineForm } from "../researchBaseline";
 import type { ResearchRunEvent } from "../researchRunEvents";
 import type { ResearchRunMetadataForm } from "../researchRunMetadata";
 import type { StreamTelemetryCsvSample } from "../streamTelemetryExport";
@@ -17,6 +18,7 @@ type StreamTelemetryPanelProps = {
   gameTitle: string;
   isRecordingCsv: boolean;
   playerMode: "guest" | "host";
+  researchBaselineForm: ResearchBaselineForm;
   researchEvents: ResearchRunEvent[];
   researchMetadataForm: ResearchRunMetadataForm;
   researchRunId: string;
@@ -28,6 +30,7 @@ type StreamTelemetryPanelProps = {
   telemetry: WebRTCTelemetry;
   onClearTelemetryCsv: () => void;
   onClose: () => void;
+  onResearchBaselineFormChange: (form: ResearchBaselineForm) => void;
   onResearchMetadataFormChange: (form: ResearchRunMetadataForm) => void;
   onResetTelemetryData: () => void;
   onToggleCsvRecording: () => void;
@@ -40,9 +43,11 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
     isRecordingCsv,
     onClearTelemetryCsv,
     onClose,
+    onResearchBaselineFormChange,
     onResearchMetadataFormChange,
     onResetTelemetryData,
     onToggleCsvRecording,
+    researchBaselineForm,
     researchEvents,
     researchMetadataForm,
     researchRunId,
@@ -160,10 +165,12 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
       {isResearchModalOpen && (
         <ResearchRunModal
           events={researchEvents}
+          baselineForm={researchBaselineForm}
           form={researchMetadataForm}
           gameId={gameId}
           gameTitle={gameTitle}
           onClose={() => setIsResearchModalOpen(false)}
+          onBaselineFormChange={onResearchBaselineFormChange}
           onFormChange={onResearchMetadataFormChange}
           playerMode={props.playerMode}
           recordedCsvSamples={recordedCsvSamples}

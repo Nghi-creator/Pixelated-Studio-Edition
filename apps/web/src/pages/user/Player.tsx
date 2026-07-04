@@ -25,6 +25,10 @@ import { useStreamPlayback } from "../../features/player/hooks/useStreamPlayback
 import { useResearchRunEvents } from "../../features/player/hooks/useResearchRunEvents";
 import { useStreamTelemetryRecording } from "../../features/player/hooks/useStreamTelemetryRecording";
 import {
+  createEmptyResearchBaselineForm,
+  type ResearchBaselineForm,
+} from "../../features/player/researchBaseline";
+import {
   createResearchRunId,
   type ResearchRunMetadataForm,
 } from "../../features/player/researchRunMetadata";
@@ -46,6 +50,8 @@ export default function Player() {
       notes: "",
       scenario: "localhost",
     });
+  const [researchBaselineForm, setResearchBaselineForm] =
+    useState<ResearchBaselineForm>(() => createEmptyResearchBaselineForm());
   const {
     clearEvents: clearResearchEvents,
     events: researchEvents,
@@ -262,6 +268,7 @@ export default function Player() {
             onResetTelemetryData={resetTelemetryData}
             onToggleCsvRecording={toggleCsvRecording}
             playerMode={playerMode}
+            researchBaselineForm={researchBaselineForm}
             researchEvents={researchEvents}
             researchMetadataForm={researchMetadataForm}
             researchRunId={researchRunId}
@@ -271,6 +278,7 @@ export default function Player() {
             status={status}
             streamProfile={streamProfile}
             telemetry={telemetry}
+            onResearchBaselineFormChange={setResearchBaselineForm}
           />
         )}
       </div>

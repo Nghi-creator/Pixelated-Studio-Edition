@@ -6,6 +6,12 @@ import {
   type ResearchRunBundleFile,
 } from "../researchRunBundle";
 import {
+  createResearchBaseline,
+  createResearchBaselineFilename,
+  researchBaselineToJson,
+  type ResearchBaselineForm,
+} from "../researchBaseline";
+import {
   createResearchRunEventsFilename,
   findFirstEventElapsedMs,
   researchRunEventsToCsv,
@@ -70,10 +76,12 @@ function dataUrlToBytes(dataUrl: string) {
 }
 
 export function ResearchRunModal({
+  baselineForm,
   events,
   form,
   gameId,
   gameTitle,
+  onBaselineFormChange,
   onClose,
   onFormChange,
   playerMode,
@@ -84,10 +92,12 @@ export function ResearchRunModal({
   status,
   streamProfile,
 }: {
+  baselineForm: ResearchBaselineForm;
   events: ResearchRunEvent[];
   form: ResearchRunMetadataForm;
   gameId: string | undefined;
   gameTitle: string;
+  onBaselineFormChange: (form: ResearchBaselineForm) => void;
   onClose: () => void;
   onFormChange: (form: ResearchRunMetadataForm) => void;
   playerMode: "guest" | "host";
@@ -104,10 +114,15 @@ export function ResearchRunModal({
   ) => {
     onFormChange({ ...form, [key]: value });
   };
+  const setBaselineField = <Key extends keyof ResearchBaselineForm>(
+    key: Key,
+    value: ResearchBaselineForm[Key],
+  ) => {
+    onBaselineFormChange({ ...baselineForm, [key]: value });
+  };
 
-  const exportMetadata = () => {
-    const capturedAt = new Date();
-    const metadata = createResearchRunMetadata({
+  const createMetadata = (capturedAt: Date) =>
+    createResearchRunMetadata({
       capturedAt,
       form,
       gameId,
@@ -121,9 +136,26 @@ export function ResearchRunModal({
       userAgent: navigator.userAgent,
     });
 
+  const buildMetadataJson = (capturedAt: Date) =>
+    researchRunMetadataToJson(createMetadata(capturedAt));
+
+  const createBaseline = (capturedAt: Date) =>
+    createResearchBaseline({
+      capturedAt,
+      form: baselineForm,
+      metadata: createMetadata(capturedAt),
+      userAgent: navigator.userAgent,
+    });
+
+  const buildBaselineJson = (capturedAt: Date) =>
+    researchBaselineToJson(createBaseline(capturedAt));
+
+  const exportMetadata = () => {
+    const capturedAt = new Date();
+
     downloadText(
       createResearchRunMetadataFilename({ gameId, recordedAt: capturedAt, runId }),
-      researchRunMetadataToJson(metadata),
+      buildMetadataJson(capturedAt),
       "application/json;charset=utf-8",
     );
   };
@@ -155,25 +187,17 @@ export function ResearchRunModal({
     );
   };
 
-  const buildMetadataJson = (capturedAt: Date) =>
-    researchRunMetadataToJson(
-      createResearchRunMetadata({
-        capturedAt,
-        form,
-        gameId,
-        gameTitle,
-        playerMode,
-        runId,
-        sessionId,
-        shareUrl,
-        status,
-        streamProfile,
-        userAgent: navigator.userAgent,
-      }),
-    );
-
   const buildSummaryJson = (generatedAt: Date) =>
     researchRunSummaryToJson(createSummary(generatedAt));
+
+  const exportBaseline = () => {
+    const capturedAt = new Date();
+    downloadText(
+      createResearchBaselineFilename({ gameId, recordedAt: capturedAt, runId }),
+      buildBaselineJson(capturedAt),
+      "application/json;charset=utf-8",
+    );
+  };
 
   const buildGraphPng = () => {
     const graphSamples = latestStreamTelemetryGraphSamples(
@@ -210,6 +234,12 @@ export function ResearchRunModal({
         name: "summary.json",
       },
     ];
+    if (form.scenario === "browser_only_baseline") {
+      files.push({
+        data: buildBaselineJson(recordedAt),
+        name: "browser-baseline.json",
+      });
+    }
     const graphPng = buildGraphPng();
     if (graphPng) {
       files.push({
@@ -233,6 +263,7 @@ export function ResearchRunModal({
   const pythonReadyElapsedMs = findFirstEventElapsedMs(events, "python_ready");
   const startGameElapsedMs = findFirstEventElapsedMs(events, "start_game_emitted");
   const summary = createSummary();
+  const isBrowserBaseline = form.scenario === "browser_only_baseline";
 
   return (
     <div
@@ -322,6 +353,78 @@ export function ResearchRunModal({
             />
           </label>
         </div>
+
+        {isBrowserBaseline && (
+          <div className="mt-4 grid gap-3 rounded-md border border-synth-border bg-synth-bg/70 p-3 sm:grid-cols-2">
+            <label className="block text-xs font-semibold uppercase text-gray-500">
+              Emulator
+              <input
+                className="mt-1 h-9 w-full rounded-md border border-synth-border bg-synth-bg px-2 text-sm font-semibold normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
+                onChange={(event) =>
+                  setBaselineField("emulatorId", event.target.value)
+                }
+                placeholder="WASM emulator/runtime"
+                value={baselineForm.emulatorId}
+              />
+            </label>
+            <label className="block text-xs font-semibold uppercase text-gray-500">
+              Startup ms
+              <input
+                className="mt-1 h-9 w-full rounded-md border border-synth-border bg-synth-bg px-2 text-sm font-semibold normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
+                inputMode="decimal"
+                onChange={(event) =>
+                  setBaselineField("startupMs", event.target.value)
+                }
+                placeholder="Manual or measured"
+                value={baselineForm.startupMs}
+              />
+            </label>
+            <label className="block text-xs font-semibold uppercase text-gray-500">
+              FPS
+              <input
+                className="mt-1 h-9 w-full rounded-md border border-synth-border bg-synth-bg px-2 text-sm font-semibold normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
+                inputMode="decimal"
+                onChange={(event) => setBaselineField("fps", event.target.value)}
+                placeholder="If available"
+                value={baselineForm.fps}
+              />
+            </label>
+            <label className="block text-xs font-semibold uppercase text-gray-500">
+              Memory MB
+              <input
+                className="mt-1 h-9 w-full rounded-md border border-synth-border bg-synth-bg px-2 text-sm font-semibold normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
+                inputMode="decimal"
+                onChange={(event) =>
+                  setBaselineField("browserMemoryMb", event.target.value)
+                }
+                placeholder="Manual if needed"
+                value={baselineForm.browserMemoryMb}
+              />
+            </label>
+            <label className="block text-xs font-semibold uppercase text-gray-500 sm:col-span-2">
+              Device notes
+              <textarea
+                className="mt-1 min-h-16 w-full resize-y rounded-md border border-synth-border bg-synth-bg px-3 py-2 text-sm font-medium normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
+                onChange={(event) =>
+                  setBaselineField("deviceNotes", event.target.value)
+                }
+                placeholder="Browser-only test device and setup"
+                value={baselineForm.deviceNotes}
+              />
+            </label>
+            <label className="block text-xs font-semibold uppercase text-gray-500 sm:col-span-2">
+              CPU notes
+              <textarea
+                className="mt-1 min-h-16 w-full resize-y rounded-md border border-synth-border bg-synth-bg px-3 py-2 text-sm font-medium normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
+                onChange={(event) =>
+                  setBaselineField("cpuNotes", event.target.value)
+                }
+                placeholder="Manual CPU/RAM observations"
+                value={baselineForm.cpuNotes}
+              />
+            </label>
+          </div>
+        )}
 
         <div className="mt-4 grid grid-cols-2 gap-2 rounded-md border border-synth-border bg-synth-bg/80 p-3 text-xs">
           <div>
@@ -440,9 +543,23 @@ export function ResearchRunModal({
             <Download className="h-4 w-4" />
             Summary JSON
           </button>
+          {isBrowserBaseline && (
+            <button
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-synth-border bg-synth-bg px-3 text-sm font-semibold text-gray-300 transition hover:bg-synth-elevated hover:text-white"
+              onClick={exportBaseline}
+              type="button"
+            >
+              <Download className="h-4 w-4" />
+              Baseline JSON
+            </button>
+          )}
           <button
             className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-synth-border bg-synth-bg px-3 text-sm font-semibold text-gray-300 transition hover:bg-synth-elevated hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={events.length === 0 && recordedCsvSamples.length === 0}
+            disabled={
+              !isBrowserBaseline &&
+              events.length === 0 &&
+              recordedCsvSamples.length === 0
+            }
             onClick={exportBundle}
             type="button"
           >

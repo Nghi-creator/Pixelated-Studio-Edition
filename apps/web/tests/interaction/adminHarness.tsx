@@ -322,10 +322,19 @@ export function AdminHarness() {
               record("telemetry-hidden");
               setShowTelemetry(false);
             }}
+            onResearchBaselineFormChange={() => record("baseline-form-change")}
             onResetTelemetryData={() => record("telemetry-reset")}
             onResearchMetadataFormChange={() => record("research-form-change")}
             onToggleCsvRecording={() => record("telemetry-csv-toggle")}
             playerMode="host"
+            researchBaselineForm={{
+              browserMemoryMb: "",
+              cpuNotes: "",
+              deviceNotes: "",
+              emulatorId: "",
+              fps: "",
+              startupMs: "",
+            }}
             researchEvents={[]}
             researchMetadataForm={{
               coldStart: false,
