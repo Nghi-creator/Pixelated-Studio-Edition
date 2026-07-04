@@ -98,6 +98,7 @@ export function useWebRTC(
   const [sessionId, setSessionId] = useState(
     () => options.sessionId || createWebRTCSessionId(),
   );
+  const onResearchEvent = options.onResearchEvent;
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
   const peerIdRef = useRef(createWebRTCSessionId());
@@ -159,10 +160,14 @@ export function useWebRTC(
       options.requestedRole || (mode === "host" ? "host" : "spectator");
     const displayName =
       options.displayName || (mode === "host" ? "Host" : "Guest");
+    const recordResearchEvent = onResearchEvent;
     const engineToken = ensureEngineToken();
 
     if (!engineToken) {
       queueMicrotask(() => {
+        recordResearchEvent?.("engine_error", {
+          reason: "missing_engine_pairing",
+        });
         setTelemetry((currentTelemetry) => ({
           ...currentTelemetry,
           lastEngineError:
@@ -194,6 +199,7 @@ export function useWebRTC(
         window.clearTimeout(bootReadyTimeoutId);
         bootReadyTimeoutId = null;
       }
+      recordResearchEvent?.("engine_error", { message });
       if (
         seamlessRestart &&
         !automaticRecoveryQueued &&
@@ -260,21 +266,32 @@ export function useWebRTC(
         socket,
         sessionId,
         onTrack: (track) => {
+          recordResearchEvent?.("remote_track_received", {
+            kind: track.kind,
+          });
           incomingStream ||= new MediaStream();
-        incomingStream.addTrack(track);
-        setStream(incomingStream);
-        profileAutoRetriesRemainingRef.current = 0;
-        sessionConflictAutoRetriesRemainingRef.current = 1;
-        setStatus("playing");
-      },
+          incomingStream.addTrack(track);
+          setStream(incomingStream);
+          profileAutoRetriesRemainingRef.current = 0;
+          sessionConflictAutoRetriesRemainingRef.current = 1;
+          recordResearchEvent?.("stream_playing", {
+            trackKind: track.kind,
+          });
+          setStatus("playing");
+        },
       });
       pcRef.current = pc;
+      let peerWasDisconnected = false;
 
       const handlePeerStateChange = () => {
         if (!pc) return;
         const { connectionState, iceConnectionState } = pc;
 
         if (connectionState === "failed" || iceConnectionState === "failed") {
+          recordResearchEvent?.("connection_failed", {
+            connectionState,
+            iceConnectionState,
+          });
           if (disconnectedTimeoutId !== null) {
             window.clearTimeout(disconnectedTimeoutId);
             disconnectedTimeoutId = null;
@@ -290,6 +307,11 @@ export function useWebRTC(
           iceConnectionState === "disconnected"
         ) {
           if (disconnectedTimeoutId !== null) return;
+          peerWasDisconnected = true;
+          recordResearchEvent?.("connection_disconnected", {
+            connectionState,
+            iceConnectionState,
+          });
           disconnectedTimeoutId = window.setTimeout(() => {
             disconnectedTimeoutId = null;
             failStream(
@@ -302,6 +324,18 @@ export function useWebRTC(
         if (disconnectedTimeoutId !== null) {
           window.clearTimeout(disconnectedTimeoutId);
           disconnectedTimeoutId = null;
+        }
+        if (
+          peerWasDisconnected &&
+          (connectionState === "connected" ||
+            iceConnectionState === "connected" ||
+            iceConnectionState === "completed")
+        ) {
+          peerWasDisconnected = false;
+          recordResearchEvent?.("connection_recovered", {
+            connectionState,
+            iceConnectionState,
+          });
         }
       };
 
@@ -341,6 +375,9 @@ export function useWebRTC(
           return;
         }
 
+        recordResearchEvent?.("answer_received", {
+          peerId,
+        });
         pc
           .setRemoteDescription(new RTCSessionDescription(answer))
           .catch((err) => {
@@ -364,6 +401,10 @@ export function useWebRTC(
 
     socket.on("connect_error", (err) => {
       console.error("[WebRTC] Engine connection failed:", err.message);
+      recordResearchEvent?.("engine_error", {
+        message: err.message,
+        source: "connect_error",
+      });
       if (err.message === "Invalid engine pairing token") {
         clearEngineToken();
         failStream(
@@ -378,6 +419,11 @@ export function useWebRTC(
 
     socket.on("engine-error", (payload: { code?: string; message?: string }) => {
       console.error("[WebRTC] Engine error:", payload?.message);
+      recordResearchEvent?.("engine_error", {
+        code: payload?.code || null,
+        message: payload?.message || null,
+        source: "engine-error",
+      });
       if (payload?.code === "engine_access_revoked") {
         clearEngineToken();
       }
@@ -428,12 +474,25 @@ export function useWebRTC(
             id: activeStreamProfile.id,
           },
         });
+        recordResearchEvent?.("start_game_emitted", {
+          restart: true,
+          streamProfileId: activeStreamProfile.id,
+        });
         startBootReadyTimer();
         return;
       }
 
       try {
+        recordResearchEvent?.("backend_session_requested", {
+          gameId,
+        });
         const bootTarget = await resolveGameBootTarget(gameId, sessionId);
+        recordResearchEvent?.("backend_session_created", {
+          mode: bootTarget.mode,
+          runtimeId:
+            "runtimeId" in bootTarget ? bootTarget.runtimeId || null : null,
+        });
+        recordResearchEvent?.("engine_stop_stale_session_requested");
         await stopActiveEngineSession().catch((err) => {
           console.warn("[WebRTC] Could not pre-stop stale active session:", err);
         });
@@ -447,6 +506,12 @@ export function useWebRTC(
           },
           ...bootTarget,
         });
+        recordResearchEvent?.("start_game_emitted", {
+          mode: bootTarget.mode,
+          runtimeId:
+            "runtimeId" in bootTarget ? bootTarget.runtimeId || null : null,
+          streamProfileId: activeStreamProfile.id,
+        });
         startBootReadyTimer();
       } catch (err) {
         console.error("Failed to boot game:", err);
@@ -456,6 +521,9 @@ export function useWebRTC(
           sessionConflictAutoRetriesRemainingRef.current > 0
         ) {
           sessionConflictAutoRetriesRemainingRef.current -= 1;
+          recordResearchEvent?.("retry_started", {
+            reason: "backend_session_conflict",
+          });
           const identity = createWebRTCRetryIdentity(false);
           peerIdRef.current = identity.peerId;
           if (identity.sessionId) setSessionId(identity.sessionId);
@@ -500,6 +568,7 @@ export function useWebRTC(
     });
 
     socket.on("python-ready", async () => {
+      recordResearchEvent?.("python_ready");
       if (bootReadyTimeoutId !== null) {
         window.clearTimeout(bootReadyTimeoutId);
         bootReadyTimeoutId = null;
@@ -531,6 +600,9 @@ export function useWebRTC(
         offerSent = true;
         try {
           await createAndSendOffer(pc, socket, sessionId, peerId);
+          recordResearchEvent?.("offer_sent", {
+            peerId,
+          });
         } catch (err) {
           offerSent = false;
           console.error("[WebRTC] Failed to create stream offer:", err);
@@ -590,6 +662,7 @@ export function useWebRTC(
     gameId,
     options.displayName,
     options.mode,
+    onResearchEvent,
     options.requestedRole,
     options.sessionId,
     pairingVersion,
@@ -598,6 +671,9 @@ export function useWebRTC(
   ]);
 
   const retry = () => {
+    onResearchEvent?.("retry_started", {
+      reason: "manual_retry",
+    });
     const identity = createWebRTCRetryIdentity(Boolean(options.sessionId));
     peerIdRef.current = identity.peerId;
     if (identity.sessionId) setSessionId(identity.sessionId);
@@ -611,6 +687,10 @@ export function useWebRTC(
 
   const reportBlackFrameStall = useCallback(() => {
     loadEngineLaunchFailureMessage().then((diagnosticMessage) => {
+      onResearchEvent?.("engine_error", {
+        message: diagnosticMessage || BLACK_FRAME_STALL_MESSAGE,
+        source: "black_frame_stall",
+      });
       setTelemetry((currentTelemetry) => ({
         ...currentTelemetry,
         lastEngineError: diagnosticMessage || BLACK_FRAME_STALL_MESSAGE,
@@ -618,7 +698,7 @@ export function useWebRTC(
       }));
       setStatus("error");
     });
-  }, []);
+  }, [onResearchEvent]);
 
   const requestPlayerSlot = (playerIndex: number) => {
     const supportedPlayerCount =

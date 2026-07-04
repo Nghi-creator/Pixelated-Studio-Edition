@@ -1,4 +1,8 @@
-import type { StreamTelemetryGraphSample } from "./streamTelemetryExport";
+import {
+  latestStreamTelemetryGraphSamples,
+  STREAM_TELEMETRY_GRAPH_WINDOW_MS,
+  type StreamTelemetryGraphSample,
+} from "./streamTelemetryExport.ts";
 
 export type StreamTelemetryGraphMetadata = {
   graphWindowSeconds?: number;
@@ -7,6 +11,23 @@ export type StreamTelemetryGraphMetadata = {
   sampleCount: number;
   status: string;
 };
+
+type StreamTelemetryGraphArtifactOptions = {
+  gameTitle: string;
+  graphWindowMs?: number;
+  playerMode: "guest" | "host";
+  status: string;
+};
+
+function dataUrlToBytes(dataUrl: string) {
+  const [, base64 = ""] = dataUrl.split(",");
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
 
 function graphRange(values: number[]) {
   const maximum = Math.max(...values, 1);
@@ -234,4 +255,33 @@ export function renderStreamTelemetryGraphPng(
   }
 
   return canvas.toDataURL("image/png");
+}
+
+export function createStreamTelemetryGraphPngBytes(
+  samples: StreamTelemetryGraphSample[],
+  {
+    gameTitle,
+    graphWindowMs = STREAM_TELEMETRY_GRAPH_WINDOW_MS,
+    playerMode,
+    status,
+  }: StreamTelemetryGraphArtifactOptions,
+) {
+  const graphSamples = latestStreamTelemetryGraphSamples(samples, graphWindowMs);
+  const dataUrl = renderStreamTelemetryGraphPng(graphSamples, {
+    gameTitle,
+    graphWindowSeconds: graphWindowMs / 1000,
+    playerMode,
+    sampleCount: graphSamples.length,
+    status,
+  });
+
+  return dataUrl ? dataUrlToBytes(dataUrl) : null;
+}
+
+export function createStreamTelemetryGraphPngBlob(
+  samples: StreamTelemetryGraphSample[],
+  metadata: StreamTelemetryGraphArtifactOptions,
+) {
+  const bytes = createStreamTelemetryGraphPngBytes(samples, metadata);
+  return bytes ? new Blob([bytes], { type: "image/png" }) : null;
 }

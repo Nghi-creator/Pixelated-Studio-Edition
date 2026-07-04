@@ -2,13 +2,12 @@ import { useState } from "react";
 import { engineAuthHeaders } from "../../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../../lib/engine/engineConfig";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
-import { renderStreamTelemetryGraphPng } from "../streamTelemetryGraphPng";
+import { downloadBlob } from "../downloadFile";
+import { createStreamTelemetryGraphPngBlob } from "../streamTelemetryGraphPng";
 import {
   addPacketLossDeltas,
   createStreamTelemetryGraphFilename,
   createStreamTelemetryCsvFilename,
-  latestStreamTelemetryGraphSamples,
-  STREAM_TELEMETRY_GRAPH_WINDOW_MS,
   streamTelemetrySamplesToCsv,
   type StreamTelemetryCsvSample,
   type StreamTelemetryGraphSample,
@@ -164,12 +163,7 @@ export function useStreamTelemetryExportActions({
         return;
       }
 
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = suggestedName;
-      link.click();
-      URL.revokeObjectURL(url);
+      downloadBlob(suggestedName, blob);
       setCsvState("exported");
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") return;
@@ -194,25 +188,21 @@ export function useStreamTelemetryExportActions({
                 : Math.max(0, sample.packetsLost - history[index - 1].packetsLost),
             packetsLostTotal: sample.packetsLost,
           }));
-    const graphSamples = latestStreamTelemetryGraphSamples(sourceGraphSamples);
-
-    const dataUrl = renderStreamTelemetryGraphPng(graphSamples, {
+    const graphPng = createStreamTelemetryGraphPngBlob(sourceGraphSamples, {
       gameTitle,
-      graphWindowSeconds: STREAM_TELEMETRY_GRAPH_WINDOW_MS / 1000,
       playerMode,
-      sampleCount: graphSamples.length,
       status,
     });
-    if (!dataUrl) {
+    if (!graphPng) {
       setGraphState("failed");
       window.setTimeout(() => setGraphState("idle"), 1600);
       return;
     }
 
-    const link = document.createElement("a");
-    link.href = dataUrl;
-    link.download = createStreamTelemetryGraphFilename({ gameId, sessionId });
-    link.click();
+    downloadBlob(
+      createStreamTelemetryGraphFilename({ gameId, sessionId }),
+      graphPng,
+    );
     setGraphState("exported");
     window.setTimeout(() => setGraphState("idle"), 1600);
   };
