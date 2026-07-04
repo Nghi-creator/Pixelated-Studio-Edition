@@ -5,6 +5,7 @@ import {
   createWebRTCRetryIdentity,
 } from "../../../src/lib/webrtc/webrtcIdentity.ts";
 import { assertEngineRuntimeKindMatches } from "../../../src/lib/webrtc/runtimeKind.ts";
+import { isRetryableBackendSessionConflict } from "../../../src/lib/webrtc/webrtcSessionErrors.ts";
 
 test("WebRTC retry rotates peer identity and local session identity", () => {
   const first = createWebRTCRetryIdentity(false);
@@ -45,4 +46,16 @@ test("engine runtime guard explains native/libretro mismatches before boot", () 
     () => assertEngineRuntimeKindMatches("libretro", "native_linux"),
     /libretro engine/,
   );
+});
+
+test("backend session conflicts are retryable", () => {
+  assert.equal(
+    isRetryableBackendSessionConflict({ status: 409 }),
+    true,
+  );
+  assert.equal(
+    isRetryableBackendSessionConflict({ status: 500 }),
+    false,
+  );
+  assert.equal(isRetryableBackendSessionConflict(new Error("Conflict")), false);
 });
