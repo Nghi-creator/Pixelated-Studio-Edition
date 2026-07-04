@@ -48,15 +48,26 @@ function safeMetadataPart(value: string) {
     .slice(0, 80);
 }
 
+function createResearchRunRandomPart(recordedAt: Date) {
+  const cryptoApi =
+    typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
+
+  if (cryptoApi?.randomUUID) {
+    return cryptoApi.randomUUID().slice(0, 8);
+  }
+
+  if (cryptoApi?.getRandomValues) {
+    return Array.from(
+      cryptoApi.getRandomValues(new Uint8Array(4)),
+      (byte) => byte.toString(16).padStart(2, "0"),
+    ).join("");
+  }
+
+  return recordedAt.getTime().toString(16).slice(-8).padStart(8, "0");
+}
+
 export function createResearchRunId(recordedAt = new Date()) {
-  const randomPart =
-    typeof crypto !== "undefined" && "randomUUID" in crypto
-      ? crypto.randomUUID().slice(0, 8)
-      : typeof crypto !== "undefined" && "getRandomValues" in crypto
-        ? Array.from(crypto.getRandomValues(new Uint8Array(4)))
-            .map((byte) => byte.toString(16).padStart(2, "0"))
-            .join("")
-        : recordedAt.getTime().toString(16).slice(-8).padStart(8, "0");
+  const randomPart = createResearchRunRandomPart(recordedAt);
   const timestamp = recordedAt.toISOString().replace(/[:.]/g, "-");
 
   return `edge-run-${timestamp}-${randomPart}`;
