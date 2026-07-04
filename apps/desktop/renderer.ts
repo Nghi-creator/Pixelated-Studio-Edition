@@ -562,6 +562,52 @@ pixelatedWindow.PixelatedModal.bindDocsModal({
 
 type StatusTone = "offline" | "ready" | "running";
 
+function compactFailedStatus(state: EngineStatePayload) {
+  const detail = (state.detail || "").toLowerCase();
+
+  if (detail.includes("no such container")) return "Container Not Found";
+  if (
+    detail.includes("port is already allocated") ||
+    detail.includes("bind for 0.0.0.0:8080 failed") ||
+    detail.includes("bind for 127.0.0.1:8080 failed")
+  ) {
+    return "Port 8080 Busy";
+  }
+  if (state.phase === "docker") return "Docker Unavailable";
+  if (state.phase === "image") return "Image Not Ready";
+  if (state.phase === "cleanup") return "Cleanup Failed";
+  if (state.phase === "container") return "Container Failed";
+  if (state.phase === "health") return "Health Check Failed";
+  return "Engine Failed";
+}
+
+function compactStartingStatus(state: EngineStatePayload) {
+  const labels: Record<string, string> = {
+    BUILDING_IMAGE: "Building Image",
+    CHECKING_DOCKER: "Checking Docker",
+    PULLING_IMAGE: "Pulling Image",
+    REMOVING_STALE: "Cleaning Container",
+    STARTING_CONTAINER: "Starting Container",
+    WAITING_HEALTH: "Checking Health",
+  };
+
+  if (state.key && labels[state.key]) return labels[state.key];
+  if (state.phase === "docker") return "Checking Docker";
+  if (state.phase === "image") return "Preparing Image";
+  if (state.phase === "cleanup") return "Cleaning Container";
+  if (state.phase === "container") return "Starting Container";
+  if (state.phase === "health") return "Checking Health";
+  return "Starting Engine";
+}
+
+function getCompactLifecycleStatus(state: EngineStatePayload) {
+  if (state.status === "failed") return compactFailedStatus(state);
+  if (state.status === "starting") return compactStartingStatus(state);
+  if (state.status === "stopping") return "Stopping Engine";
+  if (state.status === "ready") return "Engine Ready";
+  return "Engine Offline";
+}
+
 function setStatusPresentation(text: string, tone: StatusTone) {
   const toneClasses = {
     offline: {
@@ -680,9 +726,7 @@ function resetFailedUi() {
 }
 
 function setLifecycleState(state: EngineStatePayload) {
-  const detail = state.detail ? ` - ${state.detail}` : "";
-  const label = state.label || "Engine";
-  const statusLabel = `${label}${detail}`;
+  const statusLabel = getCompactLifecycleStatus(state);
   phases.render(state);
 
   if (state.status === "ready") {

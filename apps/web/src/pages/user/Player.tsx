@@ -22,6 +22,7 @@ import { usePlayerStreamSettings } from "../../features/player/hooks/usePlayerSt
 import { useGameReactions } from "../../features/player/hooks/useGameReactions";
 import { usePlayCount } from "../../features/player/hooks/usePlayCount";
 import { useStreamPlayback } from "../../features/player/hooks/useStreamPlayback";
+import { useStreamTelemetryRecording } from "../../features/player/hooks/useStreamTelemetryRecording";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
 import { shouldIgnoreGameInput } from "../../lib/webrtc/webrtcInput";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
@@ -69,6 +70,20 @@ export default function Player() {
     mode: playerMode,
     requestedRole: playerMode === "host" ? "host" : invitedRole,
     sessionId: invitedSessionId,
+  });
+  const {
+    clearTelemetryCsv,
+    csvStatusText,
+    csvStatusTitle,
+    isRecordingCsv,
+    recordedCsvSamples,
+    toggleCsvRecording,
+  } = useStreamTelemetryRecording({
+    gameId: id,
+    playerMode,
+    sessionId,
+    status,
+    telemetry,
   });
   const { authorName, gameRights, gameTitle } = useGameMetadata(id);
   const {
@@ -162,7 +177,7 @@ export default function Player() {
       />
 
       <div
-        className={`grid w-full gap-4 transition-[max-width,grid-template-columns] duration-300 ${
+        className={`grid w-full items-start gap-4 transition-[max-width,grid-template-columns] duration-300 ${
           showStreamTelemetry
             ? `${playerLayoutClassName} xl:grid-cols-[minmax(0,1fr)_18rem]`
             : playerLayoutClassName
@@ -195,8 +210,14 @@ export default function Player() {
         {showStreamTelemetry && (
           <StreamTelemetryPanel
             gameId={id}
+            gameTitle={gameTitle}
+            isRecordingCsv={isRecordingCsv}
+            onClearTelemetryCsv={clearTelemetryCsv}
             onClose={() => setShowStreamTelemetry(false)}
+            onResetTelemetryData={clearTelemetryCsv}
+            onToggleCsvRecording={toggleCsvRecording}
             playerMode={playerMode}
+            recordedCsvSamples={recordedCsvSamples}
             sessionId={sessionId}
             shareUrl={shareInvite.url}
             status={status}
@@ -205,7 +226,9 @@ export default function Player() {
         )}
       </div>
 
-      <div className={`mt-3 flex w-full ${playerLayoutClassName}`}>
+      <div
+        className={`mt-3 flex w-full flex-wrap items-center justify-between gap-2 ${playerLayoutClassName}`}
+      >
         {authorName ? (
           <p className="text-sm font-medium text-synth-primary">
             Developed by: {authorName}
@@ -213,9 +236,20 @@ export default function Player() {
         ) : (
           <span />
         )}
+        {(isRecordingCsv || recordedCsvSamples.length > 0) && (
+          <button
+            className="rounded-full border border-synth-border bg-synth-surface px-3 py-1 text-xs font-semibold text-synth-secondary transition hover:bg-synth-elevated hover:text-white"
+            onClick={() => setShowStreamTelemetry(true)}
+            title={csvStatusTitle}
+            type="button"
+          >
+            {csvStatusText}
+          </button>
+        )}
       </div>
 
       <PlayerInstructions
+        layoutClassName={playerLayoutClassName}
         lobby={
           <LobbyPanel
             currentParticipant={localParticipant}
@@ -239,6 +273,7 @@ export default function Player() {
         isLoadingComments={isLoadingComments}
         isLoadingMoreComments={isLoadingMoreComments}
         isSubmittingComment={isSubmittingComment}
+        layoutClassName={playerLayoutClassName}
         newComment={newComment}
         onCommentReaction={handleCommentReaction}
         onDeleteComment={handleDeleteComment}

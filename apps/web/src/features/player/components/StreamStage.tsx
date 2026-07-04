@@ -22,6 +22,7 @@ export function StreamStage({
   fallbackActive = false,
   isMuted,
   onRetry,
+  showStreamTelemetry,
   status,
   telemetry,
   videoRef,
@@ -32,7 +33,11 @@ export function StreamStage({
   return (
     <div className="relative w-full">
       {controls}
-      <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-b-lg border border-synth-border bg-black shadow-card">
+      <div
+        className={`relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-b-lg border border-synth-border bg-black shadow-card ${
+          showStreamTelemetry ? "xl:aspect-[16/9.5]" : ""
+        }`}
+      >
         {status === "connecting" && (
           <div className="absolute inset-px z-10 flex items-center justify-center rounded-b-[0.45rem] bg-black">
             <LoaderCircle
