@@ -4,11 +4,12 @@ import { useResearchRunExports } from "../hooks/useResearchRunExports";
 import type { ResearchBaselineForm } from "../researchBaseline";
 import type { ResearchRunEvent } from "../researchRunEvents";
 import {
-  RESEARCH_RUN_SCHEMA_VERSION,
   type ResearchRunMetadataForm,
   type ResearchRunScenario,
 } from "../researchRunMetadata";
 import type { StreamTelemetryCsvSample } from "../streamTelemetryExport";
+import { ResearchBaselineFields } from "./ResearchBaselineFields";
+import { ResearchRunPreview } from "./ResearchRunPreview";
 
 const SCENARIO_OPTIONS: Array<{
   label: string;
@@ -60,12 +61,6 @@ export function ResearchRunModal({
     value: ResearchRunMetadataForm[Key],
   ) => {
     onFormChange({ ...form, [key]: value });
-  };
-  const setBaselineField = <Key extends keyof ResearchBaselineForm>(
-    key: Key,
-    value: ResearchBaselineForm[Key],
-  ) => {
-    onBaselineFormChange({ ...baselineForm, [key]: value });
   };
   const {
     canExportBundle,
@@ -186,167 +181,23 @@ export function ResearchRunModal({
         </div>
 
         {isBrowserBaseline && (
-          <div className="mt-4 grid gap-3 rounded-md border border-synth-border bg-synth-bg/70 p-3 sm:grid-cols-2">
-            <label className="block text-xs font-semibold uppercase text-gray-500">
-              Emulator
-              <input
-                className="mt-1 h-9 w-full rounded-md border border-synth-border bg-synth-bg px-2 text-sm font-semibold normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
-                onChange={(event) =>
-                  setBaselineField("emulatorId", event.target.value)
-                }
-                placeholder="WASM emulator/runtime"
-                value={baselineForm.emulatorId}
-              />
-            </label>
-            <label className="block text-xs font-semibold uppercase text-gray-500">
-              Startup ms
-              <input
-                className="mt-1 h-9 w-full rounded-md border border-synth-border bg-synth-bg px-2 text-sm font-semibold normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
-                inputMode="decimal"
-                onChange={(event) =>
-                  setBaselineField("startupMs", event.target.value)
-                }
-                placeholder="Manual or measured"
-                value={baselineForm.startupMs}
-              />
-            </label>
-            <label className="block text-xs font-semibold uppercase text-gray-500">
-              FPS
-              <input
-                className="mt-1 h-9 w-full rounded-md border border-synth-border bg-synth-bg px-2 text-sm font-semibold normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
-                inputMode="decimal"
-                onChange={(event) => setBaselineField("fps", event.target.value)}
-                placeholder="If available"
-                value={baselineForm.fps}
-              />
-            </label>
-            <label className="block text-xs font-semibold uppercase text-gray-500">
-              Memory MB
-              <input
-                className="mt-1 h-9 w-full rounded-md border border-synth-border bg-synth-bg px-2 text-sm font-semibold normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
-                inputMode="decimal"
-                onChange={(event) =>
-                  setBaselineField("browserMemoryMb", event.target.value)
-                }
-                placeholder="Manual if needed"
-                value={baselineForm.browserMemoryMb}
-              />
-            </label>
-            <label className="block text-xs font-semibold uppercase text-gray-500 sm:col-span-2">
-              Device notes
-              <textarea
-                className="mt-1 min-h-16 w-full resize-y rounded-md border border-synth-border bg-synth-bg px-3 py-2 text-sm font-medium normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
-                onChange={(event) =>
-                  setBaselineField("deviceNotes", event.target.value)
-                }
-                placeholder="Browser-only test device and setup"
-                value={baselineForm.deviceNotes}
-              />
-            </label>
-            <label className="block text-xs font-semibold uppercase text-gray-500 sm:col-span-2">
-              CPU notes
-              <textarea
-                className="mt-1 min-h-16 w-full resize-y rounded-md border border-synth-border bg-synth-bg px-3 py-2 text-sm font-medium normal-case text-white outline-none transition placeholder:text-gray-600 focus:border-synth-primary"
-                onChange={(event) =>
-                  setBaselineField("cpuNotes", event.target.value)
-                }
-                placeholder="Manual CPU/RAM observations"
-                value={baselineForm.cpuNotes}
-              />
-            </label>
-          </div>
+          <ResearchBaselineFields
+            form={baselineForm}
+            onChange={onBaselineFormChange}
+          />
         )}
 
-        <div className="mt-4 grid grid-cols-2 gap-2 rounded-md border border-synth-border bg-synth-bg/80 p-3 text-xs">
-          <div>
-            <div className="font-semibold uppercase text-gray-500">Schema</div>
-            <div className="mt-1 font-bold text-white">
-              {RESEARCH_RUN_SCHEMA_VERSION}
-            </div>
-          </div>
-          <div>
-            <div className="font-semibold uppercase text-gray-500">Mode</div>
-            <div className="mt-1 font-bold capitalize text-white">
-              {playerMode}
-            </div>
-          </div>
-          <div>
-            <div className="font-semibold uppercase text-gray-500">Session</div>
-            <div className="mt-1 truncate font-bold text-white">
-              {sessionId}
-            </div>
-          </div>
-          <div>
-            <div className="font-semibold uppercase text-gray-500">Profile</div>
-            <div className="mt-1 truncate font-bold text-white">
-              {streamProfile.id}
-            </div>
-          </div>
-          <div>
-            <div className="font-semibold uppercase text-gray-500">Events</div>
-            <div className="mt-1 font-bold text-white">{events.length}</div>
-          </div>
-          <div>
-            <div className="font-semibold uppercase text-gray-500">Samples</div>
-            <div className="mt-1 font-bold text-white">
-              {recordedCsvSamples.length}
-            </div>
-          </div>
-          <div>
-            <div className="font-semibold uppercase text-gray-500">
-              First frame
-            </div>
-            <div className="mt-1 font-bold text-white">
-              {firstFrameElapsedMs === null ? "--" : `${firstFrameElapsedMs} ms`}
-            </div>
-          </div>
-          <div>
-            <div className="font-semibold uppercase text-gray-500">
-              Start game
-            </div>
-            <div className="mt-1 font-bold text-white">
-              {startGameElapsedMs === null ? "--" : `${startGameElapsedMs} ms`}
-            </div>
-          </div>
-          <div>
-            <div className="font-semibold uppercase text-gray-500">
-              Python ready
-            </div>
-            <div className="mt-1 font-bold text-white">
-              {pythonReadyElapsedMs === null ? "--" : `${pythonReadyElapsedMs} ms`}
-            </div>
-          </div>
-          <div>
-            <div className="font-semibold uppercase text-gray-500">
-              Median FPS
-            </div>
-            <div className="mt-1 font-bold text-white">
-              {summary.metrics.fps.median === null
-                ? "--"
-                : summary.metrics.fps.median}
-            </div>
-          </div>
-          <div>
-            <div className="font-semibold uppercase text-gray-500">
-              P95 jitter
-            </div>
-            <div className="mt-1 font-bold text-white">
-              {summary.metrics.jitterMs.p95 === null
-                ? "--"
-                : `${summary.metrics.jitterMs.p95} ms`}
-            </div>
-          </div>
-          <div>
-            <div className="font-semibold uppercase text-gray-500">
-              Loss/min
-            </div>
-            <div className="mt-1 font-bold text-white">
-              {summary.packetLoss.lossPerMinute === null
-                ? "--"
-                : summary.packetLoss.lossPerMinute}
-            </div>
-          </div>
-        </div>
+        <ResearchRunPreview
+          eventCount={events.length}
+          firstFrameElapsedMs={firstFrameElapsedMs}
+          playerMode={playerMode}
+          pythonReadyElapsedMs={pythonReadyElapsedMs}
+          recordedSampleCount={recordedCsvSamples.length}
+          sessionId={sessionId}
+          startGameElapsedMs={startGameElapsedMs}
+          streamProfileId={streamProfile.id}
+          summary={summary}
+        />
 
         <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button
