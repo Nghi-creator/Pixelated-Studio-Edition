@@ -123,32 +123,10 @@
     </style>
   </head>
   <body
-    class="bg-synth-bg text-gray-300 font-sans min-h-screen p-6 pt-20 relative overflow-y-auto"
+    class="bg-synth-bg text-gray-300 font-sans min-h-screen p-6 relative overflow-y-auto"
   >
-    <button
-      id="open-docs"
-      class="absolute top-6 right-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors bg-synth-surface border border-synth-border px-4 py-2 rounded-full font-medium text-sm z-10"
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="16"
-        height="16"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <circle cx="12" cy="12" r="10"></circle>
-        <path d="M12 16v-4"></path>
-        <path d="M12 8h.01"></path>
-      </svg>
-      Architecture & Docs
-    </button>
-
     <main class="mx-auto w-full max-w-[1600px]">
-      <header class="mb-6 flex flex-wrap items-end justify-between gap-5">
+      <header class="mb-6 flex flex-wrap items-center justify-between gap-5">
         <div>
           <h1
             class="text-4xl font-extrabold tracking-tight text-white"
@@ -156,6 +134,28 @@
             PIXELATED <span class="text-synth-secondary">Studio</span>
           </h1>
         </div>
+        <button
+          id="open-docs"
+          class="flex shrink-0 items-center gap-2 rounded-full border border-synth-border bg-synth-surface px-4 py-2 text-sm font-medium text-gray-400 transition-colors hover:text-white"
+          type="button"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4"></path>
+            <path d="M12 8h.01"></path>
+          </svg>
+          Architecture & Docs
+        </button>
       </header>
 
       <section class="mb-5 rounded-lg border border-synth-border bg-synth-surface/95 p-4 shadow-2xl">
@@ -230,7 +230,7 @@
           </button>
 
           <div
-            class="status-badge ml-auto flex min-w-0 max-w-full items-center gap-2 rounded-full border border-red-500/70 bg-red-500/20 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-200 sm:max-w-md"
+            class="status-badge ml-auto flex min-w-0 max-w-[15rem] items-center gap-2 rounded-full border border-red-500/70 bg-red-500/20 px-3 py-2 text-xs font-bold uppercase tracking-wide text-red-200"
             title="Engine Offline"
           >
             <span
