@@ -9,6 +9,7 @@ import {
 export function useStreamPlayback({
   isMuted,
   onBlackFrameStall,
+  onFirstVisibleFrame,
   setIsMuted,
   status,
   stream,
@@ -16,6 +17,7 @@ export function useStreamPlayback({
 }: {
   isMuted: boolean;
   onBlackFrameStall?: () => void;
+  onFirstVisibleFrame?: () => void;
   setIsMuted: (isMuted: boolean) => void;
   status: WebRTCStatus;
   stream: MediaStream | null;
@@ -49,12 +51,17 @@ export function useStreamPlayback({
     }
 
     const tracker = createStreamPlaybackSampleTracker();
+    let firstVisibleFrameReported = false;
     const canvas = document.createElement("canvas");
     canvas.width = 16;
     canvas.height = 16;
     const context = canvas.getContext("2d", { willReadFrequently: true });
 
     const recordSample = (isBlackSample: boolean) => {
+      if (!isBlackSample && !firstVisibleFrameReported) {
+        firstVisibleFrameReported = true;
+        onFirstVisibleFrame?.();
+      }
       const result = tracker.recordSample(isBlackSample);
       setSampledFallbackActive(result.fallbackActive);
       if (result.shouldReportStall) {
@@ -95,7 +102,7 @@ export function useStreamPlayback({
     return () => {
       window.clearInterval(interval);
     };
-  }, [onBlackFrameStall, status, videoRef]);
+  }, [onBlackFrameStall, onFirstVisibleFrame, status, videoRef]);
 
   return status === "playing" && sampledFallbackActive;
 }

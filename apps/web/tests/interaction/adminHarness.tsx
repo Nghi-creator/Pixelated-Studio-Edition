@@ -326,6 +326,7 @@ export function AdminHarness() {
             onResearchMetadataFormChange={() => record("research-form-change")}
             onToggleCsvRecording={() => record("telemetry-csv-toggle")}
             playerMode="host"
+            researchEvents={[]}
             researchMetadataForm={{
               coldStart: false,
               networkType: "",

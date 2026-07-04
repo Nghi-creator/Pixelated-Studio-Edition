@@ -1,6 +1,12 @@
 import { Download, X } from "lucide-react";
 import type { StreamProfile } from "../../../lib/engine/streamProfiles";
 import {
+  createResearchRunEventsFilename,
+  findFirstEventElapsedMs,
+  researchRunEventsToCsv,
+  type ResearchRunEvent,
+} from "../researchRunEvents";
+import {
   createResearchRunMetadata,
   createResearchRunMetadataFilename,
   RESEARCH_RUN_SCHEMA_VERSION,
@@ -21,8 +27,8 @@ const SCENARIO_OPTIONS: Array<{
 
 const NETWORK_OPTIONS = ["", "Ethernet", "Wi-Fi", "Mobile hotspot", "Custom"];
 
-function downloadJson(filename: string, json: string) {
-  const blob = new Blob([json], { type: "application/json;charset=utf-8" });
+function downloadText(filename: string, text: string, type: string) {
+  const blob = new Blob([text], { type });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
@@ -32,6 +38,7 @@ function downloadJson(filename: string, json: string) {
 }
 
 export function ResearchRunModal({
+  events,
   form,
   gameId,
   gameTitle,
@@ -44,6 +51,7 @@ export function ResearchRunModal({
   status,
   streamProfile,
 }: {
+  events: ResearchRunEvent[];
   form: ResearchRunMetadataForm;
   gameId: string | undefined;
   gameTitle: string;
@@ -79,11 +87,28 @@ export function ResearchRunModal({
       userAgent: navigator.userAgent,
     });
 
-    downloadJson(
+    downloadText(
       createResearchRunMetadataFilename({ gameId, recordedAt: capturedAt, runId }),
       researchRunMetadataToJson(metadata),
+      "application/json;charset=utf-8",
     );
   };
+
+  const exportEvents = () => {
+    const capturedAt = new Date();
+    downloadText(
+      createResearchRunEventsFilename({ gameId, recordedAt: capturedAt, runId }),
+      researchRunEventsToCsv(events),
+      "text/csv;charset=utf-8",
+    );
+  };
+
+  const firstFrameElapsedMs = findFirstEventElapsedMs(
+    events,
+    "first_non_black_frame",
+  );
+  const pythonReadyElapsedMs = findFirstEventElapsedMs(events, "python_ready");
+  const startGameElapsedMs = findFirstEventElapsedMs(events, "start_game_emitted");
 
   return (
     <div
@@ -199,15 +224,52 @@ export function ResearchRunModal({
               {streamProfile.id}
             </div>
           </div>
+          <div>
+            <div className="font-semibold uppercase text-gray-500">Events</div>
+            <div className="mt-1 font-bold text-white">{events.length}</div>
+          </div>
+          <div>
+            <div className="font-semibold uppercase text-gray-500">
+              First frame
+            </div>
+            <div className="mt-1 font-bold text-white">
+              {firstFrameElapsedMs === null ? "--" : `${firstFrameElapsedMs} ms`}
+            </div>
+          </div>
+          <div>
+            <div className="font-semibold uppercase text-gray-500">
+              Start game
+            </div>
+            <div className="mt-1 font-bold text-white">
+              {startGameElapsedMs === null ? "--" : `${startGameElapsedMs} ms`}
+            </div>
+          </div>
+          <div>
+            <div className="font-semibold uppercase text-gray-500">
+              Python ready
+            </div>
+            <div className="mt-1 font-bold text-white">
+              {pythonReadyElapsedMs === null ? "--" : `${pythonReadyElapsedMs} ms`}
+            </div>
+          </div>
         </div>
 
-        <div className="mt-4 flex justify-end gap-2">
+        <div className="mt-4 flex flex-wrap justify-end gap-2">
           <button
             className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-synth-border bg-synth-bg px-3 text-sm font-semibold text-gray-300 transition hover:bg-synth-elevated hover:text-white"
             onClick={onClose}
             type="button"
           >
             Close
+          </button>
+          <button
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-synth-border bg-synth-bg px-3 text-sm font-semibold text-gray-300 transition hover:bg-synth-elevated hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={events.length === 0}
+            onClick={exportEvents}
+            type="button"
+          >
+            <Download className="h-4 w-4" />
+            Events CSV
           </button>
           <button
             className="inline-flex h-9 items-center justify-center gap-2 rounded-md border border-synth-primary/70 bg-synth-primary px-3 text-sm font-bold text-white transition hover:border-synth-primary hover:bg-synth-primary/80"

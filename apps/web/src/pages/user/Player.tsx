@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CommentsPanel } from "../../features/player/comments/components/CommentsPanel";
 import { LobbyPanel } from "../../features/player/components/LobbyPanel";
@@ -22,6 +22,7 @@ import { usePlayerStreamSettings } from "../../features/player/hooks/usePlayerSt
 import { useGameReactions } from "../../features/player/hooks/useGameReactions";
 import { usePlayCount } from "../../features/player/hooks/usePlayCount";
 import { useStreamPlayback } from "../../features/player/hooks/useStreamPlayback";
+import { useResearchRunEvents } from "../../features/player/hooks/useResearchRunEvents";
 import { useStreamTelemetryRecording } from "../../features/player/hooks/useStreamTelemetryRecording";
 import {
   createResearchRunId,
@@ -37,6 +38,7 @@ export default function Player() {
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [researchRunId] = useState(() => createResearchRunId());
+  const researchSessionIdRef = useRef("");
   const [researchMetadataForm, setResearchMetadataForm] =
     useState<ResearchRunMetadataForm>({
       coldStart: false,
@@ -44,6 +46,14 @@ export default function Player() {
       notes: "",
       scenario: "localhost",
     });
+  const {
+    clearEvents: clearResearchEvents,
+    events: researchEvents,
+    recordEvent: recordResearchEvent,
+  } = useResearchRunEvents({
+    runId: researchRunId,
+    sessionIdRef: researchSessionIdRef,
+  });
   const currentUser = useAuthUser();
   const { backRoute, backText, lobbySearch } = usePlayerNavigation(
     location,
@@ -80,6 +90,7 @@ export default function Player() {
   } = useWebRTC(id || "", streamProfile, {
     displayName,
     mode: playerMode,
+    onResearchEvent: recordResearchEvent,
     requestedRole: playerMode === "host" ? "host" : invitedRole,
     sessionId: invitedSessionId,
   });
@@ -136,14 +147,35 @@ export default function Player() {
   } = useCommentReporting(currentUser);
 
   usePlayCount(id);
+  const handleFirstVisibleFrame = useCallback(() => {
+    recordResearchEvent("first_non_black_frame");
+  }, [recordResearchEvent]);
   const fallbackActive = useStreamPlayback({
     isMuted,
     onBlackFrameStall: reportBlackFrameStall,
+    onFirstVisibleFrame: handleFirstVisibleFrame,
     setIsMuted,
     status,
     stream,
     videoRef,
   });
+
+  useEffect(() => {
+    researchSessionIdRef.current = sessionId;
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (!id) return;
+    recordResearchEvent("play_clicked", {
+      gameId: id,
+      playerMode,
+    });
+  }, [id, playerMode, recordResearchEvent]);
+
+  const resetTelemetryData = () => {
+    clearTelemetryCsv();
+    clearResearchEvents();
+  };
 
   useEffect(() => {
     const gameKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "];
@@ -227,9 +259,10 @@ export default function Player() {
             onClearTelemetryCsv={clearTelemetryCsv}
             onClose={() => setShowStreamTelemetry(false)}
             onResearchMetadataFormChange={setResearchMetadataForm}
-            onResetTelemetryData={clearTelemetryCsv}
+            onResetTelemetryData={resetTelemetryData}
             onToggleCsvRecording={toggleCsvRecording}
             playerMode={playerMode}
+            researchEvents={researchEvents}
             researchMetadataForm={researchMetadataForm}
             researchRunId={researchRunId}
             recordedCsvSamples={recordedCsvSamples}

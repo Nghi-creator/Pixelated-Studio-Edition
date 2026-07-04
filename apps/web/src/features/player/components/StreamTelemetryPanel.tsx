@@ -4,6 +4,7 @@ import type { StreamProfile } from "../../../lib/engine/streamProfiles";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
 import { useStreamTelemetryExportActions } from "../hooks/useStreamTelemetryExportActions";
 import { useStreamTelemetryHistory } from "../hooks/useStreamTelemetryHistory";
+import type { ResearchRunEvent } from "../researchRunEvents";
 import type { ResearchRunMetadataForm } from "../researchRunMetadata";
 import type { StreamTelemetryCsvSample } from "../streamTelemetryExport";
 import { ResearchRunModal } from "./ResearchRunModal";
@@ -16,6 +17,7 @@ type StreamTelemetryPanelProps = {
   gameTitle: string;
   isRecordingCsv: boolean;
   playerMode: "guest" | "host";
+  researchEvents: ResearchRunEvent[];
   researchMetadataForm: ResearchRunMetadataForm;
   researchRunId: string;
   recordedCsvSamples: StreamTelemetryCsvSample[];
@@ -41,6 +43,7 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
     onResearchMetadataFormChange,
     onResetTelemetryData,
     onToggleCsvRecording,
+    researchEvents,
     researchMetadataForm,
     researchRunId,
     recordedCsvSamples,
@@ -156,6 +159,7 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
 
       {isResearchModalOpen && (
         <ResearchRunModal
+          events={researchEvents}
           form={researchMetadataForm}
           gameId={gameId}
           gameTitle={gameTitle}
