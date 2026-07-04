@@ -32,26 +32,30 @@ export function useStreamTelemetryRecording({
     if (!isRecordingCsv || recordingStartedAt === null) return;
     if (telemetry.lastUpdatedAt === null) return;
 
-    setRecordedCsvSamples((samples) => [
-      ...samples,
-      createTelemetryCsvSample({
-        gameId,
-        playerMode,
-        recordingStartedAt,
-        sessionId,
-        status,
-        telemetry: {
-          bitrateKbps: telemetry.bitrateKbps,
-          connectionState: telemetry.connectionState,
-          fps: telemetry.fps,
-          iceConnectionState: telemetry.iceConnectionState,
-          jitterMs: telemetry.jitterMs,
-          lastEngineError: telemetry.lastEngineError,
-          lastUpdatedAt: telemetry.lastUpdatedAt,
-          packetsLost: telemetry.packetsLost,
-        },
-      }),
-    ]);
+    const sampleTimer = window.setTimeout(() => {
+      setRecordedCsvSamples((samples) => [
+        ...samples,
+        createTelemetryCsvSample({
+          gameId,
+          playerMode,
+          recordingStartedAt,
+          sessionId,
+          status,
+          telemetry: {
+            bitrateKbps: telemetry.bitrateKbps,
+            connectionState: telemetry.connectionState,
+            fps: telemetry.fps,
+            iceConnectionState: telemetry.iceConnectionState,
+            jitterMs: telemetry.jitterMs,
+            lastEngineError: telemetry.lastEngineError,
+            lastUpdatedAt: telemetry.lastUpdatedAt,
+            packetsLost: telemetry.packetsLost,
+          },
+        }),
+      ]);
+    }, 0);
+
+    return () => window.clearTimeout(sampleTimer);
   }, [
     telemetry.bitrateKbps,
     telemetry.connectionState,
