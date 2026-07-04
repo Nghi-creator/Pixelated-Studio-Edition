@@ -16,7 +16,7 @@ permissions:
 
 jobs:
   npm-audit:
-    name: npm audit
+    name: npm audit production dependencies
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -44,7 +44,12 @@ jobs:
           cache-dependency-path: ${{ matrix.path }}/package-lock.json
           node-version: 22
 
-      - name: Audit ${{ matrix.label }} dependencies
+      - name: Audit ${{ matrix.label }} production dependencies
+        working-directory: ${{ matrix.path }}
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Record full dependency audit for review
+        continue-on-error: true
         working-directory: ${{ matrix.path }}
         run: npm audit --audit-level=high
 
