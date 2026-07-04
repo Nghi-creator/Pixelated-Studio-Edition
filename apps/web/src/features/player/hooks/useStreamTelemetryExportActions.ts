@@ -2,13 +2,11 @@ import { useState } from "react";
 import { engineAuthHeaders } from "../../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../../lib/engine/engineConfig";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
-import { renderStreamTelemetryGraphPng } from "../streamTelemetryGraphPng";
+import { createStreamTelemetryGraphPngBlob } from "../streamTelemetryGraphPng";
 import {
   addPacketLossDeltas,
   createStreamTelemetryGraphFilename,
   createStreamTelemetryCsvFilename,
-  latestStreamTelemetryGraphSamples,
-  STREAM_TELEMETRY_GRAPH_WINDOW_MS,
   streamTelemetrySamplesToCsv,
   type StreamTelemetryCsvSample,
   type StreamTelemetryGraphSample,
@@ -46,18 +44,6 @@ function downloadBlob(filename: string, blob: Blob) {
     link.remove();
     URL.revokeObjectURL(url);
   }, 0);
-}
-
-function dataUrlToBlob(dataUrl: string) {
-  const [metadata = "", base64 = ""] = dataUrl.split(",");
-  const mimeType =
-    metadata.match(/^data:([^;]+);base64$/)?.[1] || "application/octet-stream";
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return new Blob([bytes], { type: mimeType });
 }
 
 function buildTelemetrySnapshot({
@@ -216,16 +202,12 @@ export function useStreamTelemetryExportActions({
                 : Math.max(0, sample.packetsLost - history[index - 1].packetsLost),
             packetsLostTotal: sample.packetsLost,
           }));
-    const graphSamples = latestStreamTelemetryGraphSamples(sourceGraphSamples);
-
-    const dataUrl = renderStreamTelemetryGraphPng(graphSamples, {
+    const graphPng = createStreamTelemetryGraphPngBlob(sourceGraphSamples, {
       gameTitle,
-      graphWindowSeconds: STREAM_TELEMETRY_GRAPH_WINDOW_MS / 1000,
       playerMode,
-      sampleCount: graphSamples.length,
       status,
     });
-    if (!dataUrl) {
+    if (!graphPng) {
       setGraphState("failed");
       window.setTimeout(() => setGraphState("idle"), 1600);
       return;
@@ -233,7 +215,7 @@ export function useStreamTelemetryExportActions({
 
     downloadBlob(
       createStreamTelemetryGraphFilename({ gameId, sessionId }),
-      dataUrlToBlob(dataUrl),
+      graphPng,
     );
     setGraphState("exported");
     window.setTimeout(() => setGraphState("idle"), 1600);

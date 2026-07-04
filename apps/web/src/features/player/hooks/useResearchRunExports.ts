@@ -28,11 +28,9 @@ import {
   createResearchRunSummaryFilename,
   researchRunSummaryToJson,
 } from "../researchRunSummary";
-import { renderStreamTelemetryGraphPng } from "../streamTelemetryGraphPng";
+import { createStreamTelemetryGraphPngBytes } from "../streamTelemetryGraphPng";
 import {
   addPacketLossDeltas,
-  latestStreamTelemetryGraphSamples,
-  STREAM_TELEMETRY_GRAPH_WINDOW_MS,
   streamTelemetrySamplesToCsv,
   type StreamTelemetryCsvSample,
 } from "../streamTelemetryExport";
@@ -54,16 +52,6 @@ function downloadBlob(filename: string, blob: Blob) {
 
 function downloadText(filename: string, text: string, type: string) {
   downloadBlob(filename, new Blob([text], { type }));
-}
-
-function dataUrlToBytes(dataUrl: string) {
-  const [, base64 = ""] = dataUrl.split(",");
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let index = 0; index < binary.length; index += 1) {
-    bytes[index] = binary.charCodeAt(index);
-  }
-  return bytes;
 }
 
 export function useResearchRunExports({
@@ -152,18 +140,11 @@ export function useResearchRunExports({
   );
 
   const buildGraphPng = useCallback(() => {
-    const graphSamples = latestStreamTelemetryGraphSamples(
-      addPacketLossDeltas(recordedCsvSamples),
-    );
-    const dataUrl = renderStreamTelemetryGraphPng(graphSamples, {
+    return createStreamTelemetryGraphPngBytes(addPacketLossDeltas(recordedCsvSamples), {
       gameTitle,
-      graphWindowSeconds: STREAM_TELEMETRY_GRAPH_WINDOW_MS / 1000,
       playerMode,
-      sampleCount: graphSamples.length,
       status,
     });
-
-    return dataUrl ? dataUrlToBytes(dataUrl) : null;
   }, [gameTitle, playerMode, recordedCsvSamples, status]);
 
   const summary = useMemo(() => createSummary(), [createSummary]);
