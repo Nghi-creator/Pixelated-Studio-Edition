@@ -151,9 +151,17 @@ export function PlayerControls({
   );
 }
 
-export function PlayerInstructions({ lobby }: { lobby?: ReactNode }) {
+export function PlayerInstructions({
+  layoutClassName = "max-w-5xl",
+  lobby,
+}: {
+  layoutClassName?: string;
+  lobby?: ReactNode;
+}) {
   return (
-    <div className="mt-6 w-full max-w-5xl rounded-lg border border-synth-border bg-synth-surface p-4">
+    <div
+      className={`mt-6 w-full rounded-lg border border-synth-border bg-synth-surface p-4 ${layoutClassName}`}
+    >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-synth-secondary">
           <span className="inline-flex items-center gap-2">

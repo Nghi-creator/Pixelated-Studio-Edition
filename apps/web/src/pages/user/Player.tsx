@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CommentsPanel } from "../../features/player/comments/components/CommentsPanel";
 import { LobbyPanel } from "../../features/player/components/LobbyPanel";
@@ -22,9 +22,15 @@ import { usePlayerStreamSettings } from "../../features/player/hooks/usePlayerSt
 import { useGameReactions } from "../../features/player/hooks/useGameReactions";
 import { usePlayCount } from "../../features/player/hooks/usePlayCount";
 import { useStreamPlayback } from "../../features/player/hooks/useStreamPlayback";
+import {
+  createTelemetryCsvSample,
+  type StreamTelemetryCsvSample,
+} from "../../features/player/streamTelemetryExport";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
 import { shouldIgnoreGameInput } from "../../lib/webrtc/webrtcInput";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
+
+const LONG_TELEMETRY_RECORDING_ROWS = 10_000;
 
 export default function Player() {
   const { id } = useParams<{ id: string }>();
@@ -70,6 +76,13 @@ export default function Player() {
     requestedRole: playerMode === "host" ? "host" : invitedRole,
     sessionId: invitedSessionId,
   });
+  const [isRecordingCsv, setIsRecordingCsv] = useState(false);
+  const [recordedCsvSamples, setRecordedCsvSamples] = useState<
+    StreamTelemetryCsvSample[]
+  >([]);
+  const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(
+    null,
+  );
   const { authorName, gameRights, gameTitle } = useGameMetadata(id);
   const {
     dislikes,
@@ -136,6 +149,65 @@ export default function Player() {
       window.removeEventListener("keydown", preventScroll, { capture: true });
   }, []);
 
+  useEffect(() => {
+    if (!isRecordingCsv || recordingStartedAt === null) return;
+    if (telemetry.lastUpdatedAt === null) return;
+
+    setRecordedCsvSamples((samples) => [
+      ...samples,
+      createTelemetryCsvSample({
+        gameId: id,
+        playerMode,
+        recordingStartedAt,
+        sessionId,
+        status,
+        telemetry: {
+          bitrateKbps: telemetry.bitrateKbps,
+          connectionState: telemetry.connectionState,
+          fps: telemetry.fps,
+          iceConnectionState: telemetry.iceConnectionState,
+          jitterMs: telemetry.jitterMs,
+          lastEngineError: telemetry.lastEngineError,
+          lastUpdatedAt: telemetry.lastUpdatedAt,
+          packetsLost: telemetry.packetsLost,
+        },
+      }),
+    ]);
+  }, [
+    telemetry.bitrateKbps,
+    telemetry.connectionState,
+    telemetry.fps,
+    telemetry.iceConnectionState,
+    telemetry.jitterMs,
+    telemetry.lastEngineError,
+    telemetry.lastUpdatedAt,
+    telemetry.packetsLost,
+    id,
+    isRecordingCsv,
+    playerMode,
+    recordingStartedAt,
+    sessionId,
+    status,
+  ]);
+
+  const toggleCsvRecording = () => {
+    if (isRecordingCsv) {
+      setIsRecordingCsv(false);
+      setRecordingStartedAt(null);
+      return;
+    }
+
+    setRecordedCsvSamples([]);
+    setRecordingStartedAt(Date.now());
+    setIsRecordingCsv(true);
+  };
+
+  const clearTelemetryCsv = () => {
+    setIsRecordingCsv(false);
+    setRecordedCsvSamples([]);
+    setRecordingStartedAt(null);
+  };
+
   const shareInvite = usePlayerShareInvite({
     location,
     sessionId,
@@ -144,6 +216,15 @@ export default function Player() {
   const playerLayoutClassName = showStreamTelemetry
     ? "max-w-7xl"
     : "max-w-5xl";
+  const recordedCsvRowLabel = `${recordedCsvSamples.length} row${
+    recordedCsvSamples.length === 1 ? "" : "s"
+  }`;
+  const csvStatusText =
+    recordedCsvSamples.length >= LONG_TELEMETRY_RECORDING_ROWS
+      ? `Long CSV recording - ${recordedCsvRowLabel}`
+      : isRecordingCsv
+        ? `CSV recording - ${recordedCsvRowLabel}`
+        : `CSV ready - ${recordedCsvRowLabel}`;
 
   return (
     <div className="flex flex-col items-center pt-24 pb-24 px-4 min-h-screen">
@@ -162,7 +243,7 @@ export default function Player() {
       />
 
       <div
-        className={`grid w-full gap-4 transition-[max-width,grid-template-columns] duration-300 ${
+        className={`grid w-full items-start gap-4 transition-[max-width,grid-template-columns] duration-300 ${
           showStreamTelemetry
             ? `${playerLayoutClassName} xl:grid-cols-[minmax(0,1fr)_18rem]`
             : playerLayoutClassName
@@ -195,8 +276,14 @@ export default function Player() {
         {showStreamTelemetry && (
           <StreamTelemetryPanel
             gameId={id}
+            gameTitle={gameTitle}
+            isRecordingCsv={isRecordingCsv}
+            onClearTelemetryCsv={clearTelemetryCsv}
             onClose={() => setShowStreamTelemetry(false)}
+            onResetTelemetryData={clearTelemetryCsv}
+            onToggleCsvRecording={toggleCsvRecording}
             playerMode={playerMode}
+            recordedCsvSamples={recordedCsvSamples}
             sessionId={sessionId}
             shareUrl={shareInvite.url}
             status={status}
@@ -205,7 +292,9 @@ export default function Player() {
         )}
       </div>
 
-      <div className={`mt-3 flex w-full ${playerLayoutClassName}`}>
+      <div
+        className={`mt-3 flex w-full flex-wrap items-center justify-between gap-2 ${playerLayoutClassName}`}
+      >
         {authorName ? (
           <p className="text-sm font-medium text-synth-primary">
             Developed by: {authorName}
@@ -213,9 +302,24 @@ export default function Player() {
         ) : (
           <span />
         )}
+        {(isRecordingCsv || recordedCsvSamples.length > 0) && (
+          <button
+            className="rounded-full border border-synth-border bg-synth-surface px-3 py-1 text-xs font-semibold text-synth-secondary transition hover:bg-synth-elevated hover:text-white"
+            onClick={() => setShowStreamTelemetry(true)}
+            title={
+              recordedCsvSamples.length >= LONG_TELEMETRY_RECORDING_ROWS
+                ? "Long recording: CSV keeps the full dataset until you export or clear it."
+                : undefined
+            }
+            type="button"
+          >
+            {csvStatusText}
+          </button>
+        )}
       </div>
 
       <PlayerInstructions
+        layoutClassName={playerLayoutClassName}
         lobby={
           <LobbyPanel
             currentParticipant={localParticipant}
@@ -239,6 +343,7 @@ export default function Player() {
         isLoadingComments={isLoadingComments}
         isLoadingMoreComments={isLoadingMoreComments}
         isSubmittingComment={isSubmittingComment}
+        layoutClassName={playerLayoutClassName}
         newComment={newComment}
         onCommentReaction={handleCommentReaction}
         onDeleteComment={handleDeleteComment}

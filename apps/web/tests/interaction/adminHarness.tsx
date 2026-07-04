@@ -314,11 +314,17 @@ export function AdminHarness() {
         {showTelemetry && (
           <StreamTelemetryPanel
             gameId="harness-game"
+            gameTitle="Harness Game"
+            isRecordingCsv={false}
+            onClearTelemetryCsv={() => record("telemetry-csv-clear")}
             onClose={() => {
               record("telemetry-hidden");
               setShowTelemetry(false);
             }}
+            onResetTelemetryData={() => record("telemetry-reset")}
+            onToggleCsvRecording={() => record("telemetry-csv-toggle")}
             playerMode="host"
+            recordedCsvSamples={[]}
             sessionId="session-1"
             shareUrl="https://engine.local/play/demo?session=session-1"
             status="error"
