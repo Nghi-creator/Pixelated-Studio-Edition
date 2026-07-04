@@ -7,7 +7,13 @@ export async function registerCors(app: FastifyInstance) {
     credentials: true,
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     origin(origin, callback) {
-      const normalizedOrigin = origin ? new URL(origin).origin : "";
+      let normalizedOrigin = "";
+      try {
+        normalizedOrigin = origin ? new URL(origin).origin : "";
+      } catch {
+        callback(null, false);
+        return;
+      }
 
       if (!origin || env.allowedOrigins.includes(normalizedOrigin)) {
         callback(null, true);

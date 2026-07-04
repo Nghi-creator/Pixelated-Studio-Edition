@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  consumeCompanionRequestLimit,
   consumeCompanionLaunchTicket,
   createCompanionLaunchTicket,
   getCompanionStatusPage,
@@ -39,6 +40,26 @@ describe("desktop companion preflight", () => {
 });
 
 describe("desktop companion invite abuse controls", () => {
+  it("rate limits generic companion invite traffic per client", () => {
+    const now = 1_000;
+
+    assert.equal(
+      consumeCompanionRequestLimit("preflight-client", now, 2).allowed,
+      true,
+    );
+    assert.equal(
+      consumeCompanionRequestLimit("preflight-client", now + 1, 2).allowed,
+      true,
+    );
+    const blocked = consumeCompanionRequestLimit("preflight-client", now + 2, 2);
+    assert.equal(blocked.allowed, false);
+    assert.equal(blocked.retryAfterSeconds, 60);
+    assert.equal(
+      consumeCompanionRequestLimit("preflight-client", now + 60_000, 2).allowed,
+      true,
+    );
+  });
+
   it("temporarily blocks repeated invalid invite attempts", () => {
     revokeCompanionInvite();
     const now = 1_000;

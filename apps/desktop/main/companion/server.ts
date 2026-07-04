@@ -40,6 +40,9 @@ const REDEEM_INVITE_PATH = "/invite/redeem";
 const REDEEM_LAUNCH_PATH = "/launch/redeem";
 const RUNTIME_SWITCH_PATH = "/runtime/switch";
 const HOST_ACCESS_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const COMPANION_REQUEST_LIMIT = 120;
+const COMPANION_REQUEST_WINDOW_MS = 60 * 1000;
+const COMPANION_REQUEST_MAX_ENTRIES = 1024;
 const VALID_RUNTIME_KINDS = new Set(["libretro", "native_linux"]);
 
 export type RuntimeSwitchResult =
@@ -80,6 +83,10 @@ export type CompanionServerResult = CertificatePaths & {
 
 let companionServer: https.Server | null = null;
 let companionHttpServer: http.Server | null = null;
+const companionRequestLimits = new Map<
+  string,
+  { count: number; resetAt: number }
+>();
 
 export {
   consumeCompanionLaunchTicket,
@@ -167,9 +174,61 @@ function sendJson(
 ) {
   res.writeHead(statusCode, {
     "cache-control": "no-store",
+    "content-security-policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
     "content-type": "application/json",
+    "referrer-policy": "no-referrer",
+    "strict-transport-security": "max-age=31536000",
+    "x-content-type-options": "nosniff",
   });
   res.end(JSON.stringify(payload));
+}
+
+export function consumeCompanionRequestLimit(
+  key: string,
+  now = Date.now(),
+  limit = COMPANION_REQUEST_LIMIT,
+) {
+  const existing = companionRequestLimits.get(key);
+  if (!existing || existing.resetAt <= now) {
+    if (companionRequestLimits.size >= COMPANION_REQUEST_MAX_ENTRIES) {
+      for (const [entryKey, entry] of companionRequestLimits) {
+        if (entry.resetAt <= now) companionRequestLimits.delete(entryKey);
+      }
+    }
+    while (companionRequestLimits.size >= COMPANION_REQUEST_MAX_ENTRIES) {
+      const oldestKey = companionRequestLimits.keys().next().value;
+      if (typeof oldestKey !== "string") break;
+      companionRequestLimits.delete(oldestKey);
+    }
+    companionRequestLimits.set(key, {
+      count: 1,
+      resetAt: now + COMPANION_REQUEST_WINDOW_MS,
+    });
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
+  existing.count += 1;
+  return {
+    allowed: existing.count <= limit,
+    retryAfterSeconds: Math.max(1, Math.ceil((existing.resetAt - now) / 1000)),
+  };
+}
+
+function rejectCompanionRateLimitedRequest(
+  req: IncomingMessage,
+  res: ServerResponse,
+  scope: string,
+) {
+  const key = `${scope}:${req.socket.remoteAddress || "unknown"}`;
+  const rateLimit = consumeCompanionRequestLimit(key);
+  if (rateLimit.allowed) return false;
+
+  res.setHeader("retry-after", rateLimit.retryAfterSeconds);
+  sendJson(res, 429, {
+    code: "companion_rate_limited",
+    error: "Too many companion requests",
+  });
+  return true;
 }
 
 function setCompanionCorsHeaders(
@@ -259,6 +318,10 @@ async function handleInviteRequest(
     req.url?.startsWith(INVITE_PATH) ||
     req.url?.startsWith(REDEEM_INVITE_PATH);
   if (!isInvitePath) return false;
+
+  if (rejectCompanionRateLimitedRequest(req, res, "invite")) {
+    return true;
+  }
 
   const origin = serializeHeaderValue(req.headers.origin);
   if (origin && !setCompanionCorsHeaders(req, res, allowedOrigins)) {
@@ -406,6 +469,10 @@ async function handleLaunchRequest(
 ) {
   if (!req.url?.startsWith(REDEEM_LAUNCH_PATH)) {
     return false;
+  }
+
+  if (rejectCompanionRateLimitedRequest(req, res, "launch")) {
+    return true;
   }
 
   const origin = serializeHeaderValue(req.headers.origin);

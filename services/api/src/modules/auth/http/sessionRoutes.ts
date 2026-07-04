@@ -19,6 +19,8 @@ import {
 import { fetchPublishedGameById } from "../../catalog/services/catalogService.js";
 import { CandidateValidationError } from "../../catalog/ingestion/catalogCandidateValidation.js";
 import { createRateLimiter } from "../../security/sharedRateLimiter.js";
+import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
+import type { RateLimiter } from "../../security/sharedRateLimiter.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
 
@@ -34,6 +36,7 @@ const createSessionBodySchema = z.object({
 type SessionRouteOptions = {
   optionalUser?: typeof attachOptionalSupabaseUser;
   requireUser?: typeof requireSupabaseUser;
+  sessionCreateLimiter?: RateLimiter;
   supabase?: SupabaseServiceLike | null;
 };
 
@@ -44,6 +47,13 @@ export async function registerSessionRoutes(
   const optionalUser = options.optionalUser || attachOptionalSupabaseUser;
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const sessionCreateLimiter =
+    options.sessionCreateLimiter ||
+    createRateLimiter({
+      limit: 60,
+      namespace: "session-create-ip",
+      windowMs: 60_000,
+    });
   const verificationIpLimiter = createRateLimiter({
     limit: 1_000,
     namespace: "session-verification-ip",
@@ -60,6 +70,15 @@ export async function registerSessionRoutes(
     { preHandler: optionalUser },
     async (request, reply) => {
       const user = request.user;
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          await sessionCreateLimiter.consume(user?.id || request.ip),
+          "Session creation rate limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
+      }
 
       if (!service) {
         return reply.status(503).send({

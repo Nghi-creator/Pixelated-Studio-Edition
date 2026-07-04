@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { Socket } from "socket.io";
 
 type EngineTokenAuthOptions = {
+  allowMissingToken?: boolean;
   getRequestAccessId?: (req: Request) => string;
   getRequestClientId?: (req: Request) => string;
   getSocketAccessId?: (socket: Socket) => string;
@@ -17,7 +18,7 @@ export function createEngineTokenAuth(
   options: EngineTokenAuthOptions = {},
 ) {
   function isValidEngineToken(token: unknown) {
-    if (!engineToken) return true;
+    if (!engineToken) return options.allowMissingToken === true;
     if (typeof token !== "string" || !token) return false;
 
     const expected = Buffer.from(engineToken);

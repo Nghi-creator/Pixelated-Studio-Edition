@@ -7,6 +7,8 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../../auth/supabaseAuth.js";
+import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
+import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import {
   CANDIDATE_COLUMNS,
   type CandidateRow,
@@ -39,6 +41,8 @@ const submissionReviewBodySchema = z.discriminatedUnion("action", [
     source_repo_url: z.string().trim().url(),
   }),
 ]);
+const SUBMISSION_REVIEW_ARTIFACT_MAX_BYTES = 64 * 1024 * 1024;
+const SUBMISSION_REVIEW_ARTIFACT_TIMEOUT_MS = 15_000;
 
 type SubmissionRow = {
   author_name: string;
@@ -59,6 +63,7 @@ type SubmissionRow = {
 };
 
 type AdminSubmissionRouteOptions = {
+  adminSubmissionReviewLimiter?: RateLimiter;
   fetchArtifact?: typeof fetch;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
@@ -110,6 +115,59 @@ function artifactFilenameFor(url: string) {
   return filename || "submission.rom";
 }
 
+async function readArtifactResponse(
+  response: Response,
+  maxBytes = SUBMISSION_REVIEW_ARTIFACT_MAX_BYTES,
+) {
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > maxBytes) {
+    throw new Error(`Submitted ROM is too large. Max size is ${maxBytes} bytes.`);
+  }
+
+  if (!response.body) {
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length > maxBytes) {
+      throw new Error(`Submitted ROM is too large. Max size is ${maxBytes} bytes.`);
+    }
+    return bytes;
+  }
+
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let receivedBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (!value) continue;
+
+    receivedBytes += value.byteLength;
+    if (receivedBytes > maxBytes) {
+      await reader.cancel();
+      throw new Error(`Submitted ROM is too large. Max size is ${maxBytes} bytes.`);
+    }
+    chunks.push(value);
+  }
+
+  return Buffer.concat(chunks);
+}
+
+export async function fetchSubmissionArtifactBytes(
+  fetchArtifact: typeof fetch,
+  url: string,
+  maxBytes = SUBMISSION_REVIEW_ARTIFACT_MAX_BYTES,
+  timeoutMs = SUBMISSION_REVIEW_ARTIFACT_TIMEOUT_MS,
+) {
+  const response = await fetchArtifact(url, {
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch submitted ROM: status ${response.status}`);
+  }
+
+  return readArtifactResponse(response, maxBytes);
+}
+
 async function requireAdminRole(
   service: SupabaseServiceLike,
   userId: string,
@@ -126,6 +184,13 @@ export async function registerAdminSubmissionRoutes(
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
   const fetchArtifact = options.fetchArtifact || fetch;
+  const adminSubmissionReviewLimiter =
+    options.adminSubmissionReviewLimiter ||
+    createRateLimiter({
+      limit: 30,
+      namespace: "admin-submission-review-user",
+      windowMs: 60_000,
+    });
 
   app.get(
     "/admin/submissions",
@@ -134,6 +199,15 @@ export async function registerAdminSubmissionRoutes(
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
+      }
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          await adminSubmissionReviewLimiter.consume(user.id),
+          "Admin submission review rate limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
       }
       if (!service) {
         return reply.status(503).send({
@@ -192,6 +266,15 @@ export async function registerAdminSubmissionRoutes(
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
       }
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          await adminSubmissionReviewLimiter.consume(user.id),
+          "Admin submission review rate limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
+      }
       if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
@@ -246,11 +329,10 @@ export async function registerAdminSubmissionRoutes(
           return reply.status(422).send({ error: "Unsupported submitted ROM type" });
         }
 
-        const artifactResponse = await fetchArtifact(submission.rom_url);
-        if (!artifactResponse.ok) {
-          return reply.status(502).send({ error: "Failed to fetch submitted ROM" });
-        }
-        const artifactBytes = Buffer.from(await artifactResponse.arrayBuffer());
+        const artifactBytes = await fetchSubmissionArtifactBytes(
+          fetchArtifact,
+          submission.rom_url,
+        );
         const artifactFilename = artifactFilenameFor(submission.rom_url);
         const sourceCommit = candidateSourceRevisionFor(submission);
 
@@ -315,6 +397,12 @@ export async function registerAdminSubmissionRoutes(
         return { candidate, submission: updatedSubmission };
       } catch (err) {
         request.log.error({ err }, "Failed to review submission");
+        if (err instanceof Error && err.message.includes("too large")) {
+          return reply.status(413).send({ error: err.message });
+        }
+        if (err instanceof Error && err.message.startsWith("Failed to fetch")) {
+          return reply.status(502).send({ error: "Failed to fetch submitted ROM" });
+        }
         return reply.status(500).send({ error: "Failed to review submission" });
       }
     },
