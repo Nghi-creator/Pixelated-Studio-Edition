@@ -4,6 +4,7 @@ import { scheduleControlPlaneCleanup } from "./modules/maintenance/controlPlaneC
 import { createLoggerOptions } from "./plugins/logger.js";
 import { registerCors } from "./plugins/cors.js";
 import { registerGlobalRateLimit } from "./plugins/rateLimit.js";
+import { registerSecurityHeaders } from "./plugins/securityHeaders.js";
 import { registerAccessLogRoutes } from "./modules/observability/http/accessLogRoutes.js";
 import { registerAdminUserRoutes } from "./modules/users/http/adminUserRoutes.js";
 import { registerAdminSubmissionRoutes } from "./modules/catalog/http/adminSubmissionRoutes.js";
@@ -28,6 +29,7 @@ export async function buildServer() {
     trustProxy: env.trustProxy,
   });
 
+  await registerSecurityHeaders(app);
   await registerCors(app);
   await registerGlobalRateLimit(app);
   await registerHealthRoutes(app);

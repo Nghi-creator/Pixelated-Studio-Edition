@@ -8,6 +8,8 @@ import {
 } from "../../auth/supabaseAuth.js";
 import { getCachedUserRole } from "../../auth/roleCache.js";
 import { logTiming, timed } from "../timing.js";
+import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
+import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 
 const accessLogBodySchema = z.object({
   path: z.string().trim().min(1).max(2048),
@@ -46,6 +48,7 @@ type AccessLogStorageErrorResponse = {
 };
 
 type AccessLogRouteOptions = {
+  accessLogWriteLimiter?: RateLimiter;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
   supabaseAnon?: SupabaseAnonLike | null;
@@ -99,8 +102,25 @@ export async function registerAccessLogRoutes(
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
   const anon = options.supabaseAnon === undefined ? supabaseAnon : options.supabaseAnon;
+  const accessLogWriteLimiter =
+    options.accessLogWriteLimiter ||
+    createRateLimiter({
+      limit: 120,
+      namespace: "access-log-write-ip",
+      windowMs: 60_000,
+    });
 
   app.post("/access-logs", async (request, reply) => {
+    if (
+      rejectRateLimitedRequest(
+        reply,
+        await accessLogWriteLimiter.consume(request.ip),
+        "Access-log rate limit reached. Please try again shortly.",
+      )
+    ) {
+      return;
+    }
+
     if (!service) {
       return reply.status(503).send({
         error: "Supabase service client is not configured for the API.",

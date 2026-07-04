@@ -28,8 +28,11 @@ export function getCompanionStatusPage() {
 export function serveCompanionStatus(res: ServerResponse) {
   res.writeHead(200, {
     "cache-control": "no-store",
+    "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
     "content-type": "text/html; charset=utf-8",
+    "referrer-policy": "no-referrer",
+    "strict-transport-security": "max-age=31536000",
+    "x-content-type-options": "nosniff",
   });
   res.end(getCompanionStatusPage());
 }
-

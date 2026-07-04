@@ -14,6 +14,7 @@ import {
   resolveGameBootTarget,
   type WebRTCStatus,
 } from "./webrtcSession";
+import { isRetryableBackendSessionConflict } from "./webrtcSessionErrors";
 import {
   createWebRTCProfileRestartIdentity,
   createWebRTCRetryIdentity,
@@ -38,6 +39,7 @@ import {
   loadEngineInputCapabilities,
   loadEngineLaunchFailureMessage,
   loadEngineShareContext,
+  stopActiveEngineSession,
 } from "./engineContext";
 import {
   endSyncedMultiplayerLobby,
@@ -110,6 +112,7 @@ export function useWebRTC(
   const appliedStreamProfileIdRef = useRef(streamProfile.id);
   const seamlessRestartRef = useRef(false);
   const profileAutoRetriesRemainingRef = useRef(0);
+  const sessionConflictAutoRetriesRemainingRef = useRef(1);
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -258,11 +261,12 @@ export function useWebRTC(
         sessionId,
         onTrack: (track) => {
           incomingStream ||= new MediaStream();
-          incomingStream.addTrack(track);
-          setStream(incomingStream);
-          profileAutoRetriesRemainingRef.current = 0;
-          setStatus("playing");
-        },
+        incomingStream.addTrack(track);
+        setStream(incomingStream);
+        profileAutoRetriesRemainingRef.current = 0;
+        sessionConflictAutoRetriesRemainingRef.current = 1;
+        setStatus("playing");
+      },
       });
       pcRef.current = pc;
 
@@ -430,6 +434,9 @@ export function useWebRTC(
 
       try {
         const bootTarget = await resolveGameBootTarget(gameId, sessionId);
+        await stopActiveEngineSession().catch((err) => {
+          console.warn("[WebRTC] Could not pre-stop stale active session:", err);
+        });
         socket.emit("start-game", {
           sessionId,
           iceServers: iceServersForSession,
@@ -443,6 +450,18 @@ export function useWebRTC(
         startBootReadyTimer();
       } catch (err) {
         console.error("Failed to boot game:", err);
+        if (
+          isRetryableBackendSessionConflict(err) &&
+          !options.sessionId &&
+          sessionConflictAutoRetriesRemainingRef.current > 0
+        ) {
+          sessionConflictAutoRetriesRemainingRef.current -= 1;
+          const identity = createWebRTCRetryIdentity(false);
+          peerIdRef.current = identity.peerId;
+          if (identity.sessionId) setSessionId(identity.sessionId);
+          setRetryVersion((currentVersion) => currentVersion + 1);
+          return;
+        }
         failStream(getErrorMessage(err, STREAM_BOOT_ERROR_MESSAGE));
       }
     });
@@ -586,6 +605,7 @@ export function useWebRTC(
     lastMetricSentAtRef.current = 0;
     seamlessRestartRef.current = false;
     profileAutoRetriesRemainingRef.current = 0;
+    sessionConflictAutoRetriesRemainingRef.current = 1;
     setRetryVersion((currentVersion) => currentVersion + 1);
   };
 

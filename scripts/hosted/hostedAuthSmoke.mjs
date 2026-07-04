@@ -310,7 +310,7 @@ async function redeemConfirmation(email, password) {
   });
   await confirmationPage.waitForURL(
     (url) => url.origin === new URL(webUrl).origin && url.pathname === "/",
-    { timeout: 30_000 },
+    { timeout: 30_000, waitUntil: "domcontentloaded" },
   );
   await confirmationPage.waitForFunction(
     () =>
@@ -341,7 +341,7 @@ async function redeemRecovery(email, newPassword) {
     (url) =>
       url.origin === new URL(webUrl).origin &&
       url.pathname === "/reset-password",
-    { timeout: 30_000 },
+    { timeout: 30_000, waitUntil: "domcontentloaded" },
   );
   await recoveryPage
     .getByRole("heading", { name: "Create New Password", exact: true })
@@ -372,7 +372,7 @@ async function redeemRecovery(email, newPassword) {
   await loginPage.getByRole("button", { name: "Sign In", exact: true }).click();
   await loginPage.waitForURL(
     (url) => url.origin === new URL(webUrl).origin && url.pathname === "/",
-    { timeout: 30_000 },
+    { timeout: 30_000, waitUntil: "domcontentloaded" },
   );
 }
 

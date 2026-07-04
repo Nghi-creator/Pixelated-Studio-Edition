@@ -18,6 +18,8 @@ and GitHub Actions pipeline checks need to be reported.
   tripwires for agents.
 - `project-flows.md`: compact runtime flow map for boot, pairing, gameplay,
   multiplayer, submissions, and hosted deploys.
+- `research-instrumentation-roadmap.md`: proposed research-facing telemetry,
+  experiment metadata, export, baseline, and refactoring roadmap.
 
 ## Active Operational Checklists
 

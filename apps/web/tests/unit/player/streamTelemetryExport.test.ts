@@ -4,11 +4,11 @@ import {
   createStreamTelemetryGraphFilename,
   createStreamTelemetryCsvFilename,
   latestStreamTelemetryGraphSamples,
-  renderStreamTelemetryGraphPng,
   streamTelemetrySamplesToCsv,
   STREAM_TELEMETRY_GRAPH_WINDOW_MS,
   type StreamTelemetryCsvSample,
 } from "../../../src/features/player/streamTelemetryExport.ts";
+import { renderStreamTelemetryGraphPng } from "../../../src/features/player/streamTelemetryGraphPng.ts";
 
 test("stream telemetry csv export includes stable research columns", () => {
   const sample: StreamTelemetryCsvSample = {

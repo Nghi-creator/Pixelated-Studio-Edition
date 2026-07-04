@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
+import { registerCors } from "../../src/plugins/cors.js";
 import { registerGlobalRateLimit } from "../../src/plugins/rateLimit.js";
+import { registerSecurityHeaders } from "../../src/plugins/securityHeaders.js";
 import type { RateLimiter } from "../../src/modules/security/sharedRateLimiter.js";
 
 function createTestLimiter(limit: number): RateLimiter {
@@ -100,5 +102,37 @@ test("health checks use an independent limiter", async () => {
   assert.deepEqual(blocked.json(), {
     error: "Health-check rate limit reached. Please try again shortly.",
   });
+  await app.close();
+});
+
+test("malformed CORS origins are denied without crashing the API", async () => {
+  const app = Fastify();
+  await registerCors(app);
+  app.get("/ok", async () => ({ ok: true }));
+
+  const response = await app.inject({
+    headers: { origin: "::::" },
+    method: "GET",
+    url: "/ok",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers["access-control-allow-origin"], undefined);
+  await app.close();
+});
+
+test("security headers are attached to API responses", async () => {
+  const app = Fastify();
+  await registerSecurityHeaders(app);
+  app.get("/ok", async () => ({ ok: true }));
+
+  const response = await app.inject({ method: "GET", url: "/ok" });
+
+  assert.equal(response.headers["x-content-type-options"], "nosniff");
+  assert.equal(response.headers["referrer-policy"], "no-referrer");
+  assert.match(
+    String(response.headers["content-security-policy"]),
+    /default-src 'none'/,
+  );
   await app.close();
 });

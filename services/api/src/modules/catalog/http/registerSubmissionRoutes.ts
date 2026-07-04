@@ -5,6 +5,8 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../../auth/supabaseAuth.js";
+import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
+import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 
 const submissionBodySchema = z.object({
   assetLicenseSpdx: z.string().trim().max(80).nullable().optional(),
@@ -165,6 +167,7 @@ type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 type SubmissionRouteOptions = {
   notifySubmission?: (submission: SubmissionPayload) => Promise<void>;
   requireUser?: typeof requireSupabaseUser;
+  submissionWriteLimiter?: RateLimiter;
   supabase?: SupabaseServiceLike | null;
 };
 
@@ -265,6 +268,13 @@ export async function registerSubmissionRoutes(
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
   const notifySubmission = options.notifySubmission || defaultNotifySubmission;
+  const submissionWriteLimiter =
+    options.submissionWriteLimiter ||
+    createRateLimiter({
+      limit: 10,
+      namespace: "submission-write-user",
+      windowMs: 60 * 60 * 1000,
+    });
 
   app.post(
     "/submissions/games",
@@ -273,6 +283,15 @@ export async function registerSubmissionRoutes(
       const user = request.user;
       if (!user) {
         return reply.status(401).send({ error: "Missing authenticated user" });
+      }
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          await submissionWriteLimiter.consume(user.id),
+          "Submission rate limit reached. Please try again later.",
+        )
+      ) {
+        return;
       }
 
       if (!service) {
