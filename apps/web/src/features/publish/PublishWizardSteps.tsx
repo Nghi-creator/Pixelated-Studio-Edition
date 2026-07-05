@@ -1,16 +1,14 @@
 import { CheckCircle, Image as ImageIcon } from "lucide-react";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import { PublishFileField } from "./PublishFileField";
-import {
-  SUPPORTED_SUBMISSION_ROM_LABEL,
-} from "./publishSubmission";
+import { SUPPORTED_SUBMISSION_ROM_LABEL } from "./publishSubmission";
 import type { usePublishSubmissionForm } from "./usePublishSubmissionForm";
 import {
   CheckboxField,
   ChoiceGroup,
   FieldLabel,
-  inputClassName,
 } from "./PublishFormUi";
+import { inputClassName } from "./PublishFormConstants";
 
 type PublishFormState = ReturnType<typeof usePublishSubmissionForm>;
 

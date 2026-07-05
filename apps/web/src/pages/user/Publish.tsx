@@ -12,8 +12,8 @@ import { PixelIcon } from "../../components/ui/PixelIcon";
 import {
   PublishActionButton,
   PublishProgress,
-  publishSteps,
 } from "../../features/publish/PublishFormUi";
+import { publishSteps } from "../../features/publish/PublishFormConstants";
 import { getSubmissionRightsErrors } from "../../features/publish/publishSubmission";
 import {
   PublishBasicsStep,
