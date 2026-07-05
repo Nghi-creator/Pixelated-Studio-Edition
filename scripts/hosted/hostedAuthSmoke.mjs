@@ -309,7 +309,9 @@ async function redeemConfirmation(email, password) {
     waitUntil: "domcontentloaded",
   });
   await confirmationPage.waitForURL(
-    (url) => url.origin === new URL(webUrl).origin && url.pathname === "/home",
+    (url) =>
+      url.origin === new URL(webUrl).origin &&
+      (url.hash.includes("access_token") || url.hash === ""),
     { timeout: 30_000, waitUntil: "domcontentloaded" },
   );
   await confirmationPage.waitForFunction(
@@ -323,6 +325,9 @@ async function redeemConfirmation(email, password) {
     null,
     { timeout: 30_000 },
   );
+  await confirmationPage.goto(`${webUrl}/home`, {
+    waitUntil: "domcontentloaded",
+  });
   await confirmationPage.screenshot({
     fullPage: true,
     path: path.join(runDir, "03-signup-confirmed.png"),
