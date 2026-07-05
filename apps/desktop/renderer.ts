@@ -82,6 +82,27 @@ type PhaseTracker = {
   render: (state?: EngineStatePayload) => void;
 };
 
+type ClientAccessController = {
+  refresh: () => Promise<void>;
+  resetActionPending: () => void;
+  setControlsEnabled: (enabled: boolean) => void;
+  startPolling: () => void;
+  stopPolling: () => void;
+};
+
+type DockerRecoveryController = {
+  setDockerRecoveryPending: (pending: boolean) => void;
+  setDockerRecoveryVisible: (
+    visible: boolean,
+    diagnostic?: DockerDiagnosticPayload | null,
+  ) => void;
+  setImageBuildPending: (pending: boolean) => void;
+  setImageRecoveryVisible: (
+    visible: boolean,
+    payload?: EngineImageRecoveryPayload | null,
+  ) => void;
+};
+
 type ElectronApi = {
   createCompanionQrDataUrl: (url: string) => Promise<string>;
   launchWeb: () => Promise<void>;
@@ -166,6 +187,46 @@ type PixelatedWindow = Window &
         phaseSummary: HTMLElement;
       }) => PhaseTracker;
     };
+    PixelatedClients: {
+      createClientAccessController: (elements: {
+        clientsList: HTMLElement;
+        clientsStatus: HTMLElement;
+        getExposureMode: () => ExposureMode;
+        getIsRunning: () => boolean;
+        listEngineClients: () => Promise<{ clients: EngineClientPayload[] }>;
+        revokeEngineClient: (
+          clientId: string,
+        ) => Promise<{ disconnected: number }>;
+        rotateEngineToken: (options: { exposureMode?: ExposureMode }) => void;
+        rotateTokenButton: HTMLButtonElement;
+      }) => ClientAccessController;
+    };
+    PixelatedRecovery: {
+      createDockerRecoveryController: (elements: {
+        buildEngineImage: (options: { exposureMode?: ExposureMode }) => void;
+        buildImageButton: HTMLButtonElement;
+        cancelDockerRecovery: () => void;
+        copyDiagnosticsButton: HTMLButtonElement;
+        desktopPanels: HTMLElement;
+        downloadButton: HTMLButtonElement;
+        getExposureMode: () => ExposureMode;
+        guideButton: HTMLButtonElement;
+        guidance: HTMLElement;
+        initializeEngine: () => void;
+        logs: LogController;
+        openDockerResource: (
+          resource: "guide" | "install",
+          diagnosticCode: string,
+        ) => Promise<void>;
+        panel: HTMLElement;
+        retryButton: HTMLButtonElement;
+        startButton: HTMLButtonElement;
+        startDockerApplication: (options: { exposureMode?: ExposureMode }) => void;
+        startupPanel: HTMLElement;
+        syncPanelHeights: () => void;
+        title: HTMLElement;
+      }) => DockerRecoveryController;
+    };
   };
 
 const pixelatedWindow = window as PixelatedWindow;
@@ -213,122 +274,13 @@ const regenerateInviteBtn = requiredElement(
   HTMLButtonElement,
 );
 const revokeInviteBtn = requiredElement("revoke-invite", HTMLButtonElement);
-const dockerRecovery = requiredElement("docker-recovery");
-const dockerRecoveryTitle = requiredElement("docker-recovery-title");
-const dockerRecoveryGuidance = requiredElement("docker-recovery-guidance");
-const dockerRetryBtn = requiredElement("docker-retry", HTMLButtonElement);
-const dockerStartBtn = requiredElement("docker-start", HTMLButtonElement);
-const dockerBuildImageBtn = requiredElement(
-  "docker-build-image",
-  HTMLButtonElement,
-);
-const dockerDownloadBtn = requiredElement("docker-download", HTMLButtonElement);
-const dockerGuideBtn = requiredElement("docker-guide", HTMLButtonElement);
-const dockerCopyDiagnosticsBtn = requiredElement(
-  "docker-copy-diagnostics",
-  HTMLButtonElement,
-);
-const clientsList = requiredElement("clients-list");
-const clientsStatus = requiredElement("clients-status");
-const rotateTokenBtn = requiredElement("rotate-token", HTMLButtonElement);
 
 let isRunning = false;
 let pendingCompanionPayload: EngineCompanionPayload | null = null;
-let dockerDiagnostic: DockerDiagnosticPayload | null = null;
-let imageRecovery: EngineImageRecoveryPayload | null = null;
-let dockerRecoveryPending = false;
-let imageBuildPending = false;
-let clientsActionPending = false;
-let clientsPollTimer: number | null = null;
-
-function createImageRecoveryActionState(pending: boolean) {
-  return {
-    buildDisabled: pending,
-    buildHidden: false,
-    buildText: pending ? "Building..." : "Build image & retry",
-    downloadHidden: true,
-    guideHidden: true,
-    retryDisabled: pending,
-    startDisabled: pending,
-    startHidden: true,
-  };
-}
-
-function setDockerRecoveryPending(pending: boolean) {
-  dockerRecoveryPending = pending;
-  dockerStartBtn.innerText = pending ? "Cancel waiting" : "Start Docker";
-  dockerRetryBtn.disabled = pending;
-  dockerBuildImageBtn.disabled = pending;
-  dockerDownloadBtn.disabled = pending;
-  dockerGuideBtn.disabled = pending;
-}
-
-function setImageBuildPending(pending: boolean) {
-  imageBuildPending = pending;
-  const state = createImageRecoveryActionState(pending);
-  dockerBuildImageBtn.innerText = state.buildText;
-  dockerRetryBtn.disabled = state.retryDisabled;
-  dockerStartBtn.disabled = state.startDisabled;
-  dockerBuildImageBtn.disabled = state.buildDisabled;
-  dockerDownloadBtn.disabled = pending;
-  dockerGuideBtn.disabled = pending;
-}
-
-function setDockerRecoveryVisible(
-  visible: boolean,
-  diagnostic: DockerDiagnosticPayload | null = null,
-) {
-  dockerDiagnostic = visible ? diagnostic : null;
-  imageRecovery = null;
-  dockerRecovery.classList.toggle("hidden", !visible);
-  startupPanel.classList.toggle("recovery-active", visible);
-  if (!visible) {
-    desktopPanels.style.removeProperty("--startup-recovery-height");
-  }
-  requestAnimationFrame(syncPanelHeights);
-  if (!visible || !diagnostic) return;
-
-  dockerRecoveryTitle.innerText = diagnostic.title;
-  dockerRecoveryGuidance.innerText = diagnostic.guidance;
-  dockerBuildImageBtn.classList.add("hidden");
-  dockerDownloadBtn.classList.toggle(
-    "hidden",
-    diagnostic.code !== "cli_missing",
-  );
-  dockerGuideBtn.classList.remove("hidden");
-  dockerStartBtn.classList.toggle("hidden", !diagnostic.canStartDocker);
-  dockerCopyDiagnosticsBtn.classList.remove("hidden");
-  setDockerRecoveryPending(false);
-}
-
-function setImageRecoveryVisible(
-  visible: boolean,
-  payload: EngineImageRecoveryPayload | null = null,
-) {
-  imageRecovery = visible ? payload : null;
-  dockerDiagnostic = null;
-  dockerRecovery.classList.toggle("hidden", !visible);
-  startupPanel.classList.toggle("recovery-active", visible);
-  if (!visible) {
-    desktopPanels.style.removeProperty("--startup-recovery-height");
-  }
-  requestAnimationFrame(syncPanelHeights);
-  if (!visible || !payload) return;
-
-  dockerRecoveryTitle.innerText = payload.title;
-  dockerRecoveryGuidance.innerText = payload.guidance;
-  const actionState = createImageRecoveryActionState(false);
-  dockerBuildImageBtn.classList.toggle("hidden", actionState.buildHidden);
-  dockerDownloadBtn.classList.toggle("hidden", actionState.downloadHidden);
-  dockerGuideBtn.classList.toggle("hidden", actionState.guideHidden);
-  dockerStartBtn.classList.toggle("hidden", actionState.startHidden);
-  dockerCopyDiagnosticsBtn.classList.remove("hidden");
-  setImageBuildPending(false);
-}
 
 function initializeEngine() {
-  setDockerRecoveryVisible(false);
-  setImageRecoveryVisible(false);
+  recovery.setDockerRecoveryVisible(false);
+  recovery.setImageRecoveryVisible(false);
   logs.clear();
   tokenPanel.classList.add("hidden");
   tokenValue.innerText = "";
@@ -360,150 +312,6 @@ function setInviteButtonsPending(isPending: boolean) {
 
   regenerateInviteBtn.innerText = "Regenerate";
   revokeInviteBtn.innerText = "Revoke";
-}
-
-function formatClientScope(scope: EngineClientPayload["accessScope"]) {
-  if (scope === "companion-guest") return "LAN guest";
-  if (scope === "companion-host") return "Host launch";
-  return "Raw token";
-}
-
-function formatClientRole(role: string) {
-  if (role === "host") return "Host";
-  if (role === "spectator") return "Spectator";
-  if (role === "player") return "Player";
-  if (role === "camera") return "Camera";
-  return "Connected";
-}
-
-function formatTimestamp(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "unknown";
-  return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-}
-
-function setClientControlsEnabled(enabled: boolean) {
-  rotateTokenBtn.disabled = !enabled || clientsActionPending;
-}
-
-function renderClients(clients: EngineClientPayload[]) {
-  clientsList.replaceChildren();
-
-  if (!isRunning) {
-    clientsStatus.innerText = "Start the engine to see connected browser clients.";
-    setClientControlsEnabled(false);
-    return;
-  }
-
-  setClientControlsEnabled(true);
-
-  const visibleClients = clients.filter((client) => client.role !== "camera");
-  if (visibleClients.length === 0) {
-    clientsStatus.innerText =
-      "No browser clients are connected yet. Same-browser tabs will appear as separate connections.";
-    return;
-  }
-
-  clientsStatus.innerText = `${visibleClients.length} browser client${
-    visibleClients.length === 1 ? "" : "s"
-  } connected.`;
-
-  for (const client of visibleClients) {
-    const card = document.createElement("article");
-    card.className =
-      "rounded-lg border border-synth-border bg-[#050810] p-3 text-xs shadow-inner";
-
-    const header = document.createElement("div");
-    header.className = "flex items-start justify-between gap-3";
-
-    const title = document.createElement("p");
-    title.className = "font-bold text-white";
-    title.innerText = `${formatClientScope(client.accessScope)} · ${formatClientRole(
-      client.role,
-    )}`;
-
-    const revokeButton = document.createElement("button");
-    revokeButton.className =
-      "shrink-0 rounded-md border border-red-400/50 bg-red-500/10 px-2.5 py-1 text-[11px] font-bold text-red-200 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-50";
-    revokeButton.disabled = clientsActionPending;
-    revokeButton.type = "button";
-    revokeButton.innerText = "Revoke";
-    revokeButton.addEventListener("click", () => {
-      void revokeClient(client.id);
-    });
-
-    const lastSeen = document.createElement("span");
-    lastSeen.className = "text-gray-500";
-    lastSeen.innerText = `Seen ${formatTimestamp(client.lastSeenAt)} · ${
-      client.socketCount
-    } socket${client.socketCount === 1 ? "" : "s"}`;
-
-    const titleGroup = document.createElement("div");
-    titleGroup.append(title, lastSeen);
-
-    header.append(titleGroup, revokeButton);
-
-    const details = document.createElement("p");
-    details.className = "mt-2 break-all font-mono leading-5 text-synth-secondary";
-    details.innerText = `${client.remoteAddress}${
-      client.sessionId ? ` · ${client.sessionId}` : ""
-    }`;
-
-    const userAgent = document.createElement("p");
-    userAgent.className = "mt-1 line-clamp-2 leading-5 text-gray-500";
-    userAgent.innerText = client.userAgent;
-
-    card.append(header, details, userAgent);
-    clientsList.append(card);
-  }
-}
-
-async function revokeClient(clientId: string) {
-  if (!isRunning || clientsActionPending) return;
-  clientsActionPending = true;
-  setClientControlsEnabled(false);
-  clientsStatus.innerText = "Revoking selected browser client...";
-
-  try {
-    await pixelatedWindow.electronAPI.revokeEngineClient(clientId);
-  } catch (err) {
-    clientsStatus.innerText = `Could not revoke client: ${String(err)}`;
-  } finally {
-    clientsActionPending = false;
-    await refreshClients();
-  }
-}
-
-async function refreshClients() {
-  if (!isRunning) {
-    renderClients([]);
-    return;
-  }
-
-  try {
-    const { clients } = await pixelatedWindow.electronAPI.listEngineClients();
-    renderClients(clients);
-  } catch (err) {
-    clientsStatus.innerText = `Could not load connected clients: ${String(err)}`;
-    clientsList.replaceChildren();
-    setClientControlsEnabled(true);
-  }
-}
-
-function startClientsPolling() {
-  if (clientsPollTimer !== null) return;
-  void refreshClients();
-  clientsPollTimer = window.setInterval(() => {
-    void refreshClients();
-  }, 3_000);
-}
-
-function stopClientsPolling() {
-  if (clientsPollTimer !== null) {
-    window.clearInterval(clientsPollTimer);
-    clientsPollTimer = null;
-  }
-  renderClients([]);
 }
 
 const logs = pixelatedWindow.PixelatedLogs.createLogController({
@@ -558,6 +366,42 @@ pixelatedWindow.PixelatedModal.bindDocsModal({
   closeButton: requiredElement("close-docs"),
   modal: requiredElement("docs-modal"),
   openButton: requiredElement("open-docs"),
+});
+
+const recovery = pixelatedWindow.PixelatedRecovery.createDockerRecoveryController({
+  buildEngineImage: pixelatedWindow.electronAPI.buildEngineImage,
+  buildImageButton: requiredElement("docker-build-image", HTMLButtonElement),
+  cancelDockerRecovery: pixelatedWindow.electronAPI.cancelDockerRecovery,
+  copyDiagnosticsButton: requiredElement(
+    "docker-copy-diagnostics",
+    HTMLButtonElement,
+  ),
+  desktopPanels,
+  downloadButton: requiredElement("docker-download", HTMLButtonElement),
+  getExposureMode: exposure.getMode,
+  guideButton: requiredElement("docker-guide", HTMLButtonElement),
+  guidance: requiredElement("docker-recovery-guidance"),
+  initializeEngine,
+  logs,
+  openDockerResource: pixelatedWindow.electronAPI.openDockerResource,
+  panel: requiredElement("docker-recovery"),
+  retryButton: requiredElement("docker-retry", HTMLButtonElement),
+  startButton: requiredElement("docker-start", HTMLButtonElement),
+  startDockerApplication: pixelatedWindow.electronAPI.startDockerApplication,
+  startupPanel,
+  syncPanelHeights,
+  title: requiredElement("docker-recovery-title"),
+});
+
+const clients = pixelatedWindow.PixelatedClients.createClientAccessController({
+  clientsList: requiredElement("clients-list"),
+  clientsStatus: requiredElement("clients-status"),
+  getExposureMode: exposure.getMode,
+  getIsRunning: () => isRunning,
+  listEngineClients: pixelatedWindow.electronAPI.listEngineClients,
+  revokeEngineClient: pixelatedWindow.electronAPI.revokeEngineClient,
+  rotateEngineToken: pixelatedWindow.electronAPI.rotateEngineToken,
+  rotateTokenButton: requiredElement("rotate-token", HTMLButtonElement),
 });
 
 type StatusTone = "offline" | "ready" | "running";
@@ -665,7 +509,7 @@ function setStatusBadge(active: boolean) {
     setPowerPending(false);
     setLaunchWebVisible(true);
     isRunning = true;
-    startClientsPolling();
+    clients.startPolling();
     if (pendingCompanionPayload) {
       exposure.setCompanionStatus(pendingCompanionPayload);
       setInviteButtonsPending(false);
@@ -699,7 +543,7 @@ function setStatusBadge(active: boolean) {
   exposure.setEnabled(true);
   phases.render({ status: "stopped", phase: "idle" });
   isRunning = false;
-  stopClientsPolling();
+  clients.stopPolling();
 }
 
 function resetFailedUi() {
@@ -722,7 +566,7 @@ function resetFailedUi() {
   revokeInviteBtn.disabled = true;
   exposure.setEnabled(true);
   isRunning = false;
-  stopClientsPolling();
+  clients.stopPolling();
 }
 
 function setLifecycleState(state: EngineStatePayload) {
@@ -730,7 +574,7 @@ function setLifecycleState(state: EngineStatePayload) {
   phases.render(state);
 
   if (state.status === "ready") {
-    setDockerRecoveryVisible(false);
+    recovery.setDockerRecoveryVisible(false);
     setStatusBadge(true);
     powerBtn.disabled = false;
     exposure.setEnabled(false);
@@ -792,80 +636,6 @@ launchWebBtn.addEventListener("click", async () => {
   }
 });
 
-dockerRetryBtn.addEventListener("click", initializeEngine);
-
-dockerStartBtn.addEventListener("click", () => {
-  if (dockerRecoveryPending) {
-    pixelatedWindow.electronAPI.cancelDockerRecovery();
-    return;
-  }
-
-  setDockerRecoveryPending(true);
-  pixelatedWindow.electronAPI.startDockerApplication({
-    exposureMode: exposure.getMode(),
-  });
-});
-
-dockerBuildImageBtn.addEventListener("click", () => {
-  if (imageBuildPending) return;
-
-  setImageBuildPending(true);
-  pixelatedWindow.electronAPI.buildEngineImage({
-    exposureMode: exposure.getMode(),
-  });
-});
-
-async function openDockerResource(resource: "guide" | "install") {
-  if (!dockerDiagnostic) return;
-
-  dockerRetryBtn.disabled = true;
-  dockerBuildImageBtn.disabled = true;
-  dockerDownloadBtn.disabled = true;
-  dockerGuideBtn.disabled = true;
-  try {
-    await pixelatedWindow.electronAPI.openDockerResource(
-      resource,
-      dockerDiagnostic.code,
-    );
-  } catch (err) {
-    logs.append(
-      `<span class="text-red-400">Could not open Docker guidance: ${logs.sanitize(String(err))}</span>`,
-    );
-  } finally {
-    if (!dockerRecoveryPending) {
-      dockerRetryBtn.disabled = false;
-      dockerBuildImageBtn.disabled = false;
-      dockerDownloadBtn.disabled = false;
-      dockerGuideBtn.disabled = false;
-    }
-  }
-}
-
-dockerDownloadBtn.addEventListener("click", () => {
-  void openDockerResource("install");
-});
-
-dockerGuideBtn.addEventListener("click", () => {
-  void openDockerResource("guide");
-});
-
-dockerCopyDiagnosticsBtn.addEventListener("click", async () => {
-  const summary = dockerDiagnostic?.summary || imageRecovery?.summary;
-  if (!summary) return;
-
-  try {
-    await navigator.clipboard.writeText(summary);
-    dockerCopyDiagnosticsBtn.innerText = "Copied";
-    setTimeout(() => {
-      dockerCopyDiagnosticsBtn.innerText = "Copy diagnostics";
-    }, 1200);
-  } catch {
-    logs.append(
-      '<span class="text-red-400">Failed to copy the sanitized diagnostic.</span>',
-    );
-  }
-});
-
 clearLogsBtn.addEventListener("click", () => {
   logs.clear();
 });
@@ -913,16 +683,6 @@ revokeInviteBtn.addEventListener("click", () => {
   pixelatedWindow.electronAPI.revokeLanInvite();
 });
 
-rotateTokenBtn.addEventListener("click", () => {
-  if (!isRunning || clientsActionPending) return;
-  clientsActionPending = true;
-  setClientControlsEnabled(false);
-  clientsStatus.innerText = "Rotating token and restarting engine...";
-  pixelatedWindow.electronAPI.rotateEngineToken({
-    exposureMode: exposure.getMode(),
-  });
-});
-
 pixelatedWindow.electronAPI.onEngineToken((event, token) => {
   tokenValue.innerText = token;
   tokenPanel.classList.remove("hidden");
@@ -946,7 +706,7 @@ pixelatedWindow.electronAPI.onEngineCompanion((event, payload) => {
 });
 
 pixelatedWindow.electronAPI.onDockerDiagnostic((event, payload) => {
-  setDockerRecoveryVisible(true, payload);
+  recovery.setDockerRecoveryVisible(true, payload);
   logs.append(
     `<span class="text-red-400">${logs.sanitize(payload.title)}</span>`,
   );
@@ -956,7 +716,7 @@ pixelatedWindow.electronAPI.onDockerDiagnostic((event, payload) => {
 });
 
 pixelatedWindow.electronAPI.onEngineImageRecovery((event, payload) => {
-  setImageRecoveryVisible(true, payload);
+  recovery.setImageRecoveryVisible(true, payload);
   logs.append(
     `<span class="text-red-400">${logs.sanitize(payload.title)}</span>`,
   );
@@ -966,28 +726,28 @@ pixelatedWindow.electronAPI.onEngineImageRecovery((event, payload) => {
 });
 
 pixelatedWindow.electronAPI.onDockerRecoveryStarted(() => {
-  setDockerRecoveryPending(true);
+  recovery.setDockerRecoveryPending(true);
 });
 
 pixelatedWindow.electronAPI.onDockerRecoveryReady(() => {
-  setDockerRecoveryVisible(false);
+  recovery.setDockerRecoveryVisible(false);
 });
 
 pixelatedWindow.electronAPI.onDockerRecoveryCancelled(() => {
-  setDockerRecoveryPending(false);
+  recovery.setDockerRecoveryPending(false);
 });
 
 pixelatedWindow.electronAPI.onEngineImageBuildStarted(() => {
-  setImageBuildPending(true);
+  recovery.setImageBuildPending(true);
 });
 
 pixelatedWindow.electronAPI.onEngineImageBuildReady(() => {
-  setImageRecoveryVisible(false);
+  recovery.setImageRecoveryVisible(false);
 });
 
 pixelatedWindow.electronAPI.onEngineState((event, state) => {
   if (state.status === "ready" || state.status === "failed" || state.status === "stopped") {
-    clientsActionPending = false;
+    clients.resetActionPending();
   }
   setLifecycleState(state);
 });
@@ -1006,4 +766,4 @@ exposure.render();
 phases.render();
 regenerateInviteBtn.disabled = true;
 revokeInviteBtn.disabled = true;
-setClientControlsEnabled(false);
+clients.setControlsEnabled(false);
