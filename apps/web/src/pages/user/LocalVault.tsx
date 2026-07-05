@@ -238,7 +238,7 @@ export default function LocalVault() {
         <div
           className={`mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${
             vaultMessage.tone === "error"
-              ? "border-red-400/30 bg-red-500/10 text-red-200"
+              ? "danger-panel font-bold"
               : "border-[#C02066]/40 bg-[#9B0048]/15 text-[#F38BB4]"
           }`}
         >

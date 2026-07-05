@@ -24,7 +24,7 @@ function PreflightRow({
     tone === "pass"
       ? "text-[#F38BB4]"
       : tone === "fail"
-        ? "text-red-200"
+        ? "font-semibold text-red-100"
         : tone === "checking"
           ? "text-synth-secondary"
           : "text-gray-400";

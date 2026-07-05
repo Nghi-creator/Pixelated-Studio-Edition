@@ -347,7 +347,7 @@ async function main() {
     await page.getByPlaceholder("Email address").fill(email);
     await page.getByPlaceholder("Password").fill(password);
     await page.getByRole("button", { name: "Sign In", exact: true }).click();
-    await page.waitForURL((url) => url.pathname === "/", { timeout: 30_000 });
+    await page.waitForURL((url) => url.pathname === "/home", { timeout: 30_000 });
     bearerToken = await getBrowserBearerToken();
     assert.ok(bearerToken, "Hosted sign-in did not persist a Supabase session.");
     const me = await apiRequest("/me");

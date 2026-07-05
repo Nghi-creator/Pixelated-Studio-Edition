@@ -165,7 +165,7 @@ export default function Publish() {
       >
         {visibleError && (
           <div
-            className="mb-6 rounded-lg border border-red-300 bg-red-700/80 px-4 py-3 text-sm font-extrabold text-white shadow-lg shadow-red-950/30"
+            className="danger-panel mb-6 rounded-lg border px-4 py-3 text-sm font-bold"
             role="alert"
           >
             {visibleError}

@@ -19,3 +19,137 @@
     @apply outline-none ring-2 ring-synth-primary/50 ring-offset-2 ring-offset-synth-bg;
   }
 }
+
+@layer components {
+  .danger-panel {
+    border-color: rgba(239, 68, 68, 0.55);
+    background-color: rgba(127, 29, 29, 0.38);
+    color: rgb(254, 202, 202);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+  }
+
+  .danger-action {
+    border-color: rgba(239, 68, 68, 0.72);
+    background-color: rgba(127, 29, 29, 0.46);
+    color: rgb(254, 202, 202);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  }
+
+  .danger-action:hover {
+    background-color: rgba(153, 27, 27, 0.58);
+    color: white;
+  }
+
+  .feature-pop-card {
+    position: relative;
+    z-index: 0;
+    transform: translateZ(0);
+    transform-origin: center;
+    transition:
+      transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+      box-shadow 220ms ease,
+      border-color 220ms ease,
+      background-color 220ms ease;
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .feature-pop-card:hover {
+      z-index: 20;
+      transform: translateY(-14px) scale(1.07);
+      border-color: rgba(216, 164, 181, 0.92);
+      background-color: rgba(74, 40, 53, 0.94);
+      box-shadow:
+        0 22px 48px rgba(0, 0, 0, 0.46),
+        0 0 0 1px rgba(255, 194, 209, 0.16),
+        0 0 38px rgba(216, 164, 181, 0.22);
+    }
+  }
+
+  .pixel-title-glow {
+    position: relative;
+    display: inline-block;
+    text-shadow:
+      0 0 8px rgba(255, 194, 209, 0.48),
+      0 0 22px rgba(216, 164, 181, 0.44),
+      0 0 42px rgba(155, 0, 72, 0.34),
+      0 0 68px rgba(184, 111, 136, 0.24);
+    animation: pixel-title-flicker 4.8s steps(1, end) infinite;
+  }
+
+  .pixel-title-glow::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      110deg,
+      transparent 0%,
+      transparent 42%,
+      rgba(255, 226, 235, 0.82) 50%,
+      transparent 58%,
+      transparent 100%
+    );
+    mix-blend-mode: screen;
+    opacity: 0;
+    transform: translateX(-115%);
+    animation: pixel-title-sweep 5.6s ease-in-out infinite;
+  }
+
+  @keyframes pixel-title-flicker {
+    0%,
+    7%,
+    9%,
+    13%,
+    100% {
+      opacity: 1;
+      text-shadow:
+        0 0 8px rgba(255, 194, 209, 0.48),
+        0 0 22px rgba(216, 164, 181, 0.44),
+        0 0 42px rgba(155, 0, 72, 0.34),
+        0 0 68px rgba(184, 111, 136, 0.24);
+    }
+
+    8%,
+    12% {
+      opacity: 0.88;
+      text-shadow:
+        2px 0 0 rgba(255, 194, 209, 0.48),
+        -2px 0 0 rgba(216, 164, 181, 0.36),
+        0 0 32px rgba(255, 194, 209, 0.52),
+        0 0 58px rgba(155, 0, 72, 0.34);
+    }
+  }
+
+  @keyframes pixel-title-sweep {
+    0%,
+    32% {
+      opacity: 0;
+      transform: translateX(-115%);
+    }
+
+    42% {
+      opacity: 0.42;
+    }
+
+    56%,
+    100% {
+      opacity: 0;
+      transform: translateX(115%);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .feature-pop-card {
+      transition: none;
+    }
+
+    .feature-pop-card:hover {
+      transform: none;
+    }
+
+    .pixel-title-glow,
+    .pixel-title-glow::after {
+      animation: none;
+    }
+  }
+}

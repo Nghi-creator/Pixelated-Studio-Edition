@@ -141,7 +141,7 @@ export default function Profile() {
                     ? "bg-[#9B0048]/15 border-[#C02066]/50 text-[#F38BB4]"
                     : profileMessage.type === "warning"
                       ? "bg-synth-primary/10 border-synth-primary/50 text-synth-secondary"
-                      : "bg-red-500/10 border-red-500/50 text-red-400"
+                      : "danger-panel font-bold"
                 }`}
                 role={profileMessage.type === "error" ? "alert" : "status"}
               >
@@ -231,7 +231,7 @@ export default function Profile() {
             {/* Password Message Block */}
             {passwordMessage && (
               <div
-                className={`p-4 rounded-lg mb-6 border ${passwordMessage.type === "success" ? "bg-[#9B0048]/15 border-[#C02066]/50 text-[#F38BB4]" : "bg-red-500/10 border-red-500/50 text-red-400"}`}
+                className={`p-4 rounded-lg mb-6 border ${passwordMessage.type === "success" ? "bg-[#9B0048]/15 border-[#C02066]/50 text-[#F38BB4]" : "danger-panel font-bold"}`}
               >
                 {passwordMessage.text}
               </div>
@@ -289,7 +289,7 @@ export default function Profile() {
             {/* MERGED DANGER ZONE (HIDDEN FROM ADMINS/SUPER_ADMINS) */}
             {userRole !== "admin" && userRole !== "super_admin" && (
               <div className="mt-10 pt-8 border-t border-synth-border">
-                <h3 className="text-lg font-bold text-red-500 mb-2 flex items-center gap-2">
+                <h3 className="text-lg font-bold text-red-300 mb-2 flex items-center gap-2">
                   <AlertOctagon className="w-5 h-5" /> Danger Zone
                 </h3>
                 <p className="text-gray-400 text-sm mb-6">
@@ -299,7 +299,7 @@ export default function Profile() {
                 <button
                   onClick={() => setShowDeleteModal(true)}
                   type="button"
-                  className="bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 font-bold py-2.5 px-6 rounded-lg transition-all"
+                  className="danger-action rounded-lg border px-6 py-2.5 font-bold transition-colors"
                 >
                   Delete Account
                 </button>

@@ -14,6 +14,14 @@ type DesktopLaunchPairingDependencies = {
   setEngineUrl: (engineUrl: string) => void;
 };
 
+function getPostPairingUrl(url: URL) {
+  if (url.pathname !== "/") return url;
+
+  const nextUrl = new URL(url);
+  nextUrl.pathname = "/home";
+  return nextUrl;
+}
+
 export async function pairFromDesktopLaunchUrl(
   url: URL,
   {
@@ -69,7 +77,7 @@ export async function pairFromDesktopLaunchUrl(
     url.searchParams.delete("engineToken");
     url.searchParams.delete("companionUrl");
     url.searchParams.delete("launchTicket");
-    replaceState(url);
+    replaceState(getPostPairingUrl(url));
 
     try {
       await pairLocalEngine(engineUrl);
@@ -113,7 +121,7 @@ export async function pairFromDesktopLaunchUrl(
     });
     url.searchParams.delete("companionUrl");
     url.searchParams.delete("launchTicket");
-    replaceState(url);
+    replaceState(getPostPairingUrl(url));
 
     try {
       await pairLocalEngine(companionUrl);

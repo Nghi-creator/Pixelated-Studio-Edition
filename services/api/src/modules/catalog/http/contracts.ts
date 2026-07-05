@@ -19,6 +19,7 @@ export const reactionBodySchema = z.object({
 });
 
 export type CachedGamesCatalogResponse = {
+  featuredGames?: unknown[];
   games: unknown[];
   page: number;
   pageSize: number;
