@@ -110,7 +110,7 @@ export function ResearchRunModal({
       <section
         aria-labelledby="research-run-title"
         aria-modal="true"
-        className="max-h-full w-full max-w-[35rem] overflow-y-auto rounded-lg border border-synth-border bg-synth-surface p-5 shadow-card"
+        className="max-h-full w-full max-w-[37rem] overflow-y-auto rounded-lg border border-synth-border bg-synth-surface p-5 shadow-card"
         role="dialog"
       >
         <div className="mb-4 flex items-center justify-between gap-3">
