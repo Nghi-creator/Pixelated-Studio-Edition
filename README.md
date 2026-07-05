@@ -52,6 +52,26 @@ Each application keeps framework entrypoints at its root. Supporting code is
 grouped by domain, while test trees separate unit, integration, interaction,
 and smoke coverage where those types apply.
 
+## Development commands
+
+The repository is configured as an npm workspace. From the repository root:
+
+```sh
+npm install
+npm run lint
+npm test
+npm run build
+```
+
+Focused package commands are also available:
+
+```sh
+npm run test:web
+npm run verify:api
+npm run build:desktop
+npm run test:engine
+```
+
 ---
 
 ## 🌟 PIXELATED Studio desktop app

@@ -1,18 +1,38 @@
 {
   "name": "pixelated-studio-edition",
   "private": true,
+  "workspaces": [
+    "apps/desktop",
+    "apps/web",
+    "engine/runtime",
+    "services/api"
+  ],
   "scripts": {
-    "check:access-log-schema": "npm --prefix services/api run check:access-log-schema",
-    "check:submission-cleanup-policy": "npm --prefix services/api run check:submission-cleanup-policy",
-    "predeploy:hosted": "npm --prefix services/api run predeploy:hosted",
+    "build": "npm run build:api && npm run build:engine && npm run build:web && npm run build:desktop",
+    "build:api": "npm run build -w @pixelated/api",
+    "build:desktop": "npm run build -w pixelated-desktop",
+    "build:engine": "npm run build -w @pixelated/engine-runtime",
+    "build:web": "npm run build -w @pixelated/web",
+    "check:access-log-schema": "npm run check:access-log-schema -w @pixelated/api",
+    "check:submission-cleanup-policy": "npm run check:submission-cleanup-policy -w @pixelated/api",
+    "lint": "npm run lint:api && npm run lint:web",
+    "lint:api": "npm run lint -w @pixelated/api",
+    "lint:web": "npm run lint -w @pixelated/web",
+    "predeploy:hosted": "npm run predeploy:hosted -w @pixelated/api",
     "smoke:hosted-auth": "node scripts/hosted/hostedAuthSmoke.mjs",
     "smoke:hosted-pairing": "node scripts/hosted/hostedPairingSmoke.mjs",
     "smoke:lan": "node scripts/lan/multiplayerSmoke.mjs",
     "smoke:lan-summary": "node scripts/lan/summarizeSmokeArtifacts.mjs",
+    "test": "npm run test:api && npm run test:engine && npm run test:web && npm run test:desktop && npm run test:smoke",
+    "test:api": "npm test -w @pixelated/api",
+    "test:desktop": "npm test -w pixelated-desktop",
+    "test:engine": "npm test -w @pixelated/engine-runtime",
     "test:web-interactions": "node scripts/web/interactionHarnessSmoke.mjs",
+    "test:web": "npm test -w @pixelated/web",
     "test:smoke": "node --test scripts/lan/*.test.mjs",
-    "verify:hosted-contract": "node --check scripts/hosted/hostedAuthSmoke.mjs && node --check scripts/hosted/hostedPairingSmoke.mjs && node --check scripts/web/interactionHarnessSmoke.mjs && node scripts/hosted/hostedAuthSmoke.mjs --contract-only && node scripts/hosted/hostedPairingSmoke.mjs --contract-only && npm run test:smoke && npm --prefix apps/web run lint && npm --prefix apps/web run test && npm --prefix apps/web run build && npm run test:web-interactions && npm --prefix apps/desktop run test",
-    "verify:api": "npm --prefix services/api run typecheck && npm --prefix services/api run lint && npm --prefix services/api run test && npm --prefix services/api run build"
+    "typecheck:api": "npm run typecheck -w @pixelated/api",
+    "verify:hosted-contract": "node --check scripts/hosted/hostedAuthSmoke.mjs && node --check scripts/hosted/hostedPairingSmoke.mjs && node --check scripts/web/interactionHarnessSmoke.mjs && node scripts/hosted/hostedAuthSmoke.mjs --contract-only && node scripts/hosted/hostedPairingSmoke.mjs --contract-only && npm run test:smoke && npm run lint:web && npm run test:web && npm run build:web && npm run test:web-interactions && npm run test:desktop",
+    "verify:api": "npm run typecheck:api && npm run lint:api && npm run test:api && npm run build:api"
   },
   "devDependencies": {
     "playwright": "^1.55.0"
