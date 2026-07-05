@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   clearEngineToken,
-  ENGINE_PAIRING_EVENT,
   ensureEngineToken,
 } from "../engine/engineAuth";
 import { attachEngineInput } from "./webrtcInput";
@@ -59,9 +58,10 @@ import type {
   LobbyState,
   UseWebRTCOptions,
 } from "./types";
-
-const BLACK_FRAME_STALL_MESSAGE =
-  "The stream connected, but the video stayed black. Retry the stream; if this only happens on cellular data, configure a TURN relay or use Wi-Fi.";
+import { useEnginePairingVersion } from "./useEnginePairingVersion";
+import { useWebRTCLobbyControls } from "./useWebRTCLobbyControls";
+import { useWebRTCProfileRestart } from "./useWebRTCProfileRestart";
+import { useWebRTCRecoveryControls } from "./useWebRTCRecoveryControls";
 
 export type {
   EngineInputCapabilities,
@@ -93,7 +93,7 @@ export function useWebRTC(
   const [telemetry, setTelemetry] = useState<WebRTCTelemetry>(
     INITIAL_WEBRTC_TELEMETRY,
   );
-  const [pairingVersion, setPairingVersion] = useState(0);
+  const pairingVersion = useEnginePairingVersion();
   const [retryVersion, setRetryVersion] = useState(0);
   const [sessionId, setSessionId] = useState(
     () => options.sessionId || createWebRTCSessionId(),
@@ -109,11 +109,16 @@ export function useWebRTC(
   const shareContextRef = useRef(shareContext);
   const lastMetricSentAtRef = useRef(0);
   const metricsDisabledRef = useRef(false);
-  const streamProfileRef = useRef(streamProfile);
-  const appliedStreamProfileIdRef = useRef(streamProfile.id);
-  const seamlessRestartRef = useRef(false);
-  const profileAutoRetriesRemainingRef = useRef(0);
   const sessionConflictAutoRetriesRemainingRef = useRef(1);
+  const {
+    profileAutoRetriesRemainingRef,
+    seamlessRestartRef,
+    streamProfileRef,
+  } = useWebRTCProfileRestart({
+    peerIdRef,
+    setRetryVersion,
+    streamProfile,
+  });
 
   useEffect(() => {
     sessionIdRef.current = sessionId;
@@ -126,27 +131,6 @@ export function useWebRTC(
   useEffect(() => {
     shareContextRef.current = shareContext;
   }, [shareContext]);
-
-  useEffect(() => {
-    const handlePairingChange = () =>
-      setPairingVersion((currentVersion) => currentVersion + 1);
-
-    window.addEventListener(ENGINE_PAIRING_EVENT, handlePairingChange);
-    return () =>
-      window.removeEventListener(ENGINE_PAIRING_EVENT, handlePairingChange);
-  }, []);
-
-  useEffect(() => {
-    streamProfileRef.current = streamProfile;
-    if (appliedStreamProfileIdRef.current === streamProfile.id) return;
-
-    appliedStreamProfileIdRef.current = streamProfile.id;
-    const identity = createWebRTCProfileRestartIdentity();
-    peerIdRef.current = identity.peerId;
-    seamlessRestartRef.current = true;
-    profileAutoRetriesRemainingRef.current = 1;
-    setRetryVersion((currentVersion) => currentVersion + 1);
-  }, [streamProfile]);
 
   useEffect(() => {
     if (!gameId) return;
@@ -666,72 +650,40 @@ export function useWebRTC(
     options.requestedRole,
     options.sessionId,
     pairingVersion,
+    profileAutoRetriesRemainingRef,
     retryVersion,
+    seamlessRestartRef,
     sessionId,
+    streamProfileRef,
   ]);
 
-  const retry = () => {
-    onResearchEvent?.("retry_started", {
-      reason: "manual_retry",
-    });
-    const identity = createWebRTCRetryIdentity(Boolean(options.sessionId));
-    peerIdRef.current = identity.peerId;
-    if (identity.sessionId) setSessionId(identity.sessionId);
-    metricsDisabledRef.current = false;
-    lastMetricSentAtRef.current = 0;
-    seamlessRestartRef.current = false;
-    profileAutoRetriesRemainingRef.current = 0;
-    sessionConflictAutoRetriesRemainingRef.current = 1;
-    setRetryVersion((currentVersion) => currentVersion + 1);
-  };
-
-  const reportBlackFrameStall = useCallback(() => {
-    loadEngineLaunchFailureMessage().then((diagnosticMessage) => {
-      onResearchEvent?.("engine_error", {
-        message: diagnosticMessage || BLACK_FRAME_STALL_MESSAGE,
-        source: "black_frame_stall",
-      });
-      setTelemetry((currentTelemetry) => ({
-        ...currentTelemetry,
-        lastEngineError: diagnosticMessage || BLACK_FRAME_STALL_MESSAGE,
-        lastUpdatedAt: Date.now(),
-      }));
-      setStatus("error");
-    });
-  }, [onResearchEvent]);
-
-  const requestPlayerSlot = (playerIndex: number) => {
-    const supportedPlayerCount =
-      inputCapabilitiesRef.current.supportedPlayerCount;
-    if (playerIndex > supportedPlayerCount) {
-      setTelemetry((currentTelemetry) => ({
-        ...currentTelemetry,
-        lastEngineError:
-          inputCapabilitiesRef.current.limitationReason ||
-          `Player slot ${playerIndex} is not available on this engine.`,
-        lastUpdatedAt: Date.now(),
-      }));
-      return;
-    }
-
-    socketRef.current?.emit("request-player-slot", {
-      playerIndex,
-      sessionId: sessionIdRef.current,
-    });
-  };
-
-  const releasePlayerSlot = () => {
-    socketRef.current?.emit("release-player-slot", {
-      sessionId: sessionIdRef.current,
-    });
-  };
-
-  const kickParticipant = (socketId: string) => {
-    socketRef.current?.emit("lobby-kick", {
-      sessionId: sessionIdRef.current,
-      socketId,
-    });
-  };
+  const {
+    reportBlackFrameStall,
+    retry,
+  } = useWebRTCRecoveryControls({
+    lastMetricSentAtRef,
+    metricsDisabledRef,
+    onResearchEvent,
+    options,
+    peerIdRef,
+    profileAutoRetriesRemainingRef,
+    seamlessRestartRef,
+    sessionConflictAutoRetriesRemainingRef,
+    setRetryVersion,
+    setSessionId,
+    setStatus,
+    setTelemetry,
+  });
+  const {
+    kickParticipant,
+    releasePlayerSlot,
+    requestPlayerSlot,
+  } = useWebRTCLobbyControls({
+    inputCapabilitiesRef,
+    sessionIdRef,
+    setTelemetry,
+    socketRef,
+  });
 
   return {
     kickParticipant,
