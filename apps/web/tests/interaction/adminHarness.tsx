@@ -150,7 +150,7 @@ function BootRecoveryHarness({
       className="max-w-3xl space-y-3"
     >
       <PlayerHeader
-        backRoute={mode === "cloud" ? "/" : "/local"}
+        backRoute={mode === "cloud" ? "/home" : "/local"}
         backText={mode === "cloud" ? "Back to Cloud Library" : "Back to Local Vault"}
         gameTitle={title}
         onToggleTelemetry={() => onRecord(`${mode}-boot-telemetry-toggle`)}
@@ -281,7 +281,7 @@ export function AdminHarness() {
 
       <section aria-label="Stream stage harness" className="max-w-2xl">
         <PlayerHeader
-          backRoute="/"
+          backRoute="/home"
           backText="Back to Cloud Library"
           gameTitle="Harness Game"
           onToggleTelemetry={() => {
