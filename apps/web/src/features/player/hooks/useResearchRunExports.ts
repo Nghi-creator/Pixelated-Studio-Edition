@@ -32,9 +32,12 @@ import {
 import { createStreamTelemetryGraphPngBytes } from "../streamTelemetryGraphPng";
 import {
   addPacketLossDeltas,
+  createStreamTelemetryGraphFilename,
   streamTelemetrySamplesToCsv,
   type StreamTelemetryCsvSample,
+  type StreamTelemetryGraphSample,
 } from "../streamTelemetryExport";
+import type { StreamTelemetryHistorySample } from "./useStreamTelemetryHistory";
 
 export function useResearchRunExports({
   baselineForm,
@@ -42,6 +45,7 @@ export function useResearchRunExports({
   form,
   gameId,
   gameTitle,
+  history,
   playerMode,
   recordedCsvSamples,
   runId,
@@ -55,6 +59,7 @@ export function useResearchRunExports({
   form: ResearchRunMetadataForm;
   gameId: string | undefined;
   gameTitle: string;
+  history: StreamTelemetryHistorySample[];
   playerMode: "guest" | "host";
   recordedCsvSamples: StreamTelemetryCsvSample[];
   runId: string;
@@ -122,52 +127,80 @@ export function useResearchRunExports({
   );
 
   const buildGraphPng = useCallback(() => {
-    return createStreamTelemetryGraphPngBytes(addPacketLossDeltas(recordedCsvSamples), {
+    const graphSamples: StreamTelemetryGraphSample[] =
+      recordedCsvSamples.length > 0
+        ? addPacketLossDeltas(recordedCsvSamples)
+        : history.map((sample, index) => ({
+            bitrateKbps: sample.bitrateKbps,
+            elapsedMs: index * 1000,
+            fps: sample.fps,
+            jitterMs: sample.jitterMs,
+            packetsLostDelta:
+              index === 0
+                ? sample.packetsLost
+                : Math.max(
+                    0,
+                    sample.packetsLost - history[index - 1].packetsLost,
+                  ),
+            packetsLostTotal: sample.packetsLost,
+          }));
+
+    return createStreamTelemetryGraphPngBytes(graphSamples, {
       gameTitle,
       playerMode,
       status,
     });
-  }, [gameTitle, playerMode, recordedCsvSamples, status]);
+  }, [gameTitle, history, playerMode, recordedCsvSamples, status]);
 
   const summary = useMemo(() => createSummary(), [createSummary]);
 
-  const exportMetadata = useCallback(() => {
+  const exportMetadata = useCallback(async () => {
     const capturedAt = new Date();
-    downloadText(
+    await downloadText(
       createResearchRunMetadataFilename({ gameId, recordedAt: capturedAt, runId }),
       buildMetadataJson(capturedAt),
       "application/json;charset=utf-8",
     );
   }, [buildMetadataJson, gameId, runId]);
 
-  const exportEvents = useCallback(() => {
+  const exportEvents = useCallback(async () => {
     const capturedAt = new Date();
-    downloadText(
+    await downloadText(
       createResearchRunEventsFilename({ gameId, recordedAt: capturedAt, runId }),
       researchRunEventsToCsv(events),
       "text/csv;charset=utf-8",
     );
   }, [events, gameId, runId]);
 
-  const exportSummary = useCallback(() => {
+  const exportSummary = useCallback(async () => {
     const generatedAt = new Date();
-    downloadText(
+    await downloadText(
       createResearchRunSummaryFilename({ gameId, recordedAt: generatedAt, runId }),
       buildSummaryJson(generatedAt),
       "application/json;charset=utf-8",
     );
   }, [buildSummaryJson, gameId, runId]);
 
-  const exportBaseline = useCallback(() => {
+  const exportBaseline = useCallback(async () => {
     const capturedAt = new Date();
-    downloadText(
+    await downloadText(
       createResearchBaselineFilename({ gameId, recordedAt: capturedAt, runId }),
       buildBaselineJson(capturedAt),
       "application/json;charset=utf-8",
     );
   }, [buildBaselineJson, gameId, runId]);
 
-  const exportBundle = useCallback(() => {
+  const exportGraph = useCallback(async () => {
+    const graphPng = buildGraphPng();
+    if (!graphPng) return;
+
+    await downloadBlob(
+      createStreamTelemetryGraphFilename({ gameId, sessionId }),
+      new Blob([graphPng], { type: "image/png" }),
+    );
+  }, [buildGraphPng, gameId, sessionId]);
+
+  const exportBundle = useCallback(async () => {
     const recordedAt = new Date();
     const files: ResearchRunBundleFile[] = [
       {
@@ -203,7 +236,7 @@ export function useResearchRunExports({
       });
     }
 
-    downloadBlob(
+    await downloadBlob(
       createResearchRunBundleFilename({ gameId, recordedAt, runId }),
       new Blob([createResearchRunBundleTar(files, recordedAt)], {
         type: "application/x-tar",
@@ -223,12 +256,17 @@ export function useResearchRunExports({
 
   return {
     canExportBundle:
-      isBrowserBaseline || events.length > 0 || recordedCsvSamples.length > 0,
+      isBrowserBaseline ||
+      events.length > 0 ||
+      recordedCsvSamples.length > 0 ||
+      history.length > 0,
     canExportEvents: events.length > 0,
+    canExportGraph: recordedCsvSamples.length > 0 || history.length > 0,
     canExportSummary: events.length > 0 || recordedCsvSamples.length > 0,
     exportBaseline,
     exportBundle,
     exportEvents,
+    exportGraph,
     exportMetadata,
     exportSummary,
     firstFrameElapsedMs: findFirstEventElapsedMs(

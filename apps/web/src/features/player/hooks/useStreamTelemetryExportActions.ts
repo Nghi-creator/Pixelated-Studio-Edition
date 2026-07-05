@@ -3,34 +3,11 @@ import { engineAuthHeaders } from "../../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../../lib/engine/engineConfig";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
 import { downloadBlob } from "../downloadFile";
-import { createStreamTelemetryGraphPngBlob } from "../streamTelemetryGraphPng";
 import {
-  addPacketLossDeltas,
-  createStreamTelemetryGraphFilename,
   createStreamTelemetryCsvFilename,
   streamTelemetrySamplesToCsv,
   type StreamTelemetryCsvSample,
-  type StreamTelemetryGraphSample,
 } from "../streamTelemetryExport";
-import type { StreamTelemetryHistorySample } from "./useStreamTelemetryHistory";
-
-type FileSystemWritable = {
-  close: () => Promise<void>;
-  write: (data: Blob) => Promise<void>;
-};
-
-type SaveFilePickerWindow = Window &
-  typeof globalThis & {
-    showSaveFilePicker?: (options: {
-      suggestedName: string;
-      types: Array<{
-        accept: Record<string, string[]>;
-        description: string;
-      }>;
-    }) => Promise<{
-      createWritable: () => Promise<FileSystemWritable>;
-    }>;
-  };
 
 function buildTelemetrySnapshot({
   gameId,
@@ -61,8 +38,6 @@ function buildTelemetrySnapshot({
 
 export function useStreamTelemetryExportActions({
   gameId,
-  gameTitle,
-  history,
   playerMode,
   recordedCsvSamples,
   sessionId,
@@ -71,8 +46,6 @@ export function useStreamTelemetryExportActions({
   telemetry,
 }: {
   gameId: string | undefined;
-  gameTitle: string;
-  history: StreamTelemetryHistorySample[];
   playerMode: "guest" | "host";
   recordedCsvSamples: StreamTelemetryCsvSample[];
   sessionId: string;
@@ -86,16 +59,12 @@ export function useStreamTelemetryExportActions({
   const [csvState, setCsvState] = useState<"exported" | "failed" | "idle">(
     "idle",
   );
-  const [graphState, setGraphState] = useState<"exported" | "failed" | "idle">(
-    "idle",
-  );
 
   const resetCsvState = () => setCsvState("idle");
 
   const resetExportStates = () => {
     setCopyState("idle");
     setCsvState("idle");
-    setGraphState("idle");
   };
 
   const copyTelemetry = async () => {
@@ -143,68 +112,14 @@ export function useStreamTelemetryExportActions({
       const csv = streamTelemetrySamplesToCsv(recordedCsvSamples);
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       const suggestedName = createStreamTelemetryCsvFilename({ gameId, sessionId });
-      const pickerWindow = window as SaveFilePickerWindow;
-
-      if (pickerWindow.showSaveFilePicker) {
-        const fileHandle = await pickerWindow.showSaveFilePicker({
-          suggestedName,
-          types: [
-            {
-              accept: { "text/csv": [".csv"] },
-              description: "CSV file",
-            },
-          ],
-        });
-        const writable = await fileHandle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        setCsvState("exported");
-        window.setTimeout(() => setCsvState("idle"), 1600);
-        return;
-      }
-
-      downloadBlob(suggestedName, blob);
+      const result = await downloadBlob(suggestedName, blob);
+      if (result === "cancelled") return;
       setCsvState("exported");
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") return;
+    } catch {
       setCsvState("failed");
     }
 
     window.setTimeout(() => setCsvState("idle"), 1600);
-  };
-
-  const exportTelemetryGraph = () => {
-    const sourceGraphSamples: StreamTelemetryGraphSample[] =
-      recordedCsvSamples.length > 0
-        ? addPacketLossDeltas(recordedCsvSamples)
-        : history.map((sample, index) => ({
-            bitrateKbps: sample.bitrateKbps,
-            elapsedMs: index * 1000,
-            fps: sample.fps,
-            jitterMs: sample.jitterMs,
-            packetsLostDelta:
-              index === 0
-                ? sample.packetsLost
-                : Math.max(0, sample.packetsLost - history[index - 1].packetsLost),
-            packetsLostTotal: sample.packetsLost,
-          }));
-    const graphPng = createStreamTelemetryGraphPngBlob(sourceGraphSamples, {
-      gameTitle,
-      playerMode,
-      status,
-    });
-    if (!graphPng) {
-      setGraphState("failed");
-      window.setTimeout(() => setGraphState("idle"), 1600);
-      return;
-    }
-
-    downloadBlob(
-      createStreamTelemetryGraphFilename({ gameId, sessionId }),
-      graphPng,
-    );
-    setGraphState("exported");
-    window.setTimeout(() => setGraphState("idle"), 1600);
   };
 
   return {
@@ -212,8 +127,6 @@ export function useStreamTelemetryExportActions({
     copyTelemetry,
     csvState,
     exportTelemetryCsv,
-    exportTelemetryGraph,
-    graphState,
     resetCsvState,
     resetExportStates,
   };

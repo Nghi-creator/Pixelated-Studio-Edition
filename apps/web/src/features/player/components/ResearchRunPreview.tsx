@@ -33,37 +33,37 @@ export function ResearchRunPreview({
   return (
     <div className="mt-4 grid grid-cols-2 gap-2 rounded-md border border-synth-border bg-synth-bg/80 p-3 text-xs">
       <div>
-        <div className="font-semibold uppercase text-gray-500">Schema</div>
+        <div className="font-semibold uppercase text-white">Schema</div>
         <div className="mt-1 font-bold text-white">
           {RESEARCH_RUN_SCHEMA_VERSION}
         </div>
       </div>
       <div>
-        <div className="font-semibold uppercase text-gray-500">Mode</div>
+        <div className="font-semibold uppercase text-white">Mode</div>
         <div className="mt-1 font-bold capitalize text-white">
           {playerMode}
         </div>
       </div>
       <div>
-        <div className="font-semibold uppercase text-gray-500">Session</div>
+        <div className="font-semibold uppercase text-white">Session</div>
         <div className="mt-1 truncate font-bold text-white">{sessionId}</div>
       </div>
       <div>
-        <div className="font-semibold uppercase text-gray-500">Profile</div>
+        <div className="font-semibold uppercase text-white">Profile</div>
         <div className="mt-1 truncate font-bold text-white">
           {streamProfileId}
         </div>
       </div>
       <div>
-        <div className="font-semibold uppercase text-gray-500">Events</div>
+        <div className="font-semibold uppercase text-white">Events</div>
         <div className="mt-1 font-bold text-white">{eventCount}</div>
       </div>
       <div>
-        <div className="font-semibold uppercase text-gray-500">Samples</div>
+        <div className="font-semibold uppercase text-white">Samples</div>
         <div className="mt-1 font-bold text-white">{recordedSampleCount}</div>
       </div>
       <div>
-        <div className="font-semibold uppercase text-gray-500">
+        <div className="font-semibold uppercase text-white">
           First frame
         </div>
         <div className="mt-1 font-bold text-white">
@@ -71,13 +71,13 @@ export function ResearchRunPreview({
         </div>
       </div>
       <div>
-        <div className="font-semibold uppercase text-gray-500">Start game</div>
+        <div className="font-semibold uppercase text-white">Start game</div>
         <div className="mt-1 font-bold text-white">
           {formatMs(startGameElapsedMs)}
         </div>
       </div>
       <div>
-        <div className="font-semibold uppercase text-gray-500">
+        <div className="font-semibold uppercase text-white">
           Python ready
         </div>
         <div className="mt-1 font-bold text-white">
@@ -85,13 +85,13 @@ export function ResearchRunPreview({
         </div>
       </div>
       <div>
-        <div className="font-semibold uppercase text-gray-500">Median FPS</div>
+        <div className="font-semibold uppercase text-white">Median FPS</div>
         <div className="mt-1 font-bold text-white">
           {formatValue(summary.metrics.fps.median)}
         </div>
       </div>
       <div>
-        <div className="font-semibold uppercase text-gray-500">P95 jitter</div>
+        <div className="font-semibold uppercase text-white">P95 jitter</div>
         <div className="mt-1 font-bold text-white">
           {summary.metrics.jitterMs.p95 === null
             ? "--"
@@ -99,7 +99,7 @@ export function ResearchRunPreview({
         </div>
       </div>
       <div>
-        <div className="font-semibold uppercase text-gray-500">Loss/min</div>
+        <div className="font-semibold uppercase text-white">Loss/min</div>
         <div className="mt-1 font-bold text-white">
           {formatValue(summary.packetLoss.lossPerMinute)}
         </div>
