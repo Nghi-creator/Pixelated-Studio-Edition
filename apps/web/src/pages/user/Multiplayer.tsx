@@ -94,7 +94,7 @@ export default function Multiplayer() {
     <div className="mx-auto min-h-screen w-full max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <div className="mb-6">
         <Link
-          to="/"
+          to="/home"
           className="inline-flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors font-medium group"
         >
           <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />

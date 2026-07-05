@@ -1,166 +1,127 @@
 # Pixelated API
 
-Localhost-first backend control plane for Pixelated Studio.
+Hosted Fastify control plane for PIXELATED Studio. The API is the browser-facing data boundary for authenticated app workflows and the server-to-engine verifier for cloud game boot.
 
-## Local Development
+## Scope
 
-1. Install dependencies:
+The API owns:
 
-   ```bash
-   npm install
-   ```
+- Supabase JWT verification, roles, permissions, and profile access.
+- Catalog reads, featured games, favorites, reactions, comments, reports, and moderation.
+- Admin users, reports, submissions, catalog candidates, and access logs.
+- Game submission metadata and optional Formspree notifications.
+- Cloud session creation, read/delete, and engine-side session verification.
+- WebRTC ICE server configuration.
+- Signed-in local pairing metadata without storing raw desktop engine tokens.
+- Multiplayer lobby metadata and recent lobby discovery.
+- Stream metric ingestion and recent metric reads.
+- Cleanup jobs and production shared rate limiting.
 
-2. Create or edit the local env file:
+The local engine still runs separately on `localhost:8080` and verifies cloud sessions through this API before booting catalog games.
 
-   ```bash
-   cp .env.example .env
-   ```
+## Code map
 
-   This repository already has an ignored `services/api/.env` placeholder for local work. Fill in the Supabase values before testing authenticated routes.
+```text
+src/config/       Environment parsing
+src/plugins/      Fastify plugins for CORS, logging, security, rate limits
+src/modules/      Domain-owned routes, services, policies, contracts
+tests/unit/       Domain and utility tests
+tests/integration Fastify injection tests with fake Supabase services
+tests/smoke/      Hosted/predeploy smoke helpers
+scripts/          Hosted checks, importers, catalog artwork, staging smoke
+```
 
-3. Start the API:
+## Local development
 
-   ```bash
-   npm run dev
-   ```
+```sh
+npm install
+cp .env.example .env
+npm run dev
+```
 
-Default URL:
+Default local URL:
 
 ```text
 http://localhost:4000
 ```
 
-Health check:
+Health and readiness probes:
 
 ```text
-GET http://localhost:4000/health
+GET /
+HEAD /
+GET /health
+GET /ready
 ```
 
-Root probe:
+If Supabase env vars are missing, authenticated routes return `503`. Production `/ready` also requires the shared rate-limit store.
 
-```text
-GET http://localhost:4000/
+## Verification
+
+```sh
+npm run typecheck
+npm run lint
+npm test
+npm run build
 ```
 
-Readiness check:
+Root-level API gate:
 
-```text
-GET http://localhost:4000/ready
+```sh
+npm run verify:api
 ```
 
-## Current Scope
+Hosted predeploy gate:
 
-The API now handles authenticated identity/permissions, game catalog reads, favorites, reactions, comments, profile updates/deletion, admin reports, admin users, access logs, game submission metadata and notifications, WebRTC ICE server config, persisted local pairing and multiplayer lobby metadata, persisted stream metric ingestion, and cloud game session creation/verification. The local engine still runs separately on `localhost:8080`.
+```sh
+npm run predeploy:hosted
+```
 
-Implemented now:
+`predeploy:hosted` checks hosted access-log schema, submission cleanup policy, catalog RPC shape, catalog candidate import validation, typecheck, lint, and build.
 
-- Fastify server bootstrap.
-- Environment parsing.
-- CORS for localhost web and hosted Vercel origin.
-- `GET /health`.
-- `GET /`.
-- `GET /ready`.
-- `POST /access-logs`.
-- Supabase JWT verification middleware.
-- Authenticated `GET /me`.
-- Authenticated `GET /me/permissions`.
-- `GET /games`.
-- `GET /games/featured`.
-- `GET /games/:gameId`.
-- Authenticated favorites routes.
-- Authenticated game reaction routes.
-- Authenticated comment and comment reaction routes.
-- Authenticated profile routes.
-- Authenticated `POST /games/:gameId/play-count`.
-- Authenticated `POST /moderation/comments/:commentId/report`.
-- Authenticated `GET /admin/reports`.
-- Authenticated `POST /admin/reports/:reportId/action`.
-- Authenticated `GET /admin/users`.
-- Authenticated `PATCH /admin/users/:userId`.
-- Authenticated `GET /admin/access-logs`.
-- Authenticated `POST /submissions/games`.
-- Optional server-side Formspree notifications for game submissions.
-- Authenticated `GET /webrtc/ice-servers`.
-- Authenticated `POST /sessions`.
-- `POST /sessions/:sessionId/verify` for local engine cloud session verification.
-- Authenticated local pairing routes.
-- Authenticated multiplayer lobby control-plane routes.
-- Authenticated stream metric routes.
-- Supabase anon/service clients.
+## Auth model
 
-Next phase:
-
-- Run the hosted-stack smoke after API or Supabase control-plane changes.
-
-## Auth Routes
-
-Auth routes expect:
+Authenticated browser routes expect:
 
 ```text
 Authorization: Bearer <supabase-access-token>
 ```
 
-Routes:
+The engine calls:
 
 ```text
-POST /access-logs
-GET /me
-GET /me/permissions
-GET /games
-GET /games/featured
-GET /games/:gameId
-GET /favorites
-GET /favorites/:gameId
-PUT /favorites/:gameId
-DELETE /favorites/:gameId
-GET /games/:gameId/reactions
-PUT /games/:gameId/reaction
-GET /games/:gameId/comments
-POST /games/:gameId/comments
-DELETE /comments/:commentId
-PUT /comments/:commentId/reaction
-GET /profile
-PATCH /profile
-DELETE /me/account
-POST /games/:gameId/play-count
-POST /moderation/comments/:commentId/report
-GET /admin/reports
-POST /admin/reports/:reportId/action
-GET /admin/users
-PATCH /admin/users/:userId
-GET /admin/access-logs
-POST /submissions/games
-GET /webrtc/ice-servers
-POST /sessions
-GET /sessions/:sessionId
-DELETE /sessions/:sessionId
-POST /local-pairings
-GET /local-pairings/current
-DELETE /local-pairings/current
-PUT /multiplayer/lobbies/:sessionId
-GET /multiplayer/lobbies/recent
-DELETE /multiplayer/lobbies/:sessionId
-POST /metrics/stream
-GET /metrics/stream/recent
+POST /sessions/:sessionId/verify
 ```
 
-The local engine calls `POST /sessions/:sessionId/verify` with a `sessionToken` created by `POST /sessions`. That route is token-protected rather than Supabase-bearer protected because it is used server-to-engine during cloud game boot.
+with the session token created by `POST /sessions`. This route is token-protected for server-to-engine verification rather than Supabase-bearer protected.
 
-If Supabase env vars are missing, authenticated routes return `503`.
+## Data boundary
 
-## Data Boundary
+The browser should not call Supabase tables, RPCs, or realtime channels directly. `apps/web/src/lib/api/*` is the frontend boundary for API-owned app data.
 
-The browser should not call Supabase tables, RPCs, or realtime channels directly. `apps/web/src/lib/api/apiClient.ts` is the frontend boundary for app data. Browser-side Supabase usage should stay limited to auth/session handling and Storage uploads that intentionally need direct signed-in client upload behavior.
+Browser-side Supabase use should stay limited to:
 
-`supabase/migrations/20260527111500_api_owned_social_writes.sql` removes direct browser policies for the workflows now owned by this API. Deploy the matching API and web builds before pushing that migration, or push it immediately after both are live.
+- Auth/session handling.
+- Storage uploads that intentionally need direct signed-in client upload behavior, such as game submissions.
 
-## Staging Hosting Notes
+## Important route groups
 
-Use `/health` for liveness checks and `/ready` for confirming required Supabase env vars are configured.
+| Group | Examples |
+| --- | --- |
+| System | `/`, `/health`, `/ready`, `/access-logs` |
+| Identity | `/me`, `/me/permissions`, `/profile`, `/me/account` |
+| Catalog | `/games`, `/games/featured`, `/games/:gameId`, `/games/:gameId/play-count` |
+| Social | `/favorites`, `/games/:gameId/reactions`, `/games/:gameId/comments`, `/comments/:commentId/reaction`, moderation report routes |
+| Admin | `/admin/users`, `/admin/reports`, `/admin/access-logs`, admin submission and catalog-candidate routes |
+| Submissions | `/submissions/games` |
+| Engine/control | `/webrtc/ice-servers`, `/sessions`, `/sessions/:id/verify`, local pairing routes, multiplayer lobby routes |
+| Metrics | `/metrics/stream`, `/metrics/stream/recent` |
 
-Minimum backend host env:
+## Production environment
 
-```text
+Minimum hosted env:
+
+```txt
 NODE_ENV=production
 HOST=0.0.0.0
 PORT=<provider port>
@@ -185,27 +146,17 @@ SUPABASE_ANON_KEY=<your Supabase anon key>
 SUPABASE_SERVICE_ROLE_KEY=<your Supabase service role key>
 ```
 
-Production readiness requires both Redis REST values. Session verification,
-report, comment, reaction, and play-count limits use atomic shared counters so
-multiple API instances enforce the same thresholds. Local development may omit
-Redis and uses a bounded in-memory limiter. If the configured Redis endpoint is
-temporarily unavailable, the API falls back to that local limiter so protected
-routes remain available with per-instance abuse protection. Redis requests are
-bounded by `RATE_LIMIT_REDIS_TIMEOUT_MS` before fallback.
+Production readiness requires both Redis REST values. Local development may omit Redis and uses a bounded in-memory limiter.
 
-Production enables Fastify proxy trust so `request.ip` uses the client address
-forwarded by Render's ingress. Keep production traffic behind a trusted ingress;
-do not expose the Node port directly while accepting client-supplied forwarded
-headers. Render supplies the volumetric edge DDoS layer, while these API limits
-protect application work such as authentication and database queries.
+Production enables Fastify proxy trust so `request.ip` uses the client address forwarded by Render's ingress. Keep production traffic behind a trusted ingress; do not expose the Node port directly while accepting client-supplied forwarded headers.
 
-### Abuse-Control Limits
+## Abuse-control limits
 
 | Workflow | Limit | Coordination |
 | --- | --- | --- |
 | All non-health API requests | 600 per client IP per minute | Redis shared counter |
 | Public catalog reads | 180 per client IP per minute | Redis shared counter |
-| Liveness and readiness checks | 120 per client IP per minute | Redis shared counter |
+| Liveness/readiness checks | 120 per client IP per minute | Redis shared counter |
 | Session verification by IP | 1,000 per minute | Redis shared counter |
 | Session verification by IP and session | 30 per minute | Redis shared counter |
 | Comments | 10 per user per minute | Redis shared counter |
@@ -215,27 +166,13 @@ protect application work such as authentication and database queries.
 | Game submissions | 3 per user per hour | Supabase submission rows |
 | Stream metrics | 1 per user/session every 5 seconds | Supabase metric rows |
 
-## Tests
+If Redis is temporarily unavailable, the API falls back to an in-memory limiter so protected routes remain available with per-instance abuse protection.
 
-Run the focused API test suite from this folder:
+## Staging smoke
 
-```bash
-npm run test
-```
+Before triggering Render API or Vercel web deploy hooks, run:
 
-Tests are grouped under `services/api/tests/unit`, `integration`, and `smoke`.
-The route-level integration tests use Fastify injection and a fake Supabase
-service, so they do not require local database access. HTTP routes mirror their
-domains under `src/modules/*/http`, with domain and service logic kept alongside
-the owning feature module.
-
-## Staging Smoke
-
-Before triggering a Render API or Vercel web deploy, run the fail-fast hosted
-access-log schema gate from the repository root with a dedicated staging admin
-or super-admin smoke account:
-
-```bash
+```sh
 STAGING_API_URL=<render-api-url> \
 STAGING_SUPABASE_URL=<supabase-project-url> \
 STAGING_SUPABASE_ANON_KEY=<supabase-anon-key> \
@@ -244,34 +181,10 @@ STAGING_SMOKE_PASSWORD=<dedicated-staging-admin-password> \
 npm run predeploy:hosted
 ```
 
-The root command delegates to `services/api`. `predeploy:hosted` first runs
-`check:access-log-schema` against the currently hosted API, then runs
-`check:submission-cleanup-policy` against Supabase Storage. The access-log check
-writes and updates one unique `public.access_logs` session and calls
-`public.admin_access_log_summary`; missing access-log migrations stop the
-command before typecheck, lint, or build. The submission-cleanup check uploads
-and removes one disposable object under the smoke user's
-`submissions/{userId}/staging-smoke/` folder; if removal is denied, apply
-`supabase/migrations/20260614153000_allow_own_submission_cleanup.sql` to the
-hosted Supabase project before deploying. Configure `STAGING_API_URL` when
-checking a non-default Render service.
+Run the broader hosted-stack smoke:
 
-GitHub Actions workflow `.github/workflows/hosted-api-deploy-gate.yml` runs:
-
-- `npm run verify:api` on every pull request so its required status check is
-  never skipped by path filtering.
-- `npm run predeploy:hosted` on pushes to `main`, manual dispatches, and calls
-  from future Render/Vercel deploy workflows.
-
-Configure the GitHub `staging` environment with secrets `STAGING_API_URL`,
-`STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_SMOKE_EMAIL`, and
-`STAGING_SMOKE_PASSWORD`. The dedicated smoke account must be an admin or
-super-admin so the access-log summary RPC cannot be skipped. The runner signs
-in at the start of every run and does not store an expiring access token.
-
-Run the hosted-stack smoke test using the same dedicated smoke account:
-
-```bash
+```sh
+STAGING_API_URL=<render-api-url> \
 STAGING_SUPABASE_URL=<supabase-project-url> \
 STAGING_SUPABASE_ANON_KEY=<supabase-anon-key> \
 STAGING_SMOKE_EMAIL=<dedicated-staging-admin-email> \
@@ -279,16 +192,15 @@ STAGING_SMOKE_PASSWORD=<dedicated-staging-admin-password> \
 npm run smoke:staging
 ```
 
-Environment variables:
+The smoke signs in with a dedicated staging admin/super-admin account, verifies catalog cache behavior, identity/permissions, access-log schema, submission cleanup, local pairing save/read/delete, multiplayer lobby lifecycle, cloud session lifecycle, session verification, stream metric writes/reads, and admin access-log summary access when permitted.
 
-- `STAGING_BEARER_TOKEN` or `SUPABASE_ACCESS_TOKEN`: optional signed-in bearer token override for local/manual runs.
-- `STAGING_SUPABASE_URL`, `STAGING_SUPABASE_ANON_KEY`, `STAGING_SMOKE_EMAIL`, and `STAGING_SMOKE_PASSWORD`: automatic smoke-account sign-in credentials used when no bearer-token override is provided. The hosted predeploy cleanup-policy check also uses the Supabase URL and anon key to exercise browser-style Storage upload/delete behavior.
-- `STAGING_API_URL` or `API_URL`: optional API base URL, defaulting to `https://pixelated-api-services.onrender.com`.
-- `STAGING_GAME_ID`: optional game id for cloud session creation. If omitted, the runner discovers the first catalog game with a ROM target.
-- `STAGING_SMOKE_ENGINE_URL`: optional local pairing URL, defaulting to `http://127.0.0.1:8080`.
+Recognized Supabase access-log schema failures return API code `access_log_schema_drift` with relevant migration names.
 
-The runner checks `/games` cache headers and `MISS`-then-`HIT` behavior, verifies `/games/featured` remains `no-store`, checks `/me` and `/me/permissions`, writes and updates one unique access-log session to detect hosted `public.access_logs` column/index drift, verifies authenticated submission upload cleanup in Supabase Storage, exercises local pairing save/read/delete with restore, creates/updates/reads/deletes a multiplayer lobby, creates/reads/verifies/deletes a cloud session, and writes/reads a stream metric. When the token has admin access, it also verifies the hosted `public.admin_access_log_summary` RPC through `/admin/access-logs`.
+## GitHub Actions
 
-Recognized Supabase access-log schema failures return API code `access_log_schema_drift` with the relevant migration names. The smoke also treats generic failures from the access-log routes as possible hosted drift, which keeps the check useful while an older API deployment is still active.
+`.github/workflows/hosted-api-deploy-gate.yml` runs:
 
-The smoke intentionally writes one access-log session row and one stream metric row and temporarily changes local pairing metadata for the signed-in user; smoke lobbies and sessions are deleted before the run exits.
+- `npm run verify:api` on pull requests.
+- Hosted predeploy checks on pushes, manual dispatches, and reusable hosted deploy calls.
+
+`.github/workflows/hosted-deploy.yml` calls the deploy gate before Render/Vercel deploy hooks and then runs production hosted pairing/auth smokes.

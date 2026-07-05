@@ -1,179 +1,174 @@
-import { useEffect, useState } from "react";
-import { Loader2, Search } from "lucide-react";
-import HeroBanner from "../../components/user/HeroBanner";
-import GameCard from "../../components/user/GameCard";
 import {
-  useFeaturedGamesQuery,
-  useGameCatalogQuery,
-} from "../../lib/api/apiQueries";
-import {
-  GameGridSkeleton,
-  GamesCatalogSkeleton,
-  HeroSkeleton,
-} from "../../components/ui/Skeleton";
-import { Pagination } from "../../components/ui/Pagination";
+  ArrowRight,
+  Cloud,
+  Download,
+  Gamepad2,
+  MessageCircle,
+  MonitorUp,
+  Network,
+} from "lucide-react";
+import { Link } from "react-router-dom";
+import { PixelIcon } from "../../components/ui/PixelIcon";
 
-const GAMES_PER_PAGE = 15;
-const ZERO_PLAY_FEATURED_REFRESH_MS = 30_000;
+const DESKTOP_RELEASE_URL =
+  "https://github.com/Nghi-creator/Pixelated-Studio-Edition/releases/tag/v1.0.1";
 
-interface Game {
-  id: string;
-  title: string;
-  cover_url: string;
-  rom_filename?: string | null;
-  backdrop_url?: string | null;
-  play_count?: number | null;
-}
+const featureCards = [
+  {
+    icon: <Cloud className="h-5 w-5" />,
+    title: "Cloud catalog",
+    body: "Browse hosted games, search the library, open a title, and keep favorites synced to your account.",
+    accent: "text-sky-300",
+  },
+  {
+    icon: <PixelIcon className="h-5 w-5" name="publish" />,
+    title: "Local Vault",
+    body: "Upload your own NES files to the local engine volume and play them without publishing anything online.",
+    accent: "text-emerald-300",
+  },
+  {
+    icon: <Network className="h-5 w-5" />,
+    title: "LAN multiplayer",
+    body: "Host from the desktop app, share an invite, and let guests join through the companion without exposing raw engine tokens.",
+    accent: "text-amber-300",
+  },
+  {
+    icon: <PixelIcon className="h-5 w-5" name="mail" />,
+    title: "Game submissions",
+    body: "Signed-in creators can submit games and rights details for review before anything becomes public.",
+    accent: "text-fuchsia-300",
+  },
+  {
+    icon: <MessageCircle className="h-5 w-5" />,
+    title: "Social features",
+    body: "Comment on games, like what you enjoy, report abuse, block users, and keep your account space clean.",
+    accent: "text-rose-300",
+  },
+];
 
-const hasOnlyZeroPlayCounts = (games: Game[]) =>
-  games.length > 1 &&
-  games.every((game) => !game.play_count || game.play_count <= 0);
-
-function CatalogRefreshPanel({ label }: { label: string }) {
-  return (
-    <div className="relative" role="status" aria-label={label}>
-      <div className="mb-4 inline-flex items-center gap-2 rounded-md border border-synth-border bg-synth-surface px-3 py-1.5 text-sm font-semibold text-white">
-        <Loader2 className="h-4 w-4 animate-spin" />
-        {label}
-      </div>
-      <GameGridSkeleton />
-    </div>
-  );
-}
+const engineSteps = [
+  "Desktop starts Docker and launches the local engine runtime.",
+  "The engine runs the emulator, display capture, audio bridge, and Socket.IO signaling.",
+  "This website pairs with your desktop through a local token or HTTPS companion invite.",
+  "When you press play, the browser receives WebRTC video and sends input back to the engine.",
+];
 
 export default function Landing() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-
-  const catalogQuery = useGameCatalogQuery({
-    page: currentPage,
-    pageSize: GAMES_PER_PAGE,
-    search: searchQuery,
-  });
-  const featuredQuery = useFeaturedGamesQuery();
-
-  const games = (catalogQuery.data?.games || []) as Game[];
-  const featuredGames = featuredQuery.data?.featuredGames.length
-    ? (featuredQuery.data.featuredGames as Game[])
-    : ((catalogQuery.data?.featuredGames || []) as Game[]);
-  const loading = catalogQuery.isLoading;
-  const loadError = catalogQuery.isError
-    ? "Could not load the game library. Check the API connection."
-    : "";
-  const totalGames = catalogQuery.data?.total || 0;
-  const totalPages = catalogQuery.data?.totalPages || 1;
-  const shouldRefreshFeatured = hasOnlyZeroPlayCounts(featuredGames);
-  const refetchFeaturedGames = featuredQuery.refetch;
-
-  useEffect(() => {
-    if (!shouldRefreshFeatured) return;
-
-    const interval = window.setInterval(() => {
-      void refetchFeaturedGames();
-    }, ZERO_PLAY_FEATURED_REFRESH_MS);
-
-    return () => window.clearInterval(interval);
-  }, [refetchFeaturedGames, shouldRefreshFeatured]);
-
-  const safeCurrentPage = Math.min(currentPage, totalPages);
-  const pageStart = (safeCurrentPage - 1) * GAMES_PER_PAGE;
-  const showInitialCatalogSkeleton = loading && games.length === 0 && !searchQuery;
-  const showCatalogRefreshPanel =
-    catalogQuery.isFetching &&
-    (games.length > 0 || Boolean(searchQuery));
-  const catalogRefreshLabel = searchQuery
-    ? "Searching games..."
-    : "Loading games...";
-
-  const changePage = (page: number) => {
-    setCurrentPage(page);
-    document
-      .getElementById("all-games")
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
   return (
-    <div className="flex flex-col min-h-screen">
-      {loading && featuredGames.length === 0 ? (
-        <HeroSkeleton />
-      ) : (
-        <HeroBanner featuredGames={featuredGames} />
-      )}
+    <div className="min-h-screen bg-synth-bg text-white">
+      <section className="relative isolate overflow-hidden border-b border-synth-border/70">
+        <div className="absolute inset-0 -z-10 bg-[#050505]" />
+        <div
+          aria-hidden="true"
+          className="absolute inset-0 -z-10 opacity-[0.08] [background-image:linear-gradient(#D8A4B5_1px,transparent_1px),linear-gradient(90deg,#D8A4B5_1px,transparent_1px)] [background-size:24px_24px]"
+        />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
-        <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h2
-            id="all-games"
-            className="scroll-mt-24 text-2xl font-bold text-white"
-          >
-            All Games
-          </h2>
-
-          <div className="relative w-full md:w-96">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="text-gray-400 w-4 h-4" />
-            </div>
-            <input
-              type="text"
-              placeholder="Search games..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="block w-full rounded-lg border border-synth-border bg-synth-bg py-2 pl-10 pr-10 leading-5 text-white placeholder:text-gray-500 transition-colors focus:border-synth-secondary focus:outline-none"
-            />
-          </div>
-        </div>
-
-        {showInitialCatalogSkeleton ? (
-          <GamesCatalogSkeleton />
-        ) : showCatalogRefreshPanel ? (
-          <CatalogRefreshPanel label={catalogRefreshLabel} />
-        ) : loadError ? (
-          <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-8 text-center text-red-200">
-            <p>{loadError}</p>
-            <button
-              className="mt-4 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
-              onClick={() => void catalogQuery.refetch()}
-              type="button"
-            >
-              Retry
-            </button>
-          </div>
-        ) : games.length === 0 && !loading && !catalogQuery.isFetching ? (
-          <div className="text-center py-20 text-gray-500">
-            <Search className="w-12 h-12 mx-auto mb-4 opacity-20" />
-            <p className="text-xl">No games found matching "{searchQuery}"</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-            {games.map((game) => (
-              <GameCard
-                key={game.id}
-                id={game.id}
-                title={game.title}
-                coverUrl={game.cover_url}
-              />
-            ))}
-          </div>
-        )}
-
-        {!loadError && games.length > 0 && totalPages > 1 && (
-          <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-gray-500">
-              Showing {pageStart + 1}-
-              {Math.min(pageStart + games.length, totalGames)} of {totalGames}
+        <div className="mx-auto flex min-h-[460px] max-w-7xl items-center px-6 py-12 sm:min-h-[500px] sm:px-10 lg:min-h-[520px] lg:px-14 xl:px-8">
+          <div className="max-w-5xl">
+            <h1 className="text-4xl font-extrabold leading-tight text-white sm:text-5xl lg:text-6xl xl:whitespace-nowrap">
+              Pixelated Studio Edition
+            </h1>
+            <p className="mt-4 max-w-4xl text-xl font-extrabold leading-8 text-white sm:text-2xl">
+              Built for quick play, local creation, and stream research.
+            </p>
+            <p className="mt-3 max-w-4xl text-base leading-7 text-gray-200 sm:text-lg">
+              Pixelated is a web front door for fast 8-bit sessions, a local
+              tool for developers who want to test vault builds or submit games
+              for review, and a research surface for measuring browser gameplay
+              streams. Inside the gameplay screen, stream statistics help
+              compare playback quality, input behavior, and connection health
+              while the desktop engine handles the emulator work.
             </p>
 
-            <Pagination
-              currentPage={safeCurrentPage}
-              onPageChange={changePage}
-              totalPages={totalPages}
-            />
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Link
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-primary px-5 font-extrabold text-white transition-colors hover:bg-synth-primary-hover"
+                to="/home"
+              >
+                <Gamepad2 className="h-5 w-5" />
+                Go to Home Page
+                <ArrowRight className="h-5 w-5" />
+              </Link>
+              <a
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-5 font-extrabold text-white transition-colors hover:bg-synth-elevated"
+                href={DESKTOP_RELEASE_URL}
+                rel="noreferrer"
+                target="_blank"
+              >
+                <Download className="h-5 w-5" />
+                Download Desktop App
+              </a>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      </section>
+
+      <section className="border-b border-synth-border/60 bg-[#090909] px-4 py-12 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          {featureCards.map((feature) => (
+            <article
+              className="rounded-lg border border-synth-border bg-synth-surface/70 p-5 shadow-card"
+              key={feature.title}
+            >
+              <div className={`mb-4 inline-flex ${feature.accent}`}>
+                {feature.icon}
+              </div>
+              <h2 className="text-lg font-extrabold text-white">
+                {feature.title}
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-gray-300">
+                {feature.body}
+              </p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+          <div>
+            <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
+              The website stays light. The desktop app does the heavy lifting.
+            </h2>
+            <p className="mt-5 text-base leading-7 text-gray-300">
+              Pixelated uses the web app for browsing, controls, accounts, and
+              multiplayer coordination. The desktop app owns Docker, emulator
+              startup, local storage, companion invites, and the WebRTC media
+              stream.
+            </p>
+            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+              <Link
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-4 font-bold text-white transition-colors hover:bg-synth-elevated"
+                to="/engine"
+              >
+                <MonitorUp className="h-5 w-5" />
+                Connect Engine
+              </Link>
+              <Link
+                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-bg px-4 font-bold text-white transition-colors hover:bg-synth-surface"
+                to="/multiplayer"
+              >
+                <Network className="h-5 w-5" />
+                Multiplayer
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            {engineSteps.map((step, index) => (
+              <div
+                className="flex gap-4 rounded-lg border border-synth-border bg-[#120D10] p-4"
+                key={step}
+              >
+                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-synth-border bg-synth-surface text-sm font-extrabold text-synth-secondary">
+                  {index + 1}
+                </span>
+                <p className="pt-1 text-sm leading-6 text-gray-200">{step}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

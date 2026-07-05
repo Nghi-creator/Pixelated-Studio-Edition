@@ -108,7 +108,7 @@ export default function Publish() {
         </p>
         <Link
           className="rounded-lg border border-synth-border bg-synth-surface px-8 py-3 font-bold text-white transition-colors hover:bg-synth-elevated"
-          to="/"
+          to="/home"
         >
           Return to Library
         </Link>
@@ -127,7 +127,7 @@ export default function Publish() {
       <div className="mb-6">
         <Link
           className="group inline-flex items-center gap-2 font-medium text-gray-300 transition-colors hover:text-synth-secondary"
-          to="/"
+          to="/home"
         >
           <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
           Back to Library

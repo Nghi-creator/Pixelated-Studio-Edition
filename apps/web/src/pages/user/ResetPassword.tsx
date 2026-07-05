@@ -81,7 +81,7 @@ export default function ResetPassword() {
       setSuccess(true);
 
       setTimeout(() => {
-        navigate("/");
+        navigate("/home");
       }, 3000);
     } catch (err: unknown) {
       if (err instanceof Error) {

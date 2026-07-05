@@ -12,6 +12,7 @@ import { useEngineConnectionMonitor } from "./lib/engine/useEngineConnectionMoni
 import { useDesktopLaunchPairing } from "./lib/engine/useDesktopLaunchPairing";
 
 import Landing from "./pages/user/Landing";
+import Home from "./pages/user/Home";
 import Player from "./pages/user/Player";
 import Auth from "./pages/user/Auth";
 import Favorites from "./pages/user/Favorites";
@@ -76,6 +77,7 @@ export default function App() {
         {/* STANDARD ROUTES */}
         <Route element={<StandardLayout />}>
           <Route path="/" element={<Landing />} />
+          <Route path="/home" element={<Home />} />
           <Route path="/login" element={<Auth />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/favorites" element={<Favorites />} />

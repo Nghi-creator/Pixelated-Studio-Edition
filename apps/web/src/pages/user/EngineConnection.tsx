@@ -15,8 +15,8 @@ type EngineLocationState = {
 };
 
 function getSafeReturnTo(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/";
-  if (value.startsWith("/engine")) return "/";
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return "/home";
+  if (value.startsWith("/engine")) return "/home";
   return value;
 }
 
@@ -29,7 +29,7 @@ export default function EngineConnection() {
     typeof location.state === "object" && location.state !== null
       ? (location.state as EngineLocationState)
       : null;
-  const isReturning = returnTo !== "/";
+  const isReturning = returnTo !== "/home";
   const [isPaired, setIsPaired] = useState(hasEngineToken);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export default function EngineConnection() {
       <div className="mb-6">
         <Link
           className="group inline-flex items-center gap-2 font-medium text-gray-400 transition-colors hover:text-white"
-          to="/"
+          to="/home"
         >
           <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
           Back to Library

@@ -217,7 +217,7 @@ export default function LocalVault() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full min-h-screen">
       <div className="mb-6">
         <Link
-          to="/"
+          to="/home"
           className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors font-medium group"
         >
           <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />

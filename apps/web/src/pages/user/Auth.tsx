@@ -297,7 +297,7 @@ export default function Auth() {
               <div className="block">
                 <button
                   type="button"
-                  onClick={() => navigate("/")}
+                  onClick={() => navigate("/home")}
                   className="text-synth-secondary hover:text-white text-sm font-medium transition-colors"
                 >
                   Continue as Guest &rarr;

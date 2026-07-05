@@ -43,7 +43,7 @@ export default function Favorites() {
     <div className="flex flex-col min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full mt-8">
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/home")}
           className="flex items-center gap-2 text-gray-400 hover:text-synth-primary transition-colors mb-8 w-fit"
         >
           <ArrowLeft className="w-5 h-5" /> Back to Home
@@ -81,7 +81,7 @@ export default function Favorites() {
               homepage to explore the catalog.
             </p>
             <button
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/home")}
               className="mx-auto flex items-center rounded-lg border border-synth-border bg-synth-bg px-8 py-3 font-bold text-white transition-colors hover:bg-synth-surface"
             >
               Browse Games

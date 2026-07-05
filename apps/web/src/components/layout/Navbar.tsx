@@ -5,6 +5,7 @@ import {
   LogOut,
   Code,
   Loader2,
+  ScrollText,
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import type { User } from "@supabase/supabase-js";
@@ -106,6 +107,7 @@ export default function Navbar() {
   };
 
   const isFavoritesPage = location.pathname === "/favorites";
+  const isIntroPage = location.pathname === "/";
   const isEnginePage = location.pathname === "/engine";
   const isLocalPage = location.pathname === "/local";
   const isMultiplayerPage = location.pathname === "/multiplayer";
@@ -140,6 +142,14 @@ export default function Navbar() {
               <span className="hidden text-[10px] font-bold uppercase tracking-[0.22em] text-synth-secondary sm:inline">
                 Studio
               </span>
+            </Link>
+
+            <Link
+              to="/"
+              title="Intro Guide"
+              className={getNavIconClass(isIntroPage)}
+            >
+              <ScrollText className="h-5 w-5" />
             </Link>
 
             <Link
