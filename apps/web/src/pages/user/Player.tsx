@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { CommentsPanel } from "../../features/player/comments/components/CommentsPanel";
 import { LobbyPanel } from "../../features/player/components/LobbyPanel";
@@ -22,16 +22,8 @@ import { usePlayerStreamSettings } from "../../features/player/hooks/usePlayerSt
 import { useGameReactions } from "../../features/player/hooks/useGameReactions";
 import { usePlayCount } from "../../features/player/hooks/usePlayCount";
 import { useStreamPlayback } from "../../features/player/hooks/useStreamPlayback";
-import { useResearchRunEvents } from "../../features/player/hooks/useResearchRunEvents";
+import { useResearchRunState } from "../../features/player/hooks/useResearchRunState";
 import { useStreamTelemetryRecording } from "../../features/player/hooks/useStreamTelemetryRecording";
-import {
-  createEmptyResearchBaselineForm,
-  type ResearchBaselineForm,
-} from "../../features/player/researchBaseline";
-import {
-  createResearchRunId,
-  type ResearchRunMetadataForm,
-} from "../../features/player/researchRunMetadata";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
 import { shouldIgnoreGameInput } from "../../lib/webrtc/webrtcInput";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
@@ -41,25 +33,6 @@ export default function Player() {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [researchRunId] = useState(() => createResearchRunId());
-  const researchSessionIdRef = useRef("");
-  const [researchMetadataForm, setResearchMetadataForm] =
-    useState<ResearchRunMetadataForm>({
-      coldStart: false,
-      networkType: "",
-      notes: "",
-      scenario: "localhost",
-    });
-  const [researchBaselineForm, setResearchBaselineForm] =
-    useState<ResearchBaselineForm>(() => createEmptyResearchBaselineForm());
-  const {
-    clearEvents: clearResearchEvents,
-    events: researchEvents,
-    recordEvent: recordResearchEvent,
-  } = useResearchRunEvents({
-    runId: researchRunId,
-    sessionIdRef: researchSessionIdRef,
-  });
   const currentUser = useAuthUser();
   const { backRoute, backText, lobbySearch } = usePlayerNavigation(
     location,
@@ -79,6 +52,20 @@ export default function Player() {
     streamProfile,
     streamProfileId,
   } = usePlayerStreamSettings();
+  const {
+    baselineForm: researchBaselineForm,
+    clearEvents: clearResearchEvents,
+    events: researchEvents,
+    metadataForm: researchMetadataForm,
+    recordEvent: recordResearchEvent,
+    runId: researchRunId,
+    setBaselineForm: setResearchBaselineForm,
+    setMetadataForm: setResearchMetadataForm,
+    setSessionId: setResearchSessionId,
+  } = useResearchRunState({
+    gameId: id,
+    playerMode,
+  });
   const {
     inputCapabilities,
     lobbyState,
@@ -167,16 +154,8 @@ export default function Player() {
   });
 
   useEffect(() => {
-    researchSessionIdRef.current = sessionId;
-  }, [sessionId]);
-
-  useEffect(() => {
-    if (!id) return;
-    recordResearchEvent("play_clicked", {
-      gameId: id,
-      playerMode,
-    });
-  }, [id, playerMode, recordResearchEvent]);
+    setResearchSessionId(sessionId);
+  }, [sessionId, setResearchSessionId]);
 
   const resetTelemetryData = () => {
     clearTelemetryCsv();
