@@ -176,3 +176,66 @@ test("desktop launch pairing redeems companion launch tickets locally", async ()
     { name: "pairLocalEngine", value: "https://localhost:8090" },
   ]);
 });
+
+test("desktop launch pairing sends bare launch tickets to home after redemption", async () => {
+  const calls: Array<{ name: string; value: unknown }> = [];
+  const url = new URL(
+    "https://pixelated.example/?companionUrl=https%3A%2F%2Flocalhost%3A8090&launchTicket=ticket-1",
+  );
+
+  const paired = await pairFromDesktopLaunchUrl(url, {
+    createCompanionEngineToken: (token) => `companion:${token}`,
+    engineAuthHeaders: () => ({
+      "X-Engine-Token": "redeemed-token",
+      "X-Pixelated-Client-Id": "client-id",
+    }),
+    fetch: ((input, init) => {
+      calls.push({ name: "fetch", value: { input, init } });
+      if (String(input).endsWith("/launch/redeem")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({ companionToken: "redeemed-token" }),
+          status: 200,
+        } as Response);
+      }
+      return Promise.resolve({ ok: true, json: async () => ({}) } as Response);
+    }) as typeof fetch,
+    pairLocalEngine: async (engineUrl) => {
+      calls.push({ name: "pairLocalEngine", value: engineUrl });
+      return {
+        pairing: {
+          createdAt: "2026-06-17T00:00:00.000Z",
+          engineUrl,
+          pairingId: "pairing-id",
+          tokenStoredBy: "browser-local-storage",
+          updatedAt: "2026-06-17T00:00:00.000Z",
+        },
+      };
+    },
+    replaceState: (nextUrl) => {
+      calls.push({ name: "replaceState", value: nextUrl.toString() });
+    },
+    setEngineControlToken: (token) => {
+      calls.push({ name: "setEngineControlToken", value: token });
+    },
+    setEngineControlUrl: (engineUrl) => {
+      calls.push({ name: "setEngineControlUrl", value: engineUrl });
+    },
+    setEngineToken: (token) => {
+      calls.push({ name: "setEngineToken", value: token });
+    },
+    setEngineUrl: (engineUrl) => {
+      calls.push({ name: "setEngineUrl", value: engineUrl });
+    },
+  });
+
+  assert.equal(paired, true);
+  assert.equal(
+    calls.find((call) => call.name === "replaceState")?.value,
+    "https://pixelated.example/home",
+  );
+  assert.equal(
+    calls.find((call) => call.name === "pairLocalEngine")?.value,
+    "https://localhost:8090",
+  );
+});
