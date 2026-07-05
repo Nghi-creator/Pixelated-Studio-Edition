@@ -11,7 +11,7 @@ import { Link } from "react-router-dom";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 
 const DESKTOP_RELEASE_URL =
-  "https://github.com/Nghi-creator/Pixelated-Studio-Edition/releases/tag/v1.0.1";
+  "https://github.com/Nghi-creator/Pixelated-Studio-Edition/releases/latest";
 
 const featureCards = [
   {
