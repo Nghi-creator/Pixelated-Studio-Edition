@@ -39,38 +39,51 @@ async function buildCachedGamesPage(
   };
 }
 
+export async function warmGamesCatalogCache(context: CatalogRouteContext) {
+  const { gamesCatalogCache, service } = context;
+  if (!service) return null;
+
+  const cacheKey = getCatalogCacheKey(WARMUP_PAGE, WARMUP_PAGE_SIZE);
+  const cachedResponse = gamesCatalogCache.get(cacheKey);
+  if (cachedResponse?.featuredGames) return null;
+
+  const timings = {};
+  const [cachedPage, featuredGames] = await Promise.all([
+    cachedResponse ||
+      buildCachedGamesPage(service, timings, WARMUP_PAGE, WARMUP_PAGE_SIZE),
+    fetchFeaturedGames(service, timings),
+  ]);
+  gamesCatalogCache.set(cacheKey, {
+    ...cachedPage,
+    featuredGames,
+  });
+
+  return {
+    page: WARMUP_PAGE,
+    pageSize: WARMUP_PAGE_SIZE,
+    timings,
+  };
+}
+
 export function registerGamesCatalogRoutes(
   app: FastifyInstance,
   context: CatalogRouteContext,
 ) {
   const { gamesCatalogCache, service } = context;
 
-  app.addHook("onListen", () => {
+  app.addHook("onListen", async () => {
     if (!service) return;
 
-    void (async () => {
-      const cacheKey = getCatalogCacheKey(WARMUP_PAGE, WARMUP_PAGE_SIZE);
-      if (gamesCatalogCache.has(cacheKey)) return;
-
-      const timings = {};
-      try {
-        gamesCatalogCache.set(
-          cacheKey,
-          await buildCachedGamesPage(
-            service,
-            timings,
-            WARMUP_PAGE,
-            WARMUP_PAGE_SIZE,
-          ),
-        );
-        logTiming(app.log, "Games catalog warmup timing", timings, {
-          page: WARMUP_PAGE,
-          pageSize: WARMUP_PAGE_SIZE,
-        });
-      } catch (err) {
-        app.log.warn({ err }, "Failed to warm games catalog cache");
-      }
-    })();
+    try {
+      const warmup = await warmGamesCatalogCache(context);
+      if (!warmup) return;
+      logTiming(app.log, "Games catalog warmup timing", warmup.timings, {
+        page: warmup.page,
+        pageSize: warmup.pageSize,
+      });
+    } catch (err) {
+      app.log.warn({ err }, "Failed to warm games catalog cache");
+    }
   });
 
   app.get("/games", async (request, reply) => {
@@ -90,11 +103,13 @@ export function registerGamesCatalogRoutes(
     const cacheKey = getCatalogCacheKey(page, pageSize, search);
     const cachedResponse = gamesCatalogCache.get(cacheKey);
     if (cachedResponse) {
-      let featuredGames: unknown[] = [];
-      try {
-        featuredGames = await fetchFeaturedGames(service, timings);
-      } catch (err) {
-        request.log.warn({ err }, "Failed to load featured games");
+      let featuredGames = cachedResponse.featuredGames || [];
+      if (!cachedResponse.featuredGames) {
+        try {
+          featuredGames = await fetchFeaturedGames(service, timings);
+        } catch (err) {
+          request.log.warn({ err }, "Failed to load featured games");
+        }
       }
 
       reply.header("Cache-Control", "public, max-age=30, s-maxage=60");

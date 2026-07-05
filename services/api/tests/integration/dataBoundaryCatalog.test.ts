@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import Fastify from "fastify";
+import { createCatalogRouteContext } from "../../src/modules/catalog/http/catalogRouteContext.js";
+import {
+  registerGamesCatalogRoutes,
+  warmGamesCatalogCache,
+} from "../../src/modules/catalog/http/gamesRoutes.js";
 import {
   ADMIN_ID,
   createDataBoundaryApp,
@@ -760,6 +766,51 @@ test("catalog route caches public game pages briefly", async () => {
   await app.close();
 });
 
+test("catalog startup warmup covers the default home request and featured games", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGames(
+    db,
+    {
+      cover_url: "/featured.png",
+      id: "warm-featured",
+      play_count: 10,
+      title: "Warm Featured",
+    },
+    {
+      cover_url: "/alpha.png",
+      id: "warm-alpha",
+      play_count: 1,
+      title: "Warm Alpha",
+    },
+  );
+  const app = Fastify({ logger: false });
+  const context = createCatalogRouteContext({ supabase: db as never });
+  registerGamesCatalogRoutes(app, context);
+
+  await warmGamesCatalogCache(context);
+  const warmupRpcCallCount = db.rpcCalls.length;
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/games",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(response.headers["x-pixelated-cache"], "HIT");
+  assert.equal(db.rpcCalls.length, warmupRpcCallCount);
+  assert.deepEqual(
+    response.json<{ games: { id: string }[] }>().games.map((game) => game.id),
+    ["warm-alpha", "warm-featured"],
+  );
+  assert.deepEqual(
+    response
+      .json<{ featuredGames: { id: string }[] }>()
+      .featuredGames.map((game) => game.id),
+    ["warm-featured", "warm-alpha"],
+  );
+  await app.close();
+});
+
 test("catalog cache keeps featured games fresh", async () => {
   const db = new FakeSupabase();
   seedPublishedGames(db, {
@@ -847,4 +898,3 @@ test("featured games route returns a wider pool while all play counts are zero",
   );
   await app.close();
 });
-
