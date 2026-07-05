@@ -61,7 +61,7 @@
     }
 
     function renderUrls(urls: string[] = []) {
-      lanUrls.innerHTML = "";
+      lanUrls.replaceChildren();
       urls.forEach((url) => {
         const item = document.createElement("code");
         item.className = "block break-all";
@@ -104,7 +104,7 @@
     }
 
     function renderCompanionUrls(urls: string[] = []) {
-      companionUrls.innerHTML = "";
+      companionUrls.replaceChildren();
       urls.forEach((url) => {
         const item = document.createElement("code");
         item.className = "block break-all";

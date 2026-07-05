@@ -10,6 +10,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import {
   isGeneratedCatalogArtworkUrl,
+  parseCaptureCommand,
   uploadGameplayArtworkFromFile,
 } from "../src/modules/catalog/ingestion/catalogArtworkCapture.js";
 
@@ -99,6 +100,7 @@ Options:
   --game-id <id>           Process one game id.
   --artwork-dir <dir>      Use existing PNG/JPG/WebP files before capture command.
   --capture-command <cmd>  Command that writes PIXELATED_CAPTURE_OUTPUT_PATH.
+                           Quoted args are supported; shell metacharacters are not.
 
 Capture command environment:
   PIXELATED_CAPTURE_ROM_PATH
@@ -376,7 +378,8 @@ function runCaptureCommand(
   );
 
   return new Promise<void>((resolve, reject) => {
-    const child = spawn(command, {
+    const parsedCommand = parseCaptureCommand(command);
+    const child = spawn(parsedCommand.file, parsedCommand.args, {
       env: {
         ...process.env,
         PIXELATED_CAPTURE_ARTIFACT_FILENAME: target.build.artifact_filename || "",
@@ -387,7 +390,6 @@ function runCaptureCommand(
         PIXELATED_CAPTURE_ROM_PATH: paths.romPath,
         PIXELATED_CAPTURE_RUNTIME_ID: target.build.runtime_id || "",
       },
-      shell: true,
       stdio: "inherit",
     });
 
