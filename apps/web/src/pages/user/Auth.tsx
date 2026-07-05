@@ -81,7 +81,7 @@ export default function Auth() {
         </div>
 
         {error && (
-          <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg mb-6 text-sm text-center">
+          <div className="danger-panel mb-6 rounded-lg border px-4 py-3 text-center text-sm font-bold">
             {error}
           </div>
         )}

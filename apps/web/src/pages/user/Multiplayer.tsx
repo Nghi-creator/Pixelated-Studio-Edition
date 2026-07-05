@@ -163,7 +163,7 @@ export default function Multiplayer() {
               className={`mt-3 rounded-lg border px-3 py-2 text-sm ${
                 joinInvite
                   ? "border-[#C02066]/40 bg-[#9B0048]/15 text-[#F38BB4]"
-                  : "border-red-400/30 bg-red-500/10 text-red-200"
+                  : "danger-panel font-bold"
               }`}
             >
               {joinInvite?.isCompanion
@@ -176,7 +176,7 @@ export default function Multiplayer() {
 
           <div className="mt-5 flex flex-col gap-3">
             <button
-              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-synth-primary/70 bg-synth-primary/15 px-5 text-sm font-bold text-white transition-colors hover:bg-synth-primary/25 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#ff5ca8]/80 bg-[#9B0048]/55 px-5 text-sm font-bold text-white transition-colors hover:bg-[#B00052] disabled:cursor-not-allowed disabled:border-[#ff5ca8]/60 disabled:bg-[#9B0048]/35 disabled:text-red-100"
               disabled={!joinInvite}
               onClick={() => {
                 if (!joinInvite) return;
@@ -247,7 +247,7 @@ export default function Multiplayer() {
           )}
 
           {localMessage && (
-            <div className="mb-5 rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <div className="danger-panel mb-5 rounded-lg border px-4 py-3 text-sm font-bold">
               {localMessage}
             </div>
           )}
@@ -257,7 +257,7 @@ export default function Multiplayer() {
           ) : gameSource === "local" && localLoading ? (
             <MultiplayerGameGridSkeleton source="local" />
           ) : gameSource === "cloud" && cloudLoadError ? (
-            <div className="rounded-lg border border-red-400/30 bg-red-500/10 px-4 py-16 text-center text-red-200">
+            <div className="danger-panel rounded-lg border px-4 py-16 text-center font-bold">
               {cloudLoadError}
             </div>
           ) : gameSource === "cloud" ? (

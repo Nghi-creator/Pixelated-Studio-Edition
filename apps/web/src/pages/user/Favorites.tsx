@@ -57,10 +57,10 @@ export default function Favorites() {
         </div>
 
         {loadError ? (
-          <div className="rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-16 text-center text-red-200">
+          <div className="danger-panel rounded-xl border px-4 py-16 text-center font-bold">
             <p>{loadError}</p>
             <button
-              className="mt-4 rounded-lg border border-red-400/40 px-4 py-2 text-sm font-bold hover:bg-red-500/10"
+              className="danger-action mt-4 rounded-lg border px-4 py-2 text-sm font-bold transition-colors"
               onClick={() => void favoritesQuery.refetch()}
               type="button"
             >

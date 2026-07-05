@@ -21,6 +21,25 @@
 }
 
 @layer components {
+  .danger-panel {
+    border-color: rgba(239, 68, 68, 0.55);
+    background-color: rgba(127, 29, 29, 0.38);
+    color: rgb(254, 202, 202);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+  }
+
+  .danger-action {
+    border-color: rgba(239, 68, 68, 0.72);
+    background-color: rgba(127, 29, 29, 0.46);
+    color: rgb(254, 202, 202);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
+  }
+
+  .danger-action:hover {
+    background-color: rgba(153, 27, 27, 0.58);
+    color: white;
+  }
+
   .feature-pop-card {
     position: relative;
     z-index: 0;
