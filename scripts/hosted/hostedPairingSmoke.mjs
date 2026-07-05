@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
-import crypto from "node:crypto";
 import fs from "node:fs";
-import http from "node:http";
 import os from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
+import { assertHostedPairingContract } from "./hostedPairingContract.mjs";
+import { createHostedEngineProbe } from "./hostedPairingEngineProbe.mjs";
+import {
+  delay,
+  waitForHostedWebPairingBundle as waitForHostedWebPairingBundleBase,
+  waitForRenderApiDeploy as waitForRenderApiDeployBase,
+} from "./hostedPairingReadiness.mjs";
 
 const require = createRequire(import.meta.url);
 if (process.argv.includes("--help")) {
@@ -67,14 +72,12 @@ const browserRequestFailures = [];
 let browser;
 let context;
 let page;
-let engineServer;
 let companion;
 let bearerToken = "";
 let previousPairing = null;
 let createdSessionId = "";
 const createdSessionIds = [];
-let probeRuntimeKind = "libretro";
-const probeRuntimeSwitches = [];
+const engineProbe = createHostedEngineProbe({ engineToken, webUrl });
 
 function normalizeUrl(value) {
   return value.replace(/\/+$/, "");
@@ -105,171 +108,22 @@ function writeJson(file, value) {
   fs.writeFileSync(file, `${JSON.stringify(value, null, 2)}\n`);
 }
 
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function getHostedWebBuild() {
-  const response = await fetch(`${webUrl}/engine`, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`GET /engine returned ${response.status}`);
-  }
-  const html = await response.text();
-  const htmlSha256 = crypto.createHash("sha256").update(html).digest("hex");
-  const scripts = Array.from(html.matchAll(/<script[^>]+src="([^"]+)"/g)).map(
-    ([, source]) => new URL(source, webUrl).toString(),
-  );
-
-  let hasLaunchPairing = html.includes(hostedPairingBuildMarker);
-  let hasRuntimeSwitch = html.includes(hostedRuntimeSwitchBuildMarker);
-  for (const script of scripts) {
-    const asset = await fetch(script, { cache: "no-store" });
-    if (!asset.ok) continue;
-    const source = await asset.text();
-    if (source.includes(hostedPairingBuildMarker)) {
-      hasLaunchPairing = true;
-    }
-    if (source.includes(hostedRuntimeSwitchBuildMarker)) {
-      hasRuntimeSwitch = true;
-    }
-  }
-  return { hasLaunchPairing, hasRuntimeSwitch, htmlSha256 };
-}
-
 async function waitForRenderApiDeploy() {
-  const deadline = Date.now() + hostedPublishTimeoutMs;
-  let lastError = "";
-
-  while (Date.now() < deadline) {
-    try {
-      const [healthResponse, readyResponse] = await Promise.all([
-        fetch(`${apiUrl}/health`, { cache: "no-store" }),
-        fetch(`${apiUrl}/ready`, { cache: "no-store" }),
-      ]);
-      const health = await healthResponse.json();
-      const ready = await readyResponse.json();
-      const startedAtSeconds =
-        Math.floor(Date.now() / 1000) - Number(health?.uptimeSeconds);
-      const isNewProcess =
-        !renderBaselineStartedAtSeconds ||
-        startedAtSeconds > renderBaselineStartedAtSeconds;
-
-      if (
-        healthResponse.ok &&
-        health?.ok === true &&
-        readyResponse.ok &&
-        ready?.ok === true &&
-        isNewProcess
-      ) {
-        return;
-      }
-      lastError = `health=${healthResponse.status}/${JSON.stringify(health)} ready=${readyResponse.status}/${JSON.stringify(ready)} startedAtSeconds=${startedAtSeconds} baseline=${renderBaselineStartedAtSeconds || "none"}`;
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-    }
-    await delay(15_000);
-  }
-
-  throw new Error(
-    `Render did not publish a new ready API process within ${hostedPublishTimeoutMs}ms: ${lastError}`,
-  );
+  return waitForRenderApiDeployBase({
+    apiUrl,
+    renderBaselineStartedAtSeconds,
+    timeoutMs: hostedPublishTimeoutMs,
+  });
 }
 
 async function waitForHostedWebPairingBundle() {
-  const deadline = Date.now() + hostedPublishTimeoutMs;
-  let lastError = "";
-
-  while (Date.now() < deadline) {
-    try {
-      const build = await getHostedWebBuild();
-      const isNewBuild =
-        !vercelBaselineHtmlSha256 ||
-        build.htmlSha256 !== vercelBaselineHtmlSha256;
-      if (build.hasLaunchPairing && build.hasRuntimeSwitch && isNewBuild) return;
-      lastError = `htmlSha256=${build.htmlSha256} baseline=${vercelBaselineHtmlSha256 || "none"} pairingMarker=${build.hasLaunchPairing} runtimeSwitchMarker=${build.hasRuntimeSwitch}`;
-    } catch (error) {
-      lastError = error instanceof Error ? error.message : String(error);
-    }
-    await delay(15_000);
-  }
-
-  throw new Error(
-    `Vercel did not publish the signed-in one-click pairing bundle within ${hostedPublishTimeoutMs}ms: ${lastError}`,
-  );
-}
-
-function startEngineProbe() {
-  probeRuntimeKind = "libretro";
-  probeRuntimeSwitches.length = 0;
-  engineServer = http.createServer((request, response) => {
-    const origin = request.headers.origin;
-    if (origin === new URL(webUrl).origin) {
-      response.setHeader("access-control-allow-origin", origin);
-      response.setHeader(
-        "access-control-allow-headers",
-        "content-type,x-engine-token,x-pixelated-client-id,x-user-id",
-      );
-      response.setHeader("access-control-allow-methods", "GET,POST,OPTIONS");
-      if (request.headers["access-control-request-private-network"] === "true") {
-        response.setHeader("access-control-allow-private-network", "true");
-      }
-      response.setHeader("vary", "Origin");
-    }
-
-    if (request.method === "OPTIONS") {
-      response.writeHead(204);
-      response.end();
-      return;
-    }
-
-    if (request.url?.startsWith("/health")) {
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(
-        JSON.stringify({
-          engineTokenRequired: true,
-          exposureMode: "local",
-          ok: true,
-          runtimeKind: probeRuntimeKind,
-        }),
-      );
-      return;
-    }
-
-    if (request.url?.startsWith("/session/stop-active")) {
-      response.writeHead(200, { "content-type": "application/json" });
-      response.end(JSON.stringify({ stopped: false }));
-      return;
-    }
-
-    if (request.url?.startsWith("/local-games")) {
-      const authorized = request.headers["x-engine-token"] === engineToken;
-      response.writeHead(authorized ? 200 : 401, {
-        "content-type": "application/json",
-      });
-      response.end(JSON.stringify(authorized ? { games: [] } : { error: "unauthorized" }));
-      return;
-    }
-
-    response.writeHead(404, { "content-type": "application/json" });
-    response.end(JSON.stringify({ error: "not found" }));
+  return waitForHostedWebPairingBundleBase({
+    hostedPairingBuildMarker,
+    hostedRuntimeSwitchBuildMarker,
+    timeoutMs: hostedPublishTimeoutMs,
+    vercelBaselineHtmlSha256,
+    webUrl,
   });
-
-  return new Promise((resolve, reject) => {
-    engineServer.once("error", reject);
-    engineServer.listen(8080, "127.0.0.1", resolve);
-  });
-}
-
-async function requestProbeRuntimeSwitch(runtimeKind) {
-  probeRuntimeSwitches.push({
-    runtimeKind,
-    timestamp: new Date().toISOString(),
-  });
-  if (probeRuntimeKind === runtimeKind) {
-    return { runtimeKind, status: "unchanged" };
-  }
-  probeRuntimeKind = runtimeKind;
-  return { runtimeKind, status: "restarting" };
 }
 
 async function apiRequest(pathname, options = {}) {
@@ -409,99 +263,8 @@ async function cleanup() {
   await browser?.close().catch(() => undefined);
   await restorePreviousPairing().catch(() => undefined);
   companion?.stopCompanionServer();
-  if (engineServer) {
-    await new Promise((resolve) => engineServer.close(resolve));
-  }
+  await engineProbe.stop();
   fs.rmSync(certDir, { force: true, recursive: true });
-}
-
-function assertHostedPairingContract() {
-  const desktopController = fs.readFileSync(
-    path.join(
-      rootDir,
-      "apps",
-      "desktop",
-      "main",
-      "engine",
-      "controller.ts",
-    ),
-    "utf8",
-  );
-  const desktopCompanion = fs.readFileSync(
-    path.join(
-      rootDir,
-      "apps",
-      "desktop",
-      "main",
-      "companion",
-      "server.ts",
-    ),
-    "utf8",
-  );
-  const launchPairing = fs.readFileSync(
-    path.join(
-      rootDir,
-      "apps",
-      "web",
-      "src",
-      "lib",
-      "engine",
-      "desktopLaunchPairing.ts",
-    ),
-    "utf8",
-  );
-  const launchPairingHook = fs.readFileSync(
-    path.join(
-      rootDir,
-      "apps",
-      "web",
-      "src",
-      "lib",
-      "engine",
-      "useDesktopLaunchPairing.ts",
-    ),
-    "utf8",
-  );
-  const enginePairingPanel = fs.readFileSync(
-    path.join(
-      rootDir,
-      "apps",
-      "web",
-      "src",
-      "features",
-      "local-engine",
-      "EnginePairingPanel.tsx",
-    ),
-    "utf8",
-  );
-  const authSource = fs.readFileSync(
-    path.join(rootDir, "apps", "web", "src", "pages", "user", "Auth.tsx"),
-    "utf8",
-  );
-  const webRtcSession = fs.readFileSync(
-    path.join(rootDir, "apps", "web", "src", "lib", "webrtc", "webrtcSession.ts"),
-    "utf8",
-  );
-
-  assert.match(desktopController, /createHostedWebLaunchUrl/);
-  assert.match(desktopController, /createCompanionLaunchTicket/);
-  assert.match(desktopCompanion, /createCompanionLaunchTicket/);
-  assert.match(desktopCompanion, /startCompanionServer/);
-  assert.match(launchPairingHook, /pairFromDesktopLaunchUrl/);
-  assert.match(launchPairing, /engineUrl[\s\S]*engineToken/);
-  assert.match(launchPairing, /setEngineToken\(engineToken\)/);
-  assert.match(launchPairing, /companionUrl[\s\S]*launchTicket/);
-  assert.match(launchPairing, /createCompanionEngineToken\(payload\.companionToken\)/);
-  assert.match(launchPairing, /Desktop launch pairing registration v1 failed/);
-  assert.match(launchPairing, /pairLocalEngine/);
-  assert.match(
-    webRtcSession,
-    /requestEngineRuntimeSwitch\(requiredRuntimeKind\)[\s\S]*waitForEngineRuntimeKind\(requiredRuntimeKind\)[\s\S]*launchManifestId/,
-  );
-  assert.match(desktopCompanion, /RUNTIME_SWITCH_PATH/);
-  assert.match(desktopCompanion, /onRuntimeSwitch/);
-  assert.match(enginePairingPanel, /Engine URL/);
-  assert.match(authSource, /Sign In/);
 }
 
 async function main() {
@@ -509,7 +272,7 @@ async function main() {
   if (process.argv.includes("--contract-only")) {
     await step(
       "verify hosted pairing contract in repository",
-      assertHostedPairingContract,
+      () => assertHostedPairingContract(rootDir),
     );
     return;
   }
@@ -538,14 +301,14 @@ async function main() {
     companion = require(modulePath);
   });
 
-  await step("start deterministic local engine probe", startEngineProbe);
+  await step("start deterministic local engine probe", engineProbe.start);
   await step("start real desktop HTTPS companion", () =>
     companion.startCompanionServer({
       certDir,
       engineToken,
       lanAddresses: [],
       launchAllowedOrigins: [new URL(webUrl).origin],
-      onRuntimeSwitch: requestProbeRuntimeSwitch,
+      onRuntimeSwitch: engineProbe.requestRuntimeSwitch,
       port: 8090,
     }),
   );
@@ -944,7 +707,7 @@ async function main() {
     );
     assert.equal(result.bootTarget, build.launch_manifest_id);
     assert.deepEqual(
-      probeRuntimeSwitches.map((entry) => entry.runtimeKind),
+      engineProbe.getRuntimeSwitches().map((entry) => entry.runtimeKind),
       ["native_linux"],
     );
   });

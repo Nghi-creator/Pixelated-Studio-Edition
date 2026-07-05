@@ -3,18 +3,37 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
-import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
+import {
+  fetchHealth,
+  getCameraPeerState,
+  getRuntimeActiveSessionId,
+  isHttpsCompanion,
+  normalizeInviteCode,
+  nowIso,
+  preflightCompanion,
+  printCheck,
+  requestJson,
+  redeemCompanionInvite,
+  sleep,
+  summarizeHealth,
+} from "./multiplayerSmokeHealth.mjs";
+import {
+  connectCompanionGuest,
+  makeSyntheticOffer,
+} from "./multiplayerSmokeCompanion.mjs";
+import {
+  copyTextArtifact,
+  makeLogger,
+  writeJsonArtifact,
+  writeNotesTemplate,
+  writePlaceholderJson,
+} from "./multiplayerSmokeArtifacts.mjs";
 
 const DEFAULT_ENGINE_URL = "http://127.0.0.1:8080";
 const DEFAULT_OUT_DIR = ".context/smoke-artifacts";
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_POLL_MS = 2_000;
-const REPO_ROOT = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  "../..",
-);
-
 let activeRun = null;
 
 function printUsage() {
@@ -118,334 +137,6 @@ function parseArgs(argv) {
   return options;
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function nowIso() {
-  return new Date().toISOString();
-}
-
-function printCheck(status, label, detail = "") {
-  const suffix = detail ? ` - ${detail}` : "";
-  console.log(`[${status}] ${label}${suffix}`);
-}
-
-function getHealthUrl(engineUrl) {
-  return `${engineUrl}/health`;
-}
-
-function isHttpsCompanion(engineUrl) {
-  return new URL(engineUrl).protocol === "https:";
-}
-
-function normalizeInviteCode(inviteCode) {
-  return inviteCode.toUpperCase().replace(/[^A-Z0-9]/g, "");
-}
-
-function getRuntimeActiveSessionId(health) {
-  return health?.checks?.runtime?.activeSessionId || null;
-}
-
-function getCameraPeerState(health) {
-  const peers = health?.checks?.resources?.cameraPeers || {};
-  const peerIds = Array.isArray(peers.peerIds)
-    ? peers.peerIds.filter((peerId) => typeof peerId === "string")
-    : [];
-
-  return {
-    peerCount: Number(peers.peerCount) || 0,
-    peerIds,
-    sessionId: typeof peers.sessionId === "string" ? peers.sessionId : null,
-  };
-}
-
-function getInputMode(health) {
-  const bridge = health?.checks?.gamepadBridge || {};
-  const hasVirtualGamepads =
-    bridge.fileExists === true &&
-    bridge.uinputAvailable === true &&
-    bridge.failed !== true;
-
-  return {
-    bridgeFailed: bridge.failed === true,
-    bridgeFileExists: bridge.fileExists === true,
-    mode: hasVirtualGamepads ? "virtual-gamepads" : "keyboard-fallback",
-    supportedPlayers: hasVirtualGamepads ? 4 : 2,
-    uinputAvailable: bridge.uinputAvailable === true,
-  };
-}
-
-function summarizeProcess(processSnapshot) {
-  if (!processSnapshot || typeof processSnapshot !== "object") {
-    return null;
-  }
-
-  return {
-    averageCpuPercent:
-      typeof processSnapshot.averageCpuPercent === "number"
-        ? processSnapshot.averageCpuPercent
-        : null,
-    pid: typeof processSnapshot.pid === "number" ? processSnapshot.pid : null,
-    rssMb:
-      typeof processSnapshot.rssMb === "number" ? processSnapshot.rssMb : null,
-  };
-}
-
-function getResourceSnapshot(health) {
-  const resources = health?.checks?.resources || {};
-
-  return {
-    camera: summarizeProcess(resources.camera),
-    node: summarizeProcess(resources.node),
-    retroarch: summarizeProcess(resources.retroarch),
-  };
-}
-
-function summarizeHealth(health) {
-  const cameraPeers = getCameraPeerState(health);
-  const runtimeActiveSessionId = getRuntimeActiveSessionId(health);
-
-  return {
-    cameraPeers,
-    input: getInputMode(health),
-    ok: Boolean(health?.ok),
-    resources: getResourceSnapshot(health),
-    runtimeActiveSessionId,
-    runtimeCameraRunning: Boolean(health?.checks?.runtime?.cameraRunning),
-    runtimeRetroarchRunning: Boolean(health?.checks?.runtime?.retroarchRunning),
-    uptime: typeof health?.uptime === "number" ? health.uptime : null,
-  };
-}
-
-async function fetchHealth(engineUrl) {
-  const response = await fetch(getHealthUrl(engineUrl));
-  const body = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const message = body ? JSON.stringify(body) : response.statusText;
-    throw new Error(`GET /health returned ${response.status}: ${message}`);
-  }
-
-  return body;
-}
-
-async function requestJson(engineUrl, route, options = {}) {
-  const response = await fetch(`${engineUrl}${route}`, options);
-  const body = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const message = body ? JSON.stringify(body) : response.statusText;
-    throw new Error(
-      `${options.method || "GET"} ${route} returned ${response.status}: ${message}`,
-    );
-  }
-
-  return body;
-}
-
-async function preflightCompanion(engineUrl) {
-  const preflight = await requestJson(engineUrl, "/invite/preflight");
-  if (preflight?.certificate?.status !== "accepted") {
-    throw new Error("Companion preflight did not confirm certificate acceptance.");
-  }
-  if (preflight?.invite?.status !== "active") {
-    throw new Error(
-      `Companion invite is ${preflight?.invite?.status || "unknown"}, expected active.`,
-    );
-  }
-  if (preflight?.engine?.status !== "available" || preflight?.ready !== true) {
-    throw new Error("Companion preflight reports that the host engine is unavailable.");
-  }
-  return preflight;
-}
-
-async function redeemCompanionInvite(engineUrl, inviteCode) {
-  const normalizedInviteCode = normalizeInviteCode(inviteCode);
-  if (!normalizedInviteCode) {
-    throw new Error("--invite-code must contain letters or numbers.");
-  }
-
-  const redemption = await requestJson(engineUrl, "/invite/redeem", {
-    body: JSON.stringify({ code: normalizedInviteCode }),
-    headers: { "Content-Type": "application/json" },
-    method: "POST",
-  });
-  if (!redemption?.companionToken) {
-    throw new Error("Companion invite redemption returned no companion credential.");
-  }
-  return redemption;
-}
-
-function makeSyntheticOffer(peerId) {
-  const fingerprint = crypto
-    .randomBytes(32)
-    .toString("hex")
-    .toUpperCase()
-    .match(/.{2}/g)
-    .join(":");
-
-  return {
-    peerId,
-    sdp: [
-      "v=0",
-      `o=- ${Date.now()} 2 IN IP4 127.0.0.1`,
-      "s=Pixelated LAN smoke",
-      "t=0 0",
-      "a=group:BUNDLE 0 1",
-      "a=msid-semantic: WMS",
-      "m=video 9 UDP/TLS/RTP/SAVPF 96",
-      "c=IN IP4 0.0.0.0",
-      "a=mid:0",
-      "a=recvonly",
-      "a=rtcp:9 IN IP4 0.0.0.0",
-      "a=rtcp-mux",
-      "a=rtcp-rsize",
-      "a=rtpmap:96 VP8/90000",
-      "a=ice-options:trickle",
-      "a=ice-ufrag:smoke",
-      "a=ice-pwd:pixelatedsmokepixelatedsmoke",
-      `a=fingerprint:sha-256 ${fingerprint}`,
-      "a=setup:actpass",
-      "m=audio 9 UDP/TLS/RTP/SAVPF 111",
-      "c=IN IP4 0.0.0.0",
-      "a=mid:1",
-      "a=recvonly",
-      "a=rtcp:9 IN IP4 0.0.0.0",
-      "a=rtcp-mux",
-      "a=rtcp-rsize",
-      "a=rtpmap:111 opus/48000/2",
-      "a=ice-options:trickle",
-      "a=ice-ufrag:smoke",
-      "a=ice-pwd:pixelatedsmokepixelatedsmoke",
-      `a=fingerprint:sha-256 ${fingerprint}`,
-      "a=setup:actpass",
-      "",
-    ].join("\r\n"),
-    type: "offer",
-  };
-}
-
-async function connectCompanionGuest({
-  companionToken,
-  engineUrl,
-  expectedSessionId,
-  log,
-  timeoutMs,
-}) {
-  const require = createRequire(path.join(REPO_ROOT, "apps/web/package.json"));
-  const { io } = require("socket.io-client");
-  const peerId = `smoke-${crypto.randomBytes(8).toString("hex")}`;
-  const socket = io(engineUrl, {
-    autoConnect: false,
-    query: { companionToken },
-    reconnection: false,
-  });
-  const disconnectSocket = () => {
-    socket.emit("webrtc-peer-disconnect", {
-      peerId,
-      sessionId: expectedSessionId,
-    });
-    socket.disconnect();
-  };
-
-  const connected = new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error("Timed out connecting the companion smoke guest.")),
-      timeoutMs,
-    );
-    socket.once("connect_error", (err) => {
-      clearTimeout(timeout);
-      reject(new Error(`Companion guest Socket.IO connection failed: ${err.message}`));
-    });
-    socket.once("connect", () => {
-      clearTimeout(timeout);
-      resolve();
-    });
-  });
-  socket.connect();
-  try {
-    await connected;
-  } catch (err) {
-    disconnectSocket();
-    throw err;
-  }
-  log.write("companion-guest-socket-connected", { peerId, socketId: socket.id });
-
-  const lobbyJoined = new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error("Timed out waiting for companion guest lobby state.")),
-      timeoutMs,
-    );
-    socket.on("lobby-state", (state) => {
-      const participant = state?.participants?.find(
-        (entry) => entry.socketId === socket.id,
-      );
-      if (!participant) return;
-      clearTimeout(timeout);
-      resolve({ participant, state });
-    });
-  });
-  socket.emit("join-session", {
-    displayName: "LAN Smoke Guest",
-    role: "spectator",
-    sessionId: expectedSessionId,
-  });
-  let lobby;
-  try {
-    lobby = await lobbyJoined;
-  } catch (err) {
-    disconnectSocket();
-    throw err;
-  }
-  if (lobby.participant.role !== "spectator") {
-    disconnectSocket();
-    throw new Error(
-      `Companion smoke guest joined as ${lobby.participant.role}, expected spectator.`,
-    );
-  }
-  log.write("companion-guest-lobby-joined", {
-    participant: lobby.participant,
-    participantCount: lobby.state.participants.length,
-  });
-
-  const answered = new Promise((resolve, reject) => {
-    const timeout = setTimeout(
-      () => reject(new Error("Timed out waiting for the camera WebRTC answer.")),
-      timeoutMs,
-    );
-    socket.on("engine-error", (payload) => {
-      clearTimeout(timeout);
-      reject(new Error(payload?.message || "Camera rejected the smoke guest."));
-    });
-    socket.on("webrtc-answer", (answer) => {
-      if (answer?.peerId !== peerId) return;
-      clearTimeout(timeout);
-      resolve(answer);
-    });
-  });
-  socket.emit("webrtc-offer", {
-    ...makeSyntheticOffer(peerId),
-    sessionId: expectedSessionId,
-  });
-  log.write("companion-guest-offer-sent", { peerId });
-  try {
-    await answered;
-  } catch (err) {
-    disconnectSocket();
-    throw err;
-  }
-  log.write("companion-guest-answer-received", { peerId });
-
-  return {
-    disconnect() {
-      disconnectSocket();
-      log.write("companion-guest-disconnected", { peerId });
-    },
-    peerId,
-  };
-}
-
 async function activateTelemetryCapture(
   engineUrl,
   captureToken,
@@ -474,124 +165,6 @@ async function deactivateTelemetryCapture(engineUrl, captureToken) {
   if (!response.ok && response.status !== 404) {
     throw new Error(`DELETE /smoke/telemetry/active returned ${response.status}`);
   }
-}
-
-function makeLogger(outDir, runId) {
-  const runDir = path.join(outDir, runId);
-  fs.mkdirSync(runDir, { recursive: true });
-  const eventsPath = path.join(runDir, "engine-health-events.ndjson");
-
-  return {
-    eventsPath,
-    runDir,
-    write(event, payload = {}) {
-      const entry = {
-        event,
-        timestamp: nowIso(),
-        ...payload,
-      };
-      fs.appendFileSync(eventsPath, `${JSON.stringify(entry)}\n`);
-      return entry;
-    },
-  };
-}
-
-function writeJsonArtifact(runDir, fileName, payload) {
-  const artifactPath = path.join(runDir, fileName);
-  fs.writeFileSync(artifactPath, `${JSON.stringify(payload, null, 2)}\n`);
-  return artifactPath;
-}
-
-function copyTextArtifact(runDir, fileName, sourcePath) {
-  if (!sourcePath) return null;
-
-  const artifactPath = path.join(runDir, fileName);
-  fs.copyFileSync(sourcePath, artifactPath);
-  return artifactPath;
-}
-
-function writePlaceholderJson(runDir, fileName, description) {
-  const artifactPath = path.join(runDir, fileName);
-  const payload = {
-    instructions: description,
-    status: "paste-stream-telemetry-json-here",
-  };
-  fs.writeFileSync(artifactPath, `${JSON.stringify(payload, null, 2)}\n`);
-  return artifactPath;
-}
-
-function writeNotesTemplate({
-  artifactPaths,
-  baselinePeerCount,
-  expectedSessionId,
-  options,
-  reportPath,
-  runDir,
-  runId,
-  targetPeerCount,
-}) {
-  const notesPath = path.join(runDir, "manual-smoke-notes.md");
-  const sessionLabel =
-    expectedSessionId || "captured in engine-smoke-report.json after baseline";
-  const peerTargetLabel =
-    baselinePeerCount !== null &&
-    baselinePeerCount !== undefined &&
-    targetPeerCount !== null &&
-    targetPeerCount !== undefined
-      ? `${baselinePeerCount} -> ${targetPeerCount}`
-      : "captured in engine-smoke-report.json after baseline";
-  const lines = [
-    "# LAN Multiplayer Smoke Notes",
-    "",
-    `Run ID: ${runId}`,
-    `Started: ${nowIso()}`,
-    `Engine URL: ${options.engineUrl}`,
-    `Session ID: ${sessionLabel}`,
-    `Expected guest peer delta: ${options.expectedGuests}`,
-    `Peer count target: ${peerTargetLabel}`,
-    `Report: ${reportPath}`,
-    `Events: ${artifactPaths.eventsPath}`,
-    "",
-    "## Device Details",
-    "",
-    "- Date/time:",
-    "- Host OS:",
-    "- Guest device/browser:",
-    "- Host LAN URL:",
-    "- Companion URL:",
-    "- ROM:",
-    "",
-    "## Pass/Fail",
-    "",
-    "- [ ] Browser accepted the HTTPS companion certificate.",
-    "- [ ] Real guest browser stream reached LIVE STREAM ACTIVE.",
-    "- [ ] P2 request/input/release worked.",
-    "- [ ] P3/P4 state matched engine input mode.",
-    "- [ ] Invite regenerate/revoke behavior checked.",
-    "",
-    "Automated checks are recorded in `engine-smoke-report.json`: companion preflight, invite redemption, spectator join, camera answer, peer-count transition, host session survival, disconnect cleanup, and host/guest telemetry capture.",
-    "",
-    "## Results",
-    "",
-    "- Host result:",
-    "- Guest result:",
-    "- Guest disconnect result:",
-    "- P2 input result:",
-    "- P3/P4 visible state:",
-    "- Certificate UX notes:",
-    "- Invite regenerate/revoke notes:",
-    "- Overall: PASS / FAIL",
-    "",
-    "## Artifact Files",
-    "",
-    `- Engine report: ${reportPath}`,
-    `- Engine poll log: ${artifactPaths.eventsPath}`,
-    `- Host telemetry: ${artifactPaths.hostTelemetryPath}`,
-    `- Guest telemetry: ${artifactPaths.guestTelemetryPath}`,
-  ];
-
-  fs.writeFileSync(notesPath, `${lines.join("\n")}\n`);
-  return notesPath;
 }
 
 async function pollUntil({ description, engineUrl, log, predicate, pollMs, timeoutMs }) {
