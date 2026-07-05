@@ -116,7 +116,7 @@ export default function Profile() {
       {/* MAIN PROFILE PAGE */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full mt-8">
         <button
-          onClick={() => navigate("/")}
+          onClick={() => navigate("/home")}
           className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-8 w-fit"
         >
           Back to Home

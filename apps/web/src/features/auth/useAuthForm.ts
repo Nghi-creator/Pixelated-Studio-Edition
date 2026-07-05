@@ -85,7 +85,7 @@ export function useAuthForm({
           password,
         });
         if (error) throw error;
-        navigate("/");
+        navigate("/home");
       } else {
         const passwordPolicyError = getPasswordPolicyError(password);
         if (passwordPolicyError) {

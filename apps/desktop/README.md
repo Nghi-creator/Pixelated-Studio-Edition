@@ -1,19 +1,124 @@
 # Pixelated Desktop
 
-Electron wrapper for starting and stopping the local Docker engine.
+Electron desktop app for running PIXELATED Studio's local engine. It owns Docker diagnostics, engine image build/pull, container lifecycle, engine token generation, local/LAN exposure, HTTPS companion pairing, invite codes, QR codes, connected-browser controls, and packaged release validation.
 
-Main-process code is grouped under `main/companion`, `main/docker`,
-`main/engine`, `main/network`, and `main/runtime`. Tests are split between
-`tests/unit/<subsystem>/` and `tests/integration/`.
+## Code map
+
+```text
+main/companion/   HTTPS companion server, launch tickets, invites, QR, proxy
+main/docker/      Docker command wrappers, diagnostics, recovery guidance
+main/engine/      Engine startup/shutdown orchestration
+main/network/     Local/LAN exposure detection
+main/runtime/     Runtime channel/config/health state
+renderer/         Desktop UI helpers for phases, logs, clients, exposure
+tests/unit/       Main-process subsystem tests
+tests/integration Packaged/release smoke coverage
+```
+
+## Local development
 
 Run from this folder:
 
 ```sh
+npm install
 npm start
 ```
 
-`npm run build` clears stale compiler output before rebuilding, so moved files
-cannot remain in `dist` and accidentally enter a test run or packaged release.
+`npm start` builds TypeScript and launches Electron. Docker Desktop must be installed and running for engine startup.
+
+Useful commands:
+
+```sh
+npm run build
+npm test
+npm run smoke:release
+npm run dist:ci
+```
+
+`npm run build` clears stale compiler output before rebuilding so moved files cannot remain in `dist` and accidentally enter tests or packaged releases.
+
+## Normal engine flow
+
+1. Desktop checks Docker availability and reports targeted recovery guidance for missing Docker, stopped daemon, permission issues, virtualization problems, disk space, invalid contexts, and timeouts.
+2. Desktop builds or pulls the engine image.
+3. Desktop creates a per-run engine token.
+4. Desktop removes stale `pixelated-node` containers and starts a fresh runtime.
+5. Local mode publishes `127.0.0.1:8080`; LAN mode publishes `0.0.0.0:8080`.
+6. Desktop polls `/health` until the engine is ready.
+7. LAN mode also starts the HTTPS companion on port `8090`.
+
+The desktop UI reports structured startup states such as checking Docker, pulling/building, removing stale containers, starting, waiting for health, ready, stopping, stopped, and failed.
+
+## Launch Web and pairing
+
+`Launch Web` opens the configured web app and redeems a one-use launch ticket through the local HTTPS companion. The web app stores the companion URL and a scoped `companion:<credential>` token. Signed-in launches register only non-secret pairing metadata with the hosted API so later browser visits can restore the companion target.
+
+Override the hosted web target:
+
+```txt
+PIXELATED_WEB_URL=https://pixelated-studio-edition.vercel.app
+```
+
+The companion also powers LAN invite flows. LAN share links and QR codes open the hosted `/engine` invite flow, which performs certificate preflight and invite redemption before proxying HTTP and Socket.IO traffic to the local engine.
+
+## Engine runtime source and images
+
+Packaged builds include `engine/runtime` as `resources/engine-runtime`. Local development falls back to the workspace source path:
+
+```txt
+../../engine/runtime
+```
+
+Override the runtime source path:
+
+```txt
+PIXELATED_ENGINE_RUNTIME_DIR=/absolute/path/to/engine/runtime
+```
+
+Use a prebuilt libretro engine image:
+
+```txt
+PIXELATED_ENGINE_IMAGE=ghcr.io/your-org/pixelated-engine:latest
+PIXELATED_ENGINE_PULL=1
+PIXELATED_ENGINE_BUILD_FALLBACK=1
+```
+
+Native Debian runtime images are opt-in:
+
+```txt
+PIXELATED_ENGINE_RUNTIME_KIND=native_linux
+PIXELATED_ENGINE_NATIVE_IMAGE=pixelated-engine-native:debian-native-v1-...
+```
+
+Without an explicit native image override, the launcher derives the native image tag from `engine/runtime/native-runtime.lock.json`, builds `Dockerfile.native`, and passes lock metadata into image labels.
+
+## API and origin configuration
+
+The desktop app passes the hosted API URL into the engine so cloud sessions can be verified before boot:
+
+```txt
+PIXELATED_API_URL=https://pixelated-api-services.onrender.com
+```
+
+For localhost API testing:
+
+```txt
+PIXELATED_API_URL=http://127.0.0.1:4000
+```
+
+Override trusted browser origins:
+
+```txt
+PIXELATED_ALLOWED_ORIGINS=https://pixelated-studio-edition.vercel.app,http://localhost:5173,http://127.0.0.1:5173
+```
+
+Override the companion web bundle path for custom layouts:
+
+```txt
+PIXELATED_WEB_DIST_DIR=/absolute/path/to/apps/web/dist
+```
+
+## Packaging
 
 Package a release from this folder:
 
@@ -21,135 +126,14 @@ Package a release from this folder:
 npm run dist
 ```
 
-The desktop `dist` script first runs the React production build in `../web`,
-then electron-builder bundles `../web/dist` into packaged desktop artifacts as
-`resources/web-dist`. It finishes by running `npm run smoke:release` against
-electron-builder's unpacked packaged app. The release command fails if
-`app.asar` is missing required main/preload/renderer files, HTML references
-missing or CommonJS renderer output, the preload imports unsupported sandbox
-modules or omits its IPC bridge, bundled `resources/web-dist` differs from the
-fresh `apps/web/dist` build, or bundled engine runtime resources are incomplete.
+The `dist` script:
 
-Re-run the packaged artifact guard without rebuilding the installer:
+1. Builds the desktop TypeScript.
+2. Builds `apps/web`.
+3. Copies the web bundle for packaging.
+4. Runs electron-builder for DMG, NSIS, or AppImage targets.
+5. Runs the packaged release smoke against the unpacked app.
 
-```sh
-npm run smoke:release
-```
+The release smoke verifies required main/preload/renderer files, sandbox-safe preload behavior, bundled `resources/web-dist`, and bundled engine runtime resources.
 
-Packaged builds resolve the LAN HTTPS companion player from the bundled
-`resources/web-dist` resource. Local development still resolves the companion
-player from `apps/web/dist`, so run `npm run build` in `apps/web` before testing
-LAN companion mode with `npm start`.
-
-When the engine starts in LAN mode, its health payload advertises the desktop
-HTTPS companion URLs. The player lobby uses the first companion URL for its
-session-specific share link and copies invite-code guidance with it. Local-only
-localhost play continues to share a direct spectator link. Desktop also adds
-the dynamic companion origins to the engine allowlist for proxied browser and
-Socket.IO traffic.
-
-By default the desktop app builds the engine image from the bundled
-`resources/engine-runtime` directory in packaged builds, falling back to the
-workspace source path during local development:
-
-```txt
-../../engine/runtime
-```
-
-Override that path for packaged or custom layouts with:
-
-```txt
-PIXELATED_ENGINE_RUNTIME_DIR=/absolute/path/to/engine/runtime
-```
-
-The launcher can also use a prebuilt engine image. By default it keeps the local
-developer build path, but a packaged release can pull a tagged image first:
-
-```txt
-PIXELATED_ENGINE_IMAGE=ghcr.io/your-org/pixelated-engine:latest
-PIXELATED_ENGINE_PULL=1
-```
-
-If the pull fails, the launcher falls back to a local build unless disabled:
-
-```txt
-PIXELATED_ENGINE_BUILD_FALLBACK=0
-```
-
-Native Debian runtime images are opt-in so existing libretro sessions keep using
-the default `pixelated-engine` image. To test native Linux catalog builds, select
-the native runtime channel before starting the desktop app:
-
-```txt
-PIXELATED_ENGINE_RUNTIME_KIND=native_linux
-```
-
-With no explicit image override, the launcher derives the native image tag from
-`engine-runtime/native-runtime.lock.json`, for example
-`pixelated-engine-native:debian-native-v1-46d11e8650c8`, builds
-`Dockerfile.native`, and passes the lock SHA-256 into image labels. Use
-`PIXELATED_ENGINE_NATIVE_IMAGE` to override that tag for prebuilt native runtime
-images. `PIXELATED_ENGINE_IMAGE` only overrides the libretro runtime image.
-
-The desktop UI reports structured startup states: checking Docker, pulling or
-building the image, removing stale containers, starting the container, waiting
-for health, ready, stopping, stopped, and failed.
-
-Before startup, the desktop app runs a bounded Docker diagnostic. Missing Docker,
-a stopped daemon, permission errors, unavailable virtualization, full storage,
-invalid Docker contexts, timeouts, and unknown failures receive distinct status
-messages while the original command detail remains available in System Logs.
-The Startup Pipeline recovery callout can retry initialization and open official
-Docker install or diagnosis-specific setup pages. Pixelated Studio selects those
-URLs in the Electron main process and never downloads or executes an installer.
-When Docker Desktop is installed in a trusted standard location, **Start Docker**
-launches it, waits up to 90 seconds for readiness, and resumes engine
-initialization automatically. The wait can be cancelled. macOS and Windows use
-known Docker Desktop application paths; Linux uses the known Docker Desktop
-binary or its user-level systemd service and never invokes `sudo`.
-
-Intervention-required failures show targeted recovery guidance for Linux Docker
-socket permissions, Windows virtualization/WSL 2, Docker disk space, and Docker
-contexts. **Copy diagnostics** produces a shareable normalized summary without
-raw Docker output, environment values, tokens, or filesystem paths. Full raw
-details remain local in System Logs for troubleshooting.
-
-Cross-platform release validation runs through
-`.github/workflows/desktop-release-validation.yml`. It executes desktop
-diagnostic contracts, builds the native DMG, NSIS installer, or AppImage on its
-matching GitHub runner, runs the packaged `app.asar` smoke, and uploads the
-installer artifact. Real-machine onboarding results are tracked separately in
-`.context/docker-onboarding-validation.md`.
-
-The desktop app passes `PIXELATED_API_URL` into the engine so cloud sessions can be verified with the backend before boot. It defaults to the hosted Render API; override it for localhost API testing:
-
-```txt
-PIXELATED_API_URL=http://127.0.0.1:4000
-```
-
-The engine accepts the hosted app plus local Vite origins by default. Override
-the explicit comma-separated allowlist when testing another trusted web origin:
-
-```bash
-PIXELATED_ALLOWED_ORIGINS=https://pixelated-studio-edition.vercel.app,http://localhost:5173,http://127.0.0.1:5173
-```
-
-`Launch Web` opens the hosted Vercel app and securely redeems a one-time pairing
-ticket through the local HTTPS companion. Signed-in launches also register the
-non-secret companion URL with the API so a later browser visit can restore the
-pairing target. Override the hosted target when needed:
-
-```bash
-PIXELATED_WEB_URL=https://pixelated-studio-edition.vercel.app
-```
-
-The companion on port `8090` is a background HTTPS proxy, trust endpoint, and
-invite API. Opening it directly shows a small status page. LAN share links and
-QR codes open the hosted `/engine` invite flow, which uses the companion URL for
-certificate preflight and invite redemption.
-
-Override the companion web asset path for custom layouts with:
-
-```txt
-PIXELATED_WEB_DIST_DIR=/absolute/path/to/apps/web/dist
-```
+Cross-platform packaging is validated by `.github/workflows/desktop-release-validation.yml`.

@@ -51,7 +51,7 @@ export function useDeleteAccount({
       } catch {
         console.warn("Failed to clear deleted account session");
       }
-      navigate("/", { replace: true });
+      navigate("/home", { replace: true });
     } catch (error: unknown) {
       if (
         error instanceof ApiError &&

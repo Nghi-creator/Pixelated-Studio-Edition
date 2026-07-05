@@ -131,8 +131,10 @@ describe("desktop package config", () => {
   it("ships the image build recovery bridge and renderer action states", () => {
     const preloadPath = path.resolve(__dirname, "../../preload.js");
     const rendererPath = path.resolve(__dirname, "../../renderer.js");
+    const recoveryPath = path.resolve(__dirname, "../../renderer/recovery.js");
     const preload = fs.readFileSync(preloadPath, "utf8");
     const renderer = fs.readFileSync(rendererPath, "utf8");
+    const recovery = fs.readFileSync(recoveryPath, "utf8");
 
     assert.match(preload, /buildEngineImage/);
     assert.match(preload, /build-engine-image/);
@@ -143,12 +145,13 @@ describe("desktop package config", () => {
     assert.match(preload, /onEngineImageBuildReady/);
     assert.match(preload, /engine-image-build-ready/);
 
-    assert.match(renderer, /createImageRecoveryActionState/);
-    assert.match(renderer, /Build image & retry/);
-    assert.match(renderer, /Building\.\.\./);
-    assert.match(renderer, /setImageRecoveryVisible\(true, payload\)/);
-    assert.match(renderer, /setImageBuildPending\(true\)/);
-    assert.match(renderer, /setImageRecoveryVisible\(false\)/);
+    assert.match(recovery, /createImageRecoveryActionState/);
+    assert.match(recovery, /Build image & retry/);
+    assert.match(recovery, /Building\.\.\./);
+    assert.match(recovery, /function setImageRecoveryVisible/);
+    assert.match(recovery, /setImageBuildPending\(true\)/);
+    assert.match(renderer, /recovery\.setImageRecoveryVisible\(true, payload\)/);
+    assert.match(renderer, /recovery\.setImageRecoveryVisible\(false\)/);
   });
 
   it("runs the packaged release smoke as part of npm run dist", () => {

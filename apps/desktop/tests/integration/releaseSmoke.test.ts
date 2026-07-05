@@ -14,9 +14,16 @@ describe("desktop packaged release smoke helpers", () => {
     assert.deepEqual(
       getHtmlScriptSources(`
         <script src="./dist/renderer/logs.js"></script>
+        <script src="./dist/renderer/recovery.js"></script>
+        <script src="./dist/renderer/clients.js"></script>
         <script src="./dist/renderer.js"></script>
       `),
-      ["dist/renderer/logs.js", "dist/renderer.js"],
+      [
+        "dist/renderer/logs.js",
+        "dist/renderer/recovery.js",
+        "dist/renderer/clients.js",
+        "dist/renderer.js",
+      ],
     );
   });
 

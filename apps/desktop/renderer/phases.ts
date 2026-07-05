@@ -191,7 +191,7 @@
               ? `Running ${getPhaseLabel(activePhase)}`
               : "Idle";
 
-      phaseList.innerHTML = "";
+      phaseList.replaceChildren();
       startupPhases.forEach((phase) => {
         const phaseStatus = getPhaseStatus(phase.id, activePhase, state.status);
         const classes = getPhaseClasses(phaseStatus);

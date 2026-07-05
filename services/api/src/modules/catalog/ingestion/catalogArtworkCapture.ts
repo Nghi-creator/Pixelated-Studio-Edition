@@ -49,6 +49,11 @@ export type CatalogArtworkCommandInput = {
   title: string;
 };
 
+export type ParsedCaptureCommand = {
+  args: string[];
+  file: string;
+};
+
 const GENERATED_COVER_MARKER = "/storage/v1/object/public/catalog_artifacts/covers/";
 
 export function isGeneratedCatalogArtworkUrl(url: string | null | undefined) {
@@ -60,6 +65,57 @@ export function contentTypeForArtworkExtension(extension: string) {
   if (normalized === ".jpg" || normalized === ".jpeg") return "image/jpeg";
   if (normalized === ".webp") return "image/webp";
   return "image/png";
+}
+
+export function parseCaptureCommand(command: string): ParsedCaptureCommand {
+  const parts: string[] = [];
+  let current = "";
+  let quote: "'" | '"' | null = null;
+  let escaping = false;
+
+  for (const char of command.trim()) {
+    if (escaping) {
+      current += char;
+      escaping = false;
+      continue;
+    }
+
+    if (char === "\\") {
+      escaping = true;
+      continue;
+    }
+
+    if (quote) {
+      if (char === quote) {
+        quote = null;
+      } else {
+        current += char;
+      }
+      continue;
+    }
+
+    if (char === "'" || char === '"') {
+      quote = char;
+      continue;
+    }
+
+    if (/\s/.test(char)) {
+      if (current) {
+        parts.push(current);
+        current = "";
+      }
+      continue;
+    }
+
+    current += char;
+  }
+
+  if (escaping) current += "\\";
+  if (quote) throw new Error("Capture command contains an unterminated quote.");
+  if (current) parts.push(current);
+  const [file, ...args] = parts;
+  if (!file) throw new Error("Capture command cannot be empty.");
+  return { args, file };
 }
 
 function sanitizeObjectSegment(value: string) {
@@ -188,8 +244,9 @@ export function captureGameplayArtworkWithCommand(
         const romPath = path.join(tempDir, `game${artifactExtension}`);
         const outputPath = path.join(tempDir, "capture.png");
         await fs.writeFile(romPath, input.artifactBytes);
+        const parsedCommand = parseCaptureCommand(command);
 
-        const child = spawn(command, {
+        const child = spawn(parsedCommand.file, parsedCommand.args, {
           env: {
             ...process.env,
             PIXELATED_CAPTURE_ARTIFACT_FILENAME: input.artifactFilename || "",
@@ -200,7 +257,6 @@ export function captureGameplayArtworkWithCommand(
             PIXELATED_CAPTURE_ROM_PATH: romPath,
             PIXELATED_CAPTURE_RUNTIME_ID: input.runtimeId,
           },
-          shell: true,
           stdio: "ignore",
         });
 

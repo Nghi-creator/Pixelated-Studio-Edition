@@ -68,7 +68,10 @@ export const getEngineUrl = () => {
 
 export const getEngineControlUrl = () => {
   if (typeof window === "undefined") return DEFAULT_ENGINE_URL;
-  return window.localStorage.getItem(ENGINE_CONTROL_URL_STORAGE_KEY) || getEngineUrl();
+  const storedUrl = window.localStorage.getItem(ENGINE_CONTROL_URL_STORAGE_KEY);
+  return storedUrl && isAllowedEngineUrl(storedUrl)
+    ? normalizeEngineUrl(storedUrl)
+    : getEngineUrl();
 };
 
 export const getLocalCompanionControlUrl = (engineUrl = getEngineUrl()) => {

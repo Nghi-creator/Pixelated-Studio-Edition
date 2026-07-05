@@ -1,25 +1,7 @@
-import { app, BrowserWindow, ipcMain, shell, type IpcMainEvent } from "electron";
+import { app, BrowserWindow } from "electron";
 import path from "path";
-import {
-  buildEngineImageAndResume,
-  cancelDockerRecovery,
-  cleanupEngine,
-  createWebLaunchUrl,
-  listEngineClients,
-  regenerateLanInvite,
-  revokeEngineClient,
-  revokeLanInvite,
-  rotateEngineToken,
-  startEngine,
-  startDockerAndResume,
-  stopEngine,
-} from "./main/engine/controller";
-import { createCompanionQrDataUrl } from "./main/companion/qr";
-import {
-  getDockerResourceUrl,
-  isDockerDiagnosticCode,
-  type DockerResource,
-} from "./main/docker/diagnostics";
+import { cleanupEngine } from "./main/engine/controller";
+import { registerIpcHandlers } from "./main/ipc";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -38,82 +20,7 @@ function createWindow() {
   mainWindow.loadFile(path.join(__dirname, "../index.html"));
 }
 
-ipcMain.on("start-docker", (event: IpcMainEvent, options = {}) => {
-  startEngine(event, options);
-});
-
-ipcMain.on("stop-docker", (event: IpcMainEvent) => {
-  stopEngine(event);
-});
-
-ipcMain.on("start-docker-application", (event: IpcMainEvent, options = {}) => {
-  startDockerAndResume(event, options);
-});
-
-ipcMain.on("build-engine-image", (event: IpcMainEvent, options = {}) => {
-  buildEngineImageAndResume(event, options);
-});
-
-ipcMain.on("cancel-docker-recovery", (event: IpcMainEvent) => {
-  cancelDockerRecovery(event);
-});
-
-ipcMain.on("regenerate-lan-invite", (event: IpcMainEvent) => {
-  regenerateLanInvite(event);
-});
-
-ipcMain.on("revoke-lan-invite", (event: IpcMainEvent) => {
-  revokeLanInvite(event);
-});
-
-ipcMain.on("rotate-engine-token", (event: IpcMainEvent, options = {}) => {
-  rotateEngineToken(event, options);
-});
-
-ipcMain.handle("list-engine-clients", () => listEngineClients());
-
-ipcMain.handle("revoke-engine-client", (event, clientId: unknown) => {
-  if (typeof clientId !== "string" || !clientId) {
-    throw new Error("A connected client id is required.");
-  }
-  return revokeEngineClient(clientId).then((result) => {
-    event.sender.send(
-      "server-log",
-      `Revoked browser client ${clientId} and disconnected ${result.disconnected} socket(s).`,
-    );
-    return result;
-  });
-});
-
-ipcMain.handle("create-companion-qr", (_event, url: unknown) => {
-  if (typeof url !== "string") {
-    throw new Error("A companion join URL is required.");
-  }
-  return createCompanionQrDataUrl(url);
-});
-
-ipcMain.handle("launch-web", async () => {
-  const url = createWebLaunchUrl();
-  await shell.openExternal(url);
-});
-
-ipcMain.handle(
-  "open-docker-resource",
-  async (_event, resource: unknown, diagnosticCode: unknown) => {
-    if (resource !== "guide" && resource !== "install") {
-      throw new Error("Unknown Docker resource.");
-    }
-    if (!isDockerDiagnosticCode(diagnosticCode)) {
-      throw new Error("Unknown Docker diagnostic.");
-    }
-
-    const url = getDockerResourceUrl(
-      resource as DockerResource,
-      diagnosticCode,
-    );
-    await shell.openExternal(url);
-  },
-);
+registerIpcHandlers();
 
 app.whenReady().then(createWindow);
 

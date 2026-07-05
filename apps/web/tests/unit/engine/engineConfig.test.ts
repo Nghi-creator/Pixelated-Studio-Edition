@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  ENGINE_CONTROL_URL_STORAGE_KEY,
   ENGINE_URL_STORAGE_KEY,
   engineEndpoint,
+  getEngineControlUrl,
   getEngineUrl,
   isAllowedEngineUrl,
+  setEngineControlUrl,
   setEngineUrl,
 } from "../../../src/lib/engine/engineConfig.ts";
 
@@ -40,15 +43,26 @@ test("stored invalid engine URLs fall back to the default local endpoint", () =>
 
   try {
     storage.set(ENGINE_URL_STORAGE_KEY, "https://engine.example.test:8090");
+    storage.set(
+      ENGINE_CONTROL_URL_STORAGE_KEY,
+      "https://control.example.test:8090",
+    );
 
     assert.equal(getEngineUrl(), "http://localhost:8080");
+    assert.equal(getEngineControlUrl(), "http://localhost:8080");
     assert.equal(engineEndpoint("/health"), "http://localhost:8080/health");
 
     setEngineUrl("https://192.168.1.20:8090/");
+    setEngineControlUrl("https://192.168.1.21:8091/");
     assert.equal(getEngineUrl(), "https://192.168.1.20:8090");
+    assert.equal(getEngineControlUrl(), "https://192.168.1.21:8091");
     assert.equal(engineEndpoint("health"), "https://192.168.1.20:8090/health");
     assert.throws(
       () => setEngineUrl("https://engine.example.test:8090"),
+      /local or LAN engine/,
+    );
+    assert.throws(
+      () => setEngineControlUrl("https://control.example.test:8090"),
       /local or LAN engine/,
     );
   } finally {

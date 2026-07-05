@@ -8,18 +8,24 @@ const EXPECTED_RENDERER_SCRIPTS = [
   "dist/renderer/modal.js",
   "dist/renderer/exposure.js",
   "dist/renderer/phases.js",
+  "dist/renderer/recovery.js",
+  "dist/renderer/clients.js",
   "dist/renderer.js",
 ];
 const EXPECTED_PRELOAD_API = [
   "createCompanionQrDataUrl",
   "launchWeb",
+  "listEngineClients",
   "openDockerResource",
+  "buildEngineImage",
   "startDocker",
   "startDockerApplication",
   "cancelDockerRecovery",
   "stopDocker",
   "regenerateLanInvite",
+  "revokeEngineClient",
   "revokeLanInvite",
+  "rotateEngineToken",
   "onServerLog",
   "onEngineState",
   "onEngineStopped",
@@ -30,6 +36,9 @@ const EXPECTED_PRELOAD_API = [
   "onDockerRecoveryStarted",
   "onDockerRecoveryReady",
   "onDockerRecoveryCancelled",
+  "onEngineImageRecovery",
+  "onEngineImageBuildStarted",
+  "onEngineImageBuildReady",
 ];
 
 function assert(condition: unknown, message: string): asserts condition {

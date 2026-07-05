@@ -35,7 +35,7 @@ export default function AdminLayout() {
       permissionsQuery.data.profile.role !== "admin" &&
       permissionsQuery.data.profile.role !== "super_admin"
     ) {
-      navigate("/");
+      navigate("/home");
     }
   }, [navigate, permissionsQuery.data]);
 
@@ -125,7 +125,7 @@ export default function AdminLayout() {
         {/* Bottom Actions (Exit/Logout) */}
         <div className="p-4 border-t border-synth-border space-y-2">
           <Link
-            to="/"
+            to="/home"
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-white hover:bg-synth-elevated/70 transition-all font-medium"
           >
             <ArrowLeft className="w-5 h-5" />
