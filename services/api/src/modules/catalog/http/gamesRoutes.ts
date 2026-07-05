@@ -5,17 +5,73 @@ import {
   fetchFeaturedGames,
   fetchPublishedCatalogGames,
   fetchPublishedGameById,
-  type PublishedCatalogGame,
 } from "../services/catalogService.js";
 import { logTiming } from "../../observability/timing.js";
 import type { CatalogRouteContext } from "./catalogRouteContext.js";
-import { gameParamsSchema, gamesQuerySchema } from "./contracts.js";
+import {
+  gameParamsSchema,
+  gamesQuerySchema,
+  type CachedGamesCatalogResponse,
+} from "./contracts.js";
+
+const WARMUP_PAGE = 1;
+const WARMUP_PAGE_SIZE = 15;
+
+async function buildCachedGamesPage(
+  service: NonNullable<CatalogRouteContext["service"]>,
+  timings: Record<string, number>,
+  page: number,
+  pageSize: number,
+  search?: string,
+): Promise<CachedGamesCatalogResponse> {
+  const { end, start } = getPageRange(page, pageSize);
+  const data = await fetchPublishedCatalogGames(service, timings, search);
+  const rankedGames = search ? searchAndRankGames(data || [], search) : data || [];
+  const pagedGames = rankedGames.slice(start, end + 1);
+  const total = rankedGames.length;
+
+  return {
+    games: pagedGames,
+    page,
+    pageSize,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / pageSize)),
+  };
+}
 
 export function registerGamesCatalogRoutes(
   app: FastifyInstance,
   context: CatalogRouteContext,
 ) {
   const { gamesCatalogCache, service } = context;
+
+  app.addHook("onListen", () => {
+    if (!service) return;
+
+    void (async () => {
+      const cacheKey = getCatalogCacheKey(WARMUP_PAGE, WARMUP_PAGE_SIZE);
+      if (gamesCatalogCache.has(cacheKey)) return;
+
+      const timings = {};
+      try {
+        gamesCatalogCache.set(
+          cacheKey,
+          await buildCachedGamesPage(
+            service,
+            timings,
+            WARMUP_PAGE,
+            WARMUP_PAGE_SIZE,
+          ),
+        );
+        logTiming(app.log, "Games catalog warmup timing", timings, {
+          page: WARMUP_PAGE,
+          pageSize: WARMUP_PAGE_SIZE,
+        });
+      } catch (err) {
+        app.log.warn({ err }, "Failed to warm games catalog cache");
+      }
+    })();
+  });
 
   app.get("/games", async (request, reply) => {
     if (!service) {
@@ -54,10 +110,15 @@ export function registerGamesCatalogRoutes(
       return { ...cachedResponse, featuredGames };
     }
 
-    const { end, start } = getPageRange(page, pageSize);
-    let data: PublishedCatalogGame[] = [];
+    let cachedPage: CachedGamesCatalogResponse;
     try {
-      data = await fetchPublishedCatalogGames(service, timings, search);
+      cachedPage = await buildCachedGamesPage(
+        service,
+        timings,
+        page,
+        pageSize,
+        search,
+      );
     } catch (err) {
       request.log.error({ err }, "Failed to load games");
       return reply.status(500).send({ error: "Failed to load games" });
@@ -70,36 +131,21 @@ export function registerGamesCatalogRoutes(
       request.log.warn({ err }, "Failed to load featured games");
     }
 
-    const rankedGames = search
-      ? searchAndRankGames(data || [], search)
-      : data || [];
-    const pagedGames = rankedGames.slice(start, end + 1);
-    const total = rankedGames.length;
     const response = {
       featuredGames,
-      games: pagedGames,
-      page,
-      pageSize,
-      total,
-      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      ...cachedPage,
     };
 
-    gamesCatalogCache.set(cacheKey, {
-      games: response.games,
-      page: response.page,
-      pageSize: response.pageSize,
-      total: response.total,
-      totalPages: response.totalPages,
-    });
+    gamesCatalogCache.set(cacheKey, cachedPage);
     reply.header("Cache-Control", "public, max-age=30, s-maxage=60");
     reply.header("X-Pixelated-Cache", "MISS");
     logTiming(request.log, "Games catalog timing", timings, {
       cache: "miss",
       page,
       pageSize,
-      resultCount: pagedGames.length,
+      resultCount: cachedPage.games.length,
       search: Boolean(search),
-      total,
+      total: cachedPage.total,
     });
 
     return response;

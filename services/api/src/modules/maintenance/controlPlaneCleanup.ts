@@ -65,7 +65,9 @@ export async function cleanupControlPlaneState(
 }
 
 export function scheduleControlPlaneCleanup(app: FastifyInstance) {
-  void cleanupControlPlaneState(app);
+  app.addHook("onListen", () => {
+    void cleanupControlPlaneState(app);
+  });
 
   const timer = setInterval(() => {
     void cleanupControlPlaneState(app);
