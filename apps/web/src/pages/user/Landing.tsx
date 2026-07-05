@@ -65,7 +65,7 @@ export default function Landing() {
 
         <div className="mx-auto flex min-h-[460px] max-w-7xl items-center px-6 py-12 sm:min-h-[500px] sm:px-10 lg:min-h-[520px] lg:px-14 xl:px-8">
           <div className="max-w-5xl">
-            <h1 className="text-4xl font-extrabold leading-tight text-white sm:text-5xl lg:text-6xl xl:whitespace-nowrap">
+            <h1 className="pixel-title-glow text-4xl font-extrabold leading-tight text-white sm:text-5xl lg:text-6xl xl:whitespace-nowrap">
               Pixelated Studio Edition
             </h1>
             <p className="mt-4 max-w-4xl text-xl font-extrabold leading-8 text-white sm:text-2xl">
@@ -104,10 +104,10 @@ export default function Landing() {
       </section>
 
       <section className="border-b border-synth-border/60 bg-[#090909] px-4 py-12 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-7xl gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mx-auto grid max-w-7xl gap-4 overflow-visible sm:grid-cols-2 lg:grid-cols-5">
           {featureCards.map((feature) => (
             <article
-              className="rounded-lg border border-synth-border bg-synth-surface/70 p-5 shadow-card"
+              className="feature-pop-card rounded-lg border border-synth-border bg-synth-surface/70 p-5 shadow-card"
               key={feature.title}
             >
               <div className={`mb-4 inline-flex ${feature.accent}`}>
@@ -128,7 +128,7 @@ export default function Landing() {
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
           <div>
             <h2 className="text-3xl font-extrabold text-white sm:text-4xl">
-              The website stays light. The desktop app does the heavy lifting.
+              The desktop orchestrator + lightweight browser infrastructure
             </h2>
             <p className="mt-5 text-base leading-7 text-gray-300">
               Pixelated uses the web app for browsing, controls, accounts, and
