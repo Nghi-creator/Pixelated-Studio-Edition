@@ -2,7 +2,6 @@ import {
   Clipboard,
   Download,
   FlaskConical,
-  ImageDown,
   Radio,
   RotateCcw,
   Square,
@@ -12,28 +11,22 @@ import {
 export function StreamTelemetryControls({
   copyState,
   csvState,
-  graphState,
-  hasGraphSamples,
   isRecordingCsv,
   recordedCsvSampleCount,
   onClearTelemetryCsv,
   onCopyTelemetry,
   onExportTelemetryCsv,
-  onExportTelemetryGraph,
   onOpenResearch,
   onResetTelemetryData,
   onToggleCsvRecording,
 }: {
   copyState: "copied" | "failed" | "idle" | "saved";
   csvState: "exported" | "failed" | "idle";
-  graphState: "exported" | "failed" | "idle";
-  hasGraphSamples: boolean;
   isRecordingCsv: boolean;
   recordedCsvSampleCount: number;
   onClearTelemetryCsv: () => void;
   onCopyTelemetry: () => void;
   onExportTelemetryCsv: () => void;
-  onExportTelemetryGraph: () => void;
   onOpenResearch: () => void;
   onResetTelemetryData: () => void;
   onToggleCsvRecording: () => void;
@@ -100,23 +93,6 @@ export function StreamTelemetryControls({
           <Radio className="h-3.5 w-3.5 shrink-0" />
         )}
         <span className="truncate">{isRecordingCsv ? "Stop" : "CSV"}</span>
-      </button>
-      <button
-        aria-label="Export stream telemetry graph PNG"
-        className="inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-md border border-synth-border bg-synth-bg px-2 text-xs font-semibold text-gray-300 transition hover:bg-synth-elevated hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-        disabled={!hasGraphSamples}
-        onClick={onExportTelemetryGraph}
-        title="Export stream telemetry graph PNG"
-        type="button"
-      >
-        <ImageDown className="h-3.5 w-3.5 shrink-0" />
-        <span className="truncate">
-          {graphState === "exported"
-            ? "Done"
-            : graphState === "failed"
-              ? "Failed"
-              : "PNG"}
-        </span>
       </button>
       <button
         aria-label="Export recorded stream telemetry CSV"

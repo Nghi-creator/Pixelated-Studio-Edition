@@ -67,14 +67,10 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
     copyTelemetry,
     csvState,
     exportTelemetryCsv,
-    exportTelemetryGraph,
-    graphState,
     resetCsvState,
     resetExportStates,
   } = useStreamTelemetryExportActions({
     gameId,
-    gameTitle,
-    history,
     playerMode: props.playerMode,
     recordedCsvSamples,
     sessionId,
@@ -119,8 +115,6 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
       <StreamTelemetryControls
         copyState={copyState}
         csvState={csvState}
-        graphState={graphState}
-        hasGraphSamples={recordedCsvSamples.length > 0 || history.length > 0}
         isRecordingCsv={isRecordingCsv}
         onClearTelemetryCsv={clearTelemetryCsv}
         onCopyTelemetry={() => {
@@ -129,7 +123,6 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
         onExportTelemetryCsv={() => {
           void exportTelemetryCsv();
         }}
-        onExportTelemetryGraph={exportTelemetryGraph}
         onOpenResearch={() => setIsResearchModalOpen(true)}
         onResetTelemetryData={resetTelemetryData}
         onToggleCsvRecording={toggleCsvRecording}
@@ -166,6 +159,7 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
           form={researchRun.metadataForm}
           gameId={gameId}
           gameTitle={gameTitle}
+          history={history}
           onClose={() => setIsResearchModalOpen(false)}
           onBaselineFormChange={researchRun.onBaselineFormChange}
           onFormChange={researchRun.onMetadataFormChange}

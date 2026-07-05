@@ -8,7 +8,10 @@ type AdminSelectOption<TValue extends string> = {
 
 type AdminSelectProps<TValue extends string> = {
   ariaLabel: string;
+  buttonClassName?: string;
   className?: string;
+  iconClassName?: string;
+  menuClassName?: string;
   onChange: (value: TValue) => void;
   options: AdminSelectOption<TValue>[];
   value: TValue;
@@ -16,7 +19,10 @@ type AdminSelectProps<TValue extends string> = {
 
 export function AdminSelect<TValue extends string>({
   ariaLabel,
+  buttonClassName = "flex h-10 w-full min-w-44 items-center justify-between gap-4 rounded-lg border border-synth-secondary/40 bg-synth-bg pl-3 pr-4 text-left text-sm font-semibold text-white outline-none transition-colors hover:border-synth-secondary focus:border-synth-secondary",
   className = "",
+  iconClassName = "h-4 w-4",
+  menuClassName = "absolute left-0 top-full z-50 mt-2 w-full min-w-max overflow-hidden rounded-lg border border-synth-secondary/50 bg-synth-bg py-1 shadow-card",
   onChange,
   options,
   value,
@@ -51,7 +57,7 @@ export function AdminSelect<TValue extends string>({
       <button
         aria-expanded={isOpen}
         aria-label={ariaLabel}
-        className="flex h-10 w-full min-w-44 items-center justify-between gap-4 rounded-lg border border-synth-secondary/40 bg-synth-bg pl-3 pr-4 text-left text-sm font-semibold text-white outline-none transition-colors hover:border-synth-secondary focus:border-synth-secondary"
+        className={buttonClassName}
         onClick={() => setIsOpen((current) => !current)}
         type="button"
       >
@@ -59,14 +65,14 @@ export function AdminSelect<TValue extends string>({
           {selectedOption?.label || "Select"}
         </span>
         <ChevronDown
-          className={`h-4 w-4 flex-shrink-0 transition-transform ${
+          className={`${iconClassName} flex-shrink-0 transition-transform ${
             isOpen ? "rotate-180" : ""
           }`}
         />
       </button>
 
       {isOpen && (
-        <div className="absolute left-0 top-full z-50 mt-2 w-full min-w-max overflow-hidden rounded-lg border border-synth-secondary/50 bg-synth-bg py-1 shadow-card">
+        <div className={menuClassName}>
           {options.map((option) => {
             const isSelected = option.value === value;
             return (
