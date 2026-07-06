@@ -4,8 +4,11 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/auth/supabaseClient";
 import { getPublicAppUrl } from "../../lib/navigation/appUrl";
 import { getPasswordPolicyError } from "../../lib/auth/passwordPolicy";
+import { isAuthCaptchaEnabled } from "./captchaConfig";
 
 export type HostedAuthOptions = {
+  captchaToken?: string;
+  onCaptchaChallengeReset?: () => void;
   oauthRedirectTo?: string;
   resetPasswordRedirectTo?: string;
   signUpEmailRedirectTo?: string;
@@ -20,7 +23,11 @@ const getAuthErrorMessage = (error: Error) => {
   return error.message;
 };
 
+const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
 export function useAuthForm({
+  captchaToken = "",
+  onCaptchaChallengeReset,
   oauthRedirectTo = getPublicAppUrl(),
   resetPasswordRedirectTo = `${getPublicAppUrl()}/reset-password`,
   signUpEmailRedirectTo = getPublicAppUrl(),
@@ -56,6 +63,13 @@ export function useAuthForm({
     setMessage(null);
   };
 
+  const requireCaptchaToken = () => {
+    if (!isAuthCaptchaEnabled) return undefined;
+    if (captchaToken) return captchaToken;
+
+    throw new Error("Complete the verification challenge before continuing.");
+  };
+
   const showForgotPassword = () => {
     setIsForgotPassword(true);
     clearFeedback();
@@ -79,10 +93,16 @@ export function useAuthForm({
     clearFeedback();
 
     try {
+      const verifiedCaptchaToken = requireCaptchaToken();
+      const normalizedEmail = normalizeEmail(email);
+
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
-          email,
+          email: normalizedEmail,
           password,
+          options: {
+            captchaToken: verifiedCaptchaToken,
+          },
         });
         if (error) throw error;
         navigate("/home");
@@ -97,14 +117,15 @@ export function useAuthForm({
         }
 
         const { error } = await supabase.auth.signUp({
-          email,
+          email: normalizedEmail,
           password,
           options: {
+            captchaToken: verifiedCaptchaToken,
             emailRedirectTo: signUpEmailRedirectTo,
           },
         });
         if (error) throw error;
-        setVerificationPendingEmail(email);
+        setVerificationPendingEmail(normalizedEmail);
         setResendCooldown(60);
         setMessage(signupPendingMessage);
       }
@@ -115,6 +136,7 @@ export function useAuthForm({
         setError("An unexpected error occurred.");
       }
     } finally {
+      onCaptchaChallengeReset?.();
       setLoading(false);
     }
   };
@@ -125,10 +147,13 @@ export function useAuthForm({
     setResendLoading(true);
     setError(null);
     try {
+      const verifiedCaptchaToken = requireCaptchaToken();
+
       const { error } = await supabase.auth.resend({
         type: "signup",
         email: verificationPendingEmail,
         options: {
+          captchaToken: verifiedCaptchaToken,
           emailRedirectTo: signUpEmailRedirectTo,
         },
       });
@@ -143,6 +168,7 @@ export function useAuthForm({
           : "Failed to resend the verification email.",
       );
     } finally {
+      onCaptchaChallengeReset?.();
       setResendLoading(false);
     }
   };
@@ -153,7 +179,11 @@ export function useAuthForm({
     clearFeedback();
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const verifiedCaptchaToken = requireCaptchaToken();
+      const normalizedEmail = normalizeEmail(email);
+
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+        captchaToken: verifiedCaptchaToken,
         redirectTo: resetPasswordRedirectTo,
       });
       if (error) throw error;
@@ -167,6 +197,7 @@ export function useAuthForm({
         setError("Failed to send reset email.");
       }
     } finally {
+      onCaptchaChallengeReset?.();
       setLoading(false);
     }
   };
@@ -189,6 +220,7 @@ export function useAuthForm({
     handleOAuth,
     handleResendConfirmation,
     handleResetPassword,
+    isAuthCaptchaEnabled,
     isForgotPassword,
     isLogin,
     loading,

@@ -196,7 +196,7 @@ web3 = 30
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
 # [auth.captcha]
 # enabled = true
-# provider = "hcaptcha"
+# provider = "turnstile"
 # secret = ""
 
 [auth.email]

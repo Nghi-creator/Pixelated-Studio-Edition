@@ -68,9 +68,12 @@ VITE_SUPABASE_ANON_KEY=
 VITE_PUBLIC_APP_URL=https://pixelated-studio-edition.vercel.app
 VITE_API_URL=https://pixelated-api-services.onrender.com
 VITE_ENGINE_URL=http://localhost:8080
+VITE_TURNSTILE_SITE_KEY=
 ```
 
 Set `VITE_PUBLIC_APP_URL` in Vercel and in Supabase Auth redirect settings so verification, recovery, and OAuth callbacks do not fall back to localhost.
+
+Set `VITE_TURNSTILE_SITE_KEY` only after enabling Cloudflare Turnstile CAPTCHA in Supabase Auth with the matching secret key. When configured, the auth page sends CAPTCHA tokens with email/password sign-in, signup confirmation, confirmation resend, and password recovery requests.
 
 Recommended Supabase Authentication URL Configuration:
 

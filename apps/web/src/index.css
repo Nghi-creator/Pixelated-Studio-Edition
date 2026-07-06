@@ -52,6 +52,60 @@
       background-color 220ms ease;
   }
 
+  .auth-backdrop {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background:
+      radial-gradient(
+        ellipse at 50% 20%,
+        rgba(226, 139, 160, 0.26),
+        rgba(130, 55, 76, 0.16) 30%,
+        transparent 56%
+      ),
+      radial-gradient(
+        circle at 78% 78%,
+        rgba(255, 168, 177, 0.12),
+        transparent 24%
+      ),
+      linear-gradient(180deg, rgba(255, 158, 181, 0.08), transparent 48%);
+  }
+
+  .auth-backdrop::before,
+  .auth-backdrop::after {
+    content: "";
+    position: absolute;
+    inset: -16%;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .auth-backdrop::before {
+    opacity: 0.34;
+    background-image:
+      linear-gradient(rgba(255, 177, 190, 0.15) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 177, 190, 0.15) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(ellipse at center, black 0%, transparent 72%);
+    animation: auth-grid-drift 18s linear infinite;
+  }
+
+  .auth-backdrop::after {
+    opacity: 0.78;
+    background:
+      radial-gradient(circle at 22% 32%, rgba(255, 174, 188, 0.2), transparent 14%),
+      radial-gradient(circle at 78% 68%, rgba(218, 104, 130, 0.2), transparent 18%),
+      linear-gradient(
+        100deg,
+        transparent 28%,
+        rgba(255, 166, 186, 0.11) 48%,
+        transparent 68%
+      );
+    filter: blur(16px);
+    transform: translate3d(-3%, 0, 0);
+    animation: auth-ambient-sweep 14s ease-in-out infinite alternate;
+  }
+
   @media (hover: hover) and (pointer: fine) {
     .feature-pop-card:hover {
       z-index: 20;
@@ -138,6 +192,26 @@
     }
   }
 
+  @keyframes auth-grid-drift {
+    from {
+      background-position: 0 0, 0 0;
+    }
+
+    to {
+      background-position: 42px 42px, 42px 42px;
+    }
+  }
+
+  @keyframes auth-ambient-sweep {
+    from {
+      transform: translate3d(-3%, -1%, 0) scale(1);
+    }
+
+    to {
+      transform: translate3d(3%, 1%, 0) scale(1.04);
+    }
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .feature-pop-card {
       transition: none;
@@ -148,7 +222,9 @@
     }
 
     .pixel-title-glow,
-    .pixel-title-glow::after {
+    .pixel-title-glow::after,
+    .auth-backdrop::before,
+    .auth-backdrop::after {
       animation: none;
     }
   }
