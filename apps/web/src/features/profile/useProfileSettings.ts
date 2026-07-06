@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -10,6 +10,7 @@ import {
 } from "../../lib/api/apiQueries";
 import { invalidateProfileQueries } from "../../lib/api/queryClient";
 import { supabase } from "../../lib/auth/supabaseClient";
+import { isAuthCaptchaEnabled } from "../auth/captchaConfig";
 import { saveProfile } from "./profileMutations";
 import type { ProfileMessage } from "./profileSettingsTypes";
 import { useDeleteAccount } from "./useDeleteAccount";
@@ -29,12 +30,33 @@ export function useProfileSettings() {
     null,
   );
   const [username, setUsername] = useState("");
+  const [passwordCaptchaToken, setPasswordCaptchaToken] = useState("");
+  const [passwordCaptchaResetKey, setPasswordCaptchaResetKey] = useState(0);
+  const [deleteCaptchaToken, setDeleteCaptchaToken] = useState("");
+  const [deleteCaptchaResetKey, setDeleteCaptchaResetKey] = useState(0);
+  const resetPasswordCaptchaChallenge = useCallback(() => {
+    setPasswordCaptchaToken("");
+    setPasswordCaptchaResetKey((key) => key + 1);
+  }, []);
+  const resetDeleteCaptchaChallenge = useCallback(() => {
+    setDeleteCaptchaToken("");
+    setDeleteCaptchaResetKey((key) => key + 1);
+  }, []);
 
   const hasPassword = user?.app_metadata?.providers?.includes("email");
   const avatar = useProfileAvatar({ setProfileMessage });
   const { setAvatarUrl } = avatar;
-  const password = useProfilePassword({ user });
-  const deleteAccount = useDeleteAccount({ hasPassword, user });
+  const password = useProfilePassword({
+    captchaToken: passwordCaptchaToken,
+    onCaptchaChallengeReset: resetPasswordCaptchaChallenge,
+    user,
+  });
+  const deleteAccount = useDeleteAccount({
+    captchaToken: deleteCaptchaToken,
+    hasPassword,
+    onCaptchaChallengeReset: resetDeleteCaptchaChallenge,
+    user,
+  });
 
   const sessionQuery = useAuthSessionQuery();
   const profileQuery = useProfileQuery({
@@ -146,6 +168,8 @@ export function useProfileSettings() {
     closeDeleteModal: deleteAccount.closeDeleteModal,
     crop: avatar.crop,
     currentPassword: password.currentPassword,
+    deleteCaptchaResetKey,
+    deleteCaptchaToken,
     deleteError: deleteAccount.deleteError,
     deleteInput: deleteAccount.deleteInput,
     displayAvatar: avatar.displayAvatar,
@@ -155,6 +179,7 @@ export function useProfileSettings() {
     handleFileSelect: avatar.handleFileSelect,
     hasPassword,
     imageSrc: avatar.imageSrc,
+    isAuthCaptchaEnabled,
     isCropping: avatar.isCropping,
     isDeleting: deleteAccount.isDeleting,
     loadError,
@@ -163,17 +188,21 @@ export function useProfileSettings() {
     newPassword: password.newPassword,
     onCropComplete: avatar.onCropComplete,
     passwordMessage: password.passwordMessage,
+    passwordCaptchaResetKey,
+    passwordCaptchaToken,
     profileMessage,
     savingPassword: password.savingPassword,
     savingProfile,
     setCrop: avatar.setCrop,
     setCurrentPassword: password.setCurrentPassword,
+    setDeleteCaptchaToken,
     setDeleteInput: deleteAccount.setDeleteInput,
     setLoadAttempt: () => {
       void sessionQuery.refetch();
       void profileQuery.refetch();
     },
     setNewPassword: password.setNewPassword,
+    setPasswordCaptchaToken,
     setShowCropper: avatar.setShowCropper,
     setShowDeleteModal: deleteAccount.setShowDeleteModal,
     setUsername,

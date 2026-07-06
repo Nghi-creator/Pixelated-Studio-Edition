@@ -4,12 +4,18 @@ import { useNavigate } from "react-router-dom";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { ApiError, api } from "../../lib/api/apiClient";
 import { supabase } from "../../lib/auth/supabaseClient";
+import { isAuthCaptchaEnabled } from "../auth/captchaConfig";
+import { buildPasswordReauthPayload } from "./profileAuthCaptcha";
 
 export function useDeleteAccount({
+  captchaToken,
   hasPassword,
+  onCaptchaChallengeReset,
   user,
 }: {
+  captchaToken?: string;
   hasPassword: boolean | undefined;
+  onCaptchaChallengeReset?: () => void;
   user: SupabaseUser | null;
 }) {
   const navigate = useNavigate();
@@ -34,10 +40,14 @@ export function useDeleteAccount({
 
     try {
       if (hasPassword) {
-        const { error: verifyError } = await supabase.auth.signInWithPassword({
-          email: user.email!,
-          password: deleteInput,
-        });
+        const { error: verifyError } = await supabase.auth.signInWithPassword(
+          buildPasswordReauthPayload({
+            captchaToken,
+            email: user.email!,
+            isCaptchaEnabled: isAuthCaptchaEnabled,
+            password: deleteInput,
+          }),
+        );
         if (verifyError) throw new Error("Incorrect password.");
       } else if (deleteInput !== "DELETE") {
         throw new Error("You must type exactly 'DELETE' to confirm.");
@@ -70,6 +80,8 @@ export function useDeleteAccount({
       }
       deleteMutationRef.current = false;
       setIsDeleting(false);
+    } finally {
+      if (hasPassword) onCaptchaChallengeReset?.();
     }
   };
 
