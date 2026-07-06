@@ -18,7 +18,8 @@ if (process.argv.includes("--help")) {
 
 Required:
   HOSTED_SMOKE_EMAIL
-  HOSTED_SMOKE_PASSWORD
+  HOSTED_SUPABASE_URL
+  HOSTED_SUPABASE_SERVICE_ROLE_KEY
 
 Optional:
   HOSTED_WEB_URL
@@ -41,8 +42,8 @@ const apiUrl = normalizeUrl(
   process.env.HOSTED_API_URL || "https://pixelated-api-services.onrender.com",
 );
 const email = process.env.HOSTED_SMOKE_EMAIL || process.env.STAGING_SMOKE_EMAIL;
-const password =
-  process.env.HOSTED_SMOKE_PASSWORD || process.env.STAGING_SMOKE_PASSWORD;
+const supabaseUrl = normalizeUrl(process.env.HOSTED_SUPABASE_URL || "");
+const serviceRoleKey = process.env.HOSTED_SUPABASE_SERVICE_ROLE_KEY || "";
 const companionUrl = "https://localhost:8090";
 const engineToken = `hosted-smoke-engine-${Date.now()}`;
 const hostedPairingBuildMarker =
@@ -146,6 +147,41 @@ async function apiRequest(pathname, options = {}) {
     );
   }
   return payload;
+}
+
+async function adminRequest(pathname, options = {}) {
+  const response = await fetch(`${supabaseUrl}/auth/v1/admin${pathname}`, {
+    ...options,
+    body: options.body ? JSON.stringify(options.body) : undefined,
+    headers: {
+      apikey: serviceRoleKey,
+      authorization: `Bearer ${serviceRoleKey}`,
+      ...(options.body ? { "content-type": "application/json" } : {}),
+    },
+  });
+  const text = await response.text();
+  const payload = text ? JSON.parse(text) : null;
+  if (!response.ok) {
+    throw new Error(
+      `${options.method || "GET"} admin${pathname} returned ${response.status}: ${text}`,
+    );
+  }
+  return payload;
+}
+
+async function generateMagicLink() {
+  const payload = await adminRequest(
+    `/generate_link?redirect_to=${encodeURIComponent(webUrl)}`,
+    {
+      body: {
+        email,
+        type: "magiclink",
+      },
+      method: "POST",
+    },
+  );
+  assert.equal(typeof payload?.action_link, "string");
+  return payload.action_link;
 }
 
 async function getBrowserBearerToken() {
@@ -278,7 +314,8 @@ async function main() {
   }
 
   required(email, "HOSTED_SMOKE_EMAIL");
-  required(password, "HOSTED_SMOKE_PASSWORD");
+  required(supabaseUrl, "HOSTED_SUPABASE_URL");
+  required(serviceRoleKey, "HOSTED_SUPABASE_SERVICE_ROLE_KEY");
 
   const readiness = await Promise.allSettled([
     step("wait for new ready Render API process", waitForRenderApiDeploy),
@@ -342,12 +379,20 @@ async function main() {
     });
   });
 
-  await step("sign in through hosted Vercel UI", async () => {
-    await page.goto(`${webUrl}/login`, { waitUntil: "domcontentloaded" });
-    await page.getByPlaceholder("Email address").fill(email);
-    await page.getByPlaceholder("Password").fill(password);
-    await page.getByRole("button", { name: "Sign In", exact: true }).click();
-    await page.waitForURL((url) => url.pathname === "/home", { timeout: 30_000 });
+  await step("establish hosted browser session", async () => {
+    await page.goto(await generateMagicLink(), { waitUntil: "domcontentloaded" });
+    await page.waitForFunction(
+      () =>
+        Object.entries(window.localStorage).some(
+          ([key, value]) =>
+            key.startsWith("sb-") &&
+            key.endsWith("-auth-token") &&
+            value.includes("access_token"),
+        ),
+      null,
+      { timeout: 30_000 },
+    );
+    await page.goto(`${webUrl}/home`, { waitUntil: "domcontentloaded" });
     bearerToken = await getBrowserBearerToken();
     assert.ok(bearerToken, "Hosted sign-in did not persist a Supabase session.");
     const me = await apiRequest("/me");

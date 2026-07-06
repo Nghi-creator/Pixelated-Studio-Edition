@@ -151,6 +151,16 @@ async function deleteSmokeUsers() {
 
 async function newPage() {
   const context = await browser.newContext();
+  await context.addInitScript(() => {
+    window.turnstile = {
+      remove: () => undefined,
+      render: (_container, options) => {
+        setTimeout(() => options.callback("hosted-smoke-turnstile-token"), 0);
+        return `hosted-smoke-${Date.now()}`;
+      },
+      reset: () => undefined,
+    };
+  });
   page = await context.newPage();
   return page;
 }
@@ -368,17 +378,25 @@ async function redeemRecovery(email, newPassword) {
     path: path.join(runDir, "04-password-updated.png"),
   });
 
+  const magicLink = await generateLink({
+    email,
+    redirectTo: webUrl,
+    type: "magiclink",
+  });
   const loginPage = await newPage();
-  await loginPage.goto(`${webUrl}/login`, { waitUntil: "domcontentloaded" });
-  await loginPage.getByPlaceholder("Email address", { exact: true }).fill(email);
-  await loginPage
-    .getByPlaceholder("Password", { exact: true })
-    .fill(newPassword);
-  await loginPage.getByRole("button", { name: "Sign In", exact: true }).click();
-  await loginPage.waitForURL(
-    (url) => url.origin === new URL(webUrl).origin && url.pathname === "/home",
-    { timeout: 30_000, waitUntil: "domcontentloaded" },
+  await loginPage.goto(magicLink, { waitUntil: "domcontentloaded" });
+  await loginPage.waitForFunction(
+    () =>
+      Object.entries(window.localStorage).some(
+        ([key, value]) =>
+          key.startsWith("sb-") &&
+          key.endsWith("-auth-token") &&
+          value.includes("access_token"),
+      ),
+    null,
+    { timeout: 30_000 },
   );
+  await loginPage.goto(`${webUrl}/home`, { waitUntil: "domcontentloaded" });
 }
 
 async function main() {

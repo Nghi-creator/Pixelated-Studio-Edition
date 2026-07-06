@@ -221,6 +221,8 @@ jobs:
       HOSTED_SMOKE_EMAIL: ${{ secrets.HOSTED_SMOKE_EMAIL }}
       HOSTED_SMOKE_PASSWORD: ${{ secrets.HOSTED_SMOKE_PASSWORD }}
       HOSTED_SMOKE_VERCEL_BASELINE_HTML_SHA256: ${{ needs.deploy-vercel-web.outputs.baseline_html_sha256 }}
+      HOSTED_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      HOSTED_SUPABASE_URL: ${{ vars.HOSTED_SUPABASE_URL }}
       HOSTED_WEB_URL: ${{ vars.HOSTED_WEB_URL }}
     steps:
       - name: Check out repository
@@ -241,6 +243,14 @@ jobs:
           }
           test -n "$HOSTED_SMOKE_PASSWORD" || {
             echo "::error::Missing production environment secret HOSTED_SMOKE_PASSWORD."
+            exit 1
+          }
+          test -n "$HOSTED_SUPABASE_URL" || {
+            echo "::error::Missing production environment variable HOSTED_SUPABASE_URL."
+            exit 1
+          }
+          test -n "$HOSTED_SUPABASE_SERVICE_ROLE_KEY" || {
+            echo "::error::Missing production environment secret SUPABASE_SERVICE_ROLE_KEY."
             exit 1
           }
           test -n "$HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS" || {
