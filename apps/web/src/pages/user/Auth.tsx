@@ -67,7 +67,7 @@ export default function Auth() {
   } = useAuthForm(hostedAuthOptions);
 
   return (
-    <div className="auth-backdrop min-h-[85vh] flex items-center justify-center p-4">
+    <div className="pixel-animated-backdrop min-h-[85vh] flex items-center justify-center p-4">
       <div className="relative z-10 w-full max-w-[26rem] bg-synth-surface border border-synth-border rounded-lg shadow-card p-6 sm:p-7">
         <div className="text-center mb-7">
           <PixelIcon
