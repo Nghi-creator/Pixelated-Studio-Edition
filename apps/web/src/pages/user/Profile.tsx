@@ -5,6 +5,7 @@ import {
   AvatarCropModal,
   DeleteAccountModal,
 } from "../../features/profile/ProfileModals";
+import { AuthCaptcha } from "../../features/auth/AuthCaptcha";
 import {
   PASSWORD_MIN_LENGTH,
   PASSWORD_POLICY_HINT,
@@ -17,6 +18,8 @@ export default function Profile() {
     closeDeleteModal,
     crop,
     currentPassword,
+    deleteCaptchaResetKey,
+    deleteCaptchaToken,
     deleteError,
     deleteInput,
     displayAvatar,
@@ -26,6 +29,7 @@ export default function Profile() {
     handleFileSelect,
     hasPassword,
     imageSrc,
+    isAuthCaptchaEnabled,
     isCropping,
     isDeleting,
     loadError,
@@ -33,15 +37,19 @@ export default function Profile() {
     navigate,
     newPassword,
     onCropComplete,
+    passwordCaptchaResetKey,
+    passwordCaptchaToken,
     passwordMessage,
     profileMessage,
     savingPassword,
     savingProfile,
     setCrop,
     setCurrentPassword,
+    setDeleteCaptchaToken,
     setDeleteInput,
     setLoadAttempt,
     setNewPassword,
+    setPasswordCaptchaToken,
     setShowCropper,
     setShowDeleteModal,
     setUsername,
@@ -107,9 +115,13 @@ export default function Profile() {
           deleteInput={deleteInput}
           hasPassword={Boolean(hasPassword)}
           isDeleting={isDeleting}
+          isAuthCaptchaEnabled={isAuthCaptchaEnabled}
           onCancel={closeDeleteModal}
+          onCaptchaTokenChange={setDeleteCaptchaToken}
           onDeleteInputChange={setDeleteInput}
           onSubmit={handleDeleteAccount}
+          captchaResetKey={deleteCaptchaResetKey}
+          captchaToken={deleteCaptchaToken}
         />
       )}
 
@@ -271,9 +283,16 @@ export default function Profile() {
                 <p className="text-xs leading-5 text-gray-400">
                   {PASSWORD_POLICY_HINT}
                 </p>
+                <AuthCaptcha
+                  onTokenChange={setPasswordCaptchaToken}
+                  resetKey={passwordCaptchaResetKey}
+                />
                 <button
                   type="submit"
-                  disabled={savingPassword}
+                  disabled={
+                    savingPassword ||
+                    (isAuthCaptchaEnabled && !passwordCaptchaToken)
+                  }
                   className="bg-synth-primary hover:bg-synth-primary-hover text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2"
                 >
                   {savingPassword ? "Updating..." : "Update Password"}

@@ -1,5 +1,6 @@
 import { AlertOctagon, Loader2, X } from "lucide-react";
 import Cropper from "react-easy-crop";
+import { AuthCaptcha } from "../auth/AuthCaptcha";
 import type { CropArea } from "./avatarCrop";
 
 export function AvatarCropModal({
@@ -101,19 +102,27 @@ export function AvatarCropModal({
 }
 
 export function DeleteAccountModal({
+  captchaResetKey,
+  captchaToken,
   deleteError,
   deleteInput,
   hasPassword,
+  isAuthCaptchaEnabled,
   isDeleting,
   onCancel,
+  onCaptchaTokenChange,
   onDeleteInputChange,
   onSubmit,
 }: {
+  captchaResetKey: number;
+  captchaToken: string;
   deleteError: string | null;
   deleteInput: string;
   hasPassword: boolean;
+  isAuthCaptchaEnabled: boolean;
   isDeleting: boolean;
   onCancel: () => void;
+  onCaptchaTokenChange: (token: string) => void;
   onDeleteInputChange: (value: string) => void;
   onSubmit: React.SubmitEventHandler<HTMLFormElement>;
 }) {
@@ -173,9 +182,17 @@ export function DeleteAccountModal({
                 onChange={(event) => onDeleteInputChange(event.target.value)}
                 placeholder={hasPassword ? "Your password" : "DELETE"}
                 required
+                disabled={isDeleting}
                 className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500 transition-all"
               />
             </div>
+
+            {hasPassword && (
+              <AuthCaptcha
+                onTokenChange={onCaptchaTokenChange}
+                resetKey={captchaResetKey}
+              />
+            )}
 
             <div className="flex justify-end gap-3 mt-6">
               <button
@@ -188,7 +205,11 @@ export function DeleteAccountModal({
               </button>
               <button
                 type="submit"
-                disabled={isDeleting || !deleteInput}
+                disabled={
+                  isDeleting ||
+                  !deleteInput ||
+                  (hasPassword && isAuthCaptchaEnabled && !captchaToken)
+                }
                 className="px-5 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg transition-colors font-bold flex items-center gap-2"
               >
                 {isDeleting && <Loader2 className="w-4 h-4 animate-spin" />}

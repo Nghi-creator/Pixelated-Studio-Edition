@@ -3,9 +3,19 @@ import type { FormEvent } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { supabase } from "../../lib/auth/supabaseClient";
 import { getPasswordPolicyError } from "../../lib/auth/passwordPolicy";
+import { isAuthCaptchaEnabled } from "../auth/captchaConfig";
+import { buildPasswordReauthPayload } from "./profileAuthCaptcha";
 import type { PasswordMessage } from "./profileSettingsTypes";
 
-export function useProfilePassword({ user }: { user: SupabaseUser | null }) {
+export function useProfilePassword({
+  captchaToken,
+  onCaptchaChallengeReset,
+  user,
+}: {
+  captchaToken?: string;
+  onCaptchaChallengeReset?: () => void;
+  user: SupabaseUser | null;
+}) {
   const passwordMutationRef = useRef(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [passwordMessage, setPasswordMessage] =
@@ -24,10 +34,14 @@ export function useProfilePassword({ user }: { user: SupabaseUser | null }) {
       const policyError = getPasswordPolicyError(newPassword);
       if (policyError) throw new Error(policyError);
 
-      const { error: verifyError } = await supabase.auth.signInWithPassword({
-        email: user.email,
-        password: currentPassword,
-      });
+      const { error: verifyError } = await supabase.auth.signInWithPassword(
+        buildPasswordReauthPayload({
+          captchaToken,
+          email: user.email,
+          isCaptchaEnabled: isAuthCaptchaEnabled,
+          password: currentPassword,
+        }),
+      );
       if (verifyError) throw new Error("Current password is incorrect.");
 
       const { error: updateError } = await supabase.auth.updateUser({
@@ -51,6 +65,7 @@ export function useProfilePassword({ user }: { user: SupabaseUser | null }) {
         });
       }
     } finally {
+      onCaptchaChallengeReset?.();
       passwordMutationRef.current = false;
       setSavingPassword(false);
     }
