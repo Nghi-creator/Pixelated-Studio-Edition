@@ -174,8 +174,8 @@ Before triggering Render API or Vercel web deploy hooks, run:
 
 ```sh
 STAGING_API_URL=<render-api-url> \
-STAGING_SUPABASE_URL=<supabase-project-url> \
-STAGING_SUPABASE_ANON_KEY=<supabase-anon-key> \
+STAGING_SUPABASE_URL=<staging-supabase-project-url> \
+STAGING_SUPABASE_ANON_KEY=<staging-supabase-anon-key> \
 STAGING_SMOKE_EMAIL=<dedicated-staging-admin-email> \
 STAGING_SMOKE_PASSWORD=<dedicated-staging-admin-password> \
 npm run predeploy:hosted
@@ -185,14 +185,16 @@ Run the broader hosted-stack smoke:
 
 ```sh
 STAGING_API_URL=<render-api-url> \
-STAGING_SUPABASE_URL=<supabase-project-url> \
-STAGING_SUPABASE_ANON_KEY=<supabase-anon-key> \
+STAGING_SUPABASE_URL=<staging-supabase-project-url> \
+STAGING_SUPABASE_ANON_KEY=<staging-supabase-anon-key> \
 STAGING_SMOKE_EMAIL=<dedicated-staging-admin-email> \
 STAGING_SMOKE_PASSWORD=<dedicated-staging-admin-password> \
 npm run smoke:staging
 ```
 
-The smoke signs in with a dedicated staging admin/super-admin account, verifies catalog cache behavior, identity/permissions, access-log schema, submission cleanup, local pairing save/read/delete, multiplayer lobby lifecycle, cloud session lifecycle, session verification, stream metric writes/reads, and admin access-log summary access when permitted.
+The smoke authenticates as a dedicated staging admin/super-admin account, verifies catalog cache behavior, identity/permissions, access-log schema, submission cleanup, local pairing save/read/delete, multiplayer lobby lifecycle, cloud session lifecycle, session verification, stream metric writes/reads, and admin access-log summary access when permitted.
+
+Keep Supabase Auth CAPTCHA disabled on the staging project so CI can complete password-grant sign-in. `STAGING_BEARER_TOKEN` is still supported as a temporary fallback, but access tokens expire and should not be the normal staging configuration.
 
 Recognized Supabase access-log schema failures return API code `access_log_schema_drift` with relevant migration names.
 
