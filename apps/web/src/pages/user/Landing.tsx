@@ -56,15 +56,9 @@ const engineSteps = [
 export default function Landing() {
   return (
     <div className="min-h-screen bg-synth-bg text-white">
-      <section className="relative isolate overflow-hidden border-b border-synth-border/70">
-        <div className="absolute inset-0 -z-10 bg-[#050505]" />
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 -z-10 opacity-[0.08] [background-image:linear-gradient(#D8A4B5_1px,transparent_1px),linear-gradient(90deg,#D8A4B5_1px,transparent_1px)] [background-size:24px_24px]"
-        />
-
+      <section className="pixel-animated-backdrop border-b border-synth-border/70">
         <div className="mx-auto flex min-h-[460px] max-w-7xl items-center px-6 py-12 sm:min-h-[500px] sm:px-10 lg:min-h-[520px] lg:px-14 xl:px-8">
-          <div className="max-w-5xl">
+          <div className="relative z-10 max-w-5xl">
             <h1 className="pixel-title-glow text-4xl font-extrabold leading-tight text-white sm:text-5xl lg:text-6xl xl:whitespace-nowrap">
               Pixelated Studio Edition
             </h1>

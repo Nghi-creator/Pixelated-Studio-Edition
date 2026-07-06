@@ -52,6 +52,7 @@
       background-color 220ms ease;
   }
 
+  .pixel-animated-backdrop,
   .auth-backdrop {
     position: relative;
     isolation: isolate;
@@ -71,6 +72,8 @@
       linear-gradient(180deg, rgba(255, 158, 181, 0.08), transparent 48%);
   }
 
+  .pixel-animated-backdrop::before,
+  .pixel-animated-backdrop::after,
   .auth-backdrop::before,
   .auth-backdrop::after {
     content: "";
@@ -80,6 +83,7 @@
     pointer-events: none;
   }
 
+  .pixel-animated-backdrop::before,
   .auth-backdrop::before {
     opacity: 0.34;
     background-image:
@@ -90,6 +94,7 @@
     animation: auth-grid-drift 18s linear infinite;
   }
 
+  .pixel-animated-backdrop::after,
   .auth-backdrop::after {
     opacity: 0.78;
     background:
@@ -223,6 +228,8 @@
 
     .pixel-title-glow,
     .pixel-title-glow::after,
+    .pixel-animated-backdrop::before,
+    .pixel-animated-backdrop::after,
     .auth-backdrop::before,
     .auth-backdrop::after {
       animation: none;
