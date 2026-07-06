@@ -90,6 +90,7 @@ jobs:
     timeout-minutes: 15
     env:
       STAGING_API_URL: ${{ secrets.STAGING_API_URL }}
+      STAGING_BEARER_TOKEN: ${{ secrets.STAGING_BEARER_TOKEN }}
       STAGING_SUPABASE_URL: ${{ secrets.STAGING_SUPABASE_URL }}
       STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
       STAGING_SMOKE_EMAIL: ${{ secrets.STAGING_SMOKE_EMAIL }}
@@ -111,20 +112,23 @@ jobs:
             echo "::error::Missing staging environment secret STAGING_API_URL."
             exit 1
           }
+          if [ -n "$STAGING_BEARER_TOKEN" ]; then
+            exit 0
+          fi
           test -n "$STAGING_SUPABASE_URL" || {
-            echo "::error::Missing staging environment secret STAGING_SUPABASE_URL."
+            echo "::error::Missing staging environment secret STAGING_SUPABASE_URL. Provide it with STAGING_SUPABASE_ANON_KEY, STAGING_SMOKE_EMAIL, and STAGING_SMOKE_PASSWORD, or provide STAGING_BEARER_TOKEN."
             exit 1
           }
           test -n "$STAGING_SUPABASE_ANON_KEY" || {
-            echo "::error::Missing staging environment secret STAGING_SUPABASE_ANON_KEY."
+            echo "::error::Missing staging environment secret STAGING_SUPABASE_ANON_KEY. Provide it with STAGING_SUPABASE_URL, STAGING_SMOKE_EMAIL, and STAGING_SMOKE_PASSWORD, or provide STAGING_BEARER_TOKEN."
             exit 1
           }
           test -n "$STAGING_SMOKE_EMAIL" || {
-            echo "::error::Missing staging environment secret STAGING_SMOKE_EMAIL."
+            echo "::error::Missing staging environment secret STAGING_SMOKE_EMAIL. Provide it with STAGING_SUPABASE_URL, STAGING_SUPABASE_ANON_KEY, and STAGING_SMOKE_PASSWORD, or provide STAGING_BEARER_TOKEN."
             exit 1
           }
           test -n "$STAGING_SMOKE_PASSWORD" || {
-            echo "::error::Missing staging environment secret STAGING_SMOKE_PASSWORD."
+            echo "::error::Missing staging environment secret STAGING_SMOKE_PASSWORD. Provide it with STAGING_SUPABASE_URL, STAGING_SUPABASE_ANON_KEY, and STAGING_SMOKE_EMAIL, or provide STAGING_BEARER_TOKEN."
             exit 1
           }
 

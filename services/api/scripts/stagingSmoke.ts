@@ -99,12 +99,25 @@ async function resolveBearerToken() {
     },
   );
   const text = await response.text();
-  const payload = text ? (JSON.parse(text) as { access_token?: string }) : {};
+  const payload = text
+    ? (parseJson(text, "Supabase password grant") as {
+        access_token?: string;
+        error?: string;
+        error_code?: string;
+        msg?: string;
+      })
+    : {};
 
   if (!response.ok || !payload.access_token) {
+    const authError = payload.error || payload.error_code || payload.msg || text;
+    const captchaHint =
+      response.status === 400
+        ? " If Supabase Auth CAPTCHA is enabled, password-grant smoke sign-in cannot complete the interactive challenge; provide STAGING_BEARER_TOKEN for CI or relax CAPTCHA for the staging smoke account."
+        : "";
     fail(
       `Staging smoke account sign-in failed with ${response.status}. ` +
-        "Verify the dedicated account credentials and Supabase auth settings.",
+        `Verify the dedicated account credentials and Supabase auth settings.${captchaHint}` +
+        `${authError ? ` body=${authError}` : ""}`,
     );
   }
 
