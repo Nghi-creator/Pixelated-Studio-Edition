@@ -1,5 +1,11 @@
 import { useEffect, useState } from "react";
-import { ArrowLeft, CheckCircle2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Gamepad2,
+  Network,
+  Upload,
+} from "lucide-react";
 import {
   Link,
   useLocation,
@@ -13,6 +19,27 @@ import { PixelIcon } from "../../components/ui/PixelIcon";
 type EngineLocationState = {
   returnState?: unknown;
 };
+
+const pairedActionLinks = [
+  {
+    description: "Browse and launch games from the public library.",
+    icon: Gamepad2,
+    label: "Play games",
+    to: "/home",
+  },
+  {
+    description: "Upload and play games from this computer.",
+    icon: Upload,
+    label: "Access Local Vault",
+    to: "/local",
+  },
+  {
+    description: "Start a LAN lobby for nearby players.",
+    icon: Network,
+    label: "Host games on LAN",
+    to: "/multiplayer",
+  },
+];
 
 function getSafeReturnTo(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//")) return "/home";
@@ -31,6 +58,8 @@ export default function EngineConnection() {
       : null;
   const isReturning = returnTo !== "/home";
   const [isPaired, setIsPaired] = useState(hasEngineToken);
+  const [showPairedActions, setShowPairedActions] = useState(false);
+  const shouldShowPairedActions = isPaired && showPairedActions;
 
   useEffect(() => {
     const refreshEnginePairing = () => setIsPaired(hasEngineToken());
@@ -103,9 +132,46 @@ export default function EngineConnection() {
 
       <EnginePairingPanel
         onPaired={() => {
-          if (isReturning) continueToDestination();
+          setIsPaired(true);
+          if (isReturning) {
+            continueToDestination();
+            return;
+          }
+          setShowPairedActions(true);
         }}
       />
+
+      {shouldShowPairedActions && (
+        <section className="mt-6 rounded-lg border border-[#6A2941] bg-[#2B1720] p-5">
+          <div className="mb-4 flex items-center gap-2 text-[#F38BB4]">
+            <CheckCircle2 className="h-5 w-5" />
+            <h2 className="text-base font-bold text-white">You can now:</h2>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            {pairedActionLinks.map((action) => {
+              const Icon = action.icon;
+              return (
+                <Link
+                  className="group flex min-h-28 flex-col justify-between rounded-lg border border-[#7E3250] bg-synth-bg p-4 transition-colors hover:border-[#C02066] hover:bg-[#3A1C29]"
+                  key={action.to}
+                  to={action.to}
+                >
+                  <span className="flex items-center gap-3 text-sm font-bold text-white">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#C02066]/50 bg-[#9B0048]/20 text-[#F38BB4] transition-colors group-hover:bg-[#9B0048]/35">
+                      <Icon className="h-4 w-4" />
+                    </span>
+                    {action.label}
+                  </span>
+                  <span className="mt-3 text-sm leading-5 text-gray-400">
+                    {action.description}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
