@@ -152,13 +152,30 @@ async function deleteSmokeUsers() {
 async function newPage() {
   const context = await browser.newContext();
   await context.addInitScript(() => {
+    const widgets = new Map();
     window.turnstile = {
-      remove: () => undefined,
-      render: (_container, options) => {
-        setTimeout(() => options.callback("hosted-smoke-turnstile-token"), 0);
-        return `hosted-smoke-${Date.now()}`;
+      remove: (widgetId) => {
+        widgets.delete(widgetId);
       },
-      reset: () => undefined,
+      render: (_container, options) => {
+        const widgetId = `hosted-smoke-${Date.now()}-${Math.random()
+          .toString(36)
+          .slice(2)}`;
+        widgets.set(widgetId, options);
+        setTimeout(
+          () => options.callback(`hosted-smoke-turnstile-token-${widgetId}`),
+          0,
+        );
+        return widgetId;
+      },
+      reset: (widgetId) => {
+        const options = widgets.get(widgetId);
+        if (!options) return;
+        setTimeout(
+          () => options.callback(`hosted-smoke-turnstile-token-${widgetId}`),
+          0,
+        );
+      },
     };
   });
   page = await context.newPage();
