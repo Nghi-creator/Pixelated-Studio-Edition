@@ -128,6 +128,20 @@ function uniqueId(prefix: string) {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function getSupabaseProjectRef(url: string | undefined) {
+  if (!url) return null;
+
+  try {
+    const hostname = new URL(url).hostname;
+    const suffix = ".supabase.co";
+    return hostname.endsWith(suffix)
+      ? hostname.slice(0, -suffix.length)
+      : hostname;
+  } catch {
+    return null;
+  }
+}
+
 function assertHeader(response: Response, name: string, expected: string | null) {
   assert.equal(
     response.headers.get(name),
@@ -174,6 +188,17 @@ async function request<T = JsonRecord>(
         `${method} ${path} failed the hosted access-log storage contract with ${response.status}. ` +
           `Possible schema drift: verify public.access_logs.path, session_id, last_seen_at, access_count, ` +
           `the access_logs_session_id_key index, and public.admin_access_log_summary. body=${text || "<empty>"}`,
+      );
+    }
+    if (path === "/me" && response.status === 401) {
+      const stagingProject = getSupabaseProjectRef(stagingSupabaseUrl);
+      throw new Error(
+        `${method} ${path} returned 401; expected ${expected.join(
+          " or ",
+        )}. The smoke signed into Supabase project ${stagingProject || "<unknown>"}, ` +
+          "but the hosted API rejected that token. Verify STAGING_API_URL points to the staging API service, " +
+          "and that the API service env SUPABASE_URL, SUPABASE_ANON_KEY, and SUPABASE_SERVICE_ROLE_KEY use the same staging Supabase project. " +
+          `body=${text || "<empty>"}`,
       );
     }
     throw new Error(
