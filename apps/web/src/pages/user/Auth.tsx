@@ -67,8 +67,8 @@ export default function Auth() {
   } = useAuthForm(hostedAuthOptions);
 
   return (
-    <div className="min-h-[85vh] flex items-center justify-center p-4">
-      <div className="w-full max-w-[26rem] bg-synth-surface border border-synth-border rounded-lg shadow-card p-6 sm:p-7">
+    <div className="auth-backdrop min-h-[85vh] flex items-center justify-center p-4">
+      <div className="relative z-10 w-full max-w-[26rem] bg-synth-surface border border-synth-border rounded-lg shadow-card p-6 sm:p-7">
         <div className="text-center mb-7">
           <PixelIcon
             className="mx-auto mb-4 h-12 w-12 text-synth-secondary"
@@ -201,6 +201,19 @@ export default function Auth() {
                 </button>
               </div>
 
+              {/* Forgot Password Link (Only shows on Login) */}
+              {isLogin && (
+                <div className="-mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={showForgotPassword}
+                    className="text-synth-secondary hover:text-white text-sm transition-colors"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+              )}
+
               {!isLogin && (
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/70 w-5 h-5" />
@@ -252,19 +265,6 @@ export default function Auth() {
                 onTokenChange={setCaptchaToken}
                 resetKey={captchaResetKey}
               />
-
-              {/* Forgot Password Link (Only shows on Login) */}
-              {isLogin && (
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={showForgotPassword}
-                    className="text-synth-secondary hover:text-white text-sm transition-colors"
-                  >
-                    Forgot Password?
-                  </button>
-                </div>
-              )}
 
               <button
                 type="submit"
