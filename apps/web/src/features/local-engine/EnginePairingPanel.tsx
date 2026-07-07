@@ -92,12 +92,15 @@ export function EnginePairingPanel({
                   Pairing token
                 </span>
                 <input
-                  value={token}
-                  onChange={(event) => setToken(event.target.value)}
-                  className="h-11 w-full rounded-lg border border-[#7E3250] bg-synth-bg px-3 pr-11 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-[#C01662]"
-                  placeholder="Desktop app token"
-                  type={showToken ? "text" : "password"}
-                />
+                value={token}
+                onChange={(event) => setToken(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") void pairEngine();
+                }}
+                className="h-11 w-full rounded-lg border border-[#7E3250] bg-synth-bg px-3 pr-11 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-[#C01662]"
+                placeholder="Desktop app token"
+                type={showToken ? "text" : "password"}
+              />
                 <button
                   aria-label={
                     showToken ? "Hide pairing token" : "Show pairing token"
