@@ -426,6 +426,30 @@ test("sessions persist hashed tokens and verify approved boot targets", async ()
   await app.close();
 });
 
+test("sessions reject oversized client-provided session ids", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGame(db, {
+    id: GAME_ID,
+    rom_filename: "fallback.nes",
+    rom_url: "https://pxksbsloksyfwiqyfkrz.supabase.co/game.nes",
+  });
+  const app = await createTestApp(db);
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      clientSessionId: "s".repeat(81),
+      gameId: GAME_ID,
+      mode: "cloud",
+    },
+    url: "/sessions",
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(db.sessions.size, 0);
+  await app.close();
+});
+
 test("anonymous users can create playable cloud sessions", async () => {
   const db = new FakeSupabase();
   seedPublishedGame(db, {
@@ -795,6 +819,21 @@ test("local pairings are persisted, readable, and deletable", async () => {
   await app.close();
 });
 
+test("local pairings reject non-http engine URLs", async () => {
+  const db = new FakeSupabase();
+  const app = await createTestApp(db);
+
+  const response = await app.inject({
+    method: "POST",
+    payload: { engineUrl: "ftp://localhost:8080" },
+    url: "/local-pairings",
+  });
+
+  assert.equal(response.statusCode, 400);
+  assert.equal(db.pairings.size, 0);
+  await app.close();
+});
+
 test("stream metrics persist and rate-limit per user session", async () => {
   const db = new FakeSupabase();
   const app = await createTestApp(db);
@@ -879,6 +918,37 @@ test("multiplayer lobbies persist metadata without storing engine tokens", async
     db.multiplayerLobbies.get(`${USER_ID}:session-1`)?.status,
     "ended",
   );
+  await app.close();
+});
+
+test("multiplayer lobbies reject unsafe engine URLs and oversized session ids", async () => {
+  const db = new FakeSupabase();
+  const app = await createTestApp(db);
+  const lobbyPayload = {
+    engineUrl: "javascript:alert(1)",
+    exposureMode: "lan",
+    gameId: GAME_ID,
+    maxPlayers: 4,
+    participants: [{ displayName: "Host", playerIndex: 1, role: "host" }],
+  };
+
+  const unsafeUrlResponse = await app.inject({
+    method: "PUT",
+    payload: lobbyPayload,
+    url: "/multiplayer/lobbies/session-1",
+  });
+  const oversizedSessionResponse = await app.inject({
+    method: "PUT",
+    payload: {
+      ...lobbyPayload,
+      engineUrl: "http://192.168.1.10:8080",
+    },
+    url: `/multiplayer/lobbies/${"s".repeat(81)}`,
+  });
+
+  assert.equal(unsafeUrlResponse.statusCode, 400);
+  assert.equal(oversizedSessionResponse.statusCode, 400);
+  assert.equal(db.multiplayerLobbies.size, 0);
   await app.close();
 });
 

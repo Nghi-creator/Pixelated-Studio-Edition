@@ -1,3 +1,5 @@
+import { isAllowedEngineUrl } from "./engineConfig.ts";
+
 type LaunchRedemption = {
   companionToken?: string;
 };
@@ -36,61 +38,29 @@ export async function pairFromDesktopLaunchUrl(
     setEngineUrl,
   }: DesktopLaunchPairingDependencies,
 ) {
-  const engineUrl = url.searchParams.get("engineUrl");
-  const engineToken = url.searchParams.get("engineToken");
   const launchTicket = url.searchParams.get("launchTicket");
   const companionUrl = url.searchParams.get("companionUrl");
 
-  if (engineUrl && engineToken) {
-    setEngineUrl(engineUrl);
-    setEngineToken(engineToken);
-    if (companionUrl && launchTicket) {
-      try {
-        const response = await fetch(`${companionUrl}/launch/redeem`, {
-          body: JSON.stringify({ ticket: launchTicket }),
-          headers: { "content-type": "application/json" },
-          method: "POST",
-        });
-        const payload = (await response.json()) as LaunchRedemption;
-        if (response.ok && payload.companionToken) {
-          setEngineControlUrl(companionUrl);
-          setEngineControlToken(payload.companionToken);
-        } else {
-          console.warn(
-            `Desktop launch control pairing failed with status ${response.status}.`,
-          );
-        }
-      } catch (error) {
-        console.warn("Desktop launch control pairing failed.", error);
-      }
-    }
-    fetch(`${engineUrl}/local-games`, {
-      cache: "no-store",
-      headers: {
-        "X-Engine-Token": engineToken,
-        "X-User-Id": "connection-monitor",
-      },
-    }).catch((error) => {
-      console.warn("Desktop launch client presence ping failed.", error);
-    });
+  if (url.searchParams.has("engineUrl") || url.searchParams.has("engineToken")) {
+    console.error("Desktop launch pairing rejected legacy raw token parameters.");
     url.searchParams.delete("engineUrl");
     url.searchParams.delete("engineToken");
     url.searchParams.delete("companionUrl");
     url.searchParams.delete("launchTicket");
     replaceState(getPostPairingUrl(url));
-
-    try {
-      await pairLocalEngine(engineUrl);
-    } catch (error) {
-      console.warn(
-        "Desktop launch pairing registration v1 failed after local launch.",
-        error,
-      );
-    }
-    return true;
+    return false;
   }
 
   if (!launchTicket || !companionUrl) return false;
+  if (!isAllowedEngineUrl(companionUrl)) {
+    console.error("Desktop launch pairing rejected an unsafe companion URL.");
+    url.searchParams.delete("engineUrl");
+    url.searchParams.delete("engineToken");
+    url.searchParams.delete("companionUrl");
+    url.searchParams.delete("launchTicket");
+    replaceState(getPostPairingUrl(url));
+    return false;
+  }
 
   try {
     const response = await fetch(`${companionUrl}/launch/redeem`, {

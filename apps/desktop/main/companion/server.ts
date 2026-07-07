@@ -30,7 +30,7 @@ import {
 } from "./inviteState";
 
 export { getCompanionStatusPage } from "./statusPage";
-export { shouldProxy } from "./proxy";
+export { canProxyCompanionRequest, shouldProxy } from "./proxy";
 
 const ENGINE_HOST = "127.0.0.1";
 const ENGINE_PORT = 8080;
@@ -96,6 +96,16 @@ export {
   revokeCompanionInvite,
   updateCompanionInvite,
 } from "./inviteState";
+
+export function canUseRuntimeSwitchToken(
+  requestToken: string,
+  engineToken: string,
+) {
+  const tokenScope = getCompanionAccessTokenScope(requestToken);
+  if (tokenScope === "host") return true;
+  if (tokenScope === "guest") return false;
+  return Boolean(requestToken && requestToken === engineToken);
+}
 
 async function handleCompanionRequest(
   req: IncomingMessage,
@@ -558,11 +568,10 @@ async function handleRuntimeSwitchRequest(
   if (req.method !== "POST") return false;
 
   const requestToken = getCompanionTokenFromRequest(req);
-  const tokenScope = getCompanionAccessTokenScope(requestToken);
-  if (!tokenScope && (!requestToken || requestToken !== engineToken)) {
+  if (!canUseRuntimeSwitchToken(requestToken, engineToken)) {
     sendJson(res, 401, {
       code: "runtime_switch_token_invalid",
-      error: "Companion token is invalid or expired",
+      error: "Runtime switching requires host access",
     });
     return true;
   }

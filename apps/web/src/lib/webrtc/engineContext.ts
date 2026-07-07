@@ -132,7 +132,6 @@ export async function loadEngineRuntimeKind() {
 export async function loadEngineLaunchFailureMessage() {
   try {
     const response = await fetch(engineEndpoint("/health"), { cache: "no-store" });
-    if (!response.ok) return null;
     const health = (await response.json()) as EngineHealthPayload;
     return formatEngineLaunchFailure(health);
   } catch (err) {

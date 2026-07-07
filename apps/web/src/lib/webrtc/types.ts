@@ -36,6 +36,7 @@ export type WebRTCResearchEventName =
   | "connection_failed"
   | "connection_recovered"
   | "engine_error"
+  | "engine_reconnect_waiting"
   | "engine_stop_stale_session_requested"
   | "offer_sent"
   | "python_ready"

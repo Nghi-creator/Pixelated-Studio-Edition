@@ -23,11 +23,13 @@ import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import type { RateLimiter } from "../../security/sharedRateLimiter.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
+const sessionIdSchema = z.string().regex(/^[a-zA-Z0-9_-]+$/).max(80);
 
 const createSessionBodySchema = z.object({
   clientSessionId: z
     .string()
     .regex(/^[a-zA-Z0-9_-]+$/)
+    .max(80)
     .optional(),
   gameId: z.string().uuid(),
   mode: z.enum(["cloud", "local"]).default("cloud"),
@@ -187,7 +189,7 @@ export async function registerSessionRoutes(
     { preHandler: requireUser },
     async (request, reply) => {
       const params = z
-        .object({ sessionId: z.string().regex(/^[a-zA-Z0-9_-]+$/) })
+        .object({ sessionId: sessionIdSchema })
         .safeParse(request.params);
 
       if (!params.success) {
@@ -222,7 +224,7 @@ export async function registerSessionRoutes(
     { preHandler: requireUser },
     async (request, reply) => {
       const params = z
-        .object({ sessionId: z.string().regex(/^[a-zA-Z0-9_-]+$/) })
+        .object({ sessionId: sessionIdSchema })
         .safeParse(request.params);
 
       if (!params.success) {
@@ -253,7 +255,7 @@ export async function registerSessionRoutes(
 
   app.post("/sessions/:sessionId/verify", async (request, reply) => {
     const params = z
-      .object({ sessionId: z.string().regex(/^[a-zA-Z0-9_-]+$/) })
+      .object({ sessionId: sessionIdSchema })
       .safeParse(request.params);
 
     if (!params.success) {
