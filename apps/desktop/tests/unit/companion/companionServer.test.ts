@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  canProxyCompanionRequest,
   consumeCompanionRequestLimit,
   consumeCompanionLaunchTicket,
   createCompanionLaunchTicket,
@@ -81,6 +82,25 @@ describe("desktop companion engine proxy", () => {
   it("proxies smoke telemetry capture routes", () => {
     assert.equal(shouldProxy("/smoke/telemetry"), true);
     assert.equal(shouldProxy("/smoke/telemetry/active"), true);
+  });
+
+  it("keeps LAN guest tokens away from host management routes", () => {
+    assert.equal(canProxyCompanionRequest("/health", "guest"), true);
+    assert.equal(canProxyCompanionRequest("/socket.io/?EIO=4", "guest"), true);
+    assert.equal(canProxyCompanionRequest("/smoke/telemetry", "guest"), true);
+
+    assert.equal(canProxyCompanionRequest("/clients", "guest"), false);
+    assert.equal(canProxyCompanionRequest("/display/frame", "guest"), false);
+    assert.equal(canProxyCompanionRequest("/local-games", "guest"), false);
+    assert.equal(canProxyCompanionRequest("/session/stop-active", "guest"), false);
+    assert.equal(canProxyCompanionRequest("/upload", "guest"), false);
+  });
+
+  it("allows host companion tokens and raw engine-token requests to manage routes", () => {
+    assert.equal(canProxyCompanionRequest("/clients", "host"), true);
+    assert.equal(canProxyCompanionRequest("/local-games/game.nes", "host"), true);
+    assert.equal(canProxyCompanionRequest("/session/stop-active", null), true);
+    assert.equal(canProxyCompanionRequest("/not-an-engine-route", "host"), false);
   });
 });
 

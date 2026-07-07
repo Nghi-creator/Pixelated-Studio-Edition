@@ -19,11 +19,27 @@ const PROXY_PREFIXES = [
   "/socket.io",
   "/upload",
 ];
+const GUEST_PROXY_PREFIXES = ["/health", "/socket.io", "/smoke/telemetry"];
+
+type CompanionTokenScope = "guest" | "host" | null;
 
 export function shouldProxy(url = "") {
   return PROXY_PREFIXES.some((prefix) => {
     return url === prefix || url.startsWith(`${prefix}/`) || url.startsWith(`${prefix}?`);
   });
+}
+
+function matchesPrefix(url: string, prefix: string) {
+  return url === prefix || url.startsWith(`${prefix}/`) || url.startsWith(`${prefix}?`);
+}
+
+export function canProxyCompanionRequest(
+  url = "",
+  companionScope: CompanionTokenScope,
+) {
+  if (!shouldProxy(url)) return false;
+  if (companionScope !== "guest") return true;
+  return GUEST_PROXY_PREFIXES.some((prefix) => matchesPrefix(url, prefix));
 }
 
 function serializeHeaderValue(value: number | string | string[] | undefined) {
@@ -41,6 +57,11 @@ function getCompanionTokenFromRequest(req: IncomingMessage) {
   } catch {
     return "";
   }
+}
+
+function getCompanionScopeFromRequest(req: IncomingMessage): CompanionTokenScope {
+  const companionToken = getCompanionTokenFromRequest(req);
+  return companionToken ? getCompanionAccessTokenScope(companionToken) : null;
 }
 
 function getClientIdFromRequest(req: IncomingMessage) {
@@ -92,6 +113,19 @@ export function proxyHttpRequest(
   res: ServerResponse,
   engineToken: string,
 ) {
+  const companionScope = getCompanionScopeFromRequest(req);
+  if (!canProxyCompanionRequest(req.url || "", companionScope)) {
+    res.writeHead(403, {
+      "cache-control": "no-store",
+      "content-type": "application/json",
+    });
+    res.end(JSON.stringify({
+      code: "companion_proxy_forbidden",
+      error: "This companion token cannot access that engine route",
+    }));
+    return;
+  }
+
   const upstream = http.request(
     {
       headers: getProxiedHeaders(req, engineToken),
@@ -120,7 +154,8 @@ export function proxyWebSocket(
   head: Buffer,
   engineToken: string,
 ) {
-  if (!shouldProxy(req.url || "")) {
+  const companionScope = getCompanionScopeFromRequest(req);
+  if (!canProxyCompanionRequest(req.url || "", companionScope)) {
     socket.destroy();
     return;
   }

@@ -30,7 +30,7 @@ import {
 } from "./inviteState";
 
 export { getCompanionStatusPage } from "./statusPage";
-export { shouldProxy } from "./proxy";
+export { canProxyCompanionRequest, shouldProxy } from "./proxy";
 
 const ENGINE_HOST = "127.0.0.1";
 const ENGINE_PORT = 8080;
