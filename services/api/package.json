@@ -21,6 +21,7 @@
     "predeploy:hosted": "npm run check:access-log-schema && npm run check:submission-cleanup-policy && npm run check:catalog-rpc && npm run check:catalog-candidate-imports && npm run typecheck && npm run lint && npm run build",
     "smoke:staging": "tsx scripts/stagingSmoke.ts",
     "test": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "upload:catalog-artwork-overrides": "tsx scripts/uploadCatalogArtworkOverrides.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

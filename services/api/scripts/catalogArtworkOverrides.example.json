@@ -1,0 +1,18 @@
+{
+  "entries": [
+    {
+      "title": "xniq",
+      "romFilename": "xniq-alpha.gba",
+      "imagePath": "./artwork/xniq.png"
+    },
+    {
+      "gameId": "00000000-0000-0000-0000-000000000000",
+      "imagePath": "./artwork/known-game-id.png"
+    },
+    {
+      "title": "Rex Runner GB",
+      "titleAliases": ["Rex Runner"],
+      "imagePath": "./artwork/rex-runner.png"
+    }
+  ]
+}
