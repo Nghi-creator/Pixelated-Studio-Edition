@@ -217,11 +217,8 @@ export function createWebLaunchUrl() {
   }
 
   return createHostedWebLaunchUrl({
-    advertisedUrls: activeCompanion.advertisedUrls,
     companionLaunchUrl: activeCompanion.launchUrl,
     createLaunchTicket: createCompanionLaunchTicket,
-    engineToken,
-    exposureMode: activeCompanion.exposureMode,
   });
 }
 

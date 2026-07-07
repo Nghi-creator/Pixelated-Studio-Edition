@@ -51,11 +51,8 @@ type DockerRunOptions = Omit<
 };
 
 type WebLaunchUrlOptions = {
-  advertisedUrls: string[];
   companionLaunchUrl: string;
   createLaunchTicket: () => string;
-  engineToken: string;
-  exposureMode: ExposureMode;
 };
 
 export function createHostedInviteUrl(companionUrl: string) {
@@ -66,22 +63,12 @@ export function createHostedInviteUrl(companionUrl: string) {
 }
 
 export function createHostedWebLaunchUrl({
-  advertisedUrls,
   companionLaunchUrl,
   createLaunchTicket,
-  engineToken,
-  exposureMode,
 }: WebLaunchUrlOptions) {
   const url = new URL(hostedWebUrl);
-  if (exposureMode === "local") {
-    url.searchParams.set("engineUrl", advertisedUrls[0] || "http://localhost:8080");
-    url.searchParams.set("engineToken", engineToken);
-    url.searchParams.set("companionUrl", companionLaunchUrl);
-    url.searchParams.set("launchTicket", createLaunchTicket());
-  } else {
-    url.searchParams.set("companionUrl", companionLaunchUrl);
-    url.searchParams.set("launchTicket", createLaunchTicket());
-  }
+  url.searchParams.set("companionUrl", companionLaunchUrl);
+  url.searchParams.set("launchTicket", createLaunchTicket());
   return url.toString();
 }
 

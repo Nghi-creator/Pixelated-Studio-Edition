@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { createCompanionAccessToken } from "../../../main/companion/inviteState";
 import {
+  canUseRuntimeSwitchToken,
   canProxyCompanionRequest,
   consumeCompanionRequestLimit,
   consumeCompanionLaunchTicket,
@@ -101,6 +103,19 @@ describe("desktop companion engine proxy", () => {
     assert.equal(canProxyCompanionRequest("/local-games/game.nes", "host"), true);
     assert.equal(canProxyCompanionRequest("/session/stop-active", null), true);
     assert.equal(canProxyCompanionRequest("/not-an-engine-route", "host"), false);
+  });
+});
+
+describe("desktop companion runtime switching", () => {
+  it("requires host access or the raw engine token", () => {
+    const hostToken = createCompanionAccessToken(Date.now() + 60_000, "host");
+    const guestToken = createCompanionAccessToken(Date.now() + 60_000, "guest");
+
+    assert.equal(canUseRuntimeSwitchToken(hostToken, "engine-token"), true);
+    assert.equal(canUseRuntimeSwitchToken("engine-token", "engine-token"), true);
+    assert.equal(canUseRuntimeSwitchToken(guestToken, "engine-token"), false);
+    assert.equal(canUseRuntimeSwitchToken("wrong-token", "engine-token"), false);
+    assert.equal(canUseRuntimeSwitchToken("", "engine-token"), false);
   });
 });
 

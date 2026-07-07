@@ -74,29 +74,23 @@ test("engine launch helpers build hosted invite and Docker arguments", () => {
   assert.match(nativeArgs.at(-1) || "", /^pixelated-engine-native/);
 });
 
-test("hosted web launch URL uses direct local pairing and ticketed LAN pairing", () => {
+test("hosted web launch URL uses ticketed companion pairing", () => {
   const localUrl = new URL(
     createHostedWebLaunchUrl({
-      advertisedUrls: ["http://127.0.0.1:8080"],
       companionLaunchUrl: "https://localhost:8090",
       createLaunchTicket: () => "launch-ticket",
-      engineToken: "local-token",
-      exposureMode: "local",
     }),
   );
 
-  assert.equal(localUrl.searchParams.get("engineUrl"), "http://127.0.0.1:8080");
-  assert.equal(localUrl.searchParams.get("engineToken"), "local-token");
   assert.equal(localUrl.searchParams.get("companionUrl"), "https://localhost:8090");
   assert.equal(localUrl.searchParams.get("launchTicket"), "launch-ticket");
+  assert.equal(localUrl.searchParams.get("engineUrl"), null);
+  assert.equal(localUrl.searchParams.get("engineToken"), null);
 
   const lanUrl = new URL(
     createHostedWebLaunchUrl({
-      advertisedUrls: ["http://192.168.1.20:8080"],
       companionLaunchUrl: "https://localhost:8090",
       createLaunchTicket: () => "launch-ticket",
-      engineToken: "lan-token",
-      exposureMode: "lan",
     }),
   );
 
