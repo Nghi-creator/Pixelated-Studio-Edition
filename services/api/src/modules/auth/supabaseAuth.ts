@@ -33,7 +33,10 @@ export function getBearerToken(request: FastifyRequest) {
   const header = request.headers.authorization;
   if (!header) return null;
 
-  const [scheme, token] = header.split(" ");
+  const parts = header.trim().split(/\s+/);
+  if (parts.length !== 2) return null;
+
+  const [scheme, token] = parts;
   if (scheme?.toLowerCase() !== "bearer" || !token) return null;
 
   return token;

@@ -26,7 +26,14 @@ type MultiplayerLobbyRow = {
   updated_at: string;
 };
 
-const sessionIdSchema = z.string().regex(/^[a-zA-Z0-9_-]+$/);
+const sessionIdSchema = z.string().regex(/^[a-zA-Z0-9_-]+$/).max(80);
+const engineUrlSchema = z
+  .string()
+  .url()
+  .max(2048)
+  .refine((value) => ["http:", "https:"].includes(new URL(value).protocol), {
+    message: "Engine URL must use HTTP or HTTPS",
+  });
 
 const participantSchema = z.object({
   displayName: z.string().trim().min(1).max(40),
@@ -35,7 +42,7 @@ const participantSchema = z.object({
 });
 
 const lobbyBodySchema = z.object({
-  engineUrl: z.string().url().optional().nullable(),
+  engineUrl: engineUrlSchema.optional().nullable(),
   exposureMode: z.enum(["lan", "local", "unknown"]).default("unknown"),
   gameId: z.string().min(1).max(200),
   maxPlayers: z.number().int().min(1).max(4),

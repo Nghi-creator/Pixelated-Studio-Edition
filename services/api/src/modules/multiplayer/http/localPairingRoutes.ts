@@ -20,8 +20,16 @@ type LocalPairingRouteOptions = {
   supabase?: SupabaseServiceLike | null;
 };
 
+const engineUrlSchema = z
+  .string()
+  .url()
+  .max(2048)
+  .refine((value) => ["http:", "https:"].includes(new URL(value).protocol), {
+    message: "Engine URL must use HTTP or HTTPS",
+  });
+
 const pairingBodySchema = z.object({
-  engineUrl: z.string().url(),
+  engineUrl: engineUrlSchema,
 });
 
 function mapPairing(row: LocalPairingRow) {
