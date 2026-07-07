@@ -176,6 +176,26 @@ export function useWebRTC(
     let offerSent = false;
     let incomingStream: MediaStream | null = null;
     let iceServersForSession: RTCIceServer[] = FALLBACK_ICE_SERVERS;
+    let activeConnectGeneration = 0;
+    type BootTarget = Awaited<ReturnType<typeof resolveGameBootTarget>>;
+    let bootTargetPromise: Promise<BootTarget> | null = null;
+    let resolvedBootTarget: BootTarget | null = null;
+
+    const getResolvedBootTarget = () => {
+      if (resolvedBootTarget) return Promise.resolve(resolvedBootTarget);
+      if (!bootTargetPromise) {
+        bootTargetPromise = resolveGameBootTarget(gameId, sessionId)
+          .then((bootTarget) => {
+            resolvedBootTarget = bootTarget;
+            return bootTarget;
+          })
+          .catch((err) => {
+            bootTargetPromise = null;
+            throw err;
+          });
+      }
+      return bootTargetPromise;
+    };
 
     const failStream = (message: string) => {
       if (disposed) return;
@@ -415,6 +435,7 @@ export function useWebRTC(
     });
 
     socket.on("connect", async () => {
+      const connectGeneration = ++activeConnectGeneration;
       console.log("[WebRTC] Connected. Booting sequence initiated.");
 
       if (heartbeatIntervalId !== null) window.clearInterval(heartbeatIntervalId);
@@ -470,16 +491,28 @@ export function useWebRTC(
         recordResearchEvent?.("backend_session_requested", {
           gameId,
         });
-        const bootTarget = await resolveGameBootTarget(gameId, sessionId);
+        const bootTarget = await getResolvedBootTarget();
         recordResearchEvent?.("backend_session_created", {
           mode: bootTarget.mode,
           runtimeId:
             "runtimeId" in bootTarget ? bootTarget.runtimeId || null : null,
         });
+        if (connectGeneration !== activeConnectGeneration || !socket.connected) {
+          recordResearchEvent?.("engine_reconnect_waiting", {
+            reason: "runtime_switch",
+          });
+          return;
+        }
         recordResearchEvent?.("engine_stop_stale_session_requested");
         await stopActiveEngineSession().catch((err) => {
           console.warn("[WebRTC] Could not pre-stop stale active session:", err);
         });
+        if (connectGeneration !== activeConnectGeneration || !socket.connected) {
+          recordResearchEvent?.("engine_reconnect_waiting", {
+            reason: "runtime_switch_after_stop",
+          });
+          return;
+        }
         socket.emit("start-game", {
           sessionId,
           iceServers: iceServersForSession,

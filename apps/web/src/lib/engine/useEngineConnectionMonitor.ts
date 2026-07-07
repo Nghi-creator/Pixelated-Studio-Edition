@@ -4,9 +4,9 @@ import {
   engineAuthHeaders,
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
-  isCompanionEngineToken,
 } from "./engineAuth";
 import { engineEndpoint } from "./engineConfig";
+import { shouldClearEnginePairingAfterProbe } from "./engineConnectionMonitorPolicy";
 
 const ENGINE_PROBE_INTERVAL_MS = 2_000;
 const ENGINE_PROBE_TIMEOUT_MS = 1_500;
@@ -24,9 +24,8 @@ export function useEngineConnectionMonitor() {
       timeoutId = window.setTimeout(probeEngineConnection, delay);
     };
 
-    const markUnavailable = (force = false) => {
+    const markUnavailable = () => {
       if (!hasEngineToken()) return;
-      if (!force && isCompanionEngineToken()) return;
       clearEngineToken();
     };
 
@@ -60,14 +59,13 @@ export function useEngineConnectionMonitor() {
         });
 
         if (disposed) return;
-        if (response.status === 401) {
-          markUnavailable(true);
+        if (shouldClearEnginePairingAfterProbe(response.status)) {
+          markUnavailable();
           return;
         }
-
-        if (!response.ok) markUnavailable();
       } catch {
-        if (!disposed) markUnavailable();
+        // Runtime switches and Docker restarts can briefly drop probes.
+        // Keep the saved pairing unless the engine explicitly rejects it.
       } finally {
         window.clearTimeout(abortId);
         probeInFlight = false;
