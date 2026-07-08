@@ -1,19 +1,11 @@
 import crypto from "crypto";
 import { app, shell, type IpcMainEvent } from "electron";
-import path from "path";
+import { type EngineRuntimeKind } from "../runtime/config";
 import {
-  type EngineRuntimeKind,
-  companionPort,
-  engineRuntimeDir,
-  hostedWebUrl,
-} from "../runtime/config";
-import {
-  createCompanionLaunchTicket,
   revokeCompanionInvite,
   startCompanionServer,
   stopCompanionServer,
   updateCompanionInvite,
-  type CompanionServerResult,
 } from "../companion/server";
 import {
   execFileCommand,
@@ -33,69 +25,36 @@ import {
   waitForDockerReady,
   withDockerStartCapability,
 } from "../docker/recovery";
-import { getLanIpv4Addresses } from "../network/exposure";
 import { waitForEngineHealth } from "../runtime/health";
 import { emitEngineState, setCurrentEnginePhase } from "../runtime/state";
 import { getRuntimeSwitchBlocker } from "./runtimeSwitch";
 import {
   createEngineLaunchContext,
-  createHostedWebLaunchUrl,
-  createHostedInviteUrl,
   createLanInvite,
   getDockerRunArgs,
   type EngineLaunchContext,
   type StartEngineOptions,
 } from "./launch";
+import {
+  createCompanionWebLaunchUrl,
+  emitCompanionInvite,
+  startCompanionForEngine,
+} from "./companionLifecycle";
+import {
+  getEngineHealth as getEngineHealthControl,
+  listEngineClients as listEngineClientsControl,
+  revokeEngineClient as revokeEngineClientControl,
+  stopActiveEngineSession as stopActiveEngineSessionControl,
+} from "./controlClient";
+import { createImageRecoveryPayload } from "./imageRecovery";
+import type {
+  ActiveCompanion,
+  EngineClientPayload,
+  EngineControllerDependencies,
+} from "./controllerTypes";
 
-type ActiveCompanion = {
-  advertisedUrls: string[];
-  certPath: string;
-  exposureMode: EngineLaunchContext["exposureMode"];
-  launchUrl: string;
-  urls: string[];
-};
-
-export type EngineClientPayload = {
-  accessScope: "companion-guest" | "companion-host" | "raw";
-  connectedAt: string;
-  id: string;
-  lastSeenAt: string;
-  remoteAddress: string;
-  role: string;
-  sessionId: string | null;
-  socketCount: number;
-  userAgent: string;
-};
-
-type EngineHealthPayload = {
-  checks?: {
-    runtime?: {
-      activeSessionId?: string | null;
-    };
-  };
-  runtimeKind?: EngineRuntimeKind;
-};
-
-type ImageRecoveryPayload = {
-  detail: string;
-  engineImage: string;
-  guidance: string;
-  runtimeDir: string;
-  runtimeKind: EngineRuntimeKind;
-  summary: string;
-  title: string;
-};
-
-type EngineControllerDependencies = {
-  diagnoseDocker: typeof diagnoseDocker;
-  execFileCommand: typeof execFileCommand;
-  getSafeEnv: typeof getSafeEnv;
-  getUserDataPath: () => string;
-  prepareEngineImage: typeof prepareEngineImage;
-  startCompanionServer: typeof startCompanionServer;
-  stopCompanionServer: typeof stopCompanionServer;
-  waitForEngineHealth: typeof waitForEngineHealth;
-};
+export type { EngineClientPayload } from "./controllerTypes";
+export { createImageRecoveryPayload } from "./imageRecovery";
 
 let engineToken: string | null = null;
 let activeCompanion: ActiveCompanion | null = null;
@@ -139,87 +98,12 @@ function rejectInvalidImage(event: IpcMainEvent) {
   event.reply("engine-stopped");
 }
 
-async function startCompanion(
-  event: IpcMainEvent,
-  launchContext: EngineLaunchContext,
-) {
-  if (!engineToken) {
-    throw new Error("Engine token has not been initialized.");
-  }
-
-  try {
-    const companion: CompanionServerResult = await dependencies.startCompanionServer({
-      certDir: path.join(dependencies.getUserDataPath(), "certificates"),
-      engineToken,
-      inviteCode: launchContext.inviteCode,
-      inviteExpiresAt: launchContext.inviteExpiresAt,
-      lanAddresses: getLanIpv4Addresses(),
-      launchAllowedOrigins: [
-        new URL(hostedWebUrl).origin,
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-      ],
-      onRuntimeSwitch: (runtimeKind) =>
-        requestEngineRuntimeSwitch(event, runtimeKind),
-      port: companionPort,
-      preserveSecurityState: launchContext.preserveCompanionSecurity,
-    });
-    const hostedInviteUrls = launchContext.companionUrls.map(createHostedInviteUrl);
-    const localControlUrl = `http://localhost:${companion.httpPort}`;
-    activeCompanion = {
-      advertisedUrls: launchContext.advertisedUrls,
-      certPath: companion.certPath,
-      exposureMode: launchContext.exposureMode,
-      launchUrl:
-        launchContext.exposureMode === "local"
-          ? localControlUrl
-          : `https://localhost:${companion.port}`,
-      urls: hostedInviteUrls,
-    };
-    if (launchContext.exposureMode === "lan" && launchContext.inviteExpiresAt) {
-      event.reply("engine-companion", {
-        certPath: companion.certPath,
-        enabled: true,
-        inviteCode: launchContext.inviteCode,
-        inviteExpiresAt: new Date(launchContext.inviteExpiresAt).toISOString(),
-        inviteRevoked: false,
-        inviteStatus: "Invite code active.",
-        urls: hostedInviteUrls,
-      });
-    } else {
-      event.reply("engine-companion", {
-        enabled: false,
-        urls: [],
-      });
-    }
-    event.reply(
-      "server-log",
-      `Desktop companion servers ready on ports ${companion.port} (HTTPS) and ${companion.httpPort} (local HTTP).`,
-    );
-  } catch (err) {
-    const message = getErrorMessage(err);
-    activeCompanion = null;
-    event.reply("engine-companion", {
-      enabled: false,
-      error: message,
-      urls: [],
-    });
-    event.reply(
-      "server-log",
-      `<span class="text-synth-secondary">Warning: Desktop HTTPS companion could not start: ${message}</span>`,
-    );
-  }
-}
-
 export function createWebLaunchUrl() {
   if (!activeCompanion || !engineToken) {
     throw new Error("Start the engine before launching the web app.");
   }
 
-  return createHostedWebLaunchUrl({
-    companionLaunchUrl: activeCompanion.launchUrl,
-    createLaunchTicket: createCompanionLaunchTicket,
-  });
+  return createCompanionWebLaunchUrl(activeCompanion);
 }
 
 export function regenerateLanInvite(event: IpcMainEvent) {
@@ -234,7 +118,7 @@ export function regenerateLanInvite(event: IpcMainEvent) {
 
   const { inviteCode, inviteExpiresAt } = createLanInvite();
   updateCompanionInvite(inviteCode, inviteExpiresAt);
-  emitCompanionInvite(event, {
+  emitCompanionInvite(event, activeCompanion, {
     inviteCode,
     inviteExpiresAt,
     inviteRevoked: false,
@@ -254,7 +138,7 @@ export function revokeLanInvite(event: IpcMainEvent) {
   }
 
   revokeCompanionInvite();
-  emitCompanionInvite(event, {
+  emitCompanionInvite(event, activeCompanion, {
     inviteRevoked: true,
     inviteStatus:
       "Invite code revoked. Regenerate a code before inviting more guests.",
@@ -262,84 +146,26 @@ export function revokeLanInvite(event: IpcMainEvent) {
   event.reply("server-log", "LAN invite code revoked.");
 }
 
-async function requestEngineControl<T>(
-  pathName: string,
-  options: { method?: "GET" | "POST" } = {},
-) {
-  if (!engineToken) {
-    throw new Error("Engine token has not been initialized.");
-  }
-
-  const response = await fetch(`http://127.0.0.1:8080${pathName}`, {
-    headers: {
-      "X-Engine-Token": engineToken,
-    },
-    method: options.method || "GET",
-  });
-  if (!response.ok) {
-    throw new Error(`Engine control request failed with ${response.status}.`);
-  }
-
-  return (await response.json()) as T;
-}
+const getEngineToken = () => engineToken;
 
 export async function listEngineClients() {
-  if (!engineToken) return { clients: [] as EngineClientPayload[] };
-
-  return requestEngineControl<{ clients: EngineClientPayload[] }>("/clients");
+  return listEngineClientsControl(getEngineToken);
 }
 
 async function getEngineHealth() {
-  return requestEngineControl<EngineHealthPayload>("/health");
+  return getEngineHealthControl(getEngineToken);
 }
 
 async function stopActiveEngineSession() {
-  return requestEngineControl<{ sessionId?: string; stopped: boolean }>(
-    "/session/stop-active",
-    { method: "POST" },
-  );
+  return stopActiveEngineSessionControl(getEngineToken);
 }
 
 export async function revokeEngineClient(clientId: string) {
-  return requestEngineControl<{ disconnected: number }>(
-    `/clients/${encodeURIComponent(clientId)}/revoke`,
-    { method: "POST" },
-  );
+  return revokeEngineClientControl(getEngineToken, clientId);
 }
 
 function getErrorMessage(err: unknown) {
   return err instanceof Error ? err.message : String(err);
-}
-
-function emitCompanionInvite(
-  event: IpcMainEvent,
-  payload: {
-    inviteCode?: string;
-    inviteExpiresAt?: number;
-    inviteRevoked?: boolean;
-    inviteStatus: string;
-  },
-) {
-  if (!activeCompanion) {
-    event.reply("engine-companion", {
-      enabled: false,
-      error: "LAN companion is not running.",
-      urls: [],
-    });
-    return;
-  }
-
-  event.reply("engine-companion", {
-    certPath: activeCompanion.certPath,
-    enabled: true,
-    inviteCode: payload.inviteCode,
-    inviteExpiresAt: payload.inviteExpiresAt
-      ? new Date(payload.inviteExpiresAt).toISOString()
-      : undefined,
-    inviteRevoked: payload.inviteRevoked,
-    inviteStatus: payload.inviteStatus,
-    urls: activeCompanion.urls,
-  });
 }
 
 function startContainer(
@@ -385,38 +211,6 @@ function handleStartupFailure(
     .finally(() => {
       event.reply("engine-stopped");
     });
-}
-
-export function createImageRecoveryPayload(
-  launchContext: EngineLaunchContext,
-  detail: string,
-): ImageRecoveryPayload {
-  const runtimeLabel =
-    launchContext.runtimeConfig.engineRuntimeKind === "native_linux"
-      ? "native Linux"
-      : "libretro";
-  const title = "Engine image is not ready";
-  const guidance =
-    `Build the local ${runtimeLabel} Docker image, then retry engine initialization.`;
-  return {
-    detail,
-    engineImage: launchContext.runtimeConfig.engineImage,
-    guidance,
-    runtimeDir: engineRuntimeDir,
-    runtimeKind: launchContext.runtimeConfig.engineRuntimeKind,
-    summary: [
-      "Pixelated Studio engine image recovery",
-      `Status: ${title}`,
-      `Image: ${launchContext.runtimeConfig.engineImage}`,
-      `Runtime: ${launchContext.runtimeConfig.engineRuntimeKind}`,
-      `Runtime dir: ${engineRuntimeDir}`,
-      `Next step: ${guidance}`,
-      detail ? `Detail: ${detail}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n"),
-    title,
-  };
 }
 
 function emitImageRecovery(
@@ -486,7 +280,17 @@ function continueEngineStartup(
       return dependencies.waitForEngineHealth();
     })
     .then(() => {
-      return startCompanion(event, launchContext).then(() => {
+      if (!engineToken) {
+        throw new Error("Engine token has not been initialized.");
+      }
+      return startCompanionForEngine({
+        dependencies,
+        engineToken,
+        event,
+        launchContext,
+        onRuntimeSwitch: requestEngineRuntimeSwitch,
+      }).then((companion) => {
+        activeCompanion = companion;
         emitEngineState(event, "READY", "http://127.0.0.1:8080/health");
         event.reply("engine-token", engineToken);
         event.reply("engine-exposure", {
