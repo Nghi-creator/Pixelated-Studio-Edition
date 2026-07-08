@@ -1,31 +1,30 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { CommentsPanel } from "../../features/player/comments/components/CommentsPanel";
 import { LobbyPanel } from "../../features/player/components/LobbyPanel";
-import { ReportModal } from "../../features/player/comments/components/ReportModal";
-import { useCommentReporting } from "../../features/player/comments/hooks/useCommentReporting";
-import { useComments } from "../../features/player/comments/hooks/useComments";
 import {
   PlayerControls,
   PlayerInstructions,
 } from "../../features/player/components/PlayerControls";
 import { PlayerHeader } from "../../features/player/components/PlayerHeader";
-import { ReactionButtons } from "../../features/player/components/ReactionButtons";
+import { PlayerCommunitySection } from "../../features/player/components/PlayerCommunitySection";
 import { StreamStage } from "../../features/player/components/StreamStage";
 import { StreamTelemetryPanel } from "../../features/player/components/StreamTelemetryPanel";
+import {
+  PlayerRecordingStatusButton,
+  PlayerStreamGrid,
+} from "../../features/player/components/PlayerStreamGrid";
 import { useAuthUser } from "../../features/player/hooks/useAuthUser";
 import { useGameMetadata } from "../../features/player/hooks/useGameMetadata";
 import { usePlayerIdentity } from "../../features/player/hooks/usePlayerIdentity";
 import { usePlayerNavigation } from "../../features/player/hooks/usePlayerNavigation";
 import { usePlayerShareInvite } from "../../features/player/hooks/usePlayerShareInvite";
 import { usePlayerStreamSettings } from "../../features/player/hooks/usePlayerStreamSettings";
-import { useGameReactions } from "../../features/player/hooks/useGameReactions";
 import { usePlayCount } from "../../features/player/hooks/usePlayCount";
 import { useStreamPlayback } from "../../features/player/hooks/useStreamPlayback";
 import { useResearchRunState } from "../../features/player/hooks/useResearchRunState";
 import { useStreamTelemetryRecording } from "../../features/player/hooks/useStreamTelemetryRecording";
+import { usePreventGameInputScroll } from "../../features/player/hooks/usePreventGameInputScroll";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
-import { shouldIgnoreGameInput } from "../../lib/webrtc/webrtcInput";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
 
 export default function Player() {
@@ -102,42 +101,6 @@ export default function Player() {
     telemetry,
   });
   const { authorName, gameRights, gameTitle } = useGameMetadata(id);
-  const {
-    dislikes,
-    handleReaction,
-    isReactionLoading,
-    likes,
-    reactionError,
-    retryReactions,
-    userReaction,
-  } = useGameReactions(id, currentUser);
-  const {
-    comments,
-    commentsError,
-    handleCommentReaction,
-    handleDeleteComment,
-    handlePostComment,
-    hasMoreComments,
-    isLoadingComments,
-    isLoadingMoreComments,
-    isSubmittingComment,
-    loadMoreComments,
-    newComment,
-    pendingCommentIds,
-    retryComments,
-    setNewComment,
-  } = useComments(id, currentUser);
-  const {
-    closeReportModal,
-    handleSubmitReport,
-    isSubmittingReport,
-    openReportModal,
-    reportError,
-    reportMessage,
-    reportReason,
-    reportingCommentId,
-    setReportReason,
-  } = useCommentReporting(currentUser);
 
   usePlayCount(id);
   const handleFirstVisibleFrame = useCallback(() => {
@@ -162,23 +125,7 @@ export default function Player() {
     clearResearchEvents();
   };
 
-  useEffect(() => {
-    const gameKeys = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "];
-
-    const preventScroll = (event: KeyboardEvent) => {
-      if (!shouldIgnoreGameInput(event) && gameKeys.includes(event.key)) {
-        event.preventDefault();
-      }
-    };
-
-    window.addEventListener("keydown", preventScroll, {
-      passive: false,
-      capture: true,
-    });
-
-    return () =>
-      window.removeEventListener("keydown", preventScroll, { capture: true });
-  }, []);
+  usePreventGameInputScroll();
 
   const shareInvite = usePlayerShareInvite({
     location,
@@ -205,12 +152,35 @@ export default function Player() {
         status={status}
       />
 
-      <div
-        className={`grid w-full items-start gap-4 transition-[max-width,grid-template-columns] duration-300 ${
-          showStreamTelemetry
-            ? `${playerLayoutClassName} xl:grid-cols-[minmax(0,1fr)_18rem]`
-            : playerLayoutClassName
-        }`}
+      <PlayerStreamGrid
+        layoutClassName={playerLayoutClassName}
+        showStreamTelemetry={showStreamTelemetry}
+        telemetryPanel={
+          <StreamTelemetryPanel
+            gameId={id || ""}
+            gameTitle={gameTitle}
+            isRecordingCsv={isRecordingCsv}
+            onClearTelemetryCsv={clearTelemetryCsv}
+            onClose={() => setShowStreamTelemetry(false)}
+            onResetTelemetryData={resetTelemetryData}
+            onToggleCsvRecording={toggleCsvRecording}
+            playerMode={playerMode}
+            researchRun={{
+              baselineForm: researchBaselineForm,
+              events: researchEvents,
+              metadataForm: researchMetadataForm,
+              onBaselineFormChange: setResearchBaselineForm,
+              onMetadataFormChange: setResearchMetadataForm,
+              runId: researchRunId,
+            }}
+            recordedCsvSamples={recordedCsvSamples}
+            sessionId={sessionId}
+            shareUrl={shareInvite.url}
+            status={status}
+            streamProfile={streamProfile}
+            telemetry={telemetry}
+          />
+        }
       >
         <StreamStage
           controls={
@@ -235,34 +205,7 @@ export default function Player() {
           telemetry={telemetry}
           videoRef={videoRef}
         />
-
-        {showStreamTelemetry && (
-          <StreamTelemetryPanel
-            gameId={id}
-            gameTitle={gameTitle}
-            isRecordingCsv={isRecordingCsv}
-            onClearTelemetryCsv={clearTelemetryCsv}
-            onClose={() => setShowStreamTelemetry(false)}
-            onResetTelemetryData={resetTelemetryData}
-            onToggleCsvRecording={toggleCsvRecording}
-            playerMode={playerMode}
-            researchRun={{
-              baselineForm: researchBaselineForm,
-              events: researchEvents,
-              metadataForm: researchMetadataForm,
-              onBaselineFormChange: setResearchBaselineForm,
-              onMetadataFormChange: setResearchMetadataForm,
-              runId: researchRunId,
-            }}
-            recordedCsvSamples={recordedCsvSamples}
-            sessionId={sessionId}
-            shareUrl={shareInvite.url}
-            status={status}
-            streamProfile={streamProfile}
-            telemetry={telemetry}
-          />
-        )}
-      </div>
+      </PlayerStreamGrid>
 
       <div
         className={`mt-3 flex w-full flex-wrap items-center justify-between gap-2 ${playerLayoutClassName}`}
@@ -274,16 +217,12 @@ export default function Player() {
         ) : (
           <span />
         )}
-        {(isRecordingCsv || recordedCsvSamples.length > 0) && (
-          <button
-            className="rounded-full border border-synth-border bg-synth-surface px-3 py-1 text-xs font-semibold text-synth-secondary transition hover:bg-synth-elevated hover:text-white"
-            onClick={() => setShowStreamTelemetry(true)}
-            title={csvStatusTitle}
-            type="button"
-          >
-            {csvStatusText}
-          </button>
-        )}
+        <PlayerRecordingStatusButton
+          csvStatusText={csvStatusText}
+          csvStatusTitle={csvStatusTitle}
+          isVisible={isRecordingCsv || recordedCsvSamples.length > 0}
+          onOpen={() => setShowStreamTelemetry(true)}
+        />
       </div>
 
       <PlayerInstructions
@@ -303,49 +242,12 @@ export default function Player() {
         }
       />
 
-      <CommentsPanel
-        comments={comments}
-        commentsError={commentsError}
+      <PlayerCommunitySection
         currentUser={currentUser}
-        hasMoreComments={hasMoreComments}
-        isLoadingComments={isLoadingComments}
-        isLoadingMoreComments={isLoadingMoreComments}
-        isSubmittingComment={isSubmittingComment}
+        gameId={id}
         layoutClassName={playerLayoutClassName}
-        newComment={newComment}
-        onCommentReaction={handleCommentReaction}
-        onDeleteComment={handleDeleteComment}
-        onLoadMore={loadMoreComments}
-        onPostComment={handlePostComment}
-        onReportComment={openReportModal}
-        onRetryComments={retryComments}
         onSignIn={() => navigate("/login")}
-        pendingCommentIds={pendingCommentIds}
-        reactionButtons={
-          <ReactionButtons
-            dislikes={dislikes}
-            error={reactionError}
-            isLoading={isReactionLoading}
-            likes={likes}
-            onReaction={handleReaction}
-            onRetry={retryReactions}
-            userReaction={userReaction}
-          />
-        }
-        reportMessage={reportMessage}
-        setNewComment={setNewComment}
       />
-
-      {reportingCommentId && (
-        <ReportModal
-          error={reportError}
-          isSubmittingReport={isSubmittingReport}
-          onClose={closeReportModal}
-          onSubmitReport={handleSubmitReport}
-          reportReason={reportReason}
-          setReportReason={setReportReason}
-        />
-      )}
     </div>
   );
 }
