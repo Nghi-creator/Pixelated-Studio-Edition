@@ -1,134 +1,66 @@
-import { AlertOctagon } from "lucide-react";
-import { Avatar } from "../../components/ui/Avatar";
-import { ProfileSkeleton } from "../../components/ui/Skeleton";
 import {
   AvatarCropModal,
   DeleteAccountModal,
 } from "../../features/profile/ProfileModals";
-import { AuthCaptcha } from "../../features/auth/AuthCaptcha";
 import {
-  PASSWORD_MIN_LENGTH,
-  PASSWORD_POLICY_HINT,
-} from "../../lib/auth/passwordPolicy";
+  ProfileLoadingState,
+  ProfileLoadError,
+  PublicProfileSection,
+  SecuritySection,
+} from "../../features/profile/ProfileSettingsSections";
 import { useProfileSettings } from "../../features/profile/useProfileSettings";
 
 export default function Profile() {
   const profile = useProfileSettings();
-  const {
-    closeDeleteModal,
-    crop,
-    currentPassword,
-    deleteCaptchaResetKey,
-    deleteCaptchaToken,
-    deleteError,
-    deleteInput,
-    displayAvatar,
-    fileInputRef,
-    handleCropConfirm,
-    handleDeleteAccount,
-    handleFileSelect,
-    hasPassword,
-    imageSrc,
-    isAuthCaptchaEnabled,
-    isCropping,
-    isDeleting,
-    loadError,
-    loading,
-    navigate,
-    newPassword,
-    onCropComplete,
-    passwordCaptchaResetKey,
-    passwordCaptchaToken,
-    passwordMessage,
-    profileMessage,
-    savingPassword,
-    savingProfile,
-    setCrop,
-    setCurrentPassword,
-    setDeleteCaptchaToken,
-    setDeleteInput,
-    setLoadAttempt,
-    setNewPassword,
-    setPasswordCaptchaToken,
-    setShowCropper,
-    setShowDeleteModal,
-    setUsername,
-    setZoom,
-    showCropper,
-    showDeleteModal,
-    updatePassword,
-    updateProfile,
-    user,
-    userRole,
-    username,
-    zoom,
-  } = profile;
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <ProfileSkeleton />
-      </div>
-    );
+  if (profile.loading) {
+    return <ProfileLoadingState />;
   }
 
-  if (loadError) {
+  if (profile.loadError) {
     return (
-      <div className="flex min-h-[70vh] items-center justify-center px-4">
-        <div className="max-w-md rounded-lg border border-red-500/30 bg-synth-surface p-8 text-center shadow-card">
-          <AlertOctagon className="mx-auto mb-4 h-10 w-10 text-red-400" />
-          <h1 className="mb-2 text-xl font-bold text-white">
-            Account settings unavailable
-          </h1>
-          <p className="mb-6 text-sm text-gray-400">{loadError}</p>
-          <button
-            className="mx-auto flex items-center gap-2 rounded-lg bg-synth-primary px-5 py-2.5 font-bold text-white"
-            onClick={() => setLoadAttempt()}
-            type="button"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
+      <ProfileLoadError
+        loadError={profile.loadError}
+        onRetry={() => profile.setLoadAttempt()}
+      />
     );
   }
 
   return (
     <div className="flex flex-col min-h-screen">
-      {showCropper && imageSrc && (
+      {profile.showCropper && profile.imageSrc && (
         <AvatarCropModal
-          crop={crop}
-          imageSrc={imageSrc}
-          isCropping={isCropping}
-          onCancel={() => setShowCropper(false)}
-          onConfirm={() => void handleCropConfirm()}
-          onCropChange={setCrop}
-          onCropComplete={onCropComplete}
-          onZoomChange={setZoom}
-          zoom={zoom}
+          crop={profile.crop}
+          imageSrc={profile.imageSrc}
+          isCropping={profile.isCropping}
+          onCancel={() => profile.setShowCropper(false)}
+          onConfirm={() => void profile.handleCropConfirm()}
+          onCropChange={profile.setCrop}
+          onCropComplete={profile.onCropComplete}
+          onZoomChange={profile.setZoom}
+          zoom={profile.zoom}
         />
       )}
 
-      {showDeleteModal && (
+      {profile.showDeleteModal && (
         <DeleteAccountModal
-          deleteError={deleteError}
-          deleteInput={deleteInput}
-          hasPassword={Boolean(hasPassword)}
-          isDeleting={isDeleting}
-          isAuthCaptchaEnabled={isAuthCaptchaEnabled}
-          onCancel={closeDeleteModal}
-          onCaptchaTokenChange={setDeleteCaptchaToken}
-          onDeleteInputChange={setDeleteInput}
-          onSubmit={handleDeleteAccount}
-          captchaResetKey={deleteCaptchaResetKey}
-          captchaToken={deleteCaptchaToken}
+          deleteError={profile.deleteError}
+          deleteInput={profile.deleteInput}
+          hasPassword={Boolean(profile.hasPassword)}
+          isDeleting={profile.isDeleting}
+          isAuthCaptchaEnabled={profile.isAuthCaptchaEnabled}
+          onCancel={profile.closeDeleteModal}
+          onCaptchaTokenChange={profile.setDeleteCaptchaToken}
+          onDeleteInputChange={profile.setDeleteInput}
+          onSubmit={profile.handleDeleteAccount}
+          captchaResetKey={profile.deleteCaptchaResetKey}
+          captchaToken={profile.deleteCaptchaToken}
         />
       )}
 
-      {/* MAIN PROFILE PAGE */}
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full mt-8">
         <button
-          onClick={() => navigate("/home")}
+          onClick={() => profile.navigate("/home")}
           className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-8 w-fit"
         >
           Back to Home
@@ -139,192 +71,8 @@ export default function Profile() {
         </h1>
 
         <div className="space-y-8">
-          {/* PROFILE SECTION */}
-          <div className="bg-[#2B1720] border border-synth-border rounded-lg p-6 md:p-8 shadow-card">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              Public Profile
-            </h2>
-
-            {/* Profile Message Block */}
-            {profileMessage && (
-              <div
-                className={`p-4 rounded-lg mb-6 border ${
-                  profileMessage.type === "success"
-                    ? "bg-[#9B0048]/15 border-[#C02066]/50 text-[#F38BB4]"
-                    : profileMessage.type === "warning"
-                      ? "bg-synth-primary/10 border-synth-primary/50 text-synth-secondary"
-                      : "danger-panel font-bold"
-                }`}
-                role={profileMessage.type === "error" ? "alert" : "status"}
-              >
-                {profileMessage.text}
-              </div>
-            )}
-
-            <form onSubmit={updateProfile} className="space-y-8">
-              <div className="flex flex-col items-center gap-6">
-                <button
-                  aria-label="Choose a new avatar"
-                  disabled={savingProfile}
-                  onClick={() => fileInputRef.current?.click()}
-                  className="relative w-24 h-24 rounded-full overflow-hidden group cursor-pointer border-2 border-transparent hover:border-synth-border transition-colors shadow-card"
-                  type="button"
-                >
-                  <Avatar
-                    alt="Avatar"
-                    className="h-full w-full border-0"
-                    loading="eager"
-                    name={username || user?.email}
-                    size="lg"
-                    src={displayAvatar}
-                  />
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center">
-                    <span className="text-[10px] text-white font-bold uppercase tracking-wider">
-                      Change
-                    </span>
-                  </div>
-                </button>
-
-                <div className="text-center">
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    accept="image/*"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-400 mb-2">
-                  Email Address
-                </label>
-                <input
-                  type="email"
-                  disabled
-                  value={user?.email || ""}
-                  className="w-full bg-synth-bg/50 border border-synth-border text-gray-500 rounded-lg px-4 py-3 cursor-not-allowed"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter a cool username"
-                  disabled={savingProfile}
-                  maxLength={80}
-                  required
-                  className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-synth-secondary transition-all"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={savingProfile || !username.trim()}
-                className="bg-synth-primary hover:bg-synth-primary-hover text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2 "
-              >
-                {savingProfile ? "Saving..." : "Save Profile"}
-              </button>
-            </form>
-          </div>
-
-          {/* SECURITY SECTION */}
-          <div className="bg-[#2B1720] border border-synth-border rounded-lg p-6 md:p-8 shadow-card">
-            <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-              Security
-            </h2>
-
-            {/* Password Message Block */}
-            {passwordMessage && (
-              <div
-                className={`p-4 rounded-lg mb-6 border ${passwordMessage.type === "success" ? "bg-[#9B0048]/15 border-[#C02066]/50 text-[#F38BB4]" : "danger-panel font-bold"}`}
-              >
-                {passwordMessage.text}
-              </div>
-            )}
-
-            {hasPassword ? (
-              <form onSubmit={updatePassword} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    Current Password
-                  </label>
-                  <input
-                    type="password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter current password"
-                    required
-                    disabled={savingPassword}
-                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
-                    New Password
-                  </label>
-                  <input
-                    type="password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Enter new password"
-                    required
-                    minLength={PASSWORD_MIN_LENGTH}
-                    disabled={savingPassword}
-                    className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 transition-all"
-                  />
-                </div>
-                <p className="text-xs leading-5 text-gray-400">
-                  {PASSWORD_POLICY_HINT}
-                </p>
-                <AuthCaptcha
-                  onTokenChange={setPasswordCaptchaToken}
-                  resetKey={passwordCaptchaResetKey}
-                />
-                <button
-                  type="submit"
-                  disabled={
-                    savingPassword ||
-                    (isAuthCaptchaEnabled && !passwordCaptchaToken)
-                  }
-                  className="bg-synth-primary hover:bg-synth-primary-hover text-white font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2"
-                >
-                  {savingPassword ? "Updating..." : "Update Password"}
-                </button>
-              </form>
-            ) : (
-              <p className="rounded-lg border border-synth-border bg-synth-bg/40 p-4 text-sm text-gray-400">
-                This account signs in through an external provider. Manage its
-                password with that provider.
-              </p>
-            )}
-
-            {/* MERGED DANGER ZONE (HIDDEN FROM ADMINS/SUPER_ADMINS) */}
-            {userRole !== "admin" && userRole !== "super_admin" && (
-              <div className="mt-10 pt-8 border-t border-synth-border">
-                <h3 className="text-lg font-bold text-red-300 mb-2 flex items-center gap-2">
-                  <AlertOctagon className="w-5 h-5" /> Danger Zone
-                </h3>
-                <p className="text-gray-400 text-sm mb-6">
-                  Once you delete your account, there is no going back. Please
-                  be certain.
-                </p>
-                <button
-                  onClick={() => setShowDeleteModal(true)}
-                  type="button"
-                  className="danger-action rounded-lg border px-6 py-2.5 font-bold transition-colors"
-                >
-                  Delete Account
-                </button>
-              </div>
-            )}
-          </div>
+          <PublicProfileSection profile={profile} />
+          <SecuritySection profile={profile} />
         </div>
       </div>
     </div>

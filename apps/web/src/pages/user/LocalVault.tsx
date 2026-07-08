@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from "react";
 import {
-  AlertCircle,
-  Loader2,
   ArrowLeft,
-  Trash2,
-  CheckCircle2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
-  AdminConfirmDialog,
   type AdminConfirmation,
 } from "../../components/admin/AdminConfirmDialog";
 import {
@@ -17,9 +12,7 @@ import {
 } from "../../lib/engine/engineAuth";
 import {
   deleteLocalVaultGame,
-  getLocalGamePlayPath,
   fetchLocalVaultFilenames,
-  getLocalGameTitle,
   getLocalVaultErrorMessage,
   getLocalVaultUserId,
   isInvalidEngineTokenError,
@@ -27,7 +20,13 @@ import {
   uploadLocalVaultRom,
   validateLocalRomFile,
 } from "../../features/local-vault/localVaultClient";
-import { PixelIcon } from "../../components/ui/PixelIcon";
+import {
+  LocalVaultDeleteDialog,
+  LocalVaultDropzone,
+  LocalVaultGameList,
+  LocalVaultMessageBanner,
+  type LocalVaultMessage,
+} from "../../features/local-vault/LocalVaultPageParts";
 
 export default function LocalVault() {
   const [localGames, setLocalGames] = useState<string[]>([]);
@@ -42,10 +41,8 @@ export default function LocalVault() {
   const [deleteConfirmation, setDeleteConfirmation] =
     useState<AdminConfirmation | null>(null);
   const [fileInputVersion, setFileInputVersion] = useState(0);
-  const [vaultMessage, setVaultMessage] = useState<{
-    tone: "error" | "success";
-    text: string;
-  } | null>(null);
+  const [vaultMessage, setVaultMessage] =
+    useState<LocalVaultMessage | null>(null);
 
   useEffect(() => {
     const initVault = async () => {
@@ -234,143 +231,32 @@ export default function LocalVault() {
         </p>
       </div>
 
-      {vaultMessage && (
-        <div
-          className={`mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${
-            vaultMessage.tone === "error"
-              ? "danger-panel font-bold"
-              : "border-[#C02066]/40 bg-[#9B0048]/15 text-[#F38BB4]"
-          }`}
-        >
-          {vaultMessage.tone === "error" ? (
-            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          ) : (
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-          )}
-          <p>{vaultMessage.text}</p>
-        </div>
-      )}
-
-      {deleteConfirmation && (
-        <AdminConfirmDialog
-          confirmation={deleteConfirmation}
-          isPending={pendingDeleteFilename === deleteConfirmation.id}
-          onCancel={() => setDeleteConfirmation(null)}
-          onConfirm={confirmDeleteLocalGame}
-        />
-      )}
-
-      {/* THE DROPZONE */}
-      <div
-        onDragOver={handleDragOver}
+      <LocalVaultMessageBanner message={vaultMessage} />
+      <LocalVaultDeleteDialog
+        confirmation={deleteConfirmation}
+        onCancel={() => setDeleteConfirmation(null)}
+        onConfirm={confirmDeleteLocalGame}
+        pendingFilename={pendingDeleteFilename}
+      />
+      <LocalVaultDropzone
+        fileInputVersion={fileInputVersion}
+        isDragging={isDragging}
+        isEnginePaired={isEnginePaired}
+        isUploading={isUploading}
         onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className={`relative mb-12 flex h-64 w-full flex-col items-center justify-center overflow-hidden rounded-lg border-2 border-dashed transition-colors ${
-          isEnginePaired ? "cursor-pointer" : "cursor-not-allowed opacity-60"
-        } ${
-          isDragging
-            ? "border-[#C01662] bg-[#2B1720]"
-            : "border-synth-border bg-synth-bg hover:border-[#7E3250] hover:bg-[#120A0E]"
-        }`}
-      >
-        <input
-          key={fileInputVersion}
-          type="file"
-          accept=".nes,.gb,.gbc,.gba,.sfc,.smc,.md,.gen,.sms,.gg"
-          disabled={!isEnginePaired || isUploading}
-          onChange={handleFileInput}
-          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-        />
-
-        {isUploading ? (
-          <Loader2 className="w-12 h-12 text-white animate-spin mb-4" />
-        ) : (
-          <PixelIcon
-            className={`mb-4 h-12 w-12 transition-colors ${isDragging ? "text-white" : "text-[#F38BB4]"}`}
-            name="upload"
-          />
-        )}
-
-        <h3 className="text-xl font-bold text-white mb-2">
-          {isUploading ? "Transmitting to Engine..." : "Drag & Drop ROMs here"}
-        </h3>
-        <p className="text-sm text-gray-400">
-          {isEnginePaired
-            ? "or click to browse your files (.nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, .gg)"
-            : "pair the local engine before uploading"}
-        </p>
-      </div>
-
-      {/* THE LOCAL GAME GRID */}
-      {isLoadingGames ? (
-        <div className="text-center py-16 text-gray-500">
-          <Loader2 className="w-10 h-10 mx-auto mb-4 animate-spin text-white" />
-          <p className="text-xl">Loading Local Vault...</p>
-        </div>
-      ) : localGames.length === 0 ? (
-        <div className="mx-auto max-w-xl border-t border-synth-border/70 py-10 text-center text-gray-500">
-          <PixelIcon
-            className="mx-auto mb-4 h-10 w-10 text-[#F38BB4] opacity-70"
-            name={isEnginePaired ? "empty" : "engine-off"}
-          />
-          <p className="text-lg text-gray-400">
-            {isEnginePaired
-              ? "Your local vault is empty."
-              : "Pair the local engine to view your vault."}
-          </p>
-          {isEnginePaired && (
-            <p className="mt-2 text-sm leading-6 text-gray-600">
-              Upload a `.nes`, `.gb`, `.gbc`, `.gba`, `.sfc`, `.smc`, `.md`, `.gen`, `.sms`, or `.gg` ROM above and it will appear here.
-            </p>
-          )}
-          {vaultMessage?.tone === "error" && (
-            <button
-              className="mt-4 rounded-lg border border-synth-border bg-synth-bg px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-synth-surface"
-              onClick={() => fetchLocalGames(userId)}
-              type="button"
-            >
-              Retry Local Vault
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
-          {localGames.map((filename) => (
-            <Link
-              key={filename}
-              to={getLocalGamePlayPath(filename)}
-              className="group relative flex h-64 flex-col justify-between overflow-hidden rounded-lg border border-synth-border bg-synth-surface p-4 transition-colors hover:bg-synth-elevated"
-            >
-              <div>
-                <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg border border-synth-border bg-synth-bg text-synth-secondary">
-                  <PixelIcon className="h-6 w-6" name="cartridge" />
-                </div>
-                <h3 className="line-clamp-4 text-sm font-bold text-white md:text-base">
-                  {getLocalGameTitle(filename)}
-                </h3>
-              </div>
-
-              <button
-                disabled={pendingDeleteFilename === filename}
-                onClick={(e) => requestDeleteLocalGame(e, filename)}
-                className="absolute top-2 right-2 bg-synth-bg border border-synth-border p-2 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-colors hover:border-red-500 hover:bg-red-500/20 focus:outline-none z-10"
-                title="Delete from Local Vault"
-                type="button"
-              >
-                {pendingDeleteFilename === filename ? (
-                  <Loader2 className="w-4 h-4 animate-spin text-red-300" />
-                ) : (
-                  <Trash2 className="w-4 h-4 text-gray-400 hover:text-red-400 transition-colors" />
-                )}
-              </button>
-
-              <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-synth-secondary">
-                Play local ROM
-              </span>
-            </Link>
-          ))}
-        </div>
-      )}
+        onFileInput={handleFileInput}
+      />
+      <LocalVaultGameList
+        games={localGames}
+        isEnginePaired={isEnginePaired}
+        isLoading={isLoadingGames}
+        message={vaultMessage}
+        onDeleteRequest={requestDeleteLocalGame}
+        onRetry={() => fetchLocalGames(userId)}
+        pendingDeleteFilename={pendingDeleteFilename}
+      />
     </div>
   );
 }

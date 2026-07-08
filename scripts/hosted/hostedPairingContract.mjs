@@ -25,6 +25,28 @@ export function assertHostedPairingContract(rootDir) {
     ),
     "utf8",
   );
+  const desktopRuntimeSwitchRoutes = fs.readFileSync(
+    path.join(
+      rootDir,
+      "apps",
+      "desktop",
+      "main",
+      "companion",
+      "runtimeSwitchRoutes.ts",
+    ),
+    "utf8",
+  );
+  const desktopCompanionLifecycle = fs.readFileSync(
+    path.join(
+      rootDir,
+      "apps",
+      "desktop",
+      "main",
+      "engine",
+      "companionLifecycle.ts",
+    ),
+    "utf8",
+  );
   const launchPairing = fs.readFileSync(
     path.join(
       rootDir,
@@ -70,8 +92,9 @@ export function assertHostedPairingContract(rootDir) {
     "utf8",
   );
 
-  assert.match(desktopController, /createHostedWebLaunchUrl/);
-  assert.match(desktopController, /createCompanionLaunchTicket/);
+  assert.match(desktopController, /createCompanionWebLaunchUrl/);
+  assert.match(desktopCompanionLifecycle, /createHostedWebLaunchUrl/);
+  assert.match(desktopCompanionLifecycle, /createCompanionLaunchTicket/);
   assert.match(desktopCompanion, /createCompanionLaunchTicket/);
   assert.match(desktopCompanion, /startCompanionServer/);
   assert.match(launchPairingHook, /pairFromDesktopLaunchUrl/);
@@ -86,7 +109,7 @@ export function assertHostedPairingContract(rootDir) {
     webRtcSession,
     /requestEngineRuntimeSwitch\(requiredRuntimeKind\)[\s\S]*waitForEngineRuntimeKind\(requiredRuntimeKind\)[\s\S]*launchManifestId/,
   );
-  assert.match(desktopCompanion, /RUNTIME_SWITCH_PATH/);
+  assert.match(desktopRuntimeSwitchRoutes, /RUNTIME_SWITCH_PATH/);
   assert.match(desktopCompanion, /onRuntimeSwitch/);
   assert.match(enginePairingPanel, /Engine URL/);
   assert.match(authSource, /Sign In/);
