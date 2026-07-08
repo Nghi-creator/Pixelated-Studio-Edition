@@ -75,8 +75,9 @@ export function assertHostedPairingContract(rootDir) {
   assert.match(desktopCompanion, /createCompanionLaunchTicket/);
   assert.match(desktopCompanion, /startCompanionServer/);
   assert.match(launchPairingHook, /pairFromDesktopLaunchUrl/);
-  assert.match(launchPairing, /engineUrl[\s\S]*engineToken/);
-  assert.match(launchPairing, /setEngineToken\(engineToken\)/);
+  assert.doesNotMatch(launchPairing, /setEngineToken\(engineToken\)/);
+  assert.match(launchPairing, /rejected legacy raw token parameters/);
+  assert.match(launchPairing, /isAllowedEngineUrl\(companionUrl\)/);
   assert.match(launchPairing, /companionUrl[\s\S]*launchTicket/);
   assert.match(launchPairing, /createCompanionEngineToken\(payload\.companionToken\)/);
   assert.match(launchPairing, /Desktop launch pairing registration v1 failed/);
