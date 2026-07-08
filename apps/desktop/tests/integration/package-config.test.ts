@@ -18,13 +18,16 @@ type DesktopPackageJson = {
     extraResources?: ExtraResource[];
     files?: string[];
     mac?: {
+      artifactName?: string;
       icon?: string;
       target?: string;
     };
     linux?: {
+      artifactName?: string;
       target?: string;
     };
     win?: {
+      artifactName?: string;
       target?: string;
     };
   };
@@ -69,6 +72,23 @@ describe("desktop package config", () => {
     const packageJson = readPackageJson();
 
     assert.equal(packageJson.build.mac?.icon, "build/icon.png");
+  });
+
+  it("keeps desktop release artifact names stable for direct downloads", () => {
+    const packageJson = readPackageJson();
+
+    assert.equal(
+      packageJson.build.mac?.artifactName,
+      "Pixelated-Studio-mac.${ext}",
+    );
+    assert.equal(
+      packageJson.build.win?.artifactName,
+      "Pixelated-Studio-windows.${ext}",
+    );
+    assert.equal(
+      packageJson.build.linux?.artifactName,
+      "Pixelated-Studio-linux.${ext}",
+    );
   });
 
   it("defines native installer targets for every supported desktop OS", () => {

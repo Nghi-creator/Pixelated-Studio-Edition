@@ -4,14 +4,82 @@ import {
   Download,
   Gamepad2,
   MessageCircle,
-  MonitorUp,
   Network,
 } from "lucide-react";
+import type { MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 
-const DESKTOP_RELEASE_URL =
-  "https://github.com/Nghi-creator/Pixelated-Studio-Edition/releases/latest";
+type DesktopDownload = {
+  assetNamePattern: RegExp;
+  fallbackFileName: string;
+  fallbackHref: string;
+  label: string;
+};
+
+type GitHubReleaseAsset = {
+  browser_download_url: string;
+  name: string;
+};
+
+type GitHubRelease = {
+  assets?: GitHubReleaseAsset[];
+};
+
+const DESKTOP_RELEASE_API_URL =
+  "https://api.github.com/repos/Nghi-creator/Pixelated-Studio-Edition/releases/latest";
+const DESKTOP_RELEASE_FALLBACK_URL =
+  "https://github.com/Nghi-creator/Pixelated-Studio-Edition/releases/download/v1.0.1";
+
+const desktopDownloads: DesktopDownload[] = [
+  {
+    assetNamePattern: /\.dmg$/i,
+    fallbackFileName: "Pixelated.Studio-1.0.1-arm64.dmg",
+    fallbackHref: `${DESKTOP_RELEASE_FALLBACK_URL}/Pixelated.Studio-1.0.1-arm64.dmg`,
+    label: "macOS",
+  },
+  {
+    assetNamePattern: /\.exe$/i,
+    fallbackFileName: "Pixelated.Studio.Setup.1.0.1.exe",
+    fallbackHref: `${DESKTOP_RELEASE_FALLBACK_URL}/Pixelated.Studio.Setup.1.0.1.exe`,
+    label: "Windows",
+  },
+  {
+    assetNamePattern: /\.AppImage$/i,
+    fallbackFileName: "Pixelated.Studio-1.0.1.AppImage",
+    fallbackHref: `${DESKTOP_RELEASE_FALLBACK_URL}/Pixelated.Studio-1.0.1.AppImage`,
+    label: "Linux",
+  },
+];
+
+async function downloadLatestDesktopAsset(
+  event: MouseEvent<HTMLAnchorElement>,
+  download: DesktopDownload,
+) {
+  event.preventDefault();
+
+  try {
+    const response = await fetch(DESKTOP_RELEASE_API_URL, {
+      headers: { accept: "application/vnd.github+json" },
+    });
+    if (!response.ok) {
+      throw new Error(`GitHub release lookup failed: ${response.status}`);
+    }
+
+    const release = (await response.json()) as GitHubRelease;
+    const asset = release.assets?.find((candidate) =>
+      download.assetNamePattern.test(candidate.name),
+    );
+    if (!asset) {
+      throw new Error(`No ${download.label} desktop asset found.`);
+    }
+
+    window.location.assign(asset.browser_download_url);
+  } catch (error) {
+    console.warn("Falling back to pinned desktop download.", error);
+    window.location.assign(download.fallbackHref);
+  }
+}
 
 const featureCards = [
   {
@@ -83,15 +151,6 @@ export default function Landing() {
                 Go to Home Page
                 <ArrowRight className="h-5 w-5" />
               </Link>
-              <a
-                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-5 font-extrabold text-white transition-colors hover:bg-synth-elevated"
-                href={DESKTOP_RELEASE_URL}
-                rel="noreferrer"
-                target="_blank"
-              >
-                <Download className="h-5 w-5" />
-                Download Desktop App
-              </a>
             </div>
           </div>
         </div>
@@ -130,21 +189,29 @@ export default function Landing() {
               startup, local storage, companion invites, and the WebRTC media
               stream.
             </p>
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-              <Link
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-4 font-bold text-white transition-colors hover:bg-synth-elevated"
-                to="/engine"
+            <div className="mt-7">
+              <p className="text-sm font-extrabold uppercase tracking-[0.16em] text-synth-secondary">
+                Download desktop orchestrator for:
+              </p>
+              <div
+                aria-label="Download desktop orchestrator"
+                className="mt-3 grid gap-3 sm:grid-cols-3"
               >
-                <MonitorUp className="h-5 w-5" />
-                Connect Engine
-              </Link>
-              <Link
-                className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-bg px-4 font-bold text-white transition-colors hover:bg-synth-surface"
-                to="/multiplayer"
-              >
-                <Network className="h-5 w-5" />
-                Multiplayer
-              </Link>
+                {desktopDownloads.map((download) => (
+                  <a
+                    className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-4 font-bold text-white transition-colors hover:bg-synth-elevated"
+                    download={download.fallbackFileName}
+                    href={download.fallbackHref}
+                    key={download.label}
+                    onClick={(event) => {
+                      void downloadLatestDesktopAsset(event, download);
+                    }}
+                  >
+                    <Download className="h-5 w-5" />
+                    {download.label}
+                  </a>
+                ))}
+              </div>
             </div>
           </div>
 

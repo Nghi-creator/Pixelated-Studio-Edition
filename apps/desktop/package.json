@@ -33,13 +33,16 @@
       "output": "release"
     },
     "mac": {
+      "artifactName": "Pixelated-Studio-mac.${ext}",
       "icon": "build/icon.png",
       "target": "dmg"
     },
     "win": {
+      "artifactName": "Pixelated-Studio-windows.${ext}",
       "target": "nsis"
     },
     "linux": {
+      "artifactName": "Pixelated-Studio-linux.${ext}",
       "target": "AppImage"
     },
     "files": [
