@@ -24,6 +24,14 @@ function getPostPairingUrl(url: URL) {
   return nextUrl;
 }
 
+function scrubDesktopLaunchParams(url: URL) {
+  url.searchParams.delete("engineUrl");
+  url.searchParams.delete("engineToken");
+  url.searchParams.delete("companionUrl");
+  url.searchParams.delete("launchTicket");
+  return getPostPairingUrl(url);
+}
+
 export async function pairFromDesktopLaunchUrl(
   url: URL,
   {
@@ -43,22 +51,14 @@ export async function pairFromDesktopLaunchUrl(
 
   if (url.searchParams.has("engineUrl") || url.searchParams.has("engineToken")) {
     console.error("Desktop launch pairing rejected legacy raw token parameters.");
-    url.searchParams.delete("engineUrl");
-    url.searchParams.delete("engineToken");
-    url.searchParams.delete("companionUrl");
-    url.searchParams.delete("launchTicket");
-    replaceState(getPostPairingUrl(url));
+    replaceState(scrubDesktopLaunchParams(url));
     return false;
   }
 
   if (!launchTicket || !companionUrl) return false;
   if (!isAllowedEngineUrl(companionUrl)) {
     console.error("Desktop launch pairing rejected an unsafe companion URL.");
-    url.searchParams.delete("engineUrl");
-    url.searchParams.delete("engineToken");
-    url.searchParams.delete("companionUrl");
-    url.searchParams.delete("launchTicket");
-    replaceState(getPostPairingUrl(url));
+    replaceState(scrubDesktopLaunchParams(url));
     return false;
   }
 
@@ -73,6 +73,7 @@ export async function pairFromDesktopLaunchUrl(
       console.error(
         `Desktop launch pairing failed with status ${response.status}.`,
       );
+      replaceState(scrubDesktopLaunchParams(url));
       return false;
     }
 
@@ -89,9 +90,7 @@ export async function pairFromDesktopLaunchUrl(
     }).catch((error) => {
       console.warn("Desktop launch client presence ping failed.", error);
     });
-    url.searchParams.delete("companionUrl");
-    url.searchParams.delete("launchTicket");
-    replaceState(getPostPairingUrl(url));
+    replaceState(scrubDesktopLaunchParams(url));
 
     try {
       await pairLocalEngine(companionUrl);
@@ -107,6 +106,7 @@ export async function pairFromDesktopLaunchUrl(
       "Desktop launch pairing could not reach the companion.",
       error,
     );
+    replaceState(scrubDesktopLaunchParams(url));
     return false;
   }
 }
