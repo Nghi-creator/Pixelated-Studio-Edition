@@ -191,6 +191,31 @@ async function assertHostedAuthContract() {
     path.join(rootDir, "apps", "web", "src", "pages", "user", "Auth.tsx"),
     "utf8",
   );
+  const authPanelsSource = fs.readFileSync(
+    path.join(
+      rootDir,
+      "apps",
+      "web",
+      "src",
+      "features",
+      "auth",
+      "AuthPanels.tsx",
+    ),
+    "utf8",
+  );
+  const authSocialActionsSource = fs.readFileSync(
+    path.join(
+      rootDir,
+      "apps",
+      "web",
+      "src",
+      "features",
+      "auth",
+      "AuthSocialActions.tsx",
+    ),
+    "utf8",
+  );
+  const authUiSource = `${authSource}\n${authPanelsSource}\n${authSocialActionsSource}`;
   const resetSource = fs.readFileSync(
     path.join(
       rootDir,
@@ -236,8 +261,8 @@ async function assertHostedAuthContract() {
     "Sign In",
   ]) {
     assert.ok(
-      authSource.includes(expectedAuthText),
-      `Hosted auth smoke depends on Auth.tsx text: ${expectedAuthText}`,
+      authUiSource.includes(expectedAuthText),
+      `Hosted auth smoke depends on auth UI text: ${expectedAuthText}`,
     );
   }
   for (const expectedResetText of [

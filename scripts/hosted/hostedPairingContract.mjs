@@ -87,6 +87,18 @@ export function assertHostedPairingContract(rootDir) {
     path.join(rootDir, "apps", "web", "src", "pages", "user", "Auth.tsx"),
     "utf8",
   );
+  const authPanelsSource = fs.readFileSync(
+    path.join(
+      rootDir,
+      "apps",
+      "web",
+      "src",
+      "features",
+      "auth",
+      "AuthPanels.tsx",
+    ),
+    "utf8",
+  );
   const webRtcSession = fs.readFileSync(
     path.join(rootDir, "apps", "web", "src", "lib", "webrtc", "webrtcSession.ts"),
     "utf8",
@@ -112,5 +124,5 @@ export function assertHostedPairingContract(rootDir) {
   assert.match(desktopRuntimeSwitchRoutes, /RUNTIME_SWITCH_PATH/);
   assert.match(desktopCompanion, /onRuntimeSwitch/);
   assert.match(enginePairingPanel, /Engine URL/);
-  assert.match(authSource, /Sign In/);
+  assert.match(`${authSource}\n${authPanelsSource}`, /Sign In/);
 }
