@@ -40,16 +40,24 @@ export const corsOptions = {
   methods: ["GET", "POST", "DELETE"],
 };
 
-export const MAX_ROM_SIZE_BYTES = Number(
-  process.env.PIXELATED_MAX_ROM_SIZE_BYTES || 64 * 1024 * 1024,
+export function positiveNumberOrDefault(value: string | undefined, fallback: number) {
+  const parsed = value === undefined || value.trim() === "" ? NaN : Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export const MAX_ROM_SIZE_BYTES = positiveNumberOrDefault(
+  process.env.PIXELATED_MAX_ROM_SIZE_BYTES,
+  64 * 1024 * 1024,
 );
 
-export const MAX_CLOUD_ROM_SIZE_BYTES = Number(
-  process.env.PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES || 32 * 1024 * 1024,
+export const MAX_CLOUD_ROM_SIZE_BYTES = positiveNumberOrDefault(
+  process.env.PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES,
+  32 * 1024 * 1024,
 );
 
-export const CLOUD_ROM_DOWNLOAD_TIMEOUT_MS = Number(
-  process.env.PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS || 15000,
+export const CLOUD_ROM_DOWNLOAD_TIMEOUT_MS = positiveNumberOrDefault(
+  process.env.PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS,
+  15000,
 );
 
 export const ENGINE_TOKEN = process.env.PIXELATED_ENGINE_TOKEN || "";

@@ -219,6 +219,7 @@ async function defaultNotifySubmission(submission: SubmissionPayload) {
         third_party_content: submission.thirdPartyContent,
       },
     }),
+    signal: AbortSignal.timeout(5_000),
   });
 
   if (!response.ok) {

@@ -6,6 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/Nghi-creator/Pixelated-Studio-Edition/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License: MIT"></a>
+  <a href="https://nghi-creator.github.io/"><img src="https://img.shields.io/badge/CreatorOS-Portfolio-1f7a4a?style=for-the-badge" alt="CreatorOS portfolio"></a>
   <a href="https://www.linkedin.com/in/nicholas-nguyen-3bb17a335/"><img src="https://img.shields.io/badge/Built%20by-Nicholas Nguyen%20-blueviolet?style=for-the-badge" alt="Built by Nicholas"></a>
   <a href="https://dev.to/dashboard"><img src="https://img.shields.io/badge/Dev-Post-green?style=for-the-badge" alt="Dev Post"></a>
 </p>
@@ -158,6 +159,7 @@ See `.context/backend-hosting-checklist.md`, `.context/ci-rules.md`, and the pac
 
 ## Community
 
+- **CreatorOS portfolio:** [Nicholas Nguyen](https://nghi-creator.github.io/)
 - **Link to the User edition:** [PIXELATED User edition](https://github.com/Nghi-creator/Pixelated-User-Edition)
 - **Dev post:** [Dev.to Nicholas](https://dev.to/nicholasthegreat)
 - **LinkedIn:** [LinkedIn Nicholas](https://www.linkedin.com/in/nicholas-nguyen-3bb17a335/)

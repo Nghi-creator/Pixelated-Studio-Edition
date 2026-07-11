@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { allowedOrigins, corsOptions, normalizeOrigin } from "../../src/config.js";
+import {
+  allowedOrigins,
+  corsOptions,
+  normalizeOrigin,
+  positiveNumberOrDefault,
+} from "../../src/config.js";
 
 function checkOrigin(origin: string) {
   return new Promise<boolean>((resolve, reject) => {
@@ -36,5 +41,16 @@ describe("engine origin allowlist", () => {
       checkOrigin("https://untrusted.example"),
       /Origin not allowed by CORS/,
     );
+  });
+});
+
+describe("engine numeric configuration", () => {
+  it("rejects non-finite and non-positive resource limits", () => {
+    assert.equal(positiveNumberOrDefault(undefined, 10), 10);
+    assert.equal(positiveNumberOrDefault("", 10), 10);
+    assert.equal(positiveNumberOrDefault("not-a-number", 10), 10);
+    assert.equal(positiveNumberOrDefault("0", 10), 10);
+    assert.equal(positiveNumberOrDefault("-1", 10), 10);
+    assert.equal(positiveNumberOrDefault("25", 10), 25);
   });
 });

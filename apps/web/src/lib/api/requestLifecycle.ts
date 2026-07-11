@@ -26,17 +26,21 @@ export function createRequestAbortController(
 ) {
   const controller = new AbortController();
   const timeout = timerHost.setTimeout(() => controller.abort(), timeoutMs);
+  const abortFromRequest = () => controller.abort();
 
   if (requestSignal?.aborted) {
     controller.abort();
   } else {
-    requestSignal?.addEventListener("abort", () => controller.abort(), {
+    requestSignal?.addEventListener("abort", abortFromRequest, {
       once: true,
     });
   }
 
   return {
     controller,
-    cleanup: () => timerHost.clearTimeout(timeout),
+    cleanup: () => {
+      timerHost.clearTimeout(timeout);
+      requestSignal?.removeEventListener("abort", abortFromRequest);
+    },
   };
 }
