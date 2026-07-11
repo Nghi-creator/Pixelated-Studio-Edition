@@ -19,22 +19,35 @@ export function serializeHeaderValue(value: number | string | string[] | undefin
 
 export function readJsonBody(req: IncomingMessage) {
   return new Promise<unknown>((resolve, reject) => {
-    let body = "";
+    const chunks: Buffer[] = [];
+    let bodyBytes = 0;
+    let settled = false;
     req.on("data", (chunk: Buffer) => {
-      body += chunk.toString("utf8");
-      if (body.length > 1024) {
+      if (settled) return;
+      bodyBytes += chunk.length;
+      if (bodyBytes > 1024) {
+        settled = true;
         reject(new Error("Request body is too large"));
         req.destroy();
+        return;
       }
+      chunks.push(chunk);
     });
     req.on("end", () => {
+      if (settled) return;
+      settled = true;
       try {
+        const body = Buffer.concat(chunks).toString("utf8");
         resolve(body ? JSON.parse(body) : {});
       } catch {
         reject(new Error("Invalid JSON body"));
       }
     });
-    req.on("error", reject);
+    req.on("error", (error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    });
   });
 }
 

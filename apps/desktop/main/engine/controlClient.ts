@@ -4,6 +4,7 @@ import type {
 } from "./controllerTypes";
 
 type EngineTokenGetter = () => string | null;
+const ENGINE_CONTROL_TIMEOUT_MS = 5_000;
 
 async function requestEngineControl<T>(
   getEngineToken: EngineTokenGetter,
@@ -20,6 +21,7 @@ async function requestEngineControl<T>(
       "X-Engine-Token": engineToken,
     },
     method: options.method || "GET",
+    signal: AbortSignal.timeout(ENGINE_CONTROL_TIMEOUT_MS),
   });
   if (!response.ok) {
     throw new Error(`Engine control request failed with ${response.status}.`);

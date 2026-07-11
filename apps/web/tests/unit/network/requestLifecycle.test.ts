@@ -32,6 +32,16 @@ test("request timeout rejects stalled work and clears its timer", async () => {
 test("request abort controller links callers and cleans up its timeout", () => {
   const externalController = new AbortController();
   let cleared = false;
+  let removed = false;
+  const originalRemoveEventListener = externalController.signal.removeEventListener;
+  externalController.signal.removeEventListener = function (
+    type: string,
+    callback: EventListenerOrEventListenerObject,
+    options?: boolean | EventListenerOptions,
+  ) {
+    removed = true;
+    return originalRemoveEventListener.call(this, type, callback, options);
+  };
   const timerHost = {
     clearTimeout: () => {
       cleared = true;
@@ -48,4 +58,5 @@ test("request abort controller links callers and cleans up its timeout", () => {
   assert.equal(lifecycle.controller.signal.aborted, true);
   lifecycle.cleanup();
   assert.equal(cleared, true);
+  assert.equal(removed, true);
 });
