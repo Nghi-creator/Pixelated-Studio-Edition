@@ -4,13 +4,6 @@ const externalLinks = {
   personal: "https://nghi-creator.github.io/",
 };
 
-function openExternalLink(url: string) {
-  const newWindow = window.open(url, "_blank", "noopener,noreferrer");
-  if (newWindow) {
-    newWindow.opener = null;
-  }
-}
-
 export default function Footer() {
   return (
     <footer className="border-t border-synth-border/60 mt-auto bg-synth-bg py-8">
@@ -18,27 +11,30 @@ export default function Footer() {
         <p>&copy; 2026 PIXELATED Studio. All rights reserved.</p>
         <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2 md:mt-0">
           <span className="text-gray-400">Built by Nicholas Nguyen</span>
-          <button
+          <a
             className="inline-flex min-h-10 items-center px-1 text-gray-400 transition-colors hover:text-white"
-            onClick={() => openExternalLink(externalLinks.personal)}
-            type="button"
+            href={externalLinks.personal}
+            rel="noopener noreferrer"
+            target="_blank"
           >
             Profile
-          </button>
-          <button
+          </a>
+          <a
             className="inline-flex min-h-10 items-center px-1 text-gray-400 transition-colors hover:text-white"
-            onClick={() => openExternalLink(externalLinks.github)}
-            type="button"
+            href={externalLinks.github}
+            rel="noopener noreferrer"
+            target="_blank"
           >
             GitHub
-          </button>
-          <button
+          </a>
+          <a
             className="inline-flex min-h-10 items-center px-1 text-gray-400 transition-colors hover:text-white"
-            onClick={() => openExternalLink(externalLinks.linkedin)}
-            type="button"
+            href={externalLinks.linkedin}
+            rel="noopener noreferrer"
+            target="_blank"
           >
             LinkedIn
-          </button>
+          </a>
         </div>
       </div>
     </footer>
