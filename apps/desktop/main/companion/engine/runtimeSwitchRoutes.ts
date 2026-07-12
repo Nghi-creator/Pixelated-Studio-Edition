@@ -8,12 +8,12 @@ import {
   sendJson,
   serializeHeaderValue,
   setCompanionCorsHeaders,
-} from "./httpUtils";
-import { getCompanionAccessTokenScope } from "./inviteState";
+} from "../httpUtils";
+import { getCompanionAccessTokenScope } from "../invite/inviteState";
 import type {
   RuntimeKind,
   RuntimeSwitchHandler,
-} from "./types";
+} from "../types";
 
 const RUNTIME_SWITCH_PATH = "/runtime/switch";
 const VALID_RUNTIME_KINDS = new Set(["libretro", "native_linux"]);

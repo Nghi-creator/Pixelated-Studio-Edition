@@ -101,7 +101,7 @@ describe("desktop packaged release smoke helpers", () => {
 
     assert.doesNotThrow(() => assertPreloadScript(bridge, "preload.js"));
     assert.throws(
-      () => assertPreloadScript(`${bridge}\nrequire("./main/companion/qr");`, "preload.js"),
+      () => assertPreloadScript(`${bridge}\nrequire("./main/companion/invite/qr");`, "preload.js"),
       /unsupported sandbox modules/,
     );
   });

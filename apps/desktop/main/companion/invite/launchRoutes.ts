@@ -2,14 +2,14 @@ import type {
   IncomingMessage,
   ServerResponse,
 } from "http";
-import { probeEngineHealth } from "./engineHealth";
+import { probeEngineHealth } from "../engine/engineHealth";
 import {
   readJsonBody,
   rejectCompanionRateLimitedRequest,
   sendJson,
   serializeHeaderValue,
   setCompanionCorsHeaders,
-} from "./httpUtils";
+} from "../httpUtils";
 import {
   consumeCompanionLaunchTicket,
   createCompanionAccessToken,
