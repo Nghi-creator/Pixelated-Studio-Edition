@@ -1,5 +1,5 @@
 import type { spawn } from "child_process";
-import type { StreamProfile } from "../signaling/startGameHandlers";
+import type { StreamProfile } from "../../signaling/start-game/startGameHandlers";
 
 type IceServer = {
   credential?: string;

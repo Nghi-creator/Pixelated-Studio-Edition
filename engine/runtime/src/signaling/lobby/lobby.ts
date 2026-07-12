@@ -5,7 +5,7 @@ import {
   type LobbyRole,
   type LobbyState,
 } from "./lobbyState";
-import { getSessionRoom, normalizeSessionId } from "./sessionRooms";
+import { getSessionRoom, normalizeSessionId } from "../sessionRooms";
 
 export type { LobbyParticipant, LobbyRole, LobbyState };
 

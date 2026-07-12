@@ -1,16 +1,16 @@
 import { spawn, type ChildProcess } from "child_process";
 import fs from "fs";
-import { createGamepadBridge } from "../input/gamepadBridge";
-import { injectKey, type KeyAction } from "../input/injectKey";
-import { translateKey } from "../input/translateKey";
-import { removeFileIfExists } from "../roms/cloudRomDownloader";
-import type { StreamProfile } from "../signaling/startGameHandlers";
-import { launchCameraBridge } from "./cameraLauncher";
-import { launchLibretroGame } from "./libretroLauncher";
-import { launchNativeGame } from "./nativeLauncher";
+import { createGamepadBridge } from "../../input/gamepadBridge";
+import { injectKey, type KeyAction } from "../../input/injectKey";
+import { translateKey } from "../../input/translateKey";
+import { removeFileIfExists } from "../../roms/cloudRomDownloader";
+import type { StreamProfile } from "../../signaling/start-game/startGameHandlers";
+import { launchCameraBridge } from "../launchers/cameraLauncher";
+import { launchLibretroGame } from "../launchers/libretroLauncher";
+import { launchNativeGame } from "../launchers/nativeLauncher";
 import { bindManagedProcessLifecycle } from "./processLifecycle";
 import { startRuntimeHostProcesses } from "./runtimeHostProcesses";
-import { getRuntimeDefinition } from "./runtimeRegistry";
+import { getRuntimeDefinition } from "../runtimeRegistry";
 
 type IceServer = {
   credential?: string;

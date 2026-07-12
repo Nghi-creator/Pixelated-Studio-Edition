@@ -4,12 +4,12 @@ import {
   createResearchRunSummary,
   createResearchRunSummaryFilename,
   researchRunSummaryToJson,
-} from "../../../src/features/player/researchRunSummary.ts";
+} from "../../../src/features/player/research/researchRunSummary.ts";
 import {
   createResearchRunEvent,
   type ResearchRunEvent,
-} from "../../../src/features/player/researchRunEvents.ts";
-import type { StreamTelemetryCsvSample } from "../../../src/features/player/streamTelemetryExport.ts";
+} from "../../../src/features/player/research/researchRunEvents.ts";
+import type { StreamTelemetryCsvSample } from "../../../src/features/player/telemetry/streamTelemetryExport.ts";
 
 const baseSample: StreamTelemetryCsvSample = {
   bitrateKbps: 1000,

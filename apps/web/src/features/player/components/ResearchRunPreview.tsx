@@ -1,5 +1,5 @@
-import { RESEARCH_RUN_SCHEMA_VERSION } from "../researchRunMetadata";
-import type { ResearchRunSummary } from "../researchRunSummary";
+import { RESEARCH_RUN_SCHEMA_VERSION } from "../research/researchRunMetadata";
+import type { ResearchRunSummary } from "../research/researchRunSummary";
 
 function formatMs(value: number | null) {
   return value === null ? "--" : `${value} ms`;

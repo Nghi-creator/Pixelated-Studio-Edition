@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { engineAuthHeaders } from "../../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../../lib/engine/engineConfig";
+import { engineFetch } from "../../../lib/engine/engineRequest";
 
 type FallbackFrameCanvasProps = {
   active: boolean;
@@ -41,11 +42,11 @@ export function FallbackFrameCanvas({ active }: FallbackFrameCanvasProps) {
 
     const fetchAndDrawFrame = async () => {
       try {
-        const response = await fetch(engineEndpoint("/display/frame"), {
+        const response = await engineFetch(engineEndpoint("/display/frame"), {
           cache: "no-store",
           headers: engineAuthHeaders(),
           signal: abortController.signal,
-        });
+        }, 3_000);
         if (!response.ok || disposed) {
           delayMs = Math.min(MAX_FRAME_DELAY_MS, delayMs + 250);
           scheduleNextFrame();

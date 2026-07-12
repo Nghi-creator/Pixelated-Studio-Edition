@@ -20,7 +20,7 @@ import {
   PublishEvidenceStep,
   PublishFilesStep,
   PublishRightsStep,
-} from "../../features/publish/PublishWizardSteps";
+} from "../../features/publish/steps";
 import { usePublishSubmissionForm } from "../../features/publish/usePublishSubmissionForm";
 
 export default function Publish() {

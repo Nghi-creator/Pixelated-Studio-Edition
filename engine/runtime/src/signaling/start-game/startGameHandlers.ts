@@ -4,11 +4,11 @@ import {
   getSessionRoom,
   joinSession,
   normalizeSessionId,
-} from "./sessionRooms";
-import { sanitizeUserId } from "../roms/localRomStore";
+} from "../sessionRooms";
+import { sanitizeUserId } from "../../roms/localRomStore";
 import {
   getRuntimeDefinition,
-} from "../runtime/runtimeRegistry";
+} from "../../runtime/runtimeRegistry";
 import {
   launchCloudRomSession,
   launchLocalVaultSession,

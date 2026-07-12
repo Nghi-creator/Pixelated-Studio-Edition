@@ -4,7 +4,7 @@ import {
   createResearchRunEvent,
   type ResearchRunEvent,
   type ResearchRunEventName,
-} from "../researchRunEvents";
+} from "../research/researchRunEvents";
 
 export function useResearchRunEvents({
   runId,

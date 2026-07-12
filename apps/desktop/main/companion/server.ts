@@ -3,12 +3,12 @@ import http from "http";
 import https from "https";
 import { type Socket } from "net";
 import { createCompanionCertificate } from "./certificate";
-import { proxyWebSocket } from "./proxy";
+import { proxyWebSocket } from "./engine/proxy";
 import {
   resetCompanionSecurityState,
   revokeCompanionInvite,
   updateCompanionInvite,
-} from "./inviteState";
+} from "./invite/inviteState";
 import { handleCompanionRequest } from "./requestRouter";
 import type {
   CompanionRequestOptions,
@@ -24,9 +24,9 @@ export type {
 } from "./types";
 
 export { getCompanionStatusPage } from "./statusPage";
-export { canProxyCompanionRequest, shouldProxy } from "./proxy";
+export { canProxyCompanionRequest, shouldProxy } from "./engine/proxy";
 export { consumeCompanionRequestLimit } from "./httpUtils";
-export { canUseRuntimeSwitchToken } from "./runtimeSwitchRoutes";
+export { canUseRuntimeSwitchToken } from "./engine/runtimeSwitchRoutes";
 export {
   consumeCompanionLaunchTicket,
   createCompanionLaunchTicket,
@@ -34,7 +34,7 @@ export {
   recordCompanionInviteFailure,
   revokeCompanionInvite,
   updateCompanionInvite,
-} from "./inviteState";
+} from "./invite/inviteState";
 
 let companionServer: https.Server | null = null;
 let companionHttpServer: http.Server | null = null;

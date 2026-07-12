@@ -6,7 +6,7 @@ import {
   type AdminConfirmation,
 } from "../../components/admin/AdminConfirmDialog";
 import type { ApiAdminReportAction } from "../../lib/api/apiClient";
-import { useResolveAdminReportMutation } from "../../lib/api/apiMutations";
+import { useResolveAdminReportMutation } from "../../features/admin/adminMutations";
 import {
   useAdminReportsQuery,
   useAuthSessionQuery,

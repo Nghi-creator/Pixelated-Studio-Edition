@@ -1,13 +1,14 @@
 import { useState } from "react";
 import { engineAuthHeaders } from "../../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../../lib/engine/engineConfig";
+import { engineFetch } from "../../../lib/engine/engineRequest";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
 import { downloadBlob } from "../downloadFile";
 import {
   createStreamTelemetryCsvFilename,
   streamTelemetrySamplesToCsv,
   type StreamTelemetryCsvSample,
-} from "../streamTelemetryExport";
+} from "../telemetry/streamTelemetryExport";
 
 function buildTelemetrySnapshot({
   gameId,
@@ -79,14 +80,14 @@ export function useStreamTelemetryExportActions({
 
     try {
       try {
-        const response = await fetch(engineEndpoint("/smoke/telemetry"), {
+        const response = await engineFetch(engineEndpoint("/smoke/telemetry"), {
           body: JSON.stringify(snapshot),
           headers: {
             "Content-Type": "application/json",
             ...engineAuthHeaders(),
           },
           method: "POST",
-        });
+        }, 4_000);
         if (response.ok) {
           setCopyState("saved");
           window.setTimeout(() => setCopyState("idle"), 1600);

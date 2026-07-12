@@ -6,10 +6,10 @@ import { serveCompanionStatus } from "./statusPage";
 import {
   proxyHttpRequest,
   shouldProxy,
-} from "./proxy";
-import { handleInviteRequest } from "./inviteRoutes";
-import { handleLaunchRequest } from "./launchRoutes";
-import { handleRuntimeSwitchRequest } from "./runtimeSwitchRoutes";
+} from "./engine/proxy";
+import { handleInviteRequest } from "./invite/inviteRoutes";
+import { handleLaunchRequest } from "./invite/launchRoutes";
+import { handleRuntimeSwitchRequest } from "./engine/runtimeSwitchRoutes";
 import type { CompanionRequestOptions } from "./types";
 
 export async function handleCompanionRequest(

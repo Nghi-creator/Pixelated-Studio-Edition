@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createCompanionQrDataUrl } from "../../../main/companion/qr";
+import { createCompanionQrDataUrl } from "../../../main/companion/invite/qr";
 
 describe("desktop companion QR", () => {
   it("renders the advertised companion join URL as a PNG data URL", async () => {

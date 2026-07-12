@@ -5,7 +5,7 @@ import http, {
 } from "http";
 import crypto from "crypto";
 import net, { type Socket } from "net";
-import { getCompanionAccessTokenScope } from "./inviteState";
+import { getCompanionAccessTokenScope } from "../invite/inviteState";
 
 const ENGINE_HOST = "127.0.0.1";
 const ENGINE_PORT = 8080;

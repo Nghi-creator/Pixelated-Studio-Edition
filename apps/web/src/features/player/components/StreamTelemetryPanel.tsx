@@ -1,17 +1,22 @@
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { X } from "lucide-react";
 import type { StreamProfile } from "../../../lib/engine/streamProfiles";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
 import { useStreamTelemetryExportActions } from "../hooks/useStreamTelemetryExportActions";
 import { useStreamTelemetryHistory } from "../hooks/useStreamTelemetryHistory";
-import type { ResearchBaselineForm } from "../researchBaseline";
-import type { ResearchRunEvent } from "../researchRunEvents";
-import type { ResearchRunMetadataForm } from "../researchRunMetadata";
-import type { StreamTelemetryCsvSample } from "../streamTelemetryExport";
-import { ResearchRunModal } from "./ResearchRunModal";
+import type { ResearchBaselineForm } from "../research/researchBaseline";
+import type { ResearchRunEvent } from "../research/researchRunEvents";
+import type { ResearchRunMetadataForm } from "../research/researchRunMetadata";
+import type { StreamTelemetryCsvSample } from "../telemetry/streamTelemetryExport";
 import { StreamTelemetryControls } from "./StreamTelemetryControls";
 import { StreamTelemetryHistoryChart } from "./StreamTelemetryHistoryChart";
 import { StreamTelemetrySummary } from "./StreamTelemetrySummary";
+
+const ResearchRunModal = lazy(() =>
+  import("./ResearchRunModal").then(({ ResearchRunModal }) => ({
+    default: ResearchRunModal,
+  })),
+);
 
 type StreamTelemetryPanelProps = {
   gameId: string | undefined;
@@ -153,24 +158,36 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
       </div>
 
       {isResearchModalOpen && (
-        <ResearchRunModal
-          events={researchRun.events}
-          baselineForm={researchRun.baselineForm}
-          form={researchRun.metadataForm}
-          gameId={gameId}
-          gameTitle={gameTitle}
-          history={history}
-          onClose={() => setIsResearchModalOpen(false)}
-          onBaselineFormChange={researchRun.onBaselineFormChange}
-          onFormChange={researchRun.onMetadataFormChange}
-          playerMode={props.playerMode}
-          recordedCsvSamples={recordedCsvSamples}
-          runId={researchRun.runId}
-          sessionId={sessionId}
-          shareUrl={shareUrl}
-          status={status}
-          streamProfile={streamProfile}
-        />
+        <Suspense
+          fallback={
+            <div
+              aria-live="polite"
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 text-sm font-semibold text-white"
+              role="status"
+            >
+              Loading research tools…
+            </div>
+          }
+        >
+          <ResearchRunModal
+            events={researchRun.events}
+            baselineForm={researchRun.baselineForm}
+            form={researchRun.metadataForm}
+            gameId={gameId}
+            gameTitle={gameTitle}
+            history={history}
+            onClose={() => setIsResearchModalOpen(false)}
+            onBaselineFormChange={researchRun.onBaselineFormChange}
+            onFormChange={researchRun.onMetadataFormChange}
+            playerMode={props.playerMode}
+            recordedCsvSamples={recordedCsvSamples}
+            runId={researchRun.runId}
+            sessionId={sessionId}
+            shareUrl={shareUrl}
+            status={status}
+            streamProfile={streamProfile}
+          />
+        </Suspense>
       )}
     </section>
   );

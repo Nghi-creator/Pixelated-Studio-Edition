@@ -1,5 +1,5 @@
 import { execFile } from "child_process";
-import { xdotoolArgs } from "../runtime/processCommands";
+import { xdotoolArgs } from "../runtime/processes/processCommands";
 
 export type KeyAction = "keydown" | "keyup";
 

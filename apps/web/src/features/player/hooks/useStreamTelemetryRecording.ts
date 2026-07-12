@@ -3,7 +3,7 @@ import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
 import {
   createTelemetryCsvSample,
   type StreamTelemetryCsvSample,
-} from "../streamTelemetryExport";
+} from "../telemetry/streamTelemetryExport";
 
 const LONG_TELEMETRY_RECORDING_ROWS = 10_000;
 

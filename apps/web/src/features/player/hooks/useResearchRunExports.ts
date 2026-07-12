@@ -6,37 +6,37 @@ import {
   createResearchBaselineFilename,
   researchBaselineToJson,
   type ResearchBaselineForm,
-} from "../researchBaseline";
+} from "../research/researchBaseline";
 import {
   createResearchRunBundleFilename,
   createResearchRunBundleTar,
   type ResearchRunBundleFile,
-} from "../researchRunBundle";
+} from "../research/researchRunBundle";
 import {
   createResearchRunEventsFilename,
   findFirstEventElapsedMs,
   researchRunEventsToCsv,
   type ResearchRunEvent,
-} from "../researchRunEvents";
+} from "../research/researchRunEvents";
 import {
   createResearchRunMetadata,
   createResearchRunMetadataFilename,
   researchRunMetadataToJson,
   type ResearchRunMetadataForm,
-} from "../researchRunMetadata";
+} from "../research/researchRunMetadata";
 import {
   createResearchRunSummary,
   createResearchRunSummaryFilename,
   researchRunSummaryToJson,
-} from "../researchRunSummary";
-import { createStreamTelemetryGraphPngBytes } from "../streamTelemetryGraphPng";
+} from "../research/researchRunSummary";
+import { createStreamTelemetryGraphPngBytes } from "../telemetry/streamTelemetryGraphPng";
 import {
   addPacketLossDeltas,
   createStreamTelemetryGraphFilename,
   streamTelemetrySamplesToCsv,
   type StreamTelemetryCsvSample,
   type StreamTelemetryGraphSample,
-} from "../streamTelemetryExport";
+} from "../telemetry/streamTelemetryExport";
 import type { StreamTelemetryHistorySample } from "./useStreamTelemetryHistory";
 
 export function useResearchRunExports({

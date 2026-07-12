@@ -14,6 +14,7 @@ import {
   getEngineUrl,
   setEngineUrl,
 } from "../../lib/engine/engineConfig";
+import { engineFetch } from "../../lib/engine/engineRequest";
 import {
   getInviteCompanionUrl,
   getInviteFailureMessage,
@@ -213,7 +214,7 @@ export function useEnginePairing({ onPaired }: UseEnginePairingOptions = {}) {
 
     try {
       if (joiningWithInvite) {
-        const inviteResponse = await fetch(
+        const inviteResponse = await engineFetch(
           engineUrlEndpoint(normalizedUrl, "/invite/redeem"),
           {
             body: JSON.stringify({ code: normalizedInviteCode }),
@@ -251,7 +252,7 @@ export function useEnginePairing({ onPaired }: UseEnginePairingOptions = {}) {
         );
       }
 
-      const healthResponse = await fetch(
+      const healthResponse = await engineFetch(
         engineUrlEndpoint(normalizedUrl, "/health"),
       );
       if (!healthResponse.ok) {
@@ -278,7 +279,7 @@ export function useEnginePairing({ onPaired }: UseEnginePairingOptions = {}) {
         return;
       }
 
-      const authResponse = await fetch(
+      const authResponse = await engineFetch(
         engineUrlEndpoint(normalizedUrl, "/local-games"),
         {
           headers: {

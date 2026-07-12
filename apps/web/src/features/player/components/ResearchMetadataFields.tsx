@@ -2,7 +2,7 @@ import { AdminSelect } from "../../../components/ui/AdminSelect";
 import type {
   ResearchRunMetadataForm,
   ResearchRunScenario,
-} from "../researchRunMetadata";
+} from "../research/researchRunMetadata";
 
 const SCENARIO_OPTIONS: Array<{
   label: string;

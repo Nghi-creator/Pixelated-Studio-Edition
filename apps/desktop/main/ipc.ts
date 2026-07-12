@@ -1,5 +1,5 @@
 import { ipcMain, shell, type IpcMainEvent } from "electron";
-import { createCompanionQrDataUrl } from "./companion/qr";
+import { createCompanionQrDataUrl } from "./companion/invite/qr";
 import {
   getDockerResourceUrl,
   isDockerDiagnosticCode,

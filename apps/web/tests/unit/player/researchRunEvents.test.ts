@@ -5,7 +5,7 @@ import {
   createResearchRunEventsFilename,
   findFirstEventElapsedMs,
   researchRunEventsToCsv,
-} from "../../../src/features/player/researchRunEvents.ts";
+} from "../../../src/features/player/research/researchRunEvents.ts";
 
 test("research run events capture elapsed time and optional details", () => {
   assert.deepEqual(

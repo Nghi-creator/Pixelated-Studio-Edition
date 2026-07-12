@@ -6,7 +6,7 @@ import {
   normalizeStreamProfile,
   registerStartGameHandler,
   type StreamProfile,
-} from "../../src/signaling/startGameHandlers";
+} from "../../src/signaling/start-game/startGameHandlers";
 
 type RuntimeBootOptions = {
   isCloudRom?: boolean;

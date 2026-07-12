@@ -14,7 +14,12 @@ function toBytes(data: string | Uint8Array) {
   return typeof data === "string" ? new TextEncoder().encode(data) : data;
 }
 
-function writeAscii(target: Uint8Array, offset: number, length: number, value: string) {
+function writeAscii(
+  target: Uint8Array,
+  offset: number,
+  length: number,
+  value: string,
+) {
   const text = value.slice(0, length);
   for (let index = 0; index < text.length; index += 1) {
     target[offset + index] = text.charCodeAt(index);

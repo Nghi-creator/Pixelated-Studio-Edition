@@ -1,4 +1,4 @@
-import type { ResearchBaselineForm } from "../researchBaseline";
+import type { ResearchBaselineForm } from "../research/researchBaseline";
 
 export function ResearchBaselineFields({
   form,

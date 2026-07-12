@@ -4,7 +4,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { createProcessManager } from "../../src/runtime/processManager";
+import { createProcessManager } from "../../src/runtime/processes/processManager";
 
 class FakeChildProcess extends EventEmitter {
   killed = false;

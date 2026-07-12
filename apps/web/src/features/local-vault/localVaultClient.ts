@@ -5,6 +5,7 @@ import {
   hasEngineToken,
 } from "../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../lib/engine/engineConfig";
+import { engineFetch } from "../../lib/engine/engineRequest";
 export {
   getLocalGameTitle,
   getLocalGamePlayPath,
@@ -51,7 +52,7 @@ function handleInvalidToken(response: Response) {
 export async function fetchLocalVaultFilenames(userId: string) {
   if (!hasEngineToken()) return [];
 
-  const response = await fetch(engineEndpoint("/local-games"), {
+  const response = await engineFetch(engineEndpoint("/local-games"), {
     headers: { "X-User-Id": userId, ...engineAuthHeaders() },
   });
 
@@ -68,7 +69,7 @@ export async function uploadLocalVaultRom(file: File, userId: string) {
   const formData = new FormData();
   formData.append("romFile", file);
 
-  const response = await fetch(engineEndpoint("/upload"), {
+  const response = await engineFetch(engineEndpoint("/upload"), {
     body: formData,
     headers: { "X-User-Id": userId, ...engineAuthHeaders() },
     method: "POST",
@@ -86,7 +87,7 @@ export async function uploadLocalVaultRom(file: File, userId: string) {
 }
 
 export async function deleteLocalVaultGame(filename: string, userId: string) {
-  const response = await fetch(
+  const response = await engineFetch(
     engineEndpoint(`/local-games/${encodeURIComponent(filename)}`),
     {
       headers: { "X-User-Id": userId, ...engineAuthHeaders() },

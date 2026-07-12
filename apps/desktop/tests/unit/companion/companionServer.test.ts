@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { createCompanionAccessToken } from "../../../main/companion/inviteState";
+import { createCompanionAccessToken } from "../../../main/companion/invite/inviteState";
 import {
   canUseRuntimeSwitchToken,
   canProxyCompanionRequest,

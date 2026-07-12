@@ -32,6 +32,7 @@ export function assertHostedPairingContract(rootDir) {
       "desktop",
       "main",
       "companion",
+      "engine",
       "runtimeSwitchRoutes.ts",
     ),
     "utf8",

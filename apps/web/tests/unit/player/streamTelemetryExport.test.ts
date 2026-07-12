@@ -7,8 +7,8 @@ import {
   streamTelemetrySamplesToCsv,
   STREAM_TELEMETRY_GRAPH_WINDOW_MS,
   type StreamTelemetryCsvSample,
-} from "../../../src/features/player/streamTelemetryExport.ts";
-import { renderStreamTelemetryGraphPng } from "../../../src/features/player/streamTelemetryGraphPng.ts";
+} from "../../../src/features/player/telemetry/streamTelemetryExport.ts";
+import { renderStreamTelemetryGraphPng } from "../../../src/features/player/telemetry/streamTelemetryGraphPng.ts";
 
 test("stream telemetry csv export includes stable research columns", () => {
   const sample: StreamTelemetryCsvSample = {

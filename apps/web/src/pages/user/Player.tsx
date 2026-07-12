@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LobbyPanel } from "../../features/player/components/LobbyPanel";
 import {
@@ -6,9 +6,7 @@ import {
   PlayerInstructions,
 } from "../../features/player/components/PlayerControls";
 import { PlayerHeader } from "../../features/player/components/PlayerHeader";
-import { PlayerCommunitySection } from "../../features/player/components/PlayerCommunitySection";
 import { StreamStage } from "../../features/player/components/StreamStage";
-import { StreamTelemetryPanel } from "../../features/player/components/StreamTelemetryPanel";
 import {
   PlayerRecordingStatusButton,
   PlayerStreamGrid,
@@ -26,6 +24,29 @@ import { useStreamTelemetryRecording } from "../../features/player/hooks/useStre
 import { usePreventGameInputScroll } from "../../features/player/hooks/usePreventGameInputScroll";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
+
+const PlayerCommunitySection = lazy(() =>
+  import("../../features/player/components/PlayerCommunitySection").then(
+    ({ PlayerCommunitySection }) => ({ default: PlayerCommunitySection }),
+  ),
+);
+const StreamTelemetryPanel = lazy(() =>
+  import("../../features/player/components/StreamTelemetryPanel").then(
+    ({ StreamTelemetryPanel }) => ({ default: StreamTelemetryPanel }),
+  ),
+);
+
+function PlayerSectionLoading({ label }: { label: string }) {
+  return (
+    <div
+      aria-live="polite"
+      className="flex min-h-32 w-full items-center justify-center rounded-lg border border-synth-border bg-synth-surface px-4 text-sm font-semibold text-gray-300"
+      role="status"
+    >
+      {label}
+    </div>
+  );
+}
 
 export default function Player() {
   const { id } = useParams<{ id: string }>();
@@ -156,30 +177,32 @@ export default function Player() {
         layoutClassName={playerLayoutClassName}
         showStreamTelemetry={showStreamTelemetry}
         telemetryPanel={
-          <StreamTelemetryPanel
-            gameId={id || ""}
-            gameTitle={gameTitle}
-            isRecordingCsv={isRecordingCsv}
-            onClearTelemetryCsv={clearTelemetryCsv}
-            onClose={() => setShowStreamTelemetry(false)}
-            onResetTelemetryData={resetTelemetryData}
-            onToggleCsvRecording={toggleCsvRecording}
-            playerMode={playerMode}
-            researchRun={{
-              baselineForm: researchBaselineForm,
-              events: researchEvents,
-              metadataForm: researchMetadataForm,
-              onBaselineFormChange: setResearchBaselineForm,
-              onMetadataFormChange: setResearchMetadataForm,
-              runId: researchRunId,
-            }}
-            recordedCsvSamples={recordedCsvSamples}
-            sessionId={sessionId}
-            shareUrl={shareInvite.url}
-            status={status}
-            streamProfile={streamProfile}
-            telemetry={telemetry}
-          />
+          <Suspense fallback={<PlayerSectionLoading label="Loading stream stats…" />}>
+            <StreamTelemetryPanel
+              gameId={id || ""}
+              gameTitle={gameTitle}
+              isRecordingCsv={isRecordingCsv}
+              onClearTelemetryCsv={clearTelemetryCsv}
+              onClose={() => setShowStreamTelemetry(false)}
+              onResetTelemetryData={resetTelemetryData}
+              onToggleCsvRecording={toggleCsvRecording}
+              playerMode={playerMode}
+              researchRun={{
+                baselineForm: researchBaselineForm,
+                events: researchEvents,
+                metadataForm: researchMetadataForm,
+                onBaselineFormChange: setResearchBaselineForm,
+                onMetadataFormChange: setResearchMetadataForm,
+                runId: researchRunId,
+              }}
+              recordedCsvSamples={recordedCsvSamples}
+              sessionId={sessionId}
+              shareUrl={shareInvite.url}
+              status={status}
+              streamProfile={streamProfile}
+              telemetry={telemetry}
+            />
+          </Suspense>
         }
       >
         <StreamStage
@@ -242,12 +265,14 @@ export default function Player() {
         }
       />
 
-      <PlayerCommunitySection
-        currentUser={currentUser}
-        gameId={id}
-        layoutClassName={playerLayoutClassName}
-        onSignIn={() => navigate("/login")}
-      />
+      <Suspense fallback={<PlayerSectionLoading label="Loading community…" />}>
+        <PlayerCommunitySection
+          currentUser={currentUser}
+          gameId={id}
+          layoutClassName={playerLayoutClassName}
+          onSignIn={() => navigate("/login")}
+        />
+      </Suspense>
     </div>
   );
 }

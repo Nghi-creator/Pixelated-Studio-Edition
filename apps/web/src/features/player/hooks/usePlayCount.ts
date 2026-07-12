@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useCountPlayMutation } from "../../../lib/api/apiMutations";
+import { useCountPlayMutation } from "./playerMutations";
 
 export function usePlayCount(gameId: string | undefined) {
   const { mutate } = useCountPlayMutation({

@@ -1,11 +1,11 @@
 import crypto from "crypto";
 import path from "path";
-import { removeFileIfExists } from "../roms/cloudRomDownloader";
+import { removeFileIfExists } from "../../roms/cloudRomDownloader";
 import {
   findRuntimeByExtension,
   getRuntimeDefinition,
   getRuntimeExtensionForTarget,
-} from "../runtime/runtimeRegistry";
+} from "../../runtime/runtimeRegistry";
 import type { IceServer, StreamProfile } from "./startGameRequest";
 
 type RuntimeBootOptions = {

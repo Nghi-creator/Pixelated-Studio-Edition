@@ -1,6 +1,6 @@
 import type { spawn } from "child_process";
 import { getNativeLaunchManifest } from "./nativeLaunchManifests";
-import type { RuntimeDefinition } from "./runtimeRegistry";
+import type { RuntimeDefinition } from "../runtimeRegistry";
 
 type LaunchNativeOptions = {
   fileExists: (path: string) => boolean;
