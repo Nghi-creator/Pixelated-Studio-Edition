@@ -6,8 +6,8 @@ import {
   createResearchBaselineFilename,
   researchBaselineToJson,
   type ResearchBaselineForm,
-} from "../../../src/features/player/researchBaseline.ts";
-import type { ResearchRunMetadata } from "../../../src/features/player/researchRunMetadata.ts";
+} from "../../../src/features/player/research/researchBaseline.ts";
+import type { ResearchRunMetadata } from "../../../src/features/player/research/researchRunMetadata.ts";
 
 const metadata: ResearchRunMetadata = {
   capturedAt: "2026-07-04T02:03:04.000Z",

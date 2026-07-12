@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   createResearchRunBundleFilename,
   createResearchRunBundleTar,
-} from "../../../src/features/player/researchRunBundle.ts";
+} from "../../../src/features/player/research/researchRunBundle.ts";
 
 function readAscii(bytes: Uint8Array, start: number, length: number) {
   return String.fromCharCode(...bytes.slice(start, start + length)).replace(

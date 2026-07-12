@@ -1,4 +1,4 @@
-import type { WebRTCResearchEventName } from "../../lib/webrtc/types";
+import type { WebRTCResearchEventName } from "../../../lib/webrtc/types";
 
 export type ResearchRunEventName =
   | WebRTCResearchEventName

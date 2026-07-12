@@ -5,7 +5,7 @@ import {
   createResearchRunMetadataFilename,
   researchRunMetadataToJson,
   type ResearchRunMetadataForm,
-} from "../../../src/features/player/researchRunMetadata.ts";
+} from "../../../src/features/player/research/researchRunMetadata.ts";
 
 const form: ResearchRunMetadataForm = {
   coldStart: true,

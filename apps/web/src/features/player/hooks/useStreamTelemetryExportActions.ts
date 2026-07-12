@@ -8,7 +8,7 @@ import {
   createStreamTelemetryCsvFilename,
   streamTelemetrySamplesToCsv,
   type StreamTelemetryCsvSample,
-} from "../streamTelemetryExport";
+} from "../telemetry/streamTelemetryExport";
 
 function buildTelemetrySnapshot({
   gameId,

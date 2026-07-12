@@ -2,11 +2,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createEmptyResearchBaselineForm,
   type ResearchBaselineForm,
-} from "../researchBaseline";
+} from "../research/researchBaseline";
 import {
   createResearchRunId,
   type ResearchRunMetadataForm,
-} from "../researchRunMetadata";
+} from "../research/researchRunMetadata";
 import { useResearchRunEvents } from "./useResearchRunEvents";
 
 export function useResearchRunState({

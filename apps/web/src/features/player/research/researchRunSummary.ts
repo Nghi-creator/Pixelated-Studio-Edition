@@ -2,7 +2,7 @@ import type {
   ResearchRunEvent,
   ResearchRunEventName,
 } from "./researchRunEvents";
-import type { StreamTelemetryCsvSample } from "./streamTelemetryExport";
+import type { StreamTelemetryCsvSample } from "../telemetry/streamTelemetryExport";
 
 export type ResearchRunMetricSummary = {
   max: number | null;
