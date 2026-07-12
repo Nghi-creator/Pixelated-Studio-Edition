@@ -1,5 +1,5 @@
-import { sanitizeUserId } from "../roms/localRomStore";
-import { getRuntimeDefinition } from "../runtime/runtimeRegistry";
+import { sanitizeUserId } from "../../roms/localRomStore";
+import { getRuntimeDefinition } from "../../runtime/runtimeRegistry";
 
 export type IceServer = {
   credential?: string;

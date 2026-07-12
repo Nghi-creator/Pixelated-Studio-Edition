@@ -1,6 +1,6 @@
 import type { spawn } from "child_process";
-import type { RuntimeDefinition } from "./runtimeRegistry";
-import { validateGameArtifact } from "../roms/artifactValidation";
+import type { RuntimeDefinition } from "../runtimeRegistry";
+import { validateGameArtifact } from "../../roms/artifactValidation";
 
 type LaunchLibretroOptions = {
   absoluteRomPath: string;

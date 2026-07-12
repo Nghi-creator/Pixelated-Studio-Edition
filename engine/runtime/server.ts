@@ -34,17 +34,17 @@ import { registerLocalVaultRoutes } from "./src/http/localVaultRoutes";
 import { registerSessionControlRoutes } from "./src/http/sessionControlRoutes";
 import { registerSmokeTelemetryRoutes } from "./src/http/smokeTelemetryRoutes";
 import { createCloudRomDownloader } from "./src/roms/cloudRomDownloader";
-import { createProcessManager } from "./src/runtime/processManager";
+import { createProcessManager } from "./src/runtime/processes/processManager";
 import { registerEngineErrorHandlers } from "./src/signaling/engineErrorHandlers";
 import { registerInputHandlers } from "./src/signaling/inputHandlers";
-import { createLobbyManager } from "./src/signaling/lobby";
+import { createLobbyManager } from "./src/signaling/lobby/lobby";
 import {
   joinSession,
   normalizeSessionId,
 } from "./src/signaling/sessionRooms";
 import { registerSignalingRelayHandlers } from "./src/signaling/signalingRelay";
 import { createEngineTokenAuth } from "./src/signaling/socketAuth";
-import { registerStartGameHandler } from "./src/signaling/startGameHandlers";
+import { registerStartGameHandler } from "./src/signaling/start-game/startGameHandlers";
 import { verifyBackendSession } from "./src/sessions/verifyBackendSession";
 import { createHealthSnapshot } from "./src/telemetry/healthSnapshot";
 
