@@ -1,4 +1,8 @@
 import { isLikelyCompanionUrl } from "./inviteUtils.ts";
+import {
+  engineFetch,
+  EngineRequestTimeoutError,
+} from "../../lib/engine/engineRequest.ts";
 import type {
   EngineUrlScope,
   LanPreflightPayload,
@@ -120,6 +124,10 @@ export const getPairingFailureMessage = ({
     return "The engine responded with an internal error. Restart the desktop engine and try pairing again.";
   }
 
+  if (error instanceof EngineRequestTimeoutError) {
+    return "The engine did not respond in time. Keep the desktop app open, then try pairing again.";
+  }
+
   if (
     scope === "lan" &&
     window.location.protocol === "https:" &&
@@ -144,19 +152,13 @@ export const getPairingFailureMessage = ({
 };
 
 export const fetchLanPreflight = async (engineUrl: string) => {
-  const controller = new AbortController();
-  const timeout = window.setTimeout(() => controller.abort(), 4_000);
-
-  try {
-    const response = await fetch(
-      engineUrlEndpoint(engineUrl, "/invite/preflight"),
-      { cache: "no-store", signal: controller.signal },
-    );
-    if (!response.ok) {
-      throw new Error("LAN join preflight failed.");
-    }
-    return (await response.json()) as LanPreflightPayload;
-  } finally {
-    window.clearTimeout(timeout);
+  const response = await engineFetch(
+    engineUrlEndpoint(engineUrl, "/invite/preflight"),
+    { cache: "no-store" },
+    4_000,
+  );
+  if (!response.ok) {
+    throw new Error("LAN join preflight failed.");
   }
+  return (await response.json()) as LanPreflightPayload;
 };

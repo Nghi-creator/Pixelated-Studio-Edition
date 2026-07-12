@@ -15,7 +15,6 @@ supabase/.temp/
 .artifacts/
 .context/hosted-pairing-smoke/
 .context/hosted-auth-smoke/
-RESEARCH_PROPOSAL_EDGE_CLOUD_GAMING.md
-RESEARCH_PROPOSAL_ADAPTIVE_EDGE_NODE.md
-ADAPTIVE_EDGE_NODE_ROADMAP.md
+docs_research/
 user-edition/
+research-papers-latency-fingerprinting/

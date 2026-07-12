@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { Download, X } from "lucide-react";
 import type { StreamProfile } from "../../../lib/engine/streamProfiles";
 import { useResearchRunExports } from "../hooks/useResearchRunExports";
@@ -51,6 +51,7 @@ export function ResearchRunModal({
   status: string;
   streamProfile: StreamProfile;
 }) {
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
   const {
     canExportBundle,
     canExportEvents,
@@ -84,6 +85,8 @@ export function ResearchRunModal({
   });
 
   useEffect(() => {
+    const previouslyFocused = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.stopPropagation();
@@ -91,9 +94,14 @@ export function ResearchRunModal({
       }
     };
 
+    document.body.style.overflow = "hidden";
+    closeButtonRef.current?.focus();
     window.addEventListener("keydown", handleKeyDown, { capture: true });
-    return () =>
+    return () => {
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
+      document.body.style.overflow = previousOverflow;
+      if (previouslyFocused instanceof HTMLElement) previouslyFocused.focus();
+    };
   }, [onClose]);
 
   return (
@@ -108,6 +116,7 @@ export function ResearchRunModal({
       role="presentation"
     >
       <section
+        aria-describedby="research-run-description"
         aria-labelledby="research-run-title"
         aria-modal="true"
         className="max-h-full w-full max-w-[37rem] overflow-y-auto rounded-lg border border-synth-border bg-synth-surface p-5 shadow-card"
@@ -121,11 +130,15 @@ export function ResearchRunModal({
             >
               Research Run
             </h2>
-            <p className="mt-1 max-w-full truncate text-xs font-medium text-white">
+            <p
+              className="mt-1 max-w-full truncate text-xs font-medium text-white"
+              id="research-run-description"
+            >
               {runId}
             </p>
           </div>
           <button
+            ref={closeButtonRef}
             aria-label="Close research run"
             className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-synth-border bg-synth-bg text-white transition hover:bg-synth-elevated"
             onClick={onClose}
