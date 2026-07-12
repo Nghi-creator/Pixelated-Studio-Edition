@@ -29,7 +29,7 @@
     "test:engine": "npm test -w @pixelated/engine-runtime",
     "test:web-interactions": "node scripts/web/interactionHarnessSmoke.mjs",
     "test:web": "npm test -w @pixelated/web",
-    "test:smoke": "node --test scripts/lan/*.test.mjs",
+    "test:smoke": "node --test scripts/hosted/*.test.mjs scripts/lan/*.test.mjs",
     "typecheck:api": "npm run typecheck -w @pixelated/api",
     "verify:hosted-contract": "node --check scripts/hosted/hostedAuthSmoke.mjs && node --check scripts/hosted/hostedPairingSmoke.mjs && node --check scripts/web/interactionHarnessSmoke.mjs && node scripts/hosted/hostedAuthSmoke.mjs --contract-only && node scripts/hosted/hostedPairingSmoke.mjs --contract-only && npm run test:smoke && npm run lint:web && npm run test:web && npm run build:web && npm run test:web-interactions && npm run test:desktop",
     "verify:api": "npm run typecheck:api && npm run lint:api && npm run test:api && npm run build:api"

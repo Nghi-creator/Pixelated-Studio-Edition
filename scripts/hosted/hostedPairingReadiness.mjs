@@ -4,7 +4,25 @@ export async function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function getHostedWebBuild({
+const MAX_HOSTED_WEB_ASSETS = 256;
+
+function getJavaScriptAssetUrls(source, baseUrl, webOrigin) {
+  const urls = new Set();
+  const references = source.matchAll(/["'`]([^"'`]+\.js(?:\?[^"'`]*)?)["'`]/g);
+  for (const [, reference] of references) {
+    try {
+      const url = new URL(reference, baseUrl);
+      if (url.origin === webOrigin && url.pathname.endsWith(".js")) {
+        urls.add(url.toString());
+      }
+    } catch {
+      // Ignore malformed strings that merely resemble asset paths.
+    }
+  }
+  return urls;
+}
+
+export async function getHostedWebBuild({
   hostedPairingBuildMarker,
   hostedRuntimeSwitchBuildMarker,
   webUrl,
@@ -21,7 +39,17 @@ async function getHostedWebBuild({
 
   let hasLaunchPairing = html.includes(hostedPairingBuildMarker);
   let hasRuntimeSwitch = html.includes(hostedRuntimeSwitchBuildMarker);
-  for (const script of scripts) {
+  const webOrigin = new URL(webUrl).origin;
+  const pendingScripts = [...scripts];
+  const visitedScripts = new Set();
+  while (
+    pendingScripts.length > 0 &&
+    visitedScripts.size < MAX_HOSTED_WEB_ASSETS &&
+    !(hasLaunchPairing && hasRuntimeSwitch)
+  ) {
+    const script = pendingScripts.shift();
+    if (!script || visitedScripts.has(script)) continue;
+    visitedScripts.add(script);
     const asset = await fetch(script, { cache: "no-store" });
     if (!asset.ok) continue;
     const source = await asset.text();
@@ -31,8 +59,22 @@ async function getHostedWebBuild({
     if (source.includes(hostedRuntimeSwitchBuildMarker)) {
       hasRuntimeSwitch = true;
     }
+    for (const referencedAsset of getJavaScriptAssetUrls(
+      source,
+      script,
+      webOrigin,
+    )) {
+      if (!visitedScripts.has(referencedAsset)) {
+        pendingScripts.push(referencedAsset);
+      }
+    }
   }
-  return { hasLaunchPairing, hasRuntimeSwitch, htmlSha256 };
+  return {
+    assetCount: visitedScripts.size,
+    hasLaunchPairing,
+    hasRuntimeSwitch,
+    htmlSha256,
+  };
 }
 
 export async function waitForRenderApiDeploy({
@@ -99,7 +141,7 @@ export async function waitForHostedWebPairingBundle({
         !vercelBaselineHtmlSha256 ||
         build.htmlSha256 !== vercelBaselineHtmlSha256;
       if (build.hasLaunchPairing && build.hasRuntimeSwitch && isNewBuild) return;
-      lastError = `htmlSha256=${build.htmlSha256} baseline=${vercelBaselineHtmlSha256 || "none"} pairingMarker=${build.hasLaunchPairing} runtimeSwitchMarker=${build.hasRuntimeSwitch}`;
+      lastError = `htmlSha256=${build.htmlSha256} baseline=${vercelBaselineHtmlSha256 || "none"} pairingMarker=${build.hasLaunchPairing} runtimeSwitchMarker=${build.hasRuntimeSwitch} assets=${build.assetCount}`;
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
     }
