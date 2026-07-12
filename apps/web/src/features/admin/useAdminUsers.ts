@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useUpdateAdminUserMutation } from "../../lib/api/apiMutations";
+import { useUpdateAdminUserMutation } from "./adminMutations";
 import {
   useAdminUsersQuery,
   useAuthSessionQuery,

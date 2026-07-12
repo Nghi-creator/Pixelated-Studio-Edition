@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { ApiError } from "../../../../lib/api/apiClient";
-import { useReportCommentMutation } from "../../../../lib/api/apiMutations";
+import { useReportCommentMutation } from "./commentMutations";
 import { getSocialErrorMessage } from "../../socialFeedback";
 
 export function useCommentReporting(currentUser: User | null) {

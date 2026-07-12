@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
-import { useSetGameReactionMutation } from "../../../lib/api/apiMutations";
+import { useSetGameReactionMutation } from "./playerMutations";
 import { useGameReactionsQuery } from "../../../lib/api/apiQueries";
 import { getSocialErrorMessage } from "../socialFeedback";
 

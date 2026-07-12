@@ -16,7 +16,7 @@ import {
   parseRightsWarnings,
   type SubmissionFormState,
 } from "../../features/admin/submissionReviewState";
-import { useReviewGameSubmissionMutation } from "../../lib/api/apiMutations";
+import { useReviewGameSubmissionMutation } from "../../features/admin/adminMutations";
 import { useGameSubmissionsQuery } from "../../lib/api/apiQueries";
 import type {
   ApiGameSubmission,

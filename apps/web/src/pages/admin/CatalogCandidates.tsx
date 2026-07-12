@@ -10,7 +10,7 @@ import {
   getPageAfterRemoval,
   getPageRangeLabel,
 } from "../../features/admin/adminState";
-import { useReviewCatalogCandidateMutation } from "../../lib/api/apiMutations";
+import { useReviewCatalogCandidateMutation } from "../../features/admin/adminMutations";
 import { useCatalogCandidatesQuery } from "../../lib/api/apiQueries";
 import type {
   ApiCatalogCandidate,
