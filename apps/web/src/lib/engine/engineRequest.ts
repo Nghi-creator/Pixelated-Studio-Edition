@@ -1,4 +1,5 @@
 import { createRequestAbortController } from "../api/requestLifecycle.ts";
+import { isAllowedEngineUrl } from "./engineConfig.ts";
 
 const DEFAULT_ENGINE_REQUEST_TIMEOUT_MS = 8_000;
 
@@ -9,18 +10,39 @@ export class EngineRequestTimeoutError extends Error {
   }
 }
 
+export class InvalidEngineRequestUrlError extends Error {
+  constructor() {
+    super("Engine requests must target an approved local or LAN engine URL.");
+    this.name = "InvalidEngineRequestUrlError";
+  }
+}
+
+function getAllowedEngineRequestUrl(input: string | URL) {
+  const requestUrl = input.toString();
+  if (!isAllowedEngineUrl(requestUrl)) {
+    throw new InvalidEngineRequestUrlError();
+  }
+  return requestUrl;
+}
+
 export async function engineFetch(
-  input: RequestInfo | URL,
+  input: string | URL,
   init: RequestInit = {},
   timeoutMs = DEFAULT_ENGINE_REQUEST_TIMEOUT_MS,
 ) {
+  const requestUrl = getAllowedEngineRequestUrl(input);
   const { controller, cleanup } = createRequestAbortController(
     timeoutMs,
     init.signal,
   );
 
   try {
-    return await fetch(input, { ...init, signal: controller.signal });
+    // The URL is constrained above to HTTP(S), approved engine ports, and
+    // localhost/private-network hosts without embedded credentials.
+    return await fetch(requestUrl, { // lgtm[js/client-side-request-forgery]
+      ...init,
+      signal: controller.signal,
+    });
   } catch (error) {
     if (
       error instanceof Error &&

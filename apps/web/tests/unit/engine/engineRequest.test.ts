@@ -3,7 +3,35 @@ import test from "node:test";
 import {
   engineFetch,
   EngineRequestTimeoutError,
+  InvalidEngineRequestUrlError,
 } from "../../../src/lib/engine/engineRequest.ts";
+
+test("engine requests reject unapproved destinations before fetch", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalled = false;
+  globalThis.fetch = () => {
+    fetchCalled = true;
+    throw new Error("fetch must not run");
+  };
+
+  try {
+    await assert.rejects(
+      engineFetch("https://attacker.example.test:8090/health"),
+      InvalidEngineRequestUrlError,
+    );
+    await assert.rejects(
+      engineFetch("file:///tmp/pixelated.sock"),
+      InvalidEngineRequestUrlError,
+    );
+    await assert.rejects(
+      engineFetch("https://user:pass@192.168.1.20:8090/health"),
+      InvalidEngineRequestUrlError,
+    );
+    assert.equal(fetchCalled, false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
 
 test("engine requests turn stalled fetches into an actionable timeout", async () => {
   const originalFetch = globalThis.fetch;
