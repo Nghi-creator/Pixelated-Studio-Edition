@@ -160,10 +160,10 @@ describe("desktop package config", () => {
 
     assert.ok(packageJson.build.files?.includes("styles.css"));
     assert.match(packageJson.scripts?.build || "", /build:styles/);
-    assert.match(index, /Content-Security-Policy/);
-    assert.match(index, /script-src 'self'/);
-    assert.match(index, /href="\.\/styles\.css"/);
-    assert.doesNotMatch(index, /cdn\.tailwindcss\.com/);
+    assert.ok(index.includes("Content-Security-Policy"));
+    assert.ok(index.includes("script-src 'self'"));
+    assert.ok(index.includes('href="./styles.css"'));
+    assert.equal(index.includes("cdn.tailwindcss.com"), false);
   });
 
   it("ships the image build recovery bridge and renderer action states", () => {

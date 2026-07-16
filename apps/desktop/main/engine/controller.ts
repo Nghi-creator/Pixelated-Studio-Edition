@@ -36,7 +36,6 @@ import {
   createEngineControllerState,
   resetEngineControllerState,
 } from "./controllerState";
-import { createImageRecoveryPayload } from "./imageRecovery";
 import {
   createEngineLaunchContext,
   createLanInvite,
