@@ -7,8 +7,8 @@ import {
 } from "../../docker/recovery";
 import { emitEngineState } from "../../runtime/state";
 import type { EngineControllerState } from "../controllerState";
+import { emitDockerDiagnostic } from "../diagnosticEvents";
 import type { StartEngineOptions } from "../launch";
-import { emitDockerDiagnostic } from "./startupWorkflow";
 
 const getErrorMessage = (err: unknown) =>
   err instanceof Error ? err.message : String(err);

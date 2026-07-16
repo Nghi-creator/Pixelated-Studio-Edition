@@ -1,13 +1,13 @@
 import crypto from "crypto";
 import type { IpcMainEvent } from "electron";
 import { removeEngineContainerArgs } from "../../docker/commands";
-import type { DockerDiagnostic } from "../../docker/diagnostics";
 import { withDockerStartCapability } from "../../docker/recovery";
 import { emitEngineState, setCurrentEnginePhase } from "../../runtime/state";
 import { startCompanionForEngine } from "../companionLifecycle";
 import type { RuntimeSwitchHandler } from "../controllerTypes";
 import type { EngineControllerState } from "../controllerState";
 import { finishStartupAttempt } from "../controllerState";
+import { emitDockerDiagnostic } from "../diagnosticEvents";
 import { createImageRecoveryPayload } from "../imageRecovery";
 import {
   getDockerRunArgs,
@@ -28,22 +28,6 @@ export function rejectInvalidImage(event: IpcMainEvent) {
     "server-log",
     '<span class="text-red-500">ERROR: Invalid PIXELATED_ENGINE_IMAGE value.</span>',
   );
-  event.reply("engine-stopped");
-}
-
-export function emitDockerDiagnostic(
-  event: IpcMainEvent,
-  diagnostic: DockerDiagnostic,
-) {
-  emitEngineState(event, "FAILED", diagnostic.title);
-  event.reply("docker-diagnostic", diagnostic);
-  event.reply(
-    "server-log",
-    `<span class="text-red-500">ERROR: ${diagnostic.title}.</span>`,
-  );
-  if (diagnostic.detail) {
-    event.reply("server-log", `Docker diagnostic: ${diagnostic.detail}`);
-  }
   event.reply("engine-stopped");
 }
 
