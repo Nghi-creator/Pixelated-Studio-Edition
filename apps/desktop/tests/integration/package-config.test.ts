@@ -201,11 +201,14 @@ describe("desktop package config", () => {
 
   it("allows hosted, local development, and companion web origins for the engine", () => {
     const configPath = path.resolve(__dirname, "../../main/runtime/config.js");
-    const controllerPath = path.resolve(__dirname, "../../main/engine/controller.js");
+    const startupWorkflowPath = path.resolve(
+      __dirname,
+      "../../main/engine/startupWorkflow.js",
+    );
     const dockerCommandsPath = path.resolve(__dirname, "../../main/docker/commands.js");
     const engineLaunchPath = path.resolve(__dirname, "../../main/engine/launch.js");
     const config = fs.readFileSync(configPath, "utf8");
-    const controller = fs.readFileSync(controllerPath, "utf8");
+    const startupWorkflow = fs.readFileSync(startupWorkflowPath, "utf8");
     const dockerCommands = fs.readFileSync(dockerCommandsPath, "utf8");
     const engineLaunch = fs.readFileSync(engineLaunchPath, "utf8");
 
@@ -214,7 +217,7 @@ describe("desktop package config", () => {
     assert.match(config, /http:\/\/localhost:5173/);
     assert.match(config, /http:\/\/127\.0\.0\.1:5173/);
     assert.match(engineLaunch, /engineAllowedOrigins|engine_allowed_origins/);
-    assert.match(controller, /companionUrls|companion_urls/);
+    assert.match(startupWorkflow, /companionUrls|companion_urls/);
     assert.match(dockerCommands, /PIXELATED_COMPANION_URLS/);
     assert.match(dockerCommands, /PIXELATED_ALLOWED_ORIGINS/);
   });
