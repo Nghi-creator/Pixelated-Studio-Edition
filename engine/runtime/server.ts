@@ -120,6 +120,7 @@ const server = http.createServer(app);
 hardenEngineHttpServer(server);
 const io = new Server(server, {
   cors: corsOptions,
+  maxHttpBufferSize: 128 * 1024,
 });
 
 io.use(auth.useSocketEngineToken);

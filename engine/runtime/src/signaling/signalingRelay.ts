@@ -17,6 +17,9 @@ type CandidateEnvelope = {
   sessionId?: unknown;
 };
 
+const MAX_PEER_ID_LENGTH = 128;
+const MAX_PEERS_PER_SOCKET = 32;
+
 function stripSessionId(payload: unknown) {
   if (!payload || typeof payload !== "object") return {};
   const { sessionId: _sessionId, ...rest } = payload as Record<string, unknown>;
@@ -36,7 +39,10 @@ function unwrapCandidate(payload: CandidateEnvelope | SessionPayload) {
 function getPeerId(payload: unknown) {
   if (!payload || typeof payload !== "object") return null;
   const peerId = (payload as { peerId?: unknown }).peerId;
-  return typeof peerId === "string" && /^[a-zA-Z0-9_-]+$/.test(peerId)
+  return typeof peerId === "string" &&
+    peerId.length > 0 &&
+    peerId.length <= MAX_PEER_ID_LENGTH &&
+    /^[a-zA-Z0-9_-]+$/.test(peerId)
     ? peerId
     : null;
 }
@@ -46,13 +52,28 @@ function getPeerRoom(peerId: string) {
 }
 
 function rememberPeer(socket: Socket, peerId: string) {
-  const peerIds = Array.isArray(socket.data.webrtcPeerIds)
-    ? socket.data.webrtcPeerIds
+  const peerIds: string[] = Array.isArray(socket.data.webrtcPeerIds)
+    ? socket.data.webrtcPeerIds.filter(
+        (value: unknown): value is string => typeof value === "string",
+      )
     : [];
 
-  if (!peerIds.includes(peerId)) {
-    socket.data.webrtcPeerIds = [...peerIds, peerId];
-  }
+  if (peerIds.includes(peerId)) return true;
+  if (peerIds.length >= MAX_PEERS_PER_SOCKET) return false;
+  socket.data.webrtcPeerIds = [...peerIds, peerId];
+  return true;
+}
+
+function forgetPeer(socket: Socket, peerId: string) {
+  const peerIds: string[] = Array.isArray(socket.data.webrtcPeerIds)
+    ? socket.data.webrtcPeerIds.filter(
+        (value: unknown): value is string => typeof value === "string",
+      )
+    : [];
+  if (!peerIds.includes(peerId)) return;
+
+  socket.data.webrtcPeerIds = peerIds.filter((value) => value !== peerId);
+  void socket.leave(getPeerRoom(peerId));
 }
 
 function emitPeerDisconnect(socket: Socket, peerId: string) {
@@ -71,10 +92,13 @@ function relayToPeerOrSession(
   payload?: unknown,
 ) {
   const peerId = getPeerId(payload);
+  const hasPeerId =
+    payload !== null && typeof payload === "object" && "peerId" in payload;
   if (peerId) {
     socket.to(getPeerRoom(peerId)).emit(eventName, stripSessionId(payload));
     return;
   }
+  if (hasPeerId) return;
 
   relayToSession(socket, eventName, stripSessionId(payload));
 }
@@ -98,16 +122,17 @@ export function registerSignalingRelayHandlers(socket: Socket) {
 
   socket.on("webrtc-offer", (offer: SessionPayload = {}) => {
     const peerId = getPeerId(offer);
-    if (peerId) {
-      socket.join(getPeerRoom(peerId));
-      rememberPeer(socket, peerId);
-    }
+    if (!peerId || !rememberPeer(socket, peerId)) return;
+    socket.join(getPeerRoom(peerId));
     relayToSession(socket, "webrtc-offer", stripSessionId(offer));
   });
 
   socket.on("webrtc-peer-disconnect", (payload: SessionPayload = {}) => {
     const peerId = getPeerId(payload);
-    if (peerId) emitPeerDisconnect(socket, peerId);
+    if (peerId) {
+      emitPeerDisconnect(socket, peerId);
+      forgetPeer(socket, peerId);
+    }
   });
 
   socket.on("webrtc-answer", (answer: SessionPayload = {}) => {

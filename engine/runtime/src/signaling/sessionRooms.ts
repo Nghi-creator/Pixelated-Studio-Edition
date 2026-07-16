@@ -1,7 +1,10 @@
 import type { Socket } from "socket.io";
 
 export function normalizeSessionId(sessionId: unknown) {
-  return typeof sessionId === "string" && /^[a-zA-Z0-9_-]+$/.test(sessionId)
+  return typeof sessionId === "string" &&
+    sessionId.length > 0 &&
+    sessionId.length <= 128 &&
+    /^[a-zA-Z0-9_-]+$/.test(sessionId)
     ? sessionId
     : null;
 }
