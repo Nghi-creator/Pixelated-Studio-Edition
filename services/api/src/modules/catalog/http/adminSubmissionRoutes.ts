@@ -9,8 +9,9 @@ import {
 } from "../../auth/supabaseAuth.js";
 import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
+import { requireAuthenticatedService } from "../../security/authenticatedService.js";
+import { getSubmissionRomPlatform } from "../domain/submissionRom.js";
 import {
-  CANDIDATE_COLUMNS,
   type CandidateRow,
   type SupabaseServiceLike,
 } from "../ingestion/catalogCandidatePromotion.js";
@@ -78,35 +79,6 @@ function candidateSourceRevisionFor(submission: SubmissionRow) {
 
 function sha256(bytes: Buffer) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
-}
-
-function getSubmissionPlatform(filenameOrUrl: string) {
-  const extension = path.extname(new URL(filenameOrUrl).pathname).toLowerCase();
-  if (extension === ".nes") {
-    return { platformId: "nes", runtimeId: "mesen" };
-  }
-  if (extension === ".gb") {
-    return { platformId: "gb", runtimeId: "mgba" };
-  }
-  if (extension === ".gbc") {
-    return { platformId: "gbc", runtimeId: "mgba" };
-  }
-  if (extension === ".gba") {
-    return { platformId: "gba", runtimeId: "mgba" };
-  }
-  if (extension === ".sfc" || extension === ".smc") {
-    return { platformId: "snes", runtimeId: "bsnes" };
-  }
-  if (extension === ".md" || extension === ".gen") {
-    return { platformId: "genesis", runtimeId: "picodrive" };
-  }
-  if (extension === ".sms") {
-    return { platformId: "sms", runtimeId: "picodrive" };
-  }
-  if (extension === ".gg") {
-    return { platformId: "game_gear", runtimeId: "picodrive" };
-  }
-  return null;
 }
 
 function artifactFilenameFor(url: string) {
@@ -196,10 +168,9 @@ export async function registerAdminSubmissionRoutes(
     "/admin/submissions",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
+      const context = requireAuthenticatedService(request, reply, service);
+      if (!context) return;
+      const { service: authenticatedService, user } = context;
       if (
         rejectRateLimitedRequest(
           reply,
@@ -209,14 +180,9 @@ export async function registerAdminSubmissionRoutes(
       ) {
         return;
       }
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
 
       try {
-        const isAdmin = await requireAdminRole(service, user.id);
+        const isAdmin = await requireAdminRole(authenticatedService, user.id);
         if (!isAdmin) {
           return reply.status(403).send({ error: "Admin access required" });
         }
@@ -233,7 +199,7 @@ export async function registerAdminSubmissionRoutes(
       const { page, pageSize, search, status } = parsedQuery.data;
       const start = (page - 1) * pageSize;
       const end = start + pageSize - 1;
-      let query = service
+        let query = authenticatedService
         .from("game_submissions")
         .select("*", { count: "exact" })
         .eq("status", status)
@@ -262,10 +228,9 @@ export async function registerAdminSubmissionRoutes(
     "/admin/submissions/:submissionId",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
+      const context = requireAuthenticatedService(request, reply, service);
+      if (!context) return;
+      const { service: authenticatedService, user } = context;
       if (
         rejectRateLimitedRequest(
           reply,
@@ -275,12 +240,6 @@ export async function registerAdminSubmissionRoutes(
       ) {
         return;
       }
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
-
       const params = submissionParamsSchema.safeParse(request.params);
       const body = submissionReviewBodySchema.safeParse(request.body);
       if (!params.success || !body.success) {
@@ -288,12 +247,12 @@ export async function registerAdminSubmissionRoutes(
       }
 
       try {
-        const isAdmin = await requireAdminRole(service, user.id);
+        const isAdmin = await requireAdminRole(authenticatedService, user.id);
         if (!isAdmin) {
           return reply.status(403).send({ error: "Admin access required" });
         }
 
-        const { data: submission, error: submissionError } = await service
+        const { data: submission, error: submissionError } = await authenticatedService
           .from("game_submissions")
           .select("*")
           .eq("id", params.data.submissionId)
@@ -308,7 +267,7 @@ export async function registerAdminSubmissionRoutes(
 
         const now = new Date().toISOString();
         if (body.data.action === "reject") {
-          const { data, error } = await service
+          const { data, error } = await authenticatedService
             .from("game_submissions")
             .update({
               review_notes: body.data.notes,
@@ -324,7 +283,9 @@ export async function registerAdminSubmissionRoutes(
           return { submission: data };
         }
 
-        const platform = getSubmissionPlatform(submission.rom_url);
+        const platform = getSubmissionRomPlatform(
+          new URL(submission.rom_url).pathname,
+        );
         if (!platform) {
           return reply.status(422).send({ error: "Unsupported submitted ROM type" });
         }
@@ -372,29 +333,28 @@ export async function registerAdminSubmissionRoutes(
           title: submission.game_title,
         };
 
-        const { data: candidate, error: candidateError } = await service
-          .from("catalog_ingestion_candidates")
-          .insert(candidatePayload)
-          .select(CANDIDATE_COLUMNS)
-          .single<CandidateRow>();
-        if (candidateError) throw candidateError;
+        const { data: transaction, error: transactionError } = await authenticatedService.rpc(
+          "create_submission_candidate",
+          {
+            p_candidate: candidatePayload,
+            p_review_notes: body.data.notes || null,
+            p_reviewer_id: user.id,
+            p_submission_id: submission.id,
+          },
+        );
+        if (transactionError?.message === "submission_not_found") {
+          return reply.status(404).send({ error: "Submission not found" });
+        }
+        if (transactionError?.message === "submission_already_reviewed") {
+          return reply.status(409).send({ error: "Submission already reviewed" });
+        }
+        if (transactionError) throw transactionError;
 
-        const { data: updatedSubmission, error: updateError } = await service
-          .from("game_submissions")
-          .update({
-            catalog_candidate_id: candidate.id,
-            review_notes: body.data.notes || null,
-            reviewed_at: now,
-            reviewed_by: user.id,
-            status: "candidate_created",
-            updated_at: now,
-          })
-          .eq("id", submission.id)
-          .select("*")
-          .single<SubmissionRow>();
-        if (updateError) throw updateError;
-
-        return { candidate, submission: updatedSubmission };
+        const result = transaction as unknown as {
+          candidate: CandidateRow;
+          submission: SubmissionRow;
+        };
+        return { candidate: result.candidate, submission: result.submission };
       } catch (err) {
         request.log.error({ err }, "Failed to review submission");
         if (err instanceof Error && err.message.includes("too large")) {

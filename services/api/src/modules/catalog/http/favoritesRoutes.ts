@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import type { CatalogRouteContext } from "./catalogRouteContext.js";
 import { gameParamsSchema } from "./contracts.js";
+import { requireAuthenticatedService } from "../../security/authenticatedService.js";
 
 export function registerFavoriteRoutes(
   app: FastifyInstance,
@@ -9,15 +10,11 @@ export function registerFavoriteRoutes(
   const { requireUser, service } = context;
 
   app.get("/favorites", { preHandler: requireUser }, async (request, reply) => {
-    const user = request.user;
-    if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
-    if (!service) {
-      return reply.status(503).send({
-        error: "Supabase service client is not configured for the API.",
-      });
-    }
+    const authenticated = requireAuthenticatedService(request, reply, service);
+    if (!authenticated) return;
+    const { service: authenticatedService, user } = authenticated;
 
-    const { data, error } = await service
+    const { data, error } = await authenticatedService
       .from("favorites")
       .select("game_id,games(id,title,cover_url)")
       .eq("user_id", user.id)
@@ -33,17 +30,13 @@ export function registerFavoriteRoutes(
     "/favorites/:gameId",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+      const authenticated = requireAuthenticatedService(request, reply, service);
+      if (!authenticated) return;
+      const { service: authenticatedService, user } = authenticated;
       const params = gameParamsSchema.safeParse(request.params);
       if (!params.success) return reply.status(400).send({ error: "Invalid game id" });
 
-      const { data, error } = await service
+      const { data, error } = await authenticatedService
         .from("favorites")
         .select("game_id")
         .eq("user_id", user.id)
@@ -61,17 +54,13 @@ export function registerFavoriteRoutes(
     "/favorites/:gameId",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+      const authenticated = requireAuthenticatedService(request, reply, service);
+      if (!authenticated) return;
+      const { service: authenticatedService, user } = authenticated;
       const params = gameParamsSchema.safeParse(request.params);
       if (!params.success) return reply.status(400).send({ error: "Invalid game id" });
 
-      const { error } = await service
+      const { error } = await authenticatedService
         .from("favorites")
         .upsert({ game_id: params.data.gameId, user_id: user.id });
       if (error) {
@@ -86,17 +75,13 @@ export function registerFavoriteRoutes(
     "/favorites/:gameId",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+      const authenticated = requireAuthenticatedService(request, reply, service);
+      if (!authenticated) return;
+      const { service: authenticatedService, user } = authenticated;
       const params = gameParamsSchema.safeParse(request.params);
       if (!params.success) return reply.status(400).send({ error: "Invalid game id" });
 
-      const { error } = await service
+      const { error } = await authenticatedService
         .from("favorites")
         .delete()
         .eq("user_id", user.id)

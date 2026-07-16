@@ -1,20 +1,28 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createCompanionAccessToken } from "../../../main/companion/invite/inviteState";
+import { normalizeInviteCode } from "../../../main/companion/invite/inviteCode";
 import {
   canUseRuntimeSwitchToken,
   canProxyCompanionRequest,
+  companionSecretsEqual,
   consumeCompanionRequestLimit,
   consumeCompanionLaunchTicket,
   createCompanionLaunchTicket,
   getCompanionStatusPage,
   getCompanionInviteStatus,
+  matchesCompanionRequestPath,
   recordCompanionInviteFailure,
   revokeCompanionInvite,
   shouldProxy,
 } from "../../../main/companion/server";
 
 describe("desktop companion preflight", () => {
+  it("normalizes invite codes through one shared boundary", () => {
+    assert.equal(normalizeInviteCode(" ab-12 cd "), "AB12CD");
+    assert.equal(normalizeInviteCode(null), "");
+  });
+
   it("distinguishes active, expired, and revoked invite states", () => {
     const now = 1_000;
 
@@ -89,7 +97,19 @@ describe("desktop companion engine proxy", () => {
   it("keeps LAN guest tokens away from host management routes", () => {
     assert.equal(canProxyCompanionRequest("/health", "guest"), true);
     assert.equal(canProxyCompanionRequest("/socket.io/?EIO=4", "guest"), true);
-    assert.equal(canProxyCompanionRequest("/smoke/telemetry", "guest"), true);
+    assert.equal(
+      canProxyCompanionRequest("/smoke/telemetry", "guest", "POST"),
+      true,
+    );
+    assert.equal(canProxyCompanionRequest("/smoke/telemetry", "guest"), false);
+    assert.equal(
+      canProxyCompanionRequest("/smoke/telemetry/active", "guest", "PUT"),
+      false,
+    );
+    assert.equal(
+      canProxyCompanionRequest("/smoke/telemetry/extra", "guest", "POST"),
+      false,
+    );
 
     assert.equal(canProxyCompanionRequest("/clients", "guest"), false);
     assert.equal(canProxyCompanionRequest("/display/frame", "guest"), false);
@@ -103,6 +123,30 @@ describe("desktop companion engine proxy", () => {
     assert.equal(canProxyCompanionRequest("/local-games/game.nes", "host"), true);
     assert.equal(canProxyCompanionRequest("/session/stop-active", null), true);
     assert.equal(canProxyCompanionRequest("/not-an-engine-route", "host"), false);
+  });
+});
+
+describe("desktop companion route boundaries", () => {
+  it("matches exact route paths while allowing query parameters", () => {
+    assert.equal(
+      matchesCompanionRequestPath("/invite?source=qr", "/invite"),
+      true,
+    );
+    assert.equal(
+      matchesCompanionRequestPath("/invite/redeem", "/invite"),
+      false,
+    );
+    assert.equal(
+      matchesCompanionRequestPath("/invite-attacker", "/invite"),
+      false,
+    );
+    assert.equal(matchesCompanionRequestPath("/%", "/invite"), false);
+  });
+
+  it("compares non-empty companion secrets exactly", () => {
+    assert.equal(companionSecretsEqual("secret", "secret"), true);
+    assert.equal(companionSecretsEqual("secret", "different"), false);
+    assert.equal(companionSecretsEqual("", ""), false);
   });
 });
 

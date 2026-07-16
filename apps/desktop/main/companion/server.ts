@@ -25,7 +25,11 @@ export type {
 
 export { getCompanionStatusPage } from "./statusPage";
 export { canProxyCompanionRequest, shouldProxy } from "./engine/proxy";
-export { consumeCompanionRequestLimit } from "./httpUtils";
+export {
+  companionSecretsEqual,
+  consumeCompanionRequestLimit,
+  matchesCompanionRequestPath,
+} from "./httpUtils";
 export { canUseRuntimeSwitchToken } from "./engine/runtimeSwitchRoutes";
 export {
   consumeCompanionLaunchTicket,

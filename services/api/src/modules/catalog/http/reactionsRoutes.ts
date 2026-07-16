@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
+import { requireAuthenticatedService } from "../../security/authenticatedService.js";
 import type { CatalogRouteContext } from "./catalogRouteContext.js";
 import {
   commentParamsSchema,
@@ -37,13 +38,9 @@ export function registerReactionRoutes(
     "/games/:gameId/reaction",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+      const authenticated = requireAuthenticatedService(request, reply, service);
+      if (!authenticated) return;
+      const { service: authenticatedService, user } = authenticated;
       const params = gameParamsSchema.safeParse(request.params);
       const body = reactionBodySchema.safeParse(request.body);
       if (!params.success || !body.success) {
@@ -59,7 +56,7 @@ export function registerReactionRoutes(
         return;
       }
 
-      const { error } = await service.rpc("set_game_reaction", {
+      const { error } = await authenticatedService.rpc("set_game_reaction", {
         p_game_id: params.data.gameId,
         p_is_like: body.data.isLike,
         p_user_id: user.id,
@@ -76,20 +73,16 @@ export function registerReactionRoutes(
     "/comments/:commentId/reaction",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+      const authenticated = requireAuthenticatedService(request, reply, service);
+      if (!authenticated) return;
+      const { service: authenticatedService, user } = authenticated;
       const params = commentParamsSchema.safeParse(request.params);
       const body = reactionBodySchema.safeParse(request.body);
       if (!params.success || !body.success) {
         return reply.status(400).send({ error: "Invalid comment reaction" });
       }
 
-      const { data: comment, error: commentError } = await service
+      const { data: comment, error: commentError } = await authenticatedService
         .from("comments")
         .select("user_id")
         .eq("id", params.data.commentId)
@@ -111,7 +104,7 @@ export function registerReactionRoutes(
         return;
       }
 
-      const { error: reactionError } = await service.rpc("set_comment_reaction", {
+      const { error: reactionError } = await authenticatedService.rpc("set_comment_reaction", {
         p_comment_id: params.data.commentId,
         p_is_like: body.data.isLike,
         p_user_id: user.id,
@@ -121,7 +114,7 @@ export function registerReactionRoutes(
         return reply.status(500).send({ error: "Failed to save comment reaction" });
       }
 
-      const { data, error: loadError } = await service
+      const { data, error: loadError } = await authenticatedService
         .from("comment_likes")
         .select("user_id,is_like")
         .eq("comment_id", params.data.commentId);

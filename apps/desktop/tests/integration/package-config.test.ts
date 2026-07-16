@@ -133,19 +133,37 @@ describe("desktop package config", () => {
   });
 
   it("keeps packaged preload sandbox-safe and renderer scripts browser-safe", () => {
+    const mainPath = path.resolve(__dirname, "../../main.js");
     const preloadPath = path.resolve(__dirname, "../../preload.js");
     const rendererPath = path.resolve(__dirname, "../../renderer.js");
     const rendererHelperPath = path.resolve(__dirname, "../../renderer/logs.js");
+    const main = fs.readFileSync(mainPath, "utf8");
     const preload = fs.readFileSync(preloadPath, "utf8");
     const renderer = fs.readFileSync(rendererPath, "utf8");
     const rendererHelper = fs.readFileSync(rendererHelperPath, "utf8");
 
+    assert.match(main, /sandbox:\s*true/);
+    assert.match(main, /setWindowOpenHandler/);
+    assert.match(main, /will-navigate/);
     assert.doesNotMatch(preload, /require\("\.\/main\/companion\/qr"\)/);
     assert.match(preload, /ipcRenderer\.invoke|electron_1\.ipcRenderer\.invoke/);
     assert.doesNotMatch(renderer, /\bexports\b/);
     assert.doesNotMatch(rendererHelper, /\bexports\b/);
     assert.doesNotMatch(rendererHelper, /\.innerHTML\s*[+]?=/);
     assert.match(rendererHelper, /createTextNode/);
+  });
+
+  it("ships local renderer styles under a restrictive content policy", () => {
+    const packageJson = readPackageJson();
+    const indexPath = path.resolve(__dirname, "../../../index.html");
+    const index = fs.readFileSync(indexPath, "utf8");
+
+    assert.ok(packageJson.build.files?.includes("styles.css"));
+    assert.match(packageJson.scripts?.build || "", /build:styles/);
+    assert.ok(index.includes("Content-Security-Policy"));
+    assert.ok(index.includes("script-src 'self'"));
+    assert.ok(index.includes('href="./styles.css"'));
+    assert.equal(index.includes("cdn.tailwindcss.com"), false);
   });
 
   it("ships the image build recovery bridge and renderer action states", () => {
@@ -183,11 +201,14 @@ describe("desktop package config", () => {
 
   it("allows hosted, local development, and companion web origins for the engine", () => {
     const configPath = path.resolve(__dirname, "../../main/runtime/config.js");
-    const controllerPath = path.resolve(__dirname, "../../main/engine/controller.js");
+    const startupWorkflowPath = path.resolve(
+      __dirname,
+      "../../main/engine/startupWorkflow.js",
+    );
     const dockerCommandsPath = path.resolve(__dirname, "../../main/docker/commands.js");
     const engineLaunchPath = path.resolve(__dirname, "../../main/engine/launch.js");
     const config = fs.readFileSync(configPath, "utf8");
-    const controller = fs.readFileSync(controllerPath, "utf8");
+    const startupWorkflow = fs.readFileSync(startupWorkflowPath, "utf8");
     const dockerCommands = fs.readFileSync(dockerCommandsPath, "utf8");
     const engineLaunch = fs.readFileSync(engineLaunchPath, "utf8");
 
@@ -196,7 +217,7 @@ describe("desktop package config", () => {
     assert.match(config, /http:\/\/localhost:5173/);
     assert.match(config, /http:\/\/127\.0\.0\.1:5173/);
     assert.match(engineLaunch, /engineAllowedOrigins|engine_allowed_origins/);
-    assert.match(controller, /companionUrls|companion_urls/);
+    assert.match(startupWorkflow, /companionUrls|companion_urls/);
     assert.match(dockerCommands, /PIXELATED_COMPANION_URLS/);
     assert.match(dockerCommands, /PIXELATED_ALLOWED_ORIGINS/);
   });

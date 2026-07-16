@@ -7,6 +7,10 @@ import {
 } from "../../auth/supabaseAuth.js";
 import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
+import {
+  getSupportedSubmissionRomExtension,
+  SUPPORTED_SUBMISSION_ROM_LABEL,
+} from "../domain/submissionRom.js";
 
 const submissionBodySchema = z.object({
   assetLicenseSpdx: z.string().trim().max(80).nullable().optional(),
@@ -103,20 +107,6 @@ const submissionBodySchema = z.object({
 
 const SUBMISSION_RATE_LIMIT = 3;
 const SUBMISSION_RATE_WINDOW_MS = 60 * 60 * 1000;
-const SUPPORTED_SUBMISSION_ROM_EXTENSIONS = [
-  ".nes",
-  ".gb",
-  ".gbc",
-  ".gba",
-  ".sfc",
-  ".smc",
-  ".md",
-  ".gen",
-  ".sms",
-  ".gg",
-];
-const SUPPORTED_SUBMISSION_ROM_LABEL =
-  ".nes, .gb, .gbc, .gba, .sfc, .smc, .md, .gen, .sms, or .gg";
 const SUBMISSION_REVIEW_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 type SubmissionPayload = z.infer<typeof submissionBodySchema>;
@@ -154,12 +144,7 @@ function getSubmissionRomExtension(url: string) {
   const objectPath = getSubmissionObjectPath(url);
   if (!objectPath) return null;
 
-  const lowerObjectPath = objectPath.toLowerCase();
-  return (
-    SUPPORTED_SUBMISSION_ROM_EXTENSIONS.find((extension) =>
-      lowerObjectPath.endsWith(extension),
-    ) || null
-  );
+  return getSupportedSubmissionRomExtension(objectPath);
 }
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;

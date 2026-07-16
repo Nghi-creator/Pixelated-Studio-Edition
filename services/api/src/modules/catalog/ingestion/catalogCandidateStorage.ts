@@ -1,18 +1,12 @@
 import crypto from "node:crypto";
 import { assertCandidateArtifactHeader } from "./catalogCandidateValidation.js";
 import type { CandidateRow, SupabaseServiceLike } from "./catalogCandidateTypes.js";
+import { sanitizeCatalogObjectSegment } from "../domain/catalogObjectPath.js";
 
 const ALLOWED_ARTIFACT_HOSTS = new Set(["raw.githubusercontent.com"]);
 
-function sanitizeObjectSegment(value: string) {
-  return (
-    value
-      .trim()
-      .replace(/[^a-zA-Z0-9._-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 120) || "artifact"
-  );
-}
+const sanitizeObjectSegment = (value: string) =>
+  sanitizeCatalogObjectSegment(value, "artifact");
 
 function sha256(bytes: Buffer) {
   return crypto.createHash("sha256").update(bytes).digest("hex");

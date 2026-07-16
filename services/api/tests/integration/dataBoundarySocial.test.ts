@@ -655,7 +655,77 @@ test("moderation reports are created and resolved through admin routes", async (
   });
   assert.equal(actionResponse.statusCode, 200);
   assert.equal(db.rows.comments.length, 0);
+  assert.equal(db.rpcCalls.at(-1)?.fn, "resolve_comment_report");
   await adminApp.close();
+});
+
+test("ban report resolution is atomic when its database operation fails", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.rows.comments.push({
+    content: "needs review",
+    game_id: GAME_ID,
+    id: COMMENT_ID,
+    user_id: OTHER_USER_ID,
+  });
+  db.rows.reported_comments.push({
+    comment_id: COMMENT_ID,
+    id: REPORT_ID,
+    reporter_id: USER_ID,
+  });
+  db.rpcErrors.set(
+    "resolve_comment_report",
+    new Error("atomic report resolution failed"),
+  );
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const response = await app.inject({
+    method: "POST",
+    payload: { action: "ban_user" },
+    url: `/admin/reports/${REPORT_ID}/action`,
+  });
+
+  assert.equal(response.statusCode, 500);
+  assert.equal(db.rows.comments.length, 1);
+  assert.equal(
+    db.rows.profiles.find((profile) => profile.id === OTHER_USER_ID)?.is_banned ??
+      false,
+    false,
+  );
+  await app.close();
+});
+
+test("ban report resolution updates the target and removes its comment together", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.rows.comments.push({
+    content: "needs review",
+    game_id: GAME_ID,
+    id: COMMENT_ID,
+    user_id: OTHER_USER_ID,
+  });
+  db.rows.reported_comments.push({
+    comment_id: COMMENT_ID,
+    id: REPORT_ID,
+    reporter_id: USER_ID,
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const response = await app.inject({
+    method: "POST",
+    payload: { action: "ban_user" },
+    url: `/admin/reports/${REPORT_ID}/action`,
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(db.rows.comments.length, 0);
+  assert.equal(db.rows.reported_comments.length, 0);
+  assert.equal(
+    db.rows.profiles.find((profile) => profile.id === OTHER_USER_ID)?.is_banned,
+    true,
+  );
+  assert.equal(db.rpcCalls.at(-1)?.fn, "resolve_comment_report");
+  await app.close();
 });
 
 test("admin reports are paginated server-side", async () => {
@@ -751,4 +821,3 @@ test("admin reports filter target roles before pagination", async () => {
   assert.equal(userResponse.json<{ totalPages: number }>().totalPages, 2);
   await app.close();
 });
-

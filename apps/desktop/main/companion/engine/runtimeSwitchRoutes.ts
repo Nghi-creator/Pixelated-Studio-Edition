@@ -3,7 +3,9 @@ import type {
   ServerResponse,
 } from "http";
 import {
+  companionSecretsEqual,
   getCompanionTokenFromRequest,
+  matchesCompanionRequestPath,
   readJsonBody,
   sendJson,
   serializeHeaderValue,
@@ -25,7 +27,7 @@ export function canUseRuntimeSwitchToken(
   const tokenScope = getCompanionAccessTokenScope(requestToken);
   if (tokenScope === "host") return true;
   if (tokenScope === "guest") return false;
-  return Boolean(requestToken && requestToken === engineToken);
+  return companionSecretsEqual(requestToken, engineToken);
 }
 
 export async function handleRuntimeSwitchRequest(
@@ -35,7 +37,7 @@ export async function handleRuntimeSwitchRequest(
   allowedOrigins: string[],
   onRuntimeSwitch?: RuntimeSwitchHandler,
 ) {
-  if (!req.url?.startsWith(RUNTIME_SWITCH_PATH)) {
+  if (!matchesCompanionRequestPath(req.url, RUNTIME_SWITCH_PATH)) {
     return false;
   }
 

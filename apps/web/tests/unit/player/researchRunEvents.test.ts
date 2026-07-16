@@ -47,6 +47,18 @@ test("research run events csv quotes details JSON", () => {
   );
 });
 
+test("research run event csv neutralizes spreadsheet formulas", () => {
+  const event = createResearchRunEvent({
+    name: "play_clicked",
+    nowMs: Date.parse("2026-07-04T02:03:05.000Z"),
+    runId: "=unsafe",
+    runStartedAt: Date.parse("2026-07-04T02:03:04.000Z"),
+    sessionId: "@unsafe",
+  });
+
+  assert.match(researchRunEventsToCsv([event]), /,'=unsafe,'@unsafe,/);
+});
+
 test("research run event filenames are filesystem-safe", () => {
   assert.equal(
     createResearchRunEventsFilename({

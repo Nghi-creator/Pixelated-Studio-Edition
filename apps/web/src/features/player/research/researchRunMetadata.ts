@@ -41,13 +41,6 @@ export type ResearchRunMetadata = {
   };
 };
 
-function safeMetadataPart(value: string) {
-  return value
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
-
 function createResearchRunRandomPart(recordedAt: Date) {
   const cryptoApi =
     typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
@@ -147,8 +140,11 @@ export function createResearchRunMetadataFilename({
   recordedAt?: Date;
   runId: string;
 }) {
-  const safeName = safeMetadataPart([gameId || "game", runId].join("-"));
-  const timestamp = recordedAt.toISOString().replace(/[:.]/g, "-");
-
-  return `pixelated-research-run-${safeName}-${timestamp}.json`;
+  return createPlayerArtifactFilename({
+    extension: "json",
+    identity: [gameId || "game", runId],
+    prefix: "pixelated-research-run",
+    recordedAt,
+  });
 }
+import { createPlayerArtifactFilename } from "../artifactFilename.ts";

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { sanitizeCatalogObjectSegment } from "../src/modules/catalog/domain/catalogObjectPath.js";
 import path from "node:path";
 import process from "node:process";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
@@ -75,15 +76,8 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function sanitizeObjectSegment(value: string) {
-  return (
-    value
-      .trim()
-      .replace(/[^a-zA-Z0-9._-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 120) || "artifact"
-  );
-}
+const sanitizeObjectSegment = (value: string) =>
+  sanitizeCatalogObjectSegment(value, "artifact");
 
 function sha256(bytes: Buffer) {
   return crypto.createHash("sha256").update(bytes).digest("hex");

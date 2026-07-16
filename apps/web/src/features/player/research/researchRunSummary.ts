@@ -193,12 +193,11 @@ export function createResearchRunSummaryFilename({
   recordedAt?: Date;
   runId: string;
 }) {
-  const safeName = [gameId || "game", runId]
-    .join("-")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-  const timestamp = recordedAt.toISOString().replace(/[:.]/g, "-");
-
-  return `pixelated-research-summary-${safeName}-${timestamp}.json`;
+  return createPlayerArtifactFilename({
+    extension: "json",
+    identity: [gameId || "game", runId],
+    prefix: "pixelated-research-summary",
+    recordedAt,
+  });
 }
+import { createPlayerArtifactFilename } from "../artifactFilename.ts";

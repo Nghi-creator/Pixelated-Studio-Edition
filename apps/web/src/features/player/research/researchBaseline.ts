@@ -1,4 +1,5 @@
 import type { ResearchRunMetadata } from "./researchRunMetadata";
+import { createPlayerArtifactFilename } from "../artifactFilename.ts";
 
 export type ResearchBaselineForm = {
   browserMemoryMb: string;
@@ -30,13 +31,6 @@ export type ResearchBaseline = {
     emulatorId: string | null;
   };
 };
-
-function safeBaselinePart(value: string) {
-  return value
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
 
 function optionalNumber(value: string) {
   const trimmed = value.trim();
@@ -108,8 +102,10 @@ export function createResearchBaselineFilename({
   recordedAt?: Date;
   runId: string;
 }) {
-  const safeName = safeBaselinePart([gameId || "game", runId].join("-"));
-  const timestamp = recordedAt.toISOString().replace(/[:.]/g, "-");
-
-  return `pixelated-browser-baseline-${safeName}-${timestamp}.json`;
+  return createPlayerArtifactFilename({
+    extension: "json",
+    identity: [gameId || "game", runId],
+    prefix: "pixelated-browser-baseline",
+    recordedAt,
+  });
 }

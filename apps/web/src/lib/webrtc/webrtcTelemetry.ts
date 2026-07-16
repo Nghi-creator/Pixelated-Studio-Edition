@@ -35,8 +35,11 @@ export const startWebRTCTelemetry = (
 ) => {
   let previousBytesReceived: number | null = null;
   let previousTimestamp: number | null = null;
+  let pollInFlight = false;
+  let stopped = false;
 
   const publishConnectionState = () => {
+    if (stopped) return;
     onTelemetry({
       iceConnectionState: peerConnection.iceConnectionState,
       connectionState: peerConnection.connectionState,
@@ -45,7 +48,15 @@ export const startWebRTCTelemetry = (
   };
 
   const pollStats = async () => {
-    const stats = await peerConnection.getStats();
+    if (pollInFlight || stopped) return;
+    pollInFlight = true;
+    let stats: RTCStatsReport;
+    try {
+      stats = await peerConnection.getStats();
+    } finally {
+      pollInFlight = false;
+    }
+    if (stopped) return;
     let inboundBytesReceived = 0;
     let fps: number | null = null;
     let packetsLost = 0;
@@ -58,9 +69,15 @@ export const startWebRTCTelemetry = (
       const inbound = report as InboundRtpStats;
       const kind = inbound.kind || inbound.mediaType;
 
-      inboundBytesReceived += inbound.bytesReceived || 0;
-      packetsLost += inbound.packetsLost || 0;
-      newestTimestamp = Math.max(newestTimestamp || 0, inbound.timestamp);
+      if (Number.isFinite(inbound.bytesReceived)) {
+        inboundBytesReceived += inbound.bytesReceived || 0;
+      }
+      if (Number.isFinite(inbound.packetsLost)) {
+        packetsLost += inbound.packetsLost || 0;
+      }
+      if (Number.isFinite(inbound.timestamp)) {
+        newestTimestamp = Math.max(newestTimestamp || 0, inbound.timestamp);
+      }
 
       if (kind === "video" && typeof inbound.framesPerSecond === "number") {
         fps = inbound.framesPerSecond;
@@ -89,7 +106,7 @@ export const startWebRTCTelemetry = (
     onTelemetry({
       fps,
       bitrateKbps,
-      packetsLost,
+      packetsLost: Math.max(0, Math.round(packetsLost)),
       jitterMs: jitterSeconds === null ? null : jitterSeconds * 1000,
       iceConnectionState: peerConnection.iceConnectionState,
       connectionState: peerConnection.connectionState,
@@ -106,11 +123,14 @@ export const startWebRTCTelemetry = (
   publishConnectionState();
   const intervalId = window.setInterval(() => {
     pollStats().catch((err) => {
-      console.error("[WebRTC] Failed to collect stream telemetry:", err);
+      if (!stopped) {
+        console.error("[WebRTC] Failed to collect stream telemetry:", err);
+      }
     });
   }, 1000);
 
   return () => {
+    stopped = true;
     window.clearInterval(intervalId);
     peerConnection.removeEventListener(
       "iceconnectionstatechange",

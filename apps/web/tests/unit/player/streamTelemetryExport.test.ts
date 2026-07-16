@@ -61,6 +61,29 @@ test("stream telemetry csv export quotes comma and newline values", () => {
   );
 });
 
+test("stream telemetry csv neutralizes spreadsheet formulas", () => {
+  const sample: StreamTelemetryCsvSample = {
+    bitrateKbps: null,
+    capturedAt: "2026-07-04T00:46:56.000Z",
+    connectionState: "failed",
+    elapsedMs: 0,
+    fps: null,
+    gameId: "=HYPERLINK(\"https://example.test\")",
+    iceConnectionState: "disconnected",
+    jitterMs: null,
+    lastEngineError: "+cmd",
+    packetsLostDelta: 0,
+    packetsLostTotal: 0,
+    playerMode: "guest",
+    sessionId: "session-1",
+    status: "running",
+  };
+
+  const csv = streamTelemetrySamplesToCsv([sample]);
+  assert.match(csv, /"'=HYPERLINK\(""https:\/\/example\.test""\)"/);
+  assert.match(csv, /,'\+cmd$/);
+});
+
 test("stream telemetry csv export adds packet loss deltas", () => {
   const baseSample: StreamTelemetryCsvSample = {
     bitrateKbps: 900,

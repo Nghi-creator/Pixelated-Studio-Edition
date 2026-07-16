@@ -54,6 +54,9 @@ Options:
   --skip-disconnect         Do not wait for guest peer cleanup after join validation.
   --help                    Show this help.
 
+Environment:
+  PIXELATED_ENGINE_TOKEN    Host engine token required to control telemetry capture.
+
 Flow:
   1. Start the host game and wait for the host stream to play.
   2. For HTTPS companion smoke, accept the certificate once, then pass --invite-code.
@@ -66,9 +69,10 @@ and a manual pass/fail notes template.
 `);
 }
 
-function parseArgs(argv) {
+function parseArgs(argv, environment = process.env) {
   const options = {
     engineUrl: DEFAULT_ENGINE_URL,
+    engineToken: environment.PIXELATED_ENGINE_TOKEN || "",
     expectedGuests: 1,
     inviteCode: null,
     label: "lan-multiplayer-smoke",
@@ -139,13 +143,17 @@ function parseArgs(argv) {
 
 async function activateTelemetryCapture(
   engineUrl,
+  engineToken,
   captureToken,
   runId,
   sessionId,
 ) {
   await requestJson(engineUrl, "/smoke/telemetry/active", {
     body: JSON.stringify({ captureToken, runId, sessionId }),
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "X-Engine-Token": engineToken,
+    },
     method: "PUT",
   });
 }
@@ -402,9 +410,15 @@ async function run() {
   );
 
   const captureToken = crypto.randomBytes(32).toString("hex");
+  if (!options.engineToken) {
+    throw new Error(
+      "PIXELATED_ENGINE_TOKEN is required to activate smoke telemetry capture.",
+    );
+  }
   activeRun.captureToken = captureToken;
   await activateTelemetryCapture(
     options.engineUrl,
+    options.engineToken,
     captureToken,
     runId,
     expectedSessionId,

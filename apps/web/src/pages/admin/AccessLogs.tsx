@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ApiError } from "../../lib/api/apiClient";
 import { useAccessLogsQuery } from "../../lib/api/apiQueries";
-import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
+import { AdminTablePageSkeleton } from "../../components/ui/skeleton/AdminSkeletons";
 import { Pagination } from "../../components/ui/Pagination";
 import { getPageRangeLabel } from "../../features/admin/adminState";
 import { PixelIcon } from "../../components/ui/PixelIcon";

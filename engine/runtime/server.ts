@@ -32,6 +32,7 @@ import { registerErrorHandlers } from "./src/http/errorHandlers";
 import { registerHealthRoutes } from "./src/http/healthRoutes";
 import { registerLocalVaultRoutes } from "./src/http/localVaultRoutes";
 import { registerSessionControlRoutes } from "./src/http/sessionControlRoutes";
+import { hardenEngineHttpServer } from "./src/http/serverHardening";
 import { registerSmokeTelemetryRoutes } from "./src/http/smokeTelemetryRoutes";
 import { createCloudRomDownloader } from "./src/roms/cloudRomDownloader";
 import { createProcessManager } from "./src/runtime/processes/processManager";
@@ -116,8 +117,10 @@ registerSessionControlRoutes(app, {
 registerErrorHandlers(app);
 
 const server = http.createServer(app);
+hardenEngineHttpServer(server);
 const io = new Server(server, {
   cors: corsOptions,
+  maxHttpBufferSize: 128 * 1024,
 });
 
 io.use(auth.useSocketEngineToken);

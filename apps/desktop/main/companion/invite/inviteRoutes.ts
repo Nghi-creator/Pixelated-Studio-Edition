@@ -4,6 +4,8 @@ import type {
 } from "http";
 import { probeEngineHealth } from "../engine/engineHealth";
 import {
+  companionSecretsEqual,
+  matchesCompanionRequestPath,
   readJsonBody,
   rejectCompanionRateLimitedRequest,
   sendJson,
@@ -17,16 +19,11 @@ import {
   getCompanionInviteStatus,
   recordCompanionInviteFailure,
 } from "./inviteState";
+import { normalizeInviteCode } from "./inviteCode";
 
 const INVITE_PATH = "/invite";
 const PREFLIGHT_INVITE_PATH = "/invite/preflight";
 const REDEEM_INVITE_PATH = "/invite/redeem";
-
-function normalizeInviteCode(value: unknown) {
-  return typeof value === "string"
-    ? value.toUpperCase().replace(/[^A-Z0-9]/g, "")
-    : "";
-}
 
 export async function handleInviteRequest(
   req: IncomingMessage,
@@ -34,9 +31,9 @@ export async function handleInviteRequest(
   allowedOrigins: string[],
 ) {
   const isInvitePath =
-    req.url?.startsWith(PREFLIGHT_INVITE_PATH) ||
-    req.url?.startsWith(INVITE_PATH) ||
-    req.url?.startsWith(REDEEM_INVITE_PATH);
+    matchesCompanionRequestPath(req.url, PREFLIGHT_INVITE_PATH) ||
+    matchesCompanionRequestPath(req.url, INVITE_PATH) ||
+    matchesCompanionRequestPath(req.url, REDEEM_INVITE_PATH);
   if (!isInvitePath) return false;
 
   if (rejectCompanionRateLimitedRequest(req, res, "invite")) {
@@ -58,7 +55,10 @@ export async function handleInviteRequest(
     return true;
   }
 
-  if (req.method === "GET" && req.url?.startsWith(PREFLIGHT_INVITE_PATH)) {
+  if (
+    req.method === "GET" &&
+    matchesCompanionRequestPath(req.url, PREFLIGHT_INVITE_PATH)
+  ) {
     const engineAvailable = await probeEngineHealth();
     const inviteStatus = getCompanionInviteStatus();
     const inviteState = getCompanionInviteState();
@@ -80,7 +80,10 @@ export async function handleInviteRequest(
     return true;
   }
 
-  if (req.method === "GET" && req.url?.startsWith(INVITE_PATH)) {
+  if (
+    req.method === "GET" &&
+    matchesCompanionRequestPath(req.url, INVITE_PATH)
+  ) {
     const inviteStatus = getCompanionInviteStatus();
     const inviteState = getCompanionInviteState();
     sendJson(res, 200, {
@@ -97,7 +100,10 @@ export async function handleInviteRequest(
     return true;
   }
 
-  if (req.method !== "POST" || !req.url?.startsWith(REDEEM_INVITE_PATH)) {
+  if (
+    req.method !== "POST" ||
+    !matchesCompanionRequestPath(req.url, REDEEM_INVITE_PATH)
+  ) {
     return false;
   }
 
@@ -130,7 +136,7 @@ export async function handleInviteRequest(
         : undefined,
     );
 
-    if (submittedCode !== activeInviteCode) {
+    if (!companionSecretsEqual(submittedCode, activeInviteCode)) {
       const failure = recordCompanionInviteFailure(
         req.socket.remoteAddress || "unknown",
       );

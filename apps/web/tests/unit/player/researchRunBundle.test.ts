@@ -70,3 +70,11 @@ test("research run bundle filenames are filesystem-safe tar names", () => {
     "pixelated-research-bundle-Beat-Beast-edge-study-edge-run-1-2026-07-04T02-03-04-000Z.tar",
   );
 });
+
+test("research run bundle entries cannot escape through tar paths", () => {
+  const archive = createResearchRunBundleTar([
+    { data: "unsafe", name: "../../outside.txt" },
+  ]);
+
+  assert.equal(readAscii(archive, 0, 100), "outside.txt");
+});

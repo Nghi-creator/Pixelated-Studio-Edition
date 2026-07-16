@@ -20,6 +20,7 @@ import {
 import { logTiming, timed } from "../../observability/timing.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import { createRateLimiter } from "../../security/sharedRateLimiter.js";
+import { requireAuthenticatedService } from "../../security/authenticatedService.js";
 
 type ProfileRole = {
   is_banned?: boolean;
@@ -58,16 +59,9 @@ export async function registerModerationRoutes(
     "/moderation/comments/:commentId/report",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
-
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+      const context = requireAuthenticatedService(request, reply, service);
+      if (!context) return;
+      const { service: authenticatedService, user } = context;
 
       const parsedParams = commentParamsSchema.safeParse(request.params);
       if (!parsedParams.success) {
@@ -90,7 +84,7 @@ export async function registerModerationRoutes(
         return;
       }
 
-      const { error } = await service.from("reported_comments").insert({
+      const { error } = await authenticatedService.from("reported_comments").insert({
         comment_id: parsedParams.data.commentId,
         reporter_id: user.id,
         reason: parsedBody.data.reason,
@@ -116,22 +110,15 @@ export async function registerModerationRoutes(
     "/admin/reports",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
-
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+      const context = requireAuthenticatedService(request, reply, service);
+      if (!context) return;
+      const { service: authenticatedService, user } = context;
 
       const timings = {};
       const roleLookup = await timed(
         timings,
         "admin_role_check_ms",
-        () => getCachedUserRole(service, user.id),
+        () => getCachedUserRole(authenticatedService, user.id),
       );
 
       if (roleLookup.error) {
@@ -150,7 +137,7 @@ export async function registerModerationRoutes(
 
       const { page, pageSize, targetRole } = parsedQuery.data;
       const { end, start } = getPageRange(page, pageSize);
-      let reportsQuery = service
+      let reportsQuery = authenticatedService
         .from("reported_comments")
         .select(
           `
@@ -217,16 +204,9 @@ export async function registerModerationRoutes(
     "/admin/reports/:reportId/action",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
-
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+      const context = requireAuthenticatedService(request, reply, service);
+      if (!context) return;
+      const { service: authenticatedService, user } = context;
 
       const parsedParams = adminReportParamsSchema.safeParse(request.params);
       if (!parsedParams.success) {
@@ -238,7 +218,7 @@ export async function registerModerationRoutes(
         return reply.status(400).send({ error: "Invalid report action" });
       }
 
-      const { data: actorProfile, error: actorError } = await service
+      const { data: actorProfile, error: actorError } = await authenticatedService
         .from("profiles")
         .select("role")
         .eq("id", user.id)
@@ -253,7 +233,7 @@ export async function registerModerationRoutes(
         return reply.status(403).send({ error: "Admin access required" });
       }
 
-      const { data: report, error: reportError } = await service
+      const { data: report, error: reportError } = await authenticatedService
         .from("reported_comments")
         .select("comment_id, reporter_id")
         .eq("id", parsedParams.data.reportId)
@@ -274,7 +254,7 @@ export async function registerModerationRoutes(
         });
       }
 
-      const { data: comment, error: commentError } = await service
+      const { data: comment, error: commentError } = await authenticatedService
         .from("comments")
         .select("user_id")
         .eq("id", report.comment_id)
@@ -286,14 +266,14 @@ export async function registerModerationRoutes(
       }
 
       if (!comment?.user_id) {
-        await service
+        await authenticatedService
           .from("reported_comments")
           .delete()
           .eq("id", parsedParams.data.reportId);
         return reply.status(404).send({ error: "Comment not found" });
       }
 
-      const { data: targetProfile, error: targetError } = await service
+      const { data: targetProfile, error: targetError } = await authenticatedService
         .from("profiles")
         .select("role, is_banned")
         .eq("id", comment.user_id)
@@ -311,7 +291,7 @@ export async function registerModerationRoutes(
       }
 
       if (parsedBody.data.action === "ignore") {
-        const { error } = await service
+        const { error } = await authenticatedService
           .from("reported_comments")
           .delete()
           .eq("id", parsedParams.data.reportId);
@@ -333,26 +313,28 @@ export async function registerModerationRoutes(
         if (comment.user_id === user.id) {
           return reply.status(403).send({ error: "Admins cannot ban themselves" });
         }
-
-        const { error } = await service
-          .from("profiles")
-          .update({ is_banned: true })
-          .eq("id", comment.user_id);
-
-        if (error) {
-          request.log.error(error, "Failed to ban reported user");
-          return reply.status(500).send({ error: "Failed to ban user" });
-        }
       }
 
-      const { error: deleteError } = await service
-        .from("comments")
-        .delete()
-        .eq("id", report.comment_id);
+      const { error: resolutionError } = await authenticatedService.rpc(
+        "resolve_comment_report",
+        {
+          p_action: parsedBody.data.action,
+          p_comment_id: report.comment_id,
+          p_report_id: parsedParams.data.reportId,
+          p_target_user_id: comment.user_id,
+        },
+      );
 
-      if (deleteError) {
-        request.log.error(deleteError, "Failed to delete reported comment");
-        return reply.status(500).send({ error: "Failed to delete comment" });
+      if (resolutionError) {
+        request.log.error(resolutionError, "Failed to resolve reported comment");
+        if (
+          ["comment_not_found", "report_not_found", "target_user_not_found"].includes(
+            resolutionError.message,
+          )
+        ) {
+          return reply.status(404).send({ error: "Report target not found" });
+        }
+        return reply.status(500).send({ error: "Failed to resolve report" });
       }
 
       return {

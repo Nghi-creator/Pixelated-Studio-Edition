@@ -4,6 +4,7 @@ import type {
 } from "http";
 import { probeEngineHealth } from "../engine/engineHealth";
 import {
+  matchesCompanionRequestPath,
   readJsonBody,
   rejectCompanionRateLimitedRequest,
   sendJson,
@@ -23,7 +24,7 @@ export async function handleLaunchRequest(
   res: ServerResponse,
   allowedOrigins: string[],
 ) {
-  if (!req.url?.startsWith(REDEEM_LAUNCH_PATH)) {
+  if (!matchesCompanionRequestPath(req.url, REDEEM_LAUNCH_PATH)) {
     return false;
   }
 

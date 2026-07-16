@@ -19,7 +19,7 @@ const PROXY_PREFIXES = [
   "/socket.io",
   "/upload",
 ];
-const GUEST_PROXY_PREFIXES = ["/health", "/socket.io", "/smoke/telemetry"];
+const GUEST_PROXY_PREFIXES = ["/health", "/socket.io"];
 
 type CompanionTokenScope = "guest" | "host" | null;
 
@@ -33,12 +33,24 @@ function matchesPrefix(url: string, prefix: string) {
   return url === prefix || url.startsWith(`${prefix}/`) || url.startsWith(`${prefix}?`);
 }
 
+function matchesPath(url: string, path: string) {
+  try {
+    return new URL(url, "https://pixelated.local").pathname === path;
+  } catch {
+    return false;
+  }
+}
+
 export function canProxyCompanionRequest(
   url = "",
   companionScope: CompanionTokenScope,
+  method = "GET",
 ) {
   if (!shouldProxy(url)) return false;
   if (companionScope !== "guest") return true;
+  if (method === "POST" && matchesPath(url, "/smoke/telemetry")) {
+    return true;
+  }
   return GUEST_PROXY_PREFIXES.some((prefix) => matchesPrefix(url, prefix));
 }
 
@@ -114,7 +126,7 @@ export function proxyHttpRequest(
   engineToken: string,
 ) {
   const companionScope = getCompanionScopeFromRequest(req);
-  if (!canProxyCompanionRequest(req.url || "", companionScope)) {
+  if (!canProxyCompanionRequest(req.url || "", companionScope, req.method)) {
     res.writeHead(403, {
       "cache-control": "no-store",
       "content-type": "application/json",
@@ -155,7 +167,7 @@ export function proxyWebSocket(
   engineToken: string,
 ) {
   const companionScope = getCompanionScopeFromRequest(req);
-  if (!canProxyCompanionRequest(req.url || "", companionScope)) {
+  if (!canProxyCompanionRequest(req.url || "", companionScope, req.method)) {
     socket.destroy();
     return;
   }

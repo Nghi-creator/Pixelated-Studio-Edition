@@ -48,7 +48,7 @@ export function publishStreamMetric({
       timestamp: new Date(metricTimestamp).toISOString(),
     })
     .catch((err) => {
-      if (err instanceof ApiError && [401, 503].includes(err.status)) {
+      if (err instanceof ApiError && [401, 403].includes(err.status)) {
         metricsDisabledRef.current = true;
         return;
       }

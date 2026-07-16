@@ -5,6 +5,7 @@ import {
   getLocalCompanionControlUrl,
 } from "../engine/engineConfig";
 import { engineControlAuthHeaders } from "../engine/engineAuth";
+import { engineFetch } from "../engine/engineRequest";
 import type { EngineRuntimeKind } from "./runtimeKind";
 import type {
   EngineInputCapabilities,
@@ -90,7 +91,7 @@ function getInputCapabilitiesFromHealth(
 
 export async function loadEngineInputCapabilities(): Promise<EngineInputCapabilities> {
   try {
-    const response = await fetch(engineEndpoint("/health"));
+    const response = await engineFetch(engineEndpoint("/health"));
     if (!response.ok) throw new Error("Engine health check failed.");
     const health = (await response.json()) as EngineHealthPayload;
     return getInputCapabilitiesFromHealth(health);
@@ -107,7 +108,8 @@ export async function loadEngineInputCapabilities(): Promise<EngineInputCapabili
 
 export async function loadEngineShareContext(): Promise<EngineShareContext> {
   try {
-    const response = await fetch(engineEndpoint("/health"));
+    const response = await engineFetch(engineEndpoint("/health"));
+    if (!response.ok) throw new Error("Engine health check failed.");
     const health = (await response.json()) as EngineHealthPayload;
     return {
       companionUrls: health.companionUrls || [],
@@ -123,7 +125,7 @@ export async function loadEngineShareContext(): Promise<EngineShareContext> {
 }
 
 export async function loadEngineRuntimeKind() {
-  const response = await fetch(engineEndpoint("/health"));
+  const response = await engineFetch(engineEndpoint("/health"));
   if (!response.ok) throw new Error("Engine health check failed.");
   const health = (await response.json()) as EngineHealthPayload;
   return health.runtimeKind || "libretro";
@@ -131,7 +133,10 @@ export async function loadEngineRuntimeKind() {
 
 export async function loadEngineLaunchFailureMessage() {
   try {
-    const response = await fetch(engineEndpoint("/health"), { cache: "no-store" });
+    const response = await engineFetch(engineEndpoint("/health"), {
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error("Engine health check failed.");
     const health = (await response.json()) as EngineHealthPayload;
     return formatEngineLaunchFailure(health);
   } catch (err) {
@@ -144,7 +149,7 @@ export async function requestEngineRuntimeSwitch(
   runtimeKind: EngineRuntimeKind,
 ) {
   const requestSwitch = (controlUrl: string) =>
-    fetch(`${controlUrl}/runtime/switch`, {
+    engineFetch(`${controlUrl}/runtime/switch`, {
       body: JSON.stringify({ runtimeKind }),
       cache: "no-store",
       headers: {
@@ -177,7 +182,7 @@ export async function requestEngineRuntimeSwitch(
 
 export async function stopActiveEngineSession() {
   const requestStop = (controlUrl: string) =>
-    fetch(`${controlUrl}/session/stop-active`, {
+    engineFetch(`${controlUrl}/session/stop-active`, {
       cache: "no-store",
       headers: {
         ...engineControlAuthHeaders(),

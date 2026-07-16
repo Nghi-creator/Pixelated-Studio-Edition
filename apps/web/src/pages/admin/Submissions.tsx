@@ -3,7 +3,7 @@ import { AlertCircle, RefreshCw, X } from "lucide-react";
 import { Pagination } from "../../components/ui/Pagination";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import { AdminSelect } from "../../components/ui/AdminSelect";
-import { AdminReviewPageSkeleton } from "../../components/ui/Skeleton";
+import { AdminReviewPageSkeleton } from "../../components/ui/skeleton/AdminSkeletons";
 import {
   getAdminApiErrorMessage,
   getPageAfterRemoval,

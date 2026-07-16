@@ -1,6 +1,6 @@
 import { Loader2, RefreshCw, Search } from "lucide-react";
 import { Avatar } from "../../components/ui/Avatar";
-import { AdminTablePageSkeleton } from "../../components/ui/Skeleton";
+import { AdminTablePageSkeleton } from "../../components/ui/skeleton/AdminSkeletons";
 import { Pagination } from "../../components/ui/Pagination";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import { AdminConfirmDialog } from "../../components/admin/AdminConfirmDialog";
