@@ -4,11 +4,13 @@ import { createCompanionAccessToken } from "../../../main/companion/invite/invit
 import {
   canUseRuntimeSwitchToken,
   canProxyCompanionRequest,
+  companionSecretsEqual,
   consumeCompanionRequestLimit,
   consumeCompanionLaunchTicket,
   createCompanionLaunchTicket,
   getCompanionStatusPage,
   getCompanionInviteStatus,
+  matchesCompanionRequestPath,
   recordCompanionInviteFailure,
   revokeCompanionInvite,
   shouldProxy,
@@ -103,6 +105,30 @@ describe("desktop companion engine proxy", () => {
     assert.equal(canProxyCompanionRequest("/local-games/game.nes", "host"), true);
     assert.equal(canProxyCompanionRequest("/session/stop-active", null), true);
     assert.equal(canProxyCompanionRequest("/not-an-engine-route", "host"), false);
+  });
+});
+
+describe("desktop companion route boundaries", () => {
+  it("matches exact route paths while allowing query parameters", () => {
+    assert.equal(
+      matchesCompanionRequestPath("/invite?source=qr", "/invite"),
+      true,
+    );
+    assert.equal(
+      matchesCompanionRequestPath("/invite/redeem", "/invite"),
+      false,
+    );
+    assert.equal(
+      matchesCompanionRequestPath("/invite-attacker", "/invite"),
+      false,
+    );
+    assert.equal(matchesCompanionRequestPath("/%", "/invite"), false);
+  });
+
+  it("compares non-empty companion secrets exactly", () => {
+    assert.equal(companionSecretsEqual("secret", "secret"), true);
+    assert.equal(companionSecretsEqual("secret", "different"), false);
+    assert.equal(companionSecretsEqual("", ""), false);
   });
 });
 

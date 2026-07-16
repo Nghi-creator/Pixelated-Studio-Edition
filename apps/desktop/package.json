@@ -5,8 +5,9 @@
   "author": "Pixelated Studio",
   "main": "dist/main.js",
   "scripts": {
+    "build:styles": "npm exec --prefix ../web tailwindcss -- -c tailwind.config.cjs -i styles.input.css -o styles.css --minify",
     "clean": "node -e \"require('fs').rmSync('dist', { force: true, recursive: true })\"",
-    "build": "npm run clean && tsc -p tsconfig.json",
+    "build": "npm run build:styles && npm run clean && tsc -p tsconfig.json",
     "test": "npm run build && node --test \"dist/tests/**/*.test.js\"",
     "start": "npm run build && electron .",
     "prepare:web": "npm run build && npm --prefix ../web run build && node dist/scripts/prepareWebDist.js",
@@ -48,6 +49,7 @@
     "files": [
       "package.json",
       "index.html",
+      "styles.css",
       "dist/**",
       "!release/**",
       "!tests/**",

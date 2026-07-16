@@ -12,10 +12,16 @@ function createWindow() {
     minWidth: 390,
     backgroundColor: "#0B0F19",
     webPreferences: {
-      nodeIntegration: false,
       contextIsolation: true,
+      nodeIntegration: false,
       preload: path.join(__dirname, "preload.js"),
+      sandbox: true,
     },
+  });
+
+  mainWindow.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  mainWindow.webContents.on("will-navigate", (event) => {
+    event.preventDefault();
   });
   mainWindow.loadFile(path.join(__dirname, "../index.html"));
 }

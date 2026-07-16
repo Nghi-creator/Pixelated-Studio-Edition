@@ -133,19 +133,37 @@ describe("desktop package config", () => {
   });
 
   it("keeps packaged preload sandbox-safe and renderer scripts browser-safe", () => {
+    const mainPath = path.resolve(__dirname, "../../main.js");
     const preloadPath = path.resolve(__dirname, "../../preload.js");
     const rendererPath = path.resolve(__dirname, "../../renderer.js");
     const rendererHelperPath = path.resolve(__dirname, "../../renderer/logs.js");
+    const main = fs.readFileSync(mainPath, "utf8");
     const preload = fs.readFileSync(preloadPath, "utf8");
     const renderer = fs.readFileSync(rendererPath, "utf8");
     const rendererHelper = fs.readFileSync(rendererHelperPath, "utf8");
 
+    assert.match(main, /sandbox:\s*true/);
+    assert.match(main, /setWindowOpenHandler/);
+    assert.match(main, /will-navigate/);
     assert.doesNotMatch(preload, /require\("\.\/main\/companion\/qr"\)/);
     assert.match(preload, /ipcRenderer\.invoke|electron_1\.ipcRenderer\.invoke/);
     assert.doesNotMatch(renderer, /\bexports\b/);
     assert.doesNotMatch(rendererHelper, /\bexports\b/);
     assert.doesNotMatch(rendererHelper, /\.innerHTML\s*[+]?=/);
     assert.match(rendererHelper, /createTextNode/);
+  });
+
+  it("ships local renderer styles under a restrictive content policy", () => {
+    const packageJson = readPackageJson();
+    const indexPath = path.resolve(__dirname, "../../../index.html");
+    const index = fs.readFileSync(indexPath, "utf8");
+
+    assert.ok(packageJson.build.files?.includes("styles.css"));
+    assert.match(packageJson.scripts?.build || "", /build:styles/);
+    assert.match(index, /Content-Security-Policy/);
+    assert.match(index, /script-src 'self'/);
+    assert.match(index, /href="\.\/styles\.css"/);
+    assert.doesNotMatch(index, /cdn\.tailwindcss\.com/);
   });
 
   it("ships the image build recovery bridge and renderer action states", () => {

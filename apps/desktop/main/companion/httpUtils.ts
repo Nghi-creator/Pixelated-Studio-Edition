@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import type {
   IncomingMessage,
   ServerResponse,
@@ -15,6 +16,27 @@ const companionRequestLimits = new Map<
 export function serializeHeaderValue(value: number | string | string[] | undefined) {
   if (Array.isArray(value)) return value.join(", ");
   return value === undefined ? "" : String(value);
+}
+
+export function matchesCompanionRequestPath(
+  url: string | undefined,
+  path: string,
+) {
+  try {
+    return new URL(url || "/", "https://pixelated.local").pathname === path;
+  } catch {
+    return false;
+  }
+}
+
+export function companionSecretsEqual(left: string, right: string) {
+  if (!left || !right) return false;
+  const leftBytes = Buffer.from(left);
+  const rightBytes = Buffer.from(right);
+  return (
+    leftBytes.length === rightBytes.length &&
+    crypto.timingSafeEqual(leftBytes, rightBytes)
+  );
 }
 
 export function readJsonBody(req: IncomingMessage) {
