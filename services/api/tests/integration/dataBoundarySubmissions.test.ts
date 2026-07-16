@@ -393,7 +393,7 @@ test("stream metrics are written and read only for the authenticated user", asyn
       jitterMs: 3,
       packetsLost: 0,
       sessionId: "session-1",
-      timestamp: "2026-05-27T12:01:00.000Z",
+      timestamp: new Date().toISOString(),
     },
     url: "/metrics/stream",
   });

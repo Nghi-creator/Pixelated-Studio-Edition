@@ -874,6 +874,41 @@ test("stream metrics persist and rate-limit per user session", async () => {
   await app.close();
 });
 
+test("stream metrics reject oversized session ids and stale timestamps", async () => {
+  const db = new FakeSupabase();
+  const app = await createTestApp(db);
+  const metric = {
+    bitrateKbps: 1200,
+    connectionState: "connected",
+    fps: 60,
+    iceConnectionState: "connected",
+    jitterMs: 3,
+    packetsLost: 0,
+    sessionId: "s".repeat(129),
+    timestamp: new Date().toISOString(),
+  };
+
+  const oversized = await app.inject({
+    method: "POST",
+    payload: metric,
+    url: "/metrics/stream",
+  });
+  const stale = await app.inject({
+    method: "POST",
+    payload: {
+      ...metric,
+      sessionId: "stale-session",
+      timestamp: "2020-01-01T00:00:00.000Z",
+    },
+    url: "/metrics/stream",
+  });
+
+  assert.equal(oversized.statusCode, 400);
+  assert.equal(stale.statusCode, 400);
+  assert.equal(db.metrics.length, 0);
+  await app.close();
+});
+
 test("multiplayer lobbies persist metadata without storing engine tokens", async () => {
   const db = new FakeSupabase();
   const app = await createTestApp(db);

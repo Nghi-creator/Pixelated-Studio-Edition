@@ -52,6 +52,34 @@ describe("smoke telemetry store", () => {
       "session-mismatch",
     );
   });
+
+  it("binds companion snapshots to their authenticated role", () => {
+    const store = createSmokeTelemetryStore(() => "session-1");
+    store.activate(CAPTURE_TOKEN, "run-3", "session-1");
+
+    assert.equal(
+      store.submit(
+        { playerMode: "host", sessionId: "session-1" },
+        "companion-guest",
+      ),
+      "role-mismatch",
+    );
+    assert.equal(store.read(CAPTURE_TOKEN)?.host, null);
+  });
+
+  it("expires abandoned captures", () => {
+    let now = 1_000;
+    const store = createSmokeTelemetryStore(() => "session-1", {
+      captureTtlMs: 500,
+      now: () => now,
+    });
+    store.activate(CAPTURE_TOKEN, "run-4", "session-1");
+
+    now += 501;
+
+    assert.deepEqual(store.getActive(), { active: false });
+    assert.equal(store.read(CAPTURE_TOKEN), null);
+  });
 });
 
 describe("smoke telemetry routes", () => {

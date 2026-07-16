@@ -47,7 +47,8 @@ export const STREAM_TELEMETRY_CSV_HEADERS = [
 
 function csvCell(value: number | string | null) {
   if (value === null) return "";
-  const text = String(value);
+  const text =
+    typeof value === "string" && /^[=+\-@]/.test(value) ? `'${value}` : String(value);
   if (!/[",\n\r]/.test(text)) return text;
   return `"${text.replaceAll('"', '""')}"`;
 }

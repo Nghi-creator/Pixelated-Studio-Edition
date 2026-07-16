@@ -4,8 +4,13 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../../auth/supabaseAuth.js";
+import {
+  createRateLimiter,
+  type RateLimiter,
+} from "../../security/sharedRateLimiter.js";
 
 const METRIC_MIN_INTERVAL_MS = 5_000;
+const METRIC_MAX_CLOCK_SKEW_MS = 24 * 60 * 60_000;
 
 const streamMetricSchema = z.object({
   bitrateKbps: z.number().min(0).max(1_000_000).nullable(),
@@ -29,7 +34,7 @@ const streamMetricSchema = z.object({
   ]),
   jitterMs: z.number().min(0).max(60_000).nullable(),
   packetsLost: z.number().int().min(0).max(1_000_000_000),
-  sessionId: z.string().regex(/^[a-zA-Z0-9_-]+$/),
+  sessionId: z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),
   timestamp: z.string().datetime(),
 });
 
@@ -48,6 +53,7 @@ type StreamMetricRow = {
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
 type MetricRouteOptions = {
+  metricWriteLimiter?: RateLimiter;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
 };
@@ -72,6 +78,13 @@ export async function registerMetricRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const metricWriteLimiter =
+    options.metricWriteLimiter ||
+    createRateLimiter({
+      limit: 1,
+      namespace: "stream-metric-write-user-session",
+      windowMs: METRIC_MIN_INTERVAL_MS,
+    });
 
   app.post(
     "/metrics/stream",
@@ -94,6 +107,24 @@ export async function registerMetricRoutes(
       }
 
       const now = Date.now();
+      if (
+        Math.abs(Date.parse(parsedMetric.data.timestamp) - now) >
+        METRIC_MAX_CLOCK_SKEW_MS
+      ) {
+        return reply.status(400).send({ error: "Invalid stream metric timestamp" });
+      }
+
+      const rateLimit = await metricWriteLimiter.consume(
+        `${user.id}:${parsedMetric.data.sessionId}`,
+        now,
+      );
+      if (!rateLimit.allowed) {
+        return reply.status(202).send({
+          accepted: false,
+          reason: "rate_limited",
+        });
+      }
+
       const { data: latestMetric, error: latestMetricError } =
         await service
           .from("stream_metrics")

@@ -14,6 +14,11 @@ function toBytes(data: string | Uint8Array) {
   return typeof data === "string" ? new TextEncoder().encode(data) : data;
 }
 
+function safeTarName(name: string) {
+  const basename = name.split(/[\\/]/).at(-1) || "file";
+  return safeBundlePart(basename) || "file";
+}
+
 function writeAscii(
   target: Uint8Array,
   offset: number,
@@ -70,7 +75,7 @@ export function createResearchRunBundleTar(
   const mtimeSeconds = Math.floor(mtime.getTime() / 1000);
   const encodedFiles = files.map((file) => ({
     bytes: toBytes(file.data),
-    name: file.name.replace(/^\/+/, "").slice(0, 100),
+    name: safeTarName(file.name).slice(0, 100),
   }));
   const totalLength =
     encodedFiles.reduce(
