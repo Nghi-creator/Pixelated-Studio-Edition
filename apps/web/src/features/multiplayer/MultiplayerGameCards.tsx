@@ -5,7 +5,7 @@ import {
   GameArtworkFallback,
 } from "../../components/user/GameArtworkFallback";
 import { isGeneratedCatalogArtworkUrl } from "../../components/user/gameArtworkUtils";
-import { Skeleton } from "../../components/ui/Skeleton";
+import { Skeleton } from "../../components/ui/skeleton/Skeleton";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import type { ApiGame } from "../../lib/api/apiTypes";
 

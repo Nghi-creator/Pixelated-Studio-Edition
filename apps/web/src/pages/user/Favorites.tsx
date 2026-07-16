@@ -5,7 +5,7 @@ import { ArrowLeft, Heart, Loader2, Plus, X } from "lucide-react";
 import GameCard from "../../components/user/GameCard";
 import { useFavoritesQuery } from "../../lib/api/apiQueries";
 import { queryKeys } from "../../lib/api/queryClient";
-import { FavoritesPageSkeleton } from "../../components/ui/Skeleton";
+import { FavoritesPageSkeleton } from "../../components/ui/skeleton/UserSkeletons";
 import { replaceFavoriteIds } from "../../features/favorites/favoriteState";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import { api } from "../../lib/api/apiClient";

@@ -10,7 +10,7 @@ import {
   GameGridSkeleton,
   GamesCatalogSkeleton,
   HeroSkeleton,
-} from "../../components/ui/Skeleton";
+} from "../../components/ui/skeleton/UserSkeletons";
 import { Pagination } from "../../components/ui/Pagination";
 
 const GAMES_PER_PAGE = 15;

@@ -12,7 +12,7 @@ import {
   useAuthSessionQuery,
   usePermissionsQuery,
 } from "../../lib/api/apiQueries";
-import { ModerationQueueSkeleton } from "../../components/ui/Skeleton";
+import { ModerationQueueSkeleton } from "../../components/ui/skeleton/AdminSkeletons";
 import { Pagination } from "../../components/ui/Pagination";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import {

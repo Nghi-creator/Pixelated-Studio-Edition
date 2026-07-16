@@ -1,6 +1,6 @@
 import { AlertOctagon } from "lucide-react";
 import { Avatar } from "../../components/ui/Avatar";
-import { ProfileSkeleton } from "../../components/ui/Skeleton";
+import { ProfileSkeleton } from "../../components/ui/skeleton/UserSkeletons";
 import { AuthCaptcha } from "../auth/AuthCaptcha";
 import {
   PASSWORD_MIN_LENGTH,
