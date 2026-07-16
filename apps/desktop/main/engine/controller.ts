@@ -44,14 +44,14 @@ import {
 import {
   cancelDockerRecoveryWorkflow,
   runDockerRecovery,
-} from "./recoveryWorkflow";
-import { runRuntimeSwitch } from "./runtimeSwitchWorkflow";
+} from "./workflows/recoveryWorkflow";
+import { runRuntimeSwitch } from "./workflows/runtimeSwitchWorkflow";
 import {
   buildEngineImageWorkflow,
   continueEngineStartup,
   emitDockerDiagnostic,
   rejectInvalidImage,
-} from "./startupWorkflow";
+} from "./workflows/startupWorkflow";
 
 export type { EngineClientPayload } from "./controllerTypes";
 export { createImageRecoveryPayload } from "./imageRecovery";

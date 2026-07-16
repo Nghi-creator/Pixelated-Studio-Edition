@@ -1,19 +1,19 @@
 import crypto from "crypto";
 import type { IpcMainEvent } from "electron";
-import { removeEngineContainerArgs } from "../docker/commands";
-import type { DockerDiagnostic } from "../docker/diagnostics";
-import { withDockerStartCapability } from "../docker/recovery";
-import { emitEngineState, setCurrentEnginePhase } from "../runtime/state";
-import { startCompanionForEngine } from "./companionLifecycle";
-import type { RuntimeSwitchHandler } from "./controllerTypes";
-import type { EngineControllerState } from "./controllerState";
-import { finishStartupAttempt } from "./controllerState";
-import { createImageRecoveryPayload } from "./imageRecovery";
+import { removeEngineContainerArgs } from "../../docker/commands";
+import type { DockerDiagnostic } from "../../docker/diagnostics";
+import { withDockerStartCapability } from "../../docker/recovery";
+import { emitEngineState, setCurrentEnginePhase } from "../../runtime/state";
+import { startCompanionForEngine } from "../companionLifecycle";
+import type { RuntimeSwitchHandler } from "../controllerTypes";
+import type { EngineControllerState } from "../controllerState";
+import { finishStartupAttempt } from "../controllerState";
+import { createImageRecoveryPayload } from "../imageRecovery";
 import {
   getDockerRunArgs,
   type EngineLaunchContext,
   type StartEngineOptions,
-} from "./launch";
+} from "../launch";
 
 const IMAGE_RECOVERY_HANDLED = Symbol("image-recovery-handled");
 

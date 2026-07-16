@@ -1,13 +1,13 @@
 import { shell, type IpcMainEvent } from "electron";
-import { createDockerDiagnostic } from "../docker/diagnostics";
+import { createDockerDiagnostic } from "../../docker/diagnostics";
 import {
   discoverDockerStartPlan,
   executeDockerStartPlan,
   waitForDockerReady,
-} from "../docker/recovery";
-import { emitEngineState } from "../runtime/state";
-import type { EngineControllerState } from "./controllerState";
-import type { StartEngineOptions } from "./launch";
+} from "../../docker/recovery";
+import { emitEngineState } from "../../runtime/state";
+import type { EngineControllerState } from "../controllerState";
+import type { StartEngineOptions } from "../launch";
 import { emitDockerDiagnostic } from "./startupWorkflow";
 
 const getErrorMessage = (err: unknown) =>

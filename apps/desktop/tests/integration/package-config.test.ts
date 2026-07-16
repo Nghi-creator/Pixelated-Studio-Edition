@@ -203,7 +203,7 @@ describe("desktop package config", () => {
     const configPath = path.resolve(__dirname, "../../main/runtime/config.js");
     const startupWorkflowPath = path.resolve(
       __dirname,
-      "../../main/engine/startupWorkflow.js",
+      "../../main/engine/workflows/startupWorkflow.js",
     );
     const dockerCommandsPath = path.resolve(__dirname, "../../main/docker/commands.js");
     const engineLaunchPath = path.resolve(__dirname, "../../main/engine/launch.js");
