@@ -25,7 +25,12 @@ import { registerProfileRoutes } from "./modules/users/http/profileRoutes.js";
 
 export async function buildServer() {
   const app = Fastify({
+    bodyLimit: 1024 * 1024,
+    connectionTimeout: 10_000,
+    keepAliveTimeout: 5_000,
     logger: createLoggerOptions(),
+    maxRequestsPerSocket: 1_000,
+    requestTimeout: 30_000,
     trustProxy: env.trustProxy,
   });
 

@@ -106,26 +106,31 @@ export function registerSmokeTelemetryRoutes(
   const { getActiveSessionId, requireEngineToken } = options;
   const store = createSmokeTelemetryStore(getActiveSessionId);
 
-  app.put("/smoke/telemetry/active", jsonBody, (req: Request, res: Response) => {
-    const body = isRecord(req.body) ? req.body : {};
-    const captureToken =
-      typeof body.captureToken === "string" ? body.captureToken : "";
-    const runId = typeof body.runId === "string" ? body.runId.trim() : "";
-    const sessionId =
-      typeof body.sessionId === "string" ? body.sessionId.trim() : "";
+  app.put(
+    "/smoke/telemetry/active",
+    requireEngineToken,
+    jsonBody,
+    (req: Request, res: Response) => {
+      const body = isRecord(req.body) ? req.body : {};
+      const captureToken =
+        typeof body.captureToken === "string" ? body.captureToken : "";
+      const runId = typeof body.runId === "string" ? body.runId.trim() : "";
+      const sessionId =
+        typeof body.sessionId === "string" ? body.sessionId.trim() : "";
 
-    const result = store.activate(captureToken, runId, sessionId);
-    if (result === "invalid") {
-      res.status(400).json({ error: "Invalid smoke capture activation." });
-      return;
-    }
-    if (result === "session-mismatch") {
-      res.status(409).json({ error: "Smoke capture session is not active." });
-      return;
-    }
+      const result = store.activate(captureToken, runId, sessionId);
+      if (result === "invalid") {
+        res.status(400).json({ error: "Invalid smoke capture activation." });
+        return;
+      }
+      if (result === "session-mismatch") {
+        res.status(409).json({ error: "Smoke capture session is not active." });
+        return;
+      }
 
-    res.status(201).json({ active: true, runId, sessionId });
-  });
+      res.status(201).json({ active: true, runId, sessionId });
+    },
+  );
 
   app.get(
     "/smoke/telemetry/active",

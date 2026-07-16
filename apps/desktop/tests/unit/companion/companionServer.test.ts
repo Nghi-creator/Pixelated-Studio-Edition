@@ -91,7 +91,19 @@ describe("desktop companion engine proxy", () => {
   it("keeps LAN guest tokens away from host management routes", () => {
     assert.equal(canProxyCompanionRequest("/health", "guest"), true);
     assert.equal(canProxyCompanionRequest("/socket.io/?EIO=4", "guest"), true);
-    assert.equal(canProxyCompanionRequest("/smoke/telemetry", "guest"), true);
+    assert.equal(
+      canProxyCompanionRequest("/smoke/telemetry", "guest", "POST"),
+      true,
+    );
+    assert.equal(canProxyCompanionRequest("/smoke/telemetry", "guest"), false);
+    assert.equal(
+      canProxyCompanionRequest("/smoke/telemetry/active", "guest", "PUT"),
+      false,
+    );
+    assert.equal(
+      canProxyCompanionRequest("/smoke/telemetry/extra", "guest", "POST"),
+      false,
+    );
 
     assert.equal(canProxyCompanionRequest("/clients", "guest"), false);
     assert.equal(canProxyCompanionRequest("/display/frame", "guest"), false);

@@ -63,10 +63,8 @@ export function registerDisplayFrameRoutes(
         res.setHeader("content-type", "image/png");
         res.end(frame);
       } catch (err) {
-        res.status(503).json({
-          error:
-            err instanceof Error ? err.message : "Could not capture display",
-        });
+        console.error("[Engine] Display frame capture failed:", err);
+        res.status(503).json({ error: "Could not capture display" });
       } finally {
         fs.promises.unlink(outputPath).catch(() => undefined);
       }

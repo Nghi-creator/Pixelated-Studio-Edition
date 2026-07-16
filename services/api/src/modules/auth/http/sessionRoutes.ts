@@ -263,7 +263,7 @@ export async function registerSessionRoutes(
     }
 
     const body = z
-      .object({ sessionToken: z.string().min(16) })
+      .object({ sessionToken: z.string().min(16).max(128) })
       .safeParse(request.body);
 
     if (!body.success) {

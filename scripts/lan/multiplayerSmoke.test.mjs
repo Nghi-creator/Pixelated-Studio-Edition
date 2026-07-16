@@ -11,18 +11,22 @@ import {
 } from "./multiplayerSmoke.mjs";
 
 test("parses companion invite smoke options", () => {
-  const options = parseArgs([
-    "--engine-url",
-    "https://192.168.1.20:8090/",
-    "--invite-code",
-    "ab12-cd34",
-    "--expected-guests",
-    "2",
-  ]);
+  const options = parseArgs(
+    [
+      "--engine-url",
+      "https://192.168.1.20:8090/",
+      "--invite-code",
+      "ab12-cd34",
+      "--expected-guests",
+      "2",
+    ],
+    { PIXELATED_ENGINE_TOKEN: "host-engine-token" },
+  );
 
   assert.equal(options.engineUrl, "https://192.168.1.20:8090");
   assert.equal(options.inviteCode, "ab12-cd34");
   assert.equal(options.expectedGuests, 2);
+  assert.equal(options.engineToken, "host-engine-token");
   assert.equal(isHttpsCompanion(options.engineUrl), true);
   assert.equal(normalizeInviteCode(options.inviteCode), "AB12CD34");
 });

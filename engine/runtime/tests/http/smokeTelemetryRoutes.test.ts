@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
+import type { Express, RequestHandler } from "express";
 import { describe, it } from "node:test";
-import { createSmokeTelemetryStore } from "../../src/http/smokeTelemetryRoutes";
+import {
+  createSmokeTelemetryStore,
+  registerSmokeTelemetryRoutes,
+} from "../../src/http/smokeTelemetryRoutes";
 
 const CAPTURE_TOKEN = "a".repeat(64);
 
@@ -47,5 +51,28 @@ describe("smoke telemetry store", () => {
       store.submit({ playerMode: "guest", sessionId: "other-session" }),
       "session-mismatch",
     );
+  });
+});
+
+describe("smoke telemetry routes", () => {
+  it("registers engine authentication before the activation body handler", () => {
+    const activationHandlers: RequestHandler[] = [];
+    const app = {
+      delete: () => undefined,
+      get: () => undefined,
+      post: () => undefined,
+      put: (_path: string, ...handlers: RequestHandler[]) => {
+        activationHandlers.push(...handlers);
+      },
+    } as unknown as Express;
+    const requireEngineToken: RequestHandler = (_req, _res, next) => next();
+
+    registerSmokeTelemetryRoutes(app, {
+      getActiveSessionId: () => "session-1",
+      requireEngineToken,
+    });
+
+    assert.equal(activationHandlers[0], requireEngineToken);
+    assert.equal(activationHandlers.length, 3);
   });
 });
