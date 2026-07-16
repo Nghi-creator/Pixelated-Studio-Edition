@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { createCompanionAccessToken } from "../../../main/companion/invite/inviteState";
+import { normalizeInviteCode } from "../../../main/companion/invite/inviteCode";
 import {
   canUseRuntimeSwitchToken,
   canProxyCompanionRequest,
@@ -17,6 +18,11 @@ import {
 } from "../../../main/companion/server";
 
 describe("desktop companion preflight", () => {
+  it("normalizes invite codes through one shared boundary", () => {
+    assert.equal(normalizeInviteCode(" ab-12 cd "), "AB12CD");
+    assert.equal(normalizeInviteCode(null), "");
+  });
+
   it("distinguishes active, expired, and revoked invite states", () => {
     const now = 1_000;
 

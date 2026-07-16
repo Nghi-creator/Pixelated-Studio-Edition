@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { normalizeInviteCode } from "./inviteCode";
 
 const LAUNCH_TICKET_TTL_MS = 60 * 1000;
 const INVITE_FAILURE_LIMIT = 8;
@@ -29,11 +30,6 @@ let companionInviteState: CompanionInviteState = {
   expiresAt: null,
   revokedAt: null,
 };
-
-const normalizeInviteCode = (value: unknown) =>
-  typeof value === "string"
-    ? value.toUpperCase().replace(/[^A-Z0-9]/g, "")
-    : "";
 
 function clearGuestAccessTokens() {
   companionAccessTokens.forEach((record, token) => {

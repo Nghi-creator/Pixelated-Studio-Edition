@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
+import { sanitizeCatalogObjectSegment } from "../src/modules/catalog/domain/catalogObjectPath.js";
 import fs from "node:fs";
 import fsp from "node:fs/promises";
 import os from "node:os";
@@ -133,15 +134,8 @@ function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
 }
 
-function sanitizeObjectSegment(value: string) {
-  return (
-    value
-      .trim()
-      .replace(/[^a-zA-Z0-9._-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 120) || "artwork"
-  );
-}
+const sanitizeObjectSegment = (value: string) =>
+  sanitizeCatalogObjectSegment(value, "artwork");
 
 function slugForTitle(value: string) {
   return sanitizeObjectSegment(value.toLowerCase()).toLowerCase();

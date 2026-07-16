@@ -3,20 +3,13 @@ export type ResearchRunBundleFile = {
   name: string;
 };
 
-function safeBundlePart(value: string) {
-  return value
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
-
 function toBytes(data: string | Uint8Array) {
   return typeof data === "string" ? new TextEncoder().encode(data) : data;
 }
 
 function safeTarName(name: string) {
   const basename = name.split(/[\\/]/).at(-1) || "file";
-  return safeBundlePart(basename) || "file";
+  return sanitizeArtifactFilenamePart(basename) || "file";
 }
 
 function writeAscii(
@@ -104,8 +97,14 @@ export function createResearchRunBundleFilename({
   recordedAt?: Date;
   runId: string;
 }) {
-  const safeName = safeBundlePart([gameId || "game", runId].join("-"));
-  const timestamp = recordedAt.toISOString().replace(/[:.]/g, "-");
-
-  return `pixelated-research-bundle-${safeName}-${timestamp}.tar`;
+  return createPlayerArtifactFilename({
+    extension: "tar",
+    identity: [gameId || "game", runId],
+    prefix: "pixelated-research-bundle",
+    recordedAt,
+  });
 }
+import {
+  createPlayerArtifactFilename,
+  sanitizeArtifactFilenamePart,
+} from "../artifactFilename.ts";

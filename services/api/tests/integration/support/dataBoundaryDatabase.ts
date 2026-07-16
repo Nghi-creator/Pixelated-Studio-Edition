@@ -177,6 +177,50 @@ export class FakeSupabase {
       return { data: null, error: null };
     }
 
+    if (fn === "create_submission_candidate") {
+      const submission = this.rows.game_submissions.find(
+        (row) => row.id === params.p_submission_id,
+      );
+      const candidatePayload = params.p_candidate as RecordRow;
+      const candidate = {
+        id: `catalog_ingestion_candidates-${
+          this.rows.catalog_ingestion_candidates.length + 1
+        }`,
+        ...candidatePayload,
+      };
+      this.rows.catalog_ingestion_candidates.push(candidate);
+      if (submission) {
+        Object.assign(submission, {
+          catalog_candidate_id: candidate.id,
+          review_notes: params.p_review_notes,
+          reviewed_at: new Date().toISOString(),
+          reviewed_by: params.p_reviewer_id,
+          status: "candidate_created",
+          updated_at: new Date().toISOString(),
+        });
+      }
+      return {
+        data: { candidate, submission: submission || null },
+        error: null,
+      };
+    }
+
+    if (fn === "resolve_comment_report") {
+      if (params.p_action === "ban_user") {
+        const profile = this.rows.profiles.find(
+          (row) => row.id === params.p_target_user_id,
+        );
+        if (profile) profile.is_banned = true;
+      }
+      this.rows.comments = this.rows.comments.filter(
+        (row) => row.id !== params.p_comment_id,
+      );
+      this.rows.reported_comments = this.rows.reported_comments.filter(
+        (row) => row.comment_id !== params.p_comment_id,
+      );
+      return { data: null, error: null };
+    }
+
     if (fn === "admin_access_log_summary") {
       const page = Math.max(1, Number(params.p_page || 1));
       const pageSize = Math.min(100, Math.max(1, Number(params.p_page_size || 25)));

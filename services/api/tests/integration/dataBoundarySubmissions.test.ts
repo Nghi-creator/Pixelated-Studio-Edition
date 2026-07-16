@@ -188,6 +188,52 @@ test("admins can turn a game submission into a catalog candidate", async () => {
     db.rows.game_submissions[0]?.catalog_candidate_id,
     db.rows.catalog_ingestion_candidates[0]?.id,
   );
+  assert.equal(db.rpcCalls.at(-1)?.fn, "create_submission_candidate");
+  await app.close();
+});
+
+test("candidate creation preserves the pending submission when its transaction fails", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const romBytes = validNesRom();
+  const romUrl =
+    "https://example.com/storage/v1/object/public/submissions/user/roms/tiny.nes";
+  db.rows.game_submissions.push({
+    author_name: "Pixel Dev",
+    banner_url: null,
+    cover_url: null,
+    created_at: "2026-07-02T10:00:00.000Z",
+    description: "A tiny NES game",
+    email: "dev@example.com",
+    game_title: "Tiny Quest",
+    id: SUBMISSION_ID,
+    rom_url: romUrl,
+    status: "pending",
+    submitter_id: USER_ID,
+  });
+  db.rpcErrors.set(
+    "create_submission_candidate",
+    new Error("atomic candidate write failed"),
+  );
+  const app = await createDataBoundaryApp(db, ADMIN_ID, romBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: {
+      action: "create_candidate",
+      attribution_text: "Tiny Quest by Pixel Dev.",
+      code_license_spdx: "MIT",
+      license_url: "https://example.com/license",
+      noncommercial_hosting_allowed: true,
+      source_repo_url: "https://example.com/tiny-quest",
+    },
+    url: `/admin/submissions/${SUBMISSION_ID}`,
+  });
+
+  assert.equal(response.statusCode, 500);
+  assert.equal(db.rows.catalog_ingestion_candidates.length, 0);
+  assert.equal(db.rows.game_submissions[0]?.status, "pending");
+  assert.equal(db.rows.game_submissions[0]?.catalog_candidate_id, undefined);
   await app.close();
 });
 

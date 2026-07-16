@@ -6,6 +6,7 @@ import {
 } from "../../auth/supabaseAuth.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import { createRateLimiter } from "../../security/sharedRateLimiter.js";
+import { requireAuthenticatedService } from "../../security/authenticatedService.js";
 
 const gameParamsSchema = z.object({
   gameId: z.string().uuid(),
@@ -34,16 +35,9 @@ export async function registerPlayCountRoutes(
     "/games/:gameId/play-count",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
-
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+      const authenticated = requireAuthenticatedService(request, reply, service);
+      if (!authenticated) return;
+      const { service: authenticatedService, user } = authenticated;
 
       const parsedParams = gameParamsSchema.safeParse(request.params);
       if (!parsedParams.success) {
@@ -59,7 +53,7 @@ export async function registerPlayCountRoutes(
         return;
       }
 
-      const { error } = await service.rpc("increment_play_count", {
+      const { error } = await authenticatedService.rpc("increment_play_count", {
         game_id: parsedParams.data.gameId,
       });
 

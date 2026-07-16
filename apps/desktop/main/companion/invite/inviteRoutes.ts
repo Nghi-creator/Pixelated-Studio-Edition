@@ -19,16 +19,11 @@ import {
   getCompanionInviteStatus,
   recordCompanionInviteFailure,
 } from "./inviteState";
+import { normalizeInviteCode } from "./inviteCode";
 
 const INVITE_PATH = "/invite";
 const PREFLIGHT_INVITE_PATH = "/invite/preflight";
 const REDEEM_INVITE_PATH = "/invite/redeem";
-
-function normalizeInviteCode(value: unknown) {
-  return typeof value === "string"
-    ? value.toUpperCase().replace(/[^A-Z0-9]/g, "")
-    : "";
-}
 
 export async function handleInviteRequest(
   req: IncomingMessage,

@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import crypto from "node:crypto";
+import { sanitizeCatalogObjectSegment } from "../domain/catalogObjectPath.js";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -118,15 +119,8 @@ export function parseCaptureCommand(command: string): ParsedCaptureCommand {
   return { args, file };
 }
 
-function sanitizeObjectSegment(value: string) {
-  return (
-    value
-      .trim()
-      .replace(/[^a-zA-Z0-9._-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 120) || "artwork"
-  );
-}
+const sanitizeObjectSegment = (value: string) =>
+  sanitizeCatalogObjectSegment(value, "artwork");
 
 function escapeSvgText(value: string) {
   return value

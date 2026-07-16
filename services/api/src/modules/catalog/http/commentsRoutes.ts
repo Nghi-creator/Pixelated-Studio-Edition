@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { isAdminRole } from "../domain/catalogPolicy.js";
 import { getUserRole } from "../services/catalogService.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
+import { requireAuthenticatedService } from "../../security/authenticatedService.js";
 import type { CatalogRouteContext } from "./catalogRouteContext.js";
 import {
   commentBodySchema,
@@ -54,13 +55,9 @@ export function registerCommentRoutes(
     "/games/:gameId/comments",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+      const authenticated = requireAuthenticatedService(request, reply, service);
+      if (!authenticated) return;
+      const { service: authenticatedService, user } = authenticated;
 
       const params = gameParamsSchema.safeParse(request.params);
       const body = commentBodySchema.safeParse(request.body);
@@ -77,7 +74,7 @@ export function registerCommentRoutes(
         return;
       }
 
-      const { error } = await service.from("comments").insert({
+      const { error } = await authenticatedService.from("comments").insert({
         content: body.data.content,
         game_id: params.data.gameId,
         user_id: user.id,
@@ -94,18 +91,17 @@ export function registerCommentRoutes(
     "/comments/:commentId",
     { preHandler: requireUser },
     async (request, reply) => {
-      const user = request.user;
-      if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+      const authenticated = requireAuthenticatedService(request, reply, service);
+      if (!authenticated) return;
+      const { service: authenticatedService, user } = authenticated;
       const params = commentParamsSchema.safeParse(request.params);
       if (!params.success) return reply.status(400).send({ error: "Invalid comment id" });
 
-      const role = await getUserRole(service, user.id);
-      let query = service.from("comments").delete().eq("id", params.data.commentId);
+      const role = await getUserRole(authenticatedService, user.id);
+      let query = authenticatedService
+        .from("comments")
+        .delete()
+        .eq("id", params.data.commentId);
       if (!isAdminRole(role)) query = query.eq("user_id", user.id);
       const { error } = await query;
       if (error) {

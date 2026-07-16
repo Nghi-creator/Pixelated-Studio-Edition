@@ -82,14 +82,12 @@ export function createResearchRunEventsFilename({
   recordedAt?: Date;
   runId: string;
 }) {
-  const safeName = [gameId || "game", runId]
-    .join("-")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-  const timestamp = recordedAt.toISOString().replace(/[:.]/g, "-");
-
-  return `pixelated-research-events-${safeName}-${timestamp}.csv`;
+  return createPlayerArtifactFilename({
+    extension: "csv",
+    identity: [gameId || "game", runId],
+    prefix: "pixelated-research-events",
+    recordedAt,
+  });
 }
 
 export function findFirstEventElapsedMs(
@@ -98,3 +96,4 @@ export function findFirstEventElapsedMs(
 ) {
   return events.find((event) => event.name === name)?.elapsedMs ?? null;
 }
+import { createPlayerArtifactFilename } from "../artifactFilename.ts";

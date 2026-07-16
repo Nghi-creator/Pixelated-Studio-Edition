@@ -166,12 +166,11 @@ export function createStreamTelemetryCsvFilename({
   recordedAt?: Date;
   sessionId: string;
 }) {
-  const safeName = [gameId || "game", sessionId || "session"]
-    .join("-")
-    .replace(/[^a-zA-Z0-9._-]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-  const timestamp = recordedAt.toISOString().replace(/[:.]/g, "-");
-
-  return `pixelated-stream-telemetry-${safeName}-${timestamp}.csv`;
+  return createPlayerArtifactFilename({
+    extension: "csv",
+    identity: [gameId || "game", sessionId || "session"],
+    prefix: "pixelated-stream-telemetry",
+    recordedAt,
+  });
 }
+import { createPlayerArtifactFilename } from "../artifactFilename.ts";
