@@ -36,6 +36,7 @@ import {
   createEngineControllerState,
   resetEngineControllerState,
 } from "./controllerState";
+import { emitDockerDiagnostic } from "./diagnosticEvents";
 import {
   createEngineLaunchContext,
   createLanInvite,
@@ -44,17 +45,15 @@ import {
 import {
   cancelDockerRecoveryWorkflow,
   runDockerRecovery,
-} from "./recoveryWorkflow";
-import { runRuntimeSwitch } from "./runtimeSwitchWorkflow";
+} from "./workflows/recoveryWorkflow";
+import { runRuntimeSwitch } from "./workflows/runtimeSwitchWorkflow";
 import {
   buildEngineImageWorkflow,
   continueEngineStartup,
-  emitDockerDiagnostic,
   rejectInvalidImage,
-} from "./startupWorkflow";
+} from "./workflows/startupWorkflow";
 
 export type { EngineClientPayload } from "./controllerTypes";
-export { createImageRecoveryPayload } from "./imageRecovery";
 
 const defaultDependencies: EngineControllerDependencies = {
   diagnoseDocker,
@@ -244,18 +243,32 @@ export function cancelDockerRecovery(event: IpcMainEvent) {
   cancelDockerRecoveryWorkflow(state, event);
 }
 
-export function stopEngine(event: IpcMainEvent) {
+function resetEngineForShutdown() {
   state.activeStartupAttempt += 1;
   state.startupInProgress = false;
   state.recoveryInProgress = false;
-  emitEngineState(event, "STOPPING");
-  event.reply("server-log", "Initiating shutdown sequence...");
+}
+
+function stopCompanionForShutdown() {
   const safeEnv = state.dependencies.getSafeEnv();
   state.dependencies.stopCompanionServer();
   state.activeCompanion = null;
+  return safeEnv;
+}
 
-  void state.dependencies
-    .execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+function removeEngineContainer(safeEnv: NodeJS.ProcessEnv) {
+  return state.dependencies.execFileCommand("docker", removeEngineContainerArgs, {
+    env: safeEnv,
+  });
+}
+
+export function stopEngine(event: IpcMainEvent) {
+  resetEngineForShutdown();
+  emitEngineState(event, "STOPPING");
+  event.reply("server-log", "Initiating shutdown sequence...");
+  const safeEnv = stopCompanionForShutdown();
+
+  void removeEngineContainer(safeEnv)
     .then(() => {
       event.reply("server-log", "Engine successfully terminated.");
     })
@@ -280,17 +293,12 @@ export function rotateEngineToken(
     return;
   }
 
-  state.activeStartupAttempt += 1;
-  state.startupInProgress = false;
-  state.recoveryInProgress = false;
+  resetEngineForShutdown();
   emitEngineState(event, "STOPPING", "Rotating pairing token");
   event.reply("server-log", "Rotating host-local pairing token...");
-  const safeEnv = state.dependencies.getSafeEnv();
-  state.dependencies.stopCompanionServer();
-  state.activeCompanion = null;
+  const safeEnv = stopCompanionForShutdown();
 
-  void state.dependencies
-    .execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
+  void removeEngineContainer(safeEnv)
     .catch(() => undefined)
     .finally(() => {
       event.reply("server-log", "Restarting engine with a fresh pairing token.");
@@ -299,13 +307,7 @@ export function rotateEngineToken(
 }
 
 export function cleanupEngine() {
-  state.activeStartupAttempt += 1;
-  state.startupInProgress = false;
-  state.recoveryInProgress = false;
-  const safeEnv = state.dependencies.getSafeEnv();
-  state.dependencies.stopCompanionServer();
-  state.activeCompanion = null;
-  void state.dependencies
-    .execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
-    .catch(() => undefined);
+  resetEngineForShutdown();
+  const safeEnv = stopCompanionForShutdown();
+  void removeEngineContainer(safeEnv).catch(() => undefined);
 }

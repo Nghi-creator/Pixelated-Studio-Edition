@@ -1,14 +1,14 @@
 import type { IpcMainEvent } from "electron";
-import type { EngineRuntimeKind } from "../runtime/config";
-import { removeEngineContainerArgs } from "../docker/commands";
-import { emitEngineState } from "../runtime/state";
+import type { EngineRuntimeKind } from "../../runtime/config";
+import { removeEngineContainerArgs } from "../../docker/commands";
+import { emitEngineState } from "../../runtime/state";
 import type {
   EngineClientPayload,
   EngineHealthPayload,
-} from "./controllerTypes";
-import type { EngineControllerState } from "./controllerState";
-import type { StartEngineOptions } from "./launch";
-import { getRuntimeSwitchBlocker } from "./runtimeSwitch";
+} from "../controllerTypes";
+import type { EngineControllerState } from "../controllerState";
+import type { StartEngineOptions } from "../launch";
+import { getRuntimeSwitchBlocker } from "../runtimeSwitch";
 
 const getErrorMessage = (err: unknown) =>
   err instanceof Error ? err.message : String(err);
