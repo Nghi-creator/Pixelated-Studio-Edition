@@ -150,6 +150,30 @@ Production readiness requires both Redis REST values. Local development may omit
 
 Production enables Fastify proxy trust so `request.ip` uses the client address forwarded by Render's ingress. Keep production traffic behind a trusted ingress; do not expose the Node port directly while accepting client-supplied forwarded headers.
 
+## Shared Studio/User deployment
+
+Pixelated Studio Edition is the sole migration authority for the Supabase project shared by
+both editions. User Edition must not push or repair migration history.
+
+The shared API supports Studio WebRTC sessions and authenticated User Edition WASM sessions.
+Executable ROMs belong in the private `catalog_roms` bucket; public covers and backdrops remain
+in `catalog_artifacts`. The API signs private ROM URLs for User Edition session creation and
+again when the Studio engine verifies a session.
+
+Deploy the shared contract in this order:
+
+1. Confirm local and remote migration history match, review
+   `20260717100000_shared_user_edition_contract.sql`, and run a database push dry-run.
+2. Apply that migration once from this repository. It is additive and does not move or delete
+   existing objects.
+3. Deploy this compatible API before changing any `game_builds.artifact_url` records.
+4. Run `npm run mirror:catalog-artifacts -- --dry-run`; inspect every proposed object, then run
+   it with `--apply` to copy verified ROMs and update their canonical URLs.
+5. Smoke-test both editions, signed URL expiry/CORS, checksum rejection, rate limiting, and
+   idempotent play counting.
+6. Only then remove the matching legacy ROM objects from public `catalog_artifacts` paths.
+   Never perform recursive bucket-wide cleanup because artwork shares that bucket.
+
 ## Abuse-control limits
 
 | Workflow | Limit | Coordination |

@@ -380,12 +380,26 @@ test("play counts are incremented through the backend RPC boundary", async () =>
 
   const response = await app.inject({
     method: "POST",
+    payload: {
+      clientEdition: "studio",
+      playEventId: "play_1111111111111111",
+      runtimeKind: "webrtc",
+    },
     url: `/games/${GAME_ID}/play-count`,
   });
 
   assert.equal(response.statusCode, 200);
   assert.deepEqual(db.rpcCalls, [
-    { fn: "increment_play_count", params: { game_id: GAME_ID } },
+    {
+      fn: "record_game_play",
+      params: {
+        p_client_edition: "studio",
+        p_event_id: "play_1111111111111111",
+        p_game_id: GAME_ID,
+        p_runtime_kind: "webrtc",
+        p_user_id: USER_ID,
+      },
+    },
   ]);
   await app.close();
 });

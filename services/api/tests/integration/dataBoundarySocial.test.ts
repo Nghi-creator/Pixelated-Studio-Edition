@@ -277,17 +277,27 @@ test("write-heavy social and play routes are rate limited per user", async () =>
   for (let attempt = 0; attempt < 60; attempt += 1) {
     const response = await playsApp.inject({
       method: "POST",
+      payload: {
+        clientEdition: "studio",
+        playEventId: `play_${String(attempt).padStart(16, "0")}`,
+        runtimeKind: "webrtc",
+      },
       url: `/games/${GAME_ID}/play-count`,
     });
     assert.equal(response.statusCode, 200);
   }
   const blockedPlay = await playsApp.inject({
     method: "POST",
+    payload: {
+      clientEdition: "studio",
+      playEventId: "play_blocked00000000",
+      runtimeKind: "webrtc",
+    },
     url: `/games/${GAME_ID}/play-count`,
   });
   assert.equal(blockedPlay.statusCode, 429);
   assert.equal(
-    playsDb.rpcCalls.filter((call) => call.fn === "increment_play_count").length,
+    playsDb.rpcCalls.filter((call) => call.fn === "record_game_play").length,
     60,
   );
   await playsApp.close();
@@ -325,6 +335,45 @@ test("profile routes update only the authenticated profile and safely delete aut
   assert.deepEqual(db.deletedUsers, [USER_ID]);
   assert.deepEqual(db.storageObjects.avatars, []);
   assert.deepEqual(db.storageObjects.submissions, [`${OTHER_USER_ID}/roms/other.nes`]);
+  await app.close();
+});
+
+test("profile activity returns only the authenticated user's recent games", async () => {
+  const db = new FakeSupabase();
+  db.rows.games.push({ cover_url: "/tiny.png", id: GAME_ID, title: "Tiny Quest" });
+  db.rows.user_game_activity.push(
+    {
+      client_edition: "user",
+      game_id: GAME_ID,
+      last_played_at: "2026-07-16T12:00:00.000Z",
+      play_count: 3,
+      runtime_kind: "wasm",
+      user_id: USER_ID,
+    },
+    {
+      client_edition: "studio",
+      game_id: GAME_ID,
+      last_played_at: "2026-07-16T13:00:00.000Z",
+      play_count: 9,
+      runtime_kind: "webrtc",
+      user_id: OTHER_USER_ID,
+    },
+  );
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/profile/activity?limit=8",
+  });
+
+  assert.equal(response.statusCode, 200);
+  const activity = response.json<{ activity: Record<string, unknown>[] }>().activity;
+  assert.equal(activity.length, 1);
+  assert.equal(activity[0]?.client_edition, "user");
+  assert.equal(
+    (activity[0]?.game as Record<string, unknown>)?.title,
+    "Tiny Quest",
+  );
   await app.close();
 });
 

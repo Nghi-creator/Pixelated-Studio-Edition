@@ -213,10 +213,10 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
   assert.equal(db.rows.game_builds[0]?.runtime_id, "mesen");
   assert.match(
     String(db.rows.game_builds[0]?.artifact_url),
-    /^https:\/\/storage\.example\.test\/catalog_artifacts\/homebrew-hub\//,
+    /^https:\/\/storage\.example\.test\/catalog_roms\/homebrew-hub\//,
   );
   assert.equal(db.uploadedStorageObjects.length, 2);
-  assert.equal(db.uploadedStorageObjects[0]?.bucket, "catalog_artifacts");
+  assert.equal(db.uploadedStorageObjects[0]?.bucket, "catalog_roms");
   assert.equal(db.uploadedStorageObjects[0]?.bytes, artifactBytes.length);
   assert.equal(db.uploadedStorageObjects[1]?.bucket, "catalog_artifacts");
   assert.match(
@@ -292,7 +292,7 @@ test("admin can promote a curated SNES candidate into a bsnes build", async () =
   assert.equal(db.rows.games[0]?.rom_filename, "demo.sfc");
   assert.match(
     String(db.rows.games[0]?.rom_url),
-    /^https:\/\/storage\.example\.test\/catalog_artifacts\/curated-roms\//,
+    /^https:\/\/storage\.example\.test\/catalog_roms\/curated-roms\//,
   );
   assert.equal(db.rows.game_builds.length, 1);
   assert.equal(db.rows.game_builds[0]?.runtime_id, "bsnes");
@@ -300,7 +300,7 @@ test("admin can promote a curated SNES candidate into a bsnes build", async () =
   assert.equal(db.rows.game_builds[0]?.artifact_filename, "demo.sfc");
   assert.match(
     String(db.rows.game_builds[0]?.artifact_url),
-    /^https:\/\/storage\.example\.test\/catalog_artifacts\/curated-roms\//,
+    /^https:\/\/storage\.example\.test\/catalog_roms\/curated-roms\//,
   );
   assert.equal(db.uploadedStorageObjects.length, 2);
   assert.match(

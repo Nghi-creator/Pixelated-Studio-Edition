@@ -1,7 +1,8 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useCountPlayMutation } from "./playerMutations";
 
 export function usePlayCount(gameId: string | undefined) {
+  const eventRef = useRef<{ gameId: string; playEventId: string } | null>(null);
   const { mutate } = useCountPlayMutation({
     onError: (err) => {
       console.error("Failed to count play:", err);
@@ -14,7 +15,14 @@ export function usePlayCount(gameId: string | undefined) {
   useEffect(() => {
     if (!gameId) return;
 
-    const timer = setTimeout(() => mutate(gameId), 30000);
+    if (eventRef.current?.gameId !== gameId) {
+      eventRef.current = {
+        gameId,
+        playEventId: `play_${crypto.randomUUID().replaceAll("-", "")}`,
+      };
+    }
+    const event = eventRef.current;
+    const timer = setTimeout(() => mutate(event), 30000);
 
     return () => clearTimeout(timer);
   }, [gameId, mutate]);

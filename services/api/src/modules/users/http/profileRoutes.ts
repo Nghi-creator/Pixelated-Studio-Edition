@@ -19,6 +19,23 @@ const profileUpdateSchema = z.object({
 const deleteAccountSchema = z.object({
   confirmation: z.literal("DELETE"),
 });
+const profileActivityQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(20).default(8),
+});
+
+type GameActivityRow = {
+  client_edition: "studio" | "user";
+  game_id: string;
+  last_played_at: string;
+  play_count: number;
+  runtime_kind: "wasm" | "webrtc" | "native";
+};
+
+type ActivityGameRow = {
+  cover_url: string | null;
+  id: string;
+  title: string;
+};
 
 const ACCOUNT_DELETE_RECENT_SIGN_IN_MS = 10 * 60 * 1000;
 const ACCOUNT_DELETE_RATE_LIMIT = 3;
@@ -128,6 +145,60 @@ export async function registerProfileRoutes(
       }
 
       return { profile: data || null };
+    },
+  );
+
+  app.get(
+    "/profile/activity",
+    { preHandler: requireUser },
+    async (request, reply) => {
+      const user = request.user;
+      if (!user) {
+        return reply.status(401).send({ error: "Missing authenticated user" });
+      }
+      if (!service) {
+        return reply.status(503).send({
+          error: "Supabase service client is not configured for the API.",
+        });
+      }
+
+      const query = profileActivityQuerySchema.safeParse(request.query);
+      if (!query.success) {
+        return reply.status(400).send({ error: "Invalid profile activity query" });
+      }
+
+      const { data: activityRows, error: activityError } = await service
+        .from("user_game_activity")
+        .select("game_id,client_edition,runtime_kind,play_count,last_played_at")
+        .eq("user_id", user.id)
+        .order("last_played_at", { ascending: false })
+        .limit(query.data.limit)
+        .returns<GameActivityRow[]>();
+      if (activityError) {
+        request.log.error({ err: activityError }, "Failed to load profile activity");
+        return reply.status(500).send({ error: "Failed to load profile activity" });
+      }
+
+      const rows = activityRows || [];
+      if (rows.length === 0) return { activity: [] };
+
+      const { data: games, error: gamesError } = await service
+        .from("games")
+        .select("id,title,cover_url")
+        .in("id", [...new Set(rows.map((row) => row.game_id))])
+        .returns<ActivityGameRow[]>();
+      if (gamesError) {
+        request.log.error({ err: gamesError }, "Failed to load activity games");
+        return reply.status(500).send({ error: "Failed to load profile activity" });
+      }
+
+      const gamesById = new Map((games || []).map((game) => [game.id, game]));
+      return {
+        activity: rows.flatMap((row) => {
+          const game = gamesById.get(row.game_id);
+          return game ? [{ ...row, game }] : [];
+        }),
+      };
     },
   );
 

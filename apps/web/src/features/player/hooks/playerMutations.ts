@@ -24,7 +24,8 @@ export function useCountPlayMutation({
   onSuccess?: () => void;
 } = {}) {
   return useMutation({
-    mutationFn: (gameId: string) => api.countPlay(gameId),
+    mutationFn: ({ gameId, playEventId }: { gameId: string; playEventId: string }) =>
+      api.countPlay(gameId, playEventId),
     onError,
     onSuccess,
   });

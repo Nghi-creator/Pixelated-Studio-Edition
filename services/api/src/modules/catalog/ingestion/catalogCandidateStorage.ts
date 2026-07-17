@@ -71,7 +71,7 @@ export async function mirrorCandidateArtifact(
     `${candidate.artifact_sha256}-${sanitizeObjectSegment(candidate.artifact_filename)}`,
   ].join("/");
 
-  const bucket = service.storage.from("catalog_artifacts");
+  const bucket = service.storage.from("catalog_roms");
   const { error: uploadError } = await bucket.upload(objectPath, bytes, {
     contentType: "application/octet-stream",
     upsert: true,
@@ -80,7 +80,7 @@ export async function mirrorCandidateArtifact(
 
   const { data } = bucket.getPublicUrl(objectPath);
   if (!data.publicUrl) {
-    throw new Error("Failed to resolve mirrored artifact public URL.");
+    throw new Error("Failed to resolve mirrored artifact storage URL.");
   }
 
   return {

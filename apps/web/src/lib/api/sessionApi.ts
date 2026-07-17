@@ -12,9 +12,11 @@ export function createSessionApi({ apiRequest }: SessionApiDependencies) {
     createSession: (gameId: string, clientSessionId: string) =>
       apiRequest<ApiSessionResponse>("/sessions", {
         body: JSON.stringify({
+          clientEdition: "studio",
           clientSessionId,
           gameId,
           mode: "cloud",
+          runtimeKind: "webrtc",
         }),
         method: "POST",
       }),

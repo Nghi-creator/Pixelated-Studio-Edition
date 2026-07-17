@@ -1,11 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
-  attachOptionalSupabaseUser,
   requireSupabaseUser,
   supabaseService,
 } from "../supabaseAuth.js";
 import { assertBuildBootable, mapBoot } from "../domain/sessionBoot.js";
+import {
+  createSignedCatalogRomUrl,
+  getBrowserEligibility,
+  isPrivateCatalogRomUrl,
+} from "../domain/browserArtifact.js";
 import {
   createSessionId,
   createSessionToken,
@@ -21,11 +25,13 @@ import { CandidateValidationError } from "../../catalog/ingestion/catalogCandida
 import { createRateLimiter } from "../../security/sharedRateLimiter.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import type { RateLimiter } from "../../security/sharedRateLimiter.js";
+import { env } from "../../../config/env.js";
 
 const SESSION_TTL_MS = 15 * 60 * 1000;
 const sessionIdSchema = z.string().regex(/^[a-zA-Z0-9_-]+$/).max(80);
 
 const createSessionBodySchema = z.object({
+  clientEdition: z.enum(["studio", "user"]).default("studio"),
   clientSessionId: z
     .string()
     .regex(/^[a-zA-Z0-9_-]+$/)
@@ -33,10 +39,12 @@ const createSessionBodySchema = z.object({
     .optional(),
   gameId: z.string().uuid(),
   mode: z.enum(["cloud", "local"]).default("cloud"),
+  runtimeKind: z.enum(["wasm", "webrtc", "native"]).default("webrtc"),
 });
 
 type SessionRouteOptions = {
-  optionalUser?: typeof attachOptionalSupabaseUser;
+  artifactUrlLimiter?: RateLimiter;
+  signCatalogRom?: (artifactUrl: string, expiresInSeconds: number) => Promise<string>;
   requireUser?: typeof requireSupabaseUser;
   sessionCreateLimiter?: RateLimiter;
   supabase?: SupabaseServiceLike | null;
@@ -46,16 +54,24 @@ export async function registerSessionRoutes(
   app: FastifyInstance,
   options: SessionRouteOptions = {},
 ) {
-  const optionalUser = options.optionalUser || attachOptionalSupabaseUser;
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
   const sessionCreateLimiter =
     options.sessionCreateLimiter ||
     createRateLimiter({
       limit: 60,
-      namespace: "session-create-ip",
+      namespace: "session-create-user",
       windowMs: 60_000,
     });
+  const artifactUrlLimiter = options.artifactUrlLimiter || createRateLimiter({
+    limit: env.BROWSER_ARTIFACT_RATE_LIMIT_PER_MINUTE,
+    namespace: "browser-artifact-user",
+    windowMs: 60_000,
+  });
+  const signCatalogRom = options.signCatalogRom || (async (artifactUrl, expiresInSeconds) => {
+    if (!service || !env.SUPABASE_URL) throw new Error("Supabase artifact signing is not configured.");
+    return createSignedCatalogRomUrl({ artifactUrl, expiresInSeconds, service, supabaseUrl: env.SUPABASE_URL });
+  });
   const verificationIpLimiter = createRateLimiter({
     limit: 1_000,
     namespace: "session-verification-ip",
@@ -69,13 +85,14 @@ export async function registerSessionRoutes(
 
   app.post(
     "/sessions",
-    { preHandler: optionalUser },
+    { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
+      if (!user) return reply.status(401).send({ error: "Authentication is required to create a session." });
       if (
         rejectRateLimitedRequest(
           reply,
-          await sessionCreateLimiter.consume(user?.id || request.ip),
+          await sessionCreateLimiter.consume(user.id),
           "Session creation rate limit reached. Please try again shortly.",
         )
       ) {
@@ -122,6 +139,12 @@ export async function registerSessionRoutes(
         throw err;
       }
       const launchManifestId = build.launch_manifest_id || null;
+      const browser = getBrowserEligibility(build);
+      const requestsBrowserArtifact =
+        parsedBody.data.clientEdition === "user" && parsedBody.data.runtimeKind === "wasm";
+      if (requestsBrowserArtifact && !browser.eligible) {
+        return reply.status(422).send({ error: browser.reason || "This build is not browser compatible." });
+      }
 
       const sessionId = createSessionId(parsedBody.data.clientSessionId);
       const existingSession = await getLiveSession(service, sessionId);
@@ -131,9 +154,35 @@ export async function registerSessionRoutes(
         });
       }
 
+      let signedArtifactUrl: string | null = null;
+      let artifactUrlExpiresAt: string | null = null;
+      if (requestsBrowserArtifact) {
+        if (
+          rejectRateLimitedRequest(
+            reply,
+            await artifactUrlLimiter.consume(user.id),
+            "Catalog ROM URL limit reached. Please try again shortly.",
+          )
+        ) {
+          return;
+        }
+        try {
+          signedArtifactUrl = await signCatalogRom(
+            build.artifact_url || "",
+            env.BROWSER_ARTIFACT_URL_TTL_SECONDS,
+          );
+          artifactUrlExpiresAt = new Date(
+            Date.now() + env.BROWSER_ARTIFACT_URL_TTL_SECONDS * 1000,
+          ).toISOString();
+        } catch (err) {
+          request.log.error({ err, gameId: parsedBody.data.gameId }, "Failed to sign browser catalog ROM URL");
+          return reply.status(503).send({ error: "The catalog ROM is temporarily unavailable." });
+        }
+      }
+
       const sessionToken = createSessionToken();
       const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
-      const boot = {
+      const storedBoot = {
         artifactSha256: build.artifact_sha256 || null,
         artifactSize: build.artifact_size || null,
         launchManifestId,
@@ -142,23 +191,32 @@ export async function registerSessionRoutes(
         runtimeId: build.runtime_id,
         runtimeKind: build.runtime_kind,
       };
+      const boot = {
+        ...storedBoot,
+        browser: { ...browser, artifactUrlExpiresAt },
+        romUrl: signedArtifactUrl || storedBoot.romUrl,
+      };
 
       const { error: sessionError } = await service
         .from("backend_sessions")
         .insert({
-          boot_artifact_sha256: boot.artifactSha256,
-          boot_artifact_size: boot.artifactSize,
-          boot_launch_manifest_id: boot.launchManifestId,
-          boot_rom_filename: boot.romFilename,
-          boot_rom_url: boot.romUrl,
-          boot_runtime_id: boot.runtimeId,
+          boot_artifact_sha256: storedBoot.artifactSha256,
+          boot_artifact_size: storedBoot.artifactSize,
+          boot_launch_manifest_id: storedBoot.launchManifestId,
+          boot_rom_filename: storedBoot.romFilename,
+          boot_rom_url: storedBoot.romUrl,
+          boot_runtime_id: storedBoot.runtimeId,
+          browser_core_id: browser.coreId,
+          browser_system_id: browser.systemId,
+          client_edition: parsedBody.data.clientEdition,
+          client_runtime_kind: parsedBody.data.runtimeKind,
           deleted_at: null,
           expires_at: expiresAt,
           game_id: parsedBody.data.gameId,
           id: sessionId,
           mode: parsedBody.data.mode,
           session_token_hash: hashSessionToken(sessionToken),
-          user_id: user?.id || null,
+          user_id: user.id,
         });
 
       if (sessionError) {
@@ -178,7 +236,7 @@ export async function registerSessionRoutes(
         sessionId,
         sessionToken,
         user: {
-          id: user?.id || null,
+          id: user.id,
         },
       };
     },
@@ -299,8 +357,34 @@ export async function registerSessionRoutes(
       return reply.status(401).send({ error: "Invalid or expired session" });
     }
 
+    let verifiedRomUrl = session.boot_rom_url;
+    let artifactUrlExpiresAt: string | null = null;
+    if (verifiedRomUrl && isPrivateCatalogRomUrl(verifiedRomUrl)) {
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          await artifactUrlLimiter.consume(session.user_id || session.id),
+          "Catalog ROM URL limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
+      }
+      try {
+        verifiedRomUrl = await signCatalogRom(
+          verifiedRomUrl,
+          env.BROWSER_ARTIFACT_URL_TTL_SECONDS,
+        );
+        artifactUrlExpiresAt = new Date(
+          Date.now() + env.BROWSER_ARTIFACT_URL_TTL_SECONDS * 1000,
+        ).toISOString();
+      } catch (err) {
+        request.log.error({ err, sessionId: session.id }, "Failed to sign catalog ROM URL");
+        return reply.status(503).send({ error: "The catalog ROM is temporarily unavailable." });
+      }
+    }
+
     return {
-      boot: mapBoot(session),
+      boot: mapBoot(session, { artifactUrlExpiresAt, romUrl: verifiedRomUrl }),
       expiresAt: session.expires_at,
       gameId: session.game_id,
       mode: session.mode,

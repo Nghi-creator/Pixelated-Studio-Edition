@@ -222,7 +222,7 @@ export async function promoteCandidate(
       review_notes: [
         notes || candidate.review_notes,
         mirroredArtifact
-          ? `Mirrored artifact path: catalog_artifacts/${mirroredArtifact.objectPath}`
+          ? `Mirrored artifact path: catalog_roms/${mirroredArtifact.objectPath}`
           : null,
         `Generated cover path: catalog_artifacts/${generatedCover.objectPath}`,
         gameplayArtwork

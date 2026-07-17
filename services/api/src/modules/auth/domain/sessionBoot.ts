@@ -4,13 +4,23 @@ import {
 } from "../../catalog/ingestion/catalogCandidateValidation.js";
 import type { BackendSessionRow } from "../services/backendSessions.js";
 
-export function mapBoot(row: BackendSessionRow) {
+export function mapBoot(
+  row: BackendSessionRow,
+  options: { artifactUrlExpiresAt?: string | null; romUrl?: string | null } = {},
+) {
   return {
     artifactSha256: row.boot_artifact_sha256,
     artifactSize: row.boot_artifact_size,
+    browser: {
+      artifactUrlExpiresAt: options.artifactUrlExpiresAt || null,
+      coreId: row.browser_core_id,
+      eligible: Boolean(options.romUrl && row.browser_core_id && row.browser_system_id),
+      reason: row.browser_core_id ? null : "This session is not eligible for browser play.",
+      systemId: row.browser_system_id,
+    },
     launchManifestId: row.boot_launch_manifest_id,
     romFilename: row.boot_rom_filename,
-    romUrl: row.boot_rom_url,
+    romUrl: options.romUrl === undefined ? row.boot_rom_url : options.romUrl,
     runtimeId: row.boot_runtime_id,
     runtimeKind:
       row.boot_launch_manifest_id && !row.boot_rom_url && !row.boot_rom_filename
