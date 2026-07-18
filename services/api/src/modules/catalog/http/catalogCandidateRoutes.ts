@@ -357,6 +357,23 @@ export async function registerCatalogCandidateRoutes(
           readSmokeTicket(request.headers.authorization),
           smokeTicketSecret,
         );
+        const { data: claimed, error: claimError } = await service.rpc(
+          "claim_browser_smoke_artifact",
+          {
+            p_candidate_id: ticket.candidateId,
+            p_expires_at: new Date(ticket.expiresAt).toISOString(),
+            p_nonce: ticket.nonce,
+          },
+        );
+        if (claimError) {
+          request.log.error({ err: claimError }, "Failed to claim browser smoke artifact");
+          return reply.status(500).send({ error: "Failed to authorize smoke artifact" });
+        }
+        if (claimed !== true) {
+          return reply.status(409).send({
+            error: "This smoke ticket has already fetched its artifact.",
+          });
+        }
         const { data: candidate, error } = await service
           .from("catalog_ingestion_candidates")
           .select(CANDIDATE_COLUMNS)
@@ -426,23 +443,32 @@ export async function registerCatalogCandidateRoutes(
         }
         if (body.data.status === "passed") await fetchVerifiedCandidateArtifact(candidate, fetchArtifact);
 
-        const now = new Date().toISOString();
-        const { data, error } = await service
+        const { data: recorded, error: recordError } = await service.rpc(
+          "record_browser_smoke_result",
+          {
+            p_artifact_sha256: ticket.artifactSha256,
+            p_candidate_id: candidate.id,
+            p_core_id: body.data.coreId,
+            p_error: body.data.status === "failed" ? body.data.error : null,
+            p_issued_at: new Date(ticket.issuedAt).toISOString(),
+            p_reviewer_id: ticket.reviewerId,
+            p_status: body.data.status,
+          },
+        );
+        if (recordError) throw recordError;
+        if (recorded !== true) {
+          return reply.status(409).send({
+            error: "This smoke ticket has already been used.",
+          });
+        }
+
+        const { data: updatedCandidate, error: updatedCandidateError } = await service
           .from("catalog_ingestion_candidates")
-          .update({
-            browser_smoke_core_id: body.data.coreId,
-            browser_smoke_error:
-              body.data.status === "failed" ? body.data.error : null,
-            browser_smoke_status: body.data.status,
-            browser_smoke_tested_at: now,
-            browser_smoke_tested_by: ticket.reviewerId,
-            updated_at: now,
-          })
-          .eq("id", candidate.id)
           .select(CANDIDATE_COLUMNS)
+          .eq("id", candidate.id)
           .single<CandidateRow>();
-        if (error) throw error;
-        return { candidate: enrichCandidateCompatibility(data) };
+        if (updatedCandidateError) throw updatedCandidateError;
+        return { candidate: enrichCandidateCompatibility(updatedCandidate) };
       } catch (err) {
         request.log.error({ err }, "Failed to record browser smoke result");
         if (err instanceof CandidateValidationError) {

@@ -16,6 +16,7 @@ test("access-log storage errors identify missing hosted columns as schema drift"
   assert.deepEqual(response.migrations, [
     "20260603090000_repair_access_logs_path.sql",
     "20260604090000_access_log_sessions_summary.sql",
+    "20260718133000_atomic_activity_and_smoke_writes.sql",
   ]);
 });
 

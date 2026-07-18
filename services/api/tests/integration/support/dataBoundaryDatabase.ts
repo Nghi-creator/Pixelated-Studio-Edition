@@ -28,6 +28,7 @@ type Filter = {
 export class FakeSupabase {
   authListUsersCalls = 0;
   authUsers: User[] = [];
+  browserSmokeArtifactClaims = new Set<string>();
   deletedUsers: string[] = [];
   storageErrors = new Set<string>();
   signedStorageUrls: { bucket: string; expiresIn: number; path: string }[] = [];
@@ -221,6 +222,68 @@ export class FakeSupabase {
         (row) => row.comment_id !== params.p_comment_id,
       );
       return { data: null, error: null };
+    }
+
+    if (fn === "record_access_log") {
+      const sessionId = String(params.p_session_id);
+      const userId = typeof params.p_user_id === "string" ? params.p_user_id : null;
+      const existing = this.rows.access_logs.find(
+        (row) => row.session_id === sessionId,
+      );
+      const now = new Date().toISOString();
+      if (!existing) {
+        this.rows.access_logs.push({
+          access_count: 1,
+          created_at: now,
+          last_seen_at: now,
+          path: params.p_path,
+          session_id: sessionId,
+          user_id: userId,
+        });
+      } else if (!existing.user_id || existing.user_id === userId) {
+        existing.access_count = Number(existing.access_count || 0) + 1;
+        existing.last_seen_at = now;
+        existing.path = params.p_path;
+        existing.user_id = existing.user_id || userId;
+      }
+      return { data: null, error: null };
+    }
+
+    if (fn === "record_browser_smoke_result") {
+      const candidate = this.rows.catalog_ingestion_candidates.find(
+        (row) => row.id === params.p_candidate_id,
+      );
+      const issuedAt = Date.parse(String(params.p_issued_at));
+      const testedAt = candidate?.browser_smoke_tested_at
+        ? Date.parse(String(candidate.browser_smoke_tested_at))
+        : 0;
+      if (
+        !candidate ||
+        String(candidate.artifact_sha256).toLowerCase() !==
+          String(params.p_artifact_sha256).toLowerCase() ||
+        testedAt >= issuedAt
+      ) {
+        return { data: false, error: null };
+      }
+      Object.assign(candidate, {
+        browser_smoke_core_id: params.p_core_id,
+        browser_smoke_error:
+          params.p_status === "failed" ? params.p_error : null,
+        browser_smoke_status: params.p_status,
+        browser_smoke_tested_at: new Date().toISOString(),
+        browser_smoke_tested_by: params.p_reviewer_id,
+        updated_at: new Date().toISOString(),
+      });
+      return { data: true, error: null };
+    }
+
+    if (fn === "claim_browser_smoke_artifact") {
+      const nonce = String(params.p_nonce);
+      if (this.browserSmokeArtifactClaims.has(nonce)) {
+        return { data: false, error: null };
+      }
+      this.browserSmokeArtifactClaims.add(nonce);
+      return { data: true, error: null };
     }
 
     if (fn === "admin_access_log_summary") {

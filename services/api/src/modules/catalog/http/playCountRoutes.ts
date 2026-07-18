@@ -20,6 +20,12 @@ const playCountBodySchema = z.object({
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
 type PlayCountRouteOptions = {
+  hasLivePlaySession?: (input: {
+    clientEdition: "studio" | "user";
+    gameId: string;
+    runtimeKind: "wasm" | "webrtc" | "native";
+    userId: string;
+  }) => Promise<boolean>;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
 };
@@ -30,6 +36,22 @@ export async function registerPlayCountRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const hasLivePlaySession = options.hasLivePlaySession || (async (input) => {
+    if (!service) return false;
+    const { data, error } = await service
+      .from("backend_sessions")
+      .select("id")
+      .eq("user_id", input.userId)
+      .eq("game_id", input.gameId)
+      .eq("client_edition", input.clientEdition)
+      .eq("client_runtime_kind", input.runtimeKind)
+      .is("deleted_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .limit(1)
+      .maybeSingle<{ id: string }>();
+    if (error) throw error;
+    return Boolean(data);
+  });
   const playCountWriteLimiter = createRateLimiter({
     limit: 60,
     namespace: "play-count-write",
@@ -61,7 +83,22 @@ export async function registerPlayCountRoutes(
       ) {
         return;
       }
-
+      try {
+        const hasEvidence = await hasLivePlaySession({
+          clientEdition: parsedBody.data.clientEdition,
+          gameId: parsedParams.data.gameId,
+          runtimeKind: parsedBody.data.runtimeKind,
+          userId: user.id,
+        });
+        if (!hasEvidence) {
+          return reply.status(409).send({
+            error: "A matching live game session is required to count play activity.",
+          });
+        }
+      } catch (error) {
+        request.log.error({ err: error }, "Failed to verify play session");
+        return reply.status(500).send({ error: "Failed to count play" });
+      }
       const { error } = await authenticatedService.rpc("record_game_play", {
         p_client_edition: parsedBody.data.clientEdition,
         p_event_id: parsedBody.data.playEventId,

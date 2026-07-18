@@ -303,6 +303,30 @@ test("write-heavy social and play routes are rate limited per user", async () =>
   await playsApp.close();
 });
 
+test("play activity requires a matching live backend session", async () => {
+  const db = new FakeSupabase();
+  const app = await createDataBoundaryApp(db, USER_ID, undefined, {
+    hasLivePlaySession: async () => false,
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      clientEdition: "user",
+      playEventId: "play_without_session_01",
+      runtimeKind: "wasm",
+    },
+    url: `/games/${GAME_ID}/play-count`,
+  });
+
+  assert.equal(response.statusCode, 409);
+  assert.equal(
+    db.rpcCalls.some((call) => call.fn === "record_game_play"),
+    false,
+  );
+  await app.close();
+});
+
 test("profile routes update only the authenticated profile and safely delete auth user", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
@@ -541,9 +565,15 @@ test("access logs upsert browser sessions", async () => {
     payload: { path: "/play/test-game", sessionId: "browser-session-1" },
     url: "/access-logs",
   });
+  const anonymousOverwrite = await app.inject({
+    method: "POST",
+    payload: { path: "/poisoned", sessionId: "browser-session-1" },
+    url: "/access-logs",
+  });
 
   assert.equal(firstResponse.statusCode, 202);
   assert.equal(secondResponse.statusCode, 202);
+  assert.equal(anonymousOverwrite.statusCode, 202);
   assert.equal(db.rows.access_logs.length, 1);
   assert.equal(db.rows.access_logs[0]?.session_id, "browser-session-1");
   assert.equal(db.rows.access_logs[0]?.path, "/play/test-game");

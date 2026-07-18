@@ -8,6 +8,7 @@ import {
   createRateLimiter,
   type RateLimiter,
 } from "../../security/sharedRateLimiter.js";
+import { getLiveSession } from "../../auth/services/backendSessions.js";
 
 const METRIC_MIN_INTERVAL_MS = 5_000;
 const METRIC_MAX_CLOCK_SKEW_MS = 24 * 60 * 60_000;
@@ -53,6 +54,8 @@ type StreamMetricRow = {
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
 type MetricRouteOptions = {
+  hasLiveMetricSession?: (sessionId: string) => Promise<boolean>;
+  metricUserWriteLimiter?: RateLimiter;
   metricWriteLimiter?: RateLimiter;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
@@ -78,12 +81,21 @@ export async function registerMetricRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const hasLiveMetricSession = options.hasLiveMetricSession || (async (sessionId) =>
+    Boolean(service && (await getLiveSession(service, sessionId))));
   const metricWriteLimiter =
     options.metricWriteLimiter ||
     createRateLimiter({
       limit: 1,
       namespace: "stream-metric-write-user-session",
       windowMs: METRIC_MIN_INTERVAL_MS,
+    });
+  const metricUserWriteLimiter =
+    options.metricUserWriteLimiter ||
+    createRateLimiter({
+      limit: 30,
+      namespace: "stream-metric-write-user",
+      windowMs: 60_000,
     });
 
   app.post(
@@ -114,11 +126,28 @@ export async function registerMetricRoutes(
         return reply.status(400).send({ error: "Invalid stream metric timestamp" });
       }
 
-      const rateLimit = await metricWriteLimiter.consume(
+      const userRateLimit = await metricUserWriteLimiter.consume(user.id, now);
+      if (!userRateLimit.allowed) {
+        return reply.status(202).send({
+          accepted: false,
+          reason: "rate_limited",
+        });
+      }
+
+      try {
+        if (!(await hasLiveMetricSession(parsedMetric.data.sessionId))) {
+          return reply.status(404).send({ error: "Stream session is not active" });
+        }
+      } catch (error) {
+        request.log.error({ err: error }, "Failed to verify stream session");
+        return reply.status(500).send({ error: "Failed to save stream metric" });
+      }
+
+      const sessionRateLimit = await metricWriteLimiter.consume(
         `${user.id}:${parsedMetric.data.sessionId}`,
         now,
       );
-      if (!rateLimit.allowed) {
+      if (!sessionRateLimit.allowed) {
         return reply.status(202).send({
           accepted: false,
           reason: "rate_limited",

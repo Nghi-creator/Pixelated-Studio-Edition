@@ -306,6 +306,13 @@ test("admin browser smoke flow verifies the artifact and records reviewer eviden
   assert.deepEqual(artifactResponse.rawPayload, artifactBytes);
   assert.equal(artifactResponse.headers["cache-control"], "no-store");
 
+  const repeatedArtifactResponse = await app.inject({
+    headers: { authorization: `Smoke ${ticket}` },
+    method: "GET",
+    url: "/browser-smoke/artifact",
+  });
+  assert.equal(repeatedArtifactResponse.statusCode, 409);
+
   const resultResponse = await app.inject({
     headers: { authorization: `Smoke ${ticket}` },
     method: "POST",
@@ -317,6 +324,10 @@ test("admin browser smoke flow verifies the artifact and records reviewer eviden
   assert.equal(db.rows.catalog_ingestion_candidates[0]?.browser_smoke_core_id, "fceumm");
   assert.equal(db.rows.catalog_ingestion_candidates[0]?.browser_smoke_tested_by, ADMIN_ID);
   assert.ok(db.rows.catalog_ingestion_candidates[0]?.browser_smoke_tested_at);
+  assert.equal(
+    db.rpcCalls.some((call) => call.fn === "record_browser_smoke_result"),
+    true,
+  );
 
   const replayResponse = await app.inject({
     headers: { authorization: `Smoke ${ticket}` },
