@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import type { User } from "@supabase/supabase-js";
 import { getAuthSession } from "../../../lib/api/apiClient";
 import { usePermissionsQuery } from "../../../lib/api/apiQueries";
-import { queryKeys } from "../../../lib/api/queryClient";
 import { supabase } from "../../../lib/auth/supabaseClient";
 import {
   ENGINE_PAIRING_EVENT,
@@ -15,27 +13,41 @@ export function useNavbarIdentity() {
   const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const isKickingOut = useRef(false);
-  const queryClient = useQueryClient();
 
   useEffect(() => {
+    let isActive = true;
+    let receivedAuthEvent = false;
+
     const syncUser = (sessionUser: User | null) => {
+      if (!isActive) return;
       setUser(sessionUser);
       setIsSessionLoading(false);
     };
 
-    getAuthSession().then((session) => {
-      syncUser(session?.user ?? null);
-    });
+    getAuthSession()
+      .then((session) => {
+        if (!receivedAuthEvent) {
+          syncUser(session?.user ?? null);
+        }
+      })
+      .catch(() => {
+        if (!receivedAuthEvent) {
+          syncUser(null);
+        }
+      });
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.permissions() });
+      receivedAuthEvent = true;
       syncUser(session?.user ?? null);
     });
 
-    return () => subscription.unsubscribe();
-  }, [queryClient]);
+    return () => {
+      isActive = false;
+      subscription.unsubscribe();
+    };
+  }, []);
 
   const permissionsQuery = usePermissionsQuery({
     enabled: Boolean(user),

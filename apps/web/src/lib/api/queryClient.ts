@@ -64,6 +64,27 @@ export const queryKeys = {
   profile: () => ["profile"] as const,
 };
 
+const AUTH_SCOPED_QUERY_ROOTS = new Set([
+  "accessLogs",
+  "adminReports",
+  "adminUsers",
+  "authSession",
+  "catalogCandidates",
+  "favoriteIds",
+  "favorites",
+  "gameSubmissions",
+  "permissions",
+  "profile",
+]);
+
+export const clearAuthScopedQueries = (client: QueryClientInstance) => {
+  return client.resetQueries({
+    predicate: ({ queryKey }) =>
+      typeof queryKey[0] === "string" &&
+      AUTH_SCOPED_QUERY_ROOTS.has(queryKey[0]),
+  });
+};
+
 export const invalidateAdminReportsQueries = (client: QueryClientInstance) =>
   client.invalidateQueries({ queryKey: queryKeys.adminReportsRoot() });
 

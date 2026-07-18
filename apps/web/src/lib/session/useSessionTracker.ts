@@ -20,6 +20,7 @@ function getAccessSessionId() {
 export function useSessionTracker() {
   useEffect(() => {
     let isSubscribed = true;
+    let receivedAuthEvent = false;
     const accessSessionId = getAccessSessionId();
 
     const logSession = async (user_id: string | null = null) => {
@@ -40,21 +41,29 @@ export function useSessionTracker() {
     };
 
     // First attempt to grab the user payload locally
-    getAuthSession().then((session) => {
-      if (isSubscribed) {
-        logSession(session?.user?.id || null);
-      }
-    });
+    getAuthSession()
+      .then((session) => {
+        if (isSubscribed && !receivedAuthEvent) {
+          void logSession(session?.user?.id || null);
+        }
+      })
+      .catch((error) => {
+        if (isSubscribed && !receivedAuthEvent) {
+          console.error("Exception while loading the access session", error);
+        }
+      });
 
     // Also fire off if the user transitions locally
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (event === "SIGNED_IN") {
-          logSession(session?.user?.id);
+          receivedAuthEvent = true;
+          void logSession(session?.user?.id);
         } else if (event === "SIGNED_OUT") {
-          logSession(null);
+          receivedAuthEvent = true;
+          void logSession(null);
         }
-      }
+      },
     );
 
     return () => {

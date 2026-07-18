@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { QueryClient } from "@tanstack/react-query";
+import { QueryClient, QueryObserver } from "@tanstack/react-query";
 import {
+  clearAuthScopedQueries,
   invalidateAdminReportsQueries,
   invalidateAdminUsersQueries,
   invalidateFavoriteQueries,
@@ -30,6 +31,29 @@ test("query keys are stable and scoped by API concern", () => {
   assert.deepEqual(queryKeys.adminUsersRoot(), ["adminUsers"]);
   assert.deepEqual(queryKeys.adminReportsRoot(), ["adminReports"]);
   assert.deepEqual(queryKeys.localMultiplayerGames(), ["localMultiplayerGames"]);
+});
+
+test("auth changes reset private queries while preserving public catalog data", async () => {
+  const client = new QueryClient();
+  client.setQueryData(queryKeys.profile(), { username: "old-user" });
+  client.setQueryData(queryKeys.favorites(), { favorites: ["private-game"] });
+  client.setQueryData(queryKeys.gameCatalog(1, 12, ""), { games: ["public-game"] });
+  const profileObserver = new QueryObserver(client, {
+    enabled: false,
+    queryFn: async () => ({ username: "new-user" }),
+    queryKey: queryKeys.profile(),
+  });
+  const unsubscribe = profileObserver.subscribe(() => undefined);
+
+  await clearAuthScopedQueries(client);
+
+  assert.equal(client.getQueryData(queryKeys.profile()), undefined);
+  assert.equal(client.getQueryData(queryKeys.favorites()), undefined);
+  assert.equal(profileObserver.getCurrentResult().data, undefined);
+  assert.deepEqual(client.getQueryData(queryKeys.gameCatalog(1, 12, "")), {
+    games: ["public-game"],
+  });
+  unsubscribe();
 });
 
 test("shared invalidation helpers target exact and root query scopes", async () => {
