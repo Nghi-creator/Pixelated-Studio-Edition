@@ -1,6 +1,7 @@
 import process from "node:process";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { CATALOG_GENRES } from "../domain/catalogGenres.js";
 import { getCachedUserRole } from "../../auth/roleCache.js";
 import { CandidateValidationError } from "../ingestion/catalogCandidateValidation.js";
 import {
@@ -64,6 +65,7 @@ const candidateParamsSchema = z.object({ candidateId: z.string().uuid() });
 const candidateReviewBodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("promote"),
+    genreSlug: z.enum(CATALOG_GENRES).default("other"),
     notes: z.string().trim().max(2000).optional(),
   }),
   z.object({
@@ -516,6 +518,7 @@ export async function registerCatalogCandidateRoutes(
           candidate,
           user.id,
           body.data.notes || null,
+          body.data.genreSlug,
           fetchArtifact,
           captureGameplayArtwork,
         );

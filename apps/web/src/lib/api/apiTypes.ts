@@ -150,6 +150,11 @@ export type ApiPaginatedGamesResponse = {
   totalPages: number;
 };
 
+export type ApiCatalogFiltersResponse = {
+  genres: string[];
+  licenses: string[];
+};
+
 export type ApiFeaturedGamesResponse = {
   featuredGames: ApiGame[];
 };
@@ -355,6 +360,7 @@ export type ApiGame = {
     verified_at: string | null;
   }[];
   id: string;
+  genre_slug?: string | null;
   play_count?: number | null;
   rom_filename?: string | null;
   rom_url?: string | null;

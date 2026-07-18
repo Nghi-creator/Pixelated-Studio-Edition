@@ -8,6 +8,7 @@ export type CatalogGameRow = {
   cover_url?: string | null;
   developer_name?: string | null;
   developer_url?: string | null;
+  genre_slug?: string | null;
   id: string;
   play_count?: number | null;
   publication_status?: string | null;
@@ -65,6 +66,7 @@ export const PUBLIC_CATALOG_GAME_COLUMNS = [
   "author_name",
   "developer_name",
   "developer_url",
+  "genre_slug",
   "rom_url",
   "rom_filename",
   "cover_url",

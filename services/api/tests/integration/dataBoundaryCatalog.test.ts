@@ -158,6 +158,48 @@ test("catalog search is pushed into the published catalog RPC", async () => {
   await app.close();
 });
 
+test("catalog exposes eligible facets and filters genre and SPDX license server-side", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGames(
+    db,
+    { genre_slug: "puzzle", id: "puzzle-mit", title: "Puzzle MIT" },
+    { genre_slug: "action", id: "action-gpl", title: "Action GPL" },
+  );
+  const gplRights = db.rows.game_rights.find(
+    (rights) => rights.game_id === "action-gpl",
+  );
+  assert.ok(gplRights);
+  gplRights.code_license_spdx = "GPL-3.0-only";
+
+  const app = await createDataBoundaryApp(db);
+  const facetsResponse = await app.inject({ method: "GET", url: "/games/filters" });
+  assert.equal(facetsResponse.statusCode, 200);
+  assert.deepEqual(facetsResponse.json(), {
+    genres: ["action", "puzzle"],
+    licenses: ["GPL-3.0-only", "MIT"],
+  });
+
+  const filteredResponse = await app.inject({
+    method: "GET",
+    url: "/games?genre=action&license=GPL-3.0-only",
+  });
+  assert.equal(filteredResponse.statusCode, 200);
+  assert.deepEqual(
+    filteredResponse.json<{ games: { id: string }[] }>().games.map((game) => game.id),
+    ["action-gpl"],
+  );
+  assert.equal(
+    db.rpcCalls.some(
+      (call) =>
+        call.fn === "published_catalog_games" &&
+        call.params.p_genre === "action" &&
+        call.params.p_license_spdx === "GPL-3.0-only",
+    ),
+    true,
+  );
+  await app.close();
+});
+
 test("admin browser smoke flow verifies the artifact and records reviewer evidence", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
@@ -364,6 +406,7 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
   assert.equal(db.rows.games.length, 1);
   assert.equal(db.rows.games[0]?.id, GAME_ID);
   assert.equal(db.rows.games[0]?.publication_status, "published");
+  assert.equal(db.rows.games[0]?.genre_slug, "other");
   assert.equal(db.rows.games[0]?.title, "Nova the Squirrel");
   assert.equal(db.rows.game_builds.length, 1);
   assert.equal(db.rows.game_builds[0]?.game_id, GAME_ID);

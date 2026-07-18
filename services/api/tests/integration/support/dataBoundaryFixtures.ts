@@ -56,6 +56,7 @@ export function seedPublishedGames(db: FakeSupabase, ...games: RecordRow[]) {
     const gameId = String(game.id);
     const buildId = `${gameId}-build`;
     db.rows.games.push({
+      genre_slug: "other",
       publication_status: "published",
       rom_filename: `${gameId}.nes`,
       ...game,

@@ -49,11 +49,17 @@ export const queryKeys = {
   adminUsersRoot: () => ["adminUsers"] as const,
   authSession: () => ["authSession"] as const,
   featuredGames: () => ["featuredGames"] as const,
+  catalogFilters: () => ["catalogFilters"] as const,
   favorites: () => ["favorites"] as const,
   favoriteIds: () => ["favoriteIds"] as const,
   game: (gameId: string | undefined) => ["game", gameId] as const,
-  gameCatalog: (page: number, pageSize: number, search: string) =>
-    ["gameCatalog", page, pageSize, search] as const,
+  gameCatalog: (
+    page: number,
+    pageSize: number,
+    search: string,
+    genre = "",
+    license = "",
+  ) => ["gameCatalog", page, pageSize, search, genre, license] as const,
   libraryGamePicker: (pageSize: number) =>
     ["libraryGamePicker", pageSize] as const,
   gameComments: (gameId: string | undefined) => ["gameComments", gameId] as const,

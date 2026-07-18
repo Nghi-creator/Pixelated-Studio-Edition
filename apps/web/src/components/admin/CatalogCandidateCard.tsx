@@ -10,10 +10,17 @@ import {
   type CatalogCandidateReviewDetail,
 } from "../../features/admin/catalogCandidateReviewState";
 import { CatalogCandidateBrowserSmoke } from "../../features/admin/CatalogCandidateBrowserSmoke";
+import {
+  CATALOG_GENRES,
+  formatGenre,
+  type CatalogGenre,
+} from "../../features/catalog/catalogMetadata";
 
 type CatalogCandidateCardProps = {
   candidate: ApiCatalogCandidate;
+  genre: CatalogGenre;
   notes: string;
+  onGenreChange: (genre: CatalogGenre) => void;
   onNotesChange: (notes: string) => void;
   onReview: (
     candidateId: string,
@@ -64,7 +71,9 @@ function DetailPill({ detail }: { detail: CatalogCandidateReviewDetail }) {
 
 export function CatalogCandidateCard({
   candidate,
+  genre,
   notes,
+  onGenreChange,
   onNotesChange,
   onReview,
   onSmokeRecorded,
@@ -179,7 +188,25 @@ export function CatalogCandidateCard({
         onRecorded={onSmokeRecorded}
       />
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr]">
+      <div className="mt-4 grid gap-3 lg:grid-cols-[0.6fr_1fr_1fr]">
+        <div>
+          <label
+            className="mb-2 block text-xs font-extrabold uppercase text-white"
+            htmlFor={`candidate-genre-${candidate.id}`}
+          >
+            Catalog Genre
+          </label>
+          <select
+            className="w-full rounded-lg border border-synth-border bg-synth-bg px-3 py-2 text-sm text-white outline-none focus:border-synth-secondary"
+            id={`candidate-genre-${candidate.id}`}
+            onChange={(event) => onGenreChange(event.target.value as CatalogGenre)}
+            value={genre}
+          >
+            {CATALOG_GENRES.map((option) => (
+              <option key={option} value={option}>{formatGenre(option)}</option>
+            ))}
+          </select>
+        </div>
         <div className="rounded-lg border border-synth-secondary/40 bg-synth-bg/80 p-3 text-sm font-medium text-white">
           <p className="font-bold text-white">Attribution</p>
           <p className="mt-1 leading-6">{candidate.attribution_text || "Missing"}</p>

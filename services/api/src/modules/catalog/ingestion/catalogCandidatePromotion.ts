@@ -18,6 +18,7 @@ import {
   type GameRow,
   type SupabaseServiceLike,
 } from "./catalogCandidateTypes.js";
+import type { CatalogGenre } from "../domain/catalogGenres.js";
 
 export {
   CANDIDATE_COLUMNS,
@@ -33,6 +34,7 @@ export async function promoteCandidate(
   candidate: CandidateRow,
   reviewerId: string,
   notes: string | null,
+  genreSlug: CatalogGenre,
   fetchArtifact: typeof fetch,
   captureGameplayArtwork?: CaptureGameplayArtwork,
 ) {
@@ -72,6 +74,7 @@ export async function promoteCandidate(
     author_name: candidate.developer_name || candidate.title,
     developer_name: candidate.developer_name,
     developer_url: candidate.developer_url,
+    genre_slug: genreSlug,
     backdrop_url: generatedCover.publicUrl,
     cover_url: generatedCover.publicUrl,
     publication_status: "published",

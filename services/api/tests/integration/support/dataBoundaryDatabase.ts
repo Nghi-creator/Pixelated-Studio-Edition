@@ -288,10 +288,16 @@ export class FakeSupabase {
         params.p_order === "play_count_desc" ? "play_count_desc" : "title";
       const search =
         typeof params.p_search === "string" ? params.p_search.trim() : "";
-      const rows = this.getPublishedCatalogGameRows(gameId, order, search).slice(
-        0,
-        limit,
-      );
+      const genre = typeof params.p_genre === "string" ? params.p_genre : "";
+      const license =
+        typeof params.p_license_spdx === "string" ? params.p_license_spdx : "";
+      const rows = this.getPublishedCatalogGameRows(
+        gameId,
+        order,
+        search,
+        genre,
+        license,
+      ).slice(0, limit);
       return { data: rows, error: null };
     }
 
@@ -302,6 +308,8 @@ export class FakeSupabase {
     gameId: string | null,
     order: "play_count_desc" | "title",
     search: string,
+    genre: string,
+    license: string,
   ) {
     const searchTokens = search.toLowerCase().split(/\s+/).filter(Boolean);
     return this.rows.games
@@ -309,6 +317,15 @@ export class FakeSupabase {
         (game) =>
           game.publication_status === "published" &&
           (!gameId || game.id === gameId) &&
+          (!genre || game.genre_slug === genre) &&
+          (!license || this.rows.game_rights.some(
+            (rights) =>
+              rights.game_id === game.id &&
+              rights.verified_at &&
+              rights.noncommercial_hosting_allowed === true &&
+              (rights.code_license_spdx === license ||
+                rights.asset_license_spdx === license),
+          )) &&
           searchTokens.every((token) =>
             [
               game.title,

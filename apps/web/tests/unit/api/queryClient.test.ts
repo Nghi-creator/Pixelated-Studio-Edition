@@ -21,7 +21,14 @@ test("query keys are stable and scoped by API concern", () => {
     2,
     15,
     "mario",
+    "",
+    "",
   ]);
+  assert.deepEqual(queryKeys.catalogFilters(), ["catalogFilters"]);
+  assert.notDeepEqual(
+    queryKeys.gameCatalog(2, 15, "mario", "action", "MIT"),
+    queryKeys.gameCatalog(2, 15, "mario", "puzzle", "MIT"),
+  );
   assert.deepEqual(queryKeys.adminUsers(1, 25, "sam"), [
     "adminUsers",
     1,

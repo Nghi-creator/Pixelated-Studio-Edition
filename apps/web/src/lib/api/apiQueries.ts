@@ -163,21 +163,33 @@ export function useFeaturedGamesQuery() {
   });
 }
 
+export function useCatalogFiltersQuery() {
+  return useQuery({
+    queryKey: queryKeys.catalogFilters(),
+    queryFn: ({ signal }) => api.catalogFilters(signal),
+  });
+}
+
 export function useGameCatalogQuery({
   page,
   pageSize,
   search,
+  genre = "",
+  license = "",
   enabled = true,
 }: {
   enabled?: boolean;
   page: number;
   pageSize: number;
   search: string;
+  genre?: string;
+  license?: string;
 }) {
   return useQuery({
     enabled,
-    queryKey: queryKeys.gameCatalog(page, pageSize, search),
-    queryFn: ({ signal }) => api.games({ page, pageSize, search, signal }),
+    queryKey: queryKeys.gameCatalog(page, pageSize, search, genre, license),
+    queryFn: ({ signal }) =>
+      api.games({ genre, license, page, pageSize, search, signal }),
   });
 }
 

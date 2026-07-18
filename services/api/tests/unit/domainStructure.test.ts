@@ -20,6 +20,10 @@ test("catalog helpers normalize cache keys and page ranges", () => {
     getCatalogCacheKey(2, 15, "Quest"),
     getCatalogCacheKey(2, 15, "quest"),
   );
+  assert.notEqual(
+    getCatalogCacheKey(2, 15, "quest", "action", "MIT"),
+    getCatalogCacheKey(2, 15, "quest", "puzzle", "MIT"),
+  );
   assert.deepEqual(getCatalogPageRange(2, 15), { end: 29, start: 15 });
 });
 

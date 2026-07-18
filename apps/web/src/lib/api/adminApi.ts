@@ -84,11 +84,12 @@ export function createAdminApi({ apiRequest }: AdminApiDependencies) {
       candidateId: string,
       action: ApiCatalogCandidateReviewAction,
       notes: string,
+      genreSlug: string,
     ) =>
       apiRequest<ApiCatalogCandidateReviewResponse<TCandidate>>(
         `/admin/catalog-candidates/${candidateId}`,
         {
-          body: JSON.stringify({ action, notes }),
+          body: JSON.stringify({ action, genreSlug, notes }),
           method: "PATCH",
         },
       ),

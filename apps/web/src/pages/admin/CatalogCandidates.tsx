@@ -19,6 +19,7 @@ import type {
   ApiCatalogCandidateStatus,
 } from "../../lib/api/apiTypes";
 import { useDebouncedValue } from "../../lib/useDebouncedValue";
+import type { CatalogGenre } from "../../features/catalog/catalogMetadata";
 
 const CANDIDATES_PER_PAGE = 15;
 const PLATFORM_OPTIONS = [
@@ -75,6 +76,9 @@ export default function CatalogCandidates() {
   const [notesByCandidate, setNotesByCandidate] = useState<Record<string, string>>(
     {},
   );
+  const [genresByCandidate, setGenresByCandidate] = useState<
+    Record<string, CatalogGenre>
+  >({});
 
   const candidatesQuery = useCatalogCandidatesQuery<ApiCatalogCandidate>({
     page,
@@ -137,7 +141,12 @@ export default function CatalogCandidates() {
     setPendingCandidateId(candidateId);
     setToastMessage("");
     await reviewMutation
-      .mutateAsync({ action, candidateId, notes })
+      .mutateAsync({
+        action,
+        candidateId,
+        genreSlug: genresByCandidate[candidateId] || "other",
+        notes,
+      })
       .catch(() => undefined)
       .finally(() => setPendingCandidateId(null));
   };
@@ -261,8 +270,15 @@ export default function CatalogCandidates() {
           {candidates.map((candidate) => (
             <CatalogCandidateCard
               candidate={candidate}
+              genre={genresByCandidate[candidate.id] || "other"}
               key={candidate.id}
               notes={notesByCandidate[candidate.id] || ""}
+              onGenreChange={(genre) =>
+                setGenresByCandidate((current) => ({
+                  ...current,
+                  [candidate.id]: genre,
+                }))
+              }
               onNotesChange={(notes) => setCandidateNotes(candidate.id, notes)}
               onReview={(candidateId, action) =>
                 void reviewCandidate(candidateId, action)

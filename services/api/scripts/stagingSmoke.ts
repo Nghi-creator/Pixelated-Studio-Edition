@@ -300,19 +300,20 @@ async function predeployCatalogRpcCheck() {
     },
   });
 
-  logStep("checking hosted published_catalog_games RPC search signature");
+  logStep("checking hosted published_catalog_games RPC filter signature");
   const probeSearch = uniqueId("catalog-rpc-signature");
   const { data, error } = await supabase.rpc("published_catalog_games", {
     p_game_id: null,
+    p_genre: null,
     p_limit: 1,
+    p_license_spdx: null,
     p_order: "title",
     p_search: probeSearch,
   });
   if (error) {
     throw new Error(
-      "Hosted Supabase is missing the current public.published_catalog_games(uuid, integer, text, text) RPC signature. " +
-        "Apply migrations supabase/migrations/20260701100000_published_catalog_games_rpc.sql and " +
-        "supabase/migrations/20260701103000_update_published_catalog_games_search.sql before deploying. " +
+      "Hosted Supabase is missing the current public.published_catalog_games(uuid, integer, text, text, text, text) RPC signature. " +
+        "Apply migration supabase/migrations/20260718123000_catalog_genre_and_license_filters.sql before deploying. " +
         `details=${formatCatalogRpcError(error)}`,
     );
   }
