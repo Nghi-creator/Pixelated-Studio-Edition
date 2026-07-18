@@ -126,6 +126,29 @@ test("catalog route paginates, searches, and returns featured games", async () =
   await app.close();
 });
 
+test("catalog route rejects amplification-oriented query shapes", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGames(db, { id: GAME_ID, title: "Bounded" });
+  const app = await createDataBoundaryApp(db);
+
+  const oversizedPage = await app.inject({
+    method: "GET",
+    url: "/games?page=501",
+  });
+  assert.equal(oversizedPage.statusCode, 400);
+
+  const excessiveTerms = await app.inject({
+    method: "GET",
+    url: `/games?search=${encodeURIComponent("one two three four five six seven eight nine ten eleven twelve thirteen")}`,
+  });
+  assert.equal(excessiveTerms.statusCode, 400);
+  assert.equal(
+    db.rpcCalls.filter((call) => call.fn === "published_catalog_games").length,
+    0,
+  );
+  await app.close();
+});
+
 test("catalog search is pushed into the published catalog RPC", async () => {
   const db = new FakeSupabase();
   seedPublishedGames(

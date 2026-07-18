@@ -12,6 +12,8 @@ export type CatalogRouteOptions = {
   supabase?: CatalogService | null;
 };
 
+export const CATALOG_CACHE_MAX_ENTRIES = 256;
+
 export function createCatalogRouteContext(options: CatalogRouteOptions = {}) {
   return {
     commentWriteLimiter: createRateLimiter({
@@ -19,7 +21,10 @@ export function createCatalogRouteContext(options: CatalogRouteOptions = {}) {
       namespace: "comment-write",
       windowMs: 60_000,
     }),
-    gamesCatalogCache: new TtlCache<CachedGamesCatalogResponse>(60_000),
+    gamesCatalogCache: new TtlCache<CachedGamesCatalogResponse>(
+      60_000,
+      CATALOG_CACHE_MAX_ENTRIES,
+    ),
     reactionWriteLimiter: createRateLimiter({
       limit: 120,
       namespace: "reaction-write",
