@@ -265,6 +265,7 @@ export default function CatalogCandidates() {
               onReview={(candidateId, action) =>
                 void reviewCandidate(candidateId, action)
               }
+              onSmokeRecorded={() => void candidatesQuery.refetch()}
               pending={pendingCandidateId === candidate.id}
             />
           ))}

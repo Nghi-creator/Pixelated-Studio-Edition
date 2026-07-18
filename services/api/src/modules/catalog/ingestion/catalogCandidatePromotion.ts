@@ -2,7 +2,9 @@ import { uploadGameplayArtwork } from "./catalogArtworkCapture.js";
 import {
   assertCandidateRightsEvidence,
   assertCandidateRuntimeAllowed,
+  CandidateValidationError,
 } from "./catalogCandidateValidation.js";
+import { getCandidateBrowserCompatibility } from "../domain/candidateCompatibility.js";
 import {
   createGeneratedCover,
   mirrorCandidateArtifact,
@@ -37,6 +39,16 @@ export async function promoteCandidate(
   const now = new Date().toISOString();
   assertCandidateRuntimeAllowed(candidate);
   assertCandidateRightsEvidence(candidate);
+  const browserCompatibility = getCandidateBrowserCompatibility(candidate);
+  if (
+    browserCompatibility.eligible &&
+    (candidate.browser_smoke_status !== "passed" ||
+      candidate.browser_smoke_core_id !== browserCompatibility.coreId)
+  ) {
+    throw new CandidateValidationError(
+      "Run and pass the User Edition browser smoke test before promoting this candidate.",
+    );
+  }
   const isNative = candidate.runtime_kind === "native_linux";
   const mirroredArtifact = isNative
     ? null

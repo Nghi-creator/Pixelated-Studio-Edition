@@ -94,6 +94,20 @@ export type ApiMultiplayerLobbyPayload = {
 
 export type ApiAdminReportAction = "ban_user" | "delete_comment" | "ignore";
 export type ApiCatalogCandidateReviewAction = "promote" | "reject";
+export type ApiCatalogCandidateBrowserSmokeStatus =
+  | "failed"
+  | "not_tested"
+  | "passed";
+export type ApiCandidateBrowserCompatibility = {
+  coreId: "fceumm" | null;
+  eligible: boolean;
+  reason: string | null;
+  systemId: "nes" | null;
+};
+export type ApiCandidateTechnicalCompatibility = {
+  compatible: boolean;
+  reason: string | null;
+};
 export type ApiCatalogCandidateStatus =
   | "approved"
   | "needs_review"
@@ -164,6 +178,12 @@ export type ApiCatalogCandidate = {
   artifact_url: string | null;
   asset_license_spdx: string | null;
   attribution_text: string | null;
+  browser_compatibility: ApiCandidateBrowserCompatibility;
+  browser_smoke_core_id: string | null;
+  browser_smoke_error: string | null;
+  browser_smoke_status: ApiCatalogCandidateBrowserSmokeStatus;
+  browser_smoke_tested_at: string | null;
+  browser_smoke_tested_by: string | null;
   code_license_spdx: string | null;
   cover_license_spdx?: string | null;
   developer_name: string | null;
@@ -192,6 +212,7 @@ export type ApiCatalogCandidate = {
   source_kind: ApiCatalogCandidateSourceKind | string;
   source_repo_url: string;
   title: string;
+  technical_compatibility: ApiCandidateTechnicalCompatibility;
 };
 
 export type ApiPaginatedCatalogCandidatesResponse<TCandidate> = {

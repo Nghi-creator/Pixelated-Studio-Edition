@@ -59,6 +59,19 @@ const envSchema = z.object({
   SUPABASE_ANON_KEY: z.preprocess(blankToUndefined, z.string().optional()),
   SUPABASE_SERVICE_ROLE_KEY: z.preprocess(blankToUndefined, z.string().optional()),
   SUPABASE_URL: z.preprocess(blankToUndefined, z.string().url().optional()),
+  STUDIO_WEB_ORIGINS: z.string().default(
+    "http://localhost:5173,http://127.0.0.1:5173,https://pixelated-studio-edition.vercel.app",
+  ),
+  BROWSER_SMOKE_TICKET_SECRET: z.preprocess(
+    blankToUndefined,
+    z.string().min(32).optional(),
+  ),
+  BROWSER_SMOKE_TICKET_TTL_SECONDS: z.coerce
+    .number()
+    .int()
+    .min(60)
+    .max(900)
+    .default(300),
   WEB_ORIGIN: z.string().default("http://localhost:5173"),
 });
 
@@ -83,6 +96,8 @@ if (!parsedEnv.success) {
 const defaultAllowedOrigins = [
   "http://localhost:5173",
   "http://127.0.0.1:5173",
+  "http://localhost:5174",
+  "http://127.0.0.1:5174",
   "https://pixelated-studio-edition.vercel.app",
   "https://pixelated-user-edition.vercel.app",
 ];
@@ -99,6 +114,13 @@ export const env = {
         .map(normalizeOrigin)
         .filter(Boolean),
     ]),
+  ),
+  studioWebOrigins: Array.from(
+    new Set(
+      parsedEnv.data.STUDIO_WEB_ORIGINS.split(",")
+        .map(normalizeOrigin)
+        .filter(Boolean),
+    ),
   ),
   trustProxy: parsedEnv.data.NODE_ENV === "production",
 };

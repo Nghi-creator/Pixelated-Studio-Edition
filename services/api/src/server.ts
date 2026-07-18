@@ -5,6 +5,7 @@ import { createLoggerOptions } from "./plugins/logger.js";
 import { registerCors } from "./plugins/cors.js";
 import { registerGlobalRateLimit } from "./plugins/rateLimit.js";
 import { registerSecurityHeaders } from "./plugins/securityHeaders.js";
+import { registerStudioOriginGate } from "./plugins/studioOriginGate.js";
 import { registerAccessLogRoutes } from "./modules/observability/http/accessLogRoutes.js";
 import { registerAdminUserRoutes } from "./modules/users/http/adminUserRoutes.js";
 import { registerAdminSubmissionRoutes } from "./modules/catalog/http/adminSubmissionRoutes.js";
@@ -36,6 +37,7 @@ export async function buildServer() {
 
   await registerSecurityHeaders(app);
   await registerCors(app);
+  await registerStudioOriginGate(app);
   await registerGlobalRateLimit(app);
   await registerHealthRoutes(app);
   await registerAuthMethodsRoutes(app);

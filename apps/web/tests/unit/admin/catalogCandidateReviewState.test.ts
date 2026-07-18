@@ -16,11 +16,17 @@ test("catalog candidate runtime details surface native launch manifest cues", ()
     platform_id: "linux",
     runtime_id: "debian-native-v1",
     runtime_kind: "native_linux",
+    technical_compatibility: { compatible: true, reason: null },
   });
 
   assert.deepEqual(details, [
     { label: "Runtime", value: "Native Linux (debian-native-v1)" },
     { label: "Platform", value: "linux" },
+    {
+      label: "Technical Check",
+      tone: "success",
+      value: "Runtime target allowed",
+    },
     { label: "Launch Manifest", tone: "success", value: "frozen-bubble" },
     {
       label: "Debian Package",

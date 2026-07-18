@@ -12,6 +12,53 @@ function sha256(bytes: Buffer) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
 }
 
+async function readExactArtifactBytes(response: Response, expectedSize: number) {
+  const contentLengthHeader = response.headers.get("content-length");
+  const contentLength = Number(contentLengthHeader);
+  if (
+    contentLengthHeader !== null &&
+    Number.isFinite(contentLength) &&
+    contentLength >= 0 &&
+    contentLength !== expectedSize
+  ) {
+    throw new Error(
+      `Candidate artifact size mismatch. Expected ${expectedSize}, received ${contentLength}.`,
+    );
+  }
+
+  if (!response.body) {
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length !== expectedSize) {
+      throw new Error(
+        `Candidate artifact size mismatch. Expected ${expectedSize}, received ${bytes.length}.`,
+      );
+    }
+    return bytes;
+  }
+
+  const reader = response.body.getReader();
+  const bytes = Buffer.allocUnsafe(expectedSize);
+  let offset = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (offset + value.byteLength > expectedSize) {
+      await reader.cancel();
+      throw new Error(
+        `Candidate artifact size mismatch. Expected ${expectedSize}, received more data.`,
+      );
+    }
+    bytes.set(value, offset);
+    offset += value.byteLength;
+  }
+  if (offset !== expectedSize) {
+    throw new Error(
+      `Candidate artifact size mismatch. Expected ${expectedSize}, received ${offset}.`,
+    );
+  }
+  return bytes;
+}
+
 function candidateArtifactRoot(candidate: CandidateRow) {
   if (candidate.source_kind === "curated_licensed_rom") return "curated-roms";
   if (candidate.source_kind === "debian_main_games") return "debian-main";
@@ -31,8 +78,7 @@ function assertAllowedArtifactUrl(value: string) {
   }
 }
 
-export async function mirrorCandidateArtifact(
-  service: SupabaseServiceLike,
+export async function fetchVerifiedCandidateArtifact(
   candidate: CandidateRow,
   fetchArtifact: typeof fetch,
 ) {
@@ -44,6 +90,9 @@ export async function mirrorCandidateArtifact(
   ) {
     throw new Error("Candidate is missing artifact metadata.");
   }
+  if (!Number.isSafeInteger(candidate.artifact_size)) {
+    throw new Error("Candidate artifact size is invalid.");
+  }
 
   assertAllowedArtifactUrl(candidate.artifact_url);
   const response = await fetchArtifact(candidate.artifact_url);
@@ -51,18 +100,27 @@ export async function mirrorCandidateArtifact(
     throw new Error(`Failed to fetch candidate artifact: ${response.status}`);
   }
 
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length !== candidate.artifact_size) {
-    throw new Error(
-      `Candidate artifact size mismatch. Expected ${candidate.artifact_size}, received ${bytes.length}.`,
-    );
-  }
+  const bytes = await readExactArtifactBytes(response, candidate.artifact_size);
 
   const actualSha256 = sha256(bytes);
   if (actualSha256 !== candidate.artifact_sha256) {
     throw new Error("Candidate artifact checksum mismatch.");
   }
   assertCandidateArtifactHeader(candidate, bytes);
+
+  return bytes;
+}
+
+export async function mirrorCandidateArtifact(
+  service: SupabaseServiceLike,
+  candidate: CandidateRow,
+  fetchArtifact: typeof fetch,
+) {
+  const bytes = await fetchVerifiedCandidateArtifact(candidate, fetchArtifact);
+
+  if (!candidate.artifact_filename || !candidate.artifact_sha256) {
+    throw new Error("Candidate is missing artifact metadata.");
+  }
 
   const objectPath = [
     candidateArtifactRoot(candidate),

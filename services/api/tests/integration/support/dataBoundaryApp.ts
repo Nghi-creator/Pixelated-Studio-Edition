@@ -49,6 +49,7 @@ export async function createDataBoundaryApp(
       ? (extraOptions.fetchArtifact as typeof fetch)
       : async () => new Response(artifactBytes);
   const options = {
+    smokeTicketSecret: "test-browser-smoke-secret-at-least-32-characters",
     ...extraOptions,
     fetchArtifact,
     requireUser: requireUser(userId),

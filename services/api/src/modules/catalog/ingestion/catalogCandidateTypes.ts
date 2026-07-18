@@ -10,6 +10,11 @@ export type CandidateRow = {
   artifact_url: string | null;
   asset_license_spdx: string | null;
   attribution_text: string;
+  browser_smoke_core_id: string | null;
+  browser_smoke_error: string | null;
+  browser_smoke_status: "failed" | "not_tested" | "passed";
+  browser_smoke_tested_at: string | null;
+  browser_smoke_tested_by: string | null;
   code_license_spdx: string;
   cover_license_spdx: string | null;
   developer_name: string | null;
@@ -74,6 +79,11 @@ export const CANDIDATE_COLUMNS = [
   "noncommercial_hosting_allowed",
   "original_release_url",
   "attribution_text",
+  "browser_smoke_status",
+  "browser_smoke_core_id",
+  "browser_smoke_error",
+  "browser_smoke_tested_at",
+  "browser_smoke_tested_by",
   "rights_warnings",
   "import_status",
   "review_notes",

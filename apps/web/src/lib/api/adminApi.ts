@@ -89,6 +89,11 @@ export function createAdminApi({ apiRequest }: AdminApiDependencies) {
           method: "PATCH",
         },
       ),
+    createCatalogCandidateBrowserSmokeTicket: (candidateId: string) =>
+      apiRequest<{ expiresAt: string; ticket: string }>(
+        `/admin/catalog-candidates/${candidateId}/browser-smoke-ticket`,
+        { method: "POST" },
+      ),
     gameSubmissions: <TSubmission>({
       page = 1,
       pageSize = 25,

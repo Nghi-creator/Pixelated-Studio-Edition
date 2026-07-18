@@ -125,7 +125,10 @@ Minimum hosted env:
 NODE_ENV=production
 HOST=0.0.0.0
 PORT=<provider port>
-WEB_ORIGIN=https://pixelated-studio-edition.vercel.app
+WEB_ORIGIN=https://pixelated-studio-edition.vercel.app,https://pixelated-user-edition.vercel.app
+STUDIO_WEB_ORIGINS=https://pixelated-studio-edition.vercel.app
+BROWSER_SMOKE_TICKET_SECRET=<at least 32 random characters>
+BROWSER_SMOKE_TICKET_TTL_SECONDS=300
 CONTROL_PLANE_CLEANUP_INTERVAL_MS=3600000
 STREAM_METRIC_RETENTION_DAYS=7
 STUN_URLS=stun:stun.l.google.com:19302
@@ -147,6 +150,17 @@ SUPABASE_SERVICE_ROLE_KEY=<your Supabase service role key>
 ```
 
 Production readiness requires both Redis REST values. Local development may omit Redis and uses a bounded in-memory limiter.
+
+Admin routes and `POST /submissions/games` require an exact origin from
+`STUDIO_WEB_ORIGINS` in addition to their normal authentication and role checks. Origin
+checking is a product boundary and defense in depth, not a replacement for authorization:
+non-browser clients can forge an `Origin` header.
+
+Catalog candidate smoke tests are issued by Studio as short-lived, signed, candidate- and
+artifact-bound tickets. The actual emulator runs on User Edition through the capability-only
+`/browser-smoke/*` routes; the service role key and reviewer session never reach User Edition.
+Generate the ticket secret with a password manager or `openssl rand -hex 32` and configure the
+same API deployment only—neither frontend needs this secret.
 
 Production enables Fastify proxy trust so `request.ip` uses the client address forwarded by Render's ingress. Keep production traffic behind a trusted ingress; do not expose the Node port directly while accepting client-supplied forwarded headers.
 

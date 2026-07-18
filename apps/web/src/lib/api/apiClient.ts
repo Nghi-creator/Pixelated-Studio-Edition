@@ -168,6 +168,44 @@ export async function apiRequest<T>(
   return payload as T;
 }
 
+export async function apiRequestBlob(
+  path: string,
+  { timeoutMs = DEFAULT_API_TIMEOUT_MS }: { timeoutMs?: number } = {},
+) {
+  const session = await withTimeout(
+    getAuthSession(),
+    timeoutMs,
+    () => new ApiError(0, { error: "Authentication did not respond in time." }),
+  );
+  const headers = new Headers({ Accept: "application/octet-stream" });
+  if (session?.access_token) {
+    headers.set("Authorization", `Bearer ${session.access_token}`);
+  }
+  const { controller, cleanup } = createRequestAbortController(timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      cache: "no-store",
+      headers,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ApiError(0, { error: "The smoke-test artifact timed out." });
+    }
+    throw error;
+  } finally {
+    cleanup();
+  }
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new ApiError(response.status, payload);
+  }
+  return response.blob();
+}
+
 export async function getCachedPermissions(): Promise<ApiPermissionsResponse> {
   if (isCacheFresh(authScopedCache.permissions) && authScopedCache.permissions) {
     if (authScopedCache.permissions.value) return authScopedCache.permissions.value;
