@@ -89,39 +89,54 @@ function getInputCapabilitiesFromHealth(
   };
 }
 
-export async function loadEngineInputCapabilities(): Promise<EngineInputCapabilities> {
+function getShareContextFromHealth(
+  health: EngineHealthPayload,
+): EngineShareContext {
+  return {
+    companionUrls: health.companionUrls || [],
+    exposureMode: health.exposureMode || "unknown",
+  };
+}
+
+const UNAVAILABLE_INPUT_CAPABILITIES: EngineInputCapabilities = {
+  limitationReason:
+    "P3/P4 are disabled because engine health is unavailable. P1/P2 remain playable and spectators can still join.",
+  source: "unavailable",
+  supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
+};
+
+const UNAVAILABLE_SHARE_CONTEXT: EngineShareContext = {
+  companionUrls: [],
+  exposureMode: "unknown",
+};
+
+export async function loadEngineSessionContext(): Promise<{
+  inputCapabilities: EngineInputCapabilities;
+  shareContext: EngineShareContext;
+}> {
   try {
     const response = await engineFetch(engineEndpoint("/health"));
     if (!response.ok) throw new Error("Engine health check failed.");
     const health = (await response.json()) as EngineHealthPayload;
-    return getInputCapabilitiesFromHealth(health);
-  } catch (err) {
-    console.warn("[WebRTC] Could not load engine input capabilities:", err);
     return {
-      limitationReason:
-        "P3/P4 are disabled because engine health is unavailable. P1/P2 remain playable and spectators can still join.",
-      source: "unavailable",
-      supportedPlayerCount: KEYBOARD_FALLBACK_PLAYER_COUNT,
+      inputCapabilities: getInputCapabilitiesFromHealth(health),
+      shareContext: getShareContextFromHealth(health),
+    };
+  } catch (err) {
+    console.warn("[WebRTC] Could not load engine session context:", err);
+    return {
+      inputCapabilities: UNAVAILABLE_INPUT_CAPABILITIES,
+      shareContext: UNAVAILABLE_SHARE_CONTEXT,
     };
   }
 }
 
+export async function loadEngineInputCapabilities(): Promise<EngineInputCapabilities> {
+  return (await loadEngineSessionContext()).inputCapabilities;
+}
+
 export async function loadEngineShareContext(): Promise<EngineShareContext> {
-  try {
-    const response = await engineFetch(engineEndpoint("/health"));
-    if (!response.ok) throw new Error("Engine health check failed.");
-    const health = (await response.json()) as EngineHealthPayload;
-    return {
-      companionUrls: health.companionUrls || [],
-      exposureMode: health.exposureMode || "unknown",
-    };
-  } catch (err) {
-    console.warn("[WebRTC] Could not load engine share context:", err);
-    return {
-      companionUrls: [],
-      exposureMode: "unknown",
-    };
-  }
+  return (await loadEngineSessionContext()).shareContext;
 }
 
 export async function loadEngineRuntimeKind() {

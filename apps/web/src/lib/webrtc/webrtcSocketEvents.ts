@@ -1,8 +1,5 @@
 import { clearEngineToken } from "../engine/engineAuth";
-import {
-  loadEngineInputCapabilities,
-  loadEngineShareContext,
-} from "./engineContext";
+import { loadEngineSessionContext } from "./engineContext";
 import { attachEngineInput } from "./webrtcInput";
 import { syncMultiplayerLobby } from "./webrtcLobbySync";
 import { createAndSendOffer } from "./webrtcPeer";
@@ -145,16 +142,12 @@ export function bindWebRTCSocketEvents({
       runtime.bootReadyTimeoutId = null;
     }
     console.log("[WebRTC] Python is awake! Generating and sending Offer...");
-    loadEngineInputCapabilities().then((nextInputCapabilities) => {
+    loadEngineSessionContext().then((nextEngineContext) => {
       if (!runtime.disposed) {
-        params.inputCapabilitiesRef.current = nextInputCapabilities;
-        params.setInputCapabilities(nextInputCapabilities);
-      }
-    });
-    loadEngineShareContext().then((nextShareContext) => {
-      if (!runtime.disposed) {
-        params.shareContextRef.current = nextShareContext;
-        params.setShareContext(nextShareContext);
+        params.inputCapabilitiesRef.current = nextEngineContext.inputCapabilities;
+        params.setInputCapabilities(nextEngineContext.inputCapabilities);
+        params.shareContextRef.current = nextEngineContext.shareContext;
+        params.setShareContext(nextEngineContext.shareContext);
       }
     });
     if (runtime.pc) {

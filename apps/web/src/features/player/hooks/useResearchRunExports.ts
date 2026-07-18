@@ -47,7 +47,7 @@ export function useResearchRunExports({
   gameTitle,
   history,
   playerMode,
-  recordedCsvSamples,
+  recordedCsvSnapshot,
   runId,
   sessionId,
   shareUrl,
@@ -61,7 +61,10 @@ export function useResearchRunExports({
   gameTitle: string;
   history: StreamTelemetryHistorySample[];
   playerMode: "guest" | "host";
-  recordedCsvSamples: StreamTelemetryCsvSample[];
+  recordedCsvSnapshot: {
+    revision: number;
+    samples: StreamTelemetryCsvSample[];
+  };
   runId: string;
   sessionId: string;
   shareUrl: string;
@@ -69,6 +72,11 @@ export function useResearchRunExports({
   streamProfile: StreamProfile;
 }) {
   const isBrowserBaseline = form.scenario === "browser_only_baseline";
+  const recordedCsvSamples = recordedCsvSnapshot.samples;
+  const getRecordedCsvSamples = useCallback(
+    () => recordedCsvSnapshot.samples,
+    [recordedCsvSnapshot],
+  );
 
   const createMetadata = useCallback((capturedAt: Date) =>
     createResearchRunMetadata({
@@ -117,9 +125,9 @@ export function useResearchRunExports({
       events,
       generatedAt,
       runId,
-      samples: recordedCsvSamples,
+      samples: getRecordedCsvSamples(),
       sessionId,
-    }), [events, recordedCsvSamples, runId, sessionId]);
+    }), [events, getRecordedCsvSamples, runId, sessionId]);
 
   const buildSummaryJson = useCallback(
     (generatedAt: Date) => researchRunSummaryToJson(createSummary(generatedAt)),
@@ -127,9 +135,10 @@ export function useResearchRunExports({
   );
 
   const buildGraphPng = useCallback(() => {
+    const samples = getRecordedCsvSamples();
     const graphSamples: StreamTelemetryGraphSample[] =
-      recordedCsvSamples.length > 0
-        ? addPacketLossDeltas(recordedCsvSamples)
+      samples.length > 0
+        ? addPacketLossDeltas(samples)
         : history.map((sample, index) => ({
             bitrateKbps: sample.bitrateKbps,
             elapsedMs: index * 1000,
@@ -150,7 +159,13 @@ export function useResearchRunExports({
       playerMode,
       status,
     });
-  }, [gameTitle, history, playerMode, recordedCsvSamples, status]);
+  }, [
+    gameTitle,
+    getRecordedCsvSamples,
+    history,
+    playerMode,
+    status,
+  ]);
 
   const summary = useMemo(() => createSummary(), [createSummary]);
 
@@ -202,13 +217,14 @@ export function useResearchRunExports({
 
   const exportBundle = useCallback(async () => {
     const recordedAt = new Date();
+    const samples = getRecordedCsvSamples();
     const files: ResearchRunBundleFile[] = [
       {
         data: buildMetadataJson(recordedAt),
         name: "run-metadata.json",
       },
       {
-        data: streamTelemetrySamplesToCsv(recordedCsvSamples),
+        data: streamTelemetrySamplesToCsv(samples),
         name: "stream-telemetry.csv",
       },
       {
@@ -249,8 +265,8 @@ export function useResearchRunExports({
     buildSummaryJson,
     events,
     gameId,
+    getRecordedCsvSamples,
     isBrowserBaseline,
-    recordedCsvSamples,
     runId,
   ]);
 

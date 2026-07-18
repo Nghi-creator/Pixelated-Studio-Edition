@@ -113,6 +113,7 @@ export default function Player() {
     csvStatusTitle,
     isRecordingCsv,
     recordedCsvSamples,
+    recordedCsvRevision,
     toggleCsvRecording,
   } = useStreamTelemetryRecording({
     gameId: id,
@@ -196,6 +197,7 @@ export default function Player() {
                 runId: researchRunId,
               }}
               recordedCsvSamples={recordedCsvSamples}
+              recordedCsvRevision={recordedCsvRevision}
               sessionId={sessionId}
               shareUrl={shareInvite.url}
               status={status}

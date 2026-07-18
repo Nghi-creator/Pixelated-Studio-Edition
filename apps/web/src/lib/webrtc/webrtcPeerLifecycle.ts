@@ -1,7 +1,6 @@
 import {
   CHECKING_INPUT_CAPABILITIES,
-  loadEngineInputCapabilities,
-  loadEngineShareContext,
+  loadEngineSessionContext,
 } from "./engineContext";
 import {
   DISCONNECTED_GRACE_MS,
@@ -53,18 +52,16 @@ export async function initializeWebRTCPeerSession({
   params.lastMetricSentAtRef.current = 0;
   params.metricsDisabledRef.current = false;
 
-  const [nextIceServers, nextInputCapabilities, nextShareContext] =
-    await Promise.all([
-      loadIceServers(),
-      loadEngineInputCapabilities(),
-      loadEngineShareContext(),
-    ]);
+  const [nextIceServers, nextEngineContext] = await Promise.all([
+    loadIceServers(),
+    loadEngineSessionContext(),
+  ]);
   if (runtime.disposed) return;
   runtime.iceServersForSession = nextIceServers;
-  params.inputCapabilitiesRef.current = nextInputCapabilities;
-  params.shareContextRef.current = nextShareContext;
-  params.setInputCapabilities(nextInputCapabilities);
-  params.setShareContext(nextShareContext);
+  params.inputCapabilitiesRef.current = nextEngineContext.inputCapabilities;
+  params.shareContextRef.current = nextEngineContext.shareContext;
+  params.setInputCapabilities(nextEngineContext.inputCapabilities);
+  params.setShareContext(nextEngineContext.shareContext);
 
   runtime.pc = createEnginePeerConnection({
     iceServers: runtime.iceServersForSession,

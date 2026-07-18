@@ -12,9 +12,12 @@ import {
   HeroSkeleton,
 } from "../../components/ui/skeleton/UserSkeletons";
 import { Pagination } from "../../components/ui/Pagination";
+import { useDebouncedValue } from "../../lib/useDebouncedValue";
 
 const GAMES_PER_PAGE = 15;
 const ZERO_PLAY_FEATURED_REFRESH_MS = 30_000;
+const MAX_ZERO_PLAY_FEATURED_REFRESHES = 3;
+const SEARCH_DEBOUNCE_MS = 250;
 
 interface Game {
   id: string;
@@ -44,11 +47,16 @@ function CatalogRefreshPanel({ label }: { label: string }) {
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const debouncedSearchQuery = useDebouncedValue(
+    searchQuery.trim(),
+    SEARCH_DEBOUNCE_MS,
+  );
+  const [zeroPlayRefreshCount, setZeroPlayRefreshCount] = useState(0);
 
   const catalogQuery = useGameCatalogQuery({
     page: currentPage,
     pageSize: GAMES_PER_PAGE,
-    search: searchQuery,
+    search: debouncedSearchQuery,
   });
   const featuredQuery = useFeaturedGamesQuery();
 
@@ -66,20 +74,43 @@ export default function Home() {
   const refetchFeaturedGames = featuredQuery.refetch;
 
   useEffect(() => {
-    if (!shouldRefreshFeatured) return;
+    if (
+      !shouldRefreshFeatured ||
+      zeroPlayRefreshCount >= MAX_ZERO_PLAY_FEATURED_REFRESHES
+    ) {
+      return;
+    }
 
-    const interval = window.setInterval(() => {
+    const refresh = () => {
+      setZeroPlayRefreshCount((count) => count + 1);
       void refetchFeaturedGames();
-    }, ZERO_PLAY_FEATURED_REFRESH_MS);
+    };
+    let timeout: number | null = null;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
 
-    return () => window.clearInterval(interval);
-  }, [refetchFeaturedGames, shouldRefreshFeatured]);
+    if (document.visibilityState === "hidden") {
+      document.addEventListener("visibilitychange", refreshWhenVisible, {
+        once: true,
+      });
+    } else {
+      timeout = window.setTimeout(refresh, ZERO_PLAY_FEATURED_REFRESH_MS);
+    }
+
+    return () => {
+      if (timeout !== null) window.clearTimeout(timeout);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refetchFeaturedGames, shouldRefreshFeatured, zeroPlayRefreshCount]);
 
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStart = (safeCurrentPage - 1) * GAMES_PER_PAGE;
-  const showInitialCatalogSkeleton = loading && games.length === 0 && !searchQuery;
+  const isSearchSettling = searchQuery.trim() !== debouncedSearchQuery;
+  const showInitialCatalogSkeleton =
+    loading && games.length === 0 && !debouncedSearchQuery;
   const showCatalogRefreshPanel =
-    catalogQuery.isFetching &&
+    (catalogQuery.isFetching || isSearchSettling) &&
     (games.length > 0 || Boolean(searchQuery));
   const catalogRefreshLabel = searchQuery
     ? "Searching games..."
@@ -141,7 +172,10 @@ export default function Home() {
               Retry
             </button>
           </div>
-        ) : games.length === 0 && !loading && !catalogQuery.isFetching ? (
+        ) : games.length === 0 &&
+          !loading &&
+          !catalogQuery.isFetching &&
+          !isSearchSettling ? (
           <div className="text-center py-20 text-gray-500">
             <Search className="w-12 h-12 mx-auto mb-4 opacity-20" />
             <p className="text-xl">No games found matching "{searchQuery}"</p>

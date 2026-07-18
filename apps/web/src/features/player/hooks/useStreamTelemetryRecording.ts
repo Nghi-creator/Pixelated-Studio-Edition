@@ -8,6 +8,22 @@ import {
 const LONG_TELEMETRY_RECORDING_ROWS = 10_000;
 const MAX_TELEMETRY_RECORDING_ROWS = 100_000;
 
+class TelemetryRecordingBuffer {
+  private values: StreamTelemetryCsvSample[] = [];
+
+  append(sample: StreamTelemetryCsvSample) {
+    this.values.push(sample);
+  }
+
+  clear() {
+    this.values = [];
+  }
+
+  get samples() {
+    return this.values;
+  }
+}
+
 export function useStreamTelemetryRecording({
   gameId,
   playerMode,
@@ -22,9 +38,8 @@ export function useStreamTelemetryRecording({
   telemetry: WebRTCTelemetry;
 }) {
   const [isRecordingCsv, setIsRecordingCsv] = useState(false);
-  const [recordedCsvSamples, setRecordedCsvSamples] = useState<
-    StreamTelemetryCsvSample[]
-  >([]);
+  const [recordingBuffer] = useState(() => new TelemetryRecordingBuffer());
+  const [recordedCsvRevision, setRecordedCsvRevision] = useState(0);
   const [recordingStartedAt, setRecordingStartedAt] = useState<number | null>(
     null,
   );
@@ -36,12 +51,8 @@ export function useStreamTelemetryRecording({
 
     const sampleTimer = window.setTimeout(() => {
       if (recordedRowCountRef.current >= MAX_TELEMETRY_RECORDING_ROWS) return;
-      recordedRowCountRef.current += 1;
-      setRecordedCsvSamples((samples) => {
-        if (samples.length >= MAX_TELEMETRY_RECORDING_ROWS) return samples;
-        return [
-          ...samples,
-          createTelemetryCsvSample({
+      recordingBuffer.append(
+        createTelemetryCsvSample({
           gameId,
           playerMode,
           recordingStartedAt,
@@ -57,9 +68,10 @@ export function useStreamTelemetryRecording({
             lastUpdatedAt: telemetry.lastUpdatedAt,
             packetsLost: telemetry.packetsLost,
           },
-          }),
-        ];
-      });
+        }),
+      );
+      recordedRowCountRef.current += 1;
+      setRecordedCsvRevision((revision) => revision + 1);
       if (recordedRowCountRef.current >= MAX_TELEMETRY_RECORDING_ROWS) {
         setIsRecordingCsv(false);
         setRecordingStartedAt(null);
@@ -79,6 +91,7 @@ export function useStreamTelemetryRecording({
     gameId,
     isRecordingCsv,
     playerMode,
+    recordingBuffer,
     recordingStartedAt,
     sessionId,
     status,
@@ -91,19 +104,22 @@ export function useStreamTelemetryRecording({
       return;
     }
 
-    setRecordedCsvSamples([]);
+    recordingBuffer.clear();
     recordedRowCountRef.current = 0;
+    setRecordedCsvRevision((revision) => revision + 1);
     setRecordingStartedAt(Date.now());
     setIsRecordingCsv(true);
   };
 
   const clearTelemetryCsv = () => {
     setIsRecordingCsv(false);
-    setRecordedCsvSamples([]);
+    recordingBuffer.clear();
     recordedRowCountRef.current = 0;
+    setRecordedCsvRevision((revision) => revision + 1);
     setRecordingStartedAt(null);
   };
 
+  const recordedCsvSamples = recordingBuffer.samples;
   const recordedCsvRowLabel = `${recordedCsvSamples.length} row${
     recordedCsvSamples.length === 1 ? "" : "s"
   }`;
@@ -128,6 +144,7 @@ export function useStreamTelemetryRecording({
     csvStatusTitle,
     isRecordingCsv,
     recordedCsvSamples,
+    recordedCsvRevision,
     toggleCsvRecording,
   };
 }

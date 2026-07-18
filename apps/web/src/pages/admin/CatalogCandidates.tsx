@@ -18,6 +18,7 @@ import type {
   ApiCatalogCandidateSourceKind,
   ApiCatalogCandidateStatus,
 } from "../../lib/api/apiTypes";
+import { useDebouncedValue } from "../../lib/useDebouncedValue";
 
 const CANDIDATES_PER_PAGE = 15;
 const PLATFORM_OPTIONS = [
@@ -67,6 +68,7 @@ export default function CatalogCandidates() {
     useState<ApiCatalogCandidateSourceKind | "">("");
   const [platformId, setPlatformId] = useState("");
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search.trim(), 250);
   const [page, setPage] = useState(1);
   const [toastMessage, setToastMessage] = useState("");
   const [pendingCandidateId, setPendingCandidateId] = useState<string | null>(null);
@@ -78,7 +80,7 @@ export default function CatalogCandidates() {
     page,
     pageSize: CANDIDATES_PER_PAGE,
     platformId,
-    search,
+    search: debouncedSearch,
     sourceKind,
     status,
   });
@@ -91,7 +93,7 @@ export default function CatalogCandidates() {
     page,
     pageSize: CANDIDATES_PER_PAGE,
     platformId,
-    search,
+    search: debouncedSearch,
     sourceKind,
     status,
     totalCandidates,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
 } from "lucide-react";
@@ -43,46 +43,44 @@ export default function LocalVault() {
   const [fileInputVersion, setFileInputVersion] = useState(0);
   const [vaultMessage, setVaultMessage] =
     useState<LocalVaultMessage | null>(null);
+  const isMountedRef = useRef(false);
+  const refreshSequenceRef = useRef(0);
 
-  useEffect(() => {
-    const initVault = async () => {
-      const currentUserId = await getLocalVaultUserId();
-      setUserId(currentUserId);
-      if (hasEngineToken()) {
-        fetchLocalGames(currentUserId);
-      }
-    };
-    initVault();
+  const invalidatePendingRefreshes = useCallback(() => {
+    refreshSequenceRef.current += 1;
+    if (isMountedRef.current) {
+      setIsLoadingGames(false);
+    }
   }, []);
 
-  useEffect(() => {
-    const refreshEnginePairing = () => {
-      const paired = hasEngineToken();
-      setIsEnginePaired(paired);
-      if (paired) {
-        setVaultMessage(null);
-        fetchLocalGames(userId);
-      } else {
-        setLocalGames([]);
-      }
-    };
-
-    window.addEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
-    return () =>
-      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
-  }, [userId]);
-
-  const fetchLocalGames = async (uid: string) => {
+  const fetchLocalGames = useCallback(async (uid: string) => {
+    const refreshSequence = ++refreshSequenceRef.current;
     if (!hasEngineToken()) {
-      setLocalGames([]);
+      if (isMountedRef.current) {
+        setLocalGames([]);
+        setIsLoadingGames(false);
+      }
       return;
     }
 
     setIsLoadingGames(true);
     try {
-      setLocalGames(await fetchLocalVaultFilenames(uid));
+      const filenames = await fetchLocalVaultFilenames(uid);
+      if (
+        !isMountedRef.current ||
+        refreshSequence !== refreshSequenceRef.current
+      ) {
+        return;
+      }
+      setLocalGames(filenames);
       setVaultMessage(null);
     } catch (err) {
+      if (
+        !isMountedRef.current ||
+        refreshSequence !== refreshSequenceRef.current
+      ) {
+        return;
+      }
       console.error("Could not connect to local Docker engine:", err);
       if (isInvalidEngineTokenError(err)) {
         setIsEnginePaired(false);
@@ -99,9 +97,63 @@ export default function LocalVault() {
           },
       );
     } finally {
-      setIsLoadingGames(false);
+      if (
+        isMountedRef.current &&
+        refreshSequence === refreshSequenceRef.current
+      ) {
+        setIsLoadingGames(false);
+      }
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    isMountedRef.current = true;
+    let isActive = true;
+    const initVault = async () => {
+      try {
+        const currentUserId = await getLocalVaultUserId();
+        if (!isActive) return;
+        setUserId(currentUserId);
+        if (hasEngineToken()) {
+          void fetchLocalGames(currentUserId);
+        }
+      } catch (error) {
+        if (!isActive) return;
+        setVaultMessage({
+          tone: "error",
+          text: getLocalVaultErrorMessage(
+            error,
+            "Could not identify the Local Vault owner.",
+          ),
+        });
+      }
+    };
+    void initVault();
+
+    return () => {
+      isActive = false;
+      isMountedRef.current = false;
+      refreshSequenceRef.current += 1;
+    };
+  }, [fetchLocalGames]);
+
+  useEffect(() => {
+    const refreshEnginePairing = () => {
+      const paired = hasEngineToken();
+      setIsEnginePaired(paired);
+      if (paired) {
+        setVaultMessage(null);
+        void fetchLocalGames(userId);
+      } else {
+        invalidatePendingRefreshes();
+        setLocalGames([]);
+      }
+    };
+
+    window.addEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
+    return () =>
+      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
+  }, [fetchLocalGames, invalidatePendingRefreshes, userId]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -159,6 +211,7 @@ export default function LocalVault() {
     } catch (err) {
       console.error("Upload error:", err);
       if (isInvalidEngineTokenError(err)) {
+        invalidatePendingRefreshes();
         setIsEnginePaired(false);
         setLocalGames([]);
       }
@@ -198,6 +251,7 @@ export default function LocalVault() {
     } catch (err) {
       console.error("Delete error:", err);
       if (isInvalidEngineTokenError(err)) {
+        invalidatePendingRefreshes();
         setIsEnginePaired(false);
         setLocalGames([]);
       }
@@ -254,7 +308,7 @@ export default function LocalVault() {
         isLoading={isLoadingGames}
         message={vaultMessage}
         onDeleteRequest={requestDeleteLocalGame}
-        onRetry={() => fetchLocalGames(userId)}
+        onRetry={() => void fetchLocalGames(userId)}
         pendingDeleteFilename={pendingDeleteFilename}
       />
     </div>

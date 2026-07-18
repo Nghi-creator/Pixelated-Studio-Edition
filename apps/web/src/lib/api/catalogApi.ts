@@ -26,10 +26,12 @@ export function createCatalogApi({
       page = 1,
       pageSize = 15,
       search = "",
+      signal,
     }: {
       page?: number;
       pageSize?: number;
       search?: string;
+      signal?: AbortSignal;
     } = {}) => {
       const params = new URLSearchParams({
         page: String(page),
@@ -39,12 +41,14 @@ export function createCatalogApi({
 
       return apiRequest<ApiPaginatedGamesResponse>(`/games?${params}`, {
         authenticated: false,
+        signal,
       });
     },
-    featuredGames: () =>
+    featuredGames: (signal?: AbortSignal) =>
       apiRequest<ApiFeaturedGamesResponse>("/games/featured", {
         authenticated: false,
         cache: "no-store",
+        signal,
       }),
     game: (gameId: string) =>
       apiRequest<{ game: ApiGame }>(`/games/${gameId}`, {
