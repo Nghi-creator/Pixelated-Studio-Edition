@@ -48,6 +48,13 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm audit --omit=dev --audit-level=high
 
+      # Electron is declared as a development dependency because it is used by
+      # the packager, but the resulting Electron runtime ships to users.
+      - name: Audit packaged desktop runtime and build chain
+        if: matrix.label == 'desktop'
+        working-directory: ${{ matrix.path }}
+        run: npm audit --audit-level=high
+
       - name: Record full dependency audit for review
         continue-on-error: true
         working-directory: ${{ matrix.path }}

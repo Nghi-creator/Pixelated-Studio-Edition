@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { parseCaptureCommand } from "../../src/modules/catalog/ingestion/catalogArtworkCapture.js";
+import { parseCaptureCommand } from "../../../src/modules/catalog/ingestion/catalogArtworkCapture.js";
 
 test("capture command parser preserves quoted args without invoking a shell", () => {
   assert.deepEqual(

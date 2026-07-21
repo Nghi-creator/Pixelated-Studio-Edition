@@ -25,7 +25,7 @@ const mode = parseArgs(process.argv.slice(2));
 const apiUrl = normalizeBaseUrl(
   process.env.STAGING_API_URL ||
     process.env.API_URL ||
-    "https://pixelated-api-services.onrender.com",
+    "https://pixelated-api-services-6ovi.onrender.com",
 );
 const configuredBearerToken =
   process.env.STAGING_BEARER_TOKEN || process.env.SUPABASE_ACCESS_TOKEN;
@@ -261,29 +261,6 @@ async function smokeCatalogCaching() {
   assertHeader(featured.response, "X-Pixelated-Cache", null);
 }
 
-function formatCatalogRpcError(error: unknown) {
-  if (!error) return "<empty>";
-  if (error instanceof Error) return error.message;
-  if (typeof error !== "object") return String(error);
-
-  const record = error as {
-    code?: unknown;
-    details?: unknown;
-    hint?: unknown;
-    message?: unknown;
-  };
-  const summary = [
-    typeof record.code === "string" ? `code=${record.code}` : null,
-    typeof record.message === "string" ? `message=${record.message}` : null,
-    typeof record.details === "string" ? `details=${record.details}` : null,
-    typeof record.hint === "string" ? `hint=${record.hint}` : null,
-  ]
-    .filter(Boolean)
-    .join(" ");
-
-  return summary || JSON.stringify(record);
-}
-
 async function predeployCatalogRpcCheck() {
   if (!stagingSupabaseUrl || !stagingSupabaseAnonKey) {
     fail(
@@ -300,32 +277,38 @@ async function predeployCatalogRpcCheck() {
     },
   });
 
-  logStep("checking hosted published_catalog_games RPC search signature");
+  logStep("checking hosted published_catalog_games RPC is not client-callable");
   const probeSearch = uniqueId("catalog-rpc-signature");
-  const { data, error } = await supabase.rpc("published_catalog_games", {
+  const { error: directRpcError } = await supabase.rpc("published_catalog_games", {
     p_game_id: null,
+    p_genre: null,
     p_limit: 1,
+    p_license_spdx: null,
     p_order: "title",
     p_search: probeSearch,
   });
-  if (error) {
+  if (!directRpcError) {
     throw new Error(
-      "Hosted Supabase is missing the current public.published_catalog_games(uuid, integer, text, text) RPC signature. " +
-        "Apply migrations supabase/migrations/20260701100000_published_catalog_games_rpc.sql and " +
-        "supabase/migrations/20260701103000_update_published_catalog_games_search.sql before deploying. " +
-        `details=${formatCatalogRpcError(error)}`,
+      "Hosted Supabase still allows clients to execute published_catalog_games directly. " +
+        "Apply migration supabase/migrations/20260718130000_harden_shared_api_boundaries.sql before deploying.",
     );
   }
 
-  assert.equal(
-    Array.isArray(data),
-    true,
-    "published_catalog_games RPC should return an array",
+  logStep("checking hosted catalog RPC through the rate-limited API boundary");
+  const { payload } = await request<{ games?: unknown[] }>(
+    "GET",
+    `/games?pageSize=1&search=${encodeURIComponent(probeSearch)}`,
+    { auth: false },
   );
   assert.equal(
-    data.length,
+    Array.isArray(payload.games),
+    true,
+    "catalog API should return a games array",
+  );
+  assert.equal(
+    payload.games?.length,
     0,
-    "unique published_catalog_games search probe should not match catalog rows",
+    "unique catalog search probe should not match catalog rows",
   );
 }
 

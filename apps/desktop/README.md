@@ -97,7 +97,7 @@ Without an explicit native image override, the launcher derives the native image
 The desktop app passes the hosted API URL into the engine so cloud sessions can be verified before boot:
 
 ```txt
-PIXELATED_API_URL=https://pixelated-api-services.onrender.com
+PIXELATED_API_URL=https://pixelated-api-services-6ovi.onrender.com
 ```
 
 For localhost API testing:

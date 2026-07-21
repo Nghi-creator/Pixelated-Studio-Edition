@@ -14,7 +14,8 @@ type TableName =
   | "local_engine_pairings"
   | "reported_comments"
   | "stream_metrics"
-  | "profiles";
+  | "profiles"
+  | "user_game_activity";
 
 export type RecordRow = Record<string, unknown>;
 
@@ -27,6 +28,7 @@ type Filter = {
 export class FakeSupabase {
   authListUsersCalls = 0;
   authUsers: User[] = [];
+  browserSmokeArtifactClaims = new Set<string>();
   deletedUsers: string[] = [];
   storageErrors = new Set<string>();
   signedStorageUrls: { bucket: string; expiresIn: number; path: string }[] = [];
@@ -55,6 +57,7 @@ export class FakeSupabase {
     reported_comments: [],
     stream_metrics: [],
     profiles: [],
+    user_game_activity: [],
   };
   rpcCalls: { fn: string; params: RecordRow }[] = [];
   rpcErrors = new Map<string, Error>();
@@ -221,6 +224,68 @@ export class FakeSupabase {
       return { data: null, error: null };
     }
 
+    if (fn === "record_access_log") {
+      const sessionId = String(params.p_session_id);
+      const userId = typeof params.p_user_id === "string" ? params.p_user_id : null;
+      const existing = this.rows.access_logs.find(
+        (row) => row.session_id === sessionId,
+      );
+      const now = new Date().toISOString();
+      if (!existing) {
+        this.rows.access_logs.push({
+          access_count: 1,
+          created_at: now,
+          last_seen_at: now,
+          path: params.p_path,
+          session_id: sessionId,
+          user_id: userId,
+        });
+      } else if (!existing.user_id || existing.user_id === userId) {
+        existing.access_count = Number(existing.access_count || 0) + 1;
+        existing.last_seen_at = now;
+        existing.path = params.p_path;
+        existing.user_id = existing.user_id || userId;
+      }
+      return { data: null, error: null };
+    }
+
+    if (fn === "record_browser_smoke_result") {
+      const candidate = this.rows.catalog_ingestion_candidates.find(
+        (row) => row.id === params.p_candidate_id,
+      );
+      const issuedAt = Date.parse(String(params.p_issued_at));
+      const testedAt = candidate?.browser_smoke_tested_at
+        ? Date.parse(String(candidate.browser_smoke_tested_at))
+        : 0;
+      if (
+        !candidate ||
+        String(candidate.artifact_sha256).toLowerCase() !==
+          String(params.p_artifact_sha256).toLowerCase() ||
+        testedAt >= issuedAt
+      ) {
+        return { data: false, error: null };
+      }
+      Object.assign(candidate, {
+        browser_smoke_core_id: params.p_core_id,
+        browser_smoke_error:
+          params.p_status === "failed" ? params.p_error : null,
+        browser_smoke_status: params.p_status,
+        browser_smoke_tested_at: new Date().toISOString(),
+        browser_smoke_tested_by: params.p_reviewer_id,
+        updated_at: new Date().toISOString(),
+      });
+      return { data: true, error: null };
+    }
+
+    if (fn === "claim_browser_smoke_artifact") {
+      const nonce = String(params.p_nonce);
+      if (this.browserSmokeArtifactClaims.has(nonce)) {
+        return { data: false, error: null };
+      }
+      this.browserSmokeArtifactClaims.add(nonce);
+      return { data: true, error: null };
+    }
+
     if (fn === "admin_access_log_summary") {
       const page = Math.max(1, Number(params.p_page || 1));
       const pageSize = Math.min(100, Math.max(1, Number(params.p_page_size || 25)));
@@ -286,10 +351,16 @@ export class FakeSupabase {
         params.p_order === "play_count_desc" ? "play_count_desc" : "title";
       const search =
         typeof params.p_search === "string" ? params.p_search.trim() : "";
-      const rows = this.getPublishedCatalogGameRows(gameId, order, search).slice(
-        0,
-        limit,
-      );
+      const genre = typeof params.p_genre === "string" ? params.p_genre : "";
+      const license =
+        typeof params.p_license_spdx === "string" ? params.p_license_spdx : "";
+      const rows = this.getPublishedCatalogGameRows(
+        gameId,
+        order,
+        search,
+        genre,
+        license,
+      ).slice(0, limit);
       return { data: rows, error: null };
     }
 
@@ -300,6 +371,8 @@ export class FakeSupabase {
     gameId: string | null,
     order: "play_count_desc" | "title",
     search: string,
+    genre: string,
+    license: string,
   ) {
     const searchTokens = search.toLowerCase().split(/\s+/).filter(Boolean);
     return this.rows.games
@@ -307,6 +380,15 @@ export class FakeSupabase {
         (game) =>
           game.publication_status === "published" &&
           (!gameId || game.id === gameId) &&
+          (!genre || game.genre_slug === genre) &&
+          (!license || this.rows.game_rights.some(
+            (rights) =>
+              rights.game_id === game.id &&
+              rights.verified_at &&
+              rights.noncommercial_hosting_allowed === true &&
+              (rights.code_license_spdx === license ||
+                rights.asset_license_spdx === license),
+          )) &&
           searchTokens.every((token) =>
             [
               game.title,

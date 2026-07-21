@@ -11,6 +11,10 @@ import {
   getSupportedSubmissionRomExtension,
   SUPPORTED_SUBMISSION_ROM_LABEL,
 } from "../domain/submissionRom.js";
+import {
+  createSignedSubmissionUrl,
+  getSubmissionObjectPath,
+} from "../domain/submissionStorage.js";
 
 const submissionBodySchema = z.object({
   assetLicenseSpdx: z.string().trim().max(80).nullable().optional(),
@@ -107,30 +111,11 @@ const submissionBodySchema = z.object({
 
 const SUBMISSION_RATE_LIMIT = 3;
 const SUBMISSION_RATE_WINDOW_MS = 60 * 60 * 1000;
-const SUBMISSION_REVIEW_URL_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 type SubmissionPayload = z.infer<typeof submissionBodySchema>;
 
 function normalizeOptionalUrl(value: string | null | undefined) {
   return value || null;
-}
-
-function getSubmissionObjectPath(url: string) {
-  const storagePathPrefix = "/storage/v1/object/public/submissions/";
-  if (!env.SUPABASE_URL) {
-    const parsedUrl = new URL(url);
-    if (!parsedUrl.pathname.startsWith(storagePathPrefix)) return null;
-
-    return decodeURIComponent(
-      parsedUrl.pathname.slice(storagePathPrefix.length),
-    );
-  }
-
-  const normalizedSupabaseUrl = env.SUPABASE_URL.replace(/\/+$/, "");
-  const prefix = `${normalizedSupabaseUrl}/storage/v1/object/public/submissions/`;
-  if (!url.startsWith(prefix)) return null;
-
-  return decodeURIComponent(url.slice(prefix.length));
 }
 
 function isSubmissionStorageUrl(url: string, userId: string) {
@@ -210,23 +195,6 @@ async function defaultNotifySubmission(submission: SubmissionPayload) {
   if (!response.ok) {
     throw new Error(`Formspree notification failed with ${response.status}`);
   }
-}
-
-async function createSignedSubmissionUrl(
-  service: SupabaseServiceLike,
-  url: string | null | undefined,
-) {
-  if (!url) return null;
-
-  const objectPath = getSubmissionObjectPath(url);
-  if (!objectPath) return url;
-
-  const { data, error } = await service.storage
-    .from("submissions")
-    .createSignedUrl(objectPath, SUBMISSION_REVIEW_URL_TTL_SECONDS);
-  if (error || !data?.signedUrl) throw error || new Error("Missing signed URL");
-
-  return data.signedUrl;
 }
 
 async function createReviewNotificationSubmission(

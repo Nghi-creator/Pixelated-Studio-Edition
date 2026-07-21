@@ -11,6 +11,7 @@ import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLi
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import { requireAuthenticatedService } from "../../security/authenticatedService.js";
 import { getSubmissionRomPlatform } from "../domain/submissionRom.js";
+import { createSignedSubmissionUrl } from "../domain/submissionStorage.js";
 import {
   type CandidateRow,
   type SupabaseServiceLike,
@@ -62,6 +63,23 @@ type SubmissionRow = {
   status: string;
   submitter_id: string | null;
 };
+
+async function signSubmissionReviewUrls(
+  service: SupabaseServiceLike,
+  submission: SubmissionRow,
+) {
+  const [romUrl, coverUrl, bannerUrl] = await Promise.all([
+    createSignedSubmissionUrl(service, submission.rom_url),
+    createSignedSubmissionUrl(service, submission.cover_url),
+    createSignedSubmissionUrl(service, submission.banner_url),
+  ]);
+  return {
+    ...submission,
+    banner_url: bannerUrl,
+    cover_url: coverUrl,
+    rom_url: romUrl || submission.rom_url,
+  };
+}
 
 type AdminSubmissionRouteOptions = {
   adminSubmissionReviewLimiter?: RateLimiter;
@@ -199,7 +217,7 @@ export async function registerAdminSubmissionRoutes(
       const { page, pageSize, search, status } = parsedQuery.data;
       const start = (page - 1) * pageSize;
       const end = start + pageSize - 1;
-        let query = authenticatedService
+      let query = authenticatedService
         .from("game_submissions")
         .select("*", { count: "exact" })
         .eq("status", status)
@@ -214,10 +232,24 @@ export async function registerAdminSubmissionRoutes(
       }
 
       const total = count || 0;
+      let submissions: SubmissionRow[];
+      try {
+        submissions = await Promise.all(
+          ((data || []) as SubmissionRow[]).map((submission) =>
+            signSubmissionReviewUrls(authenticatedService, submission),
+          ),
+        );
+      } catch (err) {
+        request.log.error({ err }, "Failed to sign submission review URLs");
+        return reply
+          .status(503)
+          .send({ error: "Submission files are temporarily unavailable" });
+      }
+
       return {
         page,
         pageSize,
-        submissions: data || [],
+        submissions,
         total,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
       };
@@ -290,9 +322,16 @@ export async function registerAdminSubmissionRoutes(
           return reply.status(422).send({ error: "Unsupported submitted ROM type" });
         }
 
+        const signedRomUrl = await createSignedSubmissionUrl(
+          authenticatedService,
+          submission.rom_url,
+        );
+        if (!signedRomUrl) {
+          return reply.status(422).send({ error: "Submitted ROM is unavailable" });
+        }
         const artifactBytes = await fetchSubmissionArtifactBytes(
           fetchArtifact,
-          submission.rom_url,
+          signedRomUrl,
         );
         const artifactFilename = artifactFilenameFor(submission.rom_url);
         const sourceCommit = candidateSourceRevisionFor(submission);

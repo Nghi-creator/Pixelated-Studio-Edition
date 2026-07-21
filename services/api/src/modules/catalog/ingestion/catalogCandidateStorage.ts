@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { assertCandidateArtifactHeader } from "./catalogCandidateValidation.js";
 import type { CandidateRow, SupabaseServiceLike } from "./catalogCandidateTypes.js";
 import { sanitizeCatalogObjectSegment } from "../domain/catalogObjectPath.js";
+import { createSignedSubmissionUrl } from "../domain/submissionStorage.js";
 
 const ALLOWED_ARTIFACT_HOSTS = new Set(["raw.githubusercontent.com"]);
 
@@ -10,6 +11,53 @@ const sanitizeObjectSegment = (value: string) =>
 
 function sha256(bytes: Buffer) {
   return crypto.createHash("sha256").update(bytes).digest("hex");
+}
+
+async function readExactArtifactBytes(response: Response, expectedSize: number) {
+  const contentLengthHeader = response.headers.get("content-length");
+  const contentLength = Number(contentLengthHeader);
+  if (
+    contentLengthHeader !== null &&
+    Number.isFinite(contentLength) &&
+    contentLength >= 0 &&
+    contentLength !== expectedSize
+  ) {
+    throw new Error(
+      `Candidate artifact size mismatch. Expected ${expectedSize}, received ${contentLength}.`,
+    );
+  }
+
+  if (!response.body) {
+    const bytes = Buffer.from(await response.arrayBuffer());
+    if (bytes.length !== expectedSize) {
+      throw new Error(
+        `Candidate artifact size mismatch. Expected ${expectedSize}, received ${bytes.length}.`,
+      );
+    }
+    return bytes;
+  }
+
+  const reader = response.body.getReader();
+  const bytes = Buffer.allocUnsafe(expectedSize);
+  let offset = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    if (offset + value.byteLength > expectedSize) {
+      await reader.cancel();
+      throw new Error(
+        `Candidate artifact size mismatch. Expected ${expectedSize}, received more data.`,
+      );
+    }
+    bytes.set(value, offset);
+    offset += value.byteLength;
+  }
+  if (offset !== expectedSize) {
+    throw new Error(
+      `Candidate artifact size mismatch. Expected ${expectedSize}, received ${offset}.`,
+    );
+  }
+  return bytes;
 }
 
 function candidateArtifactRoot(candidate: CandidateRow) {
@@ -31,10 +79,10 @@ function assertAllowedArtifactUrl(value: string) {
   }
 }
 
-export async function mirrorCandidateArtifact(
-  service: SupabaseServiceLike,
+export async function fetchVerifiedCandidateArtifact(
   candidate: CandidateRow,
   fetchArtifact: typeof fetch,
+  service?: SupabaseServiceLike,
 ) {
   if (
     !candidate.artifact_url ||
@@ -44,25 +92,49 @@ export async function mirrorCandidateArtifact(
   ) {
     throw new Error("Candidate is missing artifact metadata.");
   }
+  if (!Number.isSafeInteger(candidate.artifact_size)) {
+    throw new Error("Candidate artifact size is invalid.");
+  }
 
-  assertAllowedArtifactUrl(candidate.artifact_url);
-  const response = await fetchArtifact(candidate.artifact_url);
+  let artifactUrl = candidate.artifact_url;
+  if (candidate.source_kind === "user_submission") {
+    if (!service) {
+      throw new Error("Submission artifact signing is not configured.");
+    }
+    const signedArtifactUrl = await createSignedSubmissionUrl(service, artifactUrl);
+    if (!signedArtifactUrl) {
+      throw new Error("Candidate submission artifact is unavailable.");
+    }
+    artifactUrl = signedArtifactUrl;
+  } else {
+    assertAllowedArtifactUrl(artifactUrl);
+  }
+  const response = await fetchArtifact(artifactUrl);
   if (!response.ok) {
     throw new Error(`Failed to fetch candidate artifact: ${response.status}`);
   }
 
-  const bytes = Buffer.from(await response.arrayBuffer());
-  if (bytes.length !== candidate.artifact_size) {
-    throw new Error(
-      `Candidate artifact size mismatch. Expected ${candidate.artifact_size}, received ${bytes.length}.`,
-    );
-  }
+  const bytes = await readExactArtifactBytes(response, candidate.artifact_size);
 
   const actualSha256 = sha256(bytes);
   if (actualSha256 !== candidate.artifact_sha256) {
     throw new Error("Candidate artifact checksum mismatch.");
   }
   assertCandidateArtifactHeader(candidate, bytes);
+
+  return bytes;
+}
+
+export async function mirrorCandidateArtifact(
+  service: SupabaseServiceLike,
+  candidate: CandidateRow,
+  fetchArtifact: typeof fetch,
+) {
+  const bytes = await fetchVerifiedCandidateArtifact(candidate, fetchArtifact, service);
+
+  if (!candidate.artifact_filename || !candidate.artifact_sha256) {
+    throw new Error("Candidate is missing artifact metadata.");
+  }
 
   const objectPath = [
     candidateArtifactRoot(candidate),
@@ -71,7 +143,7 @@ export async function mirrorCandidateArtifact(
     `${candidate.artifact_sha256}-${sanitizeObjectSegment(candidate.artifact_filename)}`,
   ].join("/");
 
-  const bucket = service.storage.from("catalog_artifacts");
+  const bucket = service.storage.from("catalog_roms");
   const { error: uploadError } = await bucket.upload(objectPath, bytes, {
     contentType: "application/octet-stream",
     upsert: true,
@@ -80,7 +152,7 @@ export async function mirrorCandidateArtifact(
 
   const { data } = bucket.getPublicUrl(objectPath);
   if (!data.publicUrl) {
-    throw new Error("Failed to resolve mirrored artifact public URL.");
+    throw new Error("Failed to resolve mirrored artifact storage URL.");
   }
 
   return {

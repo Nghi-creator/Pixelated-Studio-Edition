@@ -403,6 +403,9 @@ async function run() {
     await page
       .getByTitle("Copy HTTPS join link and invite-code guidance")
       .click();
+    await page
+      .getByText(/Invite copied\.|Could not copy automatically\./)
+      .waitFor();
     await page.getByRole("button", { exact: true, name: "P1" }).click();
     await page.getByText("request-slot:1").waitFor();
     assert.equal(

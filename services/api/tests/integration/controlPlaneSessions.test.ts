@@ -104,7 +104,7 @@ test("sessions reject oversized client-provided session ids", async () => {
   await app.close();
 });
 
-test("anonymous users can create playable cloud sessions", async () => {
+test("anonymous users cannot create playable cloud sessions", async () => {
   const db = new FakeSupabase();
   seedPublishedGame(db, {
     id: GAME_ID,
@@ -119,8 +119,9 @@ test("anonymous users can create playable cloud sessions", async () => {
   }
   const app = Fastify({ logger: false });
   await registerSessionRoutes(app, {
-    optionalUser: async () => undefined,
-    requireUser: requireUser(USER_ID),
+    requireUser: async (request) => {
+      request.user = undefined;
+    },
     supabase: db as never,
   });
 
@@ -130,30 +131,8 @@ test("anonymous users can create playable cloud sessions", async () => {
     url: "/sessions",
   });
 
-  assert.equal(createResponse.statusCode, 200);
-  const created = createResponse.json<{
-    sessionId: string;
-    sessionToken: string;
-    user: { id: string | null };
-  }>();
-  assert.equal(created.user.id, null);
-  assert.equal(db.sessions.get("anonymous-session")?.user_id, null);
-
-  const verifyResponse = await app.inject({
-    method: "POST",
-    payload: { sessionToken: created.sessionToken },
-    url: `/sessions/${created.sessionId}/verify`,
-  });
-
-  assert.equal(verifyResponse.statusCode, 200);
-  assert.equal(
-    verifyResponse.json<{ boot: { runtimeId: string } }>().boot.runtimeId,
-    "mgba",
-  );
-  assert.equal(
-    verifyResponse.json<{ user: { id: string | null } }>().user.id,
-    null,
-  );
+  assert.equal(createResponse.statusCode, 401);
+  assert.equal(db.sessions.has("anonymous-session"), false);
   await app.close();
 });
 
@@ -441,4 +420,3 @@ test("session token verification is rate limited", async () => {
   assert.equal(blockedResponse.headers["retry-after"], "60");
   await app.close();
 });
-

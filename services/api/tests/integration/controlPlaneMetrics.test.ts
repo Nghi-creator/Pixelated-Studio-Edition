@@ -7,6 +7,11 @@ import {
 
 test("stream metrics persist and rate-limit per user session", async () => {
   const db = new FakeSupabase();
+  db.sessions.set("session-1", {
+    deleted_at: null,
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
+    id: "session-1",
+  });
   const app = await createTestApp(db);
   const metric = {
     bitrateKbps: 1200,
@@ -45,6 +50,52 @@ test("stream metrics persist and rate-limit per user session", async () => {
   await app.close();
 });
 
+test("stream metrics require live sessions and enforce a user-level backstop", async () => {
+  const missingDb = new FakeSupabase();
+  const missingApp = await createTestApp(missingDb);
+  const metric = {
+    bitrateKbps: 1200,
+    connectionState: "connected",
+    fps: 60,
+    iceConnectionState: "connected",
+    jitterMs: 3,
+    packetsLost: 0,
+    timestamp: new Date().toISOString(),
+  };
+
+  const missing = await missingApp.inject({
+    method: "POST",
+    payload: { ...metric, sessionId: "missing-session" },
+    url: "/metrics/stream",
+  });
+  assert.equal(missing.statusCode, 404);
+  await missingApp.close();
+
+  const db = new FakeSupabase();
+  const app = await createTestApp(db);
+
+  for (let index = 0; index < 31; index += 1) {
+    const sessionId = `metric-session-${index}`;
+    db.sessions.set(sessionId, {
+      deleted_at: null,
+      expires_at: new Date(Date.now() + 60_000).toISOString(),
+      id: sessionId,
+    });
+    const response = await app.inject({
+      method: "POST",
+      payload: { ...metric, sessionId },
+      url: "/metrics/stream",
+    });
+    assert.equal(response.statusCode, 202);
+    assert.equal(
+      response.json<{ accepted: boolean }>().accepted,
+      index < 30,
+    );
+  }
+  assert.equal(db.metrics.length, 30);
+  await app.close();
+});
+
 test("stream metrics reject oversized session ids and stale timestamps", async () => {
   const db = new FakeSupabase();
   const app = await createTestApp(db);
@@ -79,4 +130,3 @@ test("stream metrics reject oversized session ids and stale timestamps", async (
   assert.equal(db.metrics.length, 0);
   await app.close();
 });
-

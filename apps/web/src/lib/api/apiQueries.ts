@@ -47,7 +47,8 @@ export function useAdminUsersQuery<TUser>({
   return useQuery<ApiPaginatedUsersResponse<TUser>>({
     enabled,
     queryKey: queryKeys.adminUsers(page, pageSize, search),
-    queryFn: () => api.users<TUser>({ page, pageSize, search }),
+    queryFn: ({ signal }) =>
+      api.users<TUser>({ page, pageSize, search, signal }),
   });
 }
 
@@ -78,12 +79,13 @@ export function useCatalogCandidatesQuery<TCandidate>({
       platformId,
       search,
     ),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       api.catalogCandidates<TCandidate>({
         page,
         pageSize,
         platformId,
         search,
+        signal,
         sourceKind,
         status,
       }),
@@ -106,11 +108,12 @@ export function useGameSubmissionsQuery<TSubmission>({
   return useQuery<ApiPaginatedGameSubmissionsResponse<TSubmission>>({
     enabled,
     queryKey: queryKeys.gameSubmissions(page, pageSize, status, search),
-    queryFn: () =>
+    queryFn: ({ signal }) =>
       api.gameSubmissions<TSubmission>({
         page,
         pageSize,
         search,
+        signal,
         status,
       }),
   });
@@ -156,7 +159,14 @@ export function useFavoritesQuery<TFavorite>({
 export function useFeaturedGamesQuery() {
   return useQuery({
     queryKey: queryKeys.featuredGames(),
-    queryFn: api.featuredGames,
+    queryFn: ({ signal }) => api.featuredGames(signal),
+  });
+}
+
+export function useCatalogFiltersQuery() {
+  return useQuery({
+    queryKey: queryKeys.catalogFilters(),
+    queryFn: ({ signal }) => api.catalogFilters(signal),
   });
 }
 
@@ -164,17 +174,22 @@ export function useGameCatalogQuery({
   page,
   pageSize,
   search,
+  genre = "",
+  license = "",
   enabled = true,
 }: {
   enabled?: boolean;
   page: number;
   pageSize: number;
   search: string;
+  genre?: string;
+  license?: string;
 }) {
   return useQuery({
     enabled,
-    queryKey: queryKeys.gameCatalog(page, pageSize, search),
-    queryFn: () => api.games({ page, pageSize, search }),
+    queryKey: queryKeys.gameCatalog(page, pageSize, search, genre, license),
+    queryFn: ({ signal }) =>
+      api.games({ genre, license, page, pageSize, search, signal }),
   });
 }
 

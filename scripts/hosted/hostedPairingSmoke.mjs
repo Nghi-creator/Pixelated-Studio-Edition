@@ -39,7 +39,7 @@ const webUrl = normalizeUrl(
   process.env.HOSTED_WEB_URL || "https://pixelated-studio-edition.vercel.app",
 );
 const apiUrl = normalizeUrl(
-  process.env.HOSTED_API_URL || "https://pixelated-api-services.onrender.com",
+  process.env.HOSTED_API_URL || "https://pixelated-api-services-6ovi.onrender.com",
 );
 const email = process.env.HOSTED_SMOKE_EMAIL || process.env.STAGING_SMOKE_EMAIL;
 const supabaseUrl = normalizeUrl(process.env.HOSTED_SUPABASE_URL || "");

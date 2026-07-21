@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { FastifyRequest } from "fastify";
-import { getBearerToken } from "../../src/modules/auth/supabaseAuth.js";
+import { getBearerToken } from "../../../src/modules/auth/supabaseAuth.js";
 
 function requestWithAuthorization(authorization?: string) {
   return {

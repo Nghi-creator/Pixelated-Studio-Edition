@@ -1,5 +1,6 @@
 import type {
   ApiFeaturedGamesResponse,
+  ApiCatalogFiltersResponse,
   ApiGame,
   ApiPaginatedGamesResponse,
 } from "./apiTypes";
@@ -16,34 +17,50 @@ export function createCatalogApi({
   getFavoriteIds,
 }: CatalogApiDependencies) {
   return {
-    countPlay: (gameId: string) =>
+    countPlay: (gameId: string, playEventId: string) =>
       apiRequest<{ success: true }>(`/games/${gameId}/play-count`, {
+        body: JSON.stringify({ clientEdition: "studio", playEventId, runtimeKind: "webrtc" }),
         method: "POST",
       }),
     favoriteIds: () => getFavoriteIds(),
+    catalogFilters: (signal?: AbortSignal) =>
+      apiRequest<ApiCatalogFiltersResponse>("/games/filters", {
+        authenticated: false,
+        signal,
+      }),
     games: ({
+      genre = "",
+      license = "",
       page = 1,
       pageSize = 15,
       search = "",
+      signal,
     }: {
       page?: number;
       pageSize?: number;
+      genre?: string;
+      license?: string;
       search?: string;
+      signal?: AbortSignal;
     } = {}) => {
       const params = new URLSearchParams({
         page: String(page),
         pageSize: String(pageSize),
       });
       if (search.trim()) params.set("search", search.trim());
+      if (genre) params.set("genre", genre);
+      if (license) params.set("license", license);
 
       return apiRequest<ApiPaginatedGamesResponse>(`/games?${params}`, {
         authenticated: false,
+        signal,
       });
     },
-    featuredGames: () =>
+    featuredGames: (signal?: AbortSignal) =>
       apiRequest<ApiFeaturedGamesResponse>("/games/featured", {
         authenticated: false,
         cache: "no-store",
+        signal,
       }),
     game: (gameId: string) =>
       apiRequest<{ game: ApiGame }>(`/games/${gameId}`, {

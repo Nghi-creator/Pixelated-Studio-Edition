@@ -3,6 +3,7 @@ import { Loader2, Search } from "lucide-react";
 import HeroBanner from "../../components/user/HeroBanner";
 import GameCard from "../../components/user/GameCard";
 import {
+  useCatalogFiltersQuery,
   useFeaturedGamesQuery,
   useGameCatalogQuery,
 } from "../../lib/api/apiQueries";
@@ -12,9 +13,13 @@ import {
   HeroSkeleton,
 } from "../../components/ui/skeleton/UserSkeletons";
 import { Pagination } from "../../components/ui/Pagination";
+import { useDebouncedValue } from "../../lib/useDebouncedValue";
+import { formatGenre } from "../../features/catalog/catalogMetadata";
 
 const GAMES_PER_PAGE = 15;
 const ZERO_PLAY_FEATURED_REFRESH_MS = 30_000;
+const MAX_ZERO_PLAY_FEATURED_REFRESHES = 3;
+const SEARCH_DEBOUNCE_MS = 250;
 
 interface Game {
   id: string;
@@ -44,13 +49,25 @@ function CatalogRefreshPanel({ label }: { label: string }) {
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [genreFilter, setGenreFilter] = useState("");
+  const [licenseFilter, setLicenseFilter] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(
+    searchQuery.trim(),
+    SEARCH_DEBOUNCE_MS,
+  );
+  const [zeroPlayRefreshCount, setZeroPlayRefreshCount] = useState(0);
 
   const catalogQuery = useGameCatalogQuery({
     page: currentPage,
     pageSize: GAMES_PER_PAGE,
-    search: searchQuery,
+    genre: genreFilter,
+    license: licenseFilter,
+    search: debouncedSearchQuery,
   });
   const featuredQuery = useFeaturedGamesQuery();
+  const filtersQuery = useCatalogFiltersQuery();
+  const availableGenres = filtersQuery.data?.genres || [];
+  const availableLicenses = filtersQuery.data?.licenses || [];
 
   const games = (catalogQuery.data?.games || []) as Game[];
   const featuredGames = featuredQuery.data?.featuredGames.length
@@ -66,20 +83,43 @@ export default function Home() {
   const refetchFeaturedGames = featuredQuery.refetch;
 
   useEffect(() => {
-    if (!shouldRefreshFeatured) return;
+    if (
+      !shouldRefreshFeatured ||
+      zeroPlayRefreshCount >= MAX_ZERO_PLAY_FEATURED_REFRESHES
+    ) {
+      return;
+    }
 
-    const interval = window.setInterval(() => {
+    const refresh = () => {
+      setZeroPlayRefreshCount((count) => count + 1);
       void refetchFeaturedGames();
-    }, ZERO_PLAY_FEATURED_REFRESH_MS);
+    };
+    let timeout: number | null = null;
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
 
-    return () => window.clearInterval(interval);
-  }, [refetchFeaturedGames, shouldRefreshFeatured]);
+    if (document.visibilityState === "hidden") {
+      document.addEventListener("visibilitychange", refreshWhenVisible, {
+        once: true,
+      });
+    } else {
+      timeout = window.setTimeout(refresh, ZERO_PLAY_FEATURED_REFRESH_MS);
+    }
+
+    return () => {
+      if (timeout !== null) window.clearTimeout(timeout);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [refetchFeaturedGames, shouldRefreshFeatured, zeroPlayRefreshCount]);
 
   const safeCurrentPage = Math.min(currentPage, totalPages);
   const pageStart = (safeCurrentPage - 1) * GAMES_PER_PAGE;
-  const showInitialCatalogSkeleton = loading && games.length === 0 && !searchQuery;
+  const isSearchSettling = searchQuery.trim() !== debouncedSearchQuery;
+  const showInitialCatalogSkeleton =
+    loading && games.length === 0 && !debouncedSearchQuery;
   const showCatalogRefreshPanel =
-    catalogQuery.isFetching &&
+    (catalogQuery.isFetching || isSearchSettling) &&
     (games.length > 0 || Boolean(searchQuery));
   const catalogRefreshLabel = searchQuery
     ? "Searching games..."
@@ -101,7 +141,7 @@ export default function Home() {
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
-        <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="mb-8 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <h2
             id="all-games"
             className="scroll-mt-24 text-2xl font-bold text-white"
@@ -109,20 +149,54 @@ export default function Home() {
             All Games
           </h2>
 
-          <div className="relative w-full md:w-96">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="text-gray-400 w-4 h-4" />
+          <div className="grid w-full gap-3 sm:grid-cols-3 lg:max-w-3xl">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="text-gray-400 w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search games..."
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="block w-full rounded-lg border border-synth-border bg-synth-bg py-2 pl-10 pr-3 leading-5 text-white placeholder:text-gray-500 transition-colors focus:border-synth-secondary focus:outline-none"
+              />
             </div>
-            <input
-              type="text"
-              placeholder="Search games..."
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="block w-full rounded-lg border border-synth-border bg-synth-bg py-2 pl-10 pr-10 leading-5 text-white placeholder:text-gray-500 transition-colors focus:border-synth-secondary focus:outline-none"
-            />
+            <label>
+              <span className="sr-only">Game genre</span>
+              <select
+                className="block w-full rounded-lg border border-synth-border bg-synth-bg px-3 py-2 text-white focus:border-synth-secondary focus:outline-none"
+                onChange={(event) => {
+                  setGenreFilter(event.target.value);
+                  setCurrentPage(1);
+                }}
+                value={genreFilter}
+              >
+                <option value="">All genres</option>
+                {availableGenres.map((genre) => (
+                  <option key={genre} value={genre}>{formatGenre(genre)}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              <span className="sr-only">Game license</span>
+              <select
+                className="block w-full rounded-lg border border-synth-border bg-synth-bg px-3 py-2 text-white focus:border-synth-secondary focus:outline-none"
+                onChange={(event) => {
+                  setLicenseFilter(event.target.value);
+                  setCurrentPage(1);
+                }}
+                value={licenseFilter}
+              >
+                <option value="">All licenses</option>
+                {availableLicenses.map((license) => (
+                  <option key={license} value={license}>{license}</option>
+                ))}
+              </select>
+            </label>
           </div>
         </div>
 
@@ -141,10 +215,17 @@ export default function Home() {
               Retry
             </button>
           </div>
-        ) : games.length === 0 && !loading && !catalogQuery.isFetching ? (
+        ) : games.length === 0 &&
+          !loading &&
+          !catalogQuery.isFetching &&
+          !isSearchSettling ? (
           <div className="text-center py-20 text-gray-500">
             <Search className="w-12 h-12 mx-auto mb-4 opacity-20" />
-            <p className="text-xl">No games found matching "{searchQuery}"</p>
+            <p className="text-xl">
+              {searchQuery
+                ? `No games found matching “${searchQuery}” with these filters.`
+                : "No games match the selected genre and license filters."}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">

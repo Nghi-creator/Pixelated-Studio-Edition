@@ -126,6 +126,29 @@ test("catalog route paginates, searches, and returns featured games", async () =
   await app.close();
 });
 
+test("catalog route rejects amplification-oriented query shapes", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGames(db, { id: GAME_ID, title: "Bounded" });
+  const app = await createDataBoundaryApp(db);
+
+  const oversizedPage = await app.inject({
+    method: "GET",
+    url: "/games?page=501",
+  });
+  assert.equal(oversizedPage.statusCode, 400);
+
+  const excessiveTerms = await app.inject({
+    method: "GET",
+    url: `/games?search=${encodeURIComponent("one two three four five six seven eight nine ten eleven twelve thirteen")}`,
+  });
+  assert.equal(excessiveTerms.statusCode, 400);
+  assert.equal(
+    db.rpcCalls.filter((call) => call.fn === "published_catalog_games").length,
+    0,
+  );
+  await app.close();
+});
+
 test("catalog search is pushed into the published catalog RPC", async () => {
   const db = new FakeSupabase();
   seedPublishedGames(
@@ -158,6 +181,214 @@ test("catalog search is pushed into the published catalog RPC", async () => {
   await app.close();
 });
 
+test("catalog exposes eligible facets and filters genre and SPDX license server-side", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGames(
+    db,
+    { genre_slug: "puzzle", id: "puzzle-mit", title: "Puzzle MIT" },
+    { genre_slug: "action", id: "action-gpl", title: "Action GPL" },
+  );
+  const gplRights = db.rows.game_rights.find(
+    (rights) => rights.game_id === "action-gpl",
+  );
+  assert.ok(gplRights);
+  gplRights.code_license_spdx = "GPL-3.0-only";
+
+  const app = await createDataBoundaryApp(db);
+  const facetsResponse = await app.inject({ method: "GET", url: "/games/filters" });
+  assert.equal(facetsResponse.statusCode, 200);
+  assert.deepEqual(facetsResponse.json(), {
+    genres: ["action", "puzzle"],
+    licenses: ["GPL-3.0-only", "MIT"],
+  });
+
+  const filteredResponse = await app.inject({
+    method: "GET",
+    url: "/games?genre=action&license=GPL-3.0-only",
+  });
+  assert.equal(filteredResponse.statusCode, 200);
+  assert.deepEqual(
+    filteredResponse.json<{ games: { id: string }[] }>().games.map((game) => game.id),
+    ["action-gpl"],
+  );
+  assert.equal(
+    db.rpcCalls.some(
+      (call) =>
+        call.fn === "published_catalog_games" &&
+        call.params.p_genre === "action" &&
+        call.params.p_license_spdx === "GPL-3.0-only",
+    ),
+    true,
+  );
+  await app.close();
+});
+
+test("admin browser smoke flow verifies the artifact and records reviewer evidence", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = validNesRom();
+  const candidateId = "78787878-7878-4878-8878-787878787878";
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "smoke.nes",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/repo/smoke.nes",
+    asset_license_spdx: "MIT",
+    attribution_text: "Smoke attribution",
+    browser_smoke_core_id: null,
+    browser_smoke_error: null,
+    browser_smoke_status: "not_tested",
+    browser_smoke_tested_at: null,
+    browser_smoke_tested_by: null,
+    code_license_spdx: "MIT",
+    cover_license_spdx: null,
+    developer_name: "Smoke Dev",
+    developer_url: null,
+    id: candidateId,
+    import_status: "needs_review",
+    launch_manifest_id: null,
+    license_url: "https://example.test/license",
+    noncommercial_hosting_allowed: true,
+    original_release_url: null,
+    package_component: null,
+    package_name: null,
+    package_version: null,
+    permission_evidence_url: "https://example.test/license",
+    platform_id: "nes",
+    review_notes: null,
+    runtime_id: "mesen",
+    runtime_kind: "libretro",
+    source_commit: "abababababababababababababababababababab",
+    source_entry_path: "entries/smoke/game.json",
+    source_kind: "homebrew_hub_nes",
+    source_repo_url: "https://github.com/example/repo",
+    title: "Smoke Demo",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const listResponse = await app.inject({
+    method: "GET",
+    url: "/admin/catalog-candidates",
+  });
+  assert.equal(listResponse.statusCode, 200);
+  assert.deepEqual(listResponse.json().candidates[0].browser_compatibility, {
+    coreId: "fceumm",
+    eligible: true,
+    reason: null,
+    systemId: "nes",
+  });
+  assert.deepEqual(listResponse.json().candidates[0].technical_compatibility, {
+    compatible: true,
+    reason: null,
+  });
+
+  const ticketResponse = await app.inject({
+    method: "POST",
+    url: `/admin/catalog-candidates/${candidateId}/browser-smoke-ticket`,
+  });
+  assert.equal(ticketResponse.statusCode, 200);
+  const { ticket } = ticketResponse.json<{ ticket: string }>();
+
+  const sessionResponse = await app.inject({
+    headers: { authorization: `Smoke ${ticket}` },
+    method: "GET",
+    url: "/browser-smoke/session",
+  });
+  assert.equal(sessionResponse.statusCode, 200);
+  assert.equal(sessionResponse.json().candidateId, candidateId);
+
+  const artifactResponse = await app.inject({
+    headers: { authorization: `Smoke ${ticket}` },
+    method: "GET",
+    url: "/browser-smoke/artifact",
+  });
+  assert.equal(artifactResponse.statusCode, 200);
+  assert.deepEqual(artifactResponse.rawPayload, artifactBytes);
+  assert.equal(artifactResponse.headers["cache-control"], "no-store");
+
+  const repeatedArtifactResponse = await app.inject({
+    headers: { authorization: `Smoke ${ticket}` },
+    method: "GET",
+    url: "/browser-smoke/artifact",
+  });
+  assert.equal(repeatedArtifactResponse.statusCode, 409);
+
+  const resultResponse = await app.inject({
+    headers: { authorization: `Smoke ${ticket}` },
+    method: "POST",
+    payload: { coreId: "fceumm", status: "passed" },
+    url: "/browser-smoke/result",
+  });
+  assert.equal(resultResponse.statusCode, 200);
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.browser_smoke_status, "passed");
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.browser_smoke_core_id, "fceumm");
+  assert.equal(db.rows.catalog_ingestion_candidates[0]?.browser_smoke_tested_by, ADMIN_ID);
+  assert.ok(db.rows.catalog_ingestion_candidates[0]?.browser_smoke_tested_at);
+  assert.equal(
+    db.rpcCalls.some((call) => call.fn === "record_browser_smoke_result"),
+    true,
+  );
+
+  const replayResponse = await app.inject({
+    headers: { authorization: `Smoke ${ticket}` },
+    method: "POST",
+    payload: { coreId: "fceumm", status: "passed" },
+    url: "/browser-smoke/result",
+  });
+  assert.equal(replayResponse.statusCode, 409);
+  await app.close();
+});
+
+test("browser-eligible candidates cannot be promoted before a passing smoke test", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const artifactBytes = validNesRom();
+  const candidateId = "79797979-7979-4979-8979-797979797979";
+  db.rows.catalog_ingestion_candidates.push({
+    artifact_filename: "untested.nes",
+    artifact_sha256: sha256(artifactBytes),
+    artifact_size: artifactBytes.length,
+    artifact_url: "https://raw.githubusercontent.com/example/repo/untested.nes",
+    asset_license_spdx: "MIT",
+    attribution_text: "Untested attribution",
+    browser_smoke_core_id: null,
+    browser_smoke_status: "not_tested",
+    code_license_spdx: "MIT",
+    cover_license_spdx: null,
+    developer_name: "Untested Dev",
+    developer_url: null,
+    id: candidateId,
+    import_status: "needs_review",
+    license_url: "https://example.test/license",
+    noncommercial_hosting_allowed: true,
+    original_release_url: null,
+    permission_evidence_url: "https://example.test/license",
+    platform_id: "nes",
+    review_notes: null,
+    runtime_id: "mesen",
+    runtime_kind: "libretro",
+    source_commit: "acacacacacacacacacacacacacacacacacacacac",
+    source_entry_path: "entries/untested/game.json",
+    source_kind: "homebrew_hub_nes",
+    source_repo_url: "https://github.com/example/repo",
+    title: "Untested Demo",
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
+
+  const response = await app.inject({
+    method: "PATCH",
+    payload: { action: "promote" },
+    url: `/admin/catalog-candidates/${candidateId}`,
+  });
+
+  assert.equal(response.statusCode, 422);
+  assert.deepEqual(response.json(), {
+    error: "Run and pass the User Edition browser smoke test before promoting this candidate.",
+  });
+  assert.equal(db.rows.games.length, 0);
+  await app.close();
+});
+
 test("admin can promote a catalog ingestion candidate without deleting existing games", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
@@ -175,6 +406,8 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
     artifact_url: "https://raw.githubusercontent.com/example/repo/nova.nes",
     asset_license_spdx: "GPL-3.0-or-later",
     attribution_text: "Nova attribution",
+    browser_smoke_core_id: "fceumm",
+    browser_smoke_status: "passed",
     code_license_spdx: "GPL-3.0-or-later",
     cover_license_spdx: null,
     developer_name: "NovaSquirrel",
@@ -207,16 +440,17 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
   assert.equal(db.rows.games.length, 1);
   assert.equal(db.rows.games[0]?.id, GAME_ID);
   assert.equal(db.rows.games[0]?.publication_status, "published");
+  assert.equal(db.rows.games[0]?.genre_slug, "other");
   assert.equal(db.rows.games[0]?.title, "Nova the Squirrel");
   assert.equal(db.rows.game_builds.length, 1);
   assert.equal(db.rows.game_builds[0]?.game_id, GAME_ID);
   assert.equal(db.rows.game_builds[0]?.runtime_id, "mesen");
   assert.match(
     String(db.rows.game_builds[0]?.artifact_url),
-    /^https:\/\/storage\.example\.test\/catalog_artifacts\/homebrew-hub\//,
+    /^https:\/\/storage\.example\.test\/catalog_roms\/homebrew-hub\//,
   );
   assert.equal(db.uploadedStorageObjects.length, 2);
-  assert.equal(db.uploadedStorageObjects[0]?.bucket, "catalog_artifacts");
+  assert.equal(db.uploadedStorageObjects[0]?.bucket, "catalog_roms");
   assert.equal(db.uploadedStorageObjects[0]?.bytes, artifactBytes.length);
   assert.equal(db.uploadedStorageObjects[1]?.bucket, "catalog_artifacts");
   assert.match(
@@ -292,7 +526,7 @@ test("admin can promote a curated SNES candidate into a bsnes build", async () =
   assert.equal(db.rows.games[0]?.rom_filename, "demo.sfc");
   assert.match(
     String(db.rows.games[0]?.rom_url),
-    /^https:\/\/storage\.example\.test\/catalog_artifacts\/curated-roms\//,
+    /^https:\/\/storage\.example\.test\/catalog_roms\/curated-roms\//,
   );
   assert.equal(db.rows.game_builds.length, 1);
   assert.equal(db.rows.game_builds[0]?.runtime_id, "bsnes");
@@ -300,7 +534,7 @@ test("admin can promote a curated SNES candidate into a bsnes build", async () =
   assert.equal(db.rows.game_builds[0]?.artifact_filename, "demo.sfc");
   assert.match(
     String(db.rows.game_builds[0]?.artifact_url),
-    /^https:\/\/storage\.example\.test\/catalog_artifacts\/curated-roms\//,
+    /^https:\/\/storage\.example\.test\/catalog_roms\/curated-roms\//,
   );
   assert.equal(db.uploadedStorageObjects.length, 2);
   assert.match(
@@ -333,6 +567,8 @@ test("admin promotion replaces generated fallback with captured gameplay artwork
     artifact_url: "https://raw.githubusercontent.com/example/curated-roms/capture-demo.nes",
     asset_license_spdx: "MIT",
     attribution_text: "Capture Demo attribution",
+    browser_smoke_core_id: "fceumm",
+    browser_smoke_status: "passed",
     code_license_spdx: "MIT",
     cover_license_spdx: null,
     developer_name: "Capture Dev",

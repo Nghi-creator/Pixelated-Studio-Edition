@@ -10,6 +10,7 @@ import {
   getAdminApiErrorMessage,
   getPageRangeLabel,
 } from "./adminState";
+import { useDebouncedValue } from "../../lib/useDebouncedValue";
 
 export const USERS_PER_PAGE = 25;
 
@@ -25,6 +26,7 @@ export interface AdminUserProfile {
 export function useAdminUsers() {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearchQuery = useDebouncedValue(searchQuery.trim(), 250);
   const [actionError, setActionError] = useState("");
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<
@@ -46,7 +48,7 @@ export function useAdminUsers() {
     enabled: canManageUsers,
     page,
     pageSize: USERS_PER_PAGE,
-    search: searchQuery,
+    search: debouncedSearchQuery,
   });
 
   const handleSearchChange = (nextSearchQuery: string) => {
@@ -90,7 +92,7 @@ export function useAdminUsers() {
   const updateUserMutation = useUpdateAdminUserMutation<AdminUserProfile>({
     page,
     pageSize: USERS_PER_PAGE,
-    search: searchQuery,
+    search: debouncedSearchQuery,
     onError: (error) => {
       console.error(error);
       setActionError(getAdminApiErrorMessage(error, "User update failed."));

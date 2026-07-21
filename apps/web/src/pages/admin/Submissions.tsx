@@ -23,6 +23,7 @@ import type {
   ApiGameSubmissionStatus,
   ApiSubmissionCandidatePayload,
 } from "../../lib/api/apiTypes";
+import { useDebouncedValue } from "../../lib/useDebouncedValue";
 
 const SUBMISSIONS_PER_PAGE = 15;
 const STATUS_OPTIONS: ApiGameSubmissionStatus[] = [
@@ -38,6 +39,7 @@ const STATUS_FILTER_OPTIONS = STATUS_OPTIONS.map((option) => ({
 export default function Submissions() {
   const [status, setStatus] = useState<ApiGameSubmissionStatus>("pending");
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search.trim(), 250);
   const [page, setPage] = useState(1);
   const [toastMessage, setToastMessage] = useState("");
   const [pendingSubmissionId, setPendingSubmissionId] = useState<string | null>(null);
@@ -48,7 +50,7 @@ export default function Submissions() {
   const submissionsQuery = useGameSubmissionsQuery<ApiGameSubmission>({
     page,
     pageSize: SUBMISSIONS_PER_PAGE,
-    search,
+    search: debouncedSearch,
     status,
   });
   const submissions = submissionsQuery.data?.submissions || [];
@@ -59,7 +61,7 @@ export default function Submissions() {
   const reviewMutation = useReviewGameSubmissionMutation<ApiGameSubmission>({
     page,
     pageSize: SUBMISSIONS_PER_PAGE,
-    search,
+    search: debouncedSearch,
     status,
     totalSubmissions,
     onError: (error) => {

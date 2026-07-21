@@ -54,6 +54,7 @@ export function createAdminApi({ apiRequest }: AdminApiDependencies) {
       pageSize = 25,
       platformId = "",
       search = "",
+      signal,
       sourceKind = "",
       status = "needs_review",
     }: {
@@ -61,6 +62,7 @@ export function createAdminApi({ apiRequest }: AdminApiDependencies) {
       pageSize?: number;
       platformId?: string;
       search?: string;
+      signal?: AbortSignal;
       sourceKind?: ApiCatalogCandidateSourceKind | "";
       status?: ApiCatalogCandidateStatus;
     } = {}) => {
@@ -75,29 +77,38 @@ export function createAdminApi({ apiRequest }: AdminApiDependencies) {
 
       return apiRequest<ApiPaginatedCatalogCandidatesResponse<TCandidate>>(
         `/admin/catalog-candidates?${params}`,
+        { signal },
       );
     },
     reviewCatalogCandidate: <TCandidate>(
       candidateId: string,
       action: ApiCatalogCandidateReviewAction,
       notes: string,
+      genreSlug: string,
     ) =>
       apiRequest<ApiCatalogCandidateReviewResponse<TCandidate>>(
         `/admin/catalog-candidates/${candidateId}`,
         {
-          body: JSON.stringify({ action, notes }),
+          body: JSON.stringify({ action, genreSlug, notes }),
           method: "PATCH",
         },
+      ),
+    createCatalogCandidateBrowserSmokeTicket: (candidateId: string) =>
+      apiRequest<{ expiresAt: string; ticket: string }>(
+        `/admin/catalog-candidates/${candidateId}/browser-smoke-ticket`,
+        { method: "POST" },
       ),
     gameSubmissions: <TSubmission>({
       page = 1,
       pageSize = 25,
       search = "",
+      signal,
       status = "pending",
     }: {
       page?: number;
       pageSize?: number;
       search?: string;
+      signal?: AbortSignal;
       status?: ApiGameSubmissionStatus;
     } = {}) => {
       const params = new URLSearchParams({
@@ -109,6 +120,7 @@ export function createAdminApi({ apiRequest }: AdminApiDependencies) {
 
       return apiRequest<ApiPaginatedGameSubmissionsResponse<TSubmission>>(
         `/admin/submissions?${params}`,
+        { signal },
       );
     },
     createSubmissionCandidate: <TSubmission>(
@@ -142,10 +154,12 @@ export function createAdminApi({ apiRequest }: AdminApiDependencies) {
       page = 1,
       pageSize = 25,
       search = "",
+      signal,
     }: {
       page?: number;
       pageSize?: number;
       search?: string;
+      signal?: AbortSignal;
     } = {}) => {
       const params = new URLSearchParams({
         page: String(page),
@@ -155,6 +169,7 @@ export function createAdminApi({ apiRequest }: AdminApiDependencies) {
 
       return apiRequest<ApiPaginatedUsersResponse<TUser>>(
         `/admin/users?${params}`,
+        { signal },
       );
     },
   };

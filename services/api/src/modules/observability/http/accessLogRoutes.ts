@@ -88,6 +88,7 @@ export function getAccessLogStorageErrorResponse(
       migrations: [
         "20260603090000_repair_access_logs_path.sql",
         "20260604090000_access_log_sessions_summary.sql",
+        "20260718133000_atomic_activity_and_smoke_writes.sql",
       ],
     };
   }
@@ -144,44 +145,15 @@ export async function registerAccessLogRoutes(
       }
     }
 
-    const now = new Date().toISOString();
-    const { data: existingLog, error: existingLogError } = await timed(
-      timings,
-      "access_log_lookup_ms",
-      () =>
-        service
-          .from("access_logs")
-          .select("access_count")
-          .eq("session_id", parsedBody.data.sessionId)
-          .maybeSingle<{ access_count: number | null }>(),
-    );
-
-    if (existingLogError) {
-      request.log.error({ err: existingLogError }, "Failed to load access log session");
-      return reply
-        .status(500)
-        .send(
-          getAccessLogStorageErrorResponse(
-            existingLogError,
-            "Failed to create access log",
-          ),
-        );
-    }
-
     const { error } = await timed(
       timings,
       "access_log_upsert_ms",
       () =>
-        service.from("access_logs").upsert(
-          {
-            access_count: (existingLog?.access_count || 0) + 1,
-            last_seen_at: now,
-            path: parsedBody.data.path,
-            session_id: parsedBody.data.sessionId,
-            user_id: userId,
-          },
-          { onConflict: "session_id" },
-        ),
+        service.rpc("record_access_log", {
+          p_path: parsedBody.data.path,
+          p_session_id: parsedBody.data.sessionId,
+          p_user_id: userId,
+        }),
     );
 
     if (error) {

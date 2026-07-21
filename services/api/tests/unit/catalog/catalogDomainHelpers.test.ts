@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sanitizeCatalogObjectSegment } from "../../src/modules/catalog/domain/catalogObjectPath.js";
+import { sanitizeCatalogObjectSegment } from "../../../src/modules/catalog/domain/catalogObjectPath.js";
 import {
   getSubmissionRomPlatform,
   getSupportedSubmissionRomExtension,
   SUPPORTED_SUBMISSION_ROM_EXTENSIONS,
-} from "../../src/modules/catalog/domain/submissionRom.js";
+} from "../../../src/modules/catalog/domain/submissionRom.js";
 
 test("catalog object paths use one bounded segment sanitizer", () => {
   assert.equal(

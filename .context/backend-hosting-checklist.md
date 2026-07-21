@@ -77,7 +77,7 @@ Protected GitHub environment: `production`
 Variables:
 
 ```txt
-HOSTED_API_URL=https://pixelated-api-services.onrender.com
+HOSTED_API_URL=https://pixelated-api-services-6ovi.onrender.com
 HOSTED_WEB_URL=https://pixelated-studio-edition.vercel.app
 HOSTED_SUPABASE_URL=<production-supabase-url>
 ```

@@ -1,6 +1,7 @@
-import { Copy, Link2, X } from "lucide-react";
-import { useState } from "react";
+import { Check, Copy, Link2, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { PixelIcon } from "../../../components/ui/PixelIcon";
+import { copyTextToClipboard } from "../../../lib/clipboard";
 import type {
   EngineInputCapabilities,
   LobbyParticipant,
@@ -37,6 +38,10 @@ export function LobbyPanel({
   shareUrl,
 }: LobbyPanelProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [copyState, setCopyState] = useState<"copied" | "failed" | "idle">(
+    "idle",
+  );
+  const copyResetTimerRef = useRef<number | null>(null);
   const participants = lobbyState?.participants || [];
   const currentSlot = currentParticipant?.playerIndex || null;
   const maxPlayers = lobbyState?.maxPlayers || 4;
@@ -51,8 +56,25 @@ export function LobbyPanel({
       .filter((playerIndex): playerIndex is number => playerIndex !== null),
   );
 
-  const copyShareUrl = () => {
-    void navigator.clipboard?.writeText(shareText);
+  useEffect(
+    () => () => {
+      if (copyResetTimerRef.current !== null) {
+        window.clearTimeout(copyResetTimerRef.current);
+      }
+    },
+    [],
+  );
+
+  const copyShareUrl = async () => {
+    const copied = await copyTextToClipboard(shareText);
+    setCopyState(copied ? "copied" : "failed");
+    if (copyResetTimerRef.current !== null) {
+      window.clearTimeout(copyResetTimerRef.current);
+    }
+    copyResetTimerRef.current = window.setTimeout(() => {
+      setCopyState("idle");
+      copyResetTimerRef.current = null;
+    }, 1_600);
   };
 
   return (
@@ -116,7 +138,7 @@ export function LobbyPanel({
                   </span>
                   <button
                     type="button"
-                    onClick={copyShareUrl}
+                    onClick={() => void copyShareUrl()}
                     className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-synth-border text-gray-300 transition-colors hover:bg-synth-elevated hover:text-white"
                     title={
                       shareGuidance
@@ -124,9 +146,25 @@ export function LobbyPanel({
                         : "Copy spectator invite link"
                     }
                   >
-                    <Copy className="h-4 w-4" />
+                    {copyState === "copied" ? (
+                      <Check className="h-4 w-4 text-emerald-300" />
+                    ) : (
+                      <Copy className="h-4 w-4" />
+                    )}
                   </button>
                 </div>
+                <p
+                  aria-live="polite"
+                  className={`mt-2 text-xs ${
+                    copyState === "failed" ? "text-red-300" : "text-emerald-300"
+                  }`}
+                >
+                  {copyState === "copied"
+                    ? "Invite copied."
+                    : copyState === "failed"
+                      ? "Could not copy automatically. Select the invite URL manually."
+                      : ""}
+                </p>
                 {shareGuidance && (
                   <p className="mt-2 text-xs leading-5 text-gray-400">
                     {shareGuidance}

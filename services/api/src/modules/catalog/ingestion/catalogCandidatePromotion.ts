@@ -2,7 +2,9 @@ import { uploadGameplayArtwork } from "./catalogArtworkCapture.js";
 import {
   assertCandidateRightsEvidence,
   assertCandidateRuntimeAllowed,
+  CandidateValidationError,
 } from "./catalogCandidateValidation.js";
+import { getCandidateBrowserCompatibility } from "../domain/candidateCompatibility.js";
 import {
   createGeneratedCover,
   mirrorCandidateArtifact,
@@ -16,6 +18,7 @@ import {
   type GameRow,
   type SupabaseServiceLike,
 } from "./catalogCandidateTypes.js";
+import type { CatalogGenre } from "../domain/catalogGenres.js";
 
 export {
   CANDIDATE_COLUMNS,
@@ -31,12 +34,23 @@ export async function promoteCandidate(
   candidate: CandidateRow,
   reviewerId: string,
   notes: string | null,
+  genreSlug: CatalogGenre,
   fetchArtifact: typeof fetch,
   captureGameplayArtwork?: CaptureGameplayArtwork,
 ) {
   const now = new Date().toISOString();
   assertCandidateRuntimeAllowed(candidate);
   assertCandidateRightsEvidence(candidate);
+  const browserCompatibility = getCandidateBrowserCompatibility(candidate);
+  if (
+    browserCompatibility.eligible &&
+    (candidate.browser_smoke_status !== "passed" ||
+      candidate.browser_smoke_core_id !== browserCompatibility.coreId)
+  ) {
+    throw new CandidateValidationError(
+      "Run and pass the User Edition browser smoke test before promoting this candidate.",
+    );
+  }
   const isNative = candidate.runtime_kind === "native_linux";
   const mirroredArtifact = isNative
     ? null
@@ -60,6 +74,7 @@ export async function promoteCandidate(
     author_name: candidate.developer_name || candidate.title,
     developer_name: candidate.developer_name,
     developer_url: candidate.developer_url,
+    genre_slug: genreSlug,
     backdrop_url: generatedCover.publicUrl,
     cover_url: generatedCover.publicUrl,
     publication_status: "published",
@@ -222,7 +237,7 @@ export async function promoteCandidate(
       review_notes: [
         notes || candidate.review_notes,
         mirroredArtifact
-          ? `Mirrored artifact path: catalog_artifacts/${mirroredArtifact.objectPath}`
+          ? `Mirrored artifact path: catalog_roms/${mirroredArtifact.objectPath}`
           : null,
         `Generated cover path: catalog_artifacts/${generatedCover.objectPath}`,
         gameplayArtwork

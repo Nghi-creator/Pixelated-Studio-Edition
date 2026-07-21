@@ -11,6 +11,13 @@ import {
 
 type ProfileRole = { role: string | null };
 
+export type CatalogGameFilters = {
+  genre?: string;
+  license?: string;
+  limit?: number;
+  search?: string;
+};
+
 export type { CatalogGameRow, CatalogService, PublishedCatalogGame };
 
 type SupabaseRpcError = {
@@ -39,6 +46,8 @@ async function fetchPublishedCatalogGamesFromRpc(
   timings: TimingFields,
   options: {
     gameId?: string;
+    genre?: string;
+    license?: string;
     limit: number;
     order: "play_count_desc" | "title";
     search?: string;
@@ -54,7 +63,9 @@ async function fetchPublishedCatalogGamesFromRpc(
   const { data, error } = await timed(timings, options.timingKey, () =>
     rpc("published_catalog_games", {
       p_game_id: options.gameId || null,
+      p_genre: options.genre || null,
       p_limit: options.limit,
+      p_license_spdx: options.license || null,
       p_order: options.order,
       p_search: options.search?.trim() || null,
     }),
@@ -113,15 +124,18 @@ export async function fetchFeaturedGames(
 export async function fetchPublishedCatalogGames(
   service: CatalogService,
   timings: TimingFields,
-  search?: string,
+  filters: CatalogGameFilters = {},
 ) {
+  const { genre, license, limit, search } = filters;
   const { data, error } = await timed(timings, "games_query_ms", async () => {
     const rpcGames = await fetchPublishedCatalogGamesFromRpc(
       service,
       timings,
       {
-        limit: search?.trim() ? 5000 : 1000,
+        limit: limit || (search?.trim() || genre || license ? 5000 : 1000),
         order: "title",
+        genre,
+        license,
         search,
         timingKey: "games_rpc_ms",
       },
@@ -138,8 +152,17 @@ export async function fetchPublishedCatalogGames(
     if (gamesError) return { data: null, error: gamesError };
 
     try {
+      const publishedGames = await attachPublishedBuilds(service, games || []);
       return {
-        data: await attachPublishedBuilds(service, games || []),
+        data: publishedGames.filter((game) => {
+          if (genre && game.genre_slug !== genre) return false;
+          if (!license) return true;
+          return game.game_rights.some(
+            (rights) =>
+              rights.code_license_spdx === license ||
+              rights.asset_license_spdx === license,
+          );
+        }),
         error: null,
       };
     } catch (err) {
@@ -149,6 +172,26 @@ export async function fetchPublishedCatalogGames(
 
   if (error) throw error;
   return data || [];
+}
+
+export async function fetchPublishedCatalogFilters(
+  service: CatalogService,
+  timings: TimingFields,
+) {
+  const games = await fetchPublishedCatalogGames(service, timings, { limit: 5000 });
+  const genres = new Set<string>();
+  const licenses = new Set<string>();
+  for (const game of games) {
+    if (game.genre_slug) genres.add(game.genre_slug);
+    for (const rights of game.game_rights) {
+      if (rights.code_license_spdx) licenses.add(rights.code_license_spdx);
+      if (rights.asset_license_spdx) licenses.add(rights.asset_license_spdx);
+    }
+  }
+  return {
+    genres: [...genres].sort(),
+    licenses: [...licenses].sort((left, right) => left.localeCompare(right)),
+  };
 }
 
 export async function fetchPublishedGameById(

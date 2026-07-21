@@ -1,11 +1,13 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   LogOut,
   ShieldAlert,
   LoaderCircle,
+  Menu,
   RefreshCw,
+  X,
 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import {
@@ -15,6 +17,7 @@ import {
 import { PixelIcon } from "../ui/PixelIcon";
 
 export default function AdminLayout() {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const sessionQuery = useAuthSessionQuery();
@@ -66,7 +69,7 @@ export default function AdminLayout() {
 
   if (!roleChecked) {
     return (
-      <div className="h-screen bg-synth-bg flex items-center justify-center">
+      <div className="flex min-h-dvh items-center justify-center bg-synth-bg">
         {accessError ? (
           <div className="max-w-md rounded-2xl border border-red-500/30 bg-synth-surface p-8 text-center text-red-200">
             <ShieldAlert className="mx-auto mb-4 h-10 w-10 text-red-400" />
@@ -90,15 +93,36 @@ export default function AdminLayout() {
   }
 
   return (
-    <div className="flex h-screen bg-synth-bg text-white overflow-hidden">
-      {/* 1. The Sidebar */}
-      <aside className="w-64 bg-[#2B1720] border-r border-synth-border flex flex-col flex-shrink-0 shadow-panel">
+    <div className="relative flex h-dvh min-h-dvh overflow-hidden bg-synth-bg text-white">
+      {isSidebarOpen && (
+        <button
+          aria-label="Close admin navigation"
+          className="fixed inset-0 z-40 bg-black/60 lg:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+          type="button"
+        />
+      )}
+
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-shrink-0 transform flex-col border-r border-synth-border bg-[#2B1720] shadow-panel transition-transform lg:static lg:z-auto lg:w-64 lg:translate-x-0 ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        id="admin-navigation"
+      >
         {/* Brand Header */}
-        <div className="h-20 flex items-center px-6 border-b border-synth-border">
+        <div className="flex h-20 items-center border-b border-synth-border px-6">
           <PixelIcon className="w-6 h-6 text-synth-secondary mr-3" name="admin" />
           <span className="text-xl font-extrabold tracking-wider text-white">
             MOD PANEL
           </span>
+          <button
+            aria-label="Close admin navigation"
+            className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-lg border border-synth-border text-gray-300 hover:bg-synth-elevated lg:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+            type="button"
+          >
+            <X className="h-5 w-5" />
+          </button>
         </div>
 
         {/* Navigation Links */}
@@ -109,6 +133,7 @@ export default function AdminLayout() {
               <Link
                 key={item.path}
                 to={item.path}
+                onClick={() => setIsSidebarOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   isActive
                     ? "border border-[#C02066] bg-[#9B0048] text-white font-bold"
@@ -126,6 +151,7 @@ export default function AdminLayout() {
         <div className="p-4 border-t border-synth-border space-y-2">
           <Link
             to="/home"
+            onClick={() => setIsSidebarOpen(false)}
             className="flex items-center gap-3 px-4 py-3 rounded-xl text-white hover:bg-synth-elevated/70 transition-all font-medium"
           >
             <ArrowLeft className="w-5 h-5" />
@@ -142,9 +168,23 @@ export default function AdminLayout() {
         </div>
       </aside>
 
-      {/* 2. The Main Content Area */}
-      <main className="flex-1 overflow-y-auto bg-synth-bg">
-        <div className="p-8 max-w-6xl mx-auto">
+      <main className="min-w-0 flex-1 overflow-y-auto bg-synth-bg">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-synth-border bg-synth-bg/95 px-4 backdrop-blur lg:hidden">
+          <button
+            aria-controls="admin-navigation"
+            aria-expanded={isSidebarOpen}
+            aria-label="Open admin navigation"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-synth-border text-gray-300 hover:bg-synth-surface hover:text-white"
+            onClick={() => setIsSidebarOpen(true)}
+            type="button"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="text-sm font-extrabold uppercase tracking-wider text-white">
+            Admin Panel
+          </span>
+        </header>
+        <div className="mx-auto max-w-6xl p-4 sm:p-6 lg:p-8">
           <Outlet />
         </div>
       </main>

@@ -9,16 +9,25 @@ import {
   getCatalogCandidateWarnings,
   type CatalogCandidateReviewDetail,
 } from "../../features/admin/catalogCandidateReviewState";
+import { CatalogCandidateBrowserSmoke } from "../../features/admin/CatalogCandidateBrowserSmoke";
+import {
+  CATALOG_GENRES,
+  formatGenre,
+  type CatalogGenre,
+} from "../../features/catalog/catalogMetadata";
 
 type CatalogCandidateCardProps = {
   candidate: ApiCatalogCandidate;
+  genre: CatalogGenre;
   notes: string;
+  onGenreChange: (genre: CatalogGenre) => void;
   onNotesChange: (notes: string) => void;
   onReview: (
     candidateId: string,
     action: ApiCatalogCandidateReviewAction,
   ) => void;
   pending: boolean;
+  onSmokeRecorded: () => void;
 };
 
 function toneClass(tone: CatalogCandidateReviewDetail["tone"]) {
@@ -62,15 +71,21 @@ function DetailPill({ detail }: { detail: CatalogCandidateReviewDetail }) {
 
 export function CatalogCandidateCard({
   candidate,
+  genre,
   notes,
+  onGenreChange,
   onNotesChange,
   onReview,
+  onSmokeRecorded,
   pending,
 }: CatalogCandidateCardProps) {
   const rightsDetails = getCatalogCandidateRightsDetails(candidate);
   const runtimeDetails = getCatalogCandidateRuntimeDetails(candidate);
   const warnings = getCatalogCandidateWarnings(candidate);
   const rejectRequiresNotes = notes.trim().length === 0;
+  const promoteRequiresSmoke =
+    candidate.browser_compatibility.eligible &&
+    candidate.browser_smoke_status !== "passed";
 
   return (
     <article className="rounded-lg border border-synth-secondary/35 bg-[#2B1720] p-5 shadow-card">
@@ -94,13 +109,18 @@ export function CatalogCandidateCard({
         <div className="flex flex-wrap gap-2">
           <button
             className="inline-flex h-10 items-center gap-2 rounded-lg border border-emerald-400/40 bg-emerald-500/10 px-4 text-sm font-bold text-emerald-100 transition-colors hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50"
-            disabled={pending}
+            disabled={pending || promoteRequiresSmoke}
             onClick={() => onReview(candidate.id, "promote")}
             type="button"
           >
             <CheckCircle2 className="h-4 w-4" />
             Promote
           </button>
+          {promoteRequiresSmoke && (
+            <span className="self-center text-xs font-bold text-amber-200">
+              Pass browser test first
+            </span>
+          )}
           <span
             className={`group relative inline-flex ${
               rejectRequiresNotes ? "cursor-not-allowed" : ""
@@ -163,7 +183,30 @@ export function CatalogCandidateCard({
         </div>
       )}
 
-      <div className="mt-4 grid gap-3 lg:grid-cols-[1fr_1fr]">
+      <CatalogCandidateBrowserSmoke
+        candidate={candidate}
+        onRecorded={onSmokeRecorded}
+      />
+
+      <div className="mt-4 grid gap-3 lg:grid-cols-[0.6fr_1fr_1fr]">
+        <div>
+          <label
+            className="mb-2 block text-xs font-extrabold uppercase text-white"
+            htmlFor={`candidate-genre-${candidate.id}`}
+          >
+            Catalog Genre
+          </label>
+          <select
+            className="w-full rounded-lg border border-synth-border bg-synth-bg px-3 py-2 text-sm text-white outline-none focus:border-synth-secondary"
+            id={`candidate-genre-${candidate.id}`}
+            onChange={(event) => onGenreChange(event.target.value as CatalogGenre)}
+            value={genre}
+          >
+            {CATALOG_GENRES.map((option) => (
+              <option key={option} value={option}>{formatGenre(option)}</option>
+            ))}
+          </select>
+        </div>
         <div className="rounded-lg border border-synth-secondary/40 bg-synth-bg/80 p-3 text-sm font-medium text-white">
           <p className="font-bold text-white">Attribution</p>
           <p className="mt-1 leading-6">{candidate.attribution_text || "Missing"}</p>

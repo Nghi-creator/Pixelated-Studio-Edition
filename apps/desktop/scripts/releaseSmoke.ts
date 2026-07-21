@@ -1,6 +1,15 @@
-import { extractFile, listPackage } from "@electron/asar";
 import fs from "fs";
 import path from "path";
+
+let extractFile: (archivePath: string, filePath: string) => Buffer;
+let listPackage: (
+  archivePath: string,
+  options: { isPack: boolean },
+) => string[];
+
+async function loadAsar() {
+  ({ extractFile, listPackage } = await import("@electron/asar"));
+}
 
 const RELEASE_DIR = path.resolve(process.cwd(), "release");
 const EXPECTED_RENDERER_SCRIPTS = [
@@ -247,7 +256,8 @@ function assertPackagedApp(archivePath: string) {
   );
 }
 
-export function runReleaseSmoke(releaseDir = RELEASE_DIR) {
+export async function runReleaseSmoke(releaseDir = RELEASE_DIR) {
+  await loadAsar();
   const archives = findFiles(releaseDir, "app.asar");
   assert(
     archives.length > 0,
@@ -261,10 +271,8 @@ export function runReleaseSmoke(releaseDir = RELEASE_DIR) {
 }
 
 if (require.main === module) {
-  try {
-    runReleaseSmoke();
-  } catch (err) {
+  runReleaseSmoke().catch((err) => {
     console.error(`Release smoke failed: ${err instanceof Error ? err.message : String(err)}`);
     process.exitCode = 1;
-  }
+  });
 }

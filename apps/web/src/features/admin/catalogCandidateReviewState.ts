@@ -17,6 +17,7 @@ export function getCatalogCandidateRuntimeDetails(
     | "platform_id"
     | "runtime_id"
     | "runtime_kind"
+    | "technical_compatibility"
   >,
 ): CatalogCandidateReviewDetail[] {
   const details: CatalogCandidateReviewDetail[] = [
@@ -28,6 +29,13 @@ export function getCatalogCandidateRuntimeDetails(
           : `Libretro (${candidate.runtime_id})`,
     },
     { label: "Platform", value: candidate.platform_id },
+    {
+      label: "Technical Check",
+      tone: candidate.technical_compatibility.compatible ? "success" : "danger",
+      value: candidate.technical_compatibility.compatible
+        ? "Runtime target allowed"
+        : candidate.technical_compatibility.reason || "Incompatible",
+    },
   ];
 
   if (candidate.runtime_kind === "native_linux") {

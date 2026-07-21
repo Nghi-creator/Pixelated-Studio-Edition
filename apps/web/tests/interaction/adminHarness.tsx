@@ -346,6 +346,7 @@ export function AdminHarness() {
               runId: "edge-run-harness",
             }}
             recordedCsvSamples={[]}
+            recordedCsvRevision={0}
             sessionId="session-1"
             shareUrl="https://engine.local/play/demo?session=session-1"
             status="error"

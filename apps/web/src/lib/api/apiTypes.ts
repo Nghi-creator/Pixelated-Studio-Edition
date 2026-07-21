@@ -94,6 +94,20 @@ export type ApiMultiplayerLobbyPayload = {
 
 export type ApiAdminReportAction = "ban_user" | "delete_comment" | "ignore";
 export type ApiCatalogCandidateReviewAction = "promote" | "reject";
+export type ApiCatalogCandidateBrowserSmokeStatus =
+  | "failed"
+  | "not_tested"
+  | "passed";
+export type ApiCandidateBrowserCompatibility = {
+  coreId: "fceumm" | "gambatte" | null;
+  eligible: boolean;
+  reason: string | null;
+  systemId: "nes" | "gb" | "gbc" | null;
+};
+export type ApiCandidateTechnicalCompatibility = {
+  compatible: boolean;
+  reason: string | null;
+};
 export type ApiCatalogCandidateStatus =
   | "approved"
   | "needs_review"
@@ -136,6 +150,11 @@ export type ApiPaginatedGamesResponse = {
   totalPages: number;
 };
 
+export type ApiCatalogFiltersResponse = {
+  genres: string[];
+  licenses: string[];
+};
+
 export type ApiFeaturedGamesResponse = {
   featuredGames: ApiGame[];
 };
@@ -164,6 +183,12 @@ export type ApiCatalogCandidate = {
   artifact_url: string | null;
   asset_license_spdx: string | null;
   attribution_text: string | null;
+  browser_compatibility: ApiCandidateBrowserCompatibility;
+  browser_smoke_core_id: string | null;
+  browser_smoke_error: string | null;
+  browser_smoke_status: ApiCatalogCandidateBrowserSmokeStatus;
+  browser_smoke_tested_at: string | null;
+  browser_smoke_tested_by: string | null;
   code_license_spdx: string | null;
   cover_license_spdx?: string | null;
   developer_name: string | null;
@@ -192,6 +217,7 @@ export type ApiCatalogCandidate = {
   source_kind: ApiCatalogCandidateSourceKind | string;
   source_repo_url: string;
   title: string;
+  technical_compatibility: ApiCandidateTechnicalCompatibility;
 };
 
 export type ApiPaginatedCatalogCandidatesResponse<TCandidate> = {
@@ -334,6 +360,7 @@ export type ApiGame = {
     verified_at: string | null;
   }[];
   id: string;
+  genre_slug?: string | null;
   play_count?: number | null;
   rom_filename?: string | null;
   rom_url?: string | null;

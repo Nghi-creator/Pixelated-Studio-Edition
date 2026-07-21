@@ -184,12 +184,15 @@ export function useReviewCatalogCandidateMutation<
     mutationFn: ({
       action,
       candidateId,
+      genreSlug,
       notes,
     }: {
       action: ApiCatalogCandidateReviewAction;
       candidateId: string;
+      genreSlug: string;
       notes: string;
-    }) => api.reviewCatalogCandidate<TCandidate>(candidateId, action, notes),
+    }) =>
+      api.reviewCatalogCandidate<TCandidate>(candidateId, action, notes, genreSlug),
     onError,
     onSuccess: async (result, { candidateId }) => {
       const nextTotal = Math.max(0, totalCandidates - 1);

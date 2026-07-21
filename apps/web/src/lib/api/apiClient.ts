@@ -4,7 +4,12 @@ import {
   createRequestAbortController,
   withTimeout,
 } from "./requestLifecycle";
-import { clearAuthScopedCache } from "../auth/authCache";
+import {
+  cacheValueForCurrentEntry,
+  clearAuthScopedCache,
+  type AsyncCacheEntry,
+} from "../auth/authCache";
+import { clearAuthScopedQueries, queryClient } from "./queryClient";
 import type { ApiPermissionsResponse } from "./apiTypes";
 import { createAdminApi } from "./adminApi";
 import { createCatalogApi } from "./catalogApi";
@@ -17,7 +22,7 @@ import { createTelemetryApi } from "./telemetryApi";
 export type * from "./apiTypes";
 
 const LOCAL_API_URL = "http://127.0.0.1:4000";
-const PRODUCTION_API_URL = "https://pixelated-api-services.onrender.com";
+const PRODUCTION_API_URL = "https://pixelated-api-services-6ovi.onrender.com";
 const DEFAULT_API_TIMEOUT_MS = 30_000;
 const CLIENT_CACHE_TTL_MS = 30_000;
 
@@ -56,24 +61,23 @@ export class ApiError extends Error {
 
 const authScopedCache = {
   session: null as Promise<Session | null> | null,
-  permissions: null as
-    | {
-      expiresAt: number;
-      promise: Promise<ApiPermissionsResponse>;
-      value?: ApiPermissionsResponse;
-    }
-    | null,
-  favorites: null as
-    | {
-      expiresAt: number;
-      promise: Promise<Set<string>>;
-      value?: Set<string>;
-    }
-    | null,
+  permissions: null as AsyncCacheEntry<ApiPermissionsResponse> | null,
+  favorites: null as AsyncCacheEntry<Set<string>> | null,
 };
 
-supabase.auth.onAuthStateChange(() => {
+let currentAuthUserId: string | null | undefined;
+
+supabase.auth.onAuthStateChange((_event, session) => {
   clearAuthScopedCache(authScopedCache);
+
+  const nextAuthUserId = session?.user.id ?? null;
+  if (
+    currentAuthUserId !== undefined &&
+    currentAuthUserId !== nextAuthUserId
+  ) {
+    void clearAuthScopedQueries(queryClient);
+  }
+  currentAuthUserId = nextAuthUserId;
 });
 
 export async function getAuthSession() {
@@ -168,23 +172,59 @@ export async function apiRequest<T>(
   return payload as T;
 }
 
+export async function apiRequestBlob(
+  path: string,
+  { timeoutMs = DEFAULT_API_TIMEOUT_MS }: { timeoutMs?: number } = {},
+) {
+  const session = await withTimeout(
+    getAuthSession(),
+    timeoutMs,
+    () => new ApiError(0, { error: "Authentication did not respond in time." }),
+  );
+  const headers = new Headers({ Accept: "application/octet-stream" });
+  if (session?.access_token) {
+    headers.set("Authorization", `Bearer ${session.access_token}`);
+  }
+  const { controller, cleanup } = createRequestAbortController(timeoutMs);
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_URL}${path}`, {
+      cache: "no-store",
+      headers,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new ApiError(0, { error: "The smoke-test artifact timed out." });
+    }
+    throw error;
+  } finally {
+    cleanup();
+  }
+
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new ApiError(response.status, payload);
+  }
+  return response.blob();
+}
+
 export async function getCachedPermissions(): Promise<ApiPermissionsResponse> {
   if (isCacheFresh(authScopedCache.permissions) && authScopedCache.permissions) {
     if (authScopedCache.permissions.value) return authScopedCache.permissions.value;
     return authScopedCache.permissions.promise;
   }
 
-  const promise = apiRequest<ApiPermissionsResponse>("/me/permissions").then(
-    (value) => {
-      if (authScopedCache.permissions) authScopedCache.permissions.value = value;
-      return value;
-    },
-  );
-  authScopedCache.permissions = {
+  const entry: AsyncCacheEntry<ApiPermissionsResponse> = {
     expiresAt: Date.now() + CLIENT_CACHE_TTL_MS,
-    promise,
+    promise: apiRequest<ApiPermissionsResponse>("/me/permissions").then(
+      (value) =>
+        cacheValueForCurrentEntry(authScopedCache.permissions, entry, value),
+    ),
   };
-  return promise;
+  authScopedCache.permissions = entry;
+  return entry.promise;
 }
 
 type FavoriteLike = {
@@ -198,23 +238,25 @@ async function getFavoriteIds(): Promise<Set<string>> {
     return authScopedCache.favorites.promise;
   }
 
-  const promise = apiRequest<{ favorites: FavoriteLike[] }>("/favorites").then(
-    ({ favorites }) => {
-      const favoriteIds = new Set(
-        favorites
-          .map((favorite) => favorite.id || favorite.game_id)
-          .filter((id): id is string => Boolean(id)),
-      );
-      if (authScopedCache.favorites) authScopedCache.favorites.value = favoriteIds;
-      return favoriteIds;
-    },
-  );
-
-  authScopedCache.favorites = {
+  const entry: AsyncCacheEntry<Set<string>> = {
     expiresAt: Date.now() + CLIENT_CACHE_TTL_MS,
-    promise,
+    promise: apiRequest<{ favorites: FavoriteLike[] }>("/favorites").then(
+      ({ favorites }) => {
+        const favoriteIds = new Set(
+          favorites
+            .map((favorite) => favorite.id || favorite.game_id)
+            .filter((id): id is string => Boolean(id)),
+        );
+        return cacheValueForCurrentEntry(
+          authScopedCache.favorites,
+          entry,
+          favoriteIds,
+        );
+      },
+    ),
   };
-  return promise;
+  authScopedCache.favorites = entry;
+  return entry.promise;
 }
 
 export const api = {

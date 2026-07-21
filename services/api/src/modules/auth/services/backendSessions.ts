@@ -1,14 +1,22 @@
 import { supabaseService } from "../supabaseAuth.js";
+import type {
+  BrowserCoreId,
+  BrowserSystemId,
+} from "../domain/browserCoreContract.js";
 
 export type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
 export type BackendSessionRow = {
+  browser_core_id: BrowserCoreId | null;
+  browser_system_id: BrowserSystemId | null;
   boot_artifact_sha256: string | null;
   boot_artifact_size: number | null;
   boot_launch_manifest_id: string | null;
   boot_rom_filename: string | null;
   boot_rom_url: string | null;
   boot_runtime_id: string;
+  client_edition: "studio" | "user";
+  client_runtime_kind: "wasm" | "webrtc" | "native";
   deleted_at: string | null;
   expires_at: string;
   game_id: string;
@@ -25,7 +33,7 @@ export async function getLiveSession(
   const { data, error } = await service
     .from("backend_sessions")
     .select(
-      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,boot_runtime_id,boot_artifact_size,boot_artifact_sha256,boot_launch_manifest_id,expires_at,deleted_at",
+      "id,user_id,game_id,mode,session_token_hash,boot_rom_url,boot_rom_filename,boot_runtime_id,boot_artifact_size,boot_artifact_sha256,boot_launch_manifest_id,client_edition,client_runtime_kind,browser_core_id,browser_system_id,expires_at,deleted_at",
     )
     .eq("id", sessionId)
     .is("deleted_at", null)

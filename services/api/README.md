@@ -125,7 +125,10 @@ Minimum hosted env:
 NODE_ENV=production
 HOST=0.0.0.0
 PORT=<provider port>
-WEB_ORIGIN=https://pixelated-studio-edition.vercel.app
+WEB_ORIGIN=https://pixelated-studio-edition.vercel.app,https://pixelated-user-edition.vercel.app
+STUDIO_WEB_ORIGINS=https://pixelated-studio-edition.vercel.app
+BROWSER_SMOKE_TICKET_SECRET=<at least 32 random characters>
+BROWSER_SMOKE_TICKET_TTL_SECONDS=300
 CONTROL_PLANE_CLEANUP_INTERVAL_MS=3600000
 STREAM_METRIC_RETENTION_DAYS=7
 STUN_URLS=stun:stun.l.google.com:19302
@@ -148,7 +151,42 @@ SUPABASE_SERVICE_ROLE_KEY=<your Supabase service role key>
 
 Production readiness requires both Redis REST values. Local development may omit Redis and uses a bounded in-memory limiter.
 
+Admin routes and `POST /submissions/games` require an exact origin from
+`STUDIO_WEB_ORIGINS` in addition to their normal authentication and role checks. Origin
+checking is a product boundary and defense in depth, not a replacement for authorization:
+non-browser clients can forge an `Origin` header.
+
+Catalog candidate smoke tests are issued by Studio as short-lived, signed, candidate- and
+artifact-bound tickets. The actual emulator runs on User Edition through the capability-only
+`/browser-smoke/*` routes; the service role key and reviewer session never reach User Edition.
+Generate the ticket secret with a password manager or `openssl rand -hex 32` and configure the
+same API deployment only—neither frontend needs this secret.
+
 Production enables Fastify proxy trust so `request.ip` uses the client address forwarded by Render's ingress. Keep production traffic behind a trusted ingress; do not expose the Node port directly while accepting client-supplied forwarded headers.
+
+## Shared Studio/User deployment
+
+Pixelated Studio Edition is the sole migration authority for the Supabase project shared by
+both editions. User Edition must not push or repair migration history.
+
+The shared API supports Studio WebRTC sessions and authenticated User Edition WASM sessions.
+Executable ROMs belong in the private `catalog_roms` bucket; public covers and backdrops remain
+in `catalog_artifacts`. The API signs private ROM URLs for User Edition session creation and
+again when the Studio engine verifies a session.
+
+Deploy the shared contract in this order:
+
+1. Confirm local and remote migration history match, review
+   `20260717100000_shared_user_edition_contract.sql`, and run a database push dry-run.
+2. Apply that migration once from this repository. It is additive and does not move or delete
+   existing objects.
+3. Deploy this compatible API before changing any `game_builds.artifact_url` records.
+4. Run `npm run mirror:catalog-artifacts -- --dry-run`; inspect every proposed object, then run
+   it with `--apply` to copy verified ROMs and update their canonical URLs.
+5. Smoke-test both editions, signed URL expiry/CORS, checksum rejection, rate limiting, and
+   idempotent play counting.
+6. Only then remove the matching legacy ROM objects from public `catalog_artifacts` paths.
+   Never perform recursive bucket-wide cleanup because artwork shares that bucket.
 
 ## Abuse-control limits
 

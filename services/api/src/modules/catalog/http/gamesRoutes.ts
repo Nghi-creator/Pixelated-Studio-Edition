@@ -3,6 +3,7 @@ import { searchAndRankGames } from "../domain/catalogSearch.js";
 import { getCatalogCacheKey, getPageRange } from "../domain/catalogPolicy.js";
 import {
   fetchFeaturedGames,
+  fetchPublishedCatalogFilters,
   fetchPublishedCatalogGames,
   fetchPublishedGameById,
 } from "../services/catalogService.js";
@@ -23,9 +24,15 @@ async function buildCachedGamesPage(
   page: number,
   pageSize: number,
   search?: string,
+  genre?: string,
+  license?: string,
 ): Promise<CachedGamesCatalogResponse> {
   const { end, start } = getPageRange(page, pageSize);
-  const data = await fetchPublishedCatalogGames(service, timings, search);
+  const data = await fetchPublishedCatalogGames(service, timings, {
+    genre,
+    license,
+    search,
+  });
   const rankedGames = search ? searchAndRankGames(data || [], search) : data || [];
   const pagedGames = rankedGames.slice(start, end + 1);
   const total = rankedGames.length;
@@ -98,9 +105,9 @@ export function registerGamesCatalogRoutes(
       return reply.status(400).send({ error: "Invalid games query" });
     }
 
-    const { page, pageSize, search } = query.data;
+    const { genre, license, page, pageSize, search } = query.data;
     const timings = {};
-    const cacheKey = getCatalogCacheKey(page, pageSize, search);
+    const cacheKey = getCatalogCacheKey(page, pageSize, search, genre, license);
     const cachedResponse = gamesCatalogCache.get(cacheKey);
     if (cachedResponse) {
       let featuredGames = cachedResponse.featuredGames || [];
@@ -120,6 +127,8 @@ export function registerGamesCatalogRoutes(
         pageSize,
         resultCount: cachedResponse.games.length,
         search: Boolean(search),
+        genre: genre || null,
+        license: license || null,
         total: cachedResponse.total,
       });
       return { ...cachedResponse, featuredGames };
@@ -133,6 +142,8 @@ export function registerGamesCatalogRoutes(
         page,
         pageSize,
         search,
+        genre,
+        license,
       );
     } catch (err) {
       request.log.error({ err }, "Failed to load games");
@@ -160,10 +171,30 @@ export function registerGamesCatalogRoutes(
       pageSize,
       resultCount: cachedPage.games.length,
       search: Boolean(search),
+      genre: genre || null,
+      license: license || null,
       total: cachedPage.total,
     });
 
     return response;
+  });
+
+  app.get("/games/filters", async (request, reply) => {
+    if (!service) {
+      return reply.status(503).send({
+        error: "Supabase service client is not configured for the API.",
+      });
+    }
+
+    const timings = {};
+    try {
+      const filters = await fetchPublishedCatalogFilters(service, timings);
+      reply.header("Cache-Control", "public, max-age=60, s-maxage=300");
+      return filters;
+    } catch (err) {
+      request.log.error({ err }, "Failed to load catalog filters");
+      return reply.status(500).send({ error: "Failed to load catalog filters" });
+    }
   });
 
   app.get("/games/featured", async (request, reply) => {

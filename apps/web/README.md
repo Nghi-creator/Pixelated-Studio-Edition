@@ -66,7 +66,8 @@ npm run verify:hosted-contract
 VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 VITE_PUBLIC_APP_URL=https://pixelated-studio-edition.vercel.app
-VITE_API_URL=https://pixelated-api-services.onrender.com
+VITE_API_URL=https://pixelated-api-services-6ovi.onrender.com
+VITE_USER_EDITION_ORIGIN=https://pixelated-user-edition.vercel.app
 VITE_ENGINE_URL=http://localhost:8080
 VITE_TURNSTILE_SITE_KEY=
 ```

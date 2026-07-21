@@ -28,6 +28,7 @@ export function ResearchRunModal({
   onFormChange,
   playerMode,
   recordedCsvSamples,
+  recordedCsvRevision,
   runId,
   sessionId,
   shareUrl,
@@ -45,6 +46,7 @@ export function ResearchRunModal({
   onFormChange: (form: ResearchRunMetadataForm) => void;
   playerMode: "guest" | "host";
   recordedCsvSamples: StreamTelemetryCsvSample[];
+  recordedCsvRevision: number;
   runId: string;
   sessionId: string;
   shareUrl: string;
@@ -76,7 +78,10 @@ export function ResearchRunModal({
     gameTitle,
     history,
     playerMode,
-    recordedCsvSamples,
+    recordedCsvSnapshot: {
+      revision: recordedCsvRevision,
+      samples: recordedCsvSamples,
+    },
     runId,
     sessionId,
     shareUrl,

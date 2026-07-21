@@ -32,6 +32,7 @@ type StreamTelemetryPanelProps = {
     runId: string;
   };
   recordedCsvSamples: StreamTelemetryCsvSample[];
+  recordedCsvRevision: number;
   sessionId: string;
   shareUrl: string;
   status: string;
@@ -54,6 +55,7 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
     onToggleCsvRecording,
     researchRun,
     recordedCsvSamples,
+    recordedCsvRevision,
     sessionId,
     shareUrl,
     status,
@@ -181,6 +183,7 @@ export function StreamTelemetryPanel(props: StreamTelemetryPanelProps) {
             onFormChange={researchRun.onMetadataFormChange}
             playerMode={props.playerMode}
             recordedCsvSamples={recordedCsvSamples}
+            recordedCsvRevision={recordedCsvRevision}
             runId={researchRun.runId}
             sessionId={sessionId}
             shareUrl={shareUrl}

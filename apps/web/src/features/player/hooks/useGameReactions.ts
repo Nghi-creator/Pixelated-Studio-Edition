@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { useSetGameReactionMutation } from "./playerMutations";
 import { useGameReactionsQuery } from "../../../lib/api/apiQueries";
 import { getSocialErrorMessage } from "../socialFeedback";
 
 export function useGameReactions(gameId: string | undefined, currentUser: User | null) {
-  const [reactionError, setReactionError] = useState("");
+  const [localReactionError, setLocalReactionError] = useState("");
 
   const reactionsQuery = useGameReactionsQuery(gameId);
   const reactionSummary = useMemo(() => {
@@ -28,29 +28,26 @@ export function useGameReactions(gameId: string | undefined, currentUser: User |
   const reactionMutation = useSetGameReactionMutation(gameId, {
     onError: (err) => {
       console.error(err);
-      setReactionError(
+      setLocalReactionError(
         getSocialErrorMessage(err, "Failed to update reaction. Try again."),
       );
     },
   });
 
-  useEffect(() => {
-    if (!reactionsQuery.isError) return;
-    setReactionError(
-      getSocialErrorMessage(
+  const queryReactionError = reactionsQuery.isError
+    ? getSocialErrorMessage(
         reactionsQuery.error,
         "Could not load reactions. Try again.",
-      ),
-    );
-  }, [reactionsQuery.error, reactionsQuery.isError]);
+      )
+    : "";
 
   const handleReaction = async (isLike: boolean) => {
     if (!currentUser) {
-      setReactionError("Sign in to react to this game.");
+      setLocalReactionError("Sign in to react to this game.");
       return;
     }
     if (!gameId) return;
-    setReactionError("");
+    setLocalReactionError("");
 
     await reactionMutation.mutateAsync(
       reactionSummary.userReaction === isLike ? null : isLike,
@@ -62,8 +59,11 @@ export function useGameReactions(gameId: string | undefined, currentUser: User |
     handleReaction,
     isReactionLoading: reactionsQuery.isLoading || reactionMutation.isPending,
     likes: gameId ? reactionSummary.likeCount : 0,
-    reactionError,
-    retryReactions: () => void reactionsQuery.refetch(),
+    reactionError: localReactionError || queryReactionError,
+    retryReactions: () => {
+      setLocalReactionError("");
+      void reactionsQuery.refetch();
+    },
     userReaction: gameId ? reactionSummary.userReaction : null,
   };
 }

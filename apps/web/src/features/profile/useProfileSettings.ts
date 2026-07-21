@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { api } from "../../lib/api/apiClient";
 import {
   useAuthSessionQuery,
@@ -22,9 +21,6 @@ export function useProfileSettings() {
   const queryClient = useQueryClient();
   const profileMutationRef = useRef(false);
 
-  const [user, setUser] = useState<SupabaseUser | null>(null);
-  const [userRole, setUserRole] = useState<string>("user");
-  const [loadError, setLoadError] = useState<string | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState<ProfileMessage | null>(
     null,
@@ -43,6 +39,20 @@ export function useProfileSettings() {
     setDeleteCaptchaResetKey((key) => key + 1);
   }, []);
 
+  const sessionQuery = useAuthSessionQuery();
+  const profileQuery = useProfileQuery({
+    enabled: Boolean(sessionQuery.data),
+  });
+  const user = sessionQuery.data?.user ?? null;
+  const profile = profileQuery.data?.profile;
+  const userRole = profile?.role || "user";
+  const queryError = sessionQuery.error || profileQuery.error;
+  const loadError =
+    sessionQuery.isError || profileQuery.isError
+      ? queryError instanceof Error
+        ? queryError.message
+        : "Failed to load account settings."
+      : null;
   const hasPassword = user?.app_metadata?.providers?.includes("email");
   const avatar = useProfileAvatar({ setProfileMessage });
   const { setAvatarUrl } = avatar;
@@ -58,10 +68,13 @@ export function useProfileSettings() {
     user,
   });
 
-  const sessionQuery = useAuthSessionQuery();
-  const profileQuery = useProfileQuery({
-    enabled: Boolean(sessionQuery.data),
-  });
+  const [loadedProfile, setLoadedProfile] = useState(profile);
+
+  if (profile && profile !== loadedProfile) {
+    setLoadedProfile(profile);
+    setUsername(profile.username || "");
+    setAvatarUrl(profile.avatar_url || "");
+  }
 
   useEffect(() => {
     if (sessionQuery.isLoading) return;
@@ -69,38 +82,13 @@ export function useProfileSettings() {
       navigate("/login");
       return;
     }
-
-    setUser(sessionQuery.data.user);
   }, [navigate, sessionQuery.data, sessionQuery.isLoading]);
 
   useEffect(() => {
-    const profile = profileQuery.data?.profile;
-    if (profile) {
-      setUsername(profile.username || "");
-      setAvatarUrl(profile.avatar_url || "");
-      setUserRole(profile.role || "user");
+    if (queryError) {
+      console.error("Error loading profile", queryError);
     }
-  }, [profileQuery.data, setAvatarUrl]);
-
-  useEffect(() => {
-    if (sessionQuery.isError || profileQuery.isError) {
-      const error = sessionQuery.error || profileQuery.error;
-      console.error("Error loading profile", error);
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : "Failed to load account settings.",
-      );
-      return;
-    }
-
-    setLoadError(null);
-  }, [
-    profileQuery.error,
-    profileQuery.isError,
-    sessionQuery.error,
-    sessionQuery.isError,
-  ]);
+  }, [queryError]);
 
   const updateProfile = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();

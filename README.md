@@ -140,7 +140,7 @@ npm --prefix apps/desktop run test
 Before a hosted deploy, run the staging predeploy gate with the configured staging secrets:
 
 ```sh
-STAGING_API_URL=https://pixelated-api-services.onrender.com \
+STAGING_API_URL=https://pixelated-api-services-6ovi.onrender.com \
 STAGING_SUPABASE_URL=<supabase-project-url> \
 STAGING_SUPABASE_ANON_KEY=<supabase-anon-key> \
 STAGING_SMOKE_EMAIL=<dedicated-staging-admin-email> \

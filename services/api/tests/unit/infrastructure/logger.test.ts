@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createLoggerOptions } from "../../src/plugins/logger.js";
+import { createLoggerOptions } from "../../../src/plugins/logger.js";
 
 test("API logger redacts authentication and cookie headers", () => {
   const options = createLoggerOptions();

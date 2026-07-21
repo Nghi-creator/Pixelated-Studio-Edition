@@ -49,6 +49,15 @@ export async function createDataBoundaryApp(
       ? (extraOptions.fetchArtifact as typeof fetch)
       : async () => new Response(artifactBytes);
   const options = {
+    hasLivePlaySession:
+      typeof extraOptions.hasLivePlaySession === "function"
+        ? (extraOptions.hasLivePlaySession as never)
+        : async () => true,
+    hasLiveMetricSession:
+      typeof extraOptions.hasLiveMetricSession === "function"
+        ? (extraOptions.hasLiveMetricSession as never)
+        : async () => true,
+    smokeTicketSecret: "test-browser-smoke-secret-at-least-32-characters",
     ...extraOptions,
     fetchArtifact,
     requireUser: requireUser(userId),

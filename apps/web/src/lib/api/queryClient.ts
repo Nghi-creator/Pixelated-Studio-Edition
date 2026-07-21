@@ -49,11 +49,17 @@ export const queryKeys = {
   adminUsersRoot: () => ["adminUsers"] as const,
   authSession: () => ["authSession"] as const,
   featuredGames: () => ["featuredGames"] as const,
+  catalogFilters: () => ["catalogFilters"] as const,
   favorites: () => ["favorites"] as const,
   favoriteIds: () => ["favoriteIds"] as const,
   game: (gameId: string | undefined) => ["game", gameId] as const,
-  gameCatalog: (page: number, pageSize: number, search: string) =>
-    ["gameCatalog", page, pageSize, search] as const,
+  gameCatalog: (
+    page: number,
+    pageSize: number,
+    search: string,
+    genre = "",
+    license = "",
+  ) => ["gameCatalog", page, pageSize, search, genre, license] as const,
   libraryGamePicker: (pageSize: number) =>
     ["libraryGamePicker", pageSize] as const,
   gameComments: (gameId: string | undefined) => ["gameComments", gameId] as const,
@@ -62,6 +68,27 @@ export const queryKeys = {
   localMultiplayerGames: () => ["localMultiplayerGames"] as const,
   permissions: () => ["permissions"] as const,
   profile: () => ["profile"] as const,
+};
+
+const AUTH_SCOPED_QUERY_ROOTS = new Set([
+  "accessLogs",
+  "adminReports",
+  "adminUsers",
+  "authSession",
+  "catalogCandidates",
+  "favoriteIds",
+  "favorites",
+  "gameSubmissions",
+  "permissions",
+  "profile",
+]);
+
+export const clearAuthScopedQueries = (client: QueryClientInstance) => {
+  return client.resetQueries({
+    predicate: ({ queryKey }) =>
+      typeof queryKey[0] === "string" &&
+      AUTH_SCOPED_QUERY_ROOTS.has(queryKey[0]),
+  });
 };
 
 export const invalidateAdminReportsQueries = (client: QueryClientInstance) =>
