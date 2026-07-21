@@ -67,8 +67,13 @@ STAGING_SUPABASE_URL=<project-url> \
 STAGING_SUPABASE_ANON_KEY=<anon-key> \
 STAGING_SMOKE_EMAIL=<dedicated-admin-email> \
 STAGING_SMOKE_PASSWORD=<password> \
+STAGING_STUDIO_ORIGIN=<origin-allowed-by-api> \
 npm run predeploy:hosted
 ```
+
+`STAGING_STUDIO_ORIGIN` is optional when the deployed API allows the default
+Studio web origin. Set the protected environment variable when staging uses a
+different approved Studio origin.
 
 Studio Edition is the shared Supabase migration authority. Apply migrations
 from this repository before deploying code that depends on them. Provider

@@ -14,6 +14,42 @@ const ticketPayloadSchema = z.object({
 
 export type BrowserSmokeTicketPayload = z.infer<typeof ticketPayloadSchema>;
 
+const MAX_SMOKE_AUTHORIZATION_LENGTH = 4096;
+
+export function readBrowserSmokeTicketAuthorization(
+  authorization: string | undefined,
+) {
+  if (!authorization || authorization.length > MAX_SMOKE_AUTHORIZATION_LENGTH) {
+    return "";
+  }
+
+  const separatorIndex = authorization.indexOf(" ");
+  if (
+    separatorIndex !== 5 ||
+    authorization.slice(0, separatorIndex).toLowerCase() !== "smoke"
+  ) {
+    return "";
+  }
+
+  const ticket = authorization.slice(separatorIndex + 1);
+  if (!ticket) return "";
+
+  let separatorCount = 0;
+  for (const character of ticket) {
+    const code = character.charCodeAt(0);
+    const isAsciiLetter =
+      (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+    const isDigit = code >= 48 && code <= 57;
+    if (character === ".") {
+      separatorCount += 1;
+    } else if (!isAsciiLetter && !isDigit && character !== "-" && character !== "_") {
+      return "";
+    }
+  }
+
+  return separatorCount === 1 ? ticket : "";
+}
+
 function sign(encodedPayload: string, secret: string) {
   return createHmac("sha256", secret).update(encodedPayload).digest("base64url");
 }

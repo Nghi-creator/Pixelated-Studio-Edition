@@ -339,6 +339,40 @@ test("admin browser smoke flow verifies the artifact and records reviewer eviden
   await app.close();
 });
 
+test("browser smoke capability routes share a dedicated IP rate limit", async () => {
+  const db = new FakeSupabase();
+  let attempts = 0;
+  const app = await createDataBoundaryApp(db, ADMIN_ID, validNesRom(), {
+    browserSmokeLimiter: {
+      consume: async () => {
+        attempts += 1;
+        return {
+          allowed: false,
+          remaining: 0,
+          resetAt: Date.now() + 60_000,
+        };
+      },
+    },
+  });
+
+  const responses = await Promise.all([
+    app.inject({ method: "GET", url: "/browser-smoke/session" }),
+    app.inject({ method: "GET", url: "/browser-smoke/artifact" }),
+    app.inject({
+      method: "POST",
+      payload: { coreId: "fceumm", status: "passed" },
+      url: "/browser-smoke/result",
+    }),
+  ]);
+
+  assert.equal(attempts, 3);
+  for (const response of responses) {
+    assert.equal(response.statusCode, 429);
+    assert.equal(typeof response.headers["retry-after"], "string");
+  }
+  await app.close();
+});
+
 test("browser-eligible candidates cannot be promoted before a passing smoke test", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);

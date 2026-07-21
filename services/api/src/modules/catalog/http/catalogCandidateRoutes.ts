@@ -28,8 +28,14 @@ import { fetchVerifiedCandidateArtifact } from "../ingestion/catalogCandidateSto
 import { env } from "../../../config/env.js";
 import {
   createBrowserSmokeTicket,
+  readBrowserSmokeTicketAuthorization,
   verifyBrowserSmokeTicket,
 } from "../domain/browserSmokeTicket.js";
+import {
+  createRateLimiter,
+  type RateLimiter,
+} from "../../security/sharedRateLimiter.js";
+import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 
 const candidateQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -87,6 +93,7 @@ const browserSmokeBodySchema = z.discriminatedUnion("status", [
 ]);
 
 type CatalogCandidateRouteOptions = {
+  browserSmokeLimiter?: RateLimiter;
   captureGameplayArtwork?: CaptureGameplayArtwork;
   fetchArtifact?: typeof fetch;
   requireUser?: typeof requireSupabaseUser;
@@ -94,11 +101,6 @@ type CatalogCandidateRouteOptions = {
   smokeTicketSecret?: string;
   smokeTicketTtlSeconds?: number;
 };
-
-function readSmokeTicket(authorization: string | undefined) {
-  const match = authorization?.match(/^Smoke\s+(.+)$/i);
-  return match?.[1] || "";
-}
 
 function smokeTicketWasUsed(candidate: CandidateRow, issuedAt: number) {
   if (!candidate.browser_smoke_tested_at) return false;
@@ -130,6 +132,11 @@ export async function registerCatalogCandidateRoutes(
       : options.smokeTicketSecret;
   const smokeTicketTtlSeconds =
     options.smokeTicketTtlSeconds || env.BROWSER_SMOKE_TICKET_TTL_SECONDS;
+  const browserSmokeLimiter = options.browserSmokeLimiter || createRateLimiter({
+    limit: env.BROWSER_SMOKE_RATE_LIMIT_PER_MINUTE,
+    namespace: "browser-smoke-ip",
+    windowMs: 60_000,
+  });
   const captureGameplayArtwork =
     options.captureGameplayArtwork ||
     (process.env.CATALOG_ARTWORK_CAPTURE_COMMAND
@@ -295,6 +302,15 @@ export async function registerCatalogCandidateRoutes(
   app.get(
     "/browser-smoke/session",
     async (request, reply) => {
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          await browserSmokeLimiter.consume(request.ip),
+          "Browser smoke rate limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
+      }
       if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
@@ -306,7 +322,7 @@ export async function registerCatalogCandidateRoutes(
 
       try {
         const ticket = verifyBrowserSmokeTicket(
-          readSmokeTicket(request.headers.authorization),
+          readBrowserSmokeTicketAuthorization(request.headers.authorization),
           smokeTicketSecret,
         );
         const { data: candidate, error: candidateError } = await service
@@ -350,12 +366,21 @@ export async function registerCatalogCandidateRoutes(
   app.get(
     "/browser-smoke/artifact",
     async (request, reply) => {
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          await browserSmokeLimiter.consume(request.ip),
+          "Browser smoke rate limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
+      }
       if (!service || !smokeTicketSecret) {
         return reply.status(503).send({ error: "Browser smoke tickets are not configured." });
       }
       try {
         const ticket = verifyBrowserSmokeTicket(
-          readSmokeTicket(request.headers.authorization),
+          readBrowserSmokeTicketAuthorization(request.headers.authorization),
           smokeTicketSecret,
         );
         const { data: claimed, error: claimError } = await service.rpc(
@@ -412,6 +437,15 @@ export async function registerCatalogCandidateRoutes(
   app.post(
     "/browser-smoke/result",
     async (request, reply) => {
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          await browserSmokeLimiter.consume(request.ip),
+          "Browser smoke rate limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
+      }
       if (!service || !smokeTicketSecret) {
         return reply.status(503).send({ error: "Browser smoke tickets are not configured." });
       }
@@ -420,7 +454,7 @@ export async function registerCatalogCandidateRoutes(
 
       try {
         const ticket = verifyBrowserSmokeTicket(
-          readSmokeTicket(request.headers.authorization),
+          readBrowserSmokeTicketAuthorization(request.headers.authorization),
           smokeTicketSecret,
         );
         const { data: candidate, error: candidateError } = await service

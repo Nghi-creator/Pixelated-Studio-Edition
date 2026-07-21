@@ -149,6 +149,9 @@ WEB_ORIGIN=https://pixelated-studio-edition.vercel.app,https://pixelated-user-ed
 STUDIO_WEB_ORIGINS=https://pixelated-studio-edition.vercel.app
 BROWSER_SMOKE_TICKET_SECRET=<at least 32 random characters>
 BROWSER_SMOKE_TICKET_TTL_SECONDS=300
+BROWSER_SMOKE_RATE_LIMIT_PER_MINUTE=30
+BROWSER_ARTIFACT_URL_TTL_SECONDS=300
+BROWSER_ARTIFACT_RATE_LIMIT_PER_MINUTE=20
 CONTROL_PLANE_CLEANUP_INTERVAL_MS=3600000
 STREAM_METRIC_RETENTION_DAYS=7
 STUN_URLS=stun:stun.l.google.com:19302
@@ -217,6 +220,7 @@ Deploy the shared contract in this order:
 | Liveness/readiness checks | 120 per client IP per minute | Redis shared counter |
 | Session verification by IP | 1,000 per minute | Redis shared counter |
 | Session verification by IP and session | 30 per minute | Redis shared counter |
+| Browser smoke capability routes | 30 per client IP per minute | Redis shared counter |
 | Comments | 10 per user per minute | Redis shared counter |
 | Game and comment reactions combined | 120 per user per minute | Redis shared counter |
 | Play-count writes | 60 per user per minute | Redis shared counter |
