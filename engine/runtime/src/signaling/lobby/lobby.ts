@@ -83,6 +83,7 @@ export function createLobbyManager(maxPlayers = 4) {
       sessionId,
       requestedRole,
       displayName,
+      socket.data.hostEligible !== false,
     );
     syncSocketParticipant(socket, participant);
     emitLobbyState(socket, sessionId);

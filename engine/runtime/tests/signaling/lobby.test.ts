@@ -64,6 +64,38 @@ test("second host request is downgraded to spectator", () => {
   assert.equal(lobby.canControlSession(guest as never, "session-1"), false);
 });
 
+test("companion guests cannot acquire host control in an empty lobby", () => {
+  const lobby = createLobbyManager();
+  const guest = new FakeSocket("guest-1");
+  guest.data.hostEligible = false;
+
+  const participant = lobby.joinLobby(guest as never, {
+    requestedRole: "host",
+    sessionId: "session-1",
+  });
+
+  assert.equal(participant?.role, "spectator");
+  assert.equal(participant?.playerIndex, null);
+  assert.equal(lobby.canControlSession(guest as never, "session-1"), false);
+});
+
+test("host departure does not promote an ineligible companion guest", () => {
+  const lobby = createLobbyManager();
+  const host = new FakeSocket("host-1");
+  const guest = new FakeSocket("guest-1");
+  guest.data.hostEligible = false;
+
+  lobby.joinLobby(host as never, { sessionId: "session-1" });
+  lobby.joinLobby(guest as never, {
+    requestedRole: "player",
+    sessionId: "session-1",
+  });
+  lobby.leaveLobby(host as never, "session-1");
+
+  assert.equal(lobby.getLobbyState("session-1").hostSocketId, null);
+  assert.equal(lobby.canControlSession(guest as never, "session-1"), false);
+});
+
 test("guest can request an open player slot", () => {
   const lobby = createLobbyManager();
   const host = new FakeSocket("host-1");

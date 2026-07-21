@@ -41,6 +41,12 @@ function getAccessScope(value: unknown): ClientAccessScope {
     : "raw";
 }
 
+export function getSocketAccessScope(socket: Socket): ClientAccessScope {
+  return getAccessScope(
+    getHeaderValue(socket.handshake.headers["x-pixelated-access-scope"]),
+  );
+}
+
 function fallbackClientId(remoteAddress: string, userAgent: string) {
   return `implicit:${Buffer.from(`${remoteAddress}:${userAgent}`).toString("base64url")}`;
 }
@@ -153,9 +159,7 @@ export function refreshConnectedClient(socket: Socket) {
 
   upsertClient(clientId, {
     accessId,
-    accessScope: getAccessScope(
-      getHeaderValue(socket.handshake.headers["x-pixelated-access-scope"]),
-    ),
+    accessScope: getSocketAccessScope(socket),
     remoteAddress: socket.handshake.address || "unknown",
     role: typeof socket.data.role === "string" ? socket.data.role : "connected",
     sessionId:

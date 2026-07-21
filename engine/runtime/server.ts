@@ -19,6 +19,7 @@ import {
   getRequestAccessId,
   getRequestClientId,
   getSocketAccessId,
+  getSocketAccessScope,
   getSocketClientId,
   isEngineAccessRevoked,
   isEngineClientRevoked,
@@ -97,7 +98,11 @@ const getHealthSnapshot = createHealthSnapshot({
 });
 const lobby = createLobbyManager();
 
-registerHealthRoutes(app, getHealthSnapshot);
+registerHealthRoutes(app, getHealthSnapshot, {
+  canReadDetails: (request) =>
+    request.get("x-pixelated-access-scope") !== "companion-guest" &&
+    auth.isValidEngineToken(request.get("x-engine-token")),
+});
 registerLocalVaultRoutes(app, {
   maxRomSizeBytes: MAX_ROM_SIZE_BYTES,
   requireEngineToken: auth.requireEngineToken,
@@ -131,6 +136,8 @@ registerConnectedClientRoutes(app, {
 
 io.on("connection", (socket) => {
   console.log(`[Node.js] Client connected! ID: ${socket.id}`);
+  socket.data.hostEligible =
+    getSocketAccessScope(socket) !== "companion-guest";
   trackConnectedClient(socket);
 
   socket.on("join-session", (rawPayload: unknown = {}) => {

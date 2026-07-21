@@ -16,6 +16,9 @@ import {
   validSubmissionPayload,
 } from "./dataBoundarySupport.js";
 
+const STORAGE_BASE =
+  process.env.SUPABASE_URL?.replace(/\/+$/, "") || "https://example.com";
+
 test("submissions persist metadata for the authenticated submitter", async () => {
   const db = new FakeSupabase();
   let notifiedSubmission: RecordRow | null = null;
@@ -24,15 +27,13 @@ test("submissions persist metadata for the authenticated submitter", async () =>
       notifiedSubmission = submission;
     },
   });
-  const storageBase =
-    process.env.SUPABASE_URL?.replace(/\/+$/, "") || "https://example.com";
-  const romUrl = `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.gba`;
+  const romUrl = `${STORAGE_BASE}/storage/v1/object/public/submissions/${USER_ID}/roms/tiny.gba`;
 
   const response = await app.inject({
     method: "POST",
     payload: validSubmissionPayload({
-      bannerUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/banners/banner.png`,
-      coverUrl: `${storageBase}/storage/v1/object/public/submissions/${USER_ID}/covers/cover.png`,
+      bannerUrl: `${STORAGE_BASE}/storage/v1/object/public/submissions/${USER_ID}/banners/banner.png`,
+      coverUrl: `${STORAGE_BASE}/storage/v1/object/public/submissions/${USER_ID}/covers/cover.png`,
       romUrl,
     }),
     url: "/submissions/games",
@@ -70,7 +71,7 @@ test("admins can list pending game submissions for intake review", async () => {
       email: "dev@example.com",
       game_title: "Tiny Quest",
       id: SUBMISSION_ID,
-      rom_url: "https://example.com/storage/v1/object/public/submissions/user/roms/tiny.nes",
+      rom_url: `${STORAGE_BASE}/storage/v1/object/public/submissions/user/roms/tiny.nes`,
       status: "pending",
       submitter_id: USER_ID,
     },
@@ -80,7 +81,7 @@ test("admins can list pending game submissions for intake review", async () => {
       email: "other@example.com",
       game_title: "Reviewed Quest",
       id: "99999999-9999-4999-8999-999999999999",
-      rom_url: "https://example.com/storage/v1/object/public/submissions/user/roms/reviewed.nes",
+      rom_url: `${STORAGE_BASE}/storage/v1/object/public/submissions/user/roms/reviewed.nes`,
       status: "candidate_created",
       submitter_id: OTHER_USER_ID,
     },
@@ -94,10 +95,15 @@ test("admins can list pending game submissions for intake review", async () => {
 
   assert.equal(response.statusCode, 200);
   const body = response.json<{
-    submissions: { game_title: string; id: string }[];
+    submissions: { game_title: string; id: string; rom_url: string }[];
     total: number;
   }>();
   assert.equal(body.total, 1);
+  assert.match(body.submissions[0]?.rom_url || "", /\/object\/sign\/submissions\//);
+  assert.deepEqual(
+    db.signedStorageUrls.map(({ bucket, path }) => ({ bucket, path })),
+    [{ bucket: "submissions", path: "user/roms/tiny.nes" }],
+  );
   assert.deepEqual(body.submissions, [
     { ...body.submissions[0], game_title: "Tiny Quest", id: SUBMISSION_ID },
   ]);
@@ -113,7 +119,7 @@ test("admins can reject game submissions with review notes", async () => {
     email: "dev@example.com",
     game_title: "Tiny Quest",
     id: SUBMISSION_ID,
-    rom_url: "https://example.com/storage/v1/object/public/submissions/user/roms/tiny.nes",
+    rom_url: `${STORAGE_BASE}/storage/v1/object/public/submissions/user/roms/tiny.nes`,
     status: "pending",
     submitter_id: USER_ID,
   });
@@ -140,7 +146,7 @@ test("admins can turn a game submission into a catalog candidate", async () => {
   seedProfiles(db);
   const romBytes = validNesRom();
   const romUrl =
-    "https://example.com/storage/v1/object/public/submissions/user/roms/tiny.nes";
+    `${STORAGE_BASE}/storage/v1/object/public/submissions/user/roms/tiny.nes`;
   db.rows.game_submissions.push({
     author_name: "Pixel Dev",
     banner_url: "https://example.com/banner.png",
@@ -183,6 +189,10 @@ test("admins can turn a game submission into a catalog candidate", async () => {
   assert.equal(db.rows.catalog_ingestion_candidates[0]?.artifact_sha256, sha256(romBytes));
   assert.equal(db.rows.catalog_ingestion_candidates[0]?.code_license_spdx, "MIT");
   assert.equal(db.rows.catalog_ingestion_candidates[0]?.noncommercial_hosting_allowed, true);
+  assert.deepEqual(
+    db.signedStorageUrls.map(({ bucket, path }) => ({ bucket, path })),
+    [{ bucket: "submissions", path: "user/roms/tiny.nes" }],
+  );
   assert.equal(db.rows.game_submissions[0]?.status, "candidate_created");
   assert.equal(
     db.rows.game_submissions[0]?.catalog_candidate_id,
@@ -197,7 +207,7 @@ test("candidate creation preserves the pending submission when its transaction f
   seedProfiles(db);
   const romBytes = validNesRom();
   const romUrl =
-    "https://example.com/storage/v1/object/public/submissions/user/roms/tiny.nes";
+    `${STORAGE_BASE}/storage/v1/object/public/submissions/user/roms/tiny.nes`;
   db.rows.game_submissions.push({
     author_name: "Pixel Dev",
     banner_url: null,
@@ -241,7 +251,7 @@ test("admin submission candidate review rejects oversized ROM artifacts", async 
   const db = new FakeSupabase();
   seedProfiles(db);
   const romUrl =
-    "https://example.com/storage/v1/object/public/submissions/user/roms/tiny.nes";
+    `${STORAGE_BASE}/storage/v1/object/public/submissions/user/roms/tiny.nes`;
   db.rows.game_submissions.push({
     author_name: "Pixel Dev",
     banner_url: "https://example.com/banner.png",

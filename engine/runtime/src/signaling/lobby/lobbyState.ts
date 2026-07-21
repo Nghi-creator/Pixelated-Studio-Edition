@@ -32,6 +32,16 @@ function makeParticipant(
 
 export function createLobbyStateStore(maxPlayers = 4) {
   const sessions = new Map<string, Map<string, LobbyParticipant>>();
+  const hostEligibleSockets = new Map<string, Set<string>>();
+
+  function getHostEligibleSockets(sessionId: string) {
+    let eligibleSockets = hostEligibleSockets.get(sessionId);
+    if (!eligibleSockets) {
+      eligibleSockets = new Set();
+      hostEligibleSockets.set(sessionId, eligibleSockets);
+    }
+    return eligibleSockets;
+  }
 
   function getParticipants(sessionId: string) {
     let participants = sessions.get(sessionId);
@@ -77,8 +87,12 @@ export function createLobbyStateStore(maxPlayers = 4) {
     sessionId: string,
     requestedRole: LobbyRole,
     displayName: string,
+    hostEligible = true,
   ) {
     const participants = getParticipants(sessionId);
+    const eligibleSockets = getHostEligibleSockets(sessionId);
+    if (hostEligible) eligibleSockets.add(socketId);
+    else eligibleSockets.delete(socketId);
     const existing = participants.get(socketId);
     const hasHost = [...participants.values()].some(
       (participant) =>
@@ -88,10 +102,10 @@ export function createLobbyStateStore(maxPlayers = 4) {
     let role = requestedRole;
     let playerIndex: number | null = existing?.playerIndex || null;
 
-    if (role === "host" && hasHost) {
+    if (role === "host" && (hasHost || !hostEligible)) {
       role = "spectator";
       playerIndex = null;
-    } else if (!hasHost && !existing) {
+    } else if (!hasHost && !existing && hostEligible) {
       role = "host";
       playerIndex = 1;
     } else if (role === "player") {
@@ -201,19 +215,26 @@ export function createLobbyStateStore(maxPlayers = 4) {
 
     const wasHost = participants.get(socketId)?.role === "host";
     participants.delete(socketId);
+    const eligibleSockets = getHostEligibleSockets(sessionId);
+    eligibleSockets.delete(socketId);
 
     if (participants.size === 0) {
       sessions.delete(sessionId);
+      hostEligibleSockets.delete(sessionId);
       return false;
     }
 
     if (wasHost) {
-      const nextHost = [...participants.values()][0];
-      participants.set(nextHost.socketId, {
-        ...nextHost,
-        playerIndex: 1,
-        role: "host",
-      });
+      const nextHost = [...participants.values()].find((participant) =>
+        eligibleSockets.has(participant.socketId),
+      );
+      if (nextHost) {
+        participants.set(nextHost.socketId, {
+          ...nextHost,
+          playerIndex: 1,
+          role: "host",
+        });
+      }
     }
 
     return true;

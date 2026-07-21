@@ -2,6 +2,7 @@ import crypto from "node:crypto";
 import { assertCandidateArtifactHeader } from "./catalogCandidateValidation.js";
 import type { CandidateRow, SupabaseServiceLike } from "./catalogCandidateTypes.js";
 import { sanitizeCatalogObjectSegment } from "../domain/catalogObjectPath.js";
+import { createSignedSubmissionUrl } from "../domain/submissionStorage.js";
 
 const ALLOWED_ARTIFACT_HOSTS = new Set(["raw.githubusercontent.com"]);
 
@@ -81,6 +82,7 @@ function assertAllowedArtifactUrl(value: string) {
 export async function fetchVerifiedCandidateArtifact(
   candidate: CandidateRow,
   fetchArtifact: typeof fetch,
+  service?: SupabaseServiceLike,
 ) {
   if (
     !candidate.artifact_url ||
@@ -94,8 +96,20 @@ export async function fetchVerifiedCandidateArtifact(
     throw new Error("Candidate artifact size is invalid.");
   }
 
-  assertAllowedArtifactUrl(candidate.artifact_url);
-  const response = await fetchArtifact(candidate.artifact_url);
+  let artifactUrl = candidate.artifact_url;
+  if (candidate.source_kind === "user_submission") {
+    if (!service) {
+      throw new Error("Submission artifact signing is not configured.");
+    }
+    const signedArtifactUrl = await createSignedSubmissionUrl(service, artifactUrl);
+    if (!signedArtifactUrl) {
+      throw new Error("Candidate submission artifact is unavailable.");
+    }
+    artifactUrl = signedArtifactUrl;
+  } else {
+    assertAllowedArtifactUrl(artifactUrl);
+  }
+  const response = await fetchArtifact(artifactUrl);
   if (!response.ok) {
     throw new Error(`Failed to fetch candidate artifact: ${response.status}`);
   }
@@ -116,7 +130,7 @@ export async function mirrorCandidateArtifact(
   candidate: CandidateRow,
   fetchArtifact: typeof fetch,
 ) {
-  const bytes = await fetchVerifiedCandidateArtifact(candidate, fetchArtifact);
+  const bytes = await fetchVerifiedCandidateArtifact(candidate, fetchArtifact, service);
 
   if (!candidate.artifact_filename || !candidate.artifact_sha256) {
     throw new Error("Candidate is missing artifact metadata.");

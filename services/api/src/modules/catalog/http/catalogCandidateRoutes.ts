@@ -393,7 +393,7 @@ export async function registerCatalogCandidateRoutes(
         ) {
           return reply.status(422).send({ error: "Candidate evidence changed." });
         }
-        const bytes = await fetchVerifiedCandidateArtifact(candidate, fetchArtifact);
+        const bytes = await fetchVerifiedCandidateArtifact(candidate, fetchArtifact, service);
         return reply
           .header("Cache-Control", "no-store")
           .header("Content-Length", String(bytes.length))
@@ -442,7 +442,9 @@ export async function registerCatalogCandidateRoutes(
         ) {
           return reply.status(422).send({ error: "Candidate evidence changed." });
         }
-        if (body.data.status === "passed") await fetchVerifiedCandidateArtifact(candidate, fetchArtifact);
+        if (body.data.status === "passed") {
+          await fetchVerifiedCandidateArtifact(candidate, fetchArtifact, service);
+        }
 
         const { data: recorded, error: recordError } = await service.rpc(
           "record_browser_smoke_result",
