@@ -1,10 +1,14 @@
 import { supabaseService } from "../supabaseAuth.js";
+import type {
+  BrowserCoreId,
+  BrowserSystemId,
+} from "../domain/browserCoreContract.js";
 
 export type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
 export type BackendSessionRow = {
-  browser_core_id: "fceumm" | null;
-  browser_system_id: "nes" | null;
+  browser_core_id: BrowserCoreId | null;
+  browser_system_id: BrowserSystemId | null;
   boot_artifact_sha256: string | null;
   boot_artifact_size: number | null;
   boot_launch_manifest_id: string | null;

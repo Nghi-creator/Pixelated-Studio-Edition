@@ -25,6 +25,14 @@ test("marks only verified private NES artifacts eligible for the first WASM core
     systemId: "nes",
   });
   assert.equal(getBrowserEligibility({ ...validBuild, platform_id: "gba" }).eligible, false);
+  assert.deepEqual(
+    getBrowserEligibility({
+      ...validBuild,
+      artifact_filename: "pocket.gb",
+      platform_id: "gb",
+    }),
+    { coreId: "gambatte", eligible: true, reason: null, systemId: "gb" },
+  );
   assert.equal(getBrowserEligibility({ ...validBuild, artifact_sha256: null }).eligible, false);
   assert.match(
     getBrowserEligibility({

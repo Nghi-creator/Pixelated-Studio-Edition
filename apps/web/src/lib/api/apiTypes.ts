@@ -99,10 +99,10 @@ export type ApiCatalogCandidateBrowserSmokeStatus =
   | "not_tested"
   | "passed";
 export type ApiCandidateBrowserCompatibility = {
-  coreId: "fceumm" | null;
+  coreId: "fceumm" | "gambatte" | null;
   eligible: boolean;
   reason: string | null;
-  systemId: "nes" | null;
+  systemId: "nes" | "gb" | "gbc" | null;
 };
 export type ApiCandidateTechnicalCompatibility = {
   compatible: boolean;

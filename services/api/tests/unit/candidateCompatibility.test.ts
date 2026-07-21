@@ -41,9 +41,18 @@ test("technically valid Studio candidates explain why User Edition cannot run th
   assert.deepEqual(getCandidateBrowserCompatibility(snesCandidate), {
     coreId: null,
     eligible: false,
-    reason: "The current User Edition release supports NES candidates only.",
+    reason: "This candidate is not supported by an installed User Edition browser core.",
     systemId: null,
   });
+  assert.deepEqual(
+    getCandidateBrowserCompatibility({
+      ...candidate,
+      artifact_filename: "pocket.gbc",
+      platform_id: "gbc",
+      runtime_id: "mgba",
+    }),
+    { coreId: "gambatte", eligible: true, reason: null, systemId: "gbc" },
+  );
 });
 
 test("invalid runtime pairs remain technically incompatible", () => {

@@ -1,10 +1,11 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
+import { BROWSER_CORE_IDS } from "../../auth/domain/browserCoreContract.js";
 
 const ticketPayloadSchema = z.object({
   artifactSha256: z.string().regex(/^[a-f0-9]{64}$/),
   candidateId: z.string().uuid(),
-  coreId: z.literal("fceumm"),
+  coreId: z.enum(BROWSER_CORE_IDS),
   expiresAt: z.number().int().positive(),
   issuedAt: z.number().int().positive(),
   nonce: z.string().min(16).max(128),

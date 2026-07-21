@@ -1,4 +1,8 @@
-import path from "node:path";
+import {
+  getBrowserCoreTarget,
+  type BrowserCoreId,
+  type BrowserSystemId,
+} from "../../auth/domain/browserCoreContract.js";
 import {
   assertCandidateRuntimeAllowed,
   CandidateValidationError,
@@ -19,10 +23,10 @@ export type CandidateTechnicalCompatibility = {
 };
 
 export type CandidateBrowserCompatibility = {
-  coreId: "fceumm" | null;
+  coreId: BrowserCoreId | null;
   eligible: boolean;
   reason: string | null;
-  systemId: "nes" | null;
+  systemId: BrowserSystemId | null;
 };
 
 export function getCandidateTechnicalCompatibility(
@@ -57,20 +61,13 @@ export function getCandidateBrowserCompatibility(
       systemId: null,
     };
   }
-  if (candidate.platform_id !== "nes") {
+  const target = getBrowserCoreTarget(candidate.platform_id, candidate.artifact_filename);
+  if (!target) {
     return {
       coreId: null,
       eligible: false,
-      reason: "The current User Edition release supports NES candidates only.",
+      reason: "This candidate is not supported by an installed User Edition browser core.",
       systemId: null,
-    };
-  }
-  if (path.extname(candidate.artifact_filename || "").toLowerCase() !== ".nes") {
-    return {
-      coreId: null,
-      eligible: false,
-      reason: "The candidate artifact is not an NES ROM.",
-      systemId: "nes",
     };
   }
   if (!candidate.artifact_url) {
@@ -78,7 +75,7 @@ export function getCandidateBrowserCompatibility(
       coreId: null,
       eligible: false,
       reason: "The candidate has no downloadable artifact.",
-      systemId: "nes",
+      systemId: target.systemId,
     };
   }
   if (!Number.isSafeInteger(candidate.artifact_size) || (candidate.artifact_size || 0) <= 0) {
@@ -86,7 +83,7 @@ export function getCandidateBrowserCompatibility(
       coreId: null,
       eligible: false,
       reason: "The candidate is missing a verified artifact size.",
-      systemId: "nes",
+      systemId: target.systemId,
     };
   }
   if ((candidate.artifact_size || 0) > MAX_BROWSER_CANDIDATE_BYTES) {
@@ -94,7 +91,7 @@ export function getCandidateBrowserCompatibility(
       coreId: null,
       eligible: false,
       reason: "The artifact exceeds the 64 MB browser safety limit.",
-      systemId: "nes",
+      systemId: target.systemId,
     };
   }
   if (!/^[a-f0-9]{64}$/i.test(candidate.artifact_sha256 || "")) {
@@ -102,10 +99,10 @@ export function getCandidateBrowserCompatibility(
       coreId: null,
       eligible: false,
       reason: "The candidate is missing a verified SHA-256 checksum.",
-      systemId: "nes",
+      systemId: target.systemId,
     };
   }
-  return { coreId: "fceumm", eligible: true, reason: null, systemId: "nes" };
+  return { ...target, eligible: true, reason: null };
 }
 
 export function enrichCandidateCompatibility<T extends BrowserCandidate>(candidate: T) {

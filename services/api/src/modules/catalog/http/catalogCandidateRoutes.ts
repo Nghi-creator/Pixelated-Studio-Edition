@@ -1,6 +1,7 @@
 import process from "node:process";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { BROWSER_CORE_IDS } from "../../auth/domain/browserCoreContract.js";
 import { CATALOG_GENRES } from "../domain/catalogGenres.js";
 import { getCachedUserRole } from "../../auth/roleCache.js";
 import { CandidateValidationError } from "../ingestion/catalogCandidateValidation.js";
@@ -75,11 +76,11 @@ const candidateReviewBodySchema = z.discriminatedUnion("action", [
 ]);
 const browserSmokeBodySchema = z.discriminatedUnion("status", [
   z.object({
-    coreId: z.literal("fceumm"),
+    coreId: z.enum(BROWSER_CORE_IDS),
     status: z.literal("passed"),
   }),
   z.object({
-    coreId: z.literal("fceumm"),
+    coreId: z.enum(BROWSER_CORE_IDS),
     error: z.string().trim().min(1).max(1000),
     status: z.literal("failed"),
   }),
@@ -270,7 +271,7 @@ export async function registerCatalogCandidateRoutes(
           });
         }
         const artifactSha256 = candidate.artifact_sha256?.toLowerCase();
-        if (!artifactSha256 || compatibility.coreId !== "fceumm") {
+        if (!artifactSha256 || !compatibility.coreId) {
           return reply.status(422).send({ error: "Candidate evidence is incomplete." });
         }
         const issued = createBrowserSmokeTicket(

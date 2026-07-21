@@ -1,12 +1,17 @@
 import type { SupabaseServiceLike } from "../services/backendSessions.js";
+import {
+  getBrowserCoreTarget,
+  type BrowserCoreId,
+  type BrowserSystemId,
+} from "./browserCoreContract.js";
 
 export const MAX_BROWSER_ARTIFACT_BYTES = 64 * 1024 * 1024;
 
 export type BrowserEligibility = {
-  coreId: "fceumm" | null;
+  coreId: BrowserCoreId | null;
   eligible: boolean;
   reason: string | null;
-  systemId: "nes" | null;
+  systemId: BrowserSystemId | null;
 };
 
 type BrowserBuild = {
@@ -22,33 +27,31 @@ export function getBrowserEligibility(build: BrowserBuild): BrowserEligibility {
   if (build.runtime_kind !== "libretro") {
     return { coreId: null, eligible: false, reason: "Native Linux builds require Studio Edition.", systemId: null };
   }
-  if (build.platform_id !== "nes") {
-    return { coreId: null, eligible: false, reason: "The current browser release supports NES builds only.", systemId: null };
-  }
-  if (!build.artifact_filename?.toLowerCase().endsWith(".nes")) {
-    return { coreId: null, eligible: false, reason: "The approved artifact is not an NES ROM.", systemId: "nes" };
+  const target = getBrowserCoreTarget(build.platform_id, build.artifact_filename);
+  if (!target) {
+    return { coreId: null, eligible: false, reason: "This build is not supported by an installed browser emulator core.", systemId: null };
   }
   if (!build.artifact_url) {
-    return { coreId: null, eligible: false, reason: "The build has no browser-readable artifact URL.", systemId: "nes" };
+    return { coreId: null, eligible: false, reason: "The build has no browser-readable artifact URL.", systemId: target.systemId };
   }
   try {
     const artifactUrl = new URL(build.artifact_url);
     if (!/^\/storage\/v1\/object\/(?:public|sign)\/catalog_roms\//.test(artifactUrl.pathname)) {
-      return { coreId: null, eligible: false, reason: "The ROM must be mirrored into private catalog storage before browser play.", systemId: "nes" };
+      return { coreId: null, eligible: false, reason: "The ROM must be mirrored into private catalog storage before browser play.", systemId: target.systemId };
     }
   } catch {
-    return { coreId: null, eligible: false, reason: "The approved artifact URL is invalid.", systemId: "nes" };
+    return { coreId: null, eligible: false, reason: "The approved artifact URL is invalid.", systemId: target.systemId };
   }
   if (!Number.isSafeInteger(build.artifact_size) || (build.artifact_size || 0) <= 0) {
-    return { coreId: null, eligible: false, reason: "The build is missing a verified artifact size.", systemId: "nes" };
+    return { coreId: null, eligible: false, reason: "The build is missing a verified artifact size.", systemId: target.systemId };
   }
   if ((build.artifact_size || 0) > MAX_BROWSER_ARTIFACT_BYTES) {
-    return { coreId: null, eligible: false, reason: "The artifact exceeds the 64 MB browser safety limit.", systemId: "nes" };
+    return { coreId: null, eligible: false, reason: "The artifact exceeds the 64 MB browser safety limit.", systemId: target.systemId };
   }
   if (!/^[a-f0-9]{64}$/i.test(build.artifact_sha256 || "")) {
-    return { coreId: null, eligible: false, reason: "The build is missing a verified SHA-256 checksum.", systemId: "nes" };
+    return { coreId: null, eligible: false, reason: "The build is missing a verified SHA-256 checksum.", systemId: target.systemId };
   }
-  return { coreId: "fceumm", eligible: true, reason: null, systemId: "nes" };
+  return { ...target, eligible: true, reason: null };
 }
 
 export function parseSupabaseStorageObjectUrl(value: string, supabaseUrl: string) {
@@ -91,4 +94,3 @@ export async function createSignedCatalogRomUrl({
   if (error || !data?.signedUrl) throw error || new Error("Supabase did not return a signed ROM URL.");
   return data.signedUrl;
 }
-

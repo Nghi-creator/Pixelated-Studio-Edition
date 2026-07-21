@@ -28,8 +28,8 @@ export function CatalogCandidateBrowserSmoke({ candidate, onRecorded }: Props) {
   const compatibility = candidate.browser_compatibility;
   const canRun =
     compatibility.eligible &&
-    compatibility.coreId === "fceumm" &&
-    compatibility.systemId === "nes";
+    compatibility.coreId !== null &&
+    compatibility.systemId !== null;
 
   const openSmokeRunner = async () => {
     if (!canRun || opening) return;
