@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getAccessLogStorageErrorResponse } from "../../src/modules/observability/http/accessLogRoutes.js";
+import { getAccessLogStorageErrorResponse } from "../../../src/modules/observability/http/accessLogRoutes.js";
 
 test("access-log storage errors identify missing hosted columns as schema drift", () => {
   const response = getAccessLogStorageErrorResponse(

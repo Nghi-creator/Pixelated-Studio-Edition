@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getSubmissionObjectPath } from "../../src/modules/catalog/domain/submissionStorage.js";
+import { getSubmissionObjectPath } from "../../../src/modules/catalog/domain/submissionStorage.js";
 
 const SUPABASE_URL = "https://project.supabase.co";
 

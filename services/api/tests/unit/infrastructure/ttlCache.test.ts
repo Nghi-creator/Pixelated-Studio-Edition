@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { TtlCache } from "../../src/modules/cache/ttlCache.js";
+import { TtlCache } from "../../../src/modules/cache/ttlCache.js";
 import {
   CATALOG_CACHE_MAX_ENTRIES,
   createCatalogRouteContext,
-} from "../../src/modules/catalog/http/catalogRouteContext.js";
+} from "../../../src/modules/catalog/http/catalogRouteContext.js";
 
 test("TTL cache bounds unique keys by evicting the oldest entry", () => {
   const cache = new TtlCache<number>(60_000, 2);

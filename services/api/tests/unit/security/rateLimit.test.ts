@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { FixedWindowRateLimiter } from "../../src/modules/security/fixedWindowRateLimiter.js";
-import { rejectRateLimitedRequest } from "../../src/modules/security/rateLimitResponse.js";
-import { createRateLimiter } from "../../src/modules/security/sharedRateLimiter.js";
+import { FixedWindowRateLimiter } from "../../../src/modules/security/fixedWindowRateLimiter.js";
+import { rejectRateLimitedRequest } from "../../../src/modules/security/rateLimitResponse.js";
+import { createRateLimiter } from "../../../src/modules/security/sharedRateLimiter.js";
 
 test("fixed-window limiter blocks excess attempts and resets", () => {
   const limiter = new FixedWindowRateLimiter({ limit: 2, windowMs: 1_000 });

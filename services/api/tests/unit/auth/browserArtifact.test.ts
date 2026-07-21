@@ -5,7 +5,7 @@ import {
   getBrowserEligibility,
   MAX_BROWSER_ARTIFACT_BYTES,
   parseSupabaseStorageObjectUrl,
-} from "../../src/modules/auth/domain/browserArtifact.js";
+} from "../../../src/modules/auth/domain/browserArtifact.js";
 
 const validBuild = {
   artifact_filename: "game.nes",

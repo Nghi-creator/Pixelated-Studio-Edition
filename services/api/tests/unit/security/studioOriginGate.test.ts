@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
-import { registerStudioOriginGate } from "../../src/plugins/studioOriginGate.js";
+import { registerStudioOriginGate } from "../../../src/plugins/studioOriginGate.js";
 
 async function createApp() {
   const app = Fastify({ logger: false });

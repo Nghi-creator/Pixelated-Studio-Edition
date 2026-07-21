@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   createBrowserSmokeTicket,
   verifyBrowserSmokeTicket,
-} from "../../src/modules/catalog/domain/browserSmokeTicket.js";
+} from "../../../src/modules/catalog/domain/browserSmokeTicket.js";
 
 const SECRET = "browser-smoke-test-secret-at-least-32-characters";
 const NOW = Date.UTC(2026, 6, 18, 12, 0, 0);

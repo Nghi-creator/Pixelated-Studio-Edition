@@ -3,7 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 const migrationUrl = new URL(
-  "../../../../supabase/migrations/20260718130000_harden_shared_api_boundaries.sql",
+  "../../../../../supabase/migrations/20260718130000_harden_shared_api_boundaries.sql",
   import.meta.url,
 );
 

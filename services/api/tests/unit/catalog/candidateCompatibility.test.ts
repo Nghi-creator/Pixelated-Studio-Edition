@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   getCandidateBrowserCompatibility,
   getCandidateTechnicalCompatibility,
-} from "../../src/modules/catalog/domain/candidateCompatibility.js";
+} from "../../../src/modules/catalog/domain/candidateCompatibility.js";
 
 const candidate = {
   artifact_filename: "demo.nes",

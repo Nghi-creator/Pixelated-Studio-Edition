@@ -7,7 +7,7 @@ import {
   collectCuratedRomCandidates,
   collectCuratedRomCandidateReport,
   readCuratedRomManifest,
-} from "../../src/modules/catalog/ingestion/curatedRomManifestImporter.js";
+} from "../../../src/modules/catalog/ingestion/curatedRomManifestImporter.js";
 
 function writeManifest(payload: Record<string, unknown>) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pixelated-curated-rom-"));

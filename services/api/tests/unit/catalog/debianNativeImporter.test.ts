@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   collectDebianNativeCandidates,
   type DebianNativeLockManifest,
-} from "../../src/modules/catalog/ingestion/debianNativeImporter.js";
+} from "../../../src/modules/catalog/ingestion/debianNativeImporter.js";
 
 test("Debian native importer creates review candidates from locked main/games packages", () => {
   const manifest: DebianNativeLockManifest = {

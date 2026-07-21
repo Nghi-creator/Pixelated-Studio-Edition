@@ -3,7 +3,7 @@ import fs from "node:fs";
 import test from "node:test";
 
 const migrationUrl = new URL(
-  "../../../../supabase/migrations/20260718133000_atomic_activity_and_smoke_writes.sql",
+  "../../../../../supabase/migrations/20260718133000_atomic_activity_and_smoke_writes.sql",
   import.meta.url,
 );
 
