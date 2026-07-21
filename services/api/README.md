@@ -25,9 +25,8 @@ The local engine still runs separately on `localhost:8080` and verifies cloud se
 src/config/       Environment parsing
 src/plugins/      Fastify plugins for CORS, logging, security, rate limits
 src/modules/      Domain-owned routes, services, policies, contracts
-tests/unit/       Domain and utility tests
+tests/unit/       Unit and contract tests grouped by domain
 tests/integration Fastify injection tests with fake Supabase services
-tests/smoke/      Hosted/predeploy smoke helpers
 scripts/          Hosted checks, importers, catalog artwork, staging smoke
 ```
 
@@ -78,6 +77,27 @@ npm run predeploy:hosted
 ```
 
 `predeploy:hosted` checks hosted access-log schema, submission cleanup policy, catalog RPC shape, catalog candidate import validation, typecheck, lint, and build.
+
+## Maintenance scripts
+
+Catalog intake and hosted validation scripts are active operational entrypoints,
+not test fixtures:
+
+| Command | Purpose |
+| --- | --- |
+| `check:catalog-candidate-imports` | Validate checked-in curated/native candidate contracts |
+| `generate:curated-rom-manifest` | Generate a strict reviewed-ROM manifest stub |
+| `import:curated-rom-candidates` | Dry-run or import a reviewed manifest |
+| `import:homebrew-candidates` | Discover Homebrew Hub candidates |
+| `import:debian-native-candidates` | Import the locked native runtime catalog |
+| `mirror:catalog-artifacts` | Verify and mirror private playable artifacts |
+| `capture:catalog-artwork` | Capture and upload gameplay-derived artwork |
+| `upload:catalog-artwork-overrides` | Apply reviewed manual artwork overrides |
+| `smoke:staging` | Exercise the staging API and Supabase contracts |
+
+`scripts/catalogArtworkOverrides.example.json` is the maintained input example
+for manual artwork overrides. Curated ROM format and rights guidance lives in
+`.context/curated-rom-manifest-guide.md`.
 
 ## Auth model
 

@@ -68,7 +68,7 @@ jobs:
           }
           uptime="$(jq --exit-status '.uptimeSeconds | numbers' <<<"$health")"
           echo "started_at_seconds=$(($(date +%s) - uptime))" >> "$GITHUB_OUTPUT"
-          mkdir -p .context/hosted-deploy-proof
+          mkdir -p .artifacts/hosted-deploy-proof
           jq --null-input \
             --arg mode "${{ (github.event_name == 'workflow_dispatch' && inputs.proof_mode) && 'proof' || 'deploy' }}" \
             --arg apiUrl "$HOSTED_API_URL" \
@@ -88,21 +88,21 @@ jobs:
                 startedAtSeconds: ($startedAtSeconds | tonumber)
               },
               deployHook: $deployHook
-            }' > .context/hosted-deploy-proof/render-api.json
+            }' > .artifacts/hosted-deploy-proof/render-api.json
 
       - name: Trigger Render API deploy
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
         run: |
           curl --fail-with-body --request POST "$RENDER_API_DEPLOY_HOOK_URL"
-          jq '.deployHook = "triggered"' .context/hosted-deploy-proof/render-api.json > .context/hosted-deploy-proof/render-api.tmp
-          mv .context/hosted-deploy-proof/render-api.tmp .context/hosted-deploy-proof/render-api.json
+          jq '.deployHook = "triggered"' .artifacts/hosted-deploy-proof/render-api.json > .artifacts/hosted-deploy-proof/render-api.tmp
+          mv .artifacts/hosted-deploy-proof/render-api.tmp .artifacts/hosted-deploy-proof/render-api.json
           {
             echo "## Hosted deploy: Render API"
             echo
             echo "- Readiness checks: exercised"
             echo "- Production deploy hook: triggered"
             echo "- API URL: $HOSTED_API_URL"
-          } > .context/hosted-deploy-proof/render-api.md
+          } > .artifacts/hosted-deploy-proof/render-api.md
 
       - name: Record skipped Render API deploy hook
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
@@ -113,15 +113,16 @@ jobs:
             echo "- Readiness checks: exercised"
             echo "- Production deploy hook: skipped by proof_mode"
             echo "- API URL: $HOSTED_API_URL"
-          } > .context/hosted-deploy-proof/render-api.md
+          } > .artifacts/hosted-deploy-proof/render-api.md
 
       - name: Upload Render deploy proof artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           if-no-files-found: warn
+          include-hidden-files: true
           name: hosted-deploy-render-proof-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .context/hosted-deploy-proof/
+          path: .artifacts/hosted-deploy-proof/
           retention-days: 14
 
   deploy-vercel-web:
@@ -155,7 +156,7 @@ jobs:
           curl --fail-with-body --silent --show-error "$HOSTED_WEB_URL/engine" --output current-engine.html
           html_sha256="$(sha256sum current-engine.html | cut -d ' ' -f 1)"
           echo "html_sha256=$html_sha256" >> "$GITHUB_OUTPUT"
-          mkdir -p .context/hosted-deploy-proof
+          mkdir -p .artifacts/hosted-deploy-proof
           jq --null-input \
             --arg mode "${{ (github.event_name == 'workflow_dispatch' && inputs.proof_mode) && 'proof' || 'deploy' }}" \
             --arg webUrl "$HOSTED_WEB_URL" \
@@ -170,21 +171,21 @@ jobs:
                 htmlSha256: $htmlSha256
               },
               deployHook: $deployHook
-            }' > .context/hosted-deploy-proof/vercel-web.json
+            }' > .artifacts/hosted-deploy-proof/vercel-web.json
 
       - name: Trigger Vercel web deploy
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
         run: |
           curl --fail-with-body --request POST "$VERCEL_WEB_DEPLOY_HOOK_URL"
-          jq '.deployHook = "triggered"' .context/hosted-deploy-proof/vercel-web.json > .context/hosted-deploy-proof/vercel-web.tmp
-          mv .context/hosted-deploy-proof/vercel-web.tmp .context/hosted-deploy-proof/vercel-web.json
+          jq '.deployHook = "triggered"' .artifacts/hosted-deploy-proof/vercel-web.json > .artifacts/hosted-deploy-proof/vercel-web.tmp
+          mv .artifacts/hosted-deploy-proof/vercel-web.tmp .artifacts/hosted-deploy-proof/vercel-web.json
           {
             echo "## Hosted deploy: Vercel web"
             echo
             echo "- /engine readiness fetch: exercised"
             echo "- Production deploy hook: triggered"
             echo "- Web URL: $HOSTED_WEB_URL"
-          } > .context/hosted-deploy-proof/vercel-web.md
+          } > .artifacts/hosted-deploy-proof/vercel-web.md
 
       - name: Record skipped Vercel web deploy hook
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
@@ -195,15 +196,16 @@ jobs:
             echo "- /engine readiness fetch: exercised"
             echo "- Production deploy hook: skipped by proof_mode"
             echo "- Web URL: $HOSTED_WEB_URL"
-          } > .context/hosted-deploy-proof/vercel-web.md
+          } > .artifacts/hosted-deploy-proof/vercel-web.md
 
       - name: Upload Vercel deploy proof artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
           if-no-files-found: warn
+          include-hidden-files: true
           name: hosted-deploy-vercel-proof-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .context/hosted-deploy-proof/
+          path: .artifacts/hosted-deploy-proof/
           retention-days: 14
 
   hosted-pairing-smoke:
@@ -216,7 +218,7 @@ jobs:
     timeout-minutes: 20
     env:
       HOSTED_API_URL: ${{ vars.HOSTED_API_URL }}
-      HOSTED_SMOKE_ARTIFACT_DIR: .context/hosted-pairing-smoke/run
+      HOSTED_SMOKE_ARTIFACT_DIR: .artifacts/hosted-pairing-smoke/run
       HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS: ${{ needs.deploy-render-api.outputs.baseline_started_at_seconds }}
       HOSTED_SMOKE_EMAIL: ${{ secrets.HOSTED_SMOKE_EMAIL }}
       HOSTED_SMOKE_PASSWORD: ${{ secrets.HOSTED_SMOKE_PASSWORD }}
@@ -265,7 +267,7 @@ jobs:
       - name: Record hosted pairing proof mode
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
         run: |
-          mkdir -p .context/hosted-pairing-smoke/proof
+          mkdir -p .artifacts/hosted-pairing-smoke/proof
           jq --null-input \
             --arg mode proof \
             --arg renderBaseline "$HOSTED_SMOKE_RENDER_BASELINE_STARTED_AT_SECONDS" \
@@ -277,7 +279,7 @@ jobs:
               reason: "proof_mode skips production-mutating hosted smoke after readiness proof",
               renderBaselineStartedAtSeconds: $renderBaseline,
               vercelBaselineHtmlSha256: $vercelBaseline
-            }' > .context/hosted-pairing-smoke/proof/proof-report.json
+            }' > .artifacts/hosted-pairing-smoke/proof/proof-report.json
 
       - name: Install smoke and desktop dependencies
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
@@ -310,8 +312,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           if-no-files-found: warn
+          include-hidden-files: true
           name: hosted-pairing-smoke-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .context/hosted-pairing-smoke/
+          path: .artifacts/hosted-pairing-smoke/
           retention-days: 14
 
   hosted-auth-smoke:
@@ -354,7 +357,7 @@ jobs:
       - name: Record hosted auth proof mode
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.proof_mode }}
         run: |
-          mkdir -p .context/hosted-auth-smoke/proof
+          mkdir -p .artifacts/hosted-auth-smoke/proof
           jq --null-input \
             --arg mode proof \
             '{
@@ -362,7 +365,7 @@ jobs:
               contractSmoke: "exercised",
               browserAuthSmoke: "skipped",
               reason: "proof_mode skips production-mutating hosted auth smoke after readiness proof"
-            }' > .context/hosted-auth-smoke/proof/proof-report.json
+            }' > .artifacts/hosted-auth-smoke/proof/proof-report.json
 
       - name: Install auth smoke dependencies
         run: npm ci
@@ -384,6 +387,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           if-no-files-found: warn
+          include-hidden-files: true
           name: hosted-auth-smoke-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .context/hosted-auth-smoke/
+          path: .artifacts/hosted-auth-smoke/
           retention-days: 14

@@ -31,7 +31,7 @@ import {
 } from "./multiplayerSmokeArtifacts.mjs";
 
 const DEFAULT_ENGINE_URL = "http://127.0.0.1:8080";
-const DEFAULT_OUT_DIR = ".context/smoke-artifacts";
+const DEFAULT_OUT_DIR = ".artifacts/lan-smoke";
 const DEFAULT_TIMEOUT_MS = 120_000;
 const DEFAULT_POLL_MS = 2_000;
 let activeRun = null;

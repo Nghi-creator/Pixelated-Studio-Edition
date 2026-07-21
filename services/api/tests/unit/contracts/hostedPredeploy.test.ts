@@ -7,7 +7,7 @@ type PackageJson = {
 };
 
 const packageJson = JSON.parse(
-  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../../../package.json", import.meta.url), "utf8"),
 ) as PackageJson;
 
 test("hosted predeploy fails fast on hosted Supabase schema drift", () => {

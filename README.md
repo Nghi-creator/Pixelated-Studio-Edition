@@ -148,7 +148,7 @@ STAGING_SMOKE_PASSWORD=<dedicated-staging-admin-password> \
 npm run predeploy:hosted
 ```
 
-See `.context/backend-hosting-checklist.md`, `.context/ci-rules.md`, and the package READMEs for deeper operational notes.
+See `.context/operations.md`, `.context/architecture.md`, and the package READMEs for deeper operational notes.
 
 ## Repository READMEs
 

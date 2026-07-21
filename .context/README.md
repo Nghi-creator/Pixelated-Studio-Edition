@@ -6,28 +6,19 @@ runbooks, and test fixtures that are intentionally checked in.
 
 ## Current Sources Of Truth
 
-Agents should read `agent-rules.md` and `ci-rules.md` before making large,
+Agents should read `agent-rules.md` and `operations.md` before making large,
 cross-package, workflow, deploy, smoke-test, lockfile, or PR-scale changes.
-Use `ci-rules.md` again before the final response to decide which local checks
-and GitHub Actions pipeline checks need to be reported.
 
-- `current-infrastructure.md`: deployed and local architecture, runtime
-  boundaries, and operational behavior.
+- `architecture.md`: deployed/local ownership boundaries and runtime flows.
 - `agent-rules.md`: persistent agent/Git ownership rules for this repository.
-- `ci-rules.md`: GitHub Actions map, local verification commands, and known CI
-  tripwires for agents.
-- `project-flows.md`: compact runtime flow map for boot, pairing, gameplay,
-  multiplayer, submissions, and hosted deploys.
-- `research-instrumentation-roadmap.md`: proposed research-facing telemetry,
-  experiment metadata, export, baseline, and refactoring roadmap.
+- `operations.md`: verification matrix, deploy/smoke commands, CI tripwires,
+  artifact policy, and remaining desktop release validation.
+- `research-validation.md`: implemented research evidence contract and current
+  experiment procedure.
 
 ## Active Operational Checklists
 
-- `backend-hosting-checklist.md`: hosted deploy gates, environment variables,
-  health checks, and smoke commands.
 - `lan-manual-smoke-checklist.md`: manual two-device LAN validation.
-- `docker-onboarding-validation.md`: desktop Docker onboarding validation and
-  remaining platform proof.
 
 ## Catalog Intake Fixtures
 
@@ -45,6 +36,6 @@ Test-only catalog fixtures live with the tests that consume them, not in
 - Generated smoke output.
 - Large evidence bundles.
 
-Generated smoke output defaults to `.artifacts/`, which is ignored by Git. Only
-move evidence into `.context` if the user explicitly asks to preserve it as
-project memory.
+Generated smoke output belongs in `.artifacts/`, which is ignored by Git. Do
+not move run output into `.context`; durable conclusions should be summarized
+in the relevant runbook instead.

@@ -1,6 +1,6 @@
 # LAN Manual Smoke Checklist
 
-Last reviewed: 2026-06-17
+Last reviewed: 2026-07-22
 
 Keep this file: it is the manual two-device validation runbook that automated
 tests cannot replace.
@@ -75,8 +75,8 @@ Summarize a completed bundle:
 node scripts/lan/summarizeSmokeArtifacts.mjs <artifact-dir>
 ```
 
-Smoke output should stay outside `.context` unless the user explicitly asks to
-preserve evidence.
+Smoke output defaults to `.artifacts/lan-smoke` and should remain outside
+`.context`.
 
 ## Record
 
