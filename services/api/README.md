@@ -25,9 +25,8 @@ The local engine still runs separately on `localhost:8080` and verifies cloud se
 src/config/       Environment parsing
 src/plugins/      Fastify plugins for CORS, logging, security, rate limits
 src/modules/      Domain-owned routes, services, policies, contracts
-tests/unit/       Domain and utility tests
+tests/unit/       Unit and contract tests grouped by domain
 tests/integration Fastify injection tests with fake Supabase services
-tests/smoke/      Hosted/predeploy smoke helpers
 scripts/          Hosted checks, importers, catalog artwork, staging smoke
 ```
 
@@ -79,6 +78,27 @@ npm run predeploy:hosted
 
 `predeploy:hosted` checks hosted access-log schema, submission cleanup policy, catalog RPC shape, catalog candidate import validation, typecheck, lint, and build.
 
+## Maintenance scripts
+
+Catalog intake and hosted validation scripts are active operational entrypoints,
+not test fixtures:
+
+| Command | Purpose |
+| --- | --- |
+| `check:catalog-candidate-imports` | Validate checked-in curated/native candidate contracts |
+| `generate:curated-rom-manifest` | Generate a strict reviewed-ROM manifest stub |
+| `import:curated-rom-candidates` | Dry-run or import a reviewed manifest |
+| `import:homebrew-candidates` | Discover Homebrew Hub candidates |
+| `import:debian-native-candidates` | Import the locked native runtime catalog |
+| `mirror:catalog-artifacts` | Verify and mirror private playable artifacts |
+| `capture:catalog-artwork` | Capture and upload gameplay-derived artwork |
+| `upload:catalog-artwork-overrides` | Apply reviewed manual artwork overrides |
+| `smoke:staging` | Exercise the staging API and Supabase contracts |
+
+`scripts/catalogArtworkOverrides.example.json` is the maintained input example
+for manual artwork overrides. Curated ROM format and rights guidance lives in
+`.context/curated-rom-manifest-guide.md`.
+
 ## Auth model
 
 Authenticated browser routes expect:
@@ -129,6 +149,9 @@ WEB_ORIGIN=https://pixelated-studio-edition.vercel.app,https://pixelated-user-ed
 STUDIO_WEB_ORIGINS=https://pixelated-studio-edition.vercel.app
 BROWSER_SMOKE_TICKET_SECRET=<at least 32 random characters>
 BROWSER_SMOKE_TICKET_TTL_SECONDS=300
+BROWSER_SMOKE_RATE_LIMIT_PER_MINUTE=30
+BROWSER_ARTIFACT_URL_TTL_SECONDS=300
+BROWSER_ARTIFACT_RATE_LIMIT_PER_MINUTE=20
 CONTROL_PLANE_CLEANUP_INTERVAL_MS=3600000
 STREAM_METRIC_RETENTION_DAYS=7
 STUN_URLS=stun:stun.l.google.com:19302
@@ -197,6 +220,7 @@ Deploy the shared contract in this order:
 | Liveness/readiness checks | 120 per client IP per minute | Redis shared counter |
 | Session verification by IP | 1,000 per minute | Redis shared counter |
 | Session verification by IP and session | 30 per minute | Redis shared counter |
+| Browser smoke capability routes | 30 per client IP per minute | Redis shared counter |
 | Comments | 10 per user per minute | Redis shared counter |
 | Game and comment reactions combined | 120 per user per minute | Redis shared counter |
 | Play-count writes | 60 per user per minute | Redis shared counter |

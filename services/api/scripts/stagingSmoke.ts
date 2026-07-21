@@ -36,6 +36,10 @@ const stagingSupabaseAnonKey =
 const configuredGameId = process.env.STAGING_GAME_ID;
 const smokeEngineUrl =
   process.env.STAGING_SMOKE_ENGINE_URL || "http://127.0.0.1:8080";
+const stagingStudioOrigin = normalizeOrigin(
+  process.env.STAGING_STUDIO_ORIGIN ||
+    "https://pixelated-studio-edition.vercel.app",
+);
 let authHeaders: Record<string, string> = {};
 let bearerToken = "";
 
@@ -58,6 +62,23 @@ function parseArgs(args: string[]): SmokeMode {
 
 function normalizeBaseUrl(value: string) {
   return value.replace(/\/+$/, "");
+}
+
+function normalizeOrigin(value: string) {
+  try {
+    return new URL(value).origin;
+  } catch {
+    fail(`STAGING_STUDIO_ORIGIN is not a valid URL: ${value}`);
+  }
+}
+
+function requiresStudioOrigin(method: string, path: string) {
+  const pathname = path.split("?", 1)[0] || "/";
+  return (
+    pathname === "/admin" ||
+    pathname.startsWith("/admin/") ||
+    (method === "POST" && pathname === "/submissions/games")
+  );
 }
 
 function fail(message: string): never {
@@ -167,6 +188,9 @@ async function request<T = JsonRecord>(
     headers: {
       ...(options.auth === false ? {} : authHeaders),
       ...(options.body ? { "Content-Type": "application/json" } : {}),
+      ...(requiresStudioOrigin(method, path)
+        ? { Origin: stagingStudioOrigin }
+        : {}),
     },
     method,
   });
@@ -175,6 +199,15 @@ async function request<T = JsonRecord>(
 
   if (!expected.includes(response.status)) {
     const accessLogError = payload as AccessLogErrorPayload | null;
+    if (
+      response.status === 403 &&
+      accessLogError?.error?.includes("approved Studio Edition origin")
+    ) {
+      throw new Error(
+        `${method} ${path} rejected staging Studio origin ${stagingStudioOrigin}. ` +
+          "Add it to the API STUDIO_WEB_ORIGINS setting or set STAGING_STUDIO_ORIGIN to an approved origin.",
+      );
+    }
     if (accessLogError?.code === "access_log_schema_drift") {
       throw new Error(
         `${method} ${path} detected hosted access-log schema drift` +

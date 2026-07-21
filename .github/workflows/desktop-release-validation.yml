@@ -128,7 +128,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
-          path: .context/desktop-release-assets
+          path: .artifacts/desktop-release-assets
           pattern: pixelated-desktop-*-${{ github.run_id }}-${{ github.run_attempt }}
 
       - name: Publish desktop installers to GitHub release
@@ -144,13 +144,13 @@ jobs:
 
           shopt -s nullglob
           assets=(
-            .context/desktop-release-assets/*.dmg
-            .context/desktop-release-assets/*.exe
-            .context/desktop-release-assets/*.AppImage
+            .artifacts/desktop-release-assets/*.dmg
+            .artifacts/desktop-release-assets/*.exe
+            .artifacts/desktop-release-assets/*.AppImage
           )
           if [ "${#assets[@]}" -ne 3 ]; then
             printf 'Expected 3 desktop release assets (.dmg, .exe, .AppImage), found %s.\n' "${#assets[@]}" >&2
-            find .context/desktop-release-assets -maxdepth 1 -type f -print >&2
+            find .artifacts/desktop-release-assets -maxdepth 1 -type f -print >&2
             exit 1
           fi
 

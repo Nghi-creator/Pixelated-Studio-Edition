@@ -153,6 +153,19 @@ describe("desktop package config", () => {
     assert.match(rendererHelper, /createTextNode/);
   });
 
+  it("keeps engine unit-test modules independent from the Electron binary", () => {
+    const modulePaths = [
+      "../../main/engine/controller.js",
+      "../../main/engine/workflows/recoveryWorkflow.js",
+      "../../main/runtime/config.js",
+    ];
+
+    for (const modulePath of modulePaths) {
+      const source = fs.readFileSync(path.resolve(__dirname, modulePath), "utf8");
+      assert.doesNotMatch(source, /require\(["']electron["']\)/);
+    }
+  });
+
   it("ships local renderer styles under a restrictive content policy", () => {
     const packageJson = readPackageJson();
     const indexPath = path.resolve(__dirname, "../../../index.html");

@@ -1,4 +1,3 @@
-import { app } from "electron";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -21,6 +20,10 @@ function firstAvailableEngineRuntimePath(paths: string[]) {
   return paths.find(hasEngineRuntime) || paths[0];
 }
 
+function isPackagedElectronRuntime() {
+  return Boolean(process.resourcesPath) && process.defaultApp !== true;
+}
+
 function resolveWebDistDir() {
   if (process.env.PIXELATED_WEB_DIST_DIR) {
     return path.resolve(process.env.PIXELATED_WEB_DIST_DIR);
@@ -30,7 +33,7 @@ function resolveWebDistDir() {
     ? path.join(process.resourcesPath, "web-dist")
     : path.resolve(__dirname, "../../web-dist");
   const sourceWebDistDir = path.resolve(__dirname, "../../../../apps/web/dist");
-  const isPackaged = app?.isPackaged === true;
+  const isPackaged = isPackagedElectronRuntime();
   const candidates = isPackaged
     ? [bundledWebDistDir, sourceWebDistDir]
     : [sourceWebDistDir, bundledWebDistDir];

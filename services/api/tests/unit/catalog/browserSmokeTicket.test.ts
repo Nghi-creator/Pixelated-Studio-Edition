@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   createBrowserSmokeTicket,
+  readBrowserSmokeTicketAuthorization,
   verifyBrowserSmokeTicket,
 } from "../../../src/modules/catalog/domain/browserSmokeTicket.js";
 
@@ -43,4 +44,31 @@ test("browser smoke tickets reject tampering and the wrong secret", () => {
   );
   assert.throws(() => verifyBrowserSmokeTicket(`${issued.ticket}x`, SECRET, NOW));
   assert.throws(() => verifyBrowserSmokeTicket(issued.ticket, `${SECRET}-wrong`, NOW));
+});
+
+test("browser smoke authorization parsing is bounded and non-ambiguous", () => {
+  const issued = createBrowserSmokeTicket(
+    {
+      artifactSha256: "c".repeat(64),
+      candidateId: "78787878-7878-4878-8878-787878787878",
+      coreId: "fceumm",
+      reviewerId: "22222222-2222-4222-8222-222222222222",
+    },
+    SECRET,
+    300,
+    NOW,
+  );
+
+  assert.equal(
+    readBrowserSmokeTicketAuthorization(`Smoke ${issued.ticket}`),
+    issued.ticket,
+  );
+  assert.equal(
+    readBrowserSmokeTicketAuthorization(`smoke ${issued.ticket}`),
+    issued.ticket,
+  );
+  assert.equal(readBrowserSmokeTicketAuthorization(`Smoke    ${issued.ticket}`), "");
+  assert.equal(readBrowserSmokeTicketAuthorization(`Bearer ${issued.ticket}`), "");
+  assert.equal(readBrowserSmokeTicketAuthorization(`Smoke ${issued.ticket} invalid`), "");
+  assert.equal(readBrowserSmokeTicketAuthorization(`Smoke ${"a".repeat(4096)}`), "");
 });

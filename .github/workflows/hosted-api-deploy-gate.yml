@@ -95,6 +95,7 @@ jobs:
       STAGING_SUPABASE_ANON_KEY: ${{ secrets.STAGING_SUPABASE_ANON_KEY }}
       STAGING_SMOKE_EMAIL: ${{ secrets.STAGING_SMOKE_EMAIL }}
       STAGING_SMOKE_PASSWORD: ${{ secrets.STAGING_SMOKE_PASSWORD }}
+      STAGING_STUDIO_ORIGIN: ${{ vars.STAGING_STUDIO_ORIGIN }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -149,7 +150,7 @@ jobs:
     steps:
       - name: Record hosted deploy gate proof mode
         run: |
-          mkdir -p .context/hosted-deploy-gate-proof
+          mkdir -p .artifacts/hosted-deploy-gate-proof
           jq --null-input \
             '{
               mode: "proof",
@@ -157,19 +158,20 @@ jobs:
               hostedContract: "exercised",
               stagingPredeploy: "skipped",
               reason: "proof_mode verifies deploy gate wiring without requiring staging predeploy secrets"
-            }' > .context/hosted-deploy-gate-proof/proof-report.json
+            }' > .artifacts/hosted-deploy-gate-proof/proof-report.json
           {
             echo "## Hosted deploy gate proof"
             echo
             echo "- API contract: exercised"
             echo "- Hosted web and smoke contract: exercised"
             echo "- Staging predeploy: skipped by proof_mode"
-          } > .context/hosted-deploy-gate-proof/proof-report.md
+          } > .artifacts/hosted-deploy-gate-proof/proof-report.md
 
       - name: Upload hosted deploy gate proof artifact
         uses: actions/upload-artifact@v4
         with:
           if-no-files-found: error
+          include-hidden-files: true
           name: hosted-deploy-gate-proof-${{ github.run_id }}-${{ github.run_attempt }}
-          path: .context/hosted-deploy-gate-proof/
+          path: .artifacts/hosted-deploy-gate-proof/
           retention-days: 14

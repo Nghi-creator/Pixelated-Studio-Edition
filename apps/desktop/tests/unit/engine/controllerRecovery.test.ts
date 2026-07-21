@@ -55,6 +55,7 @@ describe("desktop engine image recovery", () => {
     resetEngineControllerForTest({
       diagnoseDocker: async () => createDockerDiagnostic("ready"),
       getSafeEnv: () => ({}),
+      openPath: async () => "",
       prepareEngineImage: async () => {
         throw new Error("missing runtime Dockerfile");
       },
@@ -102,6 +103,7 @@ describe("desktop engine image recovery", () => {
       },
       getSafeEnv: () => ({}),
       getUserDataPath: () => "/tmp/pixelated-desktop-test",
+      openPath: async () => "",
       prepareEngineImage: async (_event, _safeEnv, runtimeConfig) => {
         preparedImages.push(runtimeConfig!);
       },

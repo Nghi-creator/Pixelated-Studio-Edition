@@ -58,6 +58,7 @@ export type EngineControllerDependencies = {
   execFileCommand: typeof execFileCommand;
   getSafeEnv: typeof getSafeEnv;
   getUserDataPath: () => string;
+  openPath: (targetPath: string) => Promise<string>;
   prepareEngineImage: typeof prepareEngineImage;
   startCompanionServer: typeof startCompanionServer;
   stopCompanionServer: typeof stopCompanionServer;

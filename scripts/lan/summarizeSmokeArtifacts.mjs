@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const DEFAULT_ARTIFACT_ROOT = ".context/smoke-artifacts";
+const DEFAULT_ARTIFACT_ROOT = ".artifacts/lan-smoke";
 const REQUIRED_ARTIFACTS = [
   "engine-smoke-report.json",
   "engine-health-events.ndjson",

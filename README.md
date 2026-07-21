@@ -145,10 +145,11 @@ STAGING_SUPABASE_URL=<supabase-project-url> \
 STAGING_SUPABASE_ANON_KEY=<supabase-anon-key> \
 STAGING_SMOKE_EMAIL=<dedicated-staging-admin-email> \
 STAGING_SMOKE_PASSWORD=<dedicated-staging-admin-password> \
+STAGING_STUDIO_ORIGIN=<origin-allowed-by-api> \
 npm run predeploy:hosted
 ```
 
-See `.context/backend-hosting-checklist.md`, `.context/ci-rules.md`, and the package READMEs for deeper operational notes.
+See `.context/operations.md`, `.context/architecture.md`, and the package READMEs for deeper operational notes.
 
 ## Repository READMEs
 

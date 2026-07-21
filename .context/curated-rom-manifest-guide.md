@@ -1,4 +1,6 @@
-# Curated ROM manifest guide
+# Curated ROM Manifest Guide
+
+Last reviewed: 2026-07-22
 
 Use this when a game is not available through an automated source adapter such
 as Homebrew Hub, but appears to have explicit redistribution permission.

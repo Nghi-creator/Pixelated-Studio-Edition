@@ -1,4 +1,4 @@
-import { ipcMain, shell, type IpcMainEvent } from "electron";
+import { app, ipcMain, shell, type IpcMainEvent } from "electron";
 import { createCompanionQrDataUrl } from "./companion/invite/qr";
 import {
   getDockerResourceUrl,
@@ -8,6 +8,7 @@ import {
 import {
   buildEngineImageAndResume,
   cancelDockerRecovery,
+  configureEngineControllerRuntime,
   createWebLaunchUrl,
   listEngineClients,
   regenerateLanInvite,
@@ -20,6 +21,11 @@ import {
 } from "./engine/controller";
 
 export function registerIpcHandlers() {
+  configureEngineControllerRuntime({
+    getUserDataPath: () => app.getPath("userData"),
+    openPath: (targetPath) => shell.openPath(targetPath),
+  });
+
   ipcMain.on("start-docker", (event: IpcMainEvent, options = {}) => {
     startEngine(event, options);
   });

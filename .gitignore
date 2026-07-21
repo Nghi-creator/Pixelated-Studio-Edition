@@ -13,8 +13,6 @@ __pycache__/
 supabase/.temp/
 .vercel
 .artifacts/
-.context/hosted-pairing-smoke/
-.context/hosted-auth-smoke/
 docs_research/
 user-edition/
 research-papers-latency-fingerprinting/

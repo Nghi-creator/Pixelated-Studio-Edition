@@ -7,8 +7,12 @@ type PackageJson = {
 };
 
 const packageJson = JSON.parse(
-  readFileSync(new URL("../../package.json", import.meta.url), "utf8"),
+  readFileSync(new URL("../../../package.json", import.meta.url), "utf8"),
 ) as PackageJson;
+const stagingSmoke = readFileSync(
+  new URL("../../../scripts/stagingSmoke.ts", import.meta.url),
+  "utf8",
+);
 
 test("hosted predeploy fails fast on hosted Supabase schema drift", () => {
   const scripts = packageJson.scripts || {};
@@ -22,4 +26,6 @@ test("hosted predeploy fails fast on hosted Supabase schema drift", () => {
     scripts["predeploy:hosted"] || "",
     /check:access-log-schema && npm run check:submission-cleanup-policy && npm run check:catalog-rpc && npm run check:catalog-candidate-imports && npm run typecheck/,
   );
+  assert.match(stagingSmoke, /STAGING_STUDIO_ORIGIN/);
+  assert.match(stagingSmoke, /Origin: stagingStudioOrigin/);
 });
