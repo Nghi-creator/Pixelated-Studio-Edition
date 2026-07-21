@@ -25,7 +25,7 @@ const mode = parseArgs(process.argv.slice(2));
 const apiUrl = normalizeBaseUrl(
   process.env.STAGING_API_URL ||
     process.env.API_URL ||
-    "https://pixelated-api-services.onrender.com",
+    "https://pixelated-api-services-6ovi.onrender.com",
 );
 const configuredBearerToken =
   process.env.STAGING_BEARER_TOKEN || process.env.SUPABASE_ACCESS_TOKEN;

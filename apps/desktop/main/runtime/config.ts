@@ -97,7 +97,7 @@ export const defaultEngineImage =
     ? defaultNativeEngineImage
     : defaultLibretroEngineImage;
 export const backendApiUrl =
-  process.env.PIXELATED_API_URL || "https://pixelated-api-services.onrender.com";
+  process.env.PIXELATED_API_URL || "https://pixelated-api-services-6ovi.onrender.com";
 export const hostedWebUrl =
   process.env.PIXELATED_WEB_URL || "https://pixelated-studio-edition.vercel.app";
 export const engineAllowedOrigins =

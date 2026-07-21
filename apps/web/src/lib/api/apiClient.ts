@@ -22,7 +22,7 @@ import { createTelemetryApi } from "./telemetryApi";
 export type * from "./apiTypes";
 
 const LOCAL_API_URL = "http://127.0.0.1:4000";
-const PRODUCTION_API_URL = "https://pixelated-api-services.onrender.com";
+const PRODUCTION_API_URL = "https://pixelated-api-services-6ovi.onrender.com";
 const DEFAULT_API_TIMEOUT_MS = 30_000;
 const CLIENT_CACHE_TTL_MS = 30_000;
 
