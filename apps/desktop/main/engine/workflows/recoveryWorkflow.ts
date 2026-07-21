@@ -1,4 +1,4 @@
-import { shell, type IpcMainEvent } from "electron";
+import type { IpcMainEvent } from "electron";
 import { createDockerDiagnostic } from "../../docker/diagnostics";
 import {
   discoverDockerStartPlan,
@@ -41,9 +41,7 @@ export async function runDockerRecovery({
   event.reply("server-log", "Starting Docker from a trusted system location...");
 
   try {
-    await executeDockerStartPlan(startPlan, (targetPath) =>
-      shell.openPath(targetPath),
-    );
+    await executeDockerStartPlan(startPlan, state.dependencies.openPath);
     event.reply("server-log", "Waiting for Docker Desktop to become ready...");
     const diagnostic = await waitForDockerReady(state.dependencies.getSafeEnv(), {
       isCancelled: () => attempt !== state.activeStartupAttempt,

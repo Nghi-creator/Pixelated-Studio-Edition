@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { app, type IpcMainEvent } from "electron";
+import type { IpcMainEvent } from "electron";
 import type { EngineRuntimeKind } from "../runtime/config";
 import {
   revokeCompanionInvite,
@@ -59,13 +59,28 @@ const defaultDependencies: EngineControllerDependencies = {
   diagnoseDocker,
   execFileCommand,
   getSafeEnv,
-  getUserDataPath: () => app.getPath("userData"),
+  getUserDataPath: () => {
+    throw new Error("Electron user-data access has not been configured.");
+  },
+  openPath: async () => {
+    throw new Error("Electron path opening has not been configured.");
+  },
   prepareEngineImage,
   startCompanionServer,
   stopCompanionServer,
   waitForEngineHealth,
 };
 const state = createEngineControllerState(defaultDependencies);
+
+export function configureEngineControllerRuntime(
+  dependencies: Pick<
+    EngineControllerDependencies,
+    "getUserDataPath" | "openPath"
+  >,
+) {
+  state.dependencies.getUserDataPath = dependencies.getUserDataPath;
+  state.dependencies.openPath = dependencies.openPath;
+}
 
 export function resetEngineControllerForTest(
   overrides: Partial<EngineControllerDependencies> = {},
