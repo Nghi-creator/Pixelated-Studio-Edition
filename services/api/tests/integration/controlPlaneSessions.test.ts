@@ -41,6 +41,8 @@ test("sessions persist hashed tokens and verify approved boot targets", async ()
   const storedSession = db.sessions.get("session-1");
   assert.ok(storedSession);
   assert.equal(storedSession.session_token_hash === created.sessionToken, false);
+  assert.equal(storedSession.browser_core_id, null);
+  assert.equal(storedSession.browser_system_id, null);
 
   const verifyResponse = await app.inject({
     method: "POST",
@@ -119,9 +121,7 @@ test("anonymous users cannot create playable cloud sessions", async () => {
   }
   const app = Fastify({ logger: false });
   await registerSessionRoutes(app, {
-    requireUser: async (request) => {
-      request.user = undefined;
-    },
+    requireUser: async () => undefined,
     supabase: db as never,
   });
 

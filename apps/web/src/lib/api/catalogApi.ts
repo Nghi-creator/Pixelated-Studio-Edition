@@ -33,6 +33,7 @@ export function createCatalogApi({
       license = "",
       page = 1,
       pageSize = 15,
+      platform = "",
       search = "",
       signal,
     }: {
@@ -40,6 +41,7 @@ export function createCatalogApi({
       pageSize?: number;
       genre?: string;
       license?: string;
+      platform?: string;
       search?: string;
       signal?: AbortSignal;
     } = {}) => {
@@ -50,6 +52,7 @@ export function createCatalogApi({
       if (search.trim()) params.set("search", search.trim());
       if (genre) params.set("genre", genre);
       if (license) params.set("license", license);
+      if (platform) params.set("platform", platform);
 
       return apiRequest<ApiPaginatedGamesResponse>(`/games?${params}`, {
         authenticated: false,

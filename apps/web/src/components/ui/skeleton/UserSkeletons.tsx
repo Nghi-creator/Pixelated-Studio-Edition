@@ -54,9 +54,19 @@ export function HeroSkeleton() {
 export function GamesCatalogSkeleton() {
   return (
     <div className="w-full">
-      <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-center">
-        <Skeleton className="h-8 w-36" />
-        <Skeleton className="h-10 w-full rounded-lg md:w-96" />
+      <div className="mb-8 space-y-3">
+        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+          <Skeleton className="h-8 w-36" />
+          <Skeleton className="h-10 w-full rounded-lg lg:max-w-3xl" />
+        </div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <Skeleton className="h-10 w-36 rounded-lg" />
+          <div className="grid w-full gap-3 sm:grid-cols-3 lg:max-w-3xl">
+            {Array.from({ length: 3 }, (_, index) => (
+              <Skeleton key={index} className="h-10 w-full rounded-lg" />
+            ))}
+          </div>
+        </div>
       </div>
       <GameGridSkeleton />
     </div>
@@ -134,4 +144,3 @@ export function ProfileSkeleton() {
     </div>
   );
 }
-

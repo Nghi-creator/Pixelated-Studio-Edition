@@ -59,7 +59,9 @@ export const queryKeys = {
     search: string,
     genre = "",
     license = "",
-  ) => ["gameCatalog", page, pageSize, search, genre, license] as const,
+    platform = "",
+  ) =>
+    ["gameCatalog", page, pageSize, search, genre, license, platform] as const,
   libraryGamePicker: (pageSize: number) =>
     ["libraryGamePicker", pageSize] as const,
   gameComments: (gameId: string | undefined) => ["gameComments", gameId] as const,

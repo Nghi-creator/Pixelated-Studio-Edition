@@ -10,6 +10,7 @@ export function getCatalogCacheKey(
   search?: string,
   genre?: string,
   license?: string,
+  platform?: string,
 ) {
   return JSON.stringify({
     page,
@@ -17,6 +18,7 @@ export function getCatalogCacheKey(
     search: search?.toLowerCase() || "",
     genre: genre?.toLowerCase() || "",
     license: license?.toLowerCase() || "",
+    platform: platform?.toLowerCase() || "",
   });
 }
 
