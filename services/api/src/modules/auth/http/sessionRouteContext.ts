@@ -3,6 +3,7 @@ import { env } from "../../../config/env.js";
 import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
 import { createSignedCatalogRomUrl } from "../domain/browserArtifact.js";
 import {
+  attachOptionalSupabaseUser,
   requireSupabaseUser,
   supabaseService,
 } from "../supabaseAuth.js";
@@ -20,6 +21,7 @@ export const createSessionBodySchema = z.object({
 });
 
 export type SessionRouteOptions = {
+  attachOptionalUser?: typeof attachOptionalSupabaseUser;
   artifactUrlLimiter?: RateLimiter;
   signCatalogRom?: (artifactUrl: string, expiresInSeconds: number) => Promise<string>;
   requireUser?: typeof requireSupabaseUser;
@@ -50,6 +52,8 @@ export function createSessionRouteContext(options: SessionRouteOptions) {
   });
 
   return {
+    attachOptionalUser:
+      options.attachOptionalUser || attachOptionalSupabaseUser,
     artifactUrlLimiter,
     requireUser: options.requireUser || requireSupabaseUser,
     service,

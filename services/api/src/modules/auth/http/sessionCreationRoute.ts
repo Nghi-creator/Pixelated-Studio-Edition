@@ -22,8 +22,8 @@ export function registerSessionCreationRoute(
   context: SessionRouteContext,
 ) {
   const {
+    attachOptionalUser,
     artifactUrlLimiter,
-    requireUser,
     service,
     sessionCreateLimiter,
     signCatalogRom,
@@ -31,23 +31,9 @@ export function registerSessionCreationRoute(
 
   app.post(
     "/sessions",
-    { preHandler: requireUser },
+    { preHandler: attachOptionalUser },
     async (request, reply) => {
       const user = request.user;
-      if (!user) {
-        return reply.status(401).send({
-          error: "Authentication is required to create a session.",
-        });
-      }
-      if (
-        rejectRateLimitedRequest(
-          reply,
-          await sessionCreateLimiter.consume(user.id),
-          "Session creation rate limit reached. Please try again shortly.",
-        )
-      ) {
-        return;
-      }
       if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
@@ -57,6 +43,29 @@ export function registerSessionCreationRoute(
       const parsedBody = createSessionBodySchema.safeParse(request.body);
       if (!parsedBody.success) {
         return reply.status(400).send({ error: "Invalid session request" });
+      }
+
+      const requestsBrowserArtifact =
+        parsedBody.data.clientEdition === "user" &&
+        parsedBody.data.runtimeKind === "wasm" &&
+        parsedBody.data.mode === "cloud";
+      if (!user && !requestsBrowserArtifact) {
+        return reply.status(401).send({
+          error:
+            "Authentication is required for Studio, WebRTC, and native sessions.",
+        });
+      }
+      const rateLimitIdentity = user
+        ? `user:${user.id}`
+        : `guest-ip:${request.ip}`;
+      if (
+        rejectRateLimitedRequest(
+          reply,
+          await sessionCreateLimiter.consume(rateLimitIdentity),
+          "Session creation rate limit reached. Please try again shortly.",
+        )
+      ) {
+        return;
       }
 
       let game = null;
@@ -86,9 +95,6 @@ export function registerSessionCreationRoute(
       }
 
       const browser = getBrowserEligibility(build);
-      const requestsBrowserArtifact =
-        parsedBody.data.clientEdition === "user" &&
-        parsedBody.data.runtimeKind === "wasm";
       if (requestsBrowserArtifact && !browser.eligible) {
         return reply.status(422).send({
           error: browser.reason || "This build is not browser compatible.",
@@ -106,7 +112,7 @@ export function registerSessionCreationRoute(
         if (
           rejectRateLimitedRequest(
             reply,
-            await artifactUrlLimiter.consume(user.id),
+            await artifactUrlLimiter.consume(rateLimitIdentity),
             "Catalog ROM URL limit reached. Please try again shortly.",
           )
         ) {
@@ -167,7 +173,7 @@ export function registerSessionCreationRoute(
           id: sessionId,
           mode: parsedBody.data.mode,
           session_token_hash: hashSessionToken(sessionToken),
-          user_id: user.id,
+          user_id: user?.id || null,
         });
 
       if (sessionError) {
@@ -184,7 +190,7 @@ export function registerSessionCreationRoute(
         expiresAt,
         sessionId,
         sessionToken,
-        user: { id: user.id },
+        user: { id: user?.id || null },
       };
     },
   );
