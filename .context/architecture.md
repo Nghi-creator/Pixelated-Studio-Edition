@@ -105,7 +105,9 @@ browser-supplied targets are not trusted.
 ### Cloud game boot
 
 1. Web requests a cloud session from the API.
-2. API checks auth, rights/build eligibility, and records approved boot data.
+2. API requires auth for Studio sessions; User Edition WASM may use a
+   rate-limited guest session. It checks rights/build eligibility and records
+   approved boot data.
 3. Web sends the session token to the paired engine.
 4. Engine verifies the session with the API and uses only verified boot data.
 5. Engine downloads or resolves the approved artifact and starts the runtime.

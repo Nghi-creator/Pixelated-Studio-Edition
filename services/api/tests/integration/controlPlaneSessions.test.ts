@@ -106,12 +106,13 @@ test("sessions reject oversized client-provided session ids", async () => {
   await app.close();
 });
 
-test("anonymous users cannot create playable cloud sessions", async () => {
+test("anonymous users can create User Edition WASM cloud sessions", async () => {
   const db = new FakeSupabase();
   seedPublishedGame(db, {
     id: GAME_ID,
     rom_filename: "public.gb",
-    rom_url: "https://pxksbsloksyfwiqyfkrz.supabase.co/public.gb",
+    rom_url:
+      "https://pxksbsloksyfwiqyfkrz.supabase.co/storage/v1/object/public/catalog_roms/public.gb",
   });
   const build = db.gameBuilds.get(`${GAME_ID}-build`);
   if (build) {
@@ -121,18 +122,87 @@ test("anonymous users cannot create playable cloud sessions", async () => {
   }
   const app = Fastify({ logger: false });
   await registerSessionRoutes(app, {
-    requireUser: async () => undefined,
+    attachOptionalUser: async () => undefined,
+    signCatalogRom: async () => "https://signed.example.test/public.gb",
     supabase: db as never,
   });
 
   const createResponse = await app.inject({
     method: "POST",
-    payload: { clientSessionId: "anonymous-session", gameId: GAME_ID },
+    payload: {
+      clientEdition: "user",
+      clientSessionId: "anonymous-session",
+      gameId: GAME_ID,
+      mode: "cloud",
+      runtimeKind: "wasm",
+    },
     url: "/sessions",
   });
 
-  assert.equal(createResponse.statusCode, 401);
-  assert.equal(db.sessions.has("anonymous-session"), false);
+  assert.equal(createResponse.statusCode, 200);
+  const created = createResponse.json<{
+    boot: { romUrl: string };
+    sessionToken: string;
+    user: { id: string | null };
+  }>();
+  assert.equal(
+    created.boot.romUrl,
+    "https://signed.example.test/public.gb",
+  );
+  assert.equal(created.user.id, null);
+  assert.equal(db.sessions.get("anonymous-session")?.user_id, null);
+  assert.equal(db.sessions.get("anonymous-session")?.client_edition, "user");
+  assert.equal(db.sessions.get("anonymous-session")?.client_runtime_kind, "wasm");
+
+  const stopResponse = await app.inject({
+    method: "DELETE",
+    payload: { sessionToken: created.sessionToken },
+    url: "/sessions/anonymous-session",
+  });
+  assert.equal(stopResponse.statusCode, 204);
+  assert.equal(typeof db.sessions.get("anonymous-session")?.deleted_at, "string");
+  await app.close();
+});
+
+test("anonymous users cannot create Studio or non-WASM sessions", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGame(db, {
+    id: GAME_ID,
+    rom_filename: "game.nes",
+    rom_url:
+      "https://pxksbsloksyfwiqyfkrz.supabase.co/storage/v1/object/public/catalog_roms/game.nes",
+  });
+  const app = Fastify({ logger: false });
+  await registerSessionRoutes(app, {
+    attachOptionalUser: async () => undefined,
+    supabase: db as never,
+  });
+
+  for (const payload of [
+    {
+      clientEdition: "studio",
+      clientSessionId: "anonymous-studio",
+      gameId: GAME_ID,
+      mode: "cloud",
+      runtimeKind: "webrtc",
+    },
+    {
+      clientEdition: "user",
+      clientSessionId: "anonymous-native",
+      gameId: GAME_ID,
+      mode: "cloud",
+      runtimeKind: "native",
+    },
+  ]) {
+    const response = await app.inject({
+      method: "POST",
+      payload,
+      url: "/sessions",
+    });
+    assert.equal(response.statusCode, 401);
+  }
+
+  assert.equal(db.sessions.size, 0);
   await app.close();
 });
 

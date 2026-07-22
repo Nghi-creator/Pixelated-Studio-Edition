@@ -15,12 +15,16 @@ const sessionParamsSchema = z.object({ sessionId: sessionIdSchema });
 const verifySessionBodySchema = z.object({
   sessionToken: z.string().min(16).max(128),
 });
+const stopSessionBodySchema = z.object({
+  sessionToken: z.string().min(16).max(128).optional(),
+});
 
 export function registerSessionLifecycleRoutes(
   app: FastifyInstance,
   context: SessionRouteContext,
 ) {
   const {
+    attachOptionalUser,
     artifactUrlLimiter,
     requireUser,
     service,
@@ -59,7 +63,7 @@ export function registerSessionLifecycleRoutes(
 
   app.delete(
     "/sessions/:sessionId",
-    { preHandler: requireUser },
+    { preHandler: attachOptionalUser },
     async (request, reply) => {
       const params = sessionParamsSchema.safeParse(request.params);
       if (!params.success) {
@@ -71,13 +75,28 @@ export function registerSessionLifecycleRoutes(
         });
       }
 
+      const body = stopSessionBodySchema.safeParse(request.body || {});
+      if (!body.success) {
+        return reply.status(400).send({ error: "Invalid session token" });
+      }
+
       const session = await getLiveSession(service, params.data.sessionId);
-      if (session && session.user_id === request.user?.id) {
+      const ownedByUser = Boolean(
+        request.user && session?.user_id === request.user.id,
+      );
+      const authorizedBySessionToken = Boolean(
+        session &&
+          body.data.sessionToken &&
+          sessionTokenMatches(
+            session.session_token_hash,
+            body.data.sessionToken,
+          ),
+      );
+      if (session && (ownedByUser || authorizedBySessionToken)) {
         const { error } = await service
           .from("backend_sessions")
           .update({ deleted_at: new Date().toISOString() })
-          .eq("id", params.data.sessionId)
-          .eq("user_id", request.user.id);
+          .eq("id", params.data.sessionId);
         if (error) {
           request.log.error({ err: error }, "Failed to stop session");
           return reply.status(500).send({ error: "Failed to stop session" });

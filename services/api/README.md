@@ -192,7 +192,10 @@ Production enables Fastify proxy trust so `request.ip` uses the client address f
 Pixelated Studio Edition is the sole migration authority for the Supabase project shared by
 both editions. User Edition must not push or repair migration history.
 
-The shared API supports Studio WebRTC sessions and authenticated User Edition WASM sessions.
+The shared API supports authenticated Studio WebRTC sessions plus authenticated
+or guest User Edition WASM sessions. Guest session creation is limited to the
+public browser catalog, rate-limited by client IP, and authorized afterward by
+an opaque session token.
 Executable ROMs belong in the private `catalog_roms` bucket; public covers and backdrops remain
 in `catalog_artifacts`. The API signs private ROM URLs for User Edition session creation and
 again when the Studio engine verifies a session.

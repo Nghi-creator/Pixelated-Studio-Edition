@@ -343,6 +343,7 @@ export function seedPublishedGame(
 export async function createTestApp(db: FakeSupabase, userId = USER_ID) {
   const app = Fastify({ logger: false });
   const options = {
+    attachOptionalUser: requireUser(userId),
     requireUser: requireUser(userId),
     supabase: db as never,
   };

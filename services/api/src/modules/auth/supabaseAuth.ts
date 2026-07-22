@@ -70,15 +70,15 @@ export async function attachOptionalSupabaseUser(
   request: FastifyRequest,
   reply: FastifyReply,
 ) {
+  const token = getBearerToken(request);
+  if (!token) {
+    return undefined;
+  }
+
   if (!supabaseAnon) {
     return reply.status(503).send({
       error: "Supabase auth is not configured for the API service.",
     });
-  }
-
-  const token = getBearerToken(request);
-  if (!token) {
-    return undefined;
   }
 
   const { data, error } = await supabaseAnon.auth.getUser(token);
