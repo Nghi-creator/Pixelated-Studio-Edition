@@ -8,6 +8,7 @@ export const gamesQuerySchema = z
   .object({
     genre: z.enum(CATALOG_GENRES).optional(),
     license: z.string().trim().min(1).max(80).optional(),
+    platform: z.string().trim().regex(/^[a-z0-9_]+$/).max(32).optional(),
     page: z.coerce.number().int().min(1).max(500).default(1),
     pageSize: z.coerce.number().int().min(1).max(50).default(15),
     search: z

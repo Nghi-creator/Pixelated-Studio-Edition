@@ -26,11 +26,13 @@ async function buildCachedGamesPage(
   search?: string,
   genre?: string,
   license?: string,
+  platform?: string,
 ): Promise<CachedGamesCatalogResponse> {
   const { end, start } = getPageRange(page, pageSize);
   const data = await fetchPublishedCatalogGames(service, timings, {
     genre,
     license,
+    platform,
     search,
   });
   const rankedGames = search ? searchAndRankGames(data || [], search) : data || [];
@@ -105,9 +107,16 @@ export function registerGamesCatalogRoutes(
       return reply.status(400).send({ error: "Invalid games query" });
     }
 
-    const { genre, license, page, pageSize, search } = query.data;
+    const { genre, license, page, pageSize, platform, search } = query.data;
     const timings = {};
-    const cacheKey = getCatalogCacheKey(page, pageSize, search, genre, license);
+    const cacheKey = getCatalogCacheKey(
+      page,
+      pageSize,
+      search,
+      genre,
+      license,
+      platform,
+    );
     const cachedResponse = gamesCatalogCache.get(cacheKey);
     if (cachedResponse) {
       let featuredGames = cachedResponse.featuredGames || [];
@@ -129,6 +138,7 @@ export function registerGamesCatalogRoutes(
         search: Boolean(search),
         genre: genre || null,
         license: license || null,
+        platform: platform || null,
         total: cachedResponse.total,
       });
       return { ...cachedResponse, featuredGames };
@@ -144,6 +154,7 @@ export function registerGamesCatalogRoutes(
         search,
         genre,
         license,
+        platform,
       );
     } catch (err) {
       request.log.error({ err }, "Failed to load games");
@@ -173,6 +184,7 @@ export function registerGamesCatalogRoutes(
       search: Boolean(search),
       genre: genre || null,
       license: license || null,
+      platform: platform || null,
       total: cachedPage.total,
     });
 

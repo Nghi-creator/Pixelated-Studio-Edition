@@ -216,6 +216,33 @@ test("catalog exposes eligible facets and filters genre and SPDX license server-
   await app.close();
 });
 
+test("catalog filters games by playable build platform", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGames(
+    db,
+    { id: "nes-game", title: "NES Game" },
+    { id: "gb-game", title: "Game Boy Game" },
+  );
+  const gameBoyBuild = db.rows.game_builds.find(
+    (build) => build.game_id === "gb-game",
+  );
+  assert.ok(gameBoyBuild);
+  gameBoyBuild.platform_id = "gb";
+
+  const app = await createDataBoundaryApp(db);
+  const response = await app.inject({
+    method: "GET",
+    url: "/games?platform=gb",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(
+    response.json<{ games: { id: string }[] }>().games.map((game) => game.id),
+    ["gb-game"],
+  );
+  await app.close();
+});
+
 test("catalog route caches public game pages briefly", async () => {
   const db = new FakeSupabase();
   seedPublishedGames(db, {
@@ -380,4 +407,3 @@ test("featured games route returns a wider pool while all play counts are zero",
   );
   await app.close();
 });
-

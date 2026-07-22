@@ -176,6 +176,7 @@ export function useGameCatalogQuery({
   search,
   genre = "",
   license = "",
+  platform = "",
   enabled = true,
 }: {
   enabled?: boolean;
@@ -184,12 +185,20 @@ export function useGameCatalogQuery({
   search: string;
   genre?: string;
   license?: string;
+  platform?: string;
 }) {
   return useQuery({
     enabled,
-    queryKey: queryKeys.gameCatalog(page, pageSize, search, genre, license),
+    queryKey: queryKeys.gameCatalog(
+      page,
+      pageSize,
+      search,
+      genre,
+      license,
+      platform,
+    ),
     queryFn: ({ signal }) =>
-      api.games({ genre, license, page, pageSize, search, signal }),
+      api.games({ genre, license, page, pageSize, platform, search, signal }),
   });
 }
 

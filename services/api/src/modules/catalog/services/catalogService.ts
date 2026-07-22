@@ -15,6 +15,7 @@ export type CatalogGameFilters = {
   genre?: string;
   license?: string;
   limit?: number;
+  platform?: string;
   search?: string;
 };
 
@@ -126,13 +127,14 @@ export async function fetchPublishedCatalogGames(
   timings: TimingFields,
   filters: CatalogGameFilters = {},
 ) {
-  const { genre, license, limit, search } = filters;
+  const { genre, license, limit, platform, search } = filters;
   const { data, error } = await timed(timings, "games_query_ms", async () => {
     const rpcGames = await fetchPublishedCatalogGamesFromRpc(
       service,
       timings,
       {
-        limit: limit || (search?.trim() || genre || license ? 5000 : 1000),
+        limit:
+          limit || (search?.trim() || genre || license || platform ? 5000 : 1000),
         order: "title",
         genre,
         license,
@@ -140,7 +142,16 @@ export async function fetchPublishedCatalogGames(
         timingKey: "games_rpc_ms",
       },
     );
-    if (rpcGames) return { data: rpcGames, error: null };
+    if (rpcGames) {
+      return {
+        data: platform
+          ? rpcGames.filter((game) =>
+              game.game_builds.some((build) => build.platform_id === platform),
+            )
+          : rpcGames,
+        error: null,
+      };
+    }
 
     const { data: games, error: gamesError } = await service
       .from("games")
@@ -156,6 +167,12 @@ export async function fetchPublishedCatalogGames(
       return {
         data: publishedGames.filter((game) => {
           if (genre && game.genre_slug !== genre) return false;
+          if (
+            platform &&
+            !game.game_builds.some((build) => build.platform_id === platform)
+          ) {
+            return false;
+          }
           if (!license) return true;
           return game.game_rights.some(
             (rights) =>

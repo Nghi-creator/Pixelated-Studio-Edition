@@ -1,6 +1,6 @@
 # Agent Working Rules
 
-Last updated: 2026-07-22
+Last updated: 2026-07-23
 
 ## Git Ownership
 
@@ -31,8 +31,9 @@ After making changes, agents should:
 
 ## UI Rules
 
-- Dropdown menus whose position matters use the shared custom select pattern.
-  Anchor the menu below the field, keep the chevron inside the input, and leave
-  enough right padding for the selected value.
+- Dropdown menus whose position matters must use the shared `AdminSelect`
+  custom-select pattern, never a native `<select>` (the browser may open native
+  menus above the field). Anchor the menu below with `top-full`, inset the
+  chevron with right padding, and leave enough space for the selected value.
 - Size modals to their content. Compact controls before increasing width and
   prefer the smallest explicit content cap that avoids wrapping or dead space.
