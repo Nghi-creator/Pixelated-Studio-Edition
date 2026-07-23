@@ -11,14 +11,34 @@ export type CertificatePaths = {
 const CERTIFICATE_VALIDITY_DAYS = 365;
 const CERTIFICATE_RENEWAL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-function certificateMatches(
+function writeFileAtomic(filePath: string, contents: string, mode: number) {
+  const temporaryPath = path.join(
+    path.dirname(filePath),
+    `.${path.basename(filePath)}.${process.pid}.${crypto.randomBytes(8).toString("hex")}.tmp`,
+  );
+
+  try {
+    fs.writeFileSync(temporaryPath, contents, {
+      flag: "wx",
+      mode,
+    });
+    fs.renameSync(temporaryPath, filePath);
+    fs.chmodSync(filePath, mode);
+  } finally {
+    fs.rmSync(temporaryPath, { force: true });
+  }
+}
+
+function readMatchingCertificate(
   certPath: string,
   keyPath: string,
   lanAddresses: string[],
 ) {
   try {
-    const certificate = new crypto.X509Certificate(fs.readFileSync(certPath));
-    const privateKey = crypto.createPrivateKey(fs.readFileSync(keyPath));
+    const cert = fs.readFileSync(certPath, "utf8");
+    const key = fs.readFileSync(keyPath, "utf8");
+    const certificate = new crypto.X509Certificate(cert);
+    const privateKey = crypto.createPrivateKey(key);
     const certificateKey = certificate.publicKey.export({
       format: "der",
       type: "spki",
@@ -29,16 +49,17 @@ function certificateMatches(
     });
     const validUntil = Date.parse(certificate.validTo);
 
-    return (
+    const matches =
       certificate.checkHost("localhost") === "localhost" &&
       certificate.checkHost("pixelated.local") === "pixelated.local" &&
       certificate.checkIP("127.0.0.1") === "127.0.0.1" &&
       lanAddresses.every((address) => certificate.checkIP(address) === address) &&
       validUntil > Date.now() + CERTIFICATE_RENEWAL_WINDOW_MS &&
-      certificateKey.equals(privateKeyPublic)
-    );
+      certificateKey.equals(privateKeyPublic);
+
+    return matches ? { cert, key } : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -46,16 +67,19 @@ export function createCompanionCertificate(
   certDir: string,
   lanAddresses: string[] = [],
 ): CertificatePaths {
-  fs.mkdirSync(certDir, { recursive: true });
+  fs.mkdirSync(certDir, { mode: 0o700, recursive: true });
+  fs.chmodSync(certDir, 0o700);
   const certPath = path.join(certDir, "pixelated-companion.crt");
   const keyPath = path.join(certDir, "pixelated-companion.key");
 
-  if (
-    fs.existsSync(certPath) &&
-    fs.existsSync(keyPath) &&
-    certificateMatches(certPath, keyPath, lanAddresses)
-  ) {
-    fs.chmodSync(keyPath, 0o600);
+  const existingCertificate = readMatchingCertificate(
+    certPath,
+    keyPath,
+    lanAddresses,
+  );
+  if (existingCertificate) {
+    writeFileAtomic(certPath, existingCertificate.cert, 0o644);
+    writeFileAtomic(keyPath, existingCertificate.key, 0o600);
     return { certPath, keyPath };
   }
 
@@ -92,8 +116,8 @@ export function createCompanionCertificate(
     },
   );
 
-  fs.writeFileSync(certPath, pems.cert, { mode: 0o644 });
-  fs.writeFileSync(keyPath, pems.private, { mode: 0o600 });
+  writeFileAtomic(certPath, pems.cert, 0o644);
+  writeFileAtomic(keyPath, pems.private, 0o600);
 
   return { certPath, keyPath };
 }

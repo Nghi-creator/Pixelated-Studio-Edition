@@ -1,6 +1,7 @@
 import type { spawn } from "child_process";
 import type { RuntimeDefinition } from "../runtimeRegistry";
 import { validateGameArtifact } from "../../roms/artifactValidation";
+import { RETROARCH_CONFIG_PATH } from "../runtimePaths";
 
 type LaunchLibretroOptions = {
   absoluteRomPath: string;
@@ -41,7 +42,7 @@ export function launchLibretroGame(options: LaunchLibretroOptions) {
       "-L",
       runtime.corePath,
       "--appendconfig",
-      "/tmp/retroarch.cfg",
+      RETROARCH_CONFIG_PATH,
       absoluteRomPath,
     ],
     { env: { ...process.env, DISPLAY: ":99", PULSE_SERVER: "127.0.0.1" } },

@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { createProcessManager } from "../../src/runtime/processes/processManager";
+import { RETROARCH_CONFIG_PATH } from "../../src/runtime/runtimePaths";
 
 class FakeChildProcess extends EventEmitter {
   killed = false;
@@ -87,6 +88,8 @@ test("libretro boot uses the selected registry core", () => {
     "/cores/mesen_libretro.so",
     "--appendconfig",
   ]);
+  assert.equal(spawned[0]?.args[4], RETROARCH_CONFIG_PATH);
+  assert.equal(RETROARCH_CONFIG_PATH, "/home/pixelated/retroarch.cfg");
 
   manager.cleanupActiveSession("session-nes");
 });

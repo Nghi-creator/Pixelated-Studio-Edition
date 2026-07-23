@@ -21,6 +21,13 @@ test("companion certificate helper generates and reuses a valid certificate pair
   assert.equal(certificate.checkHost("pixelated.local"), "pixelated.local");
   assert.equal(certificate.checkIP("192.0.2.10"), "192.0.2.10");
   assert.equal(fs.statSync(keyPath).mode & 0o777, 0o600);
+  if (process.platform !== "win32") {
+    assert.equal(fs.statSync(certDir).mode & 0o777, 0o700);
+  }
+  assert.deepEqual(fs.readdirSync(certDir).sort(), [
+    "pixelated-companion.crt",
+    "pixelated-companion.key",
+  ]);
 
   assert.deepEqual(createCompanionCertificate(certDir, ["192.0.2.10"]), {
     certPath,
@@ -44,4 +51,33 @@ test("companion certificate helper renews stale or mismatched certificates", (t)
     new crypto.X509Certificate(renewedCertificate).checkIP("192.0.2.11"),
     "192.0.2.11",
   );
+});
+
+test("companion certificate renewal replaces symlinks without following them", (t) => {
+  if (process.platform === "win32") {
+    t.skip("Creating symlinks requires elevated privileges on some Windows hosts.");
+    return;
+  }
+
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pixelated-cert-race-"));
+  t.after(() => fs.rmSync(tempDir, { force: true, recursive: true }));
+  const certDir = path.join(tempDir, "certificates");
+  const outsideCertificate = path.join(tempDir, "outside.crt");
+  const outsideKey = path.join(tempDir, "outside.key");
+  fs.mkdirSync(certDir);
+  fs.writeFileSync(outsideCertificate, "do-not-overwrite-certificate");
+  fs.writeFileSync(outsideKey, "do-not-overwrite-key");
+  fs.symlinkSync(
+    outsideCertificate,
+    path.join(certDir, "pixelated-companion.crt"),
+  );
+  fs.symlinkSync(outsideKey, path.join(certDir, "pixelated-companion.key"));
+
+  const result = createCompanionCertificate(certDir, ["192.0.2.10"]);
+
+  assert.equal(fs.readFileSync(outsideCertificate, "utf8"), "do-not-overwrite-certificate");
+  assert.equal(fs.readFileSync(outsideKey, "utf8"), "do-not-overwrite-key");
+  assert.equal(fs.lstatSync(result.certPath).isSymbolicLink(), false);
+  assert.equal(fs.lstatSync(result.keyPath).isSymbolicLink(), false);
+  assert.equal(fs.statSync(result.keyPath).mode & 0o777, 0o600);
 });

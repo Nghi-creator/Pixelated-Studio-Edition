@@ -1,6 +1,7 @@
 import type { spawn } from "child_process";
 import fs from "fs";
 import { pulseAudioArgs } from "./processCommands";
+import { RETROARCH_CONFIG_PATH } from "../runtimePaths";
 
 export const RETROARCH_CONFIG =
   'audio_driver = "pulse"\n' +
@@ -57,7 +58,8 @@ export function startRuntimeHostProcesses(spawnProcess: typeof spawn) {
     console.error(`[Engine] PulseAudio failed to start: ${err.message}`);
   });
 
-  fs.writeFileSync("/tmp/retroarch.cfg", RETROARCH_CONFIG);
+  fs.writeFileSync(RETROARCH_CONFIG_PATH, RETROARCH_CONFIG, { mode: 0o600 });
+  fs.chmodSync(RETROARCH_CONFIG_PATH, 0o600);
 
   return {
     pulseAudioProcess,
