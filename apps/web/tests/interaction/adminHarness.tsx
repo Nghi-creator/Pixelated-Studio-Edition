@@ -294,18 +294,31 @@ export function AdminHarness() {
         <StreamStage
           controls={
             <PlayerControls
+              canPauseStream={false}
+              canResetSession
+              canStopSession={false}
               gameTitle="Harness Game"
+              isPlaybackPaused={false}
               isMuted={isMuted}
+              onFullscreen={() => record("stream-fullscreen")}
               onMuteToggle={() => setIsMuted((muted) => !muted)}
+              onPauseToggle={() => record("stream-pause")}
+              onPixelPerfectChange={() => record("stream-pixel")}
+              onReset={() => record("stream-reset")}
+              onStop={() => record("stream-stop")}
               onStreamProfileChange={setStreamProfileId}
               onToggleTelemetry={() => setShowTelemetry((visible) => !visible)}
+              onVolumeChange={() => record("stream-volume")}
+              pixelPerfect
               selectedStreamProfileId={streamProfileId}
               showStreamTelemetry={showTelemetry}
               streamProfiles={STREAM_PROFILES}
+              volume={1}
             />
           }
           isMuted={isMuted}
           onRetry={() => record("stream-retry")}
+          pixelPerfect
           showStreamTelemetry={showTelemetry}
           status="error"
           telemetry={streamTelemetry}

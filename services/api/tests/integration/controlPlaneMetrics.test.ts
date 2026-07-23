@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   FakeSupabase,
+  OTHER_USER_ID,
+  USER_ID,
   createTestApp,
 } from "./support/controlPlaneTestHarness.js";
 
@@ -11,6 +13,7 @@ test("stream metrics persist and rate-limit per user session", async () => {
     deleted_at: null,
     expires_at: new Date(Date.now() + 60_000).toISOString(),
     id: "session-1",
+    user_id: USER_ID,
   });
   const app = await createTestApp(db);
   const metric = {
@@ -80,6 +83,7 @@ test("stream metrics require live sessions and enforce a user-level backstop", a
       deleted_at: null,
       expires_at: new Date(Date.now() + 60_000).toISOString(),
       id: sessionId,
+      user_id: USER_ID,
     });
     const response = await app.inject({
       method: "POST",
@@ -93,6 +97,36 @@ test("stream metrics require live sessions and enforce a user-level backstop", a
     );
   }
   assert.equal(db.metrics.length, 30);
+  await app.close();
+});
+
+test("stream metrics reject live sessions owned by another user", async () => {
+  const db = new FakeSupabase();
+  db.sessions.set("other-user-session", {
+    deleted_at: null,
+    expires_at: new Date(Date.now() + 60_000).toISOString(),
+    id: "other-user-session",
+    user_id: OTHER_USER_ID,
+  });
+  const app = await createTestApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      bitrateKbps: 1200,
+      connectionState: "connected",
+      fps: 60,
+      iceConnectionState: "connected",
+      jitterMs: 3,
+      packetsLost: 0,
+      sessionId: "other-user-session",
+      timestamp: new Date().toISOString(),
+    },
+    url: "/metrics/stream",
+  });
+
+  assert.equal(response.statusCode, 404);
+  assert.equal(db.metrics.length, 0);
   await app.close();
 });
 

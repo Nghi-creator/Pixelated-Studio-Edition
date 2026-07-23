@@ -139,6 +139,8 @@ describe("desktop engine image recovery", () => {
           (reply.payload[0] as { exposureMode?: string }).exposureMode === "local",
       ),
     );
-    assert.equal(dockerCommands.length, 2);
+    assert.equal(dockerCommands.length, 3);
+    assert.ok(dockerCommands[1]?.includes("CHOWN"));
+    assert.ok(dockerCommands[2]?.includes("--read-only"));
   });
 });

@@ -135,3 +135,12 @@ export async function prepareEngineImage(
 }
 
 export const hasHostUinput = () => fs.existsSync("/dev/uinput");
+
+export function getHostUinputGroupId() {
+  try {
+    const groupId = fs.statSync("/dev/uinput").gid;
+    return Number.isSafeInteger(groupId) && groupId >= 0 ? groupId : undefined;
+  } catch {
+    return undefined;
+  }
+}

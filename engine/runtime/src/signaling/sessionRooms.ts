@@ -25,6 +25,17 @@ export function joinSession(
     return null;
   }
 
+  const previousSessionId = normalizeSessionId(socket.data.sessionId);
+  if (previousSessionId && previousSessionId !== safeSessionId) {
+    const previousRoom = getSessionRoom(previousSessionId);
+    for (const room of socket.rooms) {
+      if (room === previousRoom || room.startsWith(`${previousRoom}:`)) {
+        void socket.leave(room);
+      }
+    }
+    socket.data.webrtcPeerIds = [];
+  }
+
   socket.data.sessionId = safeSessionId;
   socket.join(getSessionRoom(safeSessionId));
   console.log(
@@ -43,13 +54,18 @@ export function relayToSession(
     payload && typeof payload === "object"
       ? (payload as { sessionId?: unknown })
       : {};
-  const sessionId =
-    normalizeSessionId(sessionPayload.sessionId) || socket.data.sessionId;
+  const activeSessionId = normalizeSessionId(socket.data.sessionId);
+  const requestedSessionId = normalizeSessionId(sessionPayload.sessionId);
 
-  if (!sessionId) {
+  if (!activeSessionId) {
     console.warn(`[Node.js] Dropping ${eventName}: missing session id`);
     return;
   }
 
-  socket.to(getSessionRoom(sessionId)).emit(eventName, payload);
+  if (requestedSessionId && requestedSessionId !== activeSessionId) {
+    console.warn(`[Node.js] Dropping ${eventName}: session does not match socket`);
+    return;
+  }
+
+  socket.to(getSessionRoom(activeSessionId)).emit(eventName, payload);
 }

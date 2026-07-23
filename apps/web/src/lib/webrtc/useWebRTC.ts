@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { StreamProfile } from "../engine/streamProfiles";
 import {
   CHECKING_INPUT_CAPABILITIES,
@@ -149,6 +149,17 @@ export function useWebRTC(
     socketRef,
   });
 
+  const stop = useCallback(() => {
+    const activeSessionId = sessionIdRef.current;
+    if (activeSessionId) {
+      socketRef.current?.emit("stop-session", { sessionId: activeSessionId });
+    }
+    pcRef.current?.close();
+    pcRef.current = null;
+    setStream(null);
+    setStatus("idle");
+  }, []);
+
   return {
     kickParticipant,
     inputCapabilities,
@@ -162,6 +173,7 @@ export function useWebRTC(
     shareContext,
     stream,
     status,
+    stop,
     telemetry,
   };
 }

@@ -57,7 +57,9 @@ export function GamesCatalogSkeleton() {
       <div className="mb-8 space-y-3">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <Skeleton className="h-8 w-36" />
-          <Skeleton className="h-10 w-full rounded-lg lg:max-w-3xl" />
+          <div className="grid w-full lg:max-w-3xl lg:grid-cols-3">
+            <Skeleton className="h-10 w-full rounded-lg lg:col-span-2 lg:col-start-2" />
+          </div>
         </div>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <Skeleton className="h-10 w-36 rounded-lg" />

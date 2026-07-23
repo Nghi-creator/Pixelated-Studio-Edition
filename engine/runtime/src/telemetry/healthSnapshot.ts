@@ -31,7 +31,7 @@ type HealthPaths = {
   xvfbSocket: string;
 };
 
-type HealthSnapshotOptions = {
+export type HealthSnapshotOptions = {
   advertisedUrls?: string[];
   companionUrls?: string[];
   engineToken?: string;
@@ -40,6 +40,19 @@ type HealthSnapshotOptions = {
   healthPaths: HealthPaths;
   runtimeKind?: "libretro" | "native_linux";
 };
+
+type ReadinessChecks = {
+  cameraBridgeReady: boolean;
+  retroarchReady: boolean;
+  storageReady: boolean;
+};
+
+type PublicHealthSnapshotOptions = {
+  now?: () => number;
+  readinessCacheTtlMs?: number;
+};
+
+const DEFAULT_READINESS_CACHE_TTL_MS = 5_000;
 
 function pathExists(filePath: string): boolean {
   return fs.existsSync(filePath);
@@ -59,6 +72,77 @@ function processStarted(processRef: ProcessRef): boolean {
     Boolean(processRef) &&
     (processRef?.exitCode === null || processRef?.exitCode === 0)
   );
+}
+
+function getReadinessChecks(
+  healthPaths: HealthPaths,
+  runtimeKind: "libretro" | "native_linux",
+): ReadinessChecks {
+  return {
+    cameraBridgeReady:
+      pathExists(healthPaths.cameraBridge) &&
+      pathExists(healthPaths.pythonBinary) &&
+      pathExists(healthPaths.gstreamerBinary),
+    retroarchReady:
+      runtimeKind === "native_linux" ||
+      (pathExists(healthPaths.retroarchBinary) &&
+        healthPaths.libretroCores.every(pathExists) &&
+        pathExists(healthPaths.retroarchConfig)),
+    storageReady:
+      pathExists(healthPaths.roms) && canWriteDirectory(healthPaths.roms),
+  };
+}
+
+function readinessChecksPass(checks: ReadinessChecks) {
+  return (
+    checks.cameraBridgeReady && checks.retroarchReady && checks.storageReady
+  );
+}
+
+export function createPublicHealthSnapshot(
+  options: HealthSnapshotOptions,
+  publicOptions: PublicHealthSnapshotOptions = {},
+) {
+  const {
+    engineToken,
+    exposureMode = "local",
+    getRuntimeState,
+    healthPaths,
+    runtimeKind = "libretro",
+  } = options;
+  const now = publicOptions.now || Date.now;
+  const readinessCacheTtlMs =
+    publicOptions.readinessCacheTtlMs || DEFAULT_READINESS_CACHE_TTL_MS;
+  let cachedReadiness: ReadinessChecks | null = null;
+  let readinessExpiresAt = 0;
+
+  return function getPublicHealthSnapshot() {
+    const currentTime = now();
+    const runtimeState = getRuntimeState();
+    const readiness =
+      cachedReadiness && currentTime < readinessExpiresAt
+        ? cachedReadiness
+        : getReadinessChecks(healthPaths, runtimeKind);
+    if (readinessChecksPass(readiness)) {
+      cachedReadiness = readiness;
+      readinessExpiresAt = currentTime + readinessCacheTtlMs;
+    } else {
+      cachedReadiness = null;
+    }
+
+    const ok =
+      readinessChecksPass(readiness) &&
+      processStarted(runtimeState.virtualDisplayProcess) &&
+      processStarted(runtimeState.pulseAudioProcess) &&
+      pathExists(healthPaths.xvfbSocket);
+
+    return {
+      engineTokenRequired: Boolean(engineToken),
+      exposureMode,
+      ok,
+      runtimeKind,
+    };
+  };
 }
 
 export function createHealthSnapshot(options: HealthSnapshotOptions) {

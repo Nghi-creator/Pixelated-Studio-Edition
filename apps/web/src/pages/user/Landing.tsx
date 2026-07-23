@@ -1,8 +1,6 @@
 import {
-  ArrowRight,
   Cloud,
   Download,
-  Gamepad2,
   MessageCircle,
   Network,
 } from "lucide-react";
@@ -147,10 +145,14 @@ export default function Landing() {
                 className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-primary px-5 font-extrabold text-white transition-colors hover:bg-synth-primary-hover"
                 to="/home"
               >
-                <Gamepad2 className="h-5 w-5" />
                 Go to Home Page
-                <ArrowRight className="h-5 w-5" />
               </Link>
+              <a
+                className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-surface px-5 font-extrabold text-white transition-colors hover:bg-synth-elevated"
+                href="https://pixelated-user-edition.vercel.app/"
+              >
+                Open User Edition
+              </a>
             </div>
           </div>
         </div>

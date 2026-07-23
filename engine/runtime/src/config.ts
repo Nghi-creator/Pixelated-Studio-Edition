@@ -1,4 +1,5 @@
 import path from "path";
+import { RETROARCH_CONFIG_PATH } from "./runtime/runtimePaths";
 
 const DEFAULT_ALLOWED_ORIGINS = [
   "http://localhost:5173",
@@ -98,7 +99,7 @@ export const HEALTH_PATHS = {
   ],
   pythonBinary: "/usr/bin/python3",
   retroarchBinary: "/usr/bin/retroarch",
-  retroarchConfig: "/app/retroarch.cfg",
+  retroarchConfig: RETROARCH_CONFIG_PATH,
   roms: "/roms",
   xvfbSocket: "/tmp/.X11-unix/X99",
 };

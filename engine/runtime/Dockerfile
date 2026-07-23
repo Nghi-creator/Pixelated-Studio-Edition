@@ -110,9 +110,11 @@ FROM ${UBUNTU_IMAGE} AS python-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+COPY python-requirements.lock /tmp/python-requirements.lock
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
-    && pip3 install --no-cache-dir --target /out "python-socketio[client]" \
+    && pip3 install --no-cache-dir --target /out -r /tmp/python-requirements.lock \
     && rm -rf /var/lib/apt/lists/*
 
 FROM ${NODE_IMAGE} AS app-builder
@@ -149,8 +151,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdotool \
     xvfb \
     && rm -rf /var/lib/apt/lists/* \
-    && usermod -aG pulse-access root \
-    && mkdir -p /app /cores /roms
+    && useradd --create-home --uid 10001 --user-group pixelated \
+    && usermod -aG pulse-access pixelated \
+    && mkdir -p /app /cores /roms \
+    && chown -R 10001:10001 /roms /home/pixelated
 
 COPY --from=app-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=app-builder /app/dist /app/dist
@@ -163,5 +167,7 @@ COPY --from=python-builder /out /usr/local/lib/python3.10/dist-packages
 COPY camera.py input_gamepad.py /app/
 
 WORKDIR /app
+ENV HOME=/home/pixelated
+USER 10001:10001
 
 CMD ["node", "dist/server.js"]

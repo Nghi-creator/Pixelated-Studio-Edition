@@ -85,11 +85,21 @@ def parse_stream_profile():
     fps = min(max(fps, 24), 60)
     bitrate_kbps = min(max(bitrate_kbps, 500), 2500)
 
+    profile_id = profile.get('id', 'balanced') if isinstance(profile.get('id', 'balanced'), str) else 'balanced'
+    encoder_profiles = {
+        'performance': {'cpu_used': 8, 'max_quantizer': 56},
+        'balanced': {'cpu_used': 6, 'max_quantizer': 48},
+        'quality': {'cpu_used': 4, 'max_quantizer': 42},
+    }
+    encoder_profile = encoder_profiles.get(profile_id, encoder_profiles['balanced'])
+
     return {
         'bitrate': bitrate_kbps * 1000,
         'bitrate_kbps': bitrate_kbps,
+        'cpu_used': encoder_profile['cpu_used'],
         'fps': fps,
-        'id': profile.get('id', 'balanced') if isinstance(profile.get('id', 'balanced'), str) else 'balanced'
+        'id': profile_id,
+        'max_quantizer': encoder_profile['max_quantizer'],
     }
 
 def emit_engine_error(message):
@@ -126,7 +136,11 @@ def handle_offer(offer):
         return
 
     stream_profile = parse_stream_profile()
-    print(f"[Python] Stream profile: {stream_profile['id']} ({stream_profile['fps']}fps, {stream_profile['bitrate_kbps']}kbps)")
+    print(
+        f"[Python] Stream profile: {stream_profile['id']} "
+        f"({stream_profile['fps']}fps, {stream_profile['bitrate_kbps']}kbps, "
+        f"cpu-used={stream_profile['cpu_used']}, max-quantizer={stream_profile['max_quantizer']})"
+    )
     
     pipeline_str = f"""
         webrtcbin name=sendrecv
@@ -135,7 +149,7 @@ def handle_offer(offer):
         video/x-raw,framerate={stream_profile['fps']}/1 ! 
         videoconvert ! video/x-raw,format=I420 ! 
         queue max-size-buffers=1 leaky=downstream ! 
-        vp8enc deadline=1 cpu-used=8 threads=4 end-usage=cbr target-bitrate={stream_profile['bitrate']} max-quantizer=56 min-quantizer=4 keyframe-max-dist=120 error-resilient=1 ! 
+        vp8enc deadline=1 cpu-used={stream_profile['cpu_used']} threads=4 end-usage=cbr target-bitrate={stream_profile['bitrate']} max-quantizer={stream_profile['max_quantizer']} min-quantizer=4 keyframe-max-dist=120 error-resilient=1 !
         rtpvp8pay pt=96 ! 
         queue max-size-buffers=1 leaky=downstream ! 
         application/x-rtp,media=video,encoding-name=VP8,payload=96 ! sendrecv.

@@ -27,7 +27,7 @@ async function createApp(limits: {
   health: number;
   publicRead: number;
 }) {
-  const app = Fastify({ trustProxy: true });
+  const app = Fastify({ trustProxy: 1 });
   await registerGlobalRateLimit(app, {
     globalLimiter: createTestLimiter(limits.global),
     healthLimiter: createTestLimiter(limits.health),
@@ -62,6 +62,25 @@ test("global rate limiting uses the trusted forwarded client IP", async () => {
   assert.equal(blocked.statusCode, 429);
   assert.equal(blocked.headers["retry-after"], "60");
   assert.equal(otherClient.statusCode, 200);
+  await app.close();
+});
+
+test("proxy trust ignores client-supplied addresses beyond the trusted hop", async () => {
+  const app = await createApp({ global: 1, health: 10, publicRead: 10 });
+
+  const first = await app.inject({
+    headers: { "x-forwarded-for": "198.51.100.1, 203.0.113.40" },
+    method: "GET",
+    url: "/other",
+  });
+  const spoofedPrefix = await app.inject({
+    headers: { "x-forwarded-for": "198.51.100.2, 203.0.113.40" },
+    method: "GET",
+    url: "/other",
+  });
+
+  assert.equal(first.statusCode, 200);
+  assert.equal(spoofedPrefix.statusCode, 429);
   await app.close();
 });
 
