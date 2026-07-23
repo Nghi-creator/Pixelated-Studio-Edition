@@ -1,4 +1,9 @@
 import type { Socket } from "socket.io-client";
+import {
+  DEFAULT_STREAM_KEYBOARD_MAPPING,
+  getStreamKeyboardMapping,
+  streamActionForCode,
+} from "./inputMappings.ts";
 
 type InputTargetLike = EventTarget & {
   closest?: (selector: string) => Element | null;
@@ -44,7 +49,12 @@ const codeToGameAction: Record<string, string> = {
 };
 
 export function getGameActionForKey(key: string, code = "") {
-  return keyToGameAction[key] || codeToGameAction[code] || "";
+  return (
+    streamActionForCode(DEFAULT_STREAM_KEYBOARD_MAPPING, code) ||
+    keyToGameAction[key] ||
+    codeToGameAction[code] ||
+    ""
+  );
 }
 
 export function shouldIgnoreGameInput(
@@ -74,19 +84,29 @@ export const attachEngineInput = (
   sessionId: string,
   playerIndex = 1,
 ) => {
+  const pressedActions = new Map<string, string>();
+
   const handleKeyDown = (event: KeyboardEvent) => {
     if (shouldIgnoreGameInput(event, { respectDefaultPrevented: false })) return;
     if (event.repeat) return;
-    const gameAction = getGameActionForKey(event.key, event.code);
+    const gameAction =
+      streamActionForCode(getStreamKeyboardMapping(), event.code) ||
+      (!event.code ? getGameActionForKey(event.key) : "");
     if (!gameAction) return;
+    pressedActions.set(event.code || event.key, gameAction);
     socket.emit("keydown", { sessionId, playerIndex, gameAction });
     event.preventDefault();
   };
 
   const handleKeyUp = (event: KeyboardEvent) => {
     if (shouldIgnoreGameInput(event, { respectDefaultPrevented: false })) return;
-    const gameAction = getGameActionForKey(event.key, event.code);
+    const pressedKey = event.code || event.key;
+    const gameAction =
+      pressedActions.get(pressedKey) ||
+      streamActionForCode(getStreamKeyboardMapping(), event.code) ||
+      (!event.code ? getGameActionForKey(event.key) : "");
     if (!gameAction) return;
+    pressedActions.delete(pressedKey);
     socket.emit("keyup", { sessionId, playerIndex, gameAction });
     event.preventDefault();
   };
@@ -95,6 +115,10 @@ export const attachEngineInput = (
   window.addEventListener("keyup", handleKeyUp);
 
   return () => {
+    pressedActions.forEach((gameAction) => {
+      socket.emit("keyup", { sessionId, playerIndex, gameAction });
+    });
+    pressedActions.clear();
     window.removeEventListener("keydown", handleKeyDown);
     window.removeEventListener("keyup", handleKeyUp);
   };

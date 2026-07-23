@@ -10,7 +10,7 @@ import {
   Volume2,
   VolumeX,
 } from "lucide-react";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
 import { PixelIcon } from "../../../components/ui/PixelIcon";
 import type {
   StreamProfile,
@@ -24,7 +24,10 @@ type PlayerControlsProps = {
   gameTitle: string;
   isPlaybackPaused: boolean;
   isMuted: boolean;
+  lobbyParticipantCount: number;
   onFullscreen: () => void;
+  onOpenKeyboard: () => void;
+  onOpenLobby: () => void;
   onMuteToggle: () => void;
   onPauseToggle: () => void;
   onPixelPerfectChange: (enabled: boolean) => void;
@@ -47,7 +50,10 @@ export function PlayerControls({
   gameTitle,
   isPlaybackPaused,
   isMuted,
+  lobbyParticipantCount,
   onFullscreen,
+  onOpenKeyboard,
+  onOpenLobby,
   onMuteToggle,
   onPauseToggle,
   onPixelPerfectChange,
@@ -97,6 +103,10 @@ export function PlayerControls({
   }`;
   const menuButtonClass =
     "inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-bg px-3 text-sm font-semibold text-white transition-colors hover:bg-synth-elevated disabled:cursor-not-allowed disabled:opacity-45";
+  const openPlayerTool = (openTool: () => void) => {
+    setIsSettingsOpen(false);
+    openTool();
+  };
 
   return (
     <div
@@ -230,7 +240,26 @@ export function PlayerControls({
                 Stop
               </button>
             </div>
-            <p className="relative mt-4 border-t border-synth-border pt-4 text-xs font-bold uppercase tracking-[0.16em] text-synth-secondary">
+            <div className="relative mx-auto mt-4 grid w-full grid-cols-2 gap-2 border-t border-synth-border pt-4">
+              <button
+                className={menuButtonClass}
+                onClick={() => openPlayerTool(onOpenLobby)}
+                type="button"
+              >
+                Lobby
+                <span className="rounded-full border border-synth-border bg-synth-surface px-2 py-0.5 text-[10px] font-semibold text-gray-300">
+                  {lobbyParticipantCount}
+                </span>
+              </button>
+              <button
+                className={menuButtonClass}
+                onClick={() => openPlayerTool(onOpenKeyboard)}
+                type="button"
+              >
+                Keyboard
+              </button>
+            </div>
+            <p className="relative mt-4 text-xs font-bold uppercase tracking-[0.16em] text-synth-secondary">
               Stream quality
             </p>
             <div className="relative mt-2 grid grid-cols-3 gap-2">
@@ -264,41 +293,6 @@ export function PlayerControls({
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-export function PlayerInstructions({
-  layoutClassName = "max-w-5xl",
-  lobby,
-}: {
-  layoutClassName?: string;
-  lobby?: ReactNode;
-}) {
-  return (
-    <div
-      className={`mt-6 w-full rounded-lg border border-synth-border bg-synth-surface p-4 ${layoutClassName}`}
-    >
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-synth-secondary">
-          <span className="inline-flex items-center gap-2">
-            <span className="text-white">Move</span>
-            <kbd className="rounded border border-synth-border bg-synth-bg px-2 py-1 font-mono text-gray-200">
-              ARROWS
-            </kbd>
-          </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="text-white">Action</span>
-            <kbd className="rounded border border-synth-border bg-synth-bg px-2 py-1 font-mono text-gray-200">
-              Z
-            </kbd>
-            <kbd className="rounded border border-synth-border bg-synth-bg px-2 py-1 font-mono text-gray-200">
-              X
-            </kbd>
-          </span>
-        </div>
-        {lobby}
       </div>
     </div>
   );

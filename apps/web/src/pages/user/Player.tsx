@@ -1,10 +1,8 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LobbyPanel } from "../../features/player/components/LobbyPanel";
-import {
-  PlayerControls,
-  PlayerInstructions,
-} from "../../features/player/components/PlayerControls";
+import { KeyboardMappingDrawer } from "../../features/player/components/KeyboardMappingDrawer";
+import { PlayerControls } from "../../features/player/components/PlayerControls";
 import { PlayerHeader } from "../../features/player/components/PlayerHeader";
 import { StreamStage } from "../../features/player/components/StreamStage";
 import {
@@ -56,6 +54,9 @@ export default function Player() {
   const streamStageRef = useRef<HTMLDivElement>(null);
   const [isPlaybackPaused, setIsPlaybackPaused] = useState(false);
   const [pixelPerfect, setPixelPerfect] = useState(true);
+  const [activePlayerTool, setActivePlayerTool] = useState<
+    "keyboard" | "lobby" | null
+  >(null);
   const currentUser = useAuthUser();
   const { backRoute, backText, lobbySearch } = usePlayerNavigation(
     location,
@@ -248,8 +249,11 @@ export default function Player() {
               gameTitle={gameTitle}
               isPlaybackPaused={status === "playing" && isPlaybackPaused}
               isMuted={isMuted}
+              lobbyParticipantCount={lobbyState?.participants.length || 0}
               onFullscreen={() => void streamStageRef.current?.requestFullscreen()}
               onMuteToggle={() => setIsMuted((muted) => !muted)}
+              onOpenKeyboard={() => setActivePlayerTool("keyboard")}
+              onOpenLobby={() => setActivePlayerTool("lobby")}
               onPauseToggle={togglePlaybackPause}
               onPixelPerfectChange={setPixelPerfect}
               onReset={resetSession}
@@ -296,22 +300,22 @@ export default function Player() {
         />
       </div>
 
-      <PlayerInstructions
-        layoutClassName={playerLayoutClassName}
-        lobby={
-          <LobbyPanel
-            currentParticipant={localParticipant}
-            inputCapabilities={inputCapabilities}
-            lobbyState={lobbyState}
-            onKickParticipant={kickParticipant}
-            onReleaseSlot={releasePlayerSlot}
-            onRequestSlot={requestPlayerSlot}
-            shareGuidance={shareInvite.guidance}
-            shareText={shareInvite.text}
-            shareUrl={shareInvite.url}
-          />
-        }
+      <LobbyPanel
+        currentParticipant={localParticipant}
+        inputCapabilities={inputCapabilities}
+        isOpen={activePlayerTool === "lobby"}
+        lobbyState={lobbyState}
+        onClose={() => setActivePlayerTool(null)}
+        onKickParticipant={kickParticipant}
+        onReleaseSlot={releasePlayerSlot}
+        onRequestSlot={requestPlayerSlot}
+        shareGuidance={shareInvite.guidance}
+        shareText={shareInvite.text}
+        shareUrl={shareInvite.url}
       />
+      {activePlayerTool === "keyboard" && (
+        <KeyboardMappingDrawer onClose={() => setActivePlayerTool(null)} />
+      )}
 
       <Suspense fallback={<PlayerSectionLoading label="Loading community…" />}>
         <PlayerCommunitySection
