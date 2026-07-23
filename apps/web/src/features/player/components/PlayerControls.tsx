@@ -1,9 +1,10 @@
 import {
-  Grid2X2,
+  Blend,
   Maximize2,
   Pause,
   Play,
   RotateCcw,
+  ScanLine,
   Settings,
   Square,
   Volume2,
@@ -89,6 +90,11 @@ export function PlayerControls({
 
   const controlButtonClass =
     "inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#5D263A] bg-[#351B27] text-white transition-colors hover:bg-[#2B1720] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary";
+  const pixelButtonClass = `inline-flex h-10 w-10 items-center justify-center rounded-lg border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary ${
+    pixelPerfect
+      ? "border-synth-action-hover bg-synth-action text-white shadow-[0_0_0_2px_rgba(255,153,193,0.35)] hover:brightness-110"
+      : "border-[#5D263A] bg-[#351B27] text-gray-400 hover:bg-[#2B1720] hover:text-white"
+  }`;
   const menuButtonClass =
     "inline-flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg border border-synth-border bg-synth-bg px-3 text-sm font-semibold text-white transition-colors hover:bg-synth-elevated disabled:cursor-not-allowed disabled:opacity-45";
 
@@ -100,38 +106,6 @@ export function PlayerControls({
       <h1 className="min-w-0 flex-1 truncate text-lg font-extrabold text-white sm:text-xl">
         {gameTitle || "Loading Game..."}
       </h1>
-
-      <button
-        type="button"
-        onClick={onToggleTelemetry}
-        className={controlButtonClass}
-        aria-label="Toggle stream telemetry"
-        aria-pressed={showStreamTelemetry}
-        title="Toggle stream telemetry"
-      >
-        <PixelIcon aria-hidden="true" className="h-5 w-5" name="logs" />
-      </button>
-
-      <button
-        type="button"
-        onClick={onFullscreen}
-        className={controlButtonClass}
-        aria-label="Enter fullscreen"
-        title="Enter fullscreen"
-      >
-        <Maximize2 aria-hidden="true" className="h-5 w-5" />
-      </button>
-
-      <button
-        type="button"
-        onClick={() => onPixelPerfectChange(!pixelPerfect)}
-        className={controlButtonClass}
-        aria-label={pixelPerfect ? "Disable pixel rendering" : "Enable pixel rendering"}
-        aria-pressed={pixelPerfect}
-        title={pixelPerfect ? "Disable pixel rendering" : "Enable pixel rendering"}
-      >
-        <Grid2X2 aria-hidden="true" className="h-5 w-5" />
-      </button>
 
       <div className="hidden h-10 items-center rounded-lg border border-[#5D263A] bg-[#351B27] sm:flex">
         <button
@@ -158,6 +132,42 @@ export function PlayerControls({
           value={volume}
         />
       </div>
+
+      <button
+        type="button"
+        onClick={onToggleTelemetry}
+        className={controlButtonClass}
+        aria-label="Toggle stream telemetry"
+        aria-pressed={showStreamTelemetry}
+        title="Toggle stream telemetry"
+      >
+        <PixelIcon aria-hidden="true" className="h-5 w-5" name="logs" />
+      </button>
+
+      <button
+        type="button"
+        onClick={onFullscreen}
+        className={controlButtonClass}
+        aria-label="Enter fullscreen"
+        title="Enter fullscreen"
+      >
+        <Maximize2 aria-hidden="true" className="h-5 w-5" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => onPixelPerfectChange(!pixelPerfect)}
+        className={pixelButtonClass}
+        aria-label={pixelPerfect ? "Disable pixel rendering" : "Enable pixel rendering"}
+        aria-pressed={pixelPerfect}
+        title={pixelPerfect ? "Pixel rendering on" : "Pixel rendering off"}
+      >
+        {pixelPerfect ? (
+          <ScanLine aria-hidden="true" className="h-5 w-5" />
+        ) : (
+          <Blend aria-hidden="true" className="h-5 w-5" />
+        )}
+      </button>
 
       <div className="relative">
         <button
