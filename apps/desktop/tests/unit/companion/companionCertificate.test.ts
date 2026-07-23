@@ -20,8 +20,8 @@ test("companion certificate helper generates and reuses a valid certificate pair
   const certificate = new crypto.X509Certificate(originalCertificate);
   assert.equal(certificate.checkHost("pixelated.local"), "pixelated.local");
   assert.equal(certificate.checkIP("192.0.2.10"), "192.0.2.10");
-  assert.equal(fs.statSync(keyPath).mode & 0o777, 0o600);
   if (process.platform !== "win32") {
+    assert.equal(fs.statSync(keyPath).mode & 0o777, 0o600);
     assert.equal(fs.statSync(certDir).mode & 0o777, 0o700);
   }
   assert.deepEqual(fs.readdirSync(certDir).sort(), [
