@@ -17,13 +17,13 @@ export const STREAM_PROFILES: StreamProfile[] = [
     label: "Performance",
   },
   {
-    bitrateKbps: 1000,
+    bitrateKbps: 1400,
     fps: 60,
     id: "balanced",
     label: "Balanced",
   },
   {
-    bitrateKbps: 1600,
+    bitrateKbps: 2500,
     fps: 60,
     id: "quality",
     label: "Quality",
