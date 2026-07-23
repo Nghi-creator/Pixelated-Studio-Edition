@@ -173,7 +173,7 @@ export function registerGamesCatalogRoutes(
       ...cachedPage,
     };
 
-    gamesCatalogCache.set(cacheKey, cachedPage);
+    gamesCatalogCache.set(cacheKey, response);
     reply.header("Cache-Control", "public, max-age=30, s-maxage=60");
     reply.header("X-Pixelated-Cache", "MISS");
     logTiming(request.log, "Games catalog timing", timings, {

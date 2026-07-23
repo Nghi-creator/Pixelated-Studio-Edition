@@ -54,7 +54,10 @@ type StreamMetricRow = {
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
 type MetricRouteOptions = {
-  hasLiveMetricSession?: (sessionId: string) => Promise<boolean>;
+  hasLiveMetricSession?: (
+    sessionId: string,
+    userId: string,
+  ) => Promise<boolean>;
   metricUserWriteLimiter?: RateLimiter;
   metricWriteLimiter?: RateLimiter;
   requireUser?: typeof requireSupabaseUser;
@@ -81,8 +84,12 @@ export async function registerMetricRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
-  const hasLiveMetricSession = options.hasLiveMetricSession || (async (sessionId) =>
-    Boolean(service && (await getLiveSession(service, sessionId))));
+  const hasLiveMetricSession =
+    options.hasLiveMetricSession ||
+    (async (sessionId, userId) => {
+      const session = service && (await getLiveSession(service, sessionId));
+      return session?.user_id === userId;
+    });
   const metricWriteLimiter =
     options.metricWriteLimiter ||
     createRateLimiter({
@@ -135,7 +142,9 @@ export async function registerMetricRoutes(
       }
 
       try {
-        if (!(await hasLiveMetricSession(parsedMetric.data.sessionId))) {
+        if (
+          !(await hasLiveMetricSession(parsedMetric.data.sessionId, user.id))
+        ) {
           return reply.status(404).send({ error: "Stream session is not active" });
         }
       } catch (error) {

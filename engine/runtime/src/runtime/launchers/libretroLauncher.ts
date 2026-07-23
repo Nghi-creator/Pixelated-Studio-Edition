@@ -41,7 +41,7 @@ export function launchLibretroGame(options: LaunchLibretroOptions) {
       "-L",
       runtime.corePath,
       "--appendconfig",
-      "/app/retroarch.cfg",
+      "/tmp/retroarch.cfg",
       absoluteRomPath,
     ],
     { env: { ...process.env, DISPLAY: ":99", PULSE_SERVER: "127.0.0.1" } },

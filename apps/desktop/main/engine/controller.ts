@@ -321,8 +321,8 @@ export function rotateEngineToken(
     });
 }
 
-export function cleanupEngine() {
+export async function cleanupEngine() {
   resetEngineForShutdown();
   const safeEnv = stopCompanionForShutdown();
-  void removeEngineContainer(safeEnv).catch(() => undefined);
+  await removeEngineContainer(safeEnv).catch(() => undefined);
 }

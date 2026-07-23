@@ -320,7 +320,7 @@ test("catalog startup warmup covers the default home request and featured games"
   await app.close();
 });
 
-test("catalog cache keeps featured games fresh", async () => {
+test("catalog cache reuses featured games without another database query", async () => {
   const db = new FakeSupabase();
   seedPublishedGames(db, {
     cover_url: "/a.png",
@@ -334,6 +334,7 @@ test("catalog cache keeps featured games fresh", async () => {
     method: "GET",
     url: "/games?page=1&pageSize=15&search=cache-featured-alpha",
   });
+  const cachedRpcCallCount = db.rpcCalls.length;
   seedPublishedGames(db, {
     cover_url: "/b.png",
     id: "cache-featured-b",
@@ -348,11 +349,12 @@ test("catalog cache keeps featured games fresh", async () => {
   assert.equal(firstResponse.statusCode, 200);
   assert.equal(secondResponse.statusCode, 200);
   assert.equal(secondResponse.headers["x-pixelated-cache"], "HIT");
+  assert.equal(db.rpcCalls.length, cachedRpcCallCount);
   assert.deepEqual(
     secondResponse
       .json<{ featuredGames: { id: string }[] }>()
       .featuredGames.map((game) => game.id),
-    ["cache-featured-b", "cache-featured-a"],
+    ["cache-featured-a"],
   );
   await app.close();
 });

@@ -55,7 +55,7 @@ export function startRuntimeHostProcesses(spawnProcess: typeof spawn) {
     console.error(`[Engine] PulseAudio failed to start: ${err.message}`);
   });
 
-  fs.writeFileSync("/app/retroarch.cfg", RETROARCH_CONFIG);
+  fs.writeFileSync("/tmp/retroarch.cfg", RETROARCH_CONFIG);
 
   return {
     pulseAudioProcess,

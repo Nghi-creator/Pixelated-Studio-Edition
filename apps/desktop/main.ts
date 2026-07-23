@@ -2,6 +2,7 @@ import { app, BrowserWindow } from "electron";
 import path from "path";
 import { cleanupEngine } from "./main/engine/controller";
 import { registerIpcHandlers } from "./main/ipc";
+import { createShutdownCoordinator } from "./main/shutdown";
 
 let mainWindow: BrowserWindow | null = null;
 
@@ -28,9 +29,14 @@ function createWindow() {
 
 registerIpcHandlers();
 
+const shutdownCoordinator = createShutdownCoordinator(cleanupEngine, () =>
+  app.quit(),
+);
+
 app.whenReady().then(createWindow);
 
-app.on("window-all-closed", () => {
-  cleanupEngine();
-  app.quit();
+app.on("before-quit", (event) => {
+  shutdownCoordinator.handleBeforeQuit(event);
 });
+
+app.on("window-all-closed", () => app.quit());

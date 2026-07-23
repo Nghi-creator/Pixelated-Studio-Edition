@@ -98,7 +98,7 @@ export const HEALTH_PATHS = {
   ],
   pythonBinary: "/usr/bin/python3",
   retroarchBinary: "/usr/bin/retroarch",
-  retroarchConfig: "/app/retroarch.cfg",
+  retroarchConfig: "/tmp/retroarch.cfg",
   roms: "/roms",
   xvfbSocket: "/tmp/.X11-unix/X99",
 };

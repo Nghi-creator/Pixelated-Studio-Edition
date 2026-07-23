@@ -1,7 +1,7 @@
-ARG DEBIAN_IMAGE=debian:trixie-slim
+ARG DEBIAN_IMAGE=debian:trixie-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd
 ARG NATIVE_RUNTIME_ID=debian-native-v1
 ARG NATIVE_RUNTIME_LOCK_SHA256=unknown
-ARG NODE_IMAGE=node:20.20.2-bookworm-slim
+ARG NODE_IMAGE=node:20.20.2-bookworm-slim@sha256:2cf067cfed83d5ea958367df9f966191a942351a2df77d6f0193e162b5febfc0
 
 FROM ${NODE_IMAGE} AS app-builder
 
@@ -18,9 +18,11 @@ FROM ${DEBIAN_IMAGE} AS python-builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+COPY python-requirements.lock /tmp/python-requirements.lock
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-pip \
-    && pip3 install --break-system-packages --no-cache-dir --target /out "python-socketio[client]" \
+    && pip3 install --break-system-packages --no-cache-dir --target /out -r /tmp/python-requirements.lock \
     && rm -rf /var/lib/apt/lists/*
 
 FROM ${DEBIAN_IMAGE} AS runtime
@@ -53,8 +55,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xdotool \
     xvfb \
     && rm -rf /var/lib/apt/lists/* \
-    && usermod -aG pulse-access root \
-    && mkdir -p /app /roms
+    && useradd --create-home --uid 10001 --user-group pixelated \
+    && usermod -aG pulse-access pixelated \
+    && mkdir -p /app /roms \
+    && chown -R 10001:10001 /roms /home/pixelated
 
 COPY --from=app-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=app-builder /app/dist /app/dist
@@ -64,5 +68,7 @@ COPY camera.py input_gamepad.py /app/
 COPY native-runtime.lock.json /app/native-runtime.lock.json
 
 WORKDIR /app
+ENV HOME=/home/pixelated
+USER 10001:10001
 
 CMD ["node", "dist/server.js"]

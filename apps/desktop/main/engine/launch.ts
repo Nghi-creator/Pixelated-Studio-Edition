@@ -8,7 +8,7 @@ import {
   type EngineRuntimeKind,
   type EngineRuntimeConfig,
 } from "../runtime/config";
-import { hasHostUinput } from "../docker/client";
+import { getHostUinputGroupId, hasHostUinput } from "../docker/client";
 import { buildDockerRunArgs } from "../docker/commands";
 import {
   getAdvertisedCompanionUrls,
@@ -39,6 +39,7 @@ export type EngineLaunchContext = {
   inviteCode?: string;
   inviteExpiresAt?: number;
   publishHost: string;
+  uinputGroupId?: number;
 };
 
 type DockerRunOptions = Omit<
@@ -79,6 +80,7 @@ export function getDockerRunArgs({
   engineToken,
   exposureMode,
   publishHost,
+  uinputGroupId,
   runtimeConfig,
   runtimeKind,
 }: DockerRunOptions) {
@@ -103,6 +105,7 @@ export function getDockerRunArgs({
     exposureMode,
     includeUinputDevice,
     publishHost,
+    uinputGroupId,
   });
 }
 
@@ -117,6 +120,9 @@ export function createEngineLaunchContext(
   const advertisedUrls = getAdvertisedEngineUrls(exposureMode);
   const companionUrls = getAdvertisedCompanionUrls(exposureMode, companionPort);
   const includeUinputDevice = hasHostUinput();
+  const uinputGroupId = includeUinputDevice
+    ? getHostUinputGroupId()
+    : undefined;
   const inviteCode =
     exposureMode === "lan"
       ? crypto.randomBytes(4).toString("hex").toUpperCase()
@@ -135,6 +141,7 @@ export function createEngineLaunchContext(
     inviteCode,
     inviteExpiresAt,
     publishHost,
+    uinputGroupId,
   };
 }
 

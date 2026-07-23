@@ -48,7 +48,11 @@ import { registerSignalingRelayHandlers } from "./src/signaling/signalingRelay";
 import { createEngineTokenAuth } from "./src/signaling/socketAuth";
 import { registerStartGameHandler } from "./src/signaling/start-game/startGameHandlers";
 import { verifyBackendSession } from "./src/sessions/verifyBackendSession";
-import { createHealthSnapshot } from "./src/telemetry/healthSnapshot";
+import {
+  createHealthSnapshot,
+  createPublicHealthSnapshot,
+  type HealthSnapshotOptions,
+} from "./src/telemetry/healthSnapshot";
 
 const cors = require("cors");
 
@@ -87,7 +91,7 @@ const cloudRoms = createCloudRomDownloader({
   maxCloudRomSizeBytes: MAX_CLOUD_ROM_SIZE_BYTES,
   timeoutMs: CLOUD_ROM_DOWNLOAD_TIMEOUT_MS,
 });
-const getHealthSnapshot = createHealthSnapshot({
+const healthSnapshotOptions: HealthSnapshotOptions = {
   advertisedUrls: ADVERTISED_URLS,
   companionUrls: COMPANION_URLS,
   exposureMode: ENGINE_EXPOSURE_MODE,
@@ -95,13 +99,18 @@ const getHealthSnapshot = createHealthSnapshot({
   getRuntimeState: runtime.getRuntimeState,
   healthPaths: HEALTH_PATHS,
   runtimeKind: ENGINE_RUNTIME_KIND,
-});
+};
+const getHealthSnapshot = createHealthSnapshot(healthSnapshotOptions);
+const getPublicHealthSnapshot = createPublicHealthSnapshot(
+  healthSnapshotOptions,
+);
 const lobby = createLobbyManager();
 
 registerHealthRoutes(app, getHealthSnapshot, {
   canReadDetails: (request) =>
     request.get("x-pixelated-access-scope") !== "companion-guest" &&
     auth.isValidEngineToken(request.get("x-engine-token")),
+  getPublicHealthSnapshot,
 });
 registerLocalVaultRoutes(app, {
   maxRomSizeBytes: MAX_ROM_SIZE_BYTES,

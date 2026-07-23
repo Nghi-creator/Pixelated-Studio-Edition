@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { getHealthResponse } from "../../src/http/healthRoutes";
+import {
+  createHealthRateLimiter,
+  getHealthResponse,
+} from "../../src/http/healthRoutes";
 
 test("public health is minimal while authenticated health keeps diagnostics", () => {
   const snapshot = {
@@ -19,4 +22,16 @@ test("public health is minimal while authenticated health keeps diagnostics", ()
   assert.deepEqual(privateHealth.checks, {
     runtime: { activeSessionId: "private-session" },
   });
+});
+
+test("public health rate limiting is bounded by client and time window", () => {
+  const consume = createHealthRateLimiter(2, 1_000);
+
+  assert.equal(consume("client-a", 1_000).allowed, true);
+  assert.equal(consume("client-a", 1_100).allowed, true);
+  const limited = consume("client-a", 1_200);
+  assert.equal(limited.allowed, false);
+  assert.equal(limited.retryAfterSeconds, 1);
+  assert.equal(consume("client-b", 1_200).allowed, true);
+  assert.equal(consume("client-a", 2_000).allowed, true);
 });

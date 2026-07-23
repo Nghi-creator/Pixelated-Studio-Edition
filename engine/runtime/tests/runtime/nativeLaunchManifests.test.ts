@@ -43,18 +43,39 @@ test("native lock manifest matches allowlisted launch manifests and Docker pins"
   }
 });
 
-test("native runtime image ships the Python camera WebRTC dependencies", () => {
+test("runtime images pin the Python camera WebRTC dependencies", () => {
   const dockerfilePath = path.resolve(__dirname, "../../../Dockerfile.native");
+  const libretroDockerfilePath = path.resolve(__dirname, "../../../Dockerfile");
+  const requirementsPath = path.resolve(
+    __dirname,
+    "../../../python-requirements.lock",
+  );
   const smokePath = path.resolve(
     __dirname,
     "../../../scripts/smokeNativeRuntime.mjs",
   );
   const dockerfile = fs.readFileSync(dockerfilePath, "utf8");
+  const libretroDockerfile = fs.readFileSync(libretroDockerfilePath, "utf8");
+  const requirements = fs.readFileSync(requirementsPath, "utf8");
   const smoke = fs.readFileSync(smokePath, "utf8");
 
   assert.match(dockerfile, /gir1\.2-gst-plugins-bad-1\.0/);
   assert.match(dockerfile, /gir1\.2-gst-plugins-base-1\.0/);
-  assert.match(dockerfile, /python-socketio\[client\]/);
+  assert.match(dockerfile, /debian:trixie-slim@sha256:[a-f0-9]{64}/);
+  assert.match(dockerfile, /node:20\.20\.2-bookworm-slim@sha256:[a-f0-9]{64}/);
+  assert.match(dockerfile, /-r \/tmp\/python-requirements\.lock/);
+  assert.match(libretroDockerfile, /ubuntu:22\.04@sha256:[a-f0-9]{64}/);
+  assert.match(
+    libretroDockerfile,
+    /node:20\.20\.2-bullseye-slim@sha256:[a-f0-9]{64}/,
+  );
+  assert.match(libretroDockerfile, /-r \/tmp\/python-requirements\.lock/);
+  assert.match(requirements, /^python-socketio==\d+\.\d+\.\d+$/m);
+  for (const requirement of requirements
+    .split("\n")
+    .filter((line) => line && !line.startsWith("#"))) {
+    assert.match(requirement, /^[a-z0-9-]+==[a-zA-Z0-9.]+$/);
+  }
   assert.match(dockerfile, /PYTHONPATH=\/usr\/local\/lib\/pixelated-python/);
   assert.match(smoke, /GstWebRTC/);
   assert.match(smoke, /GstSdp/);

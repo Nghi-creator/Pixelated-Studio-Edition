@@ -1,6 +1,9 @@
 import crypto from "crypto";
 import type { IpcMainEvent } from "electron";
-import { removeEngineContainerArgs } from "../../docker/commands";
+import {
+  buildPrepareEngineVolumeArgs,
+  removeEngineContainerArgs,
+} from "../../docker/commands";
 import { withDockerStartCapability } from "../../docker/recovery";
 import { emitEngineState, setCurrentEnginePhase } from "../../runtime/state";
 import { startCompanionForEngine } from "../companionLifecycle";
@@ -140,6 +143,11 @@ export async function continueEngineStartup({
     await state.dependencies
       .execFileCommand("docker", removeEngineContainerArgs, { env: safeEnv })
       .catch(() => undefined);
+    await state.dependencies.execFileCommand(
+      "docker",
+      buildPrepareEngineVolumeArgs(launchContext.runtimeConfig.engineImage),
+      { env: safeEnv },
+    );
     await startContainer(state, event, safeEnv, launchContext);
 
     emitEngineState(event, "WAITING_HEALTH", "30 attempts / 1s interval");
