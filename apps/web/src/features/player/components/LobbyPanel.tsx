@@ -11,7 +11,9 @@ import type {
 type LobbyPanelProps = {
   currentParticipant: LobbyParticipant | null;
   inputCapabilities: EngineInputCapabilities;
+  isOpen: boolean;
   lobbyState: LobbyState | null;
+  onClose: () => void;
   onKickParticipant: (socketId: string) => void;
   onReleaseSlot: () => void;
   onRequestSlot: (playerIndex: number) => void;
@@ -29,7 +31,9 @@ function getRoleIconName(participant: LobbyParticipant) {
 export function LobbyPanel({
   currentParticipant,
   inputCapabilities,
+  isOpen,
   lobbyState,
+  onClose,
   onKickParticipant,
   onReleaseSlot,
   onRequestSlot,
@@ -37,7 +41,6 @@ export function LobbyPanel({
   shareText,
   shareUrl,
 }: LobbyPanelProps) {
-  const [isOpen, setIsOpen] = useState(false);
   const [copyState, setCopyState] = useState<"copied" | "failed" | "idle">(
     "idle",
   );
@@ -77,31 +80,14 @@ export function LobbyPanel({
     }, 1_600);
   };
 
-  return (
-    <>
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#5D263A] bg-[#351B27] px-4 text-sm font-bold text-white transition-colors hover:bg-[#2B1720]"
-      >
-        Lobby
-        <span className="rounded-full border border-synth-border bg-synth-bg px-2 py-0.5 text-[10px] font-semibold text-gray-300">
-          {participants.length}
-        </span>
-        {currentParticipant && (
-          <span className="rounded-full border border-synth-border bg-synth-bg/70 px-2 py-0.5 text-[10px] font-medium capitalize text-gray-400">
-            {currentParticipant.role}
-            {currentSlot ? ` · P${currentSlot}` : ""}
-          </span>
-        )}
-      </button>
+  if (!isOpen) return null;
 
-      {isOpen && (
+  return (
         <div className="fixed inset-0 z-[70]">
           <button
             aria-label="Close lobby"
             className="absolute inset-0 bg-black/55 backdrop-blur-sm"
-            onClick={() => setIsOpen(false)}
+            onClick={onClose}
             type="button"
           />
 
@@ -118,7 +104,7 @@ export function LobbyPanel({
               </div>
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
+                onClick={onClose}
                 className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-synth-border text-gray-400 transition-colors hover:bg-synth-elevated hover:text-white"
                 title="Close lobby"
               >
@@ -300,7 +286,5 @@ export function LobbyPanel({
             </div>
           </aside>
         </div>
-      )}
-    </>
   );
 }

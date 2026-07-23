@@ -12,10 +12,8 @@ import {
   validateLocalRomFile,
 } from "../../src/features/local-vault/localVaultClient";
 import { LobbyPanel } from "../../src/features/player/components/LobbyPanel";
-import {
-  PlayerControls,
-  PlayerInstructions,
-} from "../../src/features/player/components/PlayerControls";
+import { KeyboardMappingDrawer } from "../../src/features/player/components/KeyboardMappingDrawer";
+import { PlayerControls } from "../../src/features/player/components/PlayerControls";
 import { PlayerHeader } from "../../src/features/player/components/PlayerHeader";
 import { StreamStage } from "../../src/features/player/components/StreamStage";
 import { StreamTelemetryPanel } from "../../src/features/player/components/StreamTelemetryPanel";
@@ -189,6 +187,8 @@ export function AdminHarness() {
   const [publishError, setPublishError] = useState<string | null>(null);
   const [publishRom, setPublishRom] = useState<File | null>(null);
   const [showTelemetry, setShowTelemetry] = useState(true);
+  const [showLobby, setShowLobby] = useState(false);
+  const [showKeyboard, setShowKeyboard] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [streamProfileId, setStreamProfileId] =
     useState<StreamProfileId>("balanced");
@@ -300,8 +300,11 @@ export function AdminHarness() {
               gameTitle="Harness Game"
               isPlaybackPaused={false}
               isMuted={isMuted}
+              lobbyParticipantCount={2}
               onFullscreen={() => record("stream-fullscreen")}
               onMuteToggle={() => setIsMuted((muted) => !muted)}
+              onOpenKeyboard={() => setShowKeyboard(true)}
+              onOpenLobby={() => setShowLobby(true)}
               onPauseToggle={() => record("stream-pause")}
               onPixelPerfectChange={() => record("stream-pixel")}
               onReset={() => record("stream-reset")}
@@ -324,7 +327,6 @@ export function AdminHarness() {
           telemetry={streamTelemetry}
           videoRef={videoRef}
         />
-        <PlayerInstructions />
         {showTelemetry && (
           <StreamTelemetryPanel
             gameId="harness-game"
@@ -387,6 +389,7 @@ export function AdminHarness() {
             source: "health",
             supportedPlayerCount: 2,
           }}
+          isOpen={showLobby}
           lobbyState={{
             hostSocketId: "host-socket",
             maxPlayers: 4,
@@ -409,6 +412,7 @@ export function AdminHarness() {
             sessionId: "session-1",
           }}
           onKickParticipant={(socketId) => record(`kick:${socketId}`)}
+          onClose={() => setShowLobby(false)}
           onReleaseSlot={() => record("release-slot")}
           onRequestSlot={(playerIndex) => record(`request-slot:${playerIndex}`)}
           shareGuidance="Open this HTTPS join link, then enter the invite code."
@@ -416,6 +420,9 @@ export function AdminHarness() {
           shareUrl="https://engine.local/play/demo?session=session-1"
         />
       </section>
+      {showKeyboard && (
+        <KeyboardMappingDrawer onClose={() => setShowKeyboard(false)} />
+      )}
 
       <section aria-label="Publish form harness" className="max-w-2xl">
         <form
