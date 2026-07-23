@@ -239,3 +239,42 @@ test("player slot 3 receives a clear error when virtual gamepads are unavailable
     "Player slots 3 and 4 need virtual gamepad support. Start the engine with /dev/uinput available.",
   );
 });
+
+test("input events are bounded per socket before reaching OS injection", () => {
+  const lobby = createLobbyManager();
+  const host = new FakeSocket("host-1");
+  let inputCount = 0;
+  let now = 1_000;
+
+  lobby.joinLobby(host as never, { sessionId: "session-1" });
+  registerInputHandlers(host as never, runtime, {
+    canSendInput: lobby.canSendInput,
+    inputLimitPerSecond: 2,
+    now: () => now,
+    sendInput: () => {
+      inputCount += 1;
+      return true;
+    },
+  });
+
+  const payload = { key: "ArrowRight", sessionId: "session-1" };
+  host.emit("keydown", payload);
+  host.emit("keyup", payload);
+  host.emit("keydown", payload);
+  host.emit("keydown", payload);
+
+  assert.equal(inputCount, 2);
+  assert.deepEqual(host.outbound, [
+    {
+      event: "engine-error",
+      payload: {
+        code: "engine_input_rate_limited",
+        message: "Input rate limit reached.",
+      },
+    },
+  ]);
+
+  now += 1_000;
+  host.emit("keydown", payload);
+  assert.equal(inputCount, 3);
+});

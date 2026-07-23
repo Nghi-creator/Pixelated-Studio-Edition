@@ -27,7 +27,11 @@ type InputHandlerOptions = {
     browserKey: unknown,
     playerIndex: number,
   ) => boolean;
+  inputLimitPerSecond?: number;
+  now?: () => number;
 };
+
+const DEFAULT_INPUT_LIMIT_PER_SECOND = 60;
 
 function normalizePlayerIndex(payload: InputPayload, socket: Socket) {
   const playerIndex = Number(payload.playerIndex);
@@ -96,11 +100,39 @@ export function registerInputHandlers(
   runtime: RuntimeWithActiveSession,
   options: InputHandlerOptions = {},
 ) {
+  const inputLimit = options.inputLimitPerSecond || DEFAULT_INPUT_LIMIT_PER_SECOND;
+  const now = options.now || Date.now;
+  let inputCount = 0;
+  let inputWindowStartedAt = now();
+  let rateLimitWarningSent = false;
+
+  const consumeInputBudget = () => {
+    const currentTime = now();
+    if (currentTime - inputWindowStartedAt >= 1_000) {
+      inputCount = 0;
+      inputWindowStartedAt = currentTime;
+      rateLimitWarningSent = false;
+    }
+
+    inputCount += 1;
+    if (inputCount <= inputLimit) return true;
+    if (!rateLimitWarningSent) {
+      rateLimitWarningSent = true;
+      socket.emit("engine-error", {
+        code: "engine_input_rate_limited",
+        message: "Input rate limit reached.",
+      });
+    }
+    return false;
+  };
+
   socket.on("keydown", (data: InputPayload = {}) => {
+    if (!consumeInputBudget()) return;
     handleKeyAction("keydown", data, runtime, socket, options);
   });
 
   socket.on("keyup", (data: InputPayload = {}) => {
+    if (!consumeInputBudget()) return;
     handleKeyAction("keyup", data, runtime, socket, options);
   });
 }

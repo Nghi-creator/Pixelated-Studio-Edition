@@ -47,11 +47,22 @@ function getPeerId(payload: unknown) {
     : null;
 }
 
-function getPeerRoom(peerId: string) {
-  return `peer:${peerId}`;
+function payloadMatchesActiveSession(socket: Socket, payload: SessionPayload) {
+  const activeSessionId = normalizeSessionId(socket.data.sessionId);
+  const requestedSessionId = normalizeSessionId(payload.sessionId);
+  return Boolean(
+    activeSessionId &&
+      (!requestedSessionId || requestedSessionId === activeSessionId),
+  );
+}
+
+function getPeerRoom(sessionId: string, peerId: string) {
+  return `session:${sessionId}:peer:${peerId}`;
 }
 
 function rememberPeer(socket: Socket, peerId: string) {
+  const sessionId = normalizeSessionId(socket.data.sessionId);
+  if (!sessionId) return false;
   const peerIds: string[] = Array.isArray(socket.data.webrtcPeerIds)
     ? socket.data.webrtcPeerIds.filter(
         (value: unknown): value is string => typeof value === "string",
@@ -61,10 +72,12 @@ function rememberPeer(socket: Socket, peerId: string) {
   if (peerIds.includes(peerId)) return true;
   if (peerIds.length >= MAX_PEERS_PER_SOCKET) return false;
   socket.data.webrtcPeerIds = [...peerIds, peerId];
+  void socket.join(getPeerRoom(sessionId, peerId));
   return true;
 }
 
 function forgetPeer(socket: Socket, peerId: string) {
+  const sessionId = normalizeSessionId(socket.data.sessionId);
   const peerIds: string[] = Array.isArray(socket.data.webrtcPeerIds)
     ? socket.data.webrtcPeerIds.filter(
         (value: unknown): value is string => typeof value === "string",
@@ -73,7 +86,7 @@ function forgetPeer(socket: Socket, peerId: string) {
   if (!peerIds.includes(peerId)) return;
 
   socket.data.webrtcPeerIds = peerIds.filter((value) => value !== peerId);
-  void socket.leave(getPeerRoom(peerId));
+  if (sessionId) void socket.leave(getPeerRoom(sessionId, peerId));
 }
 
 function emitPeerDisconnect(socket: Socket, peerId: string) {
@@ -91,11 +104,22 @@ function relayToPeerOrSession(
   eventName: string,
   payload?: unknown,
 ) {
+  const sessionId = normalizeSessionId(socket.data.sessionId);
+  const requestedSessionId =
+    payload && typeof payload === "object"
+      ? normalizeSessionId((payload as SessionPayload).sessionId)
+      : null;
+  if (!sessionId || (requestedSessionId && requestedSessionId !== sessionId)) {
+    return;
+  }
+
   const peerId = getPeerId(payload);
   const hasPeerId =
     payload !== null && typeof payload === "object" && "peerId" in payload;
   if (peerId) {
-    socket.to(getPeerRoom(peerId)).emit(eventName, stripSessionId(payload));
+    socket
+      .to(getPeerRoom(sessionId, peerId))
+      .emit(eventName, stripSessionId(payload));
     return;
   }
   if (hasPeerId) return;
@@ -105,6 +129,12 @@ function relayToPeerOrSession(
 
 export function registerSignalingRelayHandlers(socket: Socket) {
   socket.on("python-ready", (payload: SessionPayload = {}) => {
+    const accessScope = socket.handshake.headers["x-pixelated-access-scope"];
+    if (accessScope === "companion-guest" || accessScope === "companion-host") {
+      console.warn("[Node.js] Dropping python-ready from a browser companion");
+      return;
+    }
+
     const sessionId =
       normalizeSessionId(payload.sessionId) || socket.data.sessionId;
 
@@ -121,9 +151,9 @@ export function registerSignalingRelayHandlers(socket: Socket) {
   });
 
   socket.on("webrtc-offer", (offer: SessionPayload = {}) => {
+    if (!payloadMatchesActiveSession(socket, offer)) return;
     const peerId = getPeerId(offer);
     if (!peerId || !rememberPeer(socket, peerId)) return;
-    socket.join(getPeerRoom(peerId));
     relayToSession(socket, "webrtc-offer", stripSessionId(offer));
   });
 

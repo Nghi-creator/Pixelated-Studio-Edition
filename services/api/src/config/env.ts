@@ -11,6 +11,10 @@ const envSchema = z.object({
     .enum(["development", "test", "production"])
     .default("development"),
   HOST: z.preprocess(blankToUndefined, z.string().optional()),
+  TRUST_PROXY_HOPS: z.preprocess(
+    blankToUndefined,
+    z.coerce.number().int().min(0).max(5).optional(),
+  ),
   PORT: z.coerce.number().int().positive().default(4000),
   CONTROL_PLANE_CLEANUP_INTERVAL_MS: z.coerce
     .number()
@@ -123,7 +127,12 @@ export const env = {
         .filter(Boolean),
     ),
   ),
-  trustProxy: parsedEnv.data.NODE_ENV === "production",
+  trustProxy:
+    parsedEnv.data.TRUST_PROXY_HOPS !== undefined
+      ? parsedEnv.data.TRUST_PROXY_HOPS || false
+      : parsedEnv.data.NODE_ENV === "production"
+        ? 1
+        : false,
 };
 
 export const sharedRateLimitStoreConfigured = Boolean(
