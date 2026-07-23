@@ -65,6 +65,16 @@ test("multiplayer lobby metadata preserves engine exposure and supported slots",
 
 test("stream error messages preserve useful errors and fall back safely", () => {
   assert.equal(
+    getErrorMessage(
+      {
+        message: "API request failed with status 403",
+        payload: { error: "A permanent account is required for this action." },
+      },
+      STREAM_BOOT_ERROR_MESSAGE,
+    ),
+    "A permanent account is required for this action.",
+  );
+  assert.equal(
     getErrorMessage(new Error("ROM file is missing"), STREAM_BOOT_ERROR_MESSAGE),
     "ROM file is missing",
   );

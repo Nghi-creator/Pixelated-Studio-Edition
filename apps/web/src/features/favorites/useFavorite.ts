@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { api, getAuthSession } from "../../lib/api/apiClient";
+import { api, getPermanentAuthSession } from "../../lib/api/apiClient";
 import { useFavoriteIdsQuery } from "../../lib/api/apiQueries";
 import { invalidateFavoriteQueries } from "../../lib/api/queryClient";
 import { supabase } from "../../lib/auth/supabaseClient";
@@ -34,7 +34,7 @@ export function useFavorite(gameId: string) {
   }, [favoriteIdsQuery.data]);
 
   const toggleFavorite = useCallback(async () => {
-    const session = await getAuthSession();
+    const session = await getPermanentAuthSession();
     if (!session) {
       navigate("/login");
       return false;

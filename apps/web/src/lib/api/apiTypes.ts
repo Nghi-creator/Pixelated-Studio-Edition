@@ -43,6 +43,7 @@ export type ApiSessionResponse = {
   sessionToken: string;
   user: {
     id: string | null;
+    isAnonymous: boolean;
   };
 };
 

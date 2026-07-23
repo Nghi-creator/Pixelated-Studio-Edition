@@ -49,6 +49,11 @@ const envSchema = z.object({
     .default(180),
   BROWSER_ARTIFACT_URL_TTL_SECONDS: z.coerce.number().int().min(60).max(900).default(300),
   BROWSER_ARTIFACT_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(20),
+  ANONYMOUS_SESSION_RATE_LIMIT_PER_MINUTE: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(10),
   BROWSER_SMOKE_RATE_LIMIT_PER_MINUTE: z.coerce.number().int().positive().default(30),
   RATE_LIMIT_REDIS_REST_TOKEN: z.preprocess(blankToUndefined, z.string().optional()),
   RATE_LIMIT_REDIS_REST_URL: z.preprocess(

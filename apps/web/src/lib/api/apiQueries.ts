@@ -1,5 +1,5 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { getAuthSession, api } from "./apiClient";
+import { getPermanentAuthSession, api } from "./apiClient";
 import { queryKeys } from "./queryClient";
 import type {
   ApiGame,
@@ -122,7 +122,7 @@ export function useGameSubmissionsQuery<TSubmission>({
 export function useAuthSessionQuery() {
   return useQuery({
     queryKey: queryKeys.authSession(),
-    queryFn: getAuthSession,
+    queryFn: getPermanentAuthSession,
   });
 }
 
@@ -130,7 +130,7 @@ export function useFavoriteIdsQuery() {
   return useQuery({
     queryKey: queryKeys.favoriteIds(),
     queryFn: async () => {
-      const session = await getAuthSession();
+      const session = await getPermanentAuthSession();
       if (!session) return new Set<string>();
       return api.favoriteIds();
     },
@@ -145,7 +145,7 @@ export function useFavoritesQuery<TFavorite>({
   return useQuery({
     queryKey: queryKeys.favorites(),
     queryFn: async () => {
-      const session = await getAuthSession();
+      const session = await getPermanentAuthSession();
       if (!session) {
         onMissingSession?.();
         return { favorites: [] as TFavorite[] };

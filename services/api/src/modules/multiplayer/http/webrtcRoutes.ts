@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { env } from "../../../config/env.js";
-import { requireSupabaseUser } from "../../auth/supabaseAuth.js";
+import { requireSupabaseIdentity } from "../../auth/supabaseAuth.js";
 
 type IceServer = {
   credential?: string;
@@ -11,7 +11,7 @@ type IceServer = {
 
 type WebRTCRouteOptions = {
   now?: () => Date;
-  requireUser?: typeof requireSupabaseUser;
+  requireUser?: typeof requireSupabaseIdentity;
 };
 
 function splitUrls(value: string | undefined) {
@@ -76,7 +76,7 @@ export async function registerWebRTCRoutes(
   app: FastifyInstance,
   options: WebRTCRouteOptions = {},
 ) {
-  const requireUser = options.requireUser || requireSupabaseUser;
+  const requireUser = options.requireUser || requireSupabaseIdentity;
   const now = options.now || (() => new Date());
 
   app.get(

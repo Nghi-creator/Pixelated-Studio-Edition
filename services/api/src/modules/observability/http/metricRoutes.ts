@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
-  requireSupabaseUser,
+  requireSupabaseIdentity,
   supabaseService,
 } from "../../auth/supabaseAuth.js";
 import {
@@ -60,7 +60,7 @@ type MetricRouteOptions = {
   ) => Promise<boolean>;
   metricUserWriteLimiter?: RateLimiter;
   metricWriteLimiter?: RateLimiter;
-  requireUser?: typeof requireSupabaseUser;
+  requireUser?: typeof requireSupabaseIdentity;
   supabase?: SupabaseServiceLike | null;
 };
 
@@ -82,7 +82,7 @@ export async function registerMetricRoutes(
   app: FastifyInstance,
   options: MetricRouteOptions = {},
 ) {
-  const requireUser = options.requireUser || requireSupabaseUser;
+  const requireUser = options.requireUser || requireSupabaseIdentity;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
   const hasLiveMetricSession =
     options.hasLiveMetricSession ||

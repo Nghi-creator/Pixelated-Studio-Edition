@@ -1,5 +1,7 @@
 import { supabase } from "../auth/supabaseClient";
 import type { Session } from "@supabase/supabase-js";
+import { isAnonymousUser } from "../auth/authIdentity";
+import { requestAnonymousSignupCaptchaToken } from "../auth/turnstileClient";
 import {
   createRequestAbortController,
   withTimeout,
@@ -66,6 +68,7 @@ const authScopedCache = {
 };
 
 let currentAuthUserId: string | null | undefined;
+let playAuthSessionPromise: Promise<Session> | null = null;
 
 supabase.auth.onAuthStateChange((_event, session) => {
   clearAuthScopedCache(authScopedCache);
@@ -92,6 +95,38 @@ export async function getAuthSession() {
   }
 
   return authScopedCache.session;
+}
+
+export async function getPermanentAuthSession() {
+  const session = await getAuthSession();
+  return isAnonymousUser(session?.user) ? null : session;
+}
+
+async function createPlayAuthSession() {
+  const existingSession = await getAuthSession();
+  if (existingSession) return existingSession;
+
+  const captchaToken = await requestAnonymousSignupCaptchaToken();
+  const { data, error } = await supabase.auth.signInAnonymously({
+    options: captchaToken ? { captchaToken } : undefined,
+  });
+  if (error || !data.session) {
+    throw new Error(
+      error?.message || "A temporary guest session could not be created.",
+    );
+  }
+
+  authScopedCache.session = Promise.resolve(data.session);
+  return data.session;
+}
+
+export function ensurePlayAuthSession() {
+  if (!playAuthSessionPromise) {
+    playAuthSessionPromise = createPlayAuthSession().finally(() => {
+      playAuthSessionPromise = null;
+    });
+  }
+  return playAuthSessionPromise;
 }
 
 function isCacheFresh(cache: { expiresAt: number } | null) {

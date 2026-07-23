@@ -153,6 +153,7 @@ BROWSER_SMOKE_TICKET_TTL_SECONDS=300
 BROWSER_SMOKE_RATE_LIMIT_PER_MINUTE=30
 BROWSER_ARTIFACT_URL_TTL_SECONDS=300
 BROWSER_ARTIFACT_RATE_LIMIT_PER_MINUTE=20
+ANONYMOUS_SESSION_RATE_LIMIT_PER_MINUTE=10
 CONTROL_PLANE_CLEANUP_INTERVAL_MS=3600000
 STREAM_METRIC_RETENTION_DAYS=7
 STUN_URLS=stun:stun.l.google.com:19302
@@ -193,10 +194,12 @@ Production enables Fastify proxy trust so `request.ip` uses the client address f
 Pixelated Studio Edition is the sole migration authority for the Supabase project shared by
 both editions. User Edition must not push or repair migration history.
 
-The shared API supports authenticated Studio WebRTC sessions plus authenticated
-or guest User Edition WASM sessions. Guest session creation is limited to the
-public browser catalog, rate-limited by client IP, and authorized afterward by
-an opaque session token.
+The shared API supports permanent or anonymous Supabase identities for Studio
+WebRTC sessions, plus authenticated or unauthenticated User Edition WASM sessions.
+Anonymous Studio session creation is limited to the published catalog, rate-limited
+by both guest identity and client IP, and authorized afterward by an opaque session
+token. Permanent-account endpoints reject identities carrying the Supabase
+`is_anonymous` claim.
 Executable ROMs belong in the private `catalog_roms` bucket; public covers and backdrops remain
 in `catalog_artifacts`. The API signs private ROM URLs for User Edition session creation and
 again when the Studio engine verifies a session.

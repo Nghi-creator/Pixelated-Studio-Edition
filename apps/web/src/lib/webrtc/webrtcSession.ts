@@ -1,4 +1,8 @@
-import { api, getAuthSession } from "../api/apiClient";
+import {
+  api,
+  ensurePlayAuthSession,
+  getAuthSession,
+} from "../api/apiClient";
 import {
   loadEngineRuntimeKind,
   requestEngineRuntimeSwitch,
@@ -25,7 +29,7 @@ const LOCAL_VAULT_EXTENSIONS = [
   ".gg",
 ];
 
-function isLocalVaultGameId(gameId: string) {
+export function isLocalVaultGameId(gameId: string) {
   const lowerGameId = gameId.toLowerCase();
   return LOCAL_VAULT_EXTENSIONS.some((extension) =>
     lowerGameId.endsWith(extension),
@@ -60,15 +64,18 @@ export const resolveGameBootTarget = async (
   clientSessionId: string,
 ) => {
   const session = await getAuthSession();
-  const userId = session?.user?.id || "anonymous";
 
   if (isLocalVaultGameId(gameId)) {
+    const userId = session?.user?.is_anonymous
+      ? "anonymous"
+      : session?.user?.id || "anonymous";
     console.log(
       `[WebRTC] Local Vault game detected. Booting directly: ${gameId} for user ${userId}`,
     );
     return { mode: "local", romFilename: gameId, userId };
   }
 
+  await ensurePlayAuthSession();
   const backendSession = await api.createSession(gameId, clientSessionId);
   const requiredRuntimeKind = backendSession.boot.runtimeKind || "libretro";
   let activeRuntimeKind = await loadEngineRuntimeKind();

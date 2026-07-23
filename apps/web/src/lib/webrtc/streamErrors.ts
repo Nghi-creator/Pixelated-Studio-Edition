@@ -26,6 +26,19 @@ type EngineLaunchFailureHealth = {
 };
 
 export function getErrorMessage(error: unknown, fallback: string) {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "payload" in error &&
+    typeof error.payload === "object" &&
+    error.payload !== null &&
+    "error" in error.payload &&
+    typeof error.payload.error === "string" &&
+    error.payload.error.trim()
+  ) {
+    return error.payload.error;
+  }
+
   if (error instanceof Error && error.message.trim()) {
     return error.message;
   }

@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import type { FastifyReply, FastifyRequest } from "fastify";
+import type { User } from "@supabase/supabase-js";
 import { env } from "../../config/env.js";
 
 export function createSupabaseAnonClient() {
@@ -29,6 +30,10 @@ export function createSupabaseServiceClient() {
 export const supabaseAnon = createSupabaseAnonClient();
 export const supabaseService = createSupabaseServiceClient();
 
+export function isAnonymousSupabaseUser(user: User | null | undefined) {
+  return user?.is_anonymous === true;
+}
+
 export function getBearerToken(request: FastifyRequest) {
   const header = request.headers.authorization;
   if (!header) return null;
@@ -42,7 +47,7 @@ export function getBearerToken(request: FastifyRequest) {
   return token;
 }
 
-export async function requireSupabaseUser(
+export async function requireSupabaseIdentity(
   request: FastifyRequest,
   reply: FastifyReply,
 ) {
@@ -64,6 +69,20 @@ export async function requireSupabaseUser(
   }
 
   request.user = data.user;
+}
+
+export async function requireSupabaseUser(
+  request: FastifyRequest,
+  reply: FastifyReply,
+) {
+  await requireSupabaseIdentity(request, reply);
+  if (reply.sent || !request.user) return;
+
+  if (isAnonymousSupabaseUser(request.user)) {
+    return reply.status(403).send({
+      error: "A permanent account is required for this action.",
+    });
+  }
 }
 
 export async function attachOptionalSupabaseUser(

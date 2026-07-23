@@ -4,6 +4,7 @@ import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLi
 import { createSignedCatalogRomUrl } from "../domain/browserArtifact.js";
 import {
   attachOptionalSupabaseUser,
+  requireSupabaseIdentity,
   requireSupabaseUser,
   supabaseService,
 } from "../supabaseAuth.js";
@@ -21,10 +22,12 @@ export const createSessionBodySchema = z.object({
 });
 
 export type SessionRouteOptions = {
+  anonymousSessionCreateIpLimiter?: RateLimiter;
   attachOptionalUser?: typeof attachOptionalSupabaseUser;
   artifactUrlLimiter?: RateLimiter;
   signCatalogRom?: (artifactUrl: string, expiresInSeconds: number) => Promise<string>;
   requireUser?: typeof requireSupabaseUser;
+  requireSessionUser?: typeof requireSupabaseIdentity;
   sessionCreateLimiter?: RateLimiter;
   supabase?: SupabaseServiceLike | null;
 };
@@ -52,10 +55,18 @@ export function createSessionRouteContext(options: SessionRouteOptions) {
   });
 
   return {
+    anonymousSessionCreateIpLimiter:
+      options.anonymousSessionCreateIpLimiter || createRateLimiter({
+        limit: env.ANONYMOUS_SESSION_RATE_LIMIT_PER_MINUTE,
+        namespace: "anonymous-session-create-ip",
+        windowMs: 60_000,
+      }),
     attachOptionalUser:
       options.attachOptionalUser || attachOptionalSupabaseUser,
     artifactUrlLimiter,
     requireUser: options.requireUser || requireSupabaseUser,
+    requireSessionUser:
+      options.requireSessionUser || requireSupabaseIdentity,
     service,
     sessionCreateLimiter: options.sessionCreateLimiter || createRateLimiter({
       limit: 60,
