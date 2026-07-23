@@ -9,6 +9,7 @@ const STREAM_TELEMETRY_VISIBILITY_KEY = "pixelated_show_stream_telemetry";
 
 export function usePlayerStreamSettings() {
   const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(1);
   const [streamProfileId, setStreamProfileId] = useState<StreamProfileId>(() => {
     if (typeof window === "undefined") return "balanced";
     return getStreamProfile(
@@ -39,5 +40,7 @@ export function usePlayerStreamSettings() {
     showStreamTelemetry,
     streamProfile: getStreamProfile(streamProfileId),
     streamProfileId,
+    setVolume,
+    volume,
   };
 }

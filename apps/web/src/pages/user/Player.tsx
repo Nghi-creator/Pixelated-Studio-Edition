@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { LobbyPanel } from "../../features/player/components/LobbyPanel";
 import {
@@ -53,6 +53,9 @@ export default function Player() {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const streamStageRef = useRef<HTMLDivElement>(null);
+  const [isPlaybackPaused, setIsPlaybackPaused] = useState(false);
+  const [pixelPerfect, setPixelPerfect] = useState(true);
   const currentUser = useAuthUser();
   const { backRoute, backText, lobbySearch } = usePlayerNavigation(
     location,
@@ -71,6 +74,8 @@ export default function Player() {
     showStreamTelemetry,
     streamProfile,
     streamProfileId,
+    setVolume,
+    volume,
   } = usePlayerStreamSettings();
   const {
     baselineForm: researchBaselineForm,
@@ -99,6 +104,7 @@ export default function Player() {
     shareContext,
     stream,
     status,
+    stop,
     telemetry,
   } = useWebRTC(id || "", streamProfile, {
     displayName,
@@ -141,6 +147,32 @@ export default function Player() {
   useEffect(() => {
     setResearchSessionId(sessionId);
   }, [sessionId, setResearchSessionId]);
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.volume = volume;
+  }, [stream, volume]);
+
+  const togglePlaybackPause = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    if (video.paused) {
+      void video.play();
+      setIsPlaybackPaused(false);
+      return;
+    }
+    video.pause();
+    setIsPlaybackPaused(true);
+  };
+
+  const resetSession = () => {
+    setIsPlaybackPaused(false);
+    retry();
+  };
+
+  const stopSession = () => {
+    setIsPlaybackPaused(false);
+    stop();
+  };
 
   const resetTelemetryData = () => {
     clearTelemetryCsv();
@@ -210,22 +242,36 @@ export default function Player() {
         <StreamStage
           controls={
             <PlayerControls
+              canPauseStream={status === "playing"}
+              canResetSession={playerMode === "host"}
+              canStopSession={playerMode === "host" && status === "playing"}
               gameTitle={gameTitle}
+              isPlaybackPaused={status === "playing" && isPlaybackPaused}
               isMuted={isMuted}
+              onFullscreen={() => void streamStageRef.current?.requestFullscreen()}
               onMuteToggle={() => setIsMuted((muted) => !muted)}
+              onPauseToggle={togglePlaybackPause}
+              onPixelPerfectChange={setPixelPerfect}
+              onReset={resetSession}
+              onStop={stopSession}
               onStreamProfileChange={setStreamProfileId}
               onToggleTelemetry={() =>
                 setShowStreamTelemetry((isVisible) => !isVisible)
               }
+              onVolumeChange={setVolume}
+              pixelPerfect={pixelPerfect}
               selectedStreamProfileId={streamProfileId}
               showStreamTelemetry={showStreamTelemetry}
               streamProfiles={STREAM_PROFILES}
+              volume={volume}
             />
           }
           fallbackActive={fallbackActive}
           isMuted={isMuted}
           onRetry={retry}
+          pixelPerfect={pixelPerfect}
           showStreamTelemetry={showStreamTelemetry}
+          stageRef={streamStageRef}
           status={status}
           telemetry={telemetry}
           videoRef={videoRef}

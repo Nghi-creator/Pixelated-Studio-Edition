@@ -10,7 +10,9 @@ type StreamStageProps = {
   fallbackActive?: boolean;
   isMuted: boolean;
   onRetry?: () => void;
+  pixelPerfect?: boolean;
   showStreamTelemetry: boolean;
+  stageRef?: RefObject<HTMLDivElement | null>;
   status: WebRTCStatus;
   telemetry: WebRTCTelemetry;
   videoRef: RefObject<HTMLVideoElement | null>;
@@ -22,7 +24,9 @@ export function StreamStage({
   fallbackActive = false,
   isMuted,
   onRetry,
+  pixelPerfect = false,
   showStreamTelemetry,
+  stageRef,
   status,
   telemetry,
   videoRef,
@@ -34,7 +38,8 @@ export function StreamStage({
     <div className="relative w-full">
       {controls}
       <div
-        className={`relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-b-lg border border-synth-border bg-black shadow-card ${
+        ref={stageRef}
+        className={`relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-b-lg border border-synth-border bg-black shadow-card fullscreen:h-screen fullscreen:w-screen fullscreen:aspect-auto fullscreen:rounded-none fullscreen:border-0 ${
           showStreamTelemetry ? "xl:aspect-[16/9.5]" : ""
         }`}
       >
@@ -75,6 +80,8 @@ export function StreamStage({
           muted={isMuted}
           playsInline
           className={`h-full w-full object-contain ${
+            pixelPerfect ? "[image-rendering:pixelated]" : ""
+          } ${
             fallbackActive ? "opacity-0" : ""
           }`}
         />
