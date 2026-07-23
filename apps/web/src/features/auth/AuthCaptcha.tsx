@@ -4,29 +4,6 @@ import { authCaptchaSiteKey, isAuthCaptchaEnabled } from "./captchaConfig";
 const TURNSTILE_SCRIPT_SRC =
   "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
 
-type TurnstileGlobal = {
-  render: (
-    container: HTMLElement,
-    options: {
-      callback: (token: string) => void;
-      "error-callback": (errorCode?: string) => void;
-      "expired-callback": () => void;
-      language: "en-US";
-      sitekey: string;
-      theme: "dark";
-      "timeout-callback": () => void;
-    },
-  ) => string;
-  remove: (widgetId: string) => void;
-  reset: (widgetId: string) => void;
-};
-
-declare global {
-  interface Window {
-    turnstile?: TurnstileGlobal;
-  }
-}
-
 type AuthCaptchaProps = {
   onTokenChange: (token: string) => void;
   resetKey: number;
@@ -65,13 +42,15 @@ export function AuthCaptcha({ onTokenChange, resetKey }: AuthCaptchaProps) {
     if (widgetIdRef.current || !window.turnstile) return;
 
     widgetIdRef.current = window.turnstile.render(containerRef.current, {
+      action: "account_auth",
+      appearance: "interaction-only",
       callback: onTokenChange,
       "error-callback": (errorCode) => {
         console.warn("[Turnstile] challenge error", errorCode);
         onTokenChange("");
       },
       "expired-callback": () => onTokenChange(""),
-      language: "en-US",
+      language: "auto",
       sitekey: authCaptchaSiteKey,
       theme: "dark",
       "timeout-callback": () => onTokenChange(""),

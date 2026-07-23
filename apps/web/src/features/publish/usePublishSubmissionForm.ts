@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { ChangeEvent, Dispatch, FormEvent, SetStateAction } from "react";
-import { api, getAuthSession } from "../../lib/api/apiClient";
+import { api, getPermanentAuthSession } from "../../lib/api/apiClient";
 import { supabase } from "../../lib/auth/supabaseClient";
 import {
   getPublishErrorMessage,
@@ -107,7 +107,7 @@ export function usePublishSubmissionForm() {
     setFormError(null);
 
     try {
-      const session = await getAuthSession();
+      const session = await getPermanentAuthSession();
 
       if (!session) {
         setFormError("Please sign in before submitting a game.");

@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../../lib/auth/supabaseClient";
 import { getPublicAppUrl } from "../../lib/navigation/appUrl";
 import { getPasswordPolicyError } from "../../lib/auth/passwordPolicy";
+import { isAnonymousUser } from "../../lib/auth/authIdentity";
 import { isAuthCaptchaEnabled } from "./captchaConfig";
 
 export type HostedAuthOptions = {
@@ -24,6 +25,16 @@ const getAuthErrorMessage = (error: Error) => {
 };
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
+
+async function clearGuestSessionBeforeAccountAuth() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!isAnonymousUser(session?.user)) return;
+
+  const { error } = await supabase.auth.signOut({ scope: "local" });
+  if (error) throw error;
+}
 
 export function useAuthForm({
   captchaToken = "",
@@ -95,6 +106,7 @@ export function useAuthForm({
     try {
       const verifiedCaptchaToken = requireCaptchaToken();
       const normalizedEmail = normalizeEmail(email);
+      await clearGuestSessionBeforeAccountAuth();
 
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
@@ -204,12 +216,21 @@ export function useAuthForm({
 
   const handleOAuth = async (provider: "google" | "github") => {
     setLoading(true);
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: oauthRedirectTo },
-    });
-    if (error) setError(error.message);
-    setLoading(false);
+    setError(null);
+    try {
+      await clearGuestSessionBeforeAccountAuth();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: oauthRedirectTo },
+      });
+      if (error) throw error;
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to start OAuth sign-in.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return {

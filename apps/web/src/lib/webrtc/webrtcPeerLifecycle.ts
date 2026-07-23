@@ -16,6 +16,8 @@ import type {
   WebRTCSessionConfig,
   WebRTCSessionRuntime,
 } from "./webrtcLifecycleTypes";
+import { ensurePlayAuthSession } from "../api/apiClient";
+import { isLocalVaultGameId } from "./webrtcSession";
 
 export async function initializeWebRTCPeerSession({
   config,
@@ -51,6 +53,19 @@ export async function initializeWebRTCPeerSession({
   }
   params.lastMetricSentAtRef.current = 0;
   params.metricsDisabledRef.current = false;
+
+  if (config.mode === "host" && !isLocalVaultGameId(params.gameId)) {
+    try {
+      await ensurePlayAuthSession();
+    } catch (error) {
+      failStream(
+        error instanceof Error
+          ? error.message
+          : "A temporary guest session could not be created.",
+      );
+      return;
+    }
+  }
 
   const [nextIceServers, nextEngineContext] = await Promise.all([
     loadIceServers(),

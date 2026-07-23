@@ -74,7 +74,10 @@ VITE_TURNSTILE_SITE_KEY=
 
 Set `VITE_PUBLIC_APP_URL` in Vercel and in Supabase Auth redirect settings so verification, recovery, and OAuth callbacks do not fall back to localhost.
 
-Set `VITE_TURNSTILE_SITE_KEY` only after enabling Cloudflare Turnstile CAPTCHA in Supabase Auth with the matching secret key. When configured, the auth page sends CAPTCHA tokens with email/password sign-in, signup confirmation, confirmation resend, and password recovery requests.
+Set `VITE_TURNSTILE_SITE_KEY` only after enabling Cloudflare Turnstile CAPTCHA in Supabase Auth with the matching secret key. When configured, account authentication and the first anonymous catalog Play send CAPTCHA tokens to Supabase. Later plays reuse the persisted guest session and do not create another anonymous user.
+
+See [`docs/anonymous-play-setup.md`](../../docs/anonymous-play-setup.md) for the
+required migration, Cloudflare, Supabase, Vercel, and API deployment settings.
 
 Recommended Supabase Authentication URL Configuration:
 

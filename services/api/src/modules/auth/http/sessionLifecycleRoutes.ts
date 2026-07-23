@@ -26,7 +26,7 @@ export function registerSessionLifecycleRoutes(
   const {
     attachOptionalUser,
     artifactUrlLimiter,
-    requireUser,
+    requireSessionUser,
     service,
     signCatalogRom,
     verificationIpLimiter,
@@ -35,7 +35,7 @@ export function registerSessionLifecycleRoutes(
 
   app.get(
     "/sessions/:sessionId",
-    { preHandler: requireUser },
+    { preHandler: requireSessionUser },
     async (request, reply) => {
       const params = sessionParamsSchema.safeParse(request.params);
       if (!params.success) {

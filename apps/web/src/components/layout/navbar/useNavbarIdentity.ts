@@ -3,6 +3,7 @@ import type { User } from "@supabase/supabase-js";
 import { getAuthSession } from "../../../lib/api/apiClient";
 import { usePermissionsQuery } from "../../../lib/api/apiQueries";
 import { supabase } from "../../../lib/auth/supabaseClient";
+import { isAnonymousUser } from "../../../lib/auth/authIdentity";
 import {
   ENGINE_PAIRING_EVENT,
   hasEngineToken,
@@ -20,7 +21,7 @@ export function useNavbarIdentity() {
 
     const syncUser = (sessionUser: User | null) => {
       if (!isActive) return;
-      setUser(sessionUser);
+      setUser(isAnonymousUser(sessionUser) ? null : sessionUser);
       setIsSessionLoading(false);
     };
 

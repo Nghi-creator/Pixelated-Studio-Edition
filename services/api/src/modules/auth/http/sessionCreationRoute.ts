@@ -11,6 +11,7 @@ import {
   hashSessionToken,
 } from "../domain/sessionTokens.js";
 import { getLiveSession } from "../services/backendSessions.js";
+import { isAnonymousSupabaseUser } from "../supabaseAuth.js";
 import {
   createSessionBodySchema,
   SESSION_TTL_MS,
@@ -23,6 +24,7 @@ export function registerSessionCreationRoute(
 ) {
   const {
     attachOptionalUser,
+    anonymousSessionCreateIpLimiter,
     artifactUrlLimiter,
     service,
     sessionCreateLimiter,
@@ -49,6 +51,7 @@ export function registerSessionCreationRoute(
         parsedBody.data.clientEdition === "user" &&
         parsedBody.data.runtimeKind === "wasm" &&
         parsedBody.data.mode === "cloud";
+      const isAnonymousUser = isAnonymousSupabaseUser(user);
       if (!user && !requestsBrowserArtifact) {
         return reply.status(401).send({
           error:
@@ -56,13 +59,25 @@ export function registerSessionCreationRoute(
         });
       }
       const rateLimitIdentity = user
-        ? `user:${user.id}`
+        ? `${isAnonymousUser ? "guest-user" : "user"}:${user.id}`
         : `guest-ip:${request.ip}`;
+      const sessionRateLimits = await Promise.all([
+        sessionCreateLimiter.consume(rateLimitIdentity),
+        ...(isAnonymousUser
+          ? [anonymousSessionCreateIpLimiter.consume(request.ip)]
+          : []),
+      ]);
+      const blockedSessionRateLimit = sessionRateLimits.find(
+        (result) => !result.allowed,
+      );
       if (
+        blockedSessionRateLimit &&
         rejectRateLimitedRequest(
           reply,
-          await sessionCreateLimiter.consume(rateLimitIdentity),
-          "Session creation rate limit reached. Please try again shortly.",
+          blockedSessionRateLimit,
+          isAnonymousUser
+            ? "Guest session creation rate limit reached. Please try again shortly."
+            : "Session creation rate limit reached. Please try again shortly.",
         )
       ) {
         return;
@@ -108,7 +123,10 @@ export function registerSessionCreationRoute(
 
       let signedArtifactUrl: string | null = null;
       let artifactUrlExpiresAt: string | null = null;
-      if (requestsBrowserArtifact) {
+      const shouldSignArtifact = Boolean(
+        build.artifact_url && (requestsBrowserArtifact || isAnonymousUser),
+      );
+      if (shouldSignArtifact) {
         if (
           rejectRateLimitedRequest(
             reply,
@@ -190,7 +208,7 @@ export function registerSessionCreationRoute(
         expiresAt,
         sessionId,
         sessionToken,
-        user: { id: user?.id || null },
+        user: { id: user?.id || null, isAnonymous: isAnonymousUser },
       };
     },
   );

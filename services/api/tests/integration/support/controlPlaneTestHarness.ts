@@ -296,13 +296,14 @@ class FakeQueryBuilder {
   }
 }
 
-export function requireUser(userId = USER_ID) {
+export function requireUser(userId = USER_ID, isAnonymous = false) {
   return async (request: FastifyRequest) => {
     request.user = {
       app_metadata: {},
       aud: "authenticated",
       created_at: new Date().toISOString(),
       id: userId,
+      is_anonymous: isAnonymous,
       user_metadata: {},
     };
     return undefined;
@@ -344,6 +345,7 @@ export async function createTestApp(db: FakeSupabase, userId = USER_ID) {
   const app = Fastify({ logger: false });
   const options = {
     attachOptionalUser: requireUser(userId),
+    requireSessionUser: requireUser(userId),
     requireUser: requireUser(userId),
     supabase: db as never,
   };

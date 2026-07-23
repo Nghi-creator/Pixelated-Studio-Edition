@@ -1,4 +1,4 @@
-import { getAuthSession } from "../../lib/api/apiClient";
+import { getPermanentAuthSession } from "../../lib/api/apiClient";
 import {
   clearEngineToken,
   engineAuthHeaders,
@@ -27,7 +27,7 @@ import {
 } from "./localVaultState";
 
 export async function getLocalVaultUserId() {
-  const session = await getAuthSession();
+  const session = await getPermanentAuthSession();
   return session?.user?.id || "anonymous";
 }
 

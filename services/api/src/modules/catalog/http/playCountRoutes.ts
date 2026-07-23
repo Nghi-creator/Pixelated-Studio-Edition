@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
-  requireSupabaseUser,
+  requireSupabaseIdentity,
   supabaseService,
 } from "../../auth/supabaseAuth.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
@@ -26,7 +26,7 @@ type PlayCountRouteOptions = {
     runtimeKind: "wasm" | "webrtc" | "native";
     userId: string;
   }) => Promise<boolean>;
-  requireUser?: typeof requireSupabaseUser;
+  requireUser?: typeof requireSupabaseIdentity;
   supabase?: SupabaseServiceLike | null;
 };
 
@@ -34,7 +34,7 @@ export async function registerPlayCountRoutes(
   app: FastifyInstance,
   options: PlayCountRouteOptions = {},
 ) {
-  const requireUser = options.requireUser || requireSupabaseUser;
+  const requireUser = options.requireUser || requireSupabaseIdentity;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
   const hasLivePlaySession = options.hasLivePlaySession || (async (input) => {
     if (!service) return false;

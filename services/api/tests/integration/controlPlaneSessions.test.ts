@@ -164,7 +164,7 @@ test("anonymous users can create User Edition WASM cloud sessions", async () => 
   await app.close();
 });
 
-test("anonymous users cannot create Studio or non-WASM sessions", async () => {
+test("unauthenticated clients cannot create Studio or non-WASM sessions", async () => {
   const db = new FakeSupabase();
   seedPublishedGame(db, {
     id: GAME_ID,
@@ -202,6 +202,99 @@ test("anonymous users cannot create Studio or non-WASM sessions", async () => {
     assert.equal(response.statusCode, 401);
   }
 
+  assert.equal(db.sessions.size, 0);
+  await app.close();
+});
+
+test("anonymous Supabase users can create rate-limited Studio sessions", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGame(db, {
+    id: GAME_ID,
+    rom_filename: "guest-game.nes",
+    rom_url:
+      "https://pxksbsloksyfwiqyfkrz.supabase.co/storage/v1/object/public/catalog_roms/guest-game.nes",
+  });
+  let anonymousIpChecks = 0;
+  const app = Fastify({ logger: false });
+  await registerSessionRoutes(app, {
+    anonymousSessionCreateIpLimiter: {
+      consume: async () => {
+        anonymousIpChecks += 1;
+        return { allowed: true, remaining: 9, resetAt: Date.now() + 60_000 };
+      },
+    },
+    attachOptionalUser: requireUser(USER_ID, true),
+    requireSessionUser: requireUser(USER_ID, true),
+    signCatalogRom: async () => "https://signed.example.test/guest-game.nes",
+    supabase: db as never,
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      clientEdition: "studio",
+      clientSessionId: "anonymous-studio-session",
+      gameId: GAME_ID,
+      mode: "cloud",
+      runtimeKind: "webrtc",
+    },
+    url: "/sessions",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.equal(anonymousIpChecks, 1);
+  assert.equal(
+    response.json<{ boot: { romUrl: string } }>().boot.romUrl,
+    "https://signed.example.test/guest-game.nes",
+  );
+  assert.deepEqual(response.json<{ user: unknown }>().user, {
+    id: USER_ID,
+    isAnonymous: true,
+  });
+  assert.equal(db.sessions.get("anonymous-studio-session")?.user_id, USER_ID);
+
+  const lookupResponse = await app.inject({
+    method: "GET",
+    url: "/sessions/anonymous-studio-session",
+  });
+  assert.equal(lookupResponse.statusCode, 200);
+  await app.close();
+});
+
+test("anonymous Studio sessions are limited by client IP", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGame(db, {
+    id: GAME_ID,
+    rom_filename: "guest-game.nes",
+    rom_url:
+      "https://pxksbsloksyfwiqyfkrz.supabase.co/storage/v1/object/public/catalog_roms/guest-game.nes",
+  });
+  const app = Fastify({ logger: false });
+  await registerSessionRoutes(app, {
+    anonymousSessionCreateIpLimiter: {
+      consume: async () => ({
+        allowed: false,
+        remaining: 0,
+        resetAt: Date.now() + 60_000,
+      }),
+    },
+    attachOptionalUser: requireUser(USER_ID, true),
+    supabase: db as never,
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      clientEdition: "studio",
+      clientSessionId: "rate-limited-anonymous-studio",
+      gameId: GAME_ID,
+      mode: "cloud",
+      runtimeKind: "webrtc",
+    },
+    url: "/sessions",
+  });
+
+  assert.equal(response.statusCode, 429);
   assert.equal(db.sessions.size, 0);
   await app.close();
 });
@@ -399,6 +492,7 @@ test("session ownership protects authenticated lookup", async () => {
 test("session lookup and verification report missing service configuration", async () => {
   const app = Fastify({ logger: false });
   await registerSessionRoutes(app, {
+    requireSessionUser: requireUser(USER_ID),
     requireUser: requireUser(USER_ID),
     supabase: null,
   });
