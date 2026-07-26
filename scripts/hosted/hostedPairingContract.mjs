@@ -101,7 +101,16 @@ export function assertHostedPairingContract(rootDir) {
     "utf8",
   );
   const webRtcSession = fs.readFileSync(
-    path.join(rootDir, "apps", "web", "src", "lib", "webrtc", "webrtcSession.ts"),
+    path.join(
+      rootDir,
+      "apps",
+      "web",
+      "src",
+      "lib",
+      "webrtc",
+      "session",
+      "webrtcSession.ts",
+    ),
     "utf8",
   );
 
