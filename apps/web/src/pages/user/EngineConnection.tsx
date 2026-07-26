@@ -11,7 +11,7 @@ import {
   useLocation,
   useNavigate,
   useSearchParams,
-} from "react-router-dom";
+} from "react-router";
 import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
 import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engine/engineAuth";
 import { PixelIcon } from "../../components/ui/PixelIcon";

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { StreamProfile } from "../engine/streamProfiles";
 import {
   CHECKING_INPUT_CAPABILITIES,
-} from "./engineContext";
+} from "./engine/engineContext";
 import type {
   EngineInputCapabilities,
   EngineShareContext,
@@ -10,17 +10,17 @@ import type {
   LobbyState,
   UseWebRTCOptions,
 } from "./types";
-import { useEnginePairingVersion } from "./useEnginePairingVersion";
-import { useWebRTCLobbyControls } from "./useWebRTCLobbyControls";
-import { useWebRTCProfileRestart } from "./useWebRTCProfileRestart";
-import { useWebRTCRecoveryControls } from "./useWebRTCRecoveryControls";
-import { useWebRTCSessionLifecycle } from "./useWebRTCSessionLifecycle";
-import { createWebRTCSessionId, type WebRTCStatus } from "./webrtcSession";
-import type { EngineSocket } from "./webrtcSocket";
+import { useEnginePairingVersion } from "./engine/useEnginePairingVersion";
+import { useWebRTCLobbyControls } from "./controls/useWebRTCLobbyControls";
+import { useWebRTCProfileRestart } from "./controls/useWebRTCProfileRestart";
+import { useWebRTCRecoveryControls } from "./controls/useWebRTCRecoveryControls";
+import { useWebRTCSessionLifecycle } from "./session/useWebRTCSessionLifecycle";
+import { createWebRTCSessionId, type WebRTCStatus } from "./session/webrtcSession";
+import type { EngineSocket } from "./transport/webrtcSocket";
 import {
   INITIAL_WEBRTC_TELEMETRY,
   type WebRTCTelemetry,
-} from "./webrtcTelemetry";
+} from "./telemetry/webrtcTelemetry";
 
 export type {
   EngineInputCapabilities,

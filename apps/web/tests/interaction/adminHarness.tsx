@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter } from "react-router";
 import "../../src/index.css";
 import {
   AdminConfirmDialog,
@@ -11,12 +11,12 @@ import {
   INVALID_ENGINE_TOKEN_MESSAGE,
   validateLocalRomFile,
 } from "../../src/features/local-vault/localVaultClient";
-import { LobbyPanel } from "../../src/features/player/components/LobbyPanel";
-import { KeyboardMappingDrawer } from "../../src/features/player/components/KeyboardMappingDrawer";
-import { PlayerControls } from "../../src/features/player/components/PlayerControls";
-import { PlayerHeader } from "../../src/features/player/components/PlayerHeader";
-import { StreamStage } from "../../src/features/player/components/StreamStage";
-import { StreamTelemetryPanel } from "../../src/features/player/components/StreamTelemetryPanel";
+import { LobbyPanel } from "../../src/features/player/components/stream/LobbyPanel";
+import { KeyboardMappingDrawer } from "../../src/features/player/components/stream/KeyboardMappingDrawer";
+import { PlayerControls } from "../../src/features/player/components/shell/PlayerControls";
+import { PlayerHeader } from "../../src/features/player/components/shell/PlayerHeader";
+import { StreamStage } from "../../src/features/player/components/stream/StreamStage";
+import { StreamTelemetryPanel } from "../../src/features/player/components/telemetry/StreamTelemetryPanel";
 import {
   validateRomFile,
   validateSubmissionImageFile,
@@ -24,8 +24,8 @@ import {
 import {
   INITIAL_WEBRTC_TELEMETRY,
   type WebRTCTelemetry,
-} from "../../src/lib/webrtc/webrtcTelemetry";
-import type { WebRTCStatus } from "../../src/lib/webrtc/webrtcSession";
+} from "../../src/lib/webrtc/telemetry/webrtcTelemetry";
+import type { WebRTCStatus } from "../../src/lib/webrtc/session/webrtcSession";
 import {
   DEFAULT_STREAM_PROFILE,
   STREAM_PROFILES,

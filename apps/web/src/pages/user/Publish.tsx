@@ -7,7 +7,7 @@ import {
   Send,
   XCircle,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import {
   PublishActionButton,

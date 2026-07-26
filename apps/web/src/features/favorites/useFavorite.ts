@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { api, getPermanentAuthSession } from "../../lib/api/apiClient";
 import { useFavoriteIdsQuery } from "../../lib/api/apiQueries";
 import { invalidateFavoriteQueries } from "../../lib/api/queryClient";

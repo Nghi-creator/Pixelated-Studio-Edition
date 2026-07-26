@@ -6,7 +6,7 @@ import {
   parseStreamKeyboardMapping,
   rebindStreamKeyboard,
   streamActionForCode,
-} from "../../../src/lib/webrtc/inputMappings.ts";
+} from "../../../src/lib/webrtc/input/inputMappings.ts";
 
 test("stream keyboard mappings parse valid preferences and reject invalid ones", () => {
   const customized = {

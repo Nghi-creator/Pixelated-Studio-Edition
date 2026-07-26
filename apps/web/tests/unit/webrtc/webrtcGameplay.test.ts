@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildMultiplayerLobbyPayload } from "../../../src/lib/webrtc/lobbyMetadata.ts";
+import { buildMultiplayerLobbyPayload } from "../../../src/lib/webrtc/lobby/lobbyMetadata.ts";
 import {
   formatEngineLaunchFailure,
   getErrorMessage,
