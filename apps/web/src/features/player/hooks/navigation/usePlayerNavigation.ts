@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Location } from "react-router-dom";
+import type { Location } from "react-router";
 
 type PlayerBackState = {
   backRoute?: unknown;
@@ -34,4 +34,3 @@ export function usePlayerNavigation(location: Location, gameId?: string) {
     ),
   };
 }
-

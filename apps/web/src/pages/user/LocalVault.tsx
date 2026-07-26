@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import {
   type AdminConfirmation,
 } from "../../components/admin/AdminConfirmDialog";

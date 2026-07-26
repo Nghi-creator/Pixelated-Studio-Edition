@@ -5,7 +5,7 @@ import {
   Network,
 } from "lucide-react";
 import type { MouseEvent } from "react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 
 type DesktopDownload = {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { Lock, Loader2, CheckCircle2 } from "lucide-react";
 import { supabase } from "../../lib/auth/supabaseClient";
 import {

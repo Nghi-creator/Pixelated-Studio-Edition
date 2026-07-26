@@ -5,7 +5,7 @@ import {
   Routes,
   Route,
   Outlet,
-} from "react-router-dom";
+} from "react-router";
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import AdminLayout from "./components/layout/AdminLayout";

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 import { ArrowLeft, Plus } from "lucide-react";
 import GameCard from "../../components/user/GameCard";
 import { useFavoritesQuery } from "../../lib/api/apiQueries";

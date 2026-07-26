@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { Location } from "react-router-dom";
+import type { Location } from "react-router";
 import type { EngineShareContext } from "../../../../lib/webrtc/useWebRTC";
 
 export function usePlayerShareInvite({
@@ -55,4 +55,3 @@ export function usePlayerShareInvite({
     };
   }, [directShareUrl, shareContext]);
 }
-

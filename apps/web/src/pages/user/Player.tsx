@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router";
 import { LobbyPanel } from "../../features/player/components/stream/LobbyPanel";
 import { KeyboardMappingDrawer } from "../../features/player/components/stream/KeyboardMappingDrawer";
 import { PlayerControls } from "../../features/player/components/shell/PlayerControls";

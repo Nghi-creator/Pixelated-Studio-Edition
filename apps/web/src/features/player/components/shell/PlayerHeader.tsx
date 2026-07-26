@@ -1,5 +1,5 @@
 import { ArrowLeft } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link } from "react-router";
 import { PixelIcon } from "../../../../components/ui/PixelIcon";
 import type { ApiGame } from "../../../../lib/api/apiClient";
 import type { WebRTCStatus } from "../../../../lib/webrtc/session/webrtcSession";
@@ -142,4 +142,3 @@ export function PlayerHeader({
     </div>
   );
 }
-

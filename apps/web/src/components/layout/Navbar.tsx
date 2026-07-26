@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import { Link, useNavigate, useLocation } from "react-router";
 import { Loader2, Menu, ScrollText, X } from "lucide-react";
 import { PixelIcon } from "../ui/PixelIcon";
 import { NavbarAccount } from "./navbar/NavbarAccount";

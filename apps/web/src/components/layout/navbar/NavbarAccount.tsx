@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { Code, LogOut } from "lucide-react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router";
 import { supabase } from "../../../lib/auth/supabaseClient";
 import { Avatar } from "../../ui/Avatar";
 import { PixelIcon } from "../../ui/PixelIcon";
