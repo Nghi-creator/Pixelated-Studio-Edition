@@ -11,7 +11,7 @@ import {
   seedProfiles,
   SUPER_ADMIN_ID,
   USER_ID,
-} from "./dataBoundarySupport.js";
+} from "../support/dataBoundarySupport.js";
 
 test("moderation reports are created and resolved through admin routes", async () => {
   const db = new FakeSupabase();

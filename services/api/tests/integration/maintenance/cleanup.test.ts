@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
-import { cleanupControlPlaneState } from "../../src/modules/maintenance/controlPlaneCleanup.js";
-import { FakeSupabase } from "./support/controlPlaneTestHarness.js";
+import { cleanupControlPlaneState } from "../../../src/modules/maintenance/controlPlaneCleanup.js";
+import { FakeSupabase } from "../support/controlPlaneTestHarness.js";
 
 test("control-plane cleanup removes expired sessions and old metrics", async () => {
   const db = new FakeSupabase();

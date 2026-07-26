@@ -7,7 +7,7 @@ import {
   seedProfiles,
   sha256,
   validNesRom,
-} from "./dataBoundarySupport.js";
+} from "../support/dataBoundarySupport.js";
 
 test("admin browser smoke flow verifies the artifact and records reviewer evidence", async () => {
   const db = new FakeSupabase();

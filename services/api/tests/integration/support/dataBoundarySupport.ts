@@ -1,5 +1,5 @@
-export { createDataBoundaryApp } from "./support/dataBoundaryApp.js";
-export { FakeSupabase, type RecordRow } from "./support/dataBoundaryDatabase.js";
+export { createDataBoundaryApp } from "./dataBoundaryApp.js";
+export { FakeSupabase, type RecordRow } from "./dataBoundaryDatabase.js";
 export {
   ADMIN_ID,
   COMMENT_ID,
@@ -17,4 +17,4 @@ export {
   validNesRom,
   validSnesRom,
   validSubmissionPayload,
-} from "./support/dataBoundaryFixtures.js";
+} from "./dataBoundaryFixtures.js";

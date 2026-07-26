@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import Fastify from "fastify";
-import { registerCors } from "../../src/plugins/cors.js";
-import { registerGlobalRateLimit } from "../../src/plugins/rateLimit.js";
-import { registerSecurityHeaders } from "../../src/plugins/securityHeaders.js";
-import type { RateLimiter } from "../../src/modules/security/sharedRateLimiter.js";
+import { registerCors } from "../../../src/plugins/cors.js";
+import { registerGlobalRateLimit } from "../../../src/plugins/rateLimit.js";
+import { registerSecurityHeaders } from "../../../src/plugins/securityHeaders.js";
+import type { RateLimiter } from "../../../src/modules/security/sharedRateLimiter.js";
 
 function createTestLimiter(limit: number): RateLimiter {
   const counts = new Map<string, number>();

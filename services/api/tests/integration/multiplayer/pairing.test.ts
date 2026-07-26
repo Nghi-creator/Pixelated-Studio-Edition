@@ -5,7 +5,7 @@ import {
   GAME_ID,
   USER_ID,
   createTestApp,
-} from "./support/controlPlaneTestHarness.js";
+} from "../support/controlPlaneTestHarness.js";
 
 test("local pairings are persisted, readable, and deletable", async () => {
   const db = new FakeSupabase();

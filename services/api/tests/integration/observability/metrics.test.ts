@@ -5,7 +5,7 @@ import {
   OTHER_USER_ID,
   USER_ID,
   createTestApp,
-} from "./support/controlPlaneTestHarness.js";
+} from "../support/controlPlaneTestHarness.js";
 
 test("stream metrics persist and rate-limit per user session", async () => {
   const db = new FakeSupabase();

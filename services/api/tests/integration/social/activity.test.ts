@@ -9,7 +9,7 @@ import {
   OTHER_USER_ID,
   seedProfiles,
   USER_ID,
-} from "./dataBoundarySupport.js";
+} from "../support/dataBoundarySupport.js";
 
 test("comment delete is scoped to owner unless actor is admin", async () => {
   const db = new FakeSupabase();
