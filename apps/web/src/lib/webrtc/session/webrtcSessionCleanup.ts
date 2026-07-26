@@ -1,5 +1,5 @@
-import { INITIAL_WEBRTC_TELEMETRY } from "./webrtcTelemetry";
-import { endSyncedMultiplayerLobby } from "./webrtcLobbySync";
+import { INITIAL_WEBRTC_TELEMETRY } from "../telemetry/webrtcTelemetry";
+import { endSyncedMultiplayerLobby } from "../lobby/webrtcLobbySync";
 import type {
   UseWebRTCSessionLifecycleParams,
   WebRTCSessionConfig,
@@ -68,3 +68,4 @@ export function cleanupWebRTCSession({
     params.setTelemetry(INITIAL_WEBRTC_TELEMETRY);
   }
 }
+

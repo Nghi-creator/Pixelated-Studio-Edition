@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { attachEngineInput, __testing } from "../../../src/lib/webrtc/webrtcInput.ts";
+import { attachEngineInput, __testing } from "../../../src/lib/webrtc/input/webrtcInput.ts";
 
 function keyboardEventFor(target: EventTarget) {
   return {

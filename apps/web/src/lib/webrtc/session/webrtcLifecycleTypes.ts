@@ -1,15 +1,15 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { StreamProfile } from "../engine/streamProfiles";
+import type { StreamProfile } from "../../engine/streamProfiles";
 import type { WebRTCStatus } from "./webrtcSession";
-import type { EngineSocket } from "./webrtcSocket";
-import type { WebRTCTelemetry } from "./webrtcTelemetry";
+import type { EngineSocket } from "../transport/webrtcSocket";
+import type { WebRTCTelemetry } from "../telemetry/webrtcTelemetry";
 import type {
   EngineInputCapabilities,
   EngineShareContext,
   LobbyParticipant,
   LobbyState,
   UseWebRTCOptions,
-} from "./types";
+} from "../types";
 import type { resolveGameBootTarget } from "./webrtcSession";
 
 export type RefValue<T> = { current: T };
@@ -74,3 +74,4 @@ export type UseWebRTCSessionLifecycleParams = {
   socketRef: RefValue<EngineSocket | null>;
   streamProfileRef: RefValue<StreamProfile>;
 };
+

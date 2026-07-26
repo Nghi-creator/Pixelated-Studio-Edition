@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState } from "react";
 import { X } from "lucide-react";
 import type { StreamProfile } from "../../../lib/engine/streamProfiles";
-import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
+import type { WebRTCTelemetry } from "../../../lib/webrtc/telemetry/webrtcTelemetry";
 import { useStreamTelemetryExportActions } from "../hooks/useStreamTelemetryExportActions";
 import { useStreamTelemetryHistory } from "../hooks/useStreamTelemetryHistory";
 import type { ResearchBaselineForm } from "../research/researchBaseline";

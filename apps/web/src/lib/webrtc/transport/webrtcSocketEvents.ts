@@ -1,21 +1,21 @@
-import { clearEngineToken } from "../engine/engineAuth";
-import { loadEngineSessionContext } from "./engineContext";
-import { attachEngineInput } from "./webrtcInput";
-import { syncMultiplayerLobby } from "./webrtcLobbySync";
+import { clearEngineToken } from "../../engine/engineAuth";
+import { loadEngineSessionContext } from "../engine/engineContext";
+import { attachEngineInput } from "../input/webrtcInput";
+import { syncMultiplayerLobby } from "../lobby/webrtcLobbySync";
 import { createAndSendOffer } from "./webrtcPeer";
 import {
   getErrorMessage,
   STREAM_OFFER_ERROR_MESSAGE,
   STREAM_REMOTE_DESCRIPTION_ERROR_MESSAGE,
-} from "./streamErrors";
-import { handleWebRTCSocketConnect } from "./webrtcBootFlow";
-import type { LobbyState } from "./types";
+} from "../streamErrors";
+import { handleWebRTCSocketConnect } from "../session/webrtcBootFlow";
+import type { LobbyState } from "../types";
 import type {
   FailStream,
   UseWebRTCSessionLifecycleParams,
   WebRTCSessionConfig,
   WebRTCSessionRuntime,
-} from "./webrtcLifecycleTypes";
+} from "../session/webrtcLifecycleTypes";
 
 export function bindWebRTCSocketEvents({
   config,
@@ -180,3 +180,4 @@ export function bindWebRTCSocketEvents({
     }
   });
 }
+

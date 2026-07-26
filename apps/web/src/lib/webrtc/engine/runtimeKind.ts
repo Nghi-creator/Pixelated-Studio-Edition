@@ -12,3 +12,4 @@ export function assertEngineRuntimeKindMatches(
       : "This game needs the libretro engine. Restart Pixelated Desktop without native runtime mode, then try again.",
   );
 }
+

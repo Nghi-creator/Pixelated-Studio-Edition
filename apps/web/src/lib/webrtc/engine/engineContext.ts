@@ -3,15 +3,15 @@ import {
   getEngineControlUrl,
   getEngineUrl,
   getLocalCompanionControlUrl,
-} from "../engine/engineConfig";
-import { engineControlAuthHeaders } from "../engine/engineAuth";
-import { engineFetch } from "../engine/engineRequest";
+} from "../../engine/engineConfig";
+import { engineControlAuthHeaders } from "../../engine/engineAuth";
+import { engineFetch } from "../../engine/engineRequest";
 import type { EngineRuntimeKind } from "./runtimeKind";
 import type {
   EngineInputCapabilities,
   EngineShareContext,
-} from "./types";
-import { formatEngineLaunchFailure } from "./streamErrors";
+} from "../types";
+import { formatEngineLaunchFailure } from "../streamErrors";
 
 const KEYBOARD_FALLBACK_PLAYER_COUNT = 2;
 const VIRTUAL_GAMEPAD_PLAYER_COUNT = 4;
@@ -267,3 +267,4 @@ async function parseRuntimeSwitchResponse(response: Response) {
     status: "unavailable" as const,
   };
 }
+

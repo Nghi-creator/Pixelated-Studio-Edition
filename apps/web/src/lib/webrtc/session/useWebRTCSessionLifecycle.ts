@@ -1,15 +1,15 @@
 import { useEffect } from "react";
-import { ensureEngineToken } from "../engine/engineAuth";
-import { FALLBACK_ICE_SERVERS } from "./webrtcConfig";
-import { createEngineSocket } from "./webrtcSocket";
+import { ensureEngineToken } from "../../engine/engineAuth";
+import { FALLBACK_ICE_SERVERS } from "../transport/webrtcConfig";
+import { createEngineSocket } from "../transport/webrtcSocket";
 import type {
   UseWebRTCSessionLifecycleParams,
   WebRTCSessionConfig,
   WebRTCSessionRuntime,
 } from "./webrtcLifecycleTypes";
 import { createFailStream } from "./webrtcSessionFailure";
-import { initializeWebRTCPeerSession } from "./webrtcPeerLifecycle";
-import { bindWebRTCSocketEvents } from "./webrtcSocketEvents";
+import { initializeWebRTCPeerSession } from "../transport/webrtcPeerLifecycle";
+import { bindWebRTCSocketEvents } from "../transport/webrtcSocketEvents";
 import { cleanupWebRTCSession } from "./webrtcSessionCleanup";
 
 export function useWebRTCSessionLifecycle(params: UseWebRTCSessionLifecycleParams) {
@@ -187,3 +187,4 @@ export function useWebRTCSessionLifecycle(params: UseWebRTCSessionLifecycleParam
     streamProfileRef,
   ]);
 }
+

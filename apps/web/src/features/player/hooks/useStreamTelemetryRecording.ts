@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
+import type { WebRTCTelemetry } from "../../../lib/webrtc/telemetry/webrtcTelemetry";
 import {
   createTelemetryCsvSample,
   type StreamTelemetryCsvSample,

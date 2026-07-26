@@ -24,8 +24,8 @@ import {
 import {
   INITIAL_WEBRTC_TELEMETRY,
   type WebRTCTelemetry,
-} from "../../src/lib/webrtc/webrtcTelemetry";
-import type { WebRTCStatus } from "../../src/lib/webrtc/webrtcSession";
+} from "../../src/lib/webrtc/telemetry/webrtcTelemetry";
+import type { WebRTCStatus } from "../../src/lib/webrtc/session/webrtcSession";
 import {
   DEFAULT_STREAM_PROFILE,
   STREAM_PROFILES,

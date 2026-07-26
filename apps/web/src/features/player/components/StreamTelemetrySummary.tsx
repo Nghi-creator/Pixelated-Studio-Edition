@@ -1,4 +1,4 @@
-import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
+import type { WebRTCTelemetry } from "../../../lib/webrtc/telemetry/webrtcTelemetry";
 import type { StreamTelemetryHistorySample } from "../hooks/useStreamTelemetryHistory";
 
 const formatNumber = (value: number | null, digits = 0) =>

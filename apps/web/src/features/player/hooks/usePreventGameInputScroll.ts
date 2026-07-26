@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { shouldIgnoreGameInput } from "../../../lib/webrtc/webrtcInput";
+import { shouldIgnoreGameInput } from "../../../lib/webrtc/input/webrtcInput";
 
 export function usePreventGameInputScroll() {
   useEffect(() => {

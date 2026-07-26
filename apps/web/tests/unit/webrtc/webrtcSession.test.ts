@@ -3,9 +3,9 @@ import test from "node:test";
 import {
   createWebRTCProfileRestartIdentity,
   createWebRTCRetryIdentity,
-} from "../../../src/lib/webrtc/webrtcIdentity.ts";
-import { assertEngineRuntimeKindMatches } from "../../../src/lib/webrtc/runtimeKind.ts";
-import { isRetryableBackendSessionConflict } from "../../../src/lib/webrtc/webrtcSessionErrors.ts";
+} from "../../../src/lib/webrtc/session/webrtcIdentity.ts";
+import { assertEngineRuntimeKindMatches } from "../../../src/lib/webrtc/engine/runtimeKind.ts";
+import { isRetryableBackendSessionConflict } from "../../../src/lib/webrtc/session/webrtcSessionErrors.ts";
 
 test("WebRTC retry rotates peer identity and local session identity", () => {
   const first = createWebRTCRetryIdentity(false);

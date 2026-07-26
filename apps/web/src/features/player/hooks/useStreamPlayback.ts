@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { RefObject } from "react";
-import type { WebRTCStatus } from "../../../lib/webrtc/webrtcSession";
+import type { WebRTCStatus } from "../../../lib/webrtc/session/webrtcSession";
 import {
   BLACK_VIDEO_SAMPLE_THRESHOLD,
   createStreamPlaybackSampleTracker,

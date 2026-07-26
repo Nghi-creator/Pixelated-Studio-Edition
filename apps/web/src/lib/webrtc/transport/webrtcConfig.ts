@@ -1,4 +1,4 @@
-import { api } from "../api/apiClient";
+import { api } from "../../api/apiClient";
 
 export const STREAM_METRIC_SEND_INTERVAL_MS = 5_000;
 export const CLIENT_HEARTBEAT_INTERVAL_MS = 20_000;
@@ -18,3 +18,4 @@ export async function loadIceServers() {
     return FALLBACK_ICE_SERVERS;
   }
 }
+

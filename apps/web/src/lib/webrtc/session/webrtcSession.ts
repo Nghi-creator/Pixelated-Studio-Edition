@@ -2,13 +2,13 @@ import {
   api,
   ensurePlayAuthSession,
   getAuthSession,
-} from "../api/apiClient";
+} from "../../api/apiClient";
 import {
   loadEngineRuntimeKind,
   requestEngineRuntimeSwitch,
   stopActiveEngineSession,
-} from "./engineContext";
-import { assertEngineRuntimeKindMatches } from "./runtimeKind";
+} from "../engine/engineContext";
+import { assertEngineRuntimeKindMatches } from "../engine/runtimeKind";
 export { createWebRTCSessionId } from "./webrtcIdentity";
 
 export type WebRTCStatus = "idle" | "connecting" | "playing" | "error";
@@ -118,3 +118,4 @@ export const resolveGameBootTarget = async (
     userId: backendSession.user.id,
   };
 };
+

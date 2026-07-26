@@ -1,11 +1,11 @@
-import { ApiError, api } from "../api/apiClient";
-import { getEngineUrl } from "../engine/engineConfig";
+import { ApiError, api } from "../../api/apiClient";
+import { getEngineUrl } from "../../engine/engineConfig";
 import { buildMultiplayerLobbyPayload } from "./lobbyMetadata";
 import type {
   EngineInputCapabilities,
   EngineShareContext,
   LobbyState,
-} from "./types";
+} from "../types";
 
 type SyncMultiplayerLobbyOptions = {
   gameId: string;
@@ -51,3 +51,4 @@ export function endSyncedMultiplayerLobby(sessionId: string) {
     console.warn("[WebRTC] Failed to end multiplayer lobby:", err);
   });
 }
+

@@ -140,3 +140,4 @@ export function formatKeyboardCode(code: string) {
 export function clearCachedStreamKeyboardMappingForTests() {
   cachedMapping = null;
 }
+

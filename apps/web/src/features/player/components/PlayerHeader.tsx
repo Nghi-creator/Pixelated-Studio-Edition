@@ -2,7 +2,7 @@ import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router-dom";
 import { PixelIcon } from "../../../components/ui/PixelIcon";
 import type { ApiGame } from "../../../lib/api/apiClient";
-import type { WebRTCStatus } from "../../../lib/webrtc/webrtcSession";
+import type { WebRTCStatus } from "../../../lib/webrtc/session/webrtcSession";
 
 type PlayerHeaderProps = {
   backRoute: string;

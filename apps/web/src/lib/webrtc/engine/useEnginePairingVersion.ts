@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ENGINE_PAIRING_EVENT } from "../engine/engineAuth";
+import { ENGINE_PAIRING_EVENT } from "../../engine/engineAuth";
 
 export function useEnginePairingVersion() {
   const [pairingVersion, setPairingVersion] = useState(0);
@@ -15,3 +15,4 @@ export function useEnginePairingVersion() {
 
   return pairingVersion;
 }
+

@@ -24,3 +24,4 @@ export function getResolvedBootTarget(
 
   return runtime.bootTargetPromise;
 }
+

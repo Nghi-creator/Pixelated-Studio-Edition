@@ -1,23 +1,23 @@
 import {
   CHECKING_INPUT_CAPABILITIES,
   loadEngineSessionContext,
-} from "./engineContext";
+} from "../engine/engineContext";
 import {
   DISCONNECTED_GRACE_MS,
   loadIceServers,
   STREAM_METRIC_SEND_INTERVAL_MS,
 } from "./webrtcConfig";
-import { publishStreamMetric } from "./webrtcMetricPublisher";
+import { publishStreamMetric } from "../telemetry/webrtcMetricPublisher";
 import { createEnginePeerConnection } from "./webrtcPeer";
-import { INITIAL_WEBRTC_TELEMETRY, startWebRTCTelemetry } from "./webrtcTelemetry";
+import { INITIAL_WEBRTC_TELEMETRY, startWebRTCTelemetry } from "../telemetry/webrtcTelemetry";
 import type {
   FailStream,
   UseWebRTCSessionLifecycleParams,
   WebRTCSessionConfig,
   WebRTCSessionRuntime,
-} from "./webrtcLifecycleTypes";
-import { ensurePlayAuthSession } from "../api/apiClient";
-import { isLocalVaultGameId } from "./webrtcSession";
+} from "../session/webrtcLifecycleTypes";
+import { ensurePlayAuthSession } from "../../api/apiClient";
+import { isLocalVaultGameId } from "../session/webrtcSession";
 
 export async function initializeWebRTCPeerSession({
   config,
@@ -177,3 +177,4 @@ export async function initializeWebRTCPeerSession({
 
   runtime.socket.connect();
 }
+

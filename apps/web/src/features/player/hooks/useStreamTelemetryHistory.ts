@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
+import type { WebRTCTelemetry } from "../../../lib/webrtc/telemetry/webrtcTelemetry";
 
 export type StreamTelemetryHistorySample = {
   bitrateKbps: number;

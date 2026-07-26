@@ -9,7 +9,7 @@ import {
   STREAM_INPUT_ACTION_LABELS,
   STREAM_INPUT_ACTIONS,
   type StreamInputAction,
-} from "../../../lib/webrtc/inputMappings";
+} from "../../../lib/webrtc/input/inputMappings";
 
 type KeyboardMappingDrawerProps = {
   onClose: () => void;

@@ -1,5 +1,5 @@
 import type { MutableRefObject } from "react";
-import { ApiError, api } from "../api/apiClient";
+import { ApiError, api } from "../../api/apiClient";
 import {
   INITIAL_WEBRTC_TELEMETRY,
   type WebRTCTelemetry,
@@ -56,3 +56,4 @@ export function publishStreamMetric({
       console.warn("[WebRTC] Failed to send stream metric:", err);
     });
 }
+

@@ -1,17 +1,17 @@
 import {
   loadEngineLaunchFailureMessage,
   stopActiveEngineSession,
-} from "./engineContext";
+} from "../engine/engineContext";
 import {
   CLIENT_HEARTBEAT_INTERVAL_MS,
   STREAM_BOOT_READY_TIMEOUT_MS,
-} from "./webrtcConfig";
+} from "../transport/webrtcConfig";
 import { createWebRTCRetryIdentity } from "./webrtcIdentity";
 import { isRetryableBackendSessionConflict } from "./webrtcSessionErrors";
 import {
   getErrorMessage,
   STREAM_BOOT_ERROR_MESSAGE,
-} from "./streamErrors";
+} from "../streamErrors";
 import { getResolvedBootTarget } from "./webrtcBootTarget";
 import type {
   FailStream,
@@ -152,3 +152,4 @@ export async function handleWebRTCSocketConnect({
     failStream(getErrorMessage(err, STREAM_BOOT_ERROR_MESSAGE));
   }
 }
+

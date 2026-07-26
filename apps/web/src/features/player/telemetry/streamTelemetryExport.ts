@@ -1,4 +1,4 @@
-import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
+import type { WebRTCTelemetry } from "../../../lib/webrtc/telemetry/webrtcTelemetry";
 
 export type StreamTelemetryCsvSample = {
   bitrateKbps: number | null;

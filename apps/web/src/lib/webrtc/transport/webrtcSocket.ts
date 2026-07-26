@@ -1,7 +1,7 @@
 import { io } from "socket.io-client";
-import { getCompanionAccessToken } from "../engine/engineAuth";
-import { getEngineClientId } from "../engine/engineClient";
-import { getEngineUrl } from "../engine/engineConfig";
+import { getCompanionAccessToken } from "../../engine/engineAuth";
+import { getEngineClientId } from "../../engine/engineClient";
+import { getEngineUrl } from "../../engine/engineConfig";
 
 export type EngineSocket = ReturnType<typeof io>;
 
@@ -24,3 +24,4 @@ export function createEngineSocket(engineToken: string) {
 
   return socket;
 }
+

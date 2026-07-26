@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import type { StreamProfile } from "../engine/streamProfiles";
-import { createWebRTCProfileRestartIdentity } from "./webrtcIdentity";
+import type { StreamProfile } from "../../engine/streamProfiles";
+import { createWebRTCProfileRestartIdentity } from "../session/webrtcIdentity";
 
 export function useWebRTCProfileRestart({
   peerIdRef,
@@ -34,3 +34,4 @@ export function useWebRTCProfileRestart({
     streamProfileRef,
   };
 }
+

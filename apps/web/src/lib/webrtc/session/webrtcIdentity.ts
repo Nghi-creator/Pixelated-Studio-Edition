@@ -15,3 +15,4 @@ export const createWebRTCProfileRestartIdentity = () => ({
   peerId: createWebRTCSessionId(),
   sessionId: null,
 });
+

@@ -1,9 +1,9 @@
-import type { ApiMultiplayerLobbyPayload } from "../api/apiTypes";
+import type { ApiMultiplayerLobbyPayload } from "../../api/apiTypes";
 import type {
   EngineInputCapabilities,
   EngineShareContext,
   LobbyState,
-} from "./types";
+} from "../types";
 
 type BuildMultiplayerLobbyPayloadOptions = {
   engineUrl: string | null;
@@ -35,3 +35,4 @@ export function buildMultiplayerLobbyPayload({
     })),
   };
 }
+

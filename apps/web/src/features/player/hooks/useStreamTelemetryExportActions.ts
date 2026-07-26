@@ -2,7 +2,7 @@ import { useState } from "react";
 import { engineAuthHeaders } from "../../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../../lib/engine/engineConfig";
 import { engineFetch } from "../../../lib/engine/engineRequest";
-import type { WebRTCTelemetry } from "../../../lib/webrtc/webrtcTelemetry";
+import type { WebRTCTelemetry } from "../../../lib/webrtc/telemetry/webrtcTelemetry";
 import { downloadBlob } from "../downloadFile";
 import {
   createStreamTelemetryCsvFilename,
