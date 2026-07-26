@@ -1,35 +1,35 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { LobbyPanel } from "../../features/player/components/LobbyPanel";
-import { KeyboardMappingDrawer } from "../../features/player/components/KeyboardMappingDrawer";
-import { PlayerControls } from "../../features/player/components/PlayerControls";
-import { PlayerHeader } from "../../features/player/components/PlayerHeader";
-import { StreamStage } from "../../features/player/components/StreamStage";
+import { LobbyPanel } from "../../features/player/components/stream/LobbyPanel";
+import { KeyboardMappingDrawer } from "../../features/player/components/stream/KeyboardMappingDrawer";
+import { PlayerControls } from "../../features/player/components/shell/PlayerControls";
+import { PlayerHeader } from "../../features/player/components/shell/PlayerHeader";
+import { StreamStage } from "../../features/player/components/stream/StreamStage";
 import {
   PlayerRecordingStatusButton,
   PlayerStreamGrid,
-} from "../../features/player/components/PlayerStreamGrid";
-import { useAuthUser } from "../../features/player/hooks/useAuthUser";
-import { useGameMetadata } from "../../features/player/hooks/useGameMetadata";
-import { usePlayerIdentity } from "../../features/player/hooks/usePlayerIdentity";
-import { usePlayerNavigation } from "../../features/player/hooks/usePlayerNavigation";
-import { usePlayerShareInvite } from "../../features/player/hooks/usePlayerShareInvite";
-import { usePlayerStreamSettings } from "../../features/player/hooks/usePlayerStreamSettings";
-import { usePlayCount } from "../../features/player/hooks/usePlayCount";
-import { useStreamPlayback } from "../../features/player/hooks/useStreamPlayback";
-import { useResearchRunState } from "../../features/player/hooks/useResearchRunState";
-import { useStreamTelemetryRecording } from "../../features/player/hooks/useStreamTelemetryRecording";
-import { usePreventGameInputScroll } from "../../features/player/hooks/usePreventGameInputScroll";
+} from "../../features/player/components/shell/PlayerStreamGrid";
+import { useAuthUser } from "../../features/player/hooks/data/useAuthUser";
+import { useGameMetadata } from "../../features/player/hooks/data/useGameMetadata";
+import { usePlayerIdentity } from "../../features/player/hooks/navigation/usePlayerIdentity";
+import { usePlayerNavigation } from "../../features/player/hooks/navigation/usePlayerNavigation";
+import { usePlayerShareInvite } from "../../features/player/hooks/navigation/usePlayerShareInvite";
+import { usePlayerStreamSettings } from "../../features/player/hooks/playback/usePlayerStreamSettings";
+import { usePlayCount } from "../../features/player/hooks/data/usePlayCount";
+import { useStreamPlayback } from "../../features/player/hooks/playback/useStreamPlayback";
+import { useResearchRunState } from "../../features/player/hooks/research/useResearchRunState";
+import { useStreamTelemetryRecording } from "../../features/player/hooks/telemetry/useStreamTelemetryRecording";
+import { usePreventGameInputScroll } from "../../features/player/hooks/playback/usePreventGameInputScroll";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
 import { useWebRTC } from "../../lib/webrtc/useWebRTC";
 
 const PlayerCommunitySection = lazy(() =>
-  import("../../features/player/components/PlayerCommunitySection").then(
+  import("../../features/player/components/community/PlayerCommunitySection").then(
     ({ PlayerCommunitySection }) => ({ default: PlayerCommunitySection }),
   ),
 );
 const StreamTelemetryPanel = lazy(() =>
-  import("../../features/player/components/StreamTelemetryPanel").then(
+  import("../../features/player/components/telemetry/StreamTelemetryPanel").then(
     ({ StreamTelemetryPanel }) => ({ default: StreamTelemetryPanel }),
   ),
 );

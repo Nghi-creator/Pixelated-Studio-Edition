@@ -5,7 +5,7 @@ import {
   createStreamPlaybackSampleTracker,
   FALLBACK_BAD_SAMPLE_COUNT,
   FALLBACK_HEALTHY_SAMPLE_COUNT,
-} from "../../../src/features/player/hooks/streamPlaybackSamples.ts";
+} from "../../../src/features/player/hooks/playback/streamPlaybackSamples.ts";
 
 test("black frame samples activate fallback before reporting a stall", () => {
   const tracker = createStreamPlaybackSampleTracker();
