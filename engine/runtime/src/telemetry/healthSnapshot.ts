@@ -12,6 +12,7 @@ type RuntimeState = {
   cameraPeerStatePath?: string | null;
   cameraProcess?: ProcessRef;
   gamepads?: Record<string, unknown>;
+  keyboard?: Record<string, unknown>;
   lastLaunchFailure?: Record<string, unknown> | null;
   pulseAudioProcess?: ProcessRef;
   retroarchProcess?: ProcessRef;
@@ -22,6 +23,7 @@ type HealthPaths = {
   cameraBridge: string;
   cameraPeerState: string;
   gamepadBridge: string;
+  keyboardBridge: string;
   gstreamerBinary: string;
   libretroCores: string[];
   pythonBinary: string;
@@ -180,6 +182,10 @@ export function createHealthSnapshot(options: HealthSnapshotOptions) {
       gamepadBridge: {
         fileExists: pathExists(healthPaths.gamepadBridge),
         ...runtimeState.gamepads,
+      },
+      keyboardBridge: {
+        fileExists: pathExists(healthPaths.keyboardBridge),
+        ...runtimeState.keyboard,
       },
       storage: {
         romsDirectoryExists: pathExists(healthPaths.roms),

@@ -1,7 +1,7 @@
 import fs from "fs";
 import { spawn, type ChildProcessWithoutNullStreams } from "child_process";
 import { translateGamepadButton } from "./translateGamepadButton";
-import type { KeyAction } from "./injectKey";
+import type { KeyAction } from "./keyboardBridge";
 
 type GamepadBridgeOptions = {
   gamepadBridgePath: string;

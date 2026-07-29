@@ -87,6 +87,7 @@ const runtime = createProcessManager({
   cameraPeerStatePath: HEALTH_PATHS.cameraPeerState,
   engineToken: ENGINE_TOKEN,
   gamepadBridgePath: HEALTH_PATHS.gamepadBridge,
+  keyboardBridgePath: HEALTH_PATHS.keyboardBridge,
 });
 const cloudRoms = createCloudRomDownloader({
   allowedRomHosts,

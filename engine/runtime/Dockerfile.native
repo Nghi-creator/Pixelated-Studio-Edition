@@ -52,7 +52,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-evdev \
     python3-gi \
     python3-gst-1.0 \
-    xdotool \
+    libxtst6 \
     xvfb \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 --user-group pixelated \
@@ -64,7 +64,7 @@ COPY --from=app-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=app-builder /app/dist /app/dist
 COPY --from=app-builder /app/node_modules /app/node_modules
 COPY --from=python-builder /out /usr/local/lib/pixelated-python
-COPY camera.py input_gamepad.py /app/
+COPY camera.py input_gamepad.py input_keyboard.py /app/
 COPY native-runtime.lock.json /app/native-runtime.lock.json
 
 WORKDIR /app

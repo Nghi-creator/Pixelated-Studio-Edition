@@ -90,6 +90,7 @@ export const HEALTH_PATHS = {
   cameraBridge: path.join(process.cwd(), "camera.py"),
   cameraPeerState: "/tmp/pixelated_camera_peers.json",
   gamepadBridge: path.join(process.cwd(), "input_gamepad.py"),
+  keyboardBridge: path.join(process.cwd(), "input_keyboard.py"),
   gstreamerBinary: "/usr/bin/gst-launch-1.0",
   libretroCores: [
     "/cores/mesen_libretro.so",

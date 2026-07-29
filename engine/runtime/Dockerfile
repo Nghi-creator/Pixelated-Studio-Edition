@@ -148,7 +148,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-gi \
     python3-gst-1.0 \
     retroarch \
-    xdotool \
+    libxtst6 \
     xvfb \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 --user-group pixelated \
@@ -164,7 +164,7 @@ COPY --from=mgba-builder /out/mgba_libretro.so /cores/mgba_libretro.so
 COPY --from=bsnes-builder /out/bsnes_libretro.so /cores/bsnes_libretro.so
 COPY --from=picodrive-builder /out/picodrive_libretro.so /cores/picodrive_libretro.so
 COPY --from=python-builder /out /usr/local/lib/python3.10/dist-packages
-COPY camera.py input_gamepad.py /app/
+COPY camera.py input_gamepad.py input_keyboard.py /app/
 
 WORKDIR /app
 ENV HOME=/home/pixelated

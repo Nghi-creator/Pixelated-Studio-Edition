@@ -33,6 +33,7 @@ function createManager(options: {
       engineToken: "engine-token",
       fileExists: options.fileExists || (() => true),
       gamepadBridgePath: "/app/gamepadBridge",
+      keyboardBridgePath: "/app/keyboardBridge",
       spawnProcess: ((command: string, args: string[] = []) => {
         spawned.push({ args, command });
         return child;

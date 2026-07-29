@@ -1,7 +1,10 @@
 import { spawn, type ChildProcess } from "child_process";
 import fs from "fs";
 import { createGamepadBridge } from "../../input/gamepadBridge";
-import { injectKey, type KeyAction } from "../../input/injectKey";
+import {
+  createKeyboardBridge,
+  type KeyAction,
+} from "../../input/keyboardBridge";
 import { translateKey } from "../../input/translateKey";
 import { removeFileIfExists } from "../../roms/cloudRomDownloader";
 import type { StreamProfile } from "../../signaling/start-game/startGameHandlers";
@@ -24,6 +27,7 @@ type ProcessManagerOptions = {
   engineToken: string;
   fileExists?: (path: string) => boolean;
   gamepadBridgePath: string;
+  keyboardBridgePath: string;
   spawnProcess?: typeof spawn;
 };
 
@@ -57,6 +61,7 @@ type RuntimeState = {
   cameraPeerStatePath: string;
   cameraProcess: ChildProcess | null;
   gamepads: ReturnType<ReturnType<typeof createGamepadBridge>["getState"]>;
+  keyboard: ReturnType<ReturnType<typeof createKeyboardBridge>["getState"]>;
   lastLaunchFailure: LaunchFailure | null;
   pulseAudioProcess: ChildProcess | null;
   retroarchProcess: ChildProcess | null;
@@ -64,11 +69,20 @@ type RuntimeState = {
 };
 
 export function createProcessManager(options: ProcessManagerOptions) {
-  const { cameraPath, cameraPeerStatePath, engineToken, gamepadBridgePath } =
-    options;
+  const {
+    cameraPath,
+    cameraPeerStatePath,
+    engineToken,
+    gamepadBridgePath,
+    keyboardBridgePath,
+  } = options;
   const fileExists = options.fileExists || fs.existsSync;
   const spawnProcess = options.spawnProcess || spawn;
   const gamepads = createGamepadBridge({ gamepadBridgePath });
+  const keyboard = createKeyboardBridge({
+    keyboardBridgePath,
+    spawnProcess,
+  });
   let retroarchProcess: ChildProcess | null = null;
   let cameraProcess: ChildProcess | null = null;
   let pulseAudioProcess: ChildProcess | null = null;
@@ -84,6 +98,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
     virtualDisplayProcess = hostProcesses.virtualDisplayProcess;
     pulseAudioProcess = hostProcesses.pulseAudioProcess;
     gamepads.start();
+    keyboard.start();
   }
 
   function cleanupActiveSession(sessionId?: string | null): void {
@@ -168,8 +183,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
     const linuxKey = translateKey(browserKey, playerIndex);
     if (!linuxKey) return true;
 
-    injectKey(action, linuxKey);
-    return true;
+    return keyboard.sendInput(action, linuxKey);
   }
 
   function bootGame(
@@ -273,6 +287,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
       retroarchProcess,
       virtualDisplayProcess,
       gamepads: gamepads.getState(),
+      keyboard: keyboard.getState(),
       cameraPeerStatePath,
       lastLaunchFailure,
     };
