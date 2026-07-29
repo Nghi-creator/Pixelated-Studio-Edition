@@ -18,9 +18,11 @@ import {
 import {
   getRequestAccessId,
   getRequestClientId,
+  getRequestVaultOwnerId,
   getSocketAccessId,
   getSocketAccessScope,
   getSocketClientId,
+  getSocketVaultOwnerId,
   isEngineAccessRevoked,
   isEngineClientRevoked,
   refreshConnectedClient,
@@ -113,6 +115,7 @@ registerHealthRoutes(app, getHealthSnapshot, {
   getPublicHealthSnapshot,
 });
 registerLocalVaultRoutes(app, {
+  getVaultOwnerId: getRequestVaultOwnerId,
   maxRomSizeBytes: MAX_ROM_SIZE_BYTES,
   requireEngineToken: auth.requireEngineToken,
 });
@@ -188,6 +191,7 @@ io.on("connection", (socket) => {
     apiUrl: PIXELATED_API_URL,
     canStartGame: lobby.canControlSession,
     downloadCloudRom: cloudRoms.downloadCloudRom,
+    getVaultOwnerId: getSocketVaultOwnerId,
     runtime,
     verifyBackendSession,
   });

@@ -7,10 +7,12 @@ export function sanitizeUserId(userId: unknown): string {
     : "anonymous";
 }
 
-export function getUserFolder(userId: unknown): string {
-  const folderPath = path.join("/roms", sanitizeUserId(userId));
-  if (!fs.existsSync(folderPath)) {
-    fs.mkdirSync(folderPath, { recursive: true });
-  }
+export function getUserFolderPath(userId: unknown): string {
+  return path.join("/roms", sanitizeUserId(userId));
+}
+
+export async function ensureUserFolder(userId: unknown): Promise<string> {
+  const folderPath = getUserFolderPath(userId);
+  await fs.promises.mkdir(folderPath, { recursive: true });
   return folderPath;
 }

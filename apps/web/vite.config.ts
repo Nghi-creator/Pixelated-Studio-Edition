@@ -1,6 +1,15 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+if (
+  process.env.VERCEL_ENV === "production" &&
+  !process.env.VITE_TURNSTILE_SITE_KEY?.trim()
+) {
+  throw new Error(
+    "Production web builds require VITE_TURNSTILE_SITE_KEY so anonymous signup cannot bypass CAPTCHA.",
+  );
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],

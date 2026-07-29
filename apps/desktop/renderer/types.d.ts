@@ -185,6 +185,14 @@ type PixelatedWindow = Window &
         phaseSummary: HTMLElement;
       }) => PhaseTracker;
     };
+    PixelatedStatus: {
+      createStatusPresenter: (elements: {
+        statusBadge: HTMLElement;
+        statusDot: HTMLElement;
+        statusText: HTMLElement;
+      }) => (text: string, tone: StatusTone) => void;
+      getCompactLifecycleStatus: (state: EngineStatePayload) => string;
+    };
     PixelatedClients: {
       createClientAccessController: (elements: {
         clientsList: HTMLElement;
@@ -198,6 +206,31 @@ type PixelatedWindow = Window &
         rotateEngineToken: (options: { exposureMode?: ExposureMode }) => void;
         rotateTokenButton: HTMLButtonElement;
       }) => ClientAccessController;
+    };
+    PixelatedEvents: {
+      bindRendererEvents: (bindings: {
+        clearLogsButton: HTMLButtonElement;
+        clients: ClientAccessController;
+        companionCopyButton: HTMLButtonElement;
+        electronApi: ElectronApi;
+        exposure: ExposureController;
+        getIsRunning: () => boolean;
+        handleEngineCompanion: (payload: EngineCompanionPayload) => void;
+        initializeEngine: () => void;
+        launchWebButton: HTMLButtonElement;
+        logs: LogController;
+        powerButton: HTMLButtonElement;
+        powerText: HTMLElement;
+        recovery: DockerRecoveryController;
+        regenerateInviteButton: HTMLButtonElement;
+        revokeInviteButton: HTMLButtonElement;
+        setLifecycleState: (state: EngineStatePayload) => void;
+        setPowerPending: (pending: boolean) => void;
+        setStatusPresentation: (text: string, tone: StatusTone) => void;
+        tokenPanel: HTMLElement;
+        tokenCopyButton: HTMLButtonElement;
+        tokenValue: HTMLElement;
+      }) => void;
     };
     PixelatedRecovery: {
       createDockerRecoveryController: (elements: {

@@ -35,6 +35,12 @@ const startupPanel = requiredElement("startup-panel");
 const statusBadge = requiredQuery<HTMLElement>(".status-badge");
 const statusDot = requiredElement("status-dot");
 const statusText = requiredElement("status-text");
+const setStatusPresentation =
+  pixelatedWindow.PixelatedStatus.createStatusPresenter({
+    statusBadge,
+    statusDot,
+    statusText,
+  });
 const tokenPanel = requiredElement("token-panel");
 const tokenValue = requiredElement("engine-token");
 const copyTokenBtn = requiredElement("copy-token", HTMLButtonElement);
@@ -175,85 +181,6 @@ const clients = pixelatedWindow.PixelatedClients.createClientAccessController({
   rotateTokenButton: requiredElement("rotate-token", HTMLButtonElement),
 });
 
-function compactFailedStatus(state: EngineStatePayload) {
-  const detail = (state.detail || "").toLowerCase();
-
-  if (detail.includes("no such container")) return "Container Not Found";
-  if (
-    detail.includes("port is already allocated") ||
-    detail.includes("bind for 0.0.0.0:8080 failed") ||
-    detail.includes("bind for 127.0.0.1:8080 failed")
-  ) {
-    return "Port 8080 Busy";
-  }
-  if (state.phase === "docker") return "Docker Unavailable";
-  if (state.phase === "image") return "Image Not Ready";
-  if (state.phase === "cleanup") return "Cleanup Failed";
-  if (state.phase === "container") return "Container Failed";
-  if (state.phase === "health") return "Health Check Failed";
-  return "Engine Failed";
-}
-
-function compactStartingStatus(state: EngineStatePayload) {
-  const labels: Record<string, string> = {
-    BUILDING_IMAGE: "Building Image",
-    CHECKING_DOCKER: "Checking Docker",
-    PULLING_IMAGE: "Pulling Image",
-    REMOVING_STALE: "Cleaning Container",
-    STARTING_CONTAINER: "Starting Container",
-    WAITING_HEALTH: "Checking Health",
-  };
-
-  if (state.key && labels[state.key]) return labels[state.key];
-  if (state.phase === "docker") return "Checking Docker";
-  if (state.phase === "image") return "Preparing Image";
-  if (state.phase === "cleanup") return "Cleaning Container";
-  if (state.phase === "container") return "Starting Container";
-  if (state.phase === "health") return "Checking Health";
-  return "Starting Engine";
-}
-
-function getCompactLifecycleStatus(state: EngineStatePayload) {
-  if (state.status === "failed") return compactFailedStatus(state);
-  if (state.status === "starting") return compactStartingStatus(state);
-  if (state.status === "stopping") return "Stopping Engine";
-  if (state.status === "ready") return "Engine Ready";
-  return "Engine Offline";
-}
-
-function setStatusPresentation(text: string, tone: StatusTone) {
-  const toneClasses = {
-    offline: {
-      badge: ["border-red-500/70", "bg-red-500/20", "text-red-200"],
-      dot: "bg-red-500",
-    },
-    ready: {
-      badge: ["border-emerald-500/50", "bg-emerald-500/10", "text-emerald-300"],
-      dot: "bg-emerald-400",
-    },
-    running: {
-      badge: [
-        "border-synth-action/60",
-        "bg-synth-action/15",
-        "text-synth-secondary",
-      ],
-      dot: "bg-synth-secondary",
-    },
-  } as const;
-  const allBadgeClasses = Object.values(toneClasses).flatMap(
-    ({ badge }) => badge,
-  );
-  const allDotClasses = Object.values(toneClasses).map(({ dot }) => dot);
-
-  statusBadge.classList.remove(...allBadgeClasses);
-  statusDot.classList.remove(...allDotClasses, "animate-pulse");
-  statusBadge.classList.add(...toneClasses[tone].badge);
-  statusDot.classList.add(toneClasses[tone].dot);
-  if (tone === "running") statusDot.classList.add("animate-pulse");
-  statusText.innerText = text;
-  statusBadge.title = text;
-}
-
 function setPowerPending(pending: boolean) {
   powerIcon.classList.toggle("hidden", pending);
   powerSpinner.classList.toggle("hidden", !pending);
@@ -339,7 +266,8 @@ function resetFailedUi() {
 }
 
 function setLifecycleState(state: EngineStatePayload) {
-  const statusLabel = getCompactLifecycleStatus(state);
+  const statusLabel =
+    pixelatedWindow.PixelatedStatus.getCompactLifecycleStatus(state);
   phases.render(state);
 
   if (state.status === "ready") {
@@ -380,89 +308,7 @@ function setLifecycleState(state: EngineStatePayload) {
   }
 }
 
-powerBtn.addEventListener("click", () => {
-  if (!isRunning) {
-    initializeEngine();
-    return;
-  }
-
-  setStatusPresentation("Stopping Engine", "running");
-  setPowerPending(true);
-  powerText.innerText = "Shutdown Engine";
-  pixelatedWindow.electronAPI.stopDocker();
-});
-
-launchWebBtn.addEventListener("click", async () => {
-  launchWebBtn.disabled = true;
-  try {
-    await pixelatedWindow.electronAPI.launchWeb();
-  } catch (err) {
-    logs.append(
-      `<span class="text-red-400">Could not launch the web app: ${logs.sanitize(String(err))}</span>`,
-    );
-  } finally {
-    launchWebBtn.disabled = false;
-  }
-});
-
-clearLogsBtn.addEventListener("click", () => {
-  logs.clear();
-});
-
-copyTokenBtn.addEventListener("click", async () => {
-  if (!tokenValue.innerText) return;
-
-  try {
-    await navigator.clipboard.writeText(tokenValue.innerText);
-    copyTokenBtn.innerText = "Copied";
-    setTimeout(() => {
-      copyTokenBtn.innerText = "Copy";
-    }, 1200);
-  } catch (err) {
-    logs.append(
-      '<span class="text-red-400">Failed to copy token. Select it manually.</span>',
-    );
-  }
-});
-
-copyCompanionBtn.addEventListener("click", async () => {
-  const url = document.querySelector<HTMLElement>("#companion-urls code")?.innerText;
-  if (!url) return;
-
-  try {
-    await navigator.clipboard.writeText(url);
-    copyCompanionBtn.innerText = "Copied";
-    setTimeout(() => {
-      copyCompanionBtn.innerText = "Copy";
-    }, 1200);
-  } catch (err) {
-    logs.append(
-      '<span class="text-red-400">Failed to copy HTTPS join page. Select it manually.</span>',
-    );
-  }
-});
-
-regenerateInviteBtn.addEventListener("click", () => {
-  setInviteButtonsPending(true);
-  pixelatedWindow.electronAPI.regenerateLanInvite();
-});
-
-revokeInviteBtn.addEventListener("click", () => {
-  setInviteButtonsPending(true);
-  pixelatedWindow.electronAPI.revokeLanInvite();
-});
-
-pixelatedWindow.electronAPI.onEngineToken((event, token) => {
-  tokenValue.innerText = token;
-  tokenPanel.classList.remove("hidden");
-});
-
-pixelatedWindow.electronAPI.onEngineExposure((event, payload) => {
-  exposure.renderUrls(payload.advertisedUrls || []);
-  exposure.renderCompanionUrls(payload.companionUrls || []);
-});
-
-pixelatedWindow.electronAPI.onEngineCompanion((event, payload) => {
+function handleEngineCompanion(payload: EngineCompanionPayload) {
   if (!isRunning) {
     pendingCompanionPayload = payload;
     return;
@@ -472,63 +318,30 @@ pixelatedWindow.electronAPI.onEngineCompanion((event, payload) => {
   setInviteButtonsPending(false);
   regenerateInviteBtn.disabled = !payload.enabled;
   revokeInviteBtn.disabled = !payload.enabled || Boolean(payload.inviteRevoked);
-});
+}
 
-pixelatedWindow.electronAPI.onDockerDiagnostic((event, payload) => {
-  recovery.setDockerRecoveryVisible(true, payload);
-  logs.append(
-    `<span class="text-red-400">${logs.sanitize(payload.title)}</span>`,
-  );
-  logs.append(
-    `<span class="text-gray-400">Platform: ${logs.sanitize(payload.platform)} | Diagnostic: ${logs.sanitize(payload.code)}</span>`,
-  );
-});
-
-pixelatedWindow.electronAPI.onEngineImageRecovery((event, payload) => {
-  recovery.setImageRecoveryVisible(true, payload);
-  logs.append(
-    `<span class="text-red-400">${logs.sanitize(payload.title)}</span>`,
-  );
-  logs.append(
-    `<span class="text-gray-400">Image: ${logs.sanitize(payload.engineImage)} | Runtime: ${logs.sanitize(payload.runtimeKind)}</span>`,
-  );
-});
-
-pixelatedWindow.electronAPI.onDockerRecoveryStarted(() => {
-  recovery.setDockerRecoveryPending(true);
-});
-
-pixelatedWindow.electronAPI.onDockerRecoveryReady(() => {
-  recovery.setDockerRecoveryVisible(false);
-});
-
-pixelatedWindow.electronAPI.onDockerRecoveryCancelled(() => {
-  recovery.setDockerRecoveryPending(false);
-});
-
-pixelatedWindow.electronAPI.onEngineImageBuildStarted(() => {
-  recovery.setImageBuildPending(true);
-});
-
-pixelatedWindow.electronAPI.onEngineImageBuildReady(() => {
-  recovery.setImageRecoveryVisible(false);
-});
-
-pixelatedWindow.electronAPI.onEngineState((event, state) => {
-  if (state.status === "ready" || state.status === "failed" || state.status === "stopped") {
-    clients.resetActionPending();
-  }
-  setLifecycleState(state);
-});
-
-pixelatedWindow.electronAPI.onServerLog((event, message) => {
-  logs.append(
-    `<span class="text-synth-primary">SYS</span> ${logs.sanitize(message)}`,
-  );
-});
-
-pixelatedWindow.electronAPI.onEngineStopped(() => {
-  powerBtn.disabled = false;
+pixelatedWindow.PixelatedEvents.bindRendererEvents({
+  clearLogsButton: clearLogsBtn,
+  clients,
+  companionCopyButton: copyCompanionBtn,
+  electronApi: pixelatedWindow.electronAPI,
+  exposure,
+  getIsRunning: () => isRunning,
+  handleEngineCompanion,
+  initializeEngine,
+  launchWebButton: launchWebBtn,
+  logs,
+  powerButton: powerBtn,
+  powerText,
+  recovery,
+  regenerateInviteButton: regenerateInviteBtn,
+  revokeInviteButton: revokeInviteBtn,
+  setLifecycleState,
+  setPowerPending,
+  setStatusPresentation,
+  tokenPanel,
+  tokenCopyButton: copyTokenBtn,
+  tokenValue,
 });
 
 exposure.render();

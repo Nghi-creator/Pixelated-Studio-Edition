@@ -37,6 +37,7 @@ type RegisterStartGameOptions = {
   apiUrl: string;
   canStartGame?: (socket: Socket, sessionId: string) => boolean;
   downloadCloudRom: DownloadCloudRom;
+  getVaultOwnerId?: (socket: Socket) => string;
   runtime: Runtime;
   verifyBackendSession: VerifyBackendSession;
 };
@@ -49,6 +50,7 @@ export function registerStartGameHandler(
     apiUrl,
     canStartGame,
     downloadCloudRom,
+    getVaultOwnerId,
     runtime,
     verifyBackendSession,
   } = options;
@@ -163,11 +165,16 @@ export function registerStartGameHandler(
       }
     } else if (romFileOrUrl) {
       try {
+        const localVaultOwnerId =
+          getVaultOwnerId?.(socket) || safeUserId;
+        if (!localVaultOwnerId) {
+          throw new Error("Missing authenticated Local Vault identity.");
+        }
         launchLocalVaultSession({
           iceServers,
           romFileOrUrl,
           runtime,
-          safeUserId,
+          safeUserId: localVaultOwnerId,
           sessionId,
           streamProfile,
         });

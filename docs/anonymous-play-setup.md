@@ -27,6 +27,11 @@ Cloudflare Turnstile protects creation of the anonymous Supabase user.
    VITE_TURNSTILE_SITE_KEY=<Cloudflare site key>
    ```
 
+   Production Vercel builds now fail when this variable is absent. Also add
+   `VITE_TURNSTILE_SITE_KEY` as a GitHub production environment variable so the
+   hosted deploy workflow can verify the deployment configuration before
+   triggering Vercel.
+
    Redeploy the web application because Vite embeds this value at build time.
 6. Configure the hosted API (Render):
 
