@@ -11,6 +11,7 @@ export default function Navbar() {
   const location = useLocation();
   const {
     avatarUrl,
+    engineConnectionStatus,
     isDeveloper,
     isEnginePaired,
     isIdentityLoading,
@@ -18,6 +19,32 @@ export default function Navbar() {
     user,
     username,
   } = useNavbarIdentity();
+  const engineStatusLabel =
+    engineConnectionStatus === "online"
+      ? "Engine Connected"
+      : engineConnectionStatus === "checking"
+        ? "Checking Engine"
+        : engineConnectionStatus === "offline"
+          ? "Engine Offline — pairing saved"
+          : engineConnectionStatus === "rejected"
+            ? "Engine Pairing Expired"
+            : "Connect Engine";
+  const engineStatusColor =
+    engineConnectionStatus === "online"
+      ? "text-[#9B0048]"
+      : engineConnectionStatus === "checking"
+        ? "text-amber-300"
+        : engineConnectionStatus === "offline"
+          ? "text-red-300"
+          : "text-gray-400";
+  const engineStatusDot =
+    engineConnectionStatus === "online"
+      ? "bg-[#9B0048]"
+      : engineConnectionStatus === "checking"
+        ? "bg-amber-300 animate-pulse"
+        : engineConnectionStatus === "offline"
+          ? "bg-red-400"
+          : "bg-amber-400";
 
   const handleFavoritesClick = (e: React.MouseEvent) => {
     if (!user) {
@@ -87,18 +114,16 @@ export default function Navbar() {
 
               <Link
                 to="/engine"
-                title={isEnginePaired ? "Engine Connected" : "Connect Engine"}
+                title={engineStatusLabel}
                 className={`relative ${getNavIconClass(isEnginePage)}`}
               >
                 <PixelIcon
-                  className={`h-6 w-6 ${
-                    isEnginePaired ? "text-[#9B0048]" : "text-gray-400"
-                  }`}
+                  className={`h-6 w-6 ${engineStatusColor}`}
                   name={isEnginePaired ? "engine-on" : "engine-off"}
                 />
                 <span
                   className={`absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border-2 border-synth-bg ${
-                    isEnginePaired ? "bg-[#9B0048]" : "bg-amber-400"
+                    engineStatusDot
                   }`}
                 />
               </Link>
@@ -201,10 +226,10 @@ export default function Navbar() {
             </Link>
             <Link className={getMobileNavClass(isEnginePage)} to="/engine">
               <PixelIcon
-                className={`h-5 w-5 ${isEnginePaired ? "text-[#C02066]" : ""}`}
+                className={`h-5 w-5 ${engineStatusColor}`}
                 name={isEnginePaired ? "engine-on" : "engine-off"}
               />
-              {isEnginePaired ? "Engine Connected" : "Connect Engine"}
+              {engineStatusLabel}
             </Link>
             {!isIdentityLoading && role !== "super_admin" && (
               <Link className={getMobileNavClass(isPublishPage)} to="/publish">

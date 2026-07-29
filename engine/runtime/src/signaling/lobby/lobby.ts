@@ -5,7 +5,11 @@ import {
   type LobbyRole,
   type LobbyState,
 } from "./lobbyState";
-import { getSessionRoom, normalizeSessionId } from "../sessionRooms";
+import {
+  getSessionRoom,
+  joinSession,
+  normalizeSessionId,
+} from "../sessionRooms";
 
 export type { LobbyParticipant, LobbyRole, LobbyState };
 
@@ -24,8 +28,6 @@ type KickPayload = {
   sessionId?: unknown;
   socketId?: unknown;
 };
-
-type LobbySocket = Pick<Socket, "data" | "emit" | "id" | "to">;
 
 function normalizeDisplayName(value: unknown, fallback: string) {
   if (typeof value !== "string") return fallback;
@@ -51,28 +53,34 @@ function normalizePlayerIndex(value: unknown, maxPlayers: number) {
 export function createLobbyManager(maxPlayers = 4) {
   const lobbyState = createLobbyStateStore(maxPlayers);
 
-  function syncSocketParticipant(socket: LobbySocket, participant: LobbyParticipant) {
+  function syncSocketParticipant(socket: Socket, participant: LobbyParticipant) {
     socket.data.lobbyRole = participant.role;
     socket.data.playerIndex = participant.playerIndex;
     return participant;
   }
 
-  function emitLobbyState(ioSocket: LobbySocket, sessionId: string) {
+  function emitLobbyState(ioSocket: Socket, sessionId: string) {
     const state = lobbyState.getLobbyState(sessionId);
     ioSocket.emit("lobby-state", state);
     ioSocket.to(getSessionRoom(sessionId)).emit("lobby-state", state);
     return state;
   }
 
-  function joinLobby(socket: LobbySocket, payload: JoinLobbyPayload = {}) {
+  function joinLobby(socket: Socket, payload: JoinLobbyPayload = {}) {
     const sessionId =
-      normalizeSessionId(payload.sessionId) || socket.data.sessionId;
+      normalizeSessionId(payload.sessionId) ||
+      normalizeSessionId(socket.data.sessionId);
     if (!sessionId) {
       socket.emit("lobby-error", { message: "Missing session id." });
       return null;
     }
 
-    socket.data.sessionId = sessionId;
+    const previousSessionId = normalizeSessionId(socket.data.sessionId);
+    if (previousSessionId && previousSessionId !== sessionId) {
+      leaveLobby(socket, previousSessionId);
+    }
+    if (!joinSession(socket, sessionId, "lobby")) return null;
+
     const displayName = normalizeDisplayName(
       payload.displayName,
       `Player ${socket.id.slice(0, 4)}`,
@@ -90,7 +98,7 @@ export function createLobbyManager(maxPlayers = 4) {
     return participant;
   }
 
-  function requestPlayerSlot(socket: LobbySocket, payload: SlotPayload = {}) {
+  function requestPlayerSlot(socket: Socket, payload: SlotPayload = {}) {
     const sessionId =
       normalizeSessionId(payload.sessionId) || socket.data.sessionId;
     if (!sessionId) {
@@ -120,7 +128,7 @@ export function createLobbyManager(maxPlayers = 4) {
     return updated;
   }
 
-  function releasePlayerSlot(socket: LobbySocket, payload: SlotPayload = {}) {
+  function releasePlayerSlot(socket: Socket, payload: SlotPayload = {}) {
     const sessionId =
       normalizeSessionId(payload.sessionId) || socket.data.sessionId;
     if (!sessionId) return null;
@@ -136,19 +144,19 @@ export function createLobbyManager(maxPlayers = 4) {
     return updated;
   }
 
-  function canControlSession(socket: LobbySocket, sessionId: string | null) {
+  function canControlSession(socket: Socket, sessionId: string | null) {
     return lobbyState.canControlSession(socket.id, sessionId);
   }
 
   function canSendInput(
-    socket: LobbySocket,
+    socket: Socket,
     sessionId: string | null,
     playerIndex: number,
   ) {
     return lobbyState.canSendInput(socket.id, sessionId, playerIndex);
   }
 
-  function kickParticipant(socket: LobbySocket, payload: KickPayload = {}) {
+  function kickParticipant(socket: Socket, payload: KickPayload = {}) {
     const sessionId =
       normalizeSessionId(payload.sessionId) || socket.data.sessionId;
     const targetSocketId =
@@ -169,12 +177,19 @@ export function createLobbyManager(maxPlayers = 4) {
       return false;
     }
 
-    socket.to(targetSocketId).emit("lobby-kicked", { sessionId });
+    const targetSocket = socket.nsp.sockets.get(targetSocketId);
+    if (
+      targetSocket &&
+      normalizeSessionId(targetSocket.data.sessionId) === sessionId
+    ) {
+      targetSocket.emit("lobby-kicked", { sessionId });
+      targetSocket.disconnect(true);
+    }
     emitLobbyState(socket, sessionId);
     return true;
   }
 
-  function leaveLobby(socket: LobbySocket, sessionId?: string | null) {
+  function leaveLobby(socket: Socket, sessionId?: string | null) {
     const safeSessionId =
       normalizeSessionId(sessionId) || socket.data.sessionId || null;
     if (!safeSessionId) return;

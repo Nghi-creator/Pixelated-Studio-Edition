@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useGameCatalogQuery } from "../../lib/api/apiQueries";
-import {
-  ENGINE_PAIRING_EVENT,
-  hasEngineToken,
-} from "../../lib/engine/engineAuth";
+import { useEngineConnectionStatus } from "../../lib/engine/useEngineConnectionStatus";
 import { getLocalVaultErrorMessage } from "../local-vault/localVaultClient";
 import { getPageSlice } from "../../components/ui/paginationUtils";
 import { searchAndRankGames } from "../search/gameSearch";
@@ -22,7 +19,8 @@ export const LOCAL_GAMES_PER_PAGE = 15;
 export function useMultiplayerCatalog() {
   const [mode, setMode] = useState<MultiplayerMode>("host");
   const [gameSource, setGameSource] = useState<GameSource>("cloud");
-  const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
+  const engineConnectionStatus = useEngineConnectionStatus();
+  const isEnginePaired = engineConnectionStatus === "online";
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [inviteUrl, setInviteUrl] = useState("");
@@ -66,16 +64,6 @@ export function useMultiplayerCatalog() {
       )
     : "";
 
-  useEffect(() => {
-    const refreshEnginePairing = () => {
-      setIsEnginePaired(hasEngineToken());
-    };
-
-    window.addEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
-    return () =>
-      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
-  }, []);
-
   const filteredLocalGames = useMemo(
     () => searchAndRankGames(localGames, searchQuery),
     [localGames, searchQuery],
@@ -115,6 +103,7 @@ export function useMultiplayerCatalog() {
     cloudPageStart,
     cloudTotal,
     cloudTotalPages,
+    engineConnectionStatus,
     filteredLocalGames,
     gameSource,
     inviteSessionId,

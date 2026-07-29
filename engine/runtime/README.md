@@ -22,10 +22,11 @@ src/http/        Express routes and HTTP error handling
 src/signaling/   Socket.IO auth, start-game, lobby, input, relay handlers
 src/runtime/     Runtime registry, process lifecycle, native/libretro launch
 src/roms/        Cloud ROM download and local vault storage
-src/input/       Browser key/gamepad translation and injection
+src/input/       Browser key/gamepad translation and persistent input bridges
 src/telemetry/   Health/resource snapshots
 tests/           Unit coverage by runtime area
 camera.py        GStreamer WebRTC sender
+input_keyboard.py Persistent X11/XTest keyboard injection bridge
 server.ts        Runtime process entry point
 ```
 

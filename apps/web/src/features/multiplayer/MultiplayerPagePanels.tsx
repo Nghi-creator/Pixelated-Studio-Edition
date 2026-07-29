@@ -8,6 +8,7 @@ import {
   Wifi,
 } from "lucide-react";
 import { PixelIcon } from "../../components/ui/PixelIcon";
+import type { EngineConnectionStatus } from "../../lib/engine/engineConnectionState";
 import {
   MultiplayerGameGridSkeleton,
 } from "./MultiplayerGameCards";
@@ -43,7 +44,18 @@ export function ModeButton({
   );
 }
 
-export function StatusPill({ paired }: { paired: boolean }) {
+export function StatusPill({ status }: { status: EngineConnectionStatus }) {
+  const paired = status === "online";
+  const label =
+    status === "checking"
+      ? "Checking engine"
+      : status === "offline"
+        ? "Engine offline"
+        : status === "rejected"
+          ? "Pairing expired"
+          : paired
+            ? "Engine connected"
+            : "Pairing needed";
   return (
     <div
       className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${
@@ -57,7 +69,7 @@ export function StatusPill({ paired }: { paired: boolean }) {
       ) : (
         <AlertCircle className="h-4 w-4" />
       )}
-      {paired ? "Engine paired" : "Pairing needed"}
+      {label}
     </div>
   );
 }

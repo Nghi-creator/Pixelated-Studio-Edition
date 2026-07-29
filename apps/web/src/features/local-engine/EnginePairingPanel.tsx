@@ -17,6 +17,7 @@ export function EnginePairingPanel({
     disconnect,
     engineUrl,
     engineUrlScope,
+    hasSavedCredential,
     inviteCode,
     isCompanionJoin,
     lanPreflight,
@@ -175,15 +176,15 @@ export function EnginePairingPanel({
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : null}
             {isCompanionJoin
-              ? pairingState === "paired"
+              ? hasSavedCredential
                 ? "Update"
                 : "Join"
-              : pairingState === "paired"
+              : hasSavedCredential
                 ? "Update"
                 : "Pair"}
           </button>
 
-          {pairingState === "paired" && (
+          {hasSavedCredential && (
             <button
               onClick={disconnect}
               className="inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-lg border border-synth-border bg-synth-bg px-3 text-sm font-semibold text-gray-300 transition-colors hover:border-red-400/70 hover:text-red-300"

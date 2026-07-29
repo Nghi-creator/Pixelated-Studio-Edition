@@ -45,7 +45,7 @@ async function parseEngineError(response: Response, fallback: string) {
 
 function handleInvalidToken(response: Response) {
   if (response.status !== 401) return;
-  clearEngineToken();
+  clearEngineToken("rejected");
   throw new InvalidEngineTokenError();
 }
 

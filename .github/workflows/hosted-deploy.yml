@@ -135,6 +135,7 @@ jobs:
       baseline_html_sha256: ${{ steps.baseline.outputs.html_sha256 }}
     env:
       HOSTED_WEB_URL: ${{ vars.HOSTED_WEB_URL }}
+      TURNSTILE_SITE_KEY: ${{ vars.VITE_TURNSTILE_SITE_KEY }}
       VERCEL_WEB_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_WEB_DEPLOY_HOOK_URL }}
     steps:
       - name: Require Vercel deploy configuration
@@ -147,6 +148,10 @@ jobs:
           fi
           test -n "$HOSTED_WEB_URL" || {
             echo "::error::Missing production environment variable HOSTED_WEB_URL."
+            exit 1
+          }
+          test -n "$TURNSTILE_SITE_KEY" || {
+            echo "::error::Missing production environment variable VITE_TURNSTILE_SITE_KEY. Configure the same Turnstile site key in GitHub and Vercel before deploying."
             exit 1
           }
 

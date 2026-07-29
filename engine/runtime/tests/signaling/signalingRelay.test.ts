@@ -169,6 +169,27 @@ test("signaling rejects oversized peer ids and bounds remembered rooms", () => {
   assert.equal((socket.data.webrtcPeerIds as string[]).length, 32);
 });
 
+test("signaling events share a bounded per-socket rate limit", () => {
+  const socket = new FakeSocket("browser-1");
+  socket.data.sessionId = "session-1";
+  let now = 1_000;
+  registerSignalingRelayHandlers(socket as never, {
+    eventLimitPerSecond: 2,
+    now: () => now,
+  });
+
+  socket.emit("webrtc-ice-candidate", { candidate: "candidate-1" });
+  socket.emit("webrtc-ice-candidate", { candidate: "candidate-2" });
+  socket.emit("webrtc-ice-candidate", { candidate: "candidate-3" });
+  socket.emit("webrtc-answer", { type: "answer" });
+
+  assert.equal(socket.relays.length, 2);
+
+  now += 1_000;
+  socket.emit("webrtc-ice-candidate", { candidate: "candidate-4" });
+  assert.equal(socket.relays.length, 3);
+});
+
 test("signaling cannot target a different session than the active socket", () => {
   const socket = new FakeSocket("browser-1");
   socket.data.sessionId = "session-1";

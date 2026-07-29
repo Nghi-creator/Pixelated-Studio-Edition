@@ -1,13 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { pulseAudioArgs, xdotoolArgs } from "../../src/runtime/processes/processCommands";
+import { pulseAudioArgs } from "../../src/runtime/processes/processCommands";
 import { RETROARCH_CONFIG } from "../../src/runtime/processes/runtimeHostProcesses";
 
-test("process commands keep values as literal arguments", () => {
-  assert.deepEqual(xdotoolArgs("keydown", "semicolon;still-a-key"), [
-    "keydown",
-    "semicolon;still-a-key",
-  ]);
+test("process commands preserve the PulseAudio runtime configuration", () => {
   assert.deepEqual(pulseAudioArgs, [
     "--daemonize=yes",
     "--exit-idle-time=-1",

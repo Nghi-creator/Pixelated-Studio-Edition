@@ -8,6 +8,20 @@ type DisplayFrameRouteOptions = {
   requireEngineToken: RequestHandler;
 };
 
+export function createConcurrencyLimiter(maxConcurrent: number) {
+  let active = 0;
+  return {
+    acquire() {
+      if (active >= maxConcurrent) return false;
+      active += 1;
+      return true;
+    },
+    release() {
+      active = Math.max(0, active - 1);
+    },
+  };
+}
+
 function captureDisplayFrame(outputPath: string) {
   return new Promise<void>((resolve, reject) => {
     const child = execFile(
@@ -45,18 +59,24 @@ export function registerDisplayFrameRoutes(
   app: Express,
   { requireEngineToken }: DisplayFrameRouteOptions,
 ) {
+  const captures = createConcurrencyLimiter(2);
   app.get(
     "/display/frame",
     requireEngineToken,
     async (_req: Request, res: Response) => {
-      const outputPath = path.join(
-        os.tmpdir(),
-        `pixelated-frame-${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2)}.png`,
-      );
+      if (!captures.acquire()) {
+        res.setHeader("retry-after", "1");
+        res.status(429).json({ error: "Display capture is busy" });
+        return;
+      }
+
+      let captureDirectory = "";
 
       try {
+        captureDirectory = await fs.promises.mkdtemp(
+          path.join(os.tmpdir(), "pixelated-frame-"),
+        );
+        const outputPath = path.join(captureDirectory, "frame.png");
         await captureDisplayFrame(outputPath);
         const frame = await fs.promises.readFile(outputPath);
         res.setHeader("cache-control", "no-store");
@@ -66,7 +86,12 @@ export function registerDisplayFrameRoutes(
         console.error("[Engine] Display frame capture failed:", err);
         res.status(503).json({ error: "Could not capture display" });
       } finally {
-        fs.promises.unlink(outputPath).catch(() => undefined);
+        captures.release();
+        if (captureDirectory) {
+          await fs.promises
+            .rm(captureDirectory, { force: true, recursive: true })
+            .catch(() => undefined);
+        }
       }
     },
   );

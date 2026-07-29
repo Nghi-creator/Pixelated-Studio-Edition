@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -13,8 +13,8 @@ import {
   useSearchParams,
 } from "react-router";
 import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
-import { ENGINE_PAIRING_EVENT, hasEngineToken } from "../../lib/engine/engineAuth";
 import { PixelIcon } from "../../components/ui/PixelIcon";
+import { useEngineConnectionStatus } from "../../lib/engine/useEngineConnectionStatus";
 
 type EngineLocationState = {
   returnState?: unknown;
@@ -47,26 +47,39 @@ function getSafeReturnTo(value: string | null) {
   return value;
 }
 
+function getDesktopLaunchErrorMessage(code: string | null) {
+  if (code === "ticket_invalid") {
+    return "The desktop launch link expired or was already replaced. Return to Pixelated Desktop and choose Launch Web again.";
+  }
+  if (code === "engine_unavailable") {
+    return "Pixelated Desktop opened the browser, but its engine was not ready. Wait for Engine Ready, then choose Launch Web again.";
+  }
+  if (code === "companion_unreachable") {
+    return "The browser could not reach Pixelated Desktop. Keep Desktop open and allow local-network access if your browser asks, then choose Launch Web again.";
+  }
+  if (code === "unsafe_companion_url") {
+    return "Desktop supplied an unsupported local companion address. Restart the current Pixelated Desktop release and try again.";
+  }
+  return "";
+}
+
 export default function EngineConnection() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnTo = getSafeReturnTo(searchParams.get("returnTo"));
+  const desktopLaunchError = getDesktopLaunchErrorMessage(
+    searchParams.get("desktopLaunchError"),
+  );
   const locationState =
     typeof location.state === "object" && location.state !== null
       ? (location.state as EngineLocationState)
       : null;
   const isReturning = returnTo !== "/home";
-  const [isPaired, setIsPaired] = useState(hasEngineToken);
+  const connectionStatus = useEngineConnectionStatus();
+  const isPaired = connectionStatus === "online";
   const [showPairedActions, setShowPairedActions] = useState(false);
   const shouldShowPairedActions = isPaired && showPairedActions;
-
-  useEffect(() => {
-    const refreshEnginePairing = () => setIsPaired(hasEngineToken());
-    window.addEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
-    return () =>
-      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
-  }, []);
 
   const continueToDestination = () => {
     navigate(returnTo, {
@@ -93,6 +106,15 @@ export default function EngineConnection() {
         </h1>
       </div>
 
+      {desktopLaunchError && (
+        <div
+          className="danger-panel mb-6 rounded-lg border px-4 py-3 text-sm font-semibold"
+          role="alert"
+        >
+          {desktopLaunchError}
+        </div>
+      )}
+
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
         {[
           "Open the desktop app or host join link",
@@ -115,7 +137,7 @@ export default function EngineConnection() {
         <div className="mb-6 flex flex-col gap-3 rounded-lg border border-[#C02066]/40 bg-[#9B0048]/15 px-4 py-3 text-sm text-[#F38BB4] sm:flex-row sm:items-center sm:justify-between">
           <span className="inline-flex items-center gap-2 font-semibold">
             <CheckCircle2 className="h-4 w-4" />
-            This browser has a saved engine connection.
+            The desktop engine is connected.
           </span>
           {isReturning && (
             <button
@@ -132,7 +154,6 @@ export default function EngineConnection() {
 
       <EnginePairingPanel
         onPaired={() => {
-          setIsPaired(true);
           if (isReturning) {
             continueToDestination();
             return;

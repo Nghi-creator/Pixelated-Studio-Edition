@@ -11,6 +11,12 @@ type CompanionAccessToken = {
   scope: "guest" | "host";
 };
 
+type CompanionLaunchTicket = {
+  accessExpiresAt?: number;
+  companionToken?: string;
+  expiresAt: number;
+};
+
 export type CompanionInviteState = {
   code: string | null;
   expiresAt: number | null;
@@ -20,7 +26,7 @@ export type CompanionInviteState = {
 export type CompanionInviteStatus = "active" | "expired" | "revoked";
 
 const companionAccessTokens = new Map<string, CompanionAccessToken>();
-const companionLaunchTickets = new Map<string, number>();
+const companionLaunchTickets = new Map<string, CompanionLaunchTicket>();
 const companionInviteFailures = new Map<
   string,
   { count: number; resetAt: number }
@@ -95,14 +101,45 @@ export function clearCompanionInviteFailure(key: string) {
 export function createCompanionLaunchTicket(now = Date.now()) {
   const ticket = crypto.randomBytes(24).toString("base64url");
   companionLaunchTickets.clear();
-  companionLaunchTickets.set(ticket, now + LAUNCH_TICKET_TTL_MS);
+  companionLaunchTickets.set(ticket, {
+    expiresAt: now + LAUNCH_TICKET_TTL_MS,
+  });
   return ticket;
 }
 
-export function consumeCompanionLaunchTicket(ticket: string, now = Date.now()) {
-  const expiresAt = companionLaunchTickets.get(ticket);
-  companionLaunchTickets.delete(ticket);
-  return Boolean(expiresAt && expiresAt > now);
+export function hasValidCompanionLaunchTicket(
+  ticket: string,
+  now = Date.now(),
+) {
+  const record = companionLaunchTickets.get(ticket);
+  if (!record || record.expiresAt <= now) {
+    companionLaunchTickets.delete(ticket);
+    return false;
+  }
+  return true;
+}
+
+export function redeemCompanionLaunchTicket(
+  ticket: string,
+  accessExpiresAt: number,
+  now = Date.now(),
+) {
+  const record = companionLaunchTickets.get(ticket);
+  if (!record || record.expiresAt <= now) {
+    companionLaunchTickets.delete(ticket);
+    return null;
+  }
+  if (!record.companionToken) {
+    record.accessExpiresAt = accessExpiresAt;
+    record.companionToken = createCompanionAccessToken(
+      accessExpiresAt,
+      "host",
+    );
+  }
+  return {
+    accessExpiresAt: record.accessExpiresAt || accessExpiresAt,
+    companionToken: record.companionToken,
+  };
 }
 
 export function getCompanionInviteStatus(

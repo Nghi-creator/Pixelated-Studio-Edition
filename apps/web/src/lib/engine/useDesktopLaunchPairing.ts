@@ -8,6 +8,7 @@ import {
   setEngineControlToken,
   setEngineToken,
 } from "./engineAuth";
+import { setEngineConnectionStatus } from "./engineConnectionState";
 import { setEngineControlUrl, setEngineUrl } from "./engineConfig";
 
 export function useDesktopLaunchPairing() {
@@ -21,6 +22,7 @@ export function useDesktopLaunchPairing() {
       pairLocalEngine: api.pairLocalEngine,
       replaceState: (url) =>
         navigate(`${url.pathname}${url.search}${url.hash}`, { replace: true }),
+      setConnectionStatus: setEngineConnectionStatus,
       setEngineControlToken,
       setEngineControlUrl,
       setEngineToken,

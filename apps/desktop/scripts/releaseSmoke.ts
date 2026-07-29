@@ -12,13 +12,15 @@ async function loadAsar() {
 }
 
 const RELEASE_DIR = path.resolve(process.cwd(), "release");
-const EXPECTED_RENDERER_SCRIPTS = [
+export const EXPECTED_RENDERER_SCRIPTS = [
   "dist/renderer/logs.js",
   "dist/renderer/modal.js",
   "dist/renderer/exposure.js",
   "dist/renderer/phases.js",
+  "dist/renderer/status.js",
   "dist/renderer/recovery.js",
   "dist/renderer/clients.js",
+  "dist/renderer/events.js",
   "dist/renderer.js",
 ];
 const EXPECTED_PRELOAD_API = [

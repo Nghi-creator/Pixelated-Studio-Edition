@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   isEngineAccessRevoked,
+  isEngineClientRevoked,
+  getRequestVaultOwnerId,
+  getSocketVaultOwnerId,
   listConnectedClients,
   revokeConnectedClient,
   trackHttpClient,
@@ -108,4 +111,49 @@ test("connected client revocation targets one browser client", () => {
     listConnectedClients().map((client) => client.id),
     ["client-two", "access_access-legacy"],
   );
+});
+
+test("revocation rejects malformed client ids", () => {
+  const io = { sockets: { sockets: new Map() } };
+
+  assert.equal(revokeConnectedClient(io as never, "x"), 0);
+  assert.equal(isEngineClientRevoked("x"), false);
+});
+
+test("vault ownership is engine-local and rejects guest access", () => {
+  assert.equal(
+    getRequestVaultOwnerId(requestFor("client-vault") as never),
+    "local_engine",
+  );
+
+  const rawRequest = {
+    get(name: string) {
+      return name.toLowerCase() === "x-pixelated-client-id"
+        ? "raw-client"
+        : "";
+    },
+  };
+  assert.equal(
+    getRequestVaultOwnerId(rawRequest as never),
+    "local_engine",
+  );
+
+  const companionSocket = {
+    handshake: {
+      auth: { clientId: "ignored-client" },
+      headers: {
+        "x-pixelated-access-id": "companion-access",
+        "x-pixelated-access-scope": "companion-host",
+      },
+      query: {},
+    },
+  };
+  assert.equal(
+    getSocketVaultOwnerId(companionSocket as never),
+    "local_engine",
+  );
+
+  companionSocket.handshake.headers["x-pixelated-access-scope"] =
+    "companion-guest";
+  assert.equal(getSocketVaultOwnerId(companionSocket as never), "");
 });

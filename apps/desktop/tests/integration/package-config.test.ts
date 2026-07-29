@@ -136,11 +136,14 @@ describe("desktop package config", () => {
     const mainPath = path.resolve(__dirname, "../../main.js");
     const preloadPath = path.resolve(__dirname, "../../preload.js");
     const rendererPath = path.resolve(__dirname, "../../renderer.js");
-    const rendererHelperPath = path.resolve(__dirname, "../../renderer/logs.js");
+    const rendererHelperPaths = [
+      "../../renderer/events.js",
+      "../../renderer/logs.js",
+      "../../renderer/status.js",
+    ];
     const main = fs.readFileSync(mainPath, "utf8");
     const preload = fs.readFileSync(preloadPath, "utf8");
     const renderer = fs.readFileSync(rendererPath, "utf8");
-    const rendererHelper = fs.readFileSync(rendererHelperPath, "utf8");
 
     assert.match(main, /sandbox:\s*true/);
     assert.match(main, /setWindowOpenHandler/);
@@ -148,9 +151,21 @@ describe("desktop package config", () => {
     assert.doesNotMatch(preload, /require\("\.\/main\/companion\/qr"\)/);
     assert.match(preload, /ipcRenderer\.invoke|electron_1\.ipcRenderer\.invoke/);
     assert.doesNotMatch(renderer, /\bexports\b/);
-    assert.doesNotMatch(rendererHelper, /\bexports\b/);
-    assert.doesNotMatch(rendererHelper, /\.innerHTML\s*[+]?=/);
-    assert.match(rendererHelper, /createTextNode/);
+
+    for (const helperPath of rendererHelperPaths) {
+      const rendererHelper = fs.readFileSync(
+        path.resolve(__dirname, helperPath),
+        "utf8",
+      );
+      assert.doesNotMatch(rendererHelper, /\bexports\b/);
+      assert.doesNotMatch(rendererHelper, /\.innerHTML\s*[+]?=/);
+    }
+
+    const rendererLogs = fs.readFileSync(
+      path.resolve(__dirname, "../../renderer/logs.js"),
+      "utf8",
+    );
+    assert.match(rendererLogs, /createTextNode/);
   });
 
   it("keeps engine unit-test modules independent from the Electron binary", () => {
@@ -181,10 +196,10 @@ describe("desktop package config", () => {
 
   it("ships the image build recovery bridge and renderer action states", () => {
     const preloadPath = path.resolve(__dirname, "../../preload.js");
-    const rendererPath = path.resolve(__dirname, "../../renderer.js");
+    const eventsPath = path.resolve(__dirname, "../../renderer/events.js");
     const recoveryPath = path.resolve(__dirname, "../../renderer/recovery.js");
     const preload = fs.readFileSync(preloadPath, "utf8");
-    const renderer = fs.readFileSync(rendererPath, "utf8");
+    const events = fs.readFileSync(eventsPath, "utf8");
     const recovery = fs.readFileSync(recoveryPath, "utf8");
 
     assert.match(preload, /buildEngineImage/);
@@ -201,8 +216,8 @@ describe("desktop package config", () => {
     assert.match(recovery, /Building\.\.\./);
     assert.match(recovery, /function setImageRecoveryVisible/);
     assert.match(recovery, /setImageBuildPending\(true\)/);
-    assert.match(renderer, /recovery\.setImageRecoveryVisible\(true, payload\)/);
-    assert.match(renderer, /recovery\.setImageRecoveryVisible\(false\)/);
+    assert.match(events, /recovery\.setImageRecoveryVisible\(true, payload\)/);
+    assert.match(events, /recovery\.setImageRecoveryVisible\(false\)/);
   });
 
   it("runs the packaged release smoke as part of npm run dist", () => {

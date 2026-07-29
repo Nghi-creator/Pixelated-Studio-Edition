@@ -53,7 +53,7 @@ jobs:
       - name: Audit packaged desktop runtime and build chain
         if: matrix.label == 'desktop'
         working-directory: ${{ matrix.path }}
-        run: npm audit --audit-level=high
+        run: node ../../scripts/security/auditDesktopBuildChain.mjs
 
       - name: Record full dependency audit for review
         continue-on-error: true

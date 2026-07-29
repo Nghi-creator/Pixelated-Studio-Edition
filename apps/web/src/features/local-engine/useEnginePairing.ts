@@ -5,6 +5,7 @@ import {
   ENGINE_PAIRING_EVENT,
   getEngineToken,
 } from "../../lib/engine/engineAuth";
+import { useEngineConnectionStatus } from "../../lib/engine/useEngineConnectionStatus";
 import {
   clearEngineUrl,
   DEFAULT_ENGINE_URL,
@@ -29,6 +30,7 @@ type UseEnginePairingOptions = {
 };
 
 export function useEnginePairing({ onPaired }: UseEnginePairingOptions = {}) {
+  const connectionStatus = useEngineConnectionStatus();
   const [engineUrl, setEngineUrlInput] = useState(
     () => getInviteCompanionUrl(window.location.search) || getEngineUrl(),
   );
@@ -37,15 +39,11 @@ export function useEnginePairing({ onPaired }: UseEnginePairingOptions = {}) {
   );
   const [inviteCode, setInviteCode] = useState("");
   const [token, setToken] = useState(getEngineToken);
-  const [pairingState, setPairingState] = useState<PairingState>(
-    token ? "paired" : "idle",
-  );
+  const [pairingAttemptState, setPairingAttemptState] = useState<
+    "idle" | "checking" | "error"
+  >("idle");
   const [showToken, setShowToken] = useState(false);
-  const [message, setMessage] = useState(
-    token
-      ? `${getScopeLabel(getEngineUrlScope(getEngineUrl()))} token is saved in this browser.`
-      : "",
-  );
+  const [attemptMessage, setAttemptMessage] = useState("");
 
   const engineUrlScope = getEngineUrlScope(engineUrl);
   const parsedEngineUrl = parseEngineUrl(engineUrl);
@@ -58,24 +56,42 @@ export function useEnginePairing({ onPaired }: UseEnginePairingOptions = {}) {
     useLanPreflight(engineUrl, isCompanionJoin);
   const preflightReady =
     lanPreflight.status === "complete" && lanPreflight.payload.ready === true;
+  const hasSavedCredential = Boolean(getEngineToken());
+  const savedScopeLabel = getScopeLabel(getEngineUrlScope(getEngineUrl()));
+  const pairingState: PairingState =
+    pairingAttemptState !== "idle"
+      ? pairingAttemptState
+      : connectionStatus === "online"
+        ? "paired"
+        : connectionStatus === "checking" && hasSavedCredential
+          ? "checking"
+          : connectionStatus === "offline" && hasSavedCredential
+            ? "offline"
+            : "idle";
+  const connectionMessage =
+    connectionStatus === "online"
+      ? attemptMessage || `${savedScopeLabel} engine is connected.`
+      : connectionStatus === "checking" && hasSavedCredential
+        ? `Checking the saved ${savedScopeLabel.toLowerCase()} connection…`
+        : connectionStatus === "offline" && hasSavedCredential
+          ? `${savedScopeLabel} token is saved, but the desktop engine is offline or unreachable.`
+          : connectionStatus === "rejected"
+            ? "The saved engine credential expired or was rejected. Pair again from the desktop app."
+            : "";
+  const message =
+    pairingAttemptState === "idle" ? connectionMessage : attemptMessage;
 
   useEffect(() => {
-    const refreshPairingState = () => {
+    const refreshPairingFields = () => {
       const currentToken = getEngineToken();
       const currentUrl = getEngineUrl();
       setToken(currentToken);
       setEngineUrlInput(currentUrl);
-      setPairingState(currentToken ? "paired" : "idle");
-      setMessage(
-        currentToken
-          ? `${getScopeLabel(getEngineUrlScope(currentUrl))} token is saved in this browser.`
-          : "",
-      );
     };
 
-    window.addEventListener(ENGINE_PAIRING_EVENT, refreshPairingState);
+    window.addEventListener(ENGINE_PAIRING_EVENT, refreshPairingFields);
     return () =>
-      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshPairingState);
+      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshPairingFields);
   }, []);
 
   useEffect(() => {
@@ -119,25 +135,25 @@ export function useEnginePairing({ onPaired }: UseEnginePairingOptions = {}) {
       setEngineUrlInput(normalizedUrl);
     }
     if (!preparation.ok) {
-      setPairingState("error");
-      setMessage(preparation.message);
+      setPairingAttemptState("error");
+      setAttemptMessage(preparation.message);
       return;
     }
 
-    setPairingState("checking");
-    setMessage(preparation.attempt.checkingMessage);
+    setPairingAttemptState("checking");
+    setAttemptMessage(preparation.attempt.checkingMessage);
     const result = await executePairing(preparation.attempt);
     if (!result.ok) {
-      setPairingState("error");
-      setMessage(result.message);
+      setPairingAttemptState("error");
+      setAttemptMessage(result.message);
       if (result.retryPreflight) void retryLanPreflight();
       return;
     }
 
     setToken(result.normalizedToken);
-    setPairingState("paired");
+    setPairingAttemptState("idle");
     setInviteJoinRequested(false);
-    setMessage(result.message);
+    setAttemptMessage(result.message);
     onPaired?.();
   };
 
@@ -146,8 +162,8 @@ export function useEnginePairing({ onPaired }: UseEnginePairingOptions = {}) {
     clearEngineUrl();
     setToken("");
     setEngineUrlInput(DEFAULT_ENGINE_URL);
-    setPairingState("idle");
-    setMessage("");
+    setPairingAttemptState("idle");
+    setAttemptMessage("");
     resetLanPreflight(DEFAULT_ENGINE_URL, false);
 
     try {
@@ -163,6 +179,7 @@ export function useEnginePairing({ onPaired }: UseEnginePairingOptions = {}) {
     disconnect,
     engineUrl,
     engineUrlScope,
+    hasSavedCredential,
     inviteCode,
     isCompanionJoin,
     lanPreflight,

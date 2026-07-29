@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import type { Express, Request, RequestHandler, Response } from "express";
 import type { Server, Socket } from "socket.io";
 
@@ -19,6 +20,7 @@ export type ConnectedClient = {
 export type PublicConnectedClient = Omit<ConnectedClient, "accessId">;
 
 const CLIENT_TTL_MS = 120_000;
+const MAX_REVOKED_IDENTIFIERS = 10_000;
 const clients = new Map<string, ConnectedClient>();
 const revokedAccessIds = new Set<string>();
 const revokedClientIds = new Set<string>();
@@ -30,7 +32,7 @@ function getHeaderValue(value: string | string[] | undefined) {
 }
 
 function normalizeClientId(value: unknown) {
-  return typeof value === "string" && /^[a-zA-Z0-9_-]{8,80}$/.test(value)
+  return typeof value === "string" && /^[a-zA-Z0-9_-]{8,96}$/.test(value)
     ? value
     : "";
 }
@@ -47,8 +49,15 @@ export function getSocketAccessScope(socket: Socket): ClientAccessScope {
   );
 }
 
+export function getRequestAccessScope(req: Request): ClientAccessScope {
+  return getAccessScope(req.get("x-pixelated-access-scope"));
+}
+
 function fallbackClientId(remoteAddress: string, userAgent: string) {
-  return `implicit:${Buffer.from(`${remoteAddress}:${userAgent}`).toString("base64url")}`;
+  return `implicit_${crypto
+    .createHash("sha256")
+    .update(`${remoteAddress}:${userAgent}`)
+    .digest("base64url")}`;
 }
 
 function clientIdFromAccessId(accessId: string) {
@@ -83,6 +92,21 @@ export function getSocketAccessId(socket: Socket) {
   return normalizeClientId(
     getHeaderValue(socket.handshake.headers["x-pixelated-access-id"]),
   );
+}
+
+function vaultOwnerId(accessScope: ClientAccessScope) {
+  // The raw engine token and companion-host token are administrative
+  // credentials for one engine-local vault. Client ids are caller-provided
+  // routing identifiers, so they must never select a storage namespace.
+  return accessScope === "companion-guest" ? "" : "local_engine";
+}
+
+export function getRequestVaultOwnerId(req: Request) {
+  return vaultOwnerId(getRequestAccessScope(req));
+}
+
+export function getSocketVaultOwnerId(socket: Socket) {
+  return vaultOwnerId(getSocketAccessScope(socket));
 }
 
 function upsertClient(
@@ -195,18 +219,19 @@ export function listConnectedClients(now = Date.now()): PublicConnectedClient[] 
 }
 
 export function revokeConnectedClient(io: Server, clientId: string) {
-  if (!clientId) return 0;
+  const safeClientId = normalizeClientId(clientId);
+  if (!safeClientId) return 0;
 
-  revokedClientIds.add(clientId);
-  const client = clients.get(clientId);
+  addBoundedRevocation(revokedClientIds, safeClientId);
+  const client = clients.get(safeClientId);
   if (client?.accessId) {
-    revokedAccessIds.add(client.accessId);
+    addBoundedRevocation(revokedAccessIds, client.accessId);
   }
-  clients.delete(clientId);
+  clients.delete(safeClientId);
   let disconnected = 0;
 
   for (const socket of io.sockets.sockets.values()) {
-    if (socket.data.engineClientId !== clientId) continue;
+    if (socket.data.engineClientId !== safeClientId) continue;
     socket.emit("engine-error", {
       code: "engine_access_revoked",
       message:
@@ -217,6 +242,16 @@ export function revokeConnectedClient(io: Server, clientId: string) {
   }
 
   return disconnected;
+}
+
+function addBoundedRevocation(target: Set<string>, value: string) {
+  target.delete(value);
+  target.add(value);
+  while (target.size > MAX_REVOKED_IDENTIFIERS) {
+    const oldest = target.values().next().value;
+    if (typeof oldest !== "string") break;
+    target.delete(oldest);
+  }
 }
 
 export function registerConnectedClientRoutes(

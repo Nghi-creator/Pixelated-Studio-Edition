@@ -77,7 +77,10 @@ test("desktop launch pairing redeems companion launch tickets locally", async ()
       if (String(input).endsWith("/launch/redeem")) {
         return Promise.resolve({
           ok: true,
-          json: async () => ({ companionToken: "redeemed-token" }),
+          json: async () => ({
+            companionToken: "redeemed-token",
+            expiresAt: "2026-06-18T00:00:00.000Z",
+          }),
           status: 200,
         } as Response);
       }
@@ -104,8 +107,8 @@ test("desktop launch pairing redeems companion launch tickets locally", async ()
     setEngineControlUrl: (engineUrl) => {
       calls.push({ name: "setEngineControlUrl", value: engineUrl });
     },
-    setEngineToken: (token) => {
-      calls.push({ name: "setEngineToken", value: token });
+    setEngineToken: (token, expiresAt) => {
+      calls.push({ name: "setEngineToken", value: { expiresAt, token } });
     },
     setEngineUrl: (engineUrl) => {
       calls.push({ name: "setEngineUrl", value: engineUrl });
@@ -126,24 +129,32 @@ test("desktop launch pairing redeems companion launch tickets locally", async ()
       },
     },
     { name: "setEngineUrl", value: "https://localhost:8090" },
-    { name: "setEngineToken", value: "companion:redeemed-token" },
+    {
+      name: "setEngineToken",
+      value: {
+        expiresAt: "2026-06-18T00:00:00.000Z",
+        token: "companion:redeemed-token",
+      },
+    },
     { name: "setEngineControlUrl", value: "https://localhost:8090" },
     { name: "setEngineControlToken", value: "redeemed-token" },
     {
       name: "fetch",
       value: {
-        input: "https://localhost:8090/local-games",
+        input: "https://localhost:8090/health/connection",
         init: {
           cache: "no-store",
           headers: {
-            "X-User-Id": "connection-monitor",
             "X-Engine-Token": "redeemed-token",
             "X-Pixelated-Client-Id": "client-id",
           },
         },
       },
     },
-    { name: "replaceState", value: "https://pixelated.example/engine" },
+    {
+      name: "replaceState",
+      value: "https://pixelated.example/engine",
+    },
     { name: "pairLocalEngine", value: "https://localhost:8090" },
   ]);
 });
@@ -183,7 +194,11 @@ test("desktop launch pairing rejects unsafe companion launch URLs before redeemi
 
   assert.equal(paired, false);
   assert.deepEqual(calls, [
-    { name: "replaceState", value: "https://pixelated.example/engine" },
+    {
+      name: "replaceState",
+      value:
+        "https://pixelated.example/engine?desktopLaunchError=unsafe_companion_url",
+    },
   ]);
 });
 
@@ -239,7 +254,8 @@ test("desktop launch pairing scrubs launch params after failed ticket redemption
     },
     {
       name: "replaceState",
-      value: "https://pixelated.example/engine?keep=1",
+      value:
+        "https://pixelated.example/engine?keep=1&desktopLaunchError=ticket_invalid",
     },
   ]);
 });
@@ -291,8 +307,20 @@ test("desktop launch pairing scrubs launch params when ticket redemption is unre
       },
     },
     {
+      name: "fetch",
+      value: {
+        input: "https://localhost:8090/launch/redeem",
+        init: {
+          body: JSON.stringify({ ticket: "ticket-1" }),
+          headers: { "content-type": "application/json" },
+          method: "POST",
+        },
+      },
+    },
+    {
       name: "replaceState",
-      value: "https://pixelated.example/home?keep=1",
+      value:
+        "https://pixelated.example/engine?keep=1&desktopLaunchError=companion_unreachable",
     },
   ]);
 });

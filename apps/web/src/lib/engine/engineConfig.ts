@@ -87,6 +87,7 @@ export const getLocalCompanionControlUrl = (engineUrl = getEngineUrl()) => {
     if (!isLocalhost || url.port !== "8080") return null;
 
     url.protocol = "http:";
+    url.hostname = "127.0.0.1";
     url.port = "8091";
     return url.toString().replace(/\/$/, "");
   } catch {

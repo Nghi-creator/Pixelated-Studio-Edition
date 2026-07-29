@@ -3,12 +3,14 @@ import {
   clearEngineToken,
   engineAuthHeaders,
   ENGINE_PAIRING_EVENT,
+  getEngineToken,
   hasEngineToken,
 } from "./engineAuth";
+import { setEngineConnectionStatus } from "./engineConnectionState";
 import { engineEndpoint } from "./engineConfig";
 import { shouldClearEnginePairingAfterProbe } from "./engineConnectionMonitorPolicy";
 
-const ENGINE_PROBE_INTERVAL_MS = 2_000;
+const ENGINE_PROBE_INTERVAL_MS = 5_000;
 const ENGINE_PROBE_TIMEOUT_MS = 1_500;
 
 export function useEngineConnectionMonitor() {
@@ -26,7 +28,7 @@ export function useEngineConnectionMonitor() {
 
     const markUnavailable = () => {
       if (!hasEngineToken()) return;
-      clearEngineToken();
+      clearEngineToken("rejected");
     };
 
     const probeEngineConnection = async () => {
@@ -35,12 +37,15 @@ export function useEngineConnectionMonitor() {
         scheduleProbe();
         return;
       }
-      if (!hasEngineToken()) {
+      const probeToken = getEngineToken();
+      if (!probeToken) {
+        setEngineConnectionStatus("unpaired");
         scheduleProbe();
         return;
       }
 
       probeInFlight = true;
+      const probeUrl = engineEndpoint("/health/connection");
       const probeController = new AbortController();
       controller = probeController;
       const abortId = window.setTimeout(
@@ -49,23 +54,35 @@ export function useEngineConnectionMonitor() {
       );
 
       try {
-        const response = await fetch(engineEndpoint("/local-games"), {
+        const response = await fetch(probeUrl, {
           cache: "no-store",
           headers: {
-            "X-User-Id": "connection-monitor",
             ...engineAuthHeaders(),
           },
           signal: probeController.signal,
         });
 
         if (disposed) return;
+        if (
+          getEngineToken() !== probeToken ||
+          engineEndpoint("/health/connection") !== probeUrl
+        ) {
+          return;
+        }
         if (shouldClearEnginePairingAfterProbe(response.status)) {
           markUnavailable();
           return;
         }
+        setEngineConnectionStatus(response.ok ? "online" : "offline");
       } catch {
         // Runtime switches and Docker restarts can briefly drop probes.
-        // Keep the saved pairing unless the engine explicitly rejects it.
+        // Keep the saved credential, but never present it as a live connection.
+        if (
+          getEngineToken() === probeToken &&
+          engineEndpoint("/health/connection") === probeUrl
+        ) {
+          setEngineConnectionStatus("offline");
+        }
       } finally {
         window.clearTimeout(abortId);
         probeInFlight = false;
@@ -75,6 +92,7 @@ export function useEngineConnectionMonitor() {
     };
 
     const handlePairingChange = () => {
+      if (hasEngineToken()) setEngineConnectionStatus("checking");
       scheduleProbe(0);
     };
     const handleVisibilityChange = () => {
@@ -84,7 +102,13 @@ export function useEngineConnectionMonitor() {
     window.addEventListener(ENGINE_PAIRING_EVENT, handlePairingChange);
     window.addEventListener("online", handlePairingChange);
     document.addEventListener("visibilitychange", handleVisibilityChange);
-    scheduleProbe(0);
+    if (hasEngineToken()) {
+      setEngineConnectionStatus("checking");
+      scheduleProbe(0);
+    } else {
+      setEngineConnectionStatus("unpaired");
+      scheduleProbe();
+    }
 
     return () => {
       disposed = true;

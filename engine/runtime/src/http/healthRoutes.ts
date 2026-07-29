@@ -1,4 +1,4 @@
-import type { Express, Request } from "express";
+import type { Express, Request, RequestHandler } from "express";
 
 type HealthSnapshot = {
   [key: string]: unknown;
@@ -14,6 +14,7 @@ type HealthRouteOptions = {
   now?: () => number;
   publicRateLimit?: number;
   publicRateLimitWindowMs?: number;
+  requireEngineToken?: RequestHandler;
 };
 
 type RateLimitWindow = {
@@ -77,6 +78,17 @@ export function registerHealthRoutes(
     options.publicRateLimitWindowMs,
   );
   const now = options.now || Date.now;
+
+  if (options.requireEngineToken) {
+    app.get(
+      "/health/connection",
+      options.requireEngineToken,
+      (_req, res) => {
+        res.set("Cache-Control", "no-store");
+        res.json({ ok: true });
+      },
+    );
+  }
 
   app.get("/health", (req, res) => {
     const includeDetails = options.canReadDetails?.(req) === true;

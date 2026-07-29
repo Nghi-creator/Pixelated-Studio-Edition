@@ -12,8 +12,8 @@ import {
   setCompanionCorsHeaders,
 } from "../httpUtils";
 import {
-  consumeCompanionLaunchTicket,
-  createCompanionAccessToken,
+  hasValidCompanionLaunchTicket,
+  redeemCompanionLaunchTicket,
 } from "./inviteState";
 
 const REDEEM_LAUNCH_PATH = "/launch/redeem";
@@ -57,7 +57,7 @@ export async function handleLaunchRequest(
       typeof (body as { ticket?: unknown }).ticket === "string"
         ? (body as { ticket: string }).ticket
         : "";
-    if (!consumeCompanionLaunchTicket(ticket)) {
+    if (!hasValidCompanionLaunchTicket(ticket)) {
       sendJson(res, 401, {
         code: "launch_ticket_invalid",
         error: "Desktop launch ticket is invalid or expired",
@@ -74,9 +74,20 @@ export async function handleLaunchRequest(
     }
 
     const accessExpiresAt = Date.now() + HOST_ACCESS_TOKEN_TTL_MS;
+    const redemption = redeemCompanionLaunchTicket(
+      ticket,
+      accessExpiresAt,
+    );
+    if (!redemption) {
+      sendJson(res, 401, {
+        code: "launch_ticket_invalid",
+        error: "Desktop launch ticket is invalid or expired",
+      });
+      return true;
+    }
     sendJson(res, 200, {
-      companionToken: createCompanionAccessToken(accessExpiresAt, "host"),
-      expiresAt: new Date(accessExpiresAt).toISOString(),
+      companionToken: redemption.companionToken,
+      expiresAt: new Date(redemption.accessExpiresAt).toISOString(),
       tokenStoredBy: "browser-local-storage",
     });
   } catch (err) {

@@ -1,12 +1,13 @@
 import { Check, Copy, Link2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { PixelIcon } from "../../../../components/ui/PixelIcon";
 import { copyTextToClipboard } from "../../../../lib/clipboard";
 import type {
   EngineInputCapabilities,
   LobbyParticipant,
   LobbyState,
 } from "../../../../lib/webrtc/useWebRTC";
+import { LobbyParticipants } from "./LobbyParticipants";
+import { LobbyPlayerSlots } from "./LobbyPlayerSlots";
 
 type LobbyPanelProps = {
   currentParticipant: LobbyParticipant | null;
@@ -21,12 +22,6 @@ type LobbyPanelProps = {
   shareText: string;
   shareUrl: string;
 };
-
-function getRoleIconName(participant: LobbyParticipant) {
-  if (participant.role === "host") return "engine-on";
-  if (participant.role === "player") return "cartridge";
-  return "profile";
-}
 
 export function LobbyPanel({
   currentParticipant,
@@ -48,16 +43,7 @@ export function LobbyPanel({
   const participants = lobbyState?.participants || [];
   const currentSlot = currentParticipant?.playerIndex || null;
   const maxPlayers = lobbyState?.maxPlayers || 4;
-  const supportedPlayerCount = Math.min(
-    maxPlayers,
-    inputCapabilities.supportedPlayerCount,
-  );
   const canKickParticipants = currentParticipant?.role === "host";
-  const occupiedSlots = new Set(
-    participants
-      .map((participant) => participant.playerIndex)
-      .filter((playerIndex): playerIndex is number => playerIndex !== null),
-  );
 
   useEffect(
     () => () => {
@@ -158,134 +144,22 @@ export function LobbyPanel({
                 )}
               </div>
 
-              <div className="mb-5">
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">
-                  Player Slots
-                </p>
-                <div className="grid grid-cols-4 gap-2">
-                  {Array.from(
-                    { length: maxPlayers },
-                    (_, index) => index + 1,
-                  ).map((playerIndex) => {
-                    const isCurrentSlot = currentSlot === playerIndex;
-                    const isOccupied =
-                      occupiedSlots.has(playerIndex) && !isCurrentSlot;
-                    const isUnsupported = playerIndex > supportedPlayerCount;
-                    const isDisabled = isOccupied || isUnsupported;
-
-                    return (
-                      <button
-                        key={playerIndex}
-                        type="button"
-                        disabled={isDisabled}
-                        onClick={() => onRequestSlot(playerIndex)}
-                        title={
-                          isUnsupported
-                            ? inputCapabilities.limitationReason ||
-                              "Slot disabled"
-                            : isOccupied
-                              ? `P${playerIndex} is already taken`
-                              : `Request P${playerIndex}`
-                        }
-                        className={`h-10 rounded-lg border text-sm font-semibold transition-colors ${
-                          isCurrentSlot
-                            ? "border-synth-border bg-synth-elevated text-white"
-                            : isDisabled
-                              ? "cursor-not-allowed border-synth-border bg-synth-bg text-gray-600"
-                              : "border-synth-border bg-synth-surface text-gray-300 hover:bg-synth-elevated hover:text-white"
-                        }`}
-                      >
-                        P{playerIndex}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {inputCapabilities.limitationReason && (
-                  <p className="mt-3 text-xs leading-5 text-gray-400">
-                    {inputCapabilities.limitationReason}
-                  </p>
-                )}
-
-                {currentParticipant?.role !== "host" && currentSlot && (
-                  <button
-                    type="button"
-                    onClick={onReleaseSlot}
-                    className="mt-3 h-10 w-full rounded-lg border border-synth-border bg-synth-surface text-sm font-semibold text-gray-300 transition-colors hover:bg-synth-elevated hover:text-white"
-                  >
-                    Watch Only
-                  </button>
-                )}
-              </div>
-
-              <div>
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-gray-500">
-                  Participants
-                </p>
-                <div className="grid gap-2">
-                  {participants.length === 0 ? (
-                    <div className="rounded-lg border border-synth-border bg-synth-surface px-3 py-6 text-center text-sm text-gray-500">
-                      No participants connected yet.
-                    </div>
-                  ) : (
-                    participants.map((participant) => {
-                      const roleIconName = getRoleIconName(participant);
-                      const isCurrent =
-                        currentParticipant?.socketId === participant.socketId;
-
-                      return (
-                        <div
-                          key={participant.socketId}
-                          className={`flex min-h-12 items-center justify-between rounded-lg border px-3 ${
-                            isCurrent
-                              ? "border-synth-border bg-synth-elevated"
-                              : "border-synth-border bg-synth-surface"
-                          }`}
-                        >
-                          <div className="flex min-w-0 items-center gap-2">
-                            <PixelIcon
-                              className="h-4 w-4 shrink-0 text-synth-secondary"
-                              name={roleIconName}
-                            />
-                            <div className="min-w-0">
-                              <span className="block truncate text-sm font-medium text-gray-200">
-                                {participant.displayName}
-                              </span>
-                              <span className="block text-[10px] uppercase tracking-wide text-[#C02066]">
-                                Connected
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                              {participant.playerIndex
-                                ? `P${participant.playerIndex}`
-                                : "View"}
-                            </span>
-                            {canKickParticipants &&
-                              !isCurrent &&
-                              participant.role !== "host" && (
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    onKickParticipant(participant.socketId)
-                                  }
-                                  className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-synth-border text-gray-400 transition-colors hover:border-red-400/70 hover:text-red-300"
-                                  title={`Remove ${participant.displayName}`}
-                                >
-                                  <X className="h-4 w-4" />
-                                </button>
-                              )}
-                          </div>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
+              <LobbyPlayerSlots
+                currentParticipant={currentParticipant}
+                inputCapabilities={inputCapabilities}
+                maxPlayers={maxPlayers}
+                onReleaseSlot={onReleaseSlot}
+                onRequestSlot={onRequestSlot}
+                participants={participants}
+              />
+              <LobbyParticipants
+                canKickParticipants={canKickParticipants}
+                currentParticipant={currentParticipant}
+                onKickParticipant={onKickParticipant}
+                participants={participants}
+              />
             </div>
           </aside>
         </div>
   );
 }
-

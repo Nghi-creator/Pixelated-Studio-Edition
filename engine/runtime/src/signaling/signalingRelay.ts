@@ -19,6 +19,12 @@ type CandidateEnvelope = {
 
 const MAX_PEER_ID_LENGTH = 128;
 const MAX_PEERS_PER_SOCKET = 32;
+const DEFAULT_SIGNALING_EVENTS_PER_SECOND = 120;
+
+type SignalingRelayOptions = {
+  eventLimitPerSecond?: number;
+  now?: () => number;
+};
 
 function stripSessionId(payload: unknown) {
   if (!payload || typeof payload !== "object") return {};
@@ -127,8 +133,39 @@ function relayToPeerOrSession(
   relayToSession(socket, eventName, stripSessionId(payload));
 }
 
-export function registerSignalingRelayHandlers(socket: Socket) {
+export function registerSignalingRelayHandlers(
+  socket: Socket,
+  options: SignalingRelayOptions = {},
+) {
+  const eventLimit =
+    options.eventLimitPerSecond || DEFAULT_SIGNALING_EVENTS_PER_SECOND;
+  const now = options.now || Date.now;
+  let eventCount = 0;
+  let eventWindowStartedAt = now();
+  let warningSent = false;
+
+  const consumeSignalingBudget = () => {
+    const currentTime = now();
+    if (currentTime - eventWindowStartedAt >= 1_000) {
+      eventCount = 0;
+      eventWindowStartedAt = currentTime;
+      warningSent = false;
+    }
+
+    eventCount += 1;
+    if (eventCount <= eventLimit) return true;
+    if (!warningSent) {
+      warningSent = true;
+      socket.emit("engine-error", {
+        code: "engine_signaling_rate_limited",
+        message: "WebRTC signaling rate limit reached.",
+      });
+    }
+    return false;
+  };
+
   socket.on("python-ready", (payload: SessionPayload = {}) => {
+    if (!consumeSignalingBudget()) return;
     const accessScope = socket.handshake.headers["x-pixelated-access-scope"];
     if (accessScope === "companion-guest" || accessScope === "companion-host") {
       console.warn("[Node.js] Dropping python-ready from a browser companion");
@@ -151,6 +188,7 @@ export function registerSignalingRelayHandlers(socket: Socket) {
   });
 
   socket.on("webrtc-offer", (offer: SessionPayload = {}) => {
+    if (!consumeSignalingBudget()) return;
     if (!payloadMatchesActiveSession(socket, offer)) return;
     const peerId = getPeerId(offer);
     if (!peerId || !rememberPeer(socket, peerId)) return;
@@ -158,6 +196,7 @@ export function registerSignalingRelayHandlers(socket: Socket) {
   });
 
   socket.on("webrtc-peer-disconnect", (payload: SessionPayload = {}) => {
+    if (!consumeSignalingBudget()) return;
     const peerId = getPeerId(payload);
     if (peerId) {
       emitPeerDisconnect(socket, peerId);
@@ -166,16 +205,19 @@ export function registerSignalingRelayHandlers(socket: Socket) {
   });
 
   socket.on("webrtc-answer", (answer: SessionPayload = {}) => {
+    if (!consumeSignalingBudget()) return;
     relayToPeerOrSession(socket, "webrtc-answer", answer);
   });
 
   socket.on("webrtc-ice-candidate", (payload: CandidateEnvelope = {}) => {
+    if (!consumeSignalingBudget()) return;
     relayToSession(socket, "webrtc-ice-candidate", unwrapCandidate(payload));
   });
 
   socket.on(
     "webrtc-ice-candidate-backend",
     (payload: CandidateEnvelope = {}) => {
+      if (!consumeSignalingBudget()) return;
       relayToPeerOrSession(
         socket,
         "webrtc-ice-candidate-backend",

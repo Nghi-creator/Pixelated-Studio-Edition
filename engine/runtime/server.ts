@@ -18,9 +18,11 @@ import {
 import {
   getRequestAccessId,
   getRequestClientId,
+  getRequestVaultOwnerId,
   getSocketAccessId,
   getSocketAccessScope,
   getSocketClientId,
+  getSocketVaultOwnerId,
   isEngineAccessRevoked,
   isEngineClientRevoked,
   refreshConnectedClient,
@@ -85,6 +87,7 @@ const runtime = createProcessManager({
   cameraPeerStatePath: HEALTH_PATHS.cameraPeerState,
   engineToken: ENGINE_TOKEN,
   gamepadBridgePath: HEALTH_PATHS.gamepadBridge,
+  keyboardBridgePath: HEALTH_PATHS.keyboardBridge,
 });
 const cloudRoms = createCloudRomDownloader({
   allowedRomHosts,
@@ -111,8 +114,10 @@ registerHealthRoutes(app, getHealthSnapshot, {
     request.get("x-pixelated-access-scope") !== "companion-guest" &&
     auth.isValidEngineToken(request.get("x-engine-token")),
   getPublicHealthSnapshot,
+  requireEngineToken: auth.requireEngineToken,
 });
 registerLocalVaultRoutes(app, {
+  getVaultOwnerId: getRequestVaultOwnerId,
   maxRomSizeBytes: MAX_ROM_SIZE_BYTES,
   requireEngineToken: auth.requireEngineToken,
 });
@@ -152,16 +157,24 @@ io.on("connection", (socket) => {
   socket.on("join-session", (rawPayload: unknown = {}) => {
     const payload = normalizeSocketPayload(rawPayload);
     const role = normalizeSocketRole(payload.role);
-    const sessionId = joinSession(socket, payload.sessionId, role);
     socket.data.role = role;
+    let sessionId: string | null;
+
+    if (role === "camera") {
+      sessionId = joinSession(socket, payload.sessionId, role);
+    } else {
+      const participant = lobby.joinLobby(socket, {
+        displayName: payload.displayName,
+        requestedRole: role === "browser" ? "host" : role,
+        sessionId: payload.sessionId,
+      });
+      sessionId = participant
+        ? normalizeSessionId(socket.data.sessionId)
+        : null;
+    }
     refreshConnectedClient(socket);
 
     if (sessionId && role !== "camera") {
-      lobby.joinLobby(socket, {
-        displayName: payload.displayName,
-        requestedRole: role === "browser" ? "host" : role,
-        sessionId,
-      });
       if (
         payload.suppressReady !== true &&
         runtime.getActiveSessionId() === sessionId
@@ -180,6 +193,7 @@ io.on("connection", (socket) => {
     apiUrl: PIXELATED_API_URL,
     canStartGame: lobby.canControlSession,
     downloadCloudRom: cloudRoms.downloadCloudRom,
+    getVaultOwnerId: getSocketVaultOwnerId,
     runtime,
     verifyBackendSession,
   });

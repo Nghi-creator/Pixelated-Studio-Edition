@@ -1,4 +1,9 @@
-export type PairingState = "idle" | "checking" | "paired" | "error";
+export type PairingState =
+  | "idle"
+  | "checking"
+  | "paired"
+  | "offline"
+  | "error";
 export type EngineUrlScope = "local" | "lan" | "custom";
 
 export type EngineHealthPayload = {
@@ -35,4 +40,3 @@ export type LanPreflightState =
   | { status: "checking" }
   | { payload: LanPreflightPayload; status: "complete" }
   | { status: "unreachable" };
-

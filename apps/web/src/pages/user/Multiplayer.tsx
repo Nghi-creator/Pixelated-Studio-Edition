@@ -35,7 +35,7 @@ export default function Multiplayer() {
             and request a slot after connecting.
           </p>
         </div>
-        <StatusPill paired={catalog.isEnginePaired} />
+        <StatusPill status={catalog.engineConnectionStatus} />
       </div>
 
       <div className="mb-6 grid gap-3 sm:grid-cols-2">
