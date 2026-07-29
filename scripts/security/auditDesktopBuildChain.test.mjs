@@ -95,6 +95,37 @@ test("follows npm reverse effects when a meta-vulnerability omits via", () => {
   assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
 });
 
+test("allows detached npm meta-vulnerabilities when every direct leaf is known", () => {
+  const report = {
+    vulnerabilities: {
+      "brace-expansion": {
+        nodes: ["node_modules/brace-expansion"],
+        severity: "high",
+        via: [advisory],
+      },
+      glob: {
+        nodes: ["node_modules/glob"],
+        severity: "high",
+        via: [],
+      },
+      "electron-builder": {
+        nodes: ["node_modules/electron-builder"],
+        severity: "high",
+        via: [],
+      },
+    },
+  };
+  const packageLock = {
+    packages: {
+      "node_modules/brace-expansion": { dev: true },
+      "node_modules/glob": { dev: true },
+      "node_modules/electron-builder": { dev: true },
+    },
+  };
+
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
+});
+
 test("does not use reverse effects to allow an unknown direct advisory", () => {
   const report = {
     vulnerabilities: {

@@ -13,6 +13,21 @@ function getGithubAdvisoryId(url) {
   );
 }
 
+function isAllowedDirectAdvisory(via) {
+  const advisoryId = getGithubAdvisoryId(via?.url);
+  return advisoryId !== null && ALLOWED_DEV_ADVISORY_IDS.has(advisoryId);
+}
+
+function isDevelopmentOnly(vulnerability, packageLock) {
+  const nodes = Array.isArray(vulnerability?.nodes)
+    ? vulnerability.nodes
+    : [];
+  return (
+    nodes.length > 0 &&
+    nodes.every((node) => packageLock.packages?.[node]?.dev === true)
+  );
+}
+
 function hasOnlyAllowedAdvisories(
   name,
   vulnerabilities,
@@ -25,13 +40,7 @@ function hasOnlyAllowedAdvisories(
   }
   if (visiting.has(name)) return true;
 
-  const nodes = Array.isArray(vulnerability.nodes)
-    ? vulnerability.nodes
-    : [];
-  if (
-    nodes.length === 0 ||
-    nodes.some((node) => packageLock.packages?.[node]?.dev !== true)
-  ) {
+  if (!isDevelopmentOnly(vulnerability, packageLock)) {
     return false;
   }
 
@@ -61,13 +70,40 @@ function hasOnlyAllowedAdvisories(
         nextVisiting,
       );
     }
-    const advisoryId = getGithubAdvisoryId(via?.url);
-    return advisoryId !== null && ALLOWED_DEV_ADVISORY_IDS.has(advisoryId);
+    return isAllowedDirectAdvisory(via);
   });
 }
 
 export function getBlockingVulnerabilities(report, packageLock) {
   const vulnerabilities = report?.vulnerabilities || {};
+  const highVulnerabilities = Object.values(vulnerabilities).filter(
+    (vulnerability) => HIGH_SEVERITIES.has(vulnerability?.severity),
+  );
+  const directAdvisories = highVulnerabilities.flatMap((vulnerability) =>
+    Array.isArray(vulnerability?.via)
+      ? vulnerability.via.filter((via) => typeof via !== "string")
+      : [],
+  );
+
+  // npm occasionally omits or truncates the `via`/`effects` links on
+  // meta-vulnerabilities. If every direct high-severity leaf is the one
+  // explicitly accepted advisory, parent entries are safe to classify by
+  // their lockfile scope instead of depending on those unstable links.
+  if (
+    directAdvisories.length > 0 &&
+    directAdvisories.every(isAllowedDirectAdvisory)
+  ) {
+    return Object.entries(vulnerabilities)
+      .filter(([, vulnerability]) =>
+        HIGH_SEVERITIES.has(vulnerability?.severity),
+      )
+      .filter(
+        ([, vulnerability]) =>
+          !isDevelopmentOnly(vulnerability, packageLock),
+      )
+      .map(([name]) => name);
+  }
+
   return Object.keys(vulnerabilities).filter(
     (name) =>
       !hasOnlyAllowedAdvisories(name, vulnerabilities, packageLock),
