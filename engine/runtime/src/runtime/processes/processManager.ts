@@ -294,6 +294,21 @@ export function createProcessManager(options: ProcessManagerOptions) {
     };
   }
 
+  function shutdown(): void {
+    cleanupActiveSession();
+    gamepads.stop();
+    keyboard.stop();
+
+    if (pulseAudioProcess) {
+      pulseAudioProcess.kill();
+      pulseAudioProcess = null;
+    }
+    if (virtualDisplayProcess) {
+      virtualDisplayProcess.kill();
+      virtualDisplayProcess = null;
+    }
+  }
+
   return {
     bootGame,
     cleanupActiveSession,
@@ -301,6 +316,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
     getRuntimeState,
     restartStream,
     sendInput,
+    shutdown,
     startVirtualDisplay,
   };
 }

@@ -24,8 +24,15 @@ test("anonymous users can create User Edition WASM cloud sessions", async () => 
     build.platform_id = "gb";
     build.runtime_id = "mgba";
   }
+  let anonymousIpChecks = 0;
   const app = Fastify({ logger: false });
   await registerSessionRoutes(app, {
+    anonymousSessionCreateIpLimiter: {
+      consume: async () => {
+        anonymousIpChecks += 1;
+        return { allowed: true, remaining: 9, resetAt: Date.now() + 60_000 };
+      },
+    },
     attachOptionalUser: async () => undefined,
     signCatalogRom: async () => "https://signed.example.test/public.gb",
     supabase: db as never,
@@ -57,6 +64,7 @@ test("anonymous users can create User Edition WASM cloud sessions", async () => 
   assert.equal(db.sessions.get("anonymous-session")?.user_id, null);
   assert.equal(db.sessions.get("anonymous-session")?.client_edition, "user");
   assert.equal(db.sessions.get("anonymous-session")?.client_runtime_kind, "wasm");
+  assert.equal(anonymousIpChecks, 1);
 
   const stopResponse = await app.inject({
     method: "DELETE",
@@ -65,6 +73,39 @@ test("anonymous users can create User Edition WASM cloud sessions", async () => 
   });
   assert.equal(stopResponse.statusCode, 204);
   assert.equal(typeof db.sessions.get("anonymous-session")?.deleted_at, "string");
+  await app.close();
+});
+
+test("unauthenticated WASM sessions are blocked by the strict IP limiter", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGame(db, { id: GAME_ID });
+  const app = Fastify({ logger: false });
+  await registerSessionRoutes(app, {
+    anonymousSessionCreateIpLimiter: {
+      consume: async () => ({
+        allowed: false,
+        remaining: 0,
+        resetAt: Date.now() + 60_000,
+      }),
+    },
+    attachOptionalUser: async () => undefined,
+    supabase: db as never,
+  });
+
+  const response = await app.inject({
+    method: "POST",
+    payload: {
+      clientEdition: "user",
+      clientSessionId: "limited-unauthenticated-wasm",
+      gameId: GAME_ID,
+      mode: "cloud",
+      runtimeKind: "wasm",
+    },
+    url: "/sessions",
+  });
+
+  assert.equal(response.statusCode, 429);
+  assert.equal(db.sessions.size, 0);
   await app.close();
 });
 

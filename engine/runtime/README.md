@@ -98,7 +98,9 @@ PIXELATED_API_URL=http://127.0.0.1:4000
 Cloud download limits and allowed ROM hosts are configured with
 `PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES`,
 `PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS`, and
-`PIXELATED_ALLOWED_ROM_HOSTS`. Local Vault uploads use
+`PIXELATED_ALLOWED_ROM_HOSTS`. Cloud downloads fail closed when the host
+allowlist is empty, reject hosts that resolve to private or reserved network
+addresses, and use the timeout as a total download deadline. Local Vault uploads use
 `PIXELATED_MAX_ROM_SIZE_BYTES`.
 
 ## Native Debian runtime

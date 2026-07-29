@@ -193,3 +193,16 @@ test("native process failures expose recent launch diagnostics", () => {
   assert.equal(failure?.exitCode, 1);
   assert.match(failure?.stderrTail || "", /SDL video output/);
 });
+
+test("runtime shutdown terminates the active game and clears its session", () => {
+  const child = new FakeChildProcess();
+  const { manager } = createManager({ spawnChild: child });
+  const romPath = writeValidNesFile();
+
+  manager.bootGame(romPath, "shutdown-session", { runtimeId: "mesen" });
+  manager.shutdown();
+
+  assert.equal(child.killed, true);
+  assert.equal(manager.getActiveSessionId(), null);
+  assert.equal(manager.getRuntimeState().retroarchProcess, null);
+});

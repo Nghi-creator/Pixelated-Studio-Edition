@@ -226,7 +226,58 @@ io.on("connection", (socket) => {
   });
 });
 
-server.listen(8080, "0.0.0.0", () => {
-  console.log("Cloud Console API running on port 8080");
-  runtime.startVirtualDisplay();
-});
+export function installEngineShutdownHandlers() {
+  let shutdownPromise: Promise<void> | null = null;
+
+  const shutdown = (signal: NodeJS.Signals) => {
+    if (shutdownPromise) return shutdownPromise;
+    console.log(`[Engine] ${signal} received; shutting down`);
+    runtime.shutdown();
+
+    shutdownPromise = new Promise<void>((resolve) => {
+      const forceCloseTimer = setTimeout(() => {
+        server.closeAllConnections();
+        resolve();
+      }, 10_000);
+      forceCloseTimer.unref();
+
+      io.close(() => {
+        clearTimeout(forceCloseTimer);
+        if (server.listening) {
+          server.close(() => resolve());
+        } else {
+          resolve();
+        }
+      });
+    });
+    return shutdownPromise;
+  };
+
+  process.once("SIGINT", () => {
+    void shutdown("SIGINT").catch((err) => {
+      console.error("[Engine] Shutdown failed", err);
+      process.exitCode = 1;
+    });
+  });
+  process.once("SIGTERM", () => {
+    void shutdown("SIGTERM").catch((err) => {
+      console.error("[Engine] Shutdown failed", err);
+      process.exitCode = 1;
+    });
+  });
+
+  return shutdown;
+}
+
+export function startEngineServer(port = 8080, host = "0.0.0.0") {
+  installEngineShutdownHandlers();
+  server.listen(port, host, () => {
+    console.log(`Cloud Console API running on port ${port}`);
+    runtime.startVirtualDisplay();
+  });
+  return server;
+}
+
+if (require.main === module) {
+  startEngineServer();
+}

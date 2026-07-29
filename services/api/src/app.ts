@@ -1,0 +1,62 @@
+import Fastify from "fastify";
+import { env } from "./config/env.js";
+import { registerAuthMethodsRoutes } from "./modules/auth/http/authMethodsRoutes.js";
+import { registerMeRoutes } from "./modules/auth/http/meRoutes.js";
+import { registerSessionRoutes } from "./modules/auth/http/sessionRoutes.js";
+import { registerAdminSubmissionRoutes } from "./modules/catalog/http/adminSubmissionRoutes.js";
+import { registerCatalogCandidateRoutes } from "./modules/catalog/http/catalogCandidateRoutes.js";
+import { registerCatalogRoutes } from "./modules/catalog/http/registerCatalogRoutes.js";
+import { registerPlayCountRoutes } from "./modules/catalog/http/playCountRoutes.js";
+import { registerSubmissionRoutes } from "./modules/catalog/http/registerSubmissionRoutes.js";
+import { scheduleControlPlaneCleanup } from "./modules/maintenance/controlPlaneCleanup.js";
+import { registerModerationRoutes } from "./modules/moderation/http/registerModerationRoutes.js";
+import { registerLocalPairingRoutes } from "./modules/multiplayer/http/localPairingRoutes.js";
+import { registerMultiplayerRoutes } from "./modules/multiplayer/http/multiplayerRoutes.js";
+import { registerWebRTCRoutes } from "./modules/multiplayer/http/webrtcRoutes.js";
+import { registerAccessLogRoutes } from "./modules/observability/http/accessLogRoutes.js";
+import { registerMetricRoutes } from "./modules/observability/http/metricRoutes.js";
+import { registerHealthRoutes } from "./modules/system/http/healthRoutes.js";
+import { registerAdminUserRoutes } from "./modules/users/http/adminUserRoutes.js";
+import { registerProfileRoutes } from "./modules/users/http/profileRoutes.js";
+import { registerCors } from "./plugins/cors.js";
+import { registerGlobalRateLimit } from "./plugins/rateLimit.js";
+import { createLoggerOptions } from "./plugins/logger.js";
+import { registerSecurityHeaders } from "./plugins/securityHeaders.js";
+import { registerStudioOriginGate } from "./plugins/studioOriginGate.js";
+
+export async function buildServer() {
+  const app = Fastify({
+    bodyLimit: 1024 * 1024,
+    connectionTimeout: 10_000,
+    keepAliveTimeout: 5_000,
+    logger: createLoggerOptions(),
+    maxRequestsPerSocket: 1_000,
+    requestTimeout: 30_000,
+    trustProxy: env.trustProxy,
+  });
+
+  await registerSecurityHeaders(app);
+  await registerCors(app);
+  await registerStudioOriginGate(app);
+  await registerGlobalRateLimit(app);
+  await registerHealthRoutes(app);
+  await registerAuthMethodsRoutes(app);
+  await registerAccessLogRoutes(app);
+  await registerCatalogCandidateRoutes(app);
+  await registerCatalogRoutes(app);
+  await registerMeRoutes(app);
+  await registerProfileRoutes(app);
+  await registerAdminSubmissionRoutes(app);
+  await registerAdminUserRoutes(app);
+  await registerLocalPairingRoutes(app);
+  await registerPlayCountRoutes(app);
+  await registerModerationRoutes(app);
+  await registerSubmissionRoutes(app);
+  await registerSessionRoutes(app);
+  await registerMetricRoutes(app);
+  await registerMultiplayerRoutes(app);
+  await registerWebRTCRoutes(app);
+  scheduleControlPlaneCleanup(app);
+
+  return app;
+}

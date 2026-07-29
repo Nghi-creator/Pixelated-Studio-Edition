@@ -1,10 +1,9 @@
 import type { FastifyInstance } from "fastify";
-import { searchAndRankGames } from "../domain/catalogSearch.js";
-import { getCatalogCacheKey, getPageRange } from "../domain/catalogPolicy.js";
+import { getCatalogCacheKey } from "../domain/catalogPolicy.js";
 import {
   fetchFeaturedGames,
   fetchPublishedCatalogFilters,
-  fetchPublishedCatalogGames,
+  fetchPublishedCatalogPage,
   fetchPublishedGameById,
 } from "../services/catalogService.js";
 import { logTiming } from "../../observability/timing.js";
@@ -28,19 +27,18 @@ async function buildCachedGamesPage(
   license?: string,
   platform?: string,
 ): Promise<CachedGamesCatalogResponse> {
-  const { end, start } = getPageRange(page, pageSize);
-  const data = await fetchPublishedCatalogGames(service, timings, {
+  const offset = (page - 1) * pageSize;
+  const { games, total } = await fetchPublishedCatalogPage(service, timings, {
     genre,
     license,
+    offset,
+    pageSize,
     platform,
     search,
   });
-  const rankedGames = search ? searchAndRankGames(data || [], search) : data || [];
-  const pagedGames = rankedGames.slice(start, end + 1);
-  const total = rankedGames.length;
 
   return {
-    games: pagedGames,
+    games,
     page,
     pageSize,
     total,

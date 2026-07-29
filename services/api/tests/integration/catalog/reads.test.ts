@@ -22,7 +22,7 @@ test("catalog and favorites are served through backend routes", async () => {
   assert.equal(gamesResponse.statusCode, 200);
   assert.equal(gamesResponse.json<{ games: unknown[] }>().games.length, 1);
   assert.equal(
-    db.rpcCalls.some((call) => call.fn === "published_catalog_games"),
+    db.rpcCalls.some((call) => call.fn === "published_catalog_games_page"),
     true,
   );
 
@@ -130,9 +130,30 @@ test("catalog route rejects amplification-oriented query shapes", async () => {
   });
   assert.equal(excessiveTerms.statusCode, 400);
   assert.equal(
-    db.rpcCalls.filter((call) => call.fn === "published_catalog_games").length,
+    db.rpcCalls.filter((call) => call.fn === "published_catalog_games_page").length,
     0,
   );
+  await app.close();
+});
+
+test("catalog preserves totals when a requested page is beyond the final row", async () => {
+  const db = new FakeSupabase();
+  seedPublishedGames(
+    db,
+    { id: "page-total-a", title: "Alpha" },
+    { id: "page-total-b", title: "Beta" },
+  );
+  const app = await createDataBoundaryApp(db);
+
+  const response = await app.inject({
+    method: "GET",
+    url: "/games?page=10&pageSize=2",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json<{ games: unknown[] }>().games, []);
+  assert.equal(response.json<{ total: number }>().total, 2);
+  assert.equal(response.json<{ totalPages: number }>().totalPages, 1);
   await app.close();
 });
 
@@ -161,7 +182,9 @@ test("catalog search is pushed into the published catalog RPC", async () => {
   assert.equal(
     db.rpcCalls.some(
       (call) =>
-        call.fn === "published_catalog_games" && call.params.p_search === "omega",
+        call.fn === "published_catalog_games_page" &&
+        call.params.p_search === "omega" &&
+        call.params.p_page_size === 5,
     ),
     true,
   );
@@ -201,7 +224,7 @@ test("catalog exposes eligible facets and filters genre and SPDX license server-
   assert.equal(
     db.rpcCalls.some(
       (call) =>
-        call.fn === "published_catalog_games" &&
+        call.fn === "published_catalog_games_page" &&
         call.params.p_genre === "action" &&
         call.params.p_license_spdx === "GPL-3.0-only",
     ),
@@ -233,6 +256,14 @@ test("catalog filters games by playable build platform", async () => {
   assert.deepEqual(
     response.json<{ games: { id: string }[] }>().games.map((game) => game.id),
     ["gb-game"],
+  );
+  assert.equal(
+    db.rpcCalls.some(
+      (call) =>
+        call.fn === "published_catalog_games_page" &&
+        call.params.p_platform === "gb",
+    ),
+    true,
   );
   await app.close();
 });
