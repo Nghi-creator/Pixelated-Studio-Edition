@@ -56,39 +56,67 @@ jobs:
       - name: Capture current Render API process
         id: baseline
         run: |
-          health="$(curl --fail-with-body --silent --show-error "$HOSTED_API_URL/health")"
-          ready="$(curl --fail-with-body --silent --show-error "$HOSTED_API_URL/ready")"
-          jq --exit-status '.ok == true and .rateLimitStore == "redis"' <<<"$health" >/dev/null || {
-            echo "::error::Production API health does not report the required Redis rate-limit store."
-            exit 1
-          }
-          jq --exit-status '.ok == true and .checks.sharedRateLimitStore == true' <<<"$ready" >/dev/null || {
-            echo "::error::Production API is not ready with the required shared rate-limit store."
-            exit 1
-          }
-          uptime="$(jq --exit-status '.uptimeSeconds | numbers' <<<"$health")"
-          echo "started_at_seconds=$(($(date +%s) - uptime))" >> "$GITHUB_OUTPUT"
           mkdir -p .artifacts/hosted-deploy-proof
-          jq --null-input \
-            --arg mode "${{ (github.event_name == 'workflow_dispatch' && inputs.proof_mode) && 'proof' || 'deploy' }}" \
-            --arg apiUrl "$HOSTED_API_URL" \
-            --argjson health "$health" \
-            --argjson ready "$ready" \
-            --arg startedAtSeconds "$(($(date +%s) - uptime))" \
-            --arg deployHook "${{ (github.event_name == 'workflow_dispatch' && inputs.proof_mode) && 'skipped' || 'pending' }}" \
-            '{
-              mode: $mode,
-              provider: "render",
-              apiUrl: $apiUrl,
-              readiness: {
-                healthOk: ($health.ok == true),
-                readyOk: ($ready.ok == true),
-                rateLimitStore: $health.rateLimitStore,
-                sharedRateLimitStore: $ready.checks.sharedRateLimitStore,
-                startedAtSeconds: ($startedAtSeconds | tonumber)
-              },
-              deployHook: $deployHook
-            }' > .artifacts/hosted-deploy-proof/render-api.json
+          mode="${{ (github.event_name == 'workflow_dispatch' && inputs.proof_mode) && 'proof' || 'deploy' }}"
+          deploy_hook="${{ (github.event_name == 'workflow_dispatch' && inputs.proof_mode) && 'skipped' || 'pending' }}"
+
+          if health="$(curl --fail-with-body --silent --show-error "$HOSTED_API_URL/health")" &&
+            ready="$(curl --fail-with-body --silent --show-error "$HOSTED_API_URL/ready")" &&
+            jq --exit-status '.ok == true and .rateLimitStore == "redis" and (.uptimeSeconds | type == "number")' <<<"$health" >/dev/null &&
+            jq --exit-status '
+              .ok == true and
+              .checks.sharedRateLimitStoreConfigured == true and
+              .checks.sharedRateLimitStoreReachable == true
+            ' <<<"$ready" >/dev/null
+          then
+            uptime="$(jq --exit-status '.uptimeSeconds | numbers' <<<"$health")"
+            started_at_seconds="$(($(date +%s) - uptime))"
+            echo "started_at_seconds=$started_at_seconds" >> "$GITHUB_OUTPUT"
+            jq --null-input \
+              --arg mode "$mode" \
+              --arg apiUrl "$HOSTED_API_URL" \
+              --argjson health "$health" \
+              --argjson ready "$ready" \
+              --arg startedAtSeconds "$started_at_seconds" \
+              --arg deployHook "$deploy_hook" \
+              '{
+                mode: $mode,
+                provider: "render",
+                apiUrl: $apiUrl,
+                readiness: {
+                  available: true,
+                  healthOk: ($health.ok == true),
+                  readyOk: ($ready.ok == true),
+                  rateLimitStore: $health.rateLimitStore,
+                  sharedRateLimitStoreConfigured: $ready.checks.sharedRateLimitStoreConfigured,
+                  sharedRateLimitStoreReachable: $ready.checks.sharedRateLimitStoreReachable,
+                  startedAtSeconds: ($startedAtSeconds | tonumber)
+                },
+                deployHook: $deployHook
+              }' > .artifacts/hosted-deploy-proof/render-api.json
+          else
+            if [ "$mode" = "proof" ]; then
+              echo "::error::Production API is not healthy and ready with a reachable Redis rate-limit store."
+              exit 1
+            fi
+
+            echo "::warning::The current Render API is unavailable or not ready; deploying without a process baseline."
+            echo "started_at_seconds=0" >> "$GITHUB_OUTPUT"
+            jq --null-input \
+              --arg mode "$mode" \
+              --arg apiUrl "$HOSTED_API_URL" \
+              --arg deployHook "$deploy_hook" \
+              '{
+                mode: $mode,
+                provider: "render",
+                apiUrl: $apiUrl,
+                readiness: {
+                  available: false,
+                  startedAtSeconds: null
+                },
+                deployHook: $deployHook
+              }' > .artifacts/hosted-deploy-proof/render-api.json
+          fi
 
       - name: Trigger Render API deploy
         if: ${{ !(github.event_name == 'workflow_dispatch' && inputs.proof_mode) }}
