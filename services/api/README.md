@@ -144,6 +144,7 @@ Browser-side Supabase use should stay limited to:
 Minimum hosted env:
 
 ```txt
+NODE_VERSION=24.18.0
 NODE_ENV=production
 HOST=0.0.0.0
 PORT=<provider port>
@@ -175,6 +176,13 @@ SUPABASE_URL=<your Supabase URL>
 SUPABASE_ANON_KEY=<your Supabase anon key>
 SUPABASE_SERVICE_ROLE_KEY=<your Supabase service role key>
 ```
+
+For a native Render Node service, pin `NODE_VERSION=24.18.0` unless the
+service's build log already confirms that it selected Node 24 from
+`services/api/package.json`. Configure Render's HTTP health-check path as
+`/health`, not `/ready`: `/health` verifies that the API process is serving,
+while `/ready` also checks live Supabase and Redis reachability and can
+temporarily return `503` during an external dependency outage.
 
 Production readiness requires both Redis REST values. Local development may omit Redis and uses a bounded in-memory limiter.
 
