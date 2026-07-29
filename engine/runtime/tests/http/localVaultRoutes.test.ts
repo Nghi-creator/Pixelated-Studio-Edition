@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import type { Request, Response } from "express";
-import { createLocalVaultRateLimiter } from "../../src/http/localVaultRoutes";
+import {
+  createLocalVaultRateLimiter,
+  sanitizeLocalVaultLogValue,
+} from "../../src/http/localVaultRoutes";
 
 function invokeRateLimit(
   middleware: ReturnType<typeof createLocalVaultRateLimiter>,
@@ -74,4 +77,15 @@ test("Local Vault rate limiting has a global ceiling across rotating ids", () =>
   assert.equal(invokeRateLimit(middleware, "client-a").nextCalled, true);
   assert.equal(invokeRateLimit(middleware, "client-b").nextCalled, true);
   assert.equal(invokeRateLimit(middleware, "client-c").statusCode, 429);
+});
+
+test("Local Vault log values cannot inject additional log lines", () => {
+  assert.equal(
+    sanitizeLocalVaultLogValue("game.nes\r\n[Admin] forged"),
+    "game.nes  [Admin] forged",
+  );
+  assert.equal(
+    sanitizeLocalVaultLogValue(`game\u001b[2J.nes`),
+    "game [2J.nes",
+  );
 });

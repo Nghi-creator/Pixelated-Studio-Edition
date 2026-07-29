@@ -134,8 +134,13 @@ async function resolveVaultFolder(
   req: Request,
   getVaultOwnerId: LocalVaultRouteOptions["getVaultOwnerId"],
 ) {
-  const ownerId = getVaultOwnerId(req);
-  if (!ownerId) {
+  const ownerIdCandidate = getVaultOwnerId(req);
+  const ownerId = path.basename(ownerIdCandidate);
+  if (
+    !ownerId ||
+    ownerId !== ownerIdCandidate ||
+    sanitizeUserId(ownerId) !== ownerId
+  ) {
     throw new Error("Missing authenticated engine client identity");
   }
 
@@ -150,9 +155,12 @@ async function resolveVaultFolder(
     accessScope !== "companion-host" &&
     accessScope !== "companion-guest"
   ) {
-    const legacyUserId = sanitizeUserId(req.get("x-user-id"));
+    const legacyUserIdCandidate = req.get("x-user-id") || "";
+    const legacyUserId = path.basename(legacyUserIdCandidate);
     const legacyFolder = getUserFolderPath(legacyUserId);
     if (
+      legacyUserId === legacyUserIdCandidate &&
+      sanitizeUserId(legacyUserId) === legacyUserId &&
       legacyUserId !== "anonymous" &&
       legacyFolder !== ownerFolder &&
       (await isRealDirectory(legacyFolder))
@@ -166,6 +174,12 @@ async function resolveVaultFolder(
   }
 
   return ensureUserFolder(ownerId);
+}
+
+export function sanitizeLocalVaultLogValue(value: unknown) {
+  return String(value)
+    .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+    .slice(0, 200);
 }
 
 function createLocalVaultUpload(
@@ -299,7 +313,7 @@ export function registerLocalVaultRoutes(
     requireEngineToken,
     uploadRateLimit,
     (req: Request, res: Response) => {
-      upload.single("romFile")(req, res, (err?: MulterError) => {
+      upload.single("romFile")(req, res, async (err?: MulterError) => {
         if (err && err instanceof multer.MulterError) {
           const message =
             err.code === "LIMIT_FILE_SIZE"
@@ -319,10 +333,16 @@ export function registerLocalVaultRoutes(
 
         let uploadedFilePath: string;
         try {
+          const userFolder = await resolveVaultFolder(req, getVaultOwnerId);
           uploadedFilePath = getVaultFilePath(
-            path.dirname(uploadRequest.file.path),
-            path.basename(uploadRequest.file.path),
+            userFolder,
+            uploadRequest.file.filename,
           );
+          if (
+            assertLocalRomPath(uploadRequest.file.path) !== uploadedFilePath
+          ) {
+            throw new Error("Multer upload path did not match the vault path");
+          }
         } catch {
           return res.status(400).json({ error: "Invalid upload path" });
         }
@@ -348,8 +368,11 @@ export function registerLocalVaultRoutes(
           });
         }
 
+        const sanitizedOriginalName = sanitizeLocalVaultLogValue(
+          uploadRequest.file.originalname,
+        );
         console.log(
-          `[Library] New local game added for user: ${uploadRequest.file.originalname}`,
+          `[Library] New local game added for user: ${sanitizedOriginalName}`,
         );
         res.json({ success: true, filename: uploadRequest.file.filename });
       });
