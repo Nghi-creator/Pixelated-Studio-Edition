@@ -26,6 +26,39 @@ function isAffectedGlobCliVersion(version) {
   );
 }
 
+function resolveLockedPackage(node, packageLock) {
+  if (typeof node !== "string") return null;
+
+  const normalizedNode = node.replaceAll("\\", "/");
+  const direct = packageLock.packages?.[normalizedNode];
+  if (direct) return { node: normalizedNode, package: direct };
+
+  const firstNodeModules = normalizedNode.indexOf("node_modules/");
+  if (firstNodeModules < 0) return null;
+
+  const dependencyChain = normalizedNode
+    .slice(firstNodeModules + "node_modules/".length)
+    .split("/node_modules/");
+  const dependencyName = dependencyChain.at(-1);
+  if (!dependencyName) return null;
+
+  for (let depth = dependencyChain.length - 2; depth >= 0; depth -= 1) {
+    const ancestorChain = dependencyChain.slice(0, depth);
+    const candidate =
+      ancestorChain.length > 0
+        ? `node_modules/${ancestorChain.join(
+            "/node_modules/",
+          )}/node_modules/${dependencyName}`
+        : `node_modules/${dependencyName}`;
+    const lockedPackage = packageLock.packages?.[candidate];
+    if (lockedPackage) {
+      return { node: candidate, package: lockedPackage };
+    }
+  }
+
+  return null;
+}
+
 function isAllowedDirectAdvisory(via, vulnerability, packageLock) {
   const advisoryId = getGithubAdvisoryId(via?.url);
   if (advisoryId !== null && ALLOWED_DEV_ADVISORY_IDS.has(advisoryId)) {
@@ -41,7 +74,10 @@ function isAllowedDirectAdvisory(via, vulnerability, packageLock) {
   return (
     nodes.length > 0 &&
     nodes.every((node) => {
-      const lockedVersion = packageLock.packages?.[node]?.version;
+      const lockedVersion = resolveLockedPackage(
+        node,
+        packageLock,
+      )?.package?.version;
       return (
         typeof lockedVersion === "string" &&
         !isAffectedGlobCliVersion(lockedVersion)
@@ -56,7 +92,10 @@ function isDevelopmentOnly(vulnerability, packageLock) {
     : [];
   return (
     nodes.length > 0 &&
-    nodes.every((node) => packageLock.packages?.[node]?.dev === true)
+    nodes.every(
+      (node) =>
+        resolveLockedPackage(node, packageLock)?.package?.dev === true,
+    )
   );
 }
 
@@ -201,9 +240,15 @@ function runAudit() {
         : [];
       const lockedNodes = Array.isArray(vulnerability?.nodes)
         ? vulnerability.nodes.map((node) => {
-            const locked = packageLock.packages?.[node];
-            return `${node}@${locked?.version || "unknown"}:${
-              locked?.dev === true ? "dev" : "non-dev"
+            const resolution = resolveLockedPackage(node, packageLock);
+            const resolutionSuffix =
+              resolution && resolution.node !== node
+                ? `->${resolution.node}`
+                : "";
+            return `${node}${resolutionSuffix}@${
+              resolution?.package?.version || "unknown"
+            }:${
+              resolution?.package?.dev === true ? "dev" : "non-dev"
             }`;
           })
         : [];

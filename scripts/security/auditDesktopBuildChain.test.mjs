@@ -263,7 +263,7 @@ test("allows the glob CLI advisory only for unaffected development versions", ()
     vulnerabilities: {
       glob: {
         nodes: [
-          "node_modules/glob",
+          "node_modules/@electron/asar/node_modules/glob",
           "node_modules/electron-builder/node_modules/glob",
         ],
         severity: "high",
