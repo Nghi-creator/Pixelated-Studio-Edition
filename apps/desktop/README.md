@@ -5,14 +5,15 @@ Electron desktop app for running PIXELATED Studio's local engine. It owns Docker
 ## Code map
 
 ```text
-main/companion/   HTTPS companion server, launch tickets, invites, QR, proxy
-main/docker/      Docker command wrappers, diagnostics, recovery guidance
-main/engine/      Engine startup/shutdown orchestration
-main/network/     Local/LAN exposure detection
-main/runtime/     Runtime channel/config/health state
-renderer/         Desktop UI helpers for phases, logs, clients, exposure
-tests/unit/       Main-process subsystem tests
-tests/integration Packaged/release smoke coverage
+main/companion/    HTTPS companion server, launch tickets, invites, QR, proxy
+main/docker/       Docker command wrappers, diagnostics, recovery guidance
+main/engine/       Engine startup/shutdown orchestration and recovery workflows
+main/network/      Local/LAN exposure detection
+main/runtime/      Runtime channel/config/health state
+renderer/          Desktop UI helpers for phases, status, logs, recovery, clients, events, and exposure
+scripts/           Web-bundle preparation and packaged release smoke
+tests/unit/        Main-process subsystem tests
+tests/integration/ Package configuration and release-contract coverage
 ```
 
 ## Local development
@@ -52,6 +53,12 @@ The desktop UI reports structured startup states such as checking Docker, pullin
 ## Launch Web and pairing
 
 `Launch Web` opens the configured web app and redeems a one-use launch ticket through the local HTTPS companion. The web app stores the companion URL and a scoped `companion:<credential>` token. Signed-in launches register only non-secret pairing metadata with the hosted API so later browser visits can restore the companion target.
+
+The browser probes saved credentials on startup and every five seconds. An
+unreachable engine is shown as offline without immediately deleting the
+credential during Docker restarts; credentials rejected by the engine are
+cleared. Closing the desktop app therefore cannot leave the UI claiming that a
+stale pairing is online.
 
 Override the hosted web target:
 

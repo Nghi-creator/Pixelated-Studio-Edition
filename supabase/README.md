@@ -15,3 +15,27 @@ Before applying a migration:
 3. Back up the production database when the change mutates existing data or schema.
 4. Apply once from this directory, then deploy the shared API before either client
    starts relying on the new contract.
+
+## Current shared responsibilities
+
+The migration history owns catalog/storage policies, edition-aware activity,
+backend sessions, catalog ingestion and browser-smoke contracts, atomic social
+and admin workflows, stale-account cleanup, and anonymous-play restrictions.
+Executable ROMs live in the private `catalog_roms` bucket; public artwork stays
+in `catalog_artifacts`.
+
+Anonymous Studio play additionally requires the hosted Supabase project to
+enable Anonymous Sign-Ins and Cloudflare Turnstile CAPTCHA. The Turnstile
+secret belongs only in Supabase; clients receive the public site key. Follow
+[`../docs/anonymous-play-setup.md`](../docs/anonymous-play-setup.md) for the
+deployment order and verification flow.
+
+Useful migration checks from the repository root:
+
+```sh
+npx supabase migration list
+npx supabase db push --dry-run
+```
+
+Do not run `db push` until the dry-run and remote migration history have been
+reviewed.

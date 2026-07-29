@@ -18,16 +18,18 @@ Normal users should start this through `apps/desktop`; the desktop app generates
 ## Code map
 
 ```text
-src/http/        Express routes and HTTP error handling
-src/signaling/   Socket.IO auth, start-game, lobby, input, relay handlers
-src/runtime/     Runtime registry, process lifecycle, native/libretro launch
-src/roms/        Cloud ROM download and local vault storage
-src/input/       Browser key/gamepad translation and persistent input bridges
-src/telemetry/   Health/resource snapshots
-tests/           Unit coverage by runtime area
-camera.py        GStreamer WebRTC sender
-input_keyboard.py Persistent X11/XTest keyboard injection bridge
-server.ts        Runtime process entry point
+src/clients/              Browser-client identity and revocation
+src/http/                 Express health, vault, session, display, and telemetry routes
+src/input/                Browser key/gamepad translation and persistent input bridges
+src/roms/                 Approved cloud downloads and owner-scoped Local Vault storage
+src/runtime/              Registry plus native/libretro launchers and host processes
+src/sessions/             Active runtime-session state
+src/signaling/            Socket.IO auth, relay, lobby, input, and start-game handlers
+src/telemetry/            Health and resource snapshots
+tests/                    Unit coverage by runtime area
+camera.py                 GStreamer WebRTC sender
+input_keyboard.py         Persistent X11/XTest keyboard injection bridge
+server.ts                 Runtime process entry point
 ```
 
 ## Local commands
@@ -55,7 +57,8 @@ Cloud sessions are approved by `services/api` before the engine boots a catalog 
 2. Web asks the API to create a cloud session.
 3. Web sends `start-game` to the local engine with the session id/token and backend-approved boot metadata.
 4. Engine verifies the session with the API.
-5. Engine downloads the approved HTTPS ROM target when needed and boots the runtime.
+5. Engine downloads the approved HTTPS ROM target under host, size, timeout,
+   and integrity constraints when needed, then boots the selected runtime.
 
 Set the API URL when running manually:
 
@@ -78,6 +81,23 @@ PIXELATED_STREAM_PROFILE=<json>
 ```
 
 The camera bridge applies the profile to GStreamer framerate caps and VP8 target bitrate.
+
+## Manual runtime configuration
+
+Desktop startup supplies these values automatically. Low-level manual runs
+must provide at least a per-run token and trusted origins:
+
+```txt
+PIXELATED_ENGINE_TOKEN=<random per-run token>
+PIXELATED_ALLOWED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173
+PIXELATED_API_URL=http://127.0.0.1:4000
+```
+
+Cloud download limits and allowed ROM hosts are configured with
+`PIXELATED_MAX_CLOUD_ROM_SIZE_BYTES`,
+`PIXELATED_CLOUD_ROM_DOWNLOAD_TIMEOUT_MS`, and
+`PIXELATED_ALLOWED_ROM_HOSTS`. Local Vault uploads use
+`PIXELATED_MAX_ROM_SIZE_BYTES`.
 
 ## Native Debian runtime
 

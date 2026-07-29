@@ -8,7 +8,7 @@
   <a href="https://github.com/Nghi-creator/Pixelated-Studio-Edition/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue?style=for-the-badge" alt="License: MIT"></a>
   <a href="https://nghi-creator.github.io/"><img src="https://img.shields.io/badge/CreatorOS-Portfolio-1f7a4a?style=for-the-badge" alt="CreatorOS portfolio"></a>
   <a href="https://www.linkedin.com/in/nicholas-nguyen-3bb17a335/"><img src="https://img.shields.io/badge/Built%20by-Nicholas Nguyen%20-blueviolet?style=for-the-badge" alt="Built by Nicholas"></a>
-  <a href="https://dev.to/dashboard"><img src="https://img.shields.io/badge/Dev-Post-green?style=for-the-badge" alt="Dev Post"></a>
+  <a href="https://dev.to/nicholasthegreat"><img src="https://img.shields.io/badge/Dev-Posts-green?style=for-the-badge" alt="Nicholas on DEV Community"></a>
 </p>
 
 ## Acknowledgments and copyright disclaimer
@@ -23,15 +23,15 @@ _If you are the original developer of a featured game and would like it removed 
 
 PIXELATED Studio is a web arcade, desktop engine, and hosted control plane for fast 8-bit gameplay, local creator workflows, LAN multiplayer, and WebRTC stream research.
 
-The browser is the front door: users browse games, sign in, save favorites, comment, react, submit games, pair an engine, and play. The desktop app owns the local Docker runtime and LAN companion. The engine container runs the emulator, capture pipeline, local vault, input routing, and WebRTC signaling. The hosted API owns authenticated app data, backend-approved cloud session boot, moderation, submissions, pairing metadata, multiplayer lobbies, access logs, and stream metrics.
+The browser is the front door: users browse games, play through a protected anonymous session or permanent account, save favorites, comment, react, submit games, pair an engine, and play. The desktop app owns the local Docker runtime and LAN companion. The engine container runs the emulator, capture pipeline, Local Vault, input routing, and WebRTC signaling. The hosted API owns the shared Studio/User catalog contract, backend-approved session boot, moderation, submissions, pairing metadata, multiplayer lobbies, access logs, and stream metrics.
 
 ## Current feature set
 
 | Area | What it does |
 | --- | --- |
-| Intro and catalog | `/` introduces the product; `/home` is the cloud game library with featured games, search, pagination, and play entry points. |
-| Desktop pairing | `/engine` pairs the browser with a local desktop engine, redeems desktop launch tickets, and supports LAN companion invites. |
-| Cloud game boot | `/play/:id` asks the API for a short-lived cloud session before the local engine downloads and boots an approved game artifact. |
+| Intro and catalog | `/` introduces the product; `/home` is the cloud game library with featured games, debounced search, platform/genre/license filters, pagination, and play entry points. |
+| Desktop pairing | `/engine` pairs the browser with a local desktop engine, redeems one-use desktop launch tickets, validates saved credentials, and supports LAN companion invites. |
+| Cloud game boot | `/play/:id` obtains a Turnstile-protected anonymous identity when needed, then asks the API for a short-lived cloud session before the local engine downloads and boots an approved game artifact. |
 | Local Vault | `/local` stores user-provided `.nes` files in the local Docker volume and boots them through the same player path. |
 | Multiplayer | `/multiplayer` supports host/guest flows, LAN invites, lobby roles, player slots, spectators, and revocable guest access. |
 | Social features | Favorites, comments, comment reactions, game reactions, reports, moderation actions, and user controls are API-owned. |
@@ -55,8 +55,8 @@ assets/          Repository-level artwork
 
 1. The desktop app checks Docker, builds or pulls the engine image, creates a per-run engine token, and starts the runtime container.
 2. The web app pairs through local engine credentials or the desktop HTTPS companion. LAN guests receive scoped companion credentials rather than the raw engine token.
-3. Cloud games are approved by the hosted API. The browser receives a session token, the local engine verifies it with the API, and only then downloads/boots the approved target.
-4. Local Vault games stay local. The browser uploads to the paired engine, and the engine stores files in the Docker `pixelated-roms` volume.
+3. Cloud games are approved by the hosted API. Signed-out players first receive a Turnstile-protected anonymous Supabase identity; the browser receives an opaque session token, and the local engine verifies it with the API before downloading/booting the approved target.
+4. Local Vault games stay local. The browser uploads to the paired engine, and the engine stores owner-scoped files in the Docker `pixelated-roms` volume.
 5. Gameplay streams through WebRTC: the engine launches the emulator/camera bridge, relays offer/answer/ICE over Socket.IO, and receives browser input.
 6. The web app records stream telemetry locally and can publish authenticated metric snapshots to the hosted API.
 
@@ -82,8 +82,8 @@ Install the latest packaged release from [GitHub Releases](https://github.com/Ng
 1. Open PIXELATED Studio.
 2. Start the engine from the desktop app.
 3. Wait for the startup pipeline to finish Docker checks, image build/pull, container start, and health polling.
-4. Use **Launch Web** or open the hosted web app at [https://pixelated-studio-edition.vercel.app/](https://pixelated-studio-edition.vercel.app/).
-5. Pair on `/engine`, then play cloud games, upload Local Vault ROMs, or host LAN multiplayer.
+4. Use **Launch Web** to open the hosted app and redeem a one-use pairing ticket automatically.
+5. If you opened the website manually, pair on `/engine`; then play cloud games, upload Local Vault ROMs, or host LAN multiplayer.
 
 ## Local development
 
@@ -92,6 +92,9 @@ Install workspace dependencies from the repository root:
 ```sh
 npm install
 ```
+
+CI and hosted builds use Node.js 22. Docker Desktop is required only for local
+engine startup and desktop/engine integration work.
 
 Common root commands:
 
@@ -125,6 +128,12 @@ Important workflows:
 - `.github/workflows/hosted-api-deploy-gate.yml`
 - `.github/workflows/hosted-deploy.yml`
 - `.github/workflows/desktop-release-validation.yml`
+- `.github/workflows/security-scan.yml`
+
+`.github/dependabot.yml` monitors all five npm lockfile locations weekly,
+groups compatible patch/minor updates, opens grouped security-update PRs, and
+checks GitHub Actions monthly. Dependabot PRs still have to pass the normal
+test, security, and release gates.
 
 Useful local equivalents:
 
@@ -151,12 +160,19 @@ npm run predeploy:hosted
 
 See `.context/operations.md`, `.context/architecture.md`, and the package READMEs for deeper operational notes.
 
+Production anonymous play additionally requires Cloudflare Turnstile,
+Supabase Anonymous Sign-Ins/CAPTCHA, the Vercel site-key variable, and the same
+GitHub production environment variable. See
+[`docs/anonymous-play-setup.md`](docs/anonymous-play-setup.md).
+
 ## Repository READMEs
 
 - [Web app](apps/web/README.md)
 - [Desktop app](apps/desktop/README.md)
 - [Engine runtime](engine/runtime/README.md)
 - [Hosted API](services/api/README.md)
+- [Supabase migrations](supabase/README.md)
+- [Durable project context](.context/README.md)
 
 ## Community
 
