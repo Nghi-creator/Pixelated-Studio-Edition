@@ -7,7 +7,13 @@ test("Studio origin overrides are also accepted by CORS", () => {
     "https://user.example.test",
     "https://studio.example.test/path/",
   );
+  const originSet = new Set(origins);
 
-  assert.ok(origins.includes("https://user.example.test"));
-  assert.ok(origins.includes("https://studio.example.test"));
+  assert.equal(originSet.has("https://user.example.test"), true);
+  assert.equal(originSet.has("https://studio.example.test"), true);
+  assert.equal(originSet.has("https://user.example.test.attacker.invalid"), false);
+  assert.equal(
+    originSet.has("https://studio.example.test.attacker.invalid"),
+    false,
+  );
 });
