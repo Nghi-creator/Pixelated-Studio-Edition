@@ -4,8 +4,10 @@ import path from "path";
 import type { Express, Request, RequestHandler, Response } from "express";
 import { validateGameArtifact } from "../roms/artifactValidation";
 import {
+  assertLocalRomPath,
   ensureUserFolder,
   getUserFolderPath,
+  getVaultFilePath,
   sanitizeUserId,
 } from "../roms/localRomStore";
 import {
@@ -16,6 +18,10 @@ import {
 const multer = require("multer");
 
 type MulterError = Error & {
+  code?: string;
+};
+
+type FileSystemError = Error & {
   code?: string;
 };
 
@@ -35,10 +41,90 @@ type LocalVaultRouteOptions = {
   requireEngineToken: RequestHandler;
 };
 
-async function pathExists(filePath: string) {
+type LocalVaultRateLimitOptions = {
+  globalLimit: number;
+  limit: number;
+  now?: () => number;
+  windowMs: number;
+};
+
+type RateLimitWindow = {
+  count: number;
+  resetAt: number;
+};
+
+const MAX_RATE_LIMIT_KEYS = 1_024;
+
+export function createLocalVaultRateLimiter({
+  globalLimit,
+  limit,
+  now = Date.now,
+  windowMs,
+}: LocalVaultRateLimitOptions): RequestHandler {
+  const keyedWindows = new Map<string, RateLimitWindow>();
+  let globalWindow: RateLimitWindow = { count: 0, resetAt: 0 };
+
+  return (req, res, next) => {
+    const currentTime = now();
+    if (globalWindow.resetAt <= currentTime) {
+      globalWindow = {
+        count: 0,
+        resetAt: currentTime + windowMs,
+      };
+    }
+    globalWindow.count += 1;
+
+    const identity =
+      req.get("x-pixelated-access-id") ||
+      req.get("x-pixelated-client-id") ||
+      req.ip ||
+      req.socket.remoteAddress ||
+      "unknown";
+    const identityKey = crypto
+      .createHash("sha256")
+      .update(identity)
+      .digest("base64url");
+    let key = identityKey;
+    if (!keyedWindows.has(key) && keyedWindows.size >= MAX_RATE_LIMIT_KEYS) {
+      for (const [storedKey, storedWindow] of keyedWindows) {
+        if (storedWindow.resetAt <= currentTime) {
+          keyedWindows.delete(storedKey);
+        }
+      }
+    }
+    if (!keyedWindows.has(key) && keyedWindows.size >= MAX_RATE_LIMIT_KEYS) {
+      key = "overflow";
+    }
+
+    const existing = keyedWindows.get(key);
+    const rateWindow =
+      !existing || existing.resetAt <= currentTime
+        ? { count: 0, resetAt: currentTime + windowMs }
+        : existing;
+    rateWindow.count += 1;
+    keyedWindows.set(key, rateWindow);
+
+    if (rateWindow.count > limit || globalWindow.count > globalLimit) {
+      const resetAt = Math.max(rateWindow.resetAt, globalWindow.resetAt);
+      res.set("Cache-Control", "no-store");
+      res.set(
+        "Retry-After",
+        String(Math.max(1, Math.ceil((resetAt - currentTime) / 1_000))),
+      );
+      res.status(429).json({ error: "Too many Local Vault requests" });
+      return;
+    }
+
+    next();
+  };
+}
+
+async function isRealDirectory(folderPath: string) {
   try {
-    await fs.promises.access(filePath);
-    return true;
+    const folderStat = await fs.promises.lstat(
+      assertLocalRomPath(folderPath),
+    );
+    return folderStat.isDirectory() && !folderStat.isSymbolicLink();
   } catch {
     return false;
   }
@@ -54,7 +140,7 @@ async function resolveVaultFolder(
   }
 
   const ownerFolder = getUserFolderPath(ownerId);
-  if (await pathExists(ownerFolder)) return ownerFolder;
+  if (await isRealDirectory(ownerFolder)) return ownerFolder;
 
   // Raw local pairings previously stored ROMs under the browser-supplied
   // account id. Migrate that folder once, but never allow companion tokens to
@@ -69,9 +155,12 @@ async function resolveVaultFolder(
     if (
       legacyUserId !== "anonymous" &&
       legacyFolder !== ownerFolder &&
-      (await pathExists(legacyFolder))
+      (await isRealDirectory(legacyFolder))
     ) {
-      await fs.promises.rename(legacyFolder, ownerFolder);
+      await fs.promises.rename(
+        assertLocalRomPath(legacyFolder),
+        assertLocalRomPath(ownerFolder),
+      );
       return ownerFolder;
     }
   }
@@ -85,13 +174,25 @@ function createLocalVaultUpload(
 ) {
   const supportedExtensions = getSupportedExtensions();
   const storage = multer.diskStorage({
-    destination(req: Request, file: MulterFile, cb: (err: Error | null, destination: string) => void) {
+    destination(
+      req: Request,
+      file: MulterFile,
+      cb: (err: Error | null, destination: string) => void,
+    ) {
       void resolveVaultFolder(req, getVaultOwnerId).then(
         (destination) => cb(null, destination),
-        (error) => cb(error instanceof Error ? error : new Error(String(error)), ""),
+        (error) =>
+          cb(
+            error instanceof Error ? error : new Error(String(error)),
+            "",
+          ),
       );
     },
-    filename(req: Request, file: MulterFile, cb: (err: Error | null, filename: string) => void) {
+    filename(
+      req: Request,
+      file: MulterFile,
+      cb: (err: Error | null, filename: string) => void,
+    ) {
       const safeFilename = path.basename(file.originalname || "unknown.rom");
       cb(null, `${Date.now()}-${crypto.randomUUID()}-${safeFilename}`);
     },
@@ -135,10 +236,26 @@ export function registerLocalVaultRoutes(
   const { getVaultOwnerId, maxRomSizeBytes, requireEngineToken } = options;
   const upload = createLocalVaultUpload(maxRomSizeBytes, getVaultOwnerId);
   const supportedExtensions = getSupportedExtensions();
+  const listRateLimit = createLocalVaultRateLimiter({
+    globalLimit: 600,
+    limit: 60,
+    windowMs: 60_000,
+  });
+  const uploadRateLimit = createLocalVaultRateLimiter({
+    globalLimit: 100,
+    limit: 10,
+    windowMs: 60_000,
+  });
+  const deleteRateLimit = createLocalVaultRateLimiter({
+    globalLimit: 300,
+    limit: 30,
+    windowMs: 60_000,
+  });
 
   app.get(
     "/local-games",
     requireEngineToken,
+    listRateLimit,
     async (req: Request, res: Response) => {
       try {
         const userFolder = await resolveVaultFolder(req, getVaultOwnerId);
@@ -159,7 +276,9 @@ export function registerLocalVaultRoutes(
               .map(async (entry) => ({
                 name: entry.name,
                 time: (
-                  await fs.promises.stat(path.join(userFolder, entry.name))
+                  await fs.promises.stat(
+                    getVaultFilePath(userFolder, entry.name),
+                  )
                 ).mtime.getTime(),
               })),
           )
@@ -175,56 +294,72 @@ export function registerLocalVaultRoutes(
     },
   );
 
-  app.post("/upload", requireEngineToken, (req: Request, res: Response) => {
-    upload.single("romFile")(req, res, (err?: MulterError) => {
-      if (err && err instanceof multer.MulterError) {
-        const message =
-          err.code === "LIMIT_FILE_SIZE"
-            ? `ROM file is too large. Max size is ${maxRomSizeBytes} bytes.`
-            : err.message;
-        return res.status(400).json({ error: message });
-      }
+  app.post(
+    "/upload",
+    requireEngineToken,
+    uploadRateLimit,
+    (req: Request, res: Response) => {
+      upload.single("romFile")(req, res, (err?: MulterError) => {
+        if (err && err instanceof multer.MulterError) {
+          const message =
+            err.code === "LIMIT_FILE_SIZE"
+              ? `ROM file is too large. Max size is ${maxRomSizeBytes} bytes.`
+              : err.message;
+          return res.status(400).json({ error: message });
+        }
 
-      if (err) {
-        return res.status(400).json({ error: err.message });
-      }
+        if (err) {
+          return res.status(400).json({ error: err.message });
+        }
 
-      const uploadRequest = req as RequestWithFile;
-      if (!uploadRequest.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
+        const uploadRequest = req as RequestWithFile;
+        if (!uploadRequest.file) {
+          return res.status(400).json({ error: "No file uploaded" });
+        }
 
-      const runtime = findRuntimeByExtension(uploadRequest.file.filename);
-      if (!runtime) {
-        fs.unlink(uploadRequest.file.path, () => {});
-        return res.status(400).json({ error: "Unsupported game file type" });
-      }
+        let uploadedFilePath: string;
+        try {
+          uploadedFilePath = getVaultFilePath(
+            path.dirname(uploadRequest.file.path),
+            path.basename(uploadRequest.file.path),
+          );
+        } catch {
+          return res.status(400).json({ error: "Invalid upload path" });
+        }
 
-      try {
-        validateGameArtifact(uploadRequest.file.path, {
-          fileLabel: "Local game file",
-          runtimeId: runtime.id,
-        });
-      } catch (validationError) {
-        fs.unlink(uploadRequest.file.path, () => {});
-        return res.status(400).json({
-          error:
-            validationError instanceof Error
-              ? validationError.message
-              : "Invalid game file",
-        });
-      }
+        const runtime = findRuntimeByExtension(uploadRequest.file.filename);
+        if (!runtime) {
+          fs.unlink(uploadedFilePath, () => {});
+          return res.status(400).json({ error: "Unsupported game file type" });
+        }
 
-      console.log(
-        `[Library] New local game added for user: ${uploadRequest.file.originalname}`,
-      );
-      res.json({ success: true, filename: uploadRequest.file.filename });
-    });
-  });
+        try {
+          validateGameArtifact(uploadedFilePath, {
+            fileLabel: "Local game file",
+            runtimeId: runtime.id,
+          });
+        } catch (validationError) {
+          fs.unlink(uploadedFilePath, () => {});
+          return res.status(400).json({
+            error:
+              validationError instanceof Error
+                ? validationError.message
+                : "Invalid game file",
+          });
+        }
+
+        console.log(
+          `[Library] New local game added for user: ${uploadRequest.file.originalname}`,
+        );
+        res.json({ success: true, filename: uploadRequest.file.filename });
+      });
+    },
+  );
 
   app.delete(
     "/local-games/:filename",
     requireEngineToken,
+    deleteRateLimit,
     async (req: Request, res: Response) => {
       try {
         const userFolder = await resolveVaultFolder(req, getVaultOwnerId);
@@ -233,14 +368,22 @@ export function registerLocalVaultRoutes(
           Array.isArray(filenameParam) ? filenameParam[0] : filenameParam,
         );
         const safeName = path.basename(decodedName);
-        const filePath = path.join(userFolder, safeName);
+        if (safeName !== decodedName) {
+          res.status(400).json({ error: "Invalid filename" });
+          return;
+        }
+        const filePath = getVaultFilePath(userFolder, safeName);
 
-        if (await pathExists(filePath)) {
+        try {
           await fs.promises.unlink(filePath);
           console.log(`[Library] Deleted local game: ${safeName}`);
           res.json({ success: true });
-        } else {
-          res.status(404).json({ error: "File not found" });
+        } catch (error) {
+          if ((error as FileSystemError).code === "ENOENT") {
+            res.status(404).json({ error: "File not found" });
+            return;
+          }
+          throw error;
         }
       } catch (err) {
         console.error("Failed to delete file:", err);
