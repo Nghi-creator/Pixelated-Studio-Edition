@@ -6,6 +6,10 @@ const advisory = {
   severity: "high",
   url: "https://github.com/advisories/GHSA-mh99-v99m-4gvg",
 };
+const globCliAdvisory = {
+  severity: "high",
+  url: "https://github.com/advisories/GHSA-5j98-mcp5-4vw2",
+};
 
 test("allows the known brace expansion advisory only on development nodes", () => {
   const report = {
@@ -252,4 +256,49 @@ test("blocks every other high severity advisory", () => {
   assert.deepEqual(getBlockingVulnerabilities(report, packageLock), [
     "unexpected",
   ]);
+});
+
+test("allows the glob CLI advisory only for unaffected development versions", () => {
+  const report = {
+    vulnerabilities: {
+      glob: {
+        nodes: [
+          "node_modules/glob",
+          "node_modules/electron-builder/node_modules/glob",
+        ],
+        severity: "high",
+        via: [globCliAdvisory],
+      },
+    },
+  };
+  const packageLock = {
+    packages: {
+      "node_modules/glob": { dev: true, version: "13.0.6" },
+      "node_modules/electron-builder/node_modules/glob": {
+        dev: true,
+        version: "7.2.3",
+      },
+    },
+  };
+
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
+});
+
+test("blocks the glob CLI advisory for an affected version", () => {
+  const report = {
+    vulnerabilities: {
+      glob: {
+        nodes: ["node_modules/glob"],
+        severity: "high",
+        via: [globCliAdvisory],
+      },
+    },
+  };
+  const packageLock = {
+    packages: {
+      "node_modules/glob": { dev: true, version: "10.4.5" },
+    },
+  };
+
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), ["glob"]);
 });

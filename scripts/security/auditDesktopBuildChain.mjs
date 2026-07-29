@@ -4,6 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ALLOWED_DEV_ADVISORY_IDS = new Set(["GHSA-MH99-V99M-4GVG"]);
+const GLOB_CLI_ADVISORY_ID = "GHSA-5J98-MCP5-4VW2";
 const HIGH_SEVERITIES = new Set(["high", "critical"]);
 
 function getGithubAdvisoryId(url) {
@@ -13,9 +14,40 @@ function getGithubAdvisoryId(url) {
   );
 }
 
-function isAllowedDirectAdvisory(via) {
+function isAffectedGlobCliVersion(version) {
+  const match = String(version).match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return true;
+
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  return (
+    (major === 10 && minor >= 2 && minor < 5) ||
+    (major === 11 && minor < 1)
+  );
+}
+
+function isAllowedDirectAdvisory(via, vulnerability, packageLock) {
   const advisoryId = getGithubAdvisoryId(via?.url);
-  return advisoryId !== null && ALLOWED_DEV_ADVISORY_IDS.has(advisoryId);
+  if (advisoryId !== null && ALLOWED_DEV_ADVISORY_IDS.has(advisoryId)) {
+    return true;
+  }
+  if (advisoryId !== GLOB_CLI_ADVISORY_ID) {
+    return false;
+  }
+
+  const nodes = Array.isArray(vulnerability?.nodes)
+    ? vulnerability.nodes
+    : [];
+  return (
+    nodes.length > 0 &&
+    nodes.every((node) => {
+      const lockedVersion = packageLock.packages?.[node]?.version;
+      return (
+        typeof lockedVersion === "string" &&
+        !isAffectedGlobCliVersion(lockedVersion)
+      );
+    })
+  );
 }
 
 function isDevelopmentOnly(vulnerability, packageLock) {
@@ -83,7 +115,7 @@ function hasOnlyAllowedAdvisories(
         )
       );
     }
-    return isAllowedDirectAdvisory(via);
+    return isAllowedDirectAdvisory(via, vulnerability, packageLock);
   });
 }
 
@@ -97,7 +129,7 @@ export function getBlockingVulnerabilities(report, packageLock) {
       ? vulnerability.via.filter(
           (via) =>
             typeof via !== "string" && typeof via?.url === "string",
-        )
+        ).map((via) => ({ via, vulnerability }))
       : [],
   );
 
@@ -107,7 +139,9 @@ export function getBlockingVulnerabilities(report, packageLock) {
   // their lockfile scope instead of depending on those unstable links.
   if (
     directAdvisories.length > 0 &&
-    directAdvisories.every(isAllowedDirectAdvisory)
+    directAdvisories.every(({ via, vulnerability }) =>
+      isAllowedDirectAdvisory(via, vulnerability, packageLock),
+    )
   ) {
     return Object.entries(vulnerabilities)
       .filter(([, vulnerability]) =>
@@ -152,13 +186,40 @@ function runAudit() {
     process.stderr.write(
       `Blocking high-severity desktop dependencies: ${blocking.join(", ")}\n`,
     );
+    for (const name of blocking) {
+      const vulnerability = report.vulnerabilities?.[name];
+      const causes = Array.isArray(vulnerability?.via)
+        ? vulnerability.via.map((via) => {
+            if (typeof via === "string") return via;
+            return (
+              getGithubAdvisoryId(via?.url) ||
+              via?.dependency ||
+              via?.name ||
+              "unidentified"
+            );
+          })
+        : [];
+      const lockedNodes = Array.isArray(vulnerability?.nodes)
+        ? vulnerability.nodes.map((node) => {
+            const locked = packageLock.packages?.[node];
+            return `${node}@${locked?.version || "unknown"}:${
+              locked?.dev === true ? "dev" : "non-dev"
+            }`;
+          })
+        : [];
+      process.stderr.write(
+        `  ${name}: causes=${causes.join("|") || "none"} nodes=${
+          lockedNodes.join("|") || "none"
+        }\n`,
+      );
+    }
     process.exitCode = 1;
     return;
   }
 
   if (audit.status !== 0) {
     process.stdout.write(
-      "Only the allowlisted build-time brace-expansion advisory remains; all affected lockfile nodes are development-only.\n",
+      "Only explicitly allowlisted build-time advisories remain; all affected lockfile nodes are development-only.\n",
     );
   }
 }
