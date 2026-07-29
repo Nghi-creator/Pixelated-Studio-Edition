@@ -6,7 +6,7 @@ import {
   type KeyAction,
 } from "../../input/keyboardBridge";
 import { translateKey } from "../../input/translateKey";
-import { removeFileIfExists } from "../../roms/cloudRomDownloader";
+import { removeCloudRomStagingArtifact } from "../../roms/cloudRomStaging";
 import type { StreamProfile } from "../../signaling/start-game/startGameHandlers";
 import { launchCameraBridge } from "../launchers/cameraLauncher";
 import { launchLibretroGame } from "../launchers/libretroLauncher";
@@ -120,7 +120,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
     }
 
     if (activeCloudRomPath) {
-      removeFileIfExists(activeCloudRomPath);
+      removeCloudRomStagingArtifact(activeCloudRomPath);
       activeCloudRomPath = null;
     }
 
@@ -136,7 +136,8 @@ export function createProcessManager(options: ProcessManagerOptions) {
   ) {
     bindManagedProcessLifecycle({
       child,
-      getActiveSessionId: () => activeSessionId,
+      getActiveSessionId: () =>
+        retroarchProcess === child ? activeSessionId : null,
       label,
       onCleanupSession: cleanupActiveSession,
       onLaunchFailure: recordLaunchFailure,
@@ -293,6 +294,21 @@ export function createProcessManager(options: ProcessManagerOptions) {
     };
   }
 
+  function shutdown(): void {
+    cleanupActiveSession();
+    gamepads.stop();
+    keyboard.stop();
+
+    if (pulseAudioProcess) {
+      pulseAudioProcess.kill();
+      pulseAudioProcess = null;
+    }
+    if (virtualDisplayProcess) {
+      virtualDisplayProcess.kill();
+      virtualDisplayProcess = null;
+    }
+  }
+
   return {
     bootGame,
     cleanupActiveSession,
@@ -300,6 +316,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
     getRuntimeState,
     restartStream,
     sendInput,
+    shutdown,
     startVirtualDisplay,
   };
 }

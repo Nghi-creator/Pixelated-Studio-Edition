@@ -343,6 +343,95 @@ export class FakeSupabase {
       };
     }
 
+    if (fn === "published_catalog_games_page") {
+      const offset = Math.max(0, Number(params.p_offset || 0));
+      const pageSize = Math.min(
+        50,
+        Math.max(1, Number(params.p_page_size || 15)),
+      );
+      const search =
+        typeof params.p_search === "string" ? params.p_search.trim() : "";
+      const rows = this.getPublishedCatalogGameRows(
+        null,
+        "title",
+        search,
+        typeof params.p_genre === "string" ? params.p_genre : "",
+        typeof params.p_license_spdx === "string"
+          ? params.p_license_spdx
+          : "",
+        typeof params.p_platform === "string" ? params.p_platform : "",
+      );
+      if (search) {
+        const normalizedSearch = search.toLowerCase();
+        rows.sort((left, right) => {
+          const score = (row: RecordRow) => {
+            const title = String(row.title || "").toLowerCase();
+            if (title === normalizedSearch) return 0;
+            if (title.startsWith(normalizedSearch)) return 1;
+            if (title.includes(normalizedSearch)) {
+              return 2 + title.indexOf(normalizedSearch) / 100;
+            }
+            return 3;
+          };
+          return (
+            score(left) - score(right) ||
+            String(left.title || "").localeCompare(String(right.title || ""))
+          );
+        });
+      }
+      const totalCount = rows.length;
+      const page = rows.slice(offset, offset + pageSize);
+      return {
+        data:
+          page.length > 0
+            ? page.map((row) => ({
+                ...row,
+                total_count: totalCount,
+              }))
+            : [
+                {
+                  game_builds: [],
+                  game_rights: [],
+                  total_count: totalCount,
+                },
+              ],
+        error: null,
+      };
+    }
+
+    if (fn === "published_catalog_filters") {
+      const rows = this.getPublishedCatalogGameRows(
+        null,
+        "title",
+        "",
+        "",
+        "",
+        "",
+      );
+      const genres = new Set<string>();
+      const licenses = new Set<string>();
+      for (const game of rows) {
+        if (typeof game.genre_slug === "string") genres.add(game.genre_slug);
+        for (const rights of game.game_rights as RecordRow[]) {
+          if (typeof rights.code_license_spdx === "string") {
+            licenses.add(rights.code_license_spdx);
+          }
+          if (typeof rights.asset_license_spdx === "string") {
+            licenses.add(rights.asset_license_spdx);
+          }
+        }
+      }
+      return {
+        data: [
+          {
+            genres: [...genres].sort(),
+            licenses: [...licenses].sort(),
+          },
+        ],
+        error: null,
+      };
+    }
+
     if (fn === "published_catalog_games") {
       const gameId =
         typeof params.p_game_id === "string" ? params.p_game_id : null;
@@ -360,6 +449,7 @@ export class FakeSupabase {
         search,
         genre,
         license,
+        "",
       ).slice(0, limit);
       return { data: rows, error: null };
     }
@@ -373,6 +463,7 @@ export class FakeSupabase {
     search: string,
     genre: string,
     license: string,
+    platform: string,
   ) {
     const searchTokens = search.toLowerCase().split(/\s+/).filter(Boolean);
     return this.rows.games
@@ -409,7 +500,12 @@ export class FakeSupabase {
           );
         });
 
-        if (verifiedBuilds.length !== 1) return null;
+        if (
+          verifiedBuilds.length !== 1 ||
+          (platform && verifiedBuilds[0]?.platform_id !== platform)
+        ) {
+          return null;
+        }
 
         return {
           ...game,

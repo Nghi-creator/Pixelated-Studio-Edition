@@ -7,7 +7,9 @@ Vite React frontend for PIXELATED Studio. The web app owns the user experience, 
 | Route | Purpose |
 | --- | --- |
 | `/` | Product introduction and download/entry links. |
-| `/home` | Cloud catalog, featured games, search, pagination, and game cards. |
+| `/home` | Cloud catalog, featured games, debounced search, platform/genre/license filters, pagination, and game cards. |
+| `/login` | Permanent-account sign-in/sign-up with Turnstile CAPTCHA. |
+| `/reset-password` | Password recovery completion flow. |
 | `/engine` | Desktop engine pairing, launch-ticket redemption, and LAN invite pairing. |
 | `/play/:id` | Gameplay screen, WebRTC stream, input forwarding, social panels, and stream telemetry. |
 | `/local` | Local Vault upload/list/delete flow against the paired engine. |
@@ -20,15 +22,16 @@ Vite React frontend for PIXELATED Studio. The web app owns the user experience, 
 ## Code map
 
 ```text
-src/pages/              Route-level screens
-src/components/         Shared UI and layout pieces
-src/features/           Feature-owned browser state and components
-src/lib/api/            Hosted API client, queries, mutations, and types
-src/lib/auth/           Supabase auth/session helpers
-src/lib/engine/         Engine pairing, local credentials, launch restore
-src/lib/webrtc/         WebRTC session, signaling, input, telemetry, recovery
-tests/unit/             Node test runner unit coverage by domain
-tests/interaction/      Browser interaction harness
+src/pages/                       Route-level user and admin screens
+src/components/                  Shared admin, layout, skeleton, UI, and user components
+src/features/player/components/  Player shell, stream, community, research, and telemetry UI
+src/features/player/hooks/       Player data, navigation, playback, research, and telemetry state
+src/lib/api/                     Hosted API client, queries, mutations, and types
+src/lib/auth/                    Supabase auth/session and Turnstile helpers
+src/lib/engine/                  Engine credentials, launch-ticket pairing, and connection monitoring
+src/lib/webrtc/                  Controls, engine context, input, lobby, session, telemetry, and transport
+tests/unit/                      Node test runner unit coverage grouped by domain
+tests/interaction/               Browser interaction harness
 ```
 
 The browser should use `src/lib/api/*` for app data owned by `services/api`. Direct Supabase browser use is intentionally limited to auth/session handling and Storage uploads for signed-in submission workflows.
@@ -39,6 +42,9 @@ The browser should use `src/lib/api/*` for app data owned by `services/api`. Dir
 npm install
 npm run dev
 ```
+
+Copy `.env.example` to `.env.local` and fill in the Supabase/API values needed
+for the routes you are exercising.
 
 Default dev URL:
 
@@ -68,13 +74,16 @@ VITE_SUPABASE_ANON_KEY=
 VITE_PUBLIC_APP_URL=https://pixelated-studio-edition.vercel.app
 VITE_API_URL=https://pixelated-api-services-6ovi.onrender.com
 VITE_USER_EDITION_ORIGIN=https://pixelated-user-edition.vercel.app
-VITE_ENGINE_URL=http://localhost:8080
 VITE_TURNSTILE_SITE_KEY=
 ```
 
 Set `VITE_PUBLIC_APP_URL` in Vercel and in Supabase Auth redirect settings so verification, recovery, and OAuth callbacks do not fall back to localhost.
 
-Set `VITE_TURNSTILE_SITE_KEY` only after enabling Cloudflare Turnstile CAPTCHA in Supabase Auth with the matching secret key. When configured, account authentication and the first anonymous catalog Play send CAPTCHA tokens to Supabase. Later plays reuse the persisted guest session and do not create another anonymous user.
+Set `VITE_TURNSTILE_SITE_KEY` only after enabling Cloudflare Turnstile CAPTCHA in Supabase Auth with the matching secret key. Production builds fail when the site key is absent. Account authentication and the first anonymous catalog Play send CAPTCHA tokens to Supabase; later plays reuse the persisted guest session and do not create another anonymous user.
+
+`VITE_USER_EDITION_ORIGIN` is used by the admin catalog-candidate browser smoke
+flow. Engine URLs are established through pairing state rather than a
+`VITE_ENGINE_URL` build variable.
 
 See [`docs/anonymous-play-setup.md`](../../docs/anonymous-play-setup.md) for the
 required migration, Cloudflare, Supabase, Vercel, and API deployment settings.
@@ -106,4 +115,4 @@ Routes that boot or manage local gameplay require an engine connection:
 - `/local`
 - `/multiplayer`
 
-The connection may be a raw local engine token for localhost use or a `companion:<credential>` token from the desktop HTTPS companion. Companion credentials are scoped and revocable, and transient companion probe failures should not erase saved pairing.
+The connection may be a raw local engine token for localhost use or a `companion:<credential>` token from the desktop HTTPS companion. Companion credentials are scoped and revocable. The app probes saved pairings at startup, on browser visibility/network changes, and every five seconds; transient reachability failures mark the engine offline, while authentication rejection clears the stale credential.

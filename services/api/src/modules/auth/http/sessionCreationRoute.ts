@@ -61,9 +61,10 @@ export function registerSessionCreationRoute(
       const rateLimitIdentity = user
         ? `${isAnonymousUser ? "guest-user" : "user"}:${user.id}`
         : `guest-ip:${request.ip}`;
+      const usesAnonymousAccess = !user || isAnonymousUser;
       const sessionRateLimits = await Promise.all([
         sessionCreateLimiter.consume(rateLimitIdentity),
-        ...(isAnonymousUser
+        ...(usesAnonymousAccess
           ? [anonymousSessionCreateIpLimiter.consume(request.ip)]
           : []),
       ]);
@@ -75,7 +76,7 @@ export function registerSessionCreationRoute(
         rejectRateLimitedRequest(
           reply,
           blockedSessionRateLimit,
-          isAnonymousUser
+          usesAnonymousAccess
             ? "Guest session creation rate limit reached. Please try again shortly."
             : "Session creation rate limit reached. Please try again shortly.",
         )

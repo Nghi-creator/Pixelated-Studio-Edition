@@ -85,7 +85,7 @@ const envSchema = z.object({
   WEB_ORIGIN: z.string().default("http://localhost:5173"),
 });
 
-function normalizeOrigin(origin: string) {
+export function normalizeOrigin(origin: string) {
   const trimmed = origin.trim();
   if (!trimmed) return "";
 
@@ -112,18 +112,31 @@ const defaultAllowedOrigins = [
   "https://pixelated-user-edition.vercel.app",
 ];
 
+export function buildAllowedOrigins(
+  webOrigins: string,
+  studioWebOrigins: string,
+) {
+  return Array.from(
+    new Set(
+      [
+        ...defaultAllowedOrigins,
+        ...webOrigins.split(","),
+        ...studioWebOrigins.split(","),
+      ]
+        .map(normalizeOrigin)
+        .filter(Boolean),
+    ),
+  );
+}
+
 export const env = {
   ...parsedEnv.data,
   HOST:
     parsedEnv.data.HOST ||
     (parsedEnv.data.NODE_ENV === "production" ? "0.0.0.0" : "127.0.0.1"),
-  allowedOrigins: Array.from(
-    new Set([
-      ...defaultAllowedOrigins.map(normalizeOrigin),
-      ...parsedEnv.data.WEB_ORIGIN.split(",")
-        .map(normalizeOrigin)
-        .filter(Boolean),
-    ]),
+  allowedOrigins: buildAllowedOrigins(
+    parsedEnv.data.WEB_ORIGIN,
+    parsedEnv.data.STUDIO_WEB_ORIGINS,
   ),
   studioWebOrigins: Array.from(
     new Set(

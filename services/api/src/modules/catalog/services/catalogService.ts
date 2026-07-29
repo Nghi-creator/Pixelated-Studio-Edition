@@ -11,18 +11,14 @@ import {
 
 type ProfileRole = { role: string | null };
 
-export type CatalogGameFilters = {
-  genre?: string;
-  license?: string;
-  limit?: number;
-  platform?: string;
-  search?: string;
-};
-
 export type { CatalogGameRow, CatalogService, PublishedCatalogGame };
 
 type SupabaseRpcError = {
   code?: string;
+};
+
+type PublishedCatalogPageRpcRow = PublishedCatalogGameRpcRow & {
+  total_count?: number | string | null;
 };
 
 function normalizePublishedCatalogRows(
@@ -122,92 +118,79 @@ export async function fetchFeaturedGames(
   return selectFeaturedGames(data || []);
 }
 
-export async function fetchPublishedCatalogGames(
+export async function fetchPublishedCatalogPage(
   service: CatalogService,
   timings: TimingFields,
-  filters: CatalogGameFilters = {},
+  options: {
+    genre?: string;
+    license?: string;
+    offset: number;
+    pageSize: number;
+    platform?: string;
+    search?: string;
+  },
 ) {
-  const { genre, license, limit, platform, search } = filters;
-  const { data, error } = await timed(timings, "games_query_ms", async () => {
-    const rpcGames = await fetchPublishedCatalogGamesFromRpc(
-      service,
-      timings,
-      {
-        limit:
-          limit || (search?.trim() || genre || license || platform ? 5000 : 1000),
-        order: "title",
-        genre,
-        license,
-        search,
-        timingKey: "games_rpc_ms",
-      },
-    );
-    if (rpcGames) {
-      return {
-        data: platform
-          ? rpcGames.filter((game) =>
-              game.game_builds.some((build) => build.platform_id === platform),
-            )
-          : rpcGames,
-        error: null,
-      };
+  const rpc =
+    "rpc" in service && typeof service.rpc === "function"
+      ? service.rpc.bind(service)
+      : null;
+
+  if (!rpc) {
+    throw new Error("Catalog page RPC is unavailable");
+  }
+
+  const { data, error } = await timed(timings, "games_page_rpc_ms", () =>
+    rpc("published_catalog_games_page", {
+      p_genre: options.genre || null,
+      p_license_spdx: options.license || null,
+      p_offset: options.offset,
+      p_page_size: options.pageSize,
+      p_platform: options.platform || null,
+      p_search: options.search?.trim() || null,
+    }),
+  );
+  if (error) {
+    if (isMissingCatalogRpc(error)) {
+      throw new Error("Catalog page migration is not installed");
     }
-
-    const { data: games, error: gamesError } = await service
-      .from("games")
-      .select(PUBLIC_CATALOG_GAME_COLUMNS)
-      .eq("publication_status", "published")
-      .order("title")
-      .limit(1000)
-      .returns<CatalogGameRow[]>();
-    if (gamesError) return { data: null, error: gamesError };
-
-    try {
-      const publishedGames = await attachPublishedBuilds(service, games || []);
-      return {
-        data: publishedGames.filter((game) => {
-          if (genre && game.genre_slug !== genre) return false;
-          if (
-            platform &&
-            !game.game_builds.some((build) => build.platform_id === platform)
-          ) {
-            return false;
-          }
-          if (!license) return true;
-          return game.game_rights.some(
-            (rights) =>
-              rights.code_license_spdx === license ||
-              rights.asset_license_spdx === license,
-          );
-        }),
-        error: null,
-      };
-    } catch (err) {
-      return { data: null, error: err as Error };
-    }
-  });
-
-  if (error) throw error;
-  return data || [];
+    throw error;
+  }
+  const rows = (data || []) as PublishedCatalogPageRpcRow[];
+  return {
+    games: normalizePublishedCatalogRows(rows),
+    total: Number(rows[0]?.total_count || 0),
+  };
 }
 
 export async function fetchPublishedCatalogFilters(
   service: CatalogService,
   timings: TimingFields,
 ) {
-  const games = await fetchPublishedCatalogGames(service, timings, { limit: 5000 });
-  const genres = new Set<string>();
-  const licenses = new Set<string>();
-  for (const game of games) {
-    if (game.genre_slug) genres.add(game.genre_slug);
-    for (const rights of game.game_rights) {
-      if (rights.code_license_spdx) licenses.add(rights.code_license_spdx);
-      if (rights.asset_license_spdx) licenses.add(rights.asset_license_spdx);
-    }
+  const rpc =
+    "rpc" in service && typeof service.rpc === "function"
+      ? service.rpc.bind(service)
+      : null;
+  if (!rpc) {
+    throw new Error("Catalog filters RPC is unavailable");
   }
+
+  const { data, error } = await timed(timings, "catalog_filters_rpc_ms", () =>
+    rpc("published_catalog_filters"),
+  );
+  if (error) {
+    if (isMissingCatalogRpc(error)) {
+      throw new Error("Catalog filters migration is not installed");
+    }
+    throw error;
+  }
+  const row = (
+    data as
+      | { genres?: string[] | null; licenses?: string[] | null }[]
+      | null
+  )?.[0];
   return {
-    genres: [...genres].sort(),
-    licenses: [...licenses].sort((left, right) => left.localeCompare(right)),
+    genres: row?.genres || [],
+    licenses: row?.licenses || [],
   };
 }
 

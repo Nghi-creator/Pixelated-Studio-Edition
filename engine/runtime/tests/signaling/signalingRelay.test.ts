@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import test from "node:test";
-import { registerSignalingRelayHandlers } from "../../src/signaling/signalingRelay";
+import {
+  createSignalingPeerRegistry,
+  registerSignalingRelayHandlers,
+} from "../../src/signaling/signalingRelay";
 import { joinSession, normalizeSessionId } from "../../src/signaling/sessionRooms";
 
 class FakeSocket extends EventEmitter {
@@ -155,7 +158,7 @@ test("peer disconnect releases remembered rooms", () => {
   assert.deepEqual(socket.data.webrtcPeerIds, []);
 });
 
-test("signaling rejects oversized peer ids and bounds remembered rooms", () => {
+test("signaling rejects oversized peer ids and allows one peer per socket", () => {
   const socket = new FakeSocket("browser-1");
   socket.data.sessionId = "session-1";
   registerSignalingRelayHandlers(socket as never);
@@ -165,8 +168,48 @@ test("signaling rejects oversized peer ids and bounds remembered rooms", () => {
     socket.emit("webrtc-offer", { peerId: `peer-${index}`, sdp: "offer" });
   }
 
-  assert.equal(socket.joins.length, 32);
-  assert.equal((socket.data.webrtcPeerIds as string[]).length, 32);
+  assert.equal(socket.joins.length, 1);
+  assert.equal((socket.data.webrtcPeerIds as string[]).length, 1);
+});
+
+test("signaling rejects offers from sockets outside the active lobby", () => {
+  const socket = new FakeSocket("browser-1");
+  socket.data.sessionId = "session-1";
+  registerSignalingRelayHandlers(socket as never, {
+    canCreatePeer: () => false,
+  });
+
+  socket.emit("webrtc-offer", { peerId: "peer-1", sdp: "offer" });
+
+  assert.deepEqual(socket.joins, []);
+  assert.deepEqual(socket.relays, []);
+});
+
+test("signaling bounds active peers across sockets and releases capacity", () => {
+  const registry = createSignalingPeerRegistry(1);
+  const firstSocket = new FakeSocket("browser-1");
+  const secondSocket = new FakeSocket("browser-2");
+  firstSocket.data.sessionId = "session-1";
+  secondSocket.data.sessionId = "session-1";
+  registerSignalingRelayHandlers(firstSocket as never, {
+    peerRegistry: registry,
+  });
+  registerSignalingRelayHandlers(secondSocket as never, {
+    peerRegistry: registry,
+  });
+
+  firstSocket.emit("webrtc-offer", { peerId: "peer-1", sdp: "offer" });
+  secondSocket.emit("webrtc-offer", { peerId: "peer-2", sdp: "offer" });
+  assert.equal(firstSocket.joins.length, 1);
+  assert.equal(secondSocket.rooms.has("session:session-1:peer:peer-2"), false);
+  assert.equal(secondSocket.relays.length, 0);
+  assert.equal(registry.size(), 1);
+
+  firstSocket.emit("webrtc-peer-disconnect", { peerId: "peer-1" });
+  secondSocket.emit("webrtc-offer", { peerId: "peer-2", sdp: "offer" });
+  assert.equal(secondSocket.rooms.has("session:session-1:peer:peer-2"), true);
+  assert.equal(secondSocket.relays.length, 1);
+  assert.equal(registry.size(), 1);
 });
 
 test("signaling events share a bounded per-socket rate limit", () => {

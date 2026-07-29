@@ -11,6 +11,7 @@ The API owns:
 - Admin users, reports, submissions, catalog candidates, and access logs.
 - Game submission metadata and optional Formspree notifications.
 - Cloud session creation, read/delete, and engine-side session verification.
+- Supabase-verified anonymous Studio identities and unauthenticated User Edition WASM sessions.
 - WebRTC ICE server configuration.
 - Signed-in local pairing metadata without storing raw desktop engine tokens.
 - Multiplayer lobby metadata and recent lobby discovery.
@@ -22,12 +23,12 @@ The local engine still runs separately on `localhost:8080` and verifies cloud se
 ## Code map
 
 ```text
-src/config/       Environment parsing
-src/plugins/      Fastify plugins for CORS, logging, security, rate limits
-src/modules/      Domain-owned routes, services, policies, contracts
-tests/unit/       Unit and contract tests grouped by domain
-tests/integration Fastify injection tests with fake Supabase services
-scripts/          Hosted checks, importers, catalog artwork, staging smoke
+src/config/        Environment parsing
+src/plugins/       Fastify plugins for CORS, logging, security, and rate limits
+src/modules/       Auth, catalog, maintenance, moderation, multiplayer, observability, security, system, and users
+tests/unit/        Unit/contract tests grouped by auth, catalog, infrastructure, and security
+tests/integration/ Fastify injection tests grouped by API domain with shared support harnesses
+scripts/           Hosted checks, importers, catalog artwork, and staging smoke
 ```
 
 ## Local development
@@ -130,11 +131,12 @@ Browser-side Supabase use should stay limited to:
 | --- | --- |
 | System | `/`, `/health`, `/ready`, `/access-logs` |
 | Identity | `/me`, `/me/permissions`, `/profile`, `/me/account` |
-| Catalog | `/games`, `/games/featured`, `/games/:gameId`, `/games/:gameId/play-count` |
+| Catalog | `/games`, `/games/filters`, `/games/featured`, `/games/:gameId`, `/games/:gameId/play-count` |
 | Social | `/favorites`, `/games/:gameId/reactions`, `/games/:gameId/comments`, `/comments/:commentId/reaction`, moderation report routes |
 | Admin | `/admin/users`, `/admin/reports`, `/admin/access-logs`, admin submission and catalog-candidate routes |
 | Submissions | `/submissions/games` |
 | Engine/control | `/webrtc/ice-servers`, `/sessions`, `/sessions/:id/verify`, local pairing routes, multiplayer lobby routes |
+| Browser smoke | `/browser-smoke/session`, `/browser-smoke/artifact`, `/browser-smoke/result` |
 | Metrics | `/metrics/stream`, `/metrics/stream/recent` |
 
 ## Production environment
@@ -227,13 +229,15 @@ Deploy the shared contract in this order:
 | Liveness/readiness checks | 120 per client IP per minute | Redis shared counter |
 | Session verification by IP | 1,000 per minute | Redis shared counter |
 | Session verification by IP and session | 30 per minute | Redis shared counter |
+| Anonymous Studio session creation | 10 per client IP per minute | Redis shared counter |
+| Signed browser artifact URLs | 20 per identity per minute | Redis shared counter |
 | Browser smoke capability routes | 30 per client IP per minute | Redis shared counter |
 | Comments | 10 per user per minute | Redis shared counter |
 | Game and comment reactions combined | 120 per user per minute | Redis shared counter |
 | Play-count writes | 60 per user per minute | Redis shared counter |
 | Comment reports | 10 per user per hour | Redis shared counter |
-| Game submissions | 3 per user per hour | Supabase submission rows |
-| Stream metrics | 1 per user/session every 5 seconds | Supabase metric rows |
+| Game submissions | 10 per user per hour | Redis shared counter |
+| Stream metrics | 30 writes per identity per minute and 1 per user/session every 5 seconds | Redis shared counter |
 
 If Redis is temporarily unavailable, the API falls back to an in-memory limiter so protected routes remain available with per-instance abuse protection.
 
@@ -275,3 +279,8 @@ Recognized Supabase access-log schema failures return API code `access_log_schem
 - Hosted predeploy checks on pushes, manual dispatches, and reusable hosted deploy calls.
 
 `.github/workflows/hosted-deploy.yml` calls the deploy gate before Render/Vercel deploy hooks and then runs production hosted pairing/auth smokes.
+
+`.github/workflows/security-scan.yml` audits production dependencies for every
+lockfile location, applies the packaged-desktop build-chain policy, scans for
+committed secret patterns, and runs CodeQL. Dependabot update policy is defined
+centrally in `.github/dependabot.yml`.

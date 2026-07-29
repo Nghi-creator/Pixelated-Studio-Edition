@@ -36,6 +36,7 @@ export {
 type RegisterStartGameOptions = {
   apiUrl: string;
   canStartGame?: (socket: Socket, sessionId: string) => boolean;
+  cloudRomStagingRoot?: string;
   downloadCloudRom: DownloadCloudRom;
   getVaultOwnerId?: (socket: Socket) => string;
   runtime: Runtime;
@@ -49,6 +50,7 @@ export function registerStartGameHandler(
   const {
     apiUrl,
     canStartGame,
+    cloudRomStagingRoot,
     downloadCloudRom,
     getVaultOwnerId,
     runtime,
@@ -155,6 +157,7 @@ export function registerStartGameHandler(
           runtime,
           runtimeId,
           sessionId,
+          stagingRoot: cloudRomStagingRoot,
           streamProfile,
         });
       } catch (err) {
