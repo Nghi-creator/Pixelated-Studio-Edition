@@ -70,6 +70,7 @@ export function PlayerControls({
 }: PlayerControlsProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const controlsRef = useRef<HTMLDivElement>(null);
+  const lastAudibleVolumeRef = useRef(volume > 0 ? volume : 1);
 
   useEffect(() => {
     if (!isSettingsOpen) return;
@@ -93,6 +94,23 @@ export function PlayerControls({
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [isSettingsOpen]);
+
+  useEffect(() => {
+    if (volume > 0) lastAudibleVolumeRef.current = volume;
+  }, [volume]);
+
+  const handleMuteToggle = () => {
+    if (isMuted && volume === 0) {
+      onVolumeChange(lastAudibleVolumeRef.current);
+    }
+    onMuteToggle();
+  };
+  const handleVolumeChange = (nextVolume: number) => {
+    onVolumeChange(nextVolume);
+    if ((nextVolume === 0 && !isMuted) || (nextVolume > 0 && isMuted)) {
+      onMuteToggle();
+    }
+  };
 
   const controlButtonClass =
     "inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#5D263A] bg-[#351B27] text-white transition-colors hover:bg-[#2B1720] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary";
@@ -120,7 +138,7 @@ export function PlayerControls({
       <div className="hidden h-10 items-center rounded-lg border border-[#5D263A] bg-[#351B27] sm:flex">
         <button
           type="button"
-          onClick={onMuteToggle}
+          onClick={handleMuteToggle}
           className="inline-flex h-full w-10 shrink-0 items-center justify-center rounded-l-lg text-white transition-colors hover:bg-[#2B1720] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary"
           aria-label={isMuted ? "Unmute game audio" : "Mute game audio"}
           title={isMuted ? "Unmute game audio" : "Mute game audio"}
@@ -136,7 +154,9 @@ export function PlayerControls({
           className="mx-3 h-1.5 w-20 cursor-pointer accent-synth-secondary lg:w-28"
           max="1"
           min="0"
-          onChange={(event) => onVolumeChange(Number(event.target.value))}
+          onChange={(event) =>
+            handleVolumeChange(Number(event.target.value))
+          }
           step="0.05"
           type="range"
           value={volume}
@@ -297,4 +317,3 @@ export function PlayerControls({
     </div>
   );
 }
-
