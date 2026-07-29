@@ -156,6 +156,12 @@ export function createLobbyManager(maxPlayers = 4) {
     return lobbyState.canSendInput(socket.id, sessionId, playerIndex);
   }
 
+  function canReceiveStream(socket: Socket, sessionId: string | null) {
+    return Boolean(
+      sessionId && lobbyState.getParticipant(socket.id, sessionId),
+    );
+  }
+
   function kickParticipant(socket: Socket, payload: KickPayload = {}) {
     const sessionId =
       normalizeSessionId(payload.sessionId) || socket.data.sessionId;
@@ -223,6 +229,7 @@ export function createLobbyManager(maxPlayers = 4) {
 
   return {
     canControlSession,
+    canReceiveStream,
     canSendInput,
     getLobbyState: lobbyState.getLobbyState,
     joinLobby,

@@ -18,13 +18,61 @@ type CandidateEnvelope = {
 };
 
 const MAX_PEER_ID_LENGTH = 128;
-const MAX_PEERS_PER_SOCKET = 32;
+const MAX_PEERS_PER_SOCKET = 1;
+const DEFAULT_MAX_ACTIVE_PEERS = 8;
 const DEFAULT_SIGNALING_EVENTS_PER_SECOND = 120;
 
+export type SignalingPeerRegistry = ReturnType<
+  typeof createSignalingPeerRegistry
+>;
+
 type SignalingRelayOptions = {
+  canCreatePeer?: (socket: Socket, sessionId: string) => boolean;
   eventLimitPerSecond?: number;
   now?: () => number;
+  peerRegistry?: SignalingPeerRegistry;
 };
+
+export function createSignalingPeerRegistry(
+  maxActivePeers = DEFAULT_MAX_ACTIVE_PEERS,
+) {
+  if (!Number.isInteger(maxActivePeers) || maxActivePeers <= 0) {
+    throw new Error("Maximum active WebRTC peers must be a positive integer");
+  }
+
+  const peers = new Map<
+    string,
+    { peerId: string; sessionId: string; socketId: string }
+  >();
+
+  const peerKey = (sessionId: string, peerId: string) =>
+    `${sessionId}:${peerId}`;
+
+  function releaseSocket(socketId: string) {
+    for (const [key, peer] of peers) {
+      if (peer.socketId === socketId) peers.delete(key);
+    }
+  }
+
+  return {
+    acquire(sessionId: string, peerId: string, socketId: string) {
+      const key = peerKey(sessionId, peerId);
+      const existing = peers.get(key);
+      if (existing?.socketId === socketId) return true;
+
+      releaseSocket(socketId);
+      if (peers.size >= maxActivePeers) return false;
+      peers.set(key, { peerId, sessionId, socketId });
+      return true;
+    },
+    release(sessionId: string, peerId: string, socketId: string) {
+      const key = peerKey(sessionId, peerId);
+      if (peers.get(key)?.socketId === socketId) peers.delete(key);
+    },
+    releaseSocket,
+    size: () => peers.size,
+  };
+}
 
 function stripSessionId(payload: unknown) {
   if (!payload || typeof payload !== "object") return {};
@@ -139,6 +187,9 @@ export function registerSignalingRelayHandlers(
 ) {
   const eventLimit =
     options.eventLimitPerSecond || DEFAULT_SIGNALING_EVENTS_PER_SECOND;
+  const canCreatePeer = options.canCreatePeer || (() => true);
+  const peerRegistry =
+    options.peerRegistry || createSignalingPeerRegistry();
   const now = options.now || Date.now;
   let eventCount = 0;
   let eventWindowStartedAt = now();
@@ -190,8 +241,24 @@ export function registerSignalingRelayHandlers(
   socket.on("webrtc-offer", (offer: SessionPayload = {}) => {
     if (!consumeSignalingBudget()) return;
     if (!payloadMatchesActiveSession(socket, offer)) return;
+    const sessionId = normalizeSessionId(socket.data.sessionId);
     const peerId = getPeerId(offer);
-    if (!peerId || !rememberPeer(socket, peerId)) return;
+    if (
+      !sessionId ||
+      !peerId ||
+      !canCreatePeer(socket, sessionId) ||
+      !rememberPeer(socket, peerId)
+    ) {
+      return;
+    }
+    if (!peerRegistry.acquire(sessionId, peerId, socket.id)) {
+      forgetPeer(socket, peerId);
+      socket.emit("engine-error", {
+        code: "engine_stream_capacity_reached",
+        message: "The engine has reached its active stream limit.",
+      });
+      return;
+    }
     relayToSession(socket, "webrtc-offer", stripSessionId(offer));
   });
 
@@ -199,8 +266,10 @@ export function registerSignalingRelayHandlers(
     if (!consumeSignalingBudget()) return;
     const peerId = getPeerId(payload);
     if (peerId) {
+      const sessionId = normalizeSessionId(socket.data.sessionId);
       emitPeerDisconnect(socket, peerId);
       forgetPeer(socket, peerId);
+      if (sessionId) peerRegistry.release(sessionId, peerId, socket.id);
     }
   });
 
@@ -234,5 +303,6 @@ export function registerSignalingRelayHandlers(
     for (const peerId of peerIds) {
       if (typeof peerId === "string") emitPeerDisconnect(socket, peerId);
     }
+    peerRegistry.releaseSocket(socket.id);
   });
 }

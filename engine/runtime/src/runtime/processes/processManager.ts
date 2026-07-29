@@ -136,7 +136,8 @@ export function createProcessManager(options: ProcessManagerOptions) {
   ) {
     bindManagedProcessLifecycle({
       child,
-      getActiveSessionId: () => activeSessionId,
+      getActiveSessionId: () =>
+        retroarchProcess === child ? activeSessionId : null,
       label,
       onCleanupSession: cleanupActiveSession,
       onLaunchFailure: recordLaunchFailure,

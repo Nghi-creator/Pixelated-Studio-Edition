@@ -19,6 +19,15 @@ STREAM_PROFILE = os.environ.get('PIXELATED_STREAM_PROFILE', '{}')
 PEER_STATE_PATH = os.environ.get('PIXELATED_CAMERA_PEER_STATE_PATH', '/tmp/pixelated_camera_peers.json')
 peers = {}
 
+def parse_max_active_peers():
+    try:
+        configured = int(os.environ.get('PIXELATED_MAX_STREAM_PEERS', '8'))
+    except Exception:
+        configured = 8
+    return min(max(configured, 1), 16)
+
+MAX_ACTIVE_PEERS = parse_max_active_peers()
+
 def write_peer_state():
     try:
         with open(PEER_STATE_PATH, 'w', encoding='utf-8') as state_file:
@@ -133,6 +142,11 @@ def handle_offer(offer):
 
     if peer_id in peers:
         print(f"[Python] Pipeline already running for peer {peer_id}! Ignoring duplicate offer.")
+        return
+    if len(peers) >= MAX_ACTIVE_PEERS:
+        emit_engine_error(
+            f"WebRTC stream capacity reached ({MAX_ACTIVE_PEERS} active peers)."
+        )
         return
 
     stream_profile = parse_stream_profile()

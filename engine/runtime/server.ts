@@ -46,7 +46,10 @@ import {
   joinSession,
   normalizeSessionId,
 } from "./src/signaling/sessionRooms";
-import { registerSignalingRelayHandlers } from "./src/signaling/signalingRelay";
+import {
+  createSignalingPeerRegistry,
+  registerSignalingRelayHandlers,
+} from "./src/signaling/signalingRelay";
 import { createEngineTokenAuth } from "./src/signaling/socketAuth";
 import { registerStartGameHandler } from "./src/signaling/start-game/startGameHandlers";
 import { verifyBackendSession } from "./src/sessions/verifyBackendSession";
@@ -108,6 +111,7 @@ const getPublicHealthSnapshot = createPublicHealthSnapshot(
   healthSnapshotOptions,
 );
 const lobby = createLobbyManager();
+const signalingPeers = createSignalingPeerRegistry();
 
 registerHealthRoutes(app, getHealthSnapshot, {
   canReadDetails: (request) =>
@@ -197,7 +201,10 @@ io.on("connection", (socket) => {
     runtime,
     verifyBackendSession,
   });
-  registerSignalingRelayHandlers(socket);
+  registerSignalingRelayHandlers(socket, {
+    canCreatePeer: lobby.canReceiveStream,
+    peerRegistry: signalingPeers,
+  });
   registerEngineErrorHandlers(socket);
   registerInputHandlers(socket, runtime, {
     canSendInput: lobby.canSendInput,

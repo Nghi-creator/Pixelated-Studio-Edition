@@ -9,6 +9,10 @@ import {
   CandidateValidationError,
   getNativeRuntimeManifestIds,
 } from "../../../src/modules/catalog/ingestion/catalogCandidateValidation.js";
+import {
+  fetchVerifiedCandidateArtifact,
+  MAX_CANDIDATE_ARTIFACT_BYTES,
+} from "../../../src/modules/catalog/ingestion/catalogCandidateStorage.js";
 
 function validNesRom() {
   return Buffer.concat([Buffer.from([0x4e, 0x45, 0x53, 0x1a]), Buffer.alloc(32)]);
@@ -182,4 +186,27 @@ test("candidate artifact header failures use review-safe errors", () => {
       ),
     CandidateValidationError,
   );
+});
+
+test("candidate artifacts are size-bounded before allocation or fetch", async () => {
+  let fetchCalled = false;
+  const candidate = {
+    artifact_filename: "oversized.nes",
+    artifact_sha256: "a".repeat(64),
+    artifact_size: MAX_CANDIDATE_ARTIFACT_BYTES + 1,
+    artifact_url: "https://raw.githubusercontent.com/example/repo/commit/game.nes",
+    source_kind: "curated_licensed_rom",
+  };
+
+  await assert.rejects(
+    fetchVerifiedCandidateArtifact(
+      candidate as never,
+      (async () => {
+        fetchCalled = true;
+        return new Response();
+      }) as typeof fetch,
+    ),
+    /Candidate artifact size is invalid/,
+  );
+  assert.equal(fetchCalled, false);
 });

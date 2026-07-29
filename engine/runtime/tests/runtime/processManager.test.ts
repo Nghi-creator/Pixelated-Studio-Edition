@@ -22,8 +22,10 @@ function createManager(options: {
   fileExists?: (path: string) => boolean;
   spawned?: { args: string[]; command: string }[];
   spawnChild?: FakeChildProcess;
+  spawnChildren?: FakeChildProcess[];
 } = {}) {
   const child = options.spawnChild || new FakeChildProcess();
+  const spawnChildren = options.spawnChildren ? [...options.spawnChildren] : null;
   const spawned = options.spawned || [];
   return {
     child,
@@ -36,7 +38,7 @@ function createManager(options: {
       keyboardBridgePath: "/app/keyboardBridge",
       spawnProcess: ((command: string, args: string[] = []) => {
         spawned.push({ args, command });
-        return child;
+        return spawnChildren?.shift() || child;
       }) as never,
     }),
     spawned,
@@ -92,6 +94,30 @@ test("libretro boot uses the selected registry core", () => {
   assert.equal(spawned[0]?.args[4], RETROARCH_CONFIG_PATH);
   assert.equal(RETROARCH_CONFIG_PATH, "/home/pixelated/retroarch.cfg");
 
+  manager.cleanupActiveSession("session-nes");
+});
+
+test("late exit from a replaced game process cannot stop its replacement", () => {
+  const firstChild = new FakeChildProcess();
+  const secondChild = new FakeChildProcess();
+  const { manager } = createManager({
+    spawnChildren: [firstChild, secondChild],
+  });
+  const firstRomPath = writeValidNesFile();
+  const secondRomPath = writeValidNesFile();
+
+  manager.bootGame(firstRomPath, "session-nes", {
+    runtimeId: "mesen",
+  });
+  manager.bootGame(secondRomPath, "session-nes", {
+    runtimeId: "mesen",
+  });
+
+  assert.equal(firstChild.killed, true);
+  firstChild.emit("exit", 0, null);
+
+  assert.equal(manager.getActiveSessionId(), "session-nes");
+  assert.equal(secondChild.killed, false);
   manager.cleanupActiveSession("session-nes");
 });
 

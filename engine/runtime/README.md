@@ -81,6 +81,8 @@ PIXELATED_STREAM_PROFILE=<json>
 ```
 
 The camera bridge applies the profile to GStreamer framerate caps and VP8 target bitrate.
+It accepts at most eight concurrent peer pipelines by default. Override the bounded
+limit with `PIXELATED_MAX_STREAM_PEERS` (1–16) for a known-capacity host.
 
 ## Manual runtime configuration
 

@@ -5,6 +5,7 @@ import { sanitizeCatalogObjectSegment } from "../domain/catalogObjectPath.js";
 import { createSignedSubmissionUrl } from "../domain/submissionStorage.js";
 
 const ALLOWED_ARTIFACT_HOSTS = new Set(["raw.githubusercontent.com"]);
+export const MAX_CANDIDATE_ARTIFACT_BYTES = 64 * 1024 * 1024;
 
 const sanitizeObjectSegment = (value: string) =>
   sanitizeCatalogObjectSegment(value, "artifact");
@@ -92,7 +93,11 @@ export async function fetchVerifiedCandidateArtifact(
   ) {
     throw new Error("Candidate is missing artifact metadata.");
   }
-  if (!Number.isSafeInteger(candidate.artifact_size)) {
+  if (
+    !Number.isSafeInteger(candidate.artifact_size) ||
+    candidate.artifact_size <= 0 ||
+    candidate.artifact_size > MAX_CANDIDATE_ARTIFACT_BYTES
+  ) {
     throw new Error("Candidate artifact size is invalid.");
   }
 
