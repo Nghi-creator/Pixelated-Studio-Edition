@@ -8,10 +8,14 @@ class FakeSocket extends EventEmitter {
   data: Record<string, unknown> = {};
   outbound: Array<{ event: string; payload: unknown }> = [];
   id: string;
+  nsp: { sockets: Map<string, FakeSocket> };
+  rooms: Set<string>;
 
   constructor(id: string) {
     super();
     this.id = id;
+    this.nsp = { sockets: new Map([[id, this]]) };
+    this.rooms = new Set([id]);
   }
 
   emit(event: string, payload?: unknown) {
@@ -27,6 +31,14 @@ class FakeSocket extends EventEmitter {
     return {
       emit: () => undefined,
     };
+  }
+
+  join(room: string) {
+    this.rooms.add(room);
+  }
+
+  leave(room: string) {
+    this.rooms.delete(room);
   }
 }
 

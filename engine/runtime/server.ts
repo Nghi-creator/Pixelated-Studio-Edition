@@ -152,16 +152,24 @@ io.on("connection", (socket) => {
   socket.on("join-session", (rawPayload: unknown = {}) => {
     const payload = normalizeSocketPayload(rawPayload);
     const role = normalizeSocketRole(payload.role);
-    const sessionId = joinSession(socket, payload.sessionId, role);
     socket.data.role = role;
+    let sessionId: string | null;
+
+    if (role === "camera") {
+      sessionId = joinSession(socket, payload.sessionId, role);
+    } else {
+      const participant = lobby.joinLobby(socket, {
+        displayName: payload.displayName,
+        requestedRole: role === "browser" ? "host" : role,
+        sessionId: payload.sessionId,
+      });
+      sessionId = participant
+        ? normalizeSessionId(socket.data.sessionId)
+        : null;
+    }
     refreshConnectedClient(socket);
 
     if (sessionId && role !== "camera") {
-      lobby.joinLobby(socket, {
-        displayName: payload.displayName,
-        requestedRole: role === "browser" ? "host" : role,
-        sessionId,
-      });
       if (
         payload.suppressReady !== true &&
         runtime.getActiveSessionId() === sessionId

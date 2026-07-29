@@ -169,8 +169,8 @@ export function createLobbyStateStore(maxPlayers = 4) {
 
   function canControlSession(socketId: string, sessionId: string | null) {
     if (!sessionId) return false;
-    const participants = getParticipants(sessionId);
-    if (participants.size === 0) return true;
+    const participants = sessions.get(sessionId);
+    if (!participants) return false;
     return participants.get(socketId)?.role === "host";
   }
 
@@ -181,7 +181,7 @@ export function createLobbyStateStore(maxPlayers = 4) {
   ) {
     if (!sessionId || !Number.isInteger(playerIndex)) return false;
     const participants = sessions.get(sessionId);
-    if (!participants || participants.size === 0) return true;
+    if (!participants) return false;
 
     const participant = participants.get(socketId);
     return (
