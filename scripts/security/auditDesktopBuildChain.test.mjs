@@ -32,6 +32,100 @@ test("allows the known brace expansion advisory only on development nodes", () =
   assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
 });
 
+test("allows GitHub URL context on the known development-only advisory", () => {
+  const report = {
+    vulnerabilities: {
+      "brace-expansion": {
+        nodes: ["node_modules/brace-expansion"],
+        severity: "high",
+        via: [
+          {
+            ...advisory,
+            url: `${advisory.url}/dependabot?query=scope%3Adevelopment`,
+          },
+        ],
+      },
+      glob: {
+        nodes: ["node_modules/glob"],
+        severity: "high",
+        via: ["brace-expansion"],
+      },
+    },
+  };
+  const packageLock = {
+    packages: {
+      "node_modules/brace-expansion": { dev: true },
+      "node_modules/glob": { dev: true },
+    },
+  };
+
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
+});
+
+test("follows npm reverse effects when a meta-vulnerability omits via", () => {
+  const report = {
+    vulnerabilities: {
+      "brace-expansion": {
+        effects: ["minimatch"],
+        nodes: ["node_modules/brace-expansion"],
+        severity: "high",
+        via: [advisory],
+      },
+      minimatch: {
+        effects: ["glob"],
+        nodes: ["node_modules/minimatch"],
+        severity: "high",
+        via: [],
+      },
+      glob: {
+        nodes: ["node_modules/glob"],
+        severity: "high",
+        via: [],
+      },
+    },
+  };
+  const packageLock = {
+    packages: {
+      "node_modules/brace-expansion": { dev: true },
+      "node_modules/minimatch": { dev: true },
+      "node_modules/glob": { dev: true },
+    },
+  };
+
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
+});
+
+test("does not use reverse effects to allow an unknown direct advisory", () => {
+  const report = {
+    vulnerabilities: {
+      "brace-expansion": {
+        effects: ["glob"],
+        nodes: ["node_modules/brace-expansion"],
+        severity: "high",
+        via: [advisory],
+      },
+      glob: {
+        nodes: ["node_modules/glob"],
+        severity: "high",
+        via: [
+          {
+            severity: "high",
+            url: "https://github.com/advisories/GHSA-not-allowlisted",
+          },
+        ],
+      },
+    },
+  };
+  const packageLock = {
+    packages: {
+      "node_modules/brace-expansion": { dev: true },
+      "node_modules/glob": { dev: true },
+    },
+  };
+
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), ["glob"]);
+});
+
 test("blocks the allowlisted advisory if it reaches production", () => {
   const report = {
     vulnerabilities: {

@@ -3,10 +3,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ALLOWED_DEV_ADVISORIES = new Set([
-  "https://github.com/advisories/GHSA-mh99-v99m-4gvg",
-]);
+const ALLOWED_DEV_ADVISORY_IDS = new Set(["GHSA-MH99-V99M-4GVG"]);
 const HIGH_SEVERITIES = new Set(["high", "critical"]);
+
+function getGithubAdvisoryId(url) {
+  if (typeof url !== "string") return null;
+  return (
+    url.match(/\/advisories\/(GHSA-[a-z0-9-]+)/i)?.[1]?.toUpperCase() ?? null
+  );
+}
 
 function hasOnlyAllowedAdvisories(
   name,
@@ -33,7 +38,19 @@ function hasOnlyAllowedAdvisories(
   const nextVisiting = new Set(visiting);
   nextVisiting.add(name);
   const causes = Array.isArray(vulnerability.via) ? vulnerability.via : [];
-  if (causes.length === 0) return false;
+  if (causes.length === 0) {
+    return Object.entries(vulnerabilities).some(
+      ([causeName, cause]) =>
+        Array.isArray(cause?.effects) &&
+        cause.effects.includes(name) &&
+        hasOnlyAllowedAdvisories(
+          causeName,
+          vulnerabilities,
+          packageLock,
+          nextVisiting,
+        ),
+    );
+  }
 
   return causes.every((via) => {
     if (typeof via === "string") {
@@ -44,7 +61,8 @@ function hasOnlyAllowedAdvisories(
         nextVisiting,
       );
     }
-    return Boolean(via?.url && ALLOWED_DEV_ADVISORIES.has(via.url));
+    const advisoryId = getGithubAdvisoryId(via?.url);
+    return advisoryId !== null && ALLOWED_DEV_ADVISORY_IDS.has(advisoryId);
   });
 }
 

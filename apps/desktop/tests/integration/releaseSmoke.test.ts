@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
 import { describe, it } from "node:test";
 import {
+  EXPECTED_RENDERER_SCRIPTS,
   assertBrowserScript,
   assertPreloadScript,
   createArchiveEntryMap,
@@ -24,6 +27,16 @@ describe("desktop packaged release smoke helpers", () => {
         "dist/renderer/clients.js",
         "dist/renderer.js",
       ],
+    );
+  });
+
+  it("keeps the source index renderer scripts aligned with the release contract", () => {
+    const sourceIndexPath = path.resolve(__dirname, "../../../index.html");
+    const sourceIndexHtml = fs.readFileSync(sourceIndexPath, "utf8");
+
+    assert.deepEqual(
+      getHtmlScriptSources(sourceIndexHtml),
+      EXPECTED_RENDERER_SCRIPTS,
     );
   });
 
