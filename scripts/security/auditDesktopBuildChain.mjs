@@ -70,6 +70,19 @@ function hasOnlyAllowedAdvisories(
         nextVisiting,
       );
     }
+    if (typeof via?.url !== "string") {
+      const dependencyName = via?.dependency || via?.name;
+      return (
+        typeof dependencyName === "string" &&
+        dependencyName !== name &&
+        hasOnlyAllowedAdvisories(
+          dependencyName,
+          vulnerabilities,
+          packageLock,
+          nextVisiting,
+        )
+      );
+    }
     return isAllowedDirectAdvisory(via);
   });
 }
@@ -81,7 +94,10 @@ export function getBlockingVulnerabilities(report, packageLock) {
   );
   const directAdvisories = highVulnerabilities.flatMap((vulnerability) =>
     Array.isArray(vulnerability?.via)
-      ? vulnerability.via.filter((via) => typeof via !== "string")
+      ? vulnerability.via.filter(
+          (via) =>
+            typeof via !== "string" && typeof via?.url === "string",
+        )
       : [],
   );
 

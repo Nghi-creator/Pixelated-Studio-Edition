@@ -126,6 +126,56 @@ test("allows detached npm meta-vulnerabilities when every direct leaf is known",
   assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
 });
 
+test("does not treat object-shaped dependency causes as direct advisories", () => {
+  const report = {
+    vulnerabilities: {
+      "brace-expansion": {
+        nodes: ["node_modules/brace-expansion"],
+        severity: "high",
+        via: [advisory],
+      },
+      minimatch: {
+        nodes: ["node_modules/minimatch"],
+        severity: "high",
+        via: [{ dependency: "brace-expansion", severity: "high" }],
+      },
+      glob: {
+        nodes: ["node_modules/glob"],
+        severity: "high",
+        via: [{ name: "minimatch", severity: "high" }],
+      },
+    },
+  };
+  const packageLock = {
+    packages: {
+      "node_modules/brace-expansion": { dev: true },
+      "node_modules/minimatch": { dev: true },
+      "node_modules/glob": { dev: true },
+    },
+  };
+
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
+});
+
+test("blocks a report containing only untraceable object metadata", () => {
+  const report = {
+    vulnerabilities: {
+      glob: {
+        nodes: ["node_modules/glob"],
+        severity: "high",
+        via: [{ severity: "high" }],
+      },
+    },
+  };
+  const packageLock = {
+    packages: {
+      "node_modules/glob": { dev: true },
+    },
+  };
+
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), ["glob"]);
+});
+
 test("does not use reverse effects to allow an unknown direct advisory", () => {
   const report = {
     vulnerabilities: {
