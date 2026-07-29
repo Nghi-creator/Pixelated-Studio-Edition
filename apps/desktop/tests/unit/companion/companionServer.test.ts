@@ -7,12 +7,13 @@ import {
   canProxyCompanionRequest,
   companionSecretsEqual,
   consumeCompanionRequestLimit,
-  consumeCompanionLaunchTicket,
   createCompanionLaunchTicket,
   getCompanionStatusPage,
   getCompanionInviteStatus,
+  hasValidCompanionLaunchTicket,
   matchesCompanionRequestPath,
   recordCompanionInviteFailure,
+  redeemCompanionLaunchTicket,
   revokeCompanionInvite,
   shouldProxy,
 } from "../../../main/companion/server";
@@ -164,15 +165,29 @@ describe("desktop companion runtime switching", () => {
 });
 
 describe("desktop companion launch tickets", () => {
-  it("consumes launch tickets once and rejects them after expiry", () => {
+  it("redeems launch tickets idempotently and rejects them after expiry", () => {
     const now = 1_000;
     const ticket = createCompanionLaunchTicket(now);
 
-    assert.equal(consumeCompanionLaunchTicket(ticket, now + 1), true);
-    assert.equal(consumeCompanionLaunchTicket(ticket, now + 2), false);
+    assert.equal(hasValidCompanionLaunchTicket(ticket, now + 1), true);
+    const first = redeemCompanionLaunchTicket(
+      ticket,
+      now + 24 * 60 * 60 * 1_000,
+      now + 1,
+    );
+    const retry = redeemCompanionLaunchTicket(
+      ticket,
+      now + 24 * 60 * 60 * 1_000,
+      now + 2,
+    );
+    assert.ok(first?.companionToken);
+    assert.equal(retry?.companionToken, first?.companionToken);
 
     const expiredTicket = createCompanionLaunchTicket(now);
-    assert.equal(consumeCompanionLaunchTicket(expiredTicket, now + 60_000), false);
+    assert.equal(
+      hasValidCompanionLaunchTicket(expiredTicket, now + 60_000),
+      false,
+    );
   });
 });
 

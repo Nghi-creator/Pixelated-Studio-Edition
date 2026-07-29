@@ -22,8 +22,16 @@ test("engine client id survives token clearing so revocation stays bound to the 
   });
 
   try {
-    const { clearEngineToken, engineAuthHeaders, setEngineToken } =
-      await import("../../../src/lib/engine/engineAuth.ts");
+    const {
+      clearEngineToken,
+      ENGINE_CONTROL_TOKEN_STORAGE_KEY,
+      ENGINE_TOKEN_EXPIRES_AT_STORAGE_KEY,
+      engineAuthHeaders,
+      engineControlAuthHeaders,
+      getEngineToken,
+      setEngineControlToken,
+      setEngineToken,
+    } = await import("../../../src/lib/engine/engineAuth.ts");
 
     setEngineToken("first-token");
     const firstClientId = engineAuthHeaders()["X-Pixelated-Client-Id"];
@@ -34,6 +42,19 @@ test("engine client id survives token clearing so revocation stays bound to the 
 
     assert.ok(firstClientId);
     assert.equal(secondClientId, firstClientId);
+
+    const expiresAt = new Date(Date.now() + 60_000).toISOString();
+    setEngineToken("expiring-token", expiresAt);
+    setEngineControlToken("expiring-control-token");
+    assert.equal(
+      storage.get(ENGINE_TOKEN_EXPIRES_AT_STORAGE_KEY),
+      String(Date.parse(expiresAt)),
+    );
+
+    storage.set(ENGINE_TOKEN_EXPIRES_AT_STORAGE_KEY, String(Date.now() - 1));
+    assert.equal(getEngineToken(), "");
+    assert.deepEqual(engineControlAuthHeaders(), {});
+    assert.equal(storage.has(ENGINE_CONTROL_TOKEN_STORAGE_KEY), false);
   } finally {
     Object.defineProperty(globalThis, "window", {
       configurable: true,

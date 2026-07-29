@@ -6,6 +6,7 @@ import {
   engineEndpoint,
   getEngineControlUrl,
   getEngineUrl,
+  getLocalCompanionControlUrl,
   isAllowedEngineUrl,
   setEngineControlUrl,
   setEngineUrl,
@@ -20,6 +21,10 @@ test("engine URLs are constrained to local and LAN engine origins", () => {
   assert.equal(isAllowedEngineUrl("https://192.168.1.20"), false);
   assert.equal(isAllowedEngineUrl("file:///tmp/engine"), false);
   assert.equal(isAllowedEngineUrl("https://user:pass@192.168.1.20:8090"), false);
+  assert.equal(
+    getLocalCompanionControlUrl("http://localhost:8080"),
+    "http://127.0.0.1:8091",
+  );
 });
 
 test("stored invalid engine URLs fall back to the default local endpoint", () => {

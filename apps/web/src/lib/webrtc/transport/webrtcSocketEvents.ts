@@ -74,7 +74,7 @@ export function bindWebRTCSocketEvents({
       source: "connect_error",
     });
     if (err.message === "Invalid engine pairing token") {
-      clearEngineToken();
+      clearEngineToken("rejected");
       failStream(
         "The saved desktop pairing token was rejected. Pair the local engine again, then retry.",
       );
@@ -93,7 +93,7 @@ export function bindWebRTCSocketEvents({
       source: "engine-error",
     });
     if (payload?.code === "engine_access_revoked") {
-      clearEngineToken();
+      clearEngineToken("rejected");
     }
     failStream(payload?.message || "Engine error");
   });
@@ -180,4 +180,3 @@ export function bindWebRTCSocketEvents({
     }
   });
 }
-

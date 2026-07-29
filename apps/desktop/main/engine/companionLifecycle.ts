@@ -47,15 +47,15 @@ export async function startCompanionForEngine({
       preserveSecurityState: launchContext.preserveCompanionSecurity,
     });
     const hostedInviteUrls = launchContext.companionUrls.map(createHostedInviteUrl);
-    const localControlUrl = `http://localhost:${companion.httpPort}`;
+    const localControlUrl = `http://127.0.0.1:${companion.httpPort}`;
     const activeCompanion: ActiveCompanion = {
       advertisedUrls: launchContext.advertisedUrls,
       certPath: companion.certPath,
       exposureMode: launchContext.exposureMode,
-      launchUrl:
-        launchContext.exposureMode === "local"
-          ? localControlUrl
-          : `https://localhost:${companion.port}`,
+      // Launch Web always runs on this machine. Keep its redemption path on
+      // loopback HTTP so LAN mode does not depend on trusting the self-signed
+      // guest certificate. Remote invite links remain HTTPS.
+      launchUrl: localControlUrl,
       urls: hostedInviteUrls,
     };
     if (launchContext.exposureMode === "lan" && launchContext.inviteExpiresAt) {

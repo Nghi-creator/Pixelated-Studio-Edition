@@ -32,10 +32,11 @@ export {
 } from "./httpUtils";
 export { canUseRuntimeSwitchToken } from "./engine/runtimeSwitchRoutes";
 export {
-  consumeCompanionLaunchTicket,
   createCompanionLaunchTicket,
   getCompanionInviteStatus,
+  hasValidCompanionLaunchTicket,
   recordCompanionInviteFailure,
+  redeemCompanionLaunchTicket,
   revokeCompanionInvite,
   updateCompanionInvite,
 } from "./invite/inviteState";

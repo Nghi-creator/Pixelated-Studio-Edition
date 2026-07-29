@@ -4,6 +4,7 @@ import {
   getCompanionAccessToken,
   setEngineToken,
 } from "../../lib/engine/engineAuth";
+import { setEngineConnectionStatus } from "../../lib/engine/engineConnectionState";
 import { setEngineUrl } from "../../lib/engine/engineConfig";
 import { engineFetch } from "../../lib/engine/engineRequest";
 import { getInviteFailureMessage } from "./inviteUtils";
@@ -26,6 +27,7 @@ export async function executePairing(
   attempt: PreparedPairing,
 ): Promise<PairingExecutionResult> {
   let normalizedToken = attempt.normalizedToken;
+  let tokenExpiresAt: string | undefined;
 
   try {
     if (attempt.joiningWithInvite) {
@@ -57,6 +59,7 @@ export async function executePairing(
         };
       }
       normalizedToken = createCompanionEngineToken(payload.companionToken);
+      tokenExpiresAt = payload.expiresAt;
     }
 
     const healthResponse = await engineFetch(
@@ -87,12 +90,11 @@ export async function executePairing(
     }
 
     const authResponse = await engineFetch(
-      engineUrlEndpoint(attempt.normalizedUrl, "/local-games"),
+      engineUrlEndpoint(attempt.normalizedUrl, "/health/connection"),
       {
         headers: {
           "X-Engine-Token":
             getCompanionAccessToken(normalizedToken) || normalizedToken,
-          "X-User-Id": "pairing-check",
         },
       },
     );
@@ -110,7 +112,8 @@ export async function executePairing(
     }
 
     setEngineUrl(attempt.normalizedUrl);
-    setEngineToken(normalizedToken);
+    setEngineToken(normalizedToken, tokenExpiresAt);
+    setEngineConnectionStatus("online");
     let message = attempt.joiningWithInvite
       ? "Joined the host engine. Keep this page open while you play."
       : actualScope === "lan"

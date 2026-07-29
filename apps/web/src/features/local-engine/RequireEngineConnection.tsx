@@ -1,22 +1,21 @@
-import { useEffect, useState } from "react";
+import { Loader2 } from "lucide-react";
 import { Navigate, Outlet, useLocation } from "react-router";
-import {
-  ENGINE_PAIRING_EVENT,
-  hasEngineToken,
-} from "../../lib/engine/engineAuth";
+import { useEngineConnectionStatus } from "../../lib/engine/useEngineConnectionStatus";
 
 export function RequireEngineConnection() {
   const location = useLocation();
-  const [isPaired, setIsPaired] = useState(hasEngineToken);
+  const connectionStatus = useEngineConnectionStatus();
 
-  useEffect(() => {
-    const refreshPairing = () => setIsPaired(hasEngineToken());
-    window.addEventListener(ENGINE_PAIRING_EVENT, refreshPairing);
-    return () =>
-      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshPairing);
-  }, []);
+  if (connectionStatus === "checking") {
+    return (
+      <div className="flex min-h-[40vh] items-center justify-center gap-3 text-sm text-gray-300">
+        <Loader2 className="h-5 w-5 animate-spin text-synth-primary" />
+        Checking the desktop engine connection…
+      </div>
+    );
+  }
 
-  if (!isPaired) {
+  if (connectionStatus !== "online") {
     const returnTo = `${location.pathname}${location.search}`;
     return (
       <Navigate

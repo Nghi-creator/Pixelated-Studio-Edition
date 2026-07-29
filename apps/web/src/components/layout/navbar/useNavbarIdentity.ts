@@ -4,14 +4,11 @@ import { getAuthSession } from "../../../lib/api/apiClient";
 import { usePermissionsQuery } from "../../../lib/api/apiQueries";
 import { supabase } from "../../../lib/auth/supabaseClient";
 import { isAnonymousUser } from "../../../lib/auth/authIdentity";
-import {
-  ENGINE_PAIRING_EVENT,
-  hasEngineToken,
-} from "../../../lib/engine/engineAuth";
+import { useEngineConnectionStatus } from "../../../lib/engine/useEngineConnectionStatus";
 
 export function useNavbarIdentity() {
   const [user, setUser] = useState<User | null>(null);
-  const [isEnginePaired, setIsEnginePaired] = useState(hasEngineToken);
+  const engineConnectionStatus = useEngineConnectionStatus();
   const [isSessionLoading, setIsSessionLoading] = useState(true);
   const isKickingOut = useRef(false);
 
@@ -69,19 +66,13 @@ export function useNavbarIdentity() {
     });
   }, [permissionsQuery.data, user]);
 
-  useEffect(() => {
-    const refreshEnginePairing = () => setIsEnginePaired(hasEngineToken());
-    window.addEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
-    return () =>
-      window.removeEventListener(ENGINE_PAIRING_EVENT, refreshEnginePairing);
-  }, []);
-
   const profile = permissionsQuery.data?.profile;
 
   return {
     avatarUrl: profile?.avatar_url || null,
     isDeveloper: Boolean(profile?.is_developer),
-    isEnginePaired,
+    engineConnectionStatus,
+    isEnginePaired: engineConnectionStatus === "online",
     isIdentityLoading:
       isSessionLoading || (Boolean(user) && permissionsQuery.isLoading),
     role: profile?.role || null,

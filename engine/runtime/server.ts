@@ -113,6 +113,7 @@ registerHealthRoutes(app, getHealthSnapshot, {
     request.get("x-pixelated-access-scope") !== "companion-guest" &&
     auth.isValidEngineToken(request.get("x-engine-token")),
   getPublicHealthSnapshot,
+  requireEngineToken: auth.requireEngineToken,
 });
 registerLocalVaultRoutes(app, {
   getVaultOwnerId: getRequestVaultOwnerId,
