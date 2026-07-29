@@ -1,6 +1,9 @@
-import crypto from "crypto";
 import path from "path";
-import { removeFileIfExists } from "../../roms/cloudRomDownloader";
+import {
+  createCloudRomStagingPath,
+  DEFAULT_CLOUD_ROM_STAGING_ROOT,
+  removeCloudRomStagingArtifact,
+} from "../../roms/cloudRomStaging";
 import {
   findRuntimeByExtension,
   getRuntimeDefinition,
@@ -72,6 +75,7 @@ export async function launchCloudRomSession(options: {
   runtime: Runtime;
   runtimeId: string;
   sessionId: string;
+  stagingRoot?: string;
   streamProfile: StreamProfile;
 }) {
   const {
@@ -83,6 +87,7 @@ export async function launchCloudRomSession(options: {
     runtime,
     runtimeId,
     sessionId,
+    stagingRoot = DEFAULT_CLOUD_ROM_STAGING_ROOT,
     streamProfile,
   } = options;
   const registryRuntime = getRuntimeDefinition(runtimeId);
@@ -91,7 +96,7 @@ export async function launchCloudRomSession(options: {
   }
 
   const extension = getRuntimeExtensionForTarget(romFileOrUrl, registryRuntime);
-  const tmpPath = `/tmp/cloud_game_${crypto.randomUUID()}${extension}`;
+  const tmpPath = createCloudRomStagingPath(extension, stagingRoot);
   console.log("[Engine] Cloud URL detected. Downloading ROM to temporary storage...");
 
   try {
@@ -108,7 +113,7 @@ export async function launchCloudRomSession(options: {
       streamProfile,
     });
   } catch (err) {
-    removeFileIfExists(tmpPath);
+    removeCloudRomStagingArtifact(tmpPath, stagingRoot);
     throw err;
   }
 }

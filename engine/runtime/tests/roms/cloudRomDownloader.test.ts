@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
+import fs from "node:fs";
 import https from "node:https";
 import os from "node:os";
 import path from "node:path";
@@ -10,6 +11,12 @@ import {
 } from "../../src/roms/cloudRomDownloader";
 
 const validation = { runtimeId: "mesen" };
+const downloadTestRoot = fs.mkdtempSync(
+  path.join(os.tmpdir(), "pixelated-download-tests-"),
+);
+test.after(() => {
+  fs.rmSync(downloadTestRoot, { force: true, recursive: true });
+});
 
 test("cloud ROM downloads fail closed without an allowed-host configuration", () => {
   const downloader = createCloudRomDownloader({
@@ -55,7 +62,7 @@ test("rejects an allowed host when DNS includes a private address", async () => 
   await assert.rejects(
     downloader.downloadCloudRom(
       "https://roms.example/game.nes",
-      path.join(os.tmpdir(), `cloud-rom-${process.pid}.nes`),
+      path.join(downloadTestRoot, "private-address.nes"),
       validation,
     ),
     /non-public network address/,
@@ -88,7 +95,7 @@ test("enforces a total deadline even when the transport never responds", async (
   await assert.rejects(
     downloader.downloadCloudRom(
       "https://roms.example/game.nes",
-      path.join(os.tmpdir(), `cloud-rom-deadline-${process.pid}.nes`),
+      path.join(downloadTestRoot, "deadline.nes"),
       validation,
     ),
     /deadline exceeded/,

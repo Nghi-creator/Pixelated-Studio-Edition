@@ -75,6 +75,13 @@ export function removeFileIfExists(filePath: string): void {
   }
 }
 
+export function createExclusiveArtifactWriteStream(filePath: string) {
+  return fs.createWriteStream(filePath, {
+    flags: "wx",
+    mode: 0o600,
+  });
+}
+
 export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
   const {
     allowedRomHosts,
@@ -145,7 +152,7 @@ export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
     const pinnedAddress = publicAddresses[0];
 
     return new Promise((resolve, reject) => {
-      const file = fs.createWriteStream(destinationPath);
+      const file = createExclusiveArtifactWriteStream(destinationPath);
       let downloadedBytes = 0;
       let settled = false;
       const deadline = setTimeout(() => {

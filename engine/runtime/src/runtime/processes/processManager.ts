@@ -6,7 +6,7 @@ import {
   type KeyAction,
 } from "../../input/keyboardBridge";
 import { translateKey } from "../../input/translateKey";
-import { removeFileIfExists } from "../../roms/cloudRomDownloader";
+import { removeCloudRomStagingArtifact } from "../../roms/cloudRomStaging";
 import type { StreamProfile } from "../../signaling/start-game/startGameHandlers";
 import { launchCameraBridge } from "../launchers/cameraLauncher";
 import { launchLibretroGame } from "../launchers/libretroLauncher";
@@ -120,7 +120,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
     }
 
     if (activeCloudRomPath) {
-      removeFileIfExists(activeCloudRomPath);
+      removeCloudRomStagingArtifact(activeCloudRomPath);
       activeCloudRomPath = null;
     }
 

@@ -1,12 +1,21 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 import {
   normalizeStreamProfile,
   registerStartGameHandler,
   type StreamProfile,
 } from "../../src/signaling/start-game/startGameHandlers";
+
+const cloudRomStagingRoot = fs.mkdtempSync(
+  path.join(os.tmpdir(), "pixelated-cloud-tests-"),
+);
+test.after(() => {
+  fs.rmSync(cloudRomStagingRoot, { force: true, recursive: true });
+});
 
 type RuntimeBootOptions = {
   isCloudRom?: boolean;
@@ -83,6 +92,7 @@ function createHarness(overrides: HarnessOverrides = {}) {
 
   registerStartGameHandler(socket as never, {
     apiUrl: "http://api.test",
+    cloudRomStagingRoot,
     downloadCloudRom:
       overrides.downloadCloudRom ||
       ((romUrl, destinationPath, validation) => {
