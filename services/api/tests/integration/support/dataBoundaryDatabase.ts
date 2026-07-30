@@ -178,6 +178,27 @@ export class FakeSupabase {
     const rpcError = this.rpcErrors.get(fn);
     if (rpcError) return { data: null, error: rpcError };
 
+    if (fn === "reject_game_submission") {
+      const submission = this.rows.game_submissions.find(
+        (row) => row.id === params.p_submission_id,
+      );
+      if (!submission) {
+        return { data: null, error: new Error("submission_not_found") };
+      }
+      if (submission.status !== "pending") {
+        return { data: null, error: new Error("submission_already_reviewed") };
+      }
+
+      Object.assign(submission, {
+        review_notes: String(params.p_review_notes).trim(),
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: params.p_reviewer_id,
+        status: "rejected",
+        updated_at: new Date().toISOString(),
+      });
+      return { data: { ...submission }, error: null };
+    }
+
     if (fn === "set_game_reaction") {
       this.setReaction("likes", "game_id", params.p_game_id, params);
       return { data: null, error: null };

@@ -64,6 +64,16 @@ type SubmissionRow = {
   submitter_id: string | null;
 };
 
+function getSubmissionTransitionError(error: { message?: string } | null) {
+  if (error?.message === "submission_not_found") {
+    return { message: "Submission not found", statusCode: 404 };
+  }
+  if (error?.message === "submission_already_reviewed") {
+    return { message: "Submission already reviewed", statusCode: 409 };
+  }
+  return null;
+}
+
 async function signSubmissionReviewUrls(
   service: SupabaseServiceLike,
   submission: SubmissionRow,
@@ -284,6 +294,28 @@ export async function registerAdminSubmissionRoutes(
           return reply.status(403).send({ error: "Admin access required" });
         }
 
+        if (body.data.action === "reject") {
+          const { data, error } = await authenticatedService.rpc(
+            "reject_game_submission",
+            {
+              p_review_notes: body.data.notes,
+              p_reviewer_id: user.id,
+              p_submission_id: params.data.submissionId,
+            },
+          );
+          const transitionError = getSubmissionTransitionError(error);
+          if (transitionError) {
+            return reply
+              .status(transitionError.statusCode)
+              .send({ error: transitionError.message });
+          }
+          if (error) throw error;
+          if (!data) {
+            throw new Error("Submission rejection returned no submission");
+          }
+          return { submission: data as unknown as SubmissionRow };
+        }
+
         const { data: submission, error: submissionError } = await authenticatedService
           .from("game_submissions")
           .select("*")
@@ -295,28 +327,6 @@ export async function registerAdminSubmissionRoutes(
         }
         if (submission.status !== "pending") {
           return reply.status(409).send({ error: "Submission already reviewed" });
-        }
-
-        const now = new Date().toISOString();
-        if (body.data.action === "reject") {
-          const { data, error } = await authenticatedService
-            .from("game_submissions")
-            .update({
-              review_notes: body.data.notes,
-              reviewed_at: now,
-              reviewed_by: user.id,
-              status: "rejected",
-              updated_at: now,
-            })
-            .eq("id", submission.id)
-            .eq("status", "pending")
-            .select("*")
-            .maybeSingle<SubmissionRow>();
-          if (error) throw error;
-          if (!data) {
-            return reply.status(409).send({ error: "Submission already reviewed" });
-          }
-          return { submission: data };
         }
 
         const platform = getSubmissionRomPlatform(
@@ -337,6 +347,7 @@ export async function registerAdminSubmissionRoutes(
           fetchArtifact,
           signedRomUrl,
         );
+        const now = new Date().toISOString();
         const artifactFilename = artifactFilenameFor(submission.rom_url);
         const sourceCommit = candidateSourceRevisionFor(submission);
 
@@ -385,11 +396,11 @@ export async function registerAdminSubmissionRoutes(
             p_submission_id: submission.id,
           },
         );
-        if (transactionError?.message === "submission_not_found") {
-          return reply.status(404).send({ error: "Submission not found" });
-        }
-        if (transactionError?.message === "submission_already_reviewed") {
-          return reply.status(409).send({ error: "Submission already reviewed" });
+        const transitionError = getSubmissionTransitionError(transactionError);
+        if (transitionError) {
+          return reply
+            .status(transitionError.statusCode)
+            .send({ error: transitionError.message });
         }
         if (transactionError) throw transactionError;
 

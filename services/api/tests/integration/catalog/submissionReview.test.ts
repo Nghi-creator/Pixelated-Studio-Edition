@@ -91,6 +91,7 @@ test("admins can reject game submissions with review notes", async () => {
     "Needs clearer rights evidence.",
   );
   assert.equal(db.rows.game_submissions[0]?.reviewed_by, ADMIN_ID);
+  assert.equal(db.rpcCalls.at(-1)?.fn, "reject_game_submission");
   await app.close();
 });
 
@@ -124,6 +125,41 @@ test("concurrent submission reviews cannot overwrite the winning decision", asyn
     [200, 409],
   );
   assert.equal(db.rows.game_submissions[0]?.review_notes, "First decision");
+  await app.close();
+});
+
+test("atomic submission rejection preserves not-found and conflict responses", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.rows.game_submissions.push({
+    author_name: "Pixel Dev",
+    created_at: "2026-07-02T10:00:00.000Z",
+    email: "dev@example.com",
+    game_title: "Reviewed Quest",
+    id: SUBMISSION_ID,
+    rom_url: `${STORAGE_BASE}/storage/v1/object/public/submissions/user/roms/tiny.nes`,
+    status: "rejected",
+    submitter_id: USER_ID,
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const reviewed = await app.inject({
+    method: "PATCH",
+    payload: { action: "reject", notes: "Second decision" },
+    url: `/admin/submissions/${SUBMISSION_ID}`,
+  });
+  const missing = await app.inject({
+    method: "PATCH",
+    payload: { action: "reject", notes: "Missing submission" },
+    url: "/admin/submissions/77777777-7777-4777-8777-777777777777",
+  });
+
+  assert.equal(reviewed.statusCode, 409);
+  assert.equal(missing.statusCode, 404);
+  assert.deepEqual(
+    db.rpcCalls.slice(-2).map(({ fn }) => fn),
+    ["reject_game_submission", "reject_game_submission"],
+  );
   await app.close();
 });
 
