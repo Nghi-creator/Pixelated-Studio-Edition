@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { normalizeInviteCode } from "./inviteCode";
 
 const LAUNCH_TICKET_TTL_MS = 60 * 1000;
+export const MAX_COMPANION_ACCESS_TOKENS = 4_096;
 const INVITE_FAILURE_LIMIT = 8;
 const INVITE_FAILURE_WINDOW_MS = 60 * 1000;
 const INVITE_FAILURE_MAX_ENTRIES = 1024;
@@ -41,6 +42,18 @@ function clearGuestAccessTokens() {
   companionAccessTokens.forEach((record, token) => {
     if (record.scope === "guest") companionAccessTokens.delete(token);
   });
+}
+
+export function pruneCompanionAccessTokens(now = Date.now()) {
+  for (const [token, record] of companionAccessTokens) {
+    if (record.expiresAt <= now) companionAccessTokens.delete(token);
+  }
+  while (companionAccessTokens.size > MAX_COMPANION_ACCESS_TOKENS) {
+    const oldestToken = companionAccessTokens.keys().next().value;
+    if (typeof oldestToken !== "string") break;
+    companionAccessTokens.delete(oldestToken);
+  }
+  return companionAccessTokens.size;
 }
 
 export function getCompanionInviteState() {
@@ -134,6 +147,7 @@ export function redeemCompanionLaunchTicket(
     record.companionToken = createCompanionAccessToken(
       accessExpiresAt,
       "host",
+      now,
     );
   }
   return {
@@ -173,7 +187,18 @@ export function getCompanionAccessTokenScope(token: string, now = Date.now()) {
 export function createCompanionAccessToken(
   expiresAt: number,
   scope: CompanionAccessToken["scope"],
+  now = Date.now(),
 ) {
+  if (!Number.isFinite(expiresAt) || expiresAt <= now) {
+    throw new Error("Companion access token expiry must be in the future");
+  }
+  pruneCompanionAccessTokens(now);
+  if (companionAccessTokens.size >= MAX_COMPANION_ACCESS_TOKENS) {
+    const oldestToken = companionAccessTokens.keys().next().value;
+    if (typeof oldestToken === "string") {
+      companionAccessTokens.delete(oldestToken);
+    }
+  }
   const token = crypto.randomBytes(24).toString("base64url");
   companionAccessTokens.set(token, { expiresAt, scope });
   return token;

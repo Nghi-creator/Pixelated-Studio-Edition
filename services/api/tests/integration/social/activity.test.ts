@@ -170,6 +170,12 @@ test("comments use one-based pagination with configurable page size", async () =
     ["comment 0"],
   );
   assert.equal(thirdResponse.json<{ hasMore: boolean }>().hasMore, false);
+
+  const excessivePageResponse = await app.inject({
+    method: "GET",
+    url: `/games/${GAME_ID}/comments?page=501&pageSize=50`,
+  });
+  assert.equal(excessivePageResponse.statusCode, 400);
   await app.close();
 });
 
@@ -288,4 +294,3 @@ test("play activity requires a matching live backend session", async () => {
   );
   await app.close();
 });
-

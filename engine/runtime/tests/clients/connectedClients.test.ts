@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { test } from "node:test";
 import {
   isEngineAccessRevoked,
@@ -7,6 +8,7 @@ import {
   getSocketVaultOwnerId,
   listConnectedClients,
   revokeConnectedClient,
+  trackConnectedClient,
   trackHttpClient,
 } from "../../src/clients/connectedClients";
 
@@ -118,6 +120,40 @@ test("revocation rejects malformed client ids", () => {
 
   assert.equal(revokeConnectedClient(io as never, "x"), 0);
   assert.equal(isEngineClientRevoked("x"), false);
+});
+
+test("socket counts are maintained incrementally on connect and disconnect", () => {
+  const createSocket = (id: string) => {
+    const socket = new EventEmitter() as EventEmitter & Record<string, any>;
+    socket.id = id;
+    socket.data = {};
+    socket.handshake = {
+      address: "127.0.0.1",
+      auth: { clientId: "counted-client" },
+      headers: { "user-agent": "Count test" },
+      query: {},
+    };
+    socket.nsp = { sockets: new Map() };
+    return socket;
+  };
+  const first = createSocket("socket-one");
+  const second = createSocket("socket-two");
+
+  trackConnectedClient(first as never);
+  trackConnectedClient(second as never);
+  assert.equal(
+    listConnectedClients().find((client) => client.id === "counted-client")
+      ?.socketCount,
+    2,
+  );
+
+  first.emit("disconnect");
+  assert.equal(
+    listConnectedClients().find((client) => client.id === "counted-client")
+      ?.socketCount,
+    1,
+  );
+  second.emit("disconnect");
 });
 
 test("vault ownership is engine-local and rejects guest access", () => {

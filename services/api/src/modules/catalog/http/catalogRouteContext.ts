@@ -21,6 +21,7 @@ export function createCatalogRouteContext(options: CatalogRouteOptions = {}) {
       namespace: "comment-write",
       windowMs: 60_000,
     }),
+    featuredGamesCache: new TtlCache<unknown[]>(30_000, 1),
     gamesCatalogCache: new TtlCache<CachedGamesCatalogResponse>(
       60_000,
       CATALOG_CACHE_MAX_ENTRIES,

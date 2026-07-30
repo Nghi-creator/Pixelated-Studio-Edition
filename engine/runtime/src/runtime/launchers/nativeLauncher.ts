@@ -10,6 +10,23 @@ type LaunchNativeOptions = {
   spawnProcess: typeof spawn;
 };
 
+export function validateNativeGameLaunch(
+  options: Pick<
+    LaunchNativeOptions,
+    "fileExists" | "launchManifestId" | "runtime"
+  >,
+) {
+  const { fileExists, launchManifestId, runtime } = options;
+  const manifest = getNativeLaunchManifest(launchManifestId);
+  if (!manifest || !runtime.launchManifestIds?.includes(manifest.id)) {
+    throw new Error(`Unsupported native launch manifest: ${launchManifestId}`);
+  }
+  if (!fileExists(manifest.executable)) {
+    throw new Error(`Native launch executable is missing: ${manifest.executable}`);
+  }
+  return manifest;
+}
+
 export function launchNativeGame(options: LaunchNativeOptions) {
   const {
     fileExists,
@@ -18,13 +35,11 @@ export function launchNativeGame(options: LaunchNativeOptions) {
     sessionId,
     spawnProcess,
   } = options;
-  const manifest = getNativeLaunchManifest(launchManifestId);
-  if (!manifest || !runtime.launchManifestIds?.includes(manifest.id)) {
-    throw new Error(`Unsupported native launch manifest: ${launchManifestId}`);
-  }
-  if (!fileExists(manifest.executable)) {
-    throw new Error(`Native launch executable is missing: ${manifest.executable}`);
-  }
+  const manifest = validateNativeGameLaunch({
+    fileExists,
+    launchManifestId,
+    runtime,
+  });
 
   console.log(
     `[Engine] Launching native manifest ${manifest.id} for session ${sessionId}`,

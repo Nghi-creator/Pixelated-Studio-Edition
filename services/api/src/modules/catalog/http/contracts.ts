@@ -29,8 +29,16 @@ export const gamesQuerySchema = z
   });
 export const commentParamsSchema = z.object({ commentId: z.string().uuid() });
 export const commentsQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
+  page: z.coerce.number().int().min(1).max(500).default(1),
   pageSize: z.coerce.number().int().min(1).max(50).default(10),
+}).superRefine((query, context) => {
+  if ((query.page - 1) * query.pageSize >= MAX_CATALOG_QUERY_RESULTS) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Comment page exceeds the bounded result window",
+      path: ["page"],
+    });
+  }
 });
 export const commentBodySchema = z.object({
   content: z.string().trim().min(1).max(2000),

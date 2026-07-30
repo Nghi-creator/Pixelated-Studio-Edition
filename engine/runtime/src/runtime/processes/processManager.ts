@@ -10,10 +10,14 @@ import { removeCloudRomStagingArtifact } from "../../roms/cloudRomStaging";
 import type { StreamProfile } from "../../signaling/start-game/startGameHandlers";
 import { launchCameraBridge } from "../launchers/cameraLauncher";
 import { launchLibretroGame } from "../launchers/libretroLauncher";
-import { launchNativeGame } from "../launchers/nativeLauncher";
+import {
+  launchNativeGame,
+  validateNativeGameLaunch,
+} from "../launchers/nativeLauncher";
 import { bindManagedProcessLifecycle } from "./processLifecycle";
 import { startRuntimeHostProcesses } from "./runtimeHostProcesses";
 import { getRuntimeDefinition } from "../runtimeRegistry";
+import { validateGameArtifact } from "../../roms/artifactValidation";
 
 type IceServer = {
   credential?: string;
@@ -196,6 +200,22 @@ export function createProcessManager(options: ProcessManagerOptions) {
     const runtime = getRuntimeDefinition(runtimeId);
     if (!runtime) {
       throw new Error(`Unsupported runtime: ${runtimeId}`);
+    }
+
+    // Validate the replacement before interrupting a healthy active session.
+    // Launchers repeat these checks immediately before spawn to retain their
+    // standalone safety boundary and reduce filesystem TOCTOU exposure.
+    if (runtime.kind === "libretro") {
+      validateGameArtifact(absoluteRomPath, {
+        fileLabel: "Game artifact",
+        runtimeId,
+      });
+    } else {
+      validateNativeGameLaunch({
+        fileExists,
+        launchManifestId: absoluteRomPath,
+        runtime,
+      });
     }
 
     cleanupActiveSession(activeSessionId);

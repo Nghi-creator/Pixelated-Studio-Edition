@@ -75,6 +75,28 @@ test("libretro boot validates artifacts before spawning RetroArch", () => {
   assert.deepEqual(spawned, []);
 });
 
+test("invalid replacement leaves the active game running", () => {
+  const child = new FakeChildProcess();
+  const { manager } = createManager({ spawnChild: child });
+  const activeRomPath = writeValidNesFile();
+  const invalidRomPath = writeTempFile("broken.nes", Buffer.alloc(32));
+
+  manager.bootGame(activeRomPath, "session-active", {
+    runtimeId: "mesen",
+  });
+
+  assert.throws(
+    () =>
+      manager.bootGame(invalidRomPath, "session-replacement", {
+        runtimeId: "mesen",
+      }),
+    /Invalid NES ROM header/,
+  );
+  assert.equal(child.killed, false);
+  assert.equal(manager.getActiveSessionId(), "session-active");
+  manager.cleanupActiveSession("session-active");
+});
+
 test("libretro boot uses the selected registry core", () => {
   const { manager, spawned } = createManager();
   const romPath = writeValidNesFile();

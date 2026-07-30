@@ -128,7 +128,7 @@ test("catalog cache reuses featured games without another database query", async
   await app.close();
 });
 
-test("featured games route bypasses shared catalog cache headers", async () => {
+test("featured games route uses a short shared cache", async () => {
   const db = new FakeSupabase();
   seedPublishedGames(db, {
     id: "featured-a",
@@ -141,9 +141,20 @@ test("featured games route bypasses shared catalog cache headers", async () => {
     method: "GET",
     url: "/games/featured",
   });
+  const cachedRpcCallCount = db.rpcCalls.length;
+  const cachedResponse = await app.inject({
+    method: "GET",
+    url: "/games/featured",
+  });
 
   assert.equal(response.statusCode, 200);
-  assert.equal(response.headers["cache-control"], "no-store");
+  assert.equal(
+    response.headers["cache-control"],
+    "public, max-age=15, s-maxage=30",
+  );
+  assert.equal(response.headers["x-pixelated-cache"], "MISS");
+  assert.equal(cachedResponse.headers["x-pixelated-cache"], "HIT");
+  assert.equal(db.rpcCalls.length, cachedRpcCallCount);
   assert.deepEqual(
     response
       .json<{ featuredGames: { id: string }[] }>()
