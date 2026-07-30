@@ -309,9 +309,13 @@ export async function registerAdminSubmissionRoutes(
               updated_at: now,
             })
             .eq("id", submission.id)
+            .eq("status", "pending")
             .select("*")
-            .single<SubmissionRow>();
+            .maybeSingle<SubmissionRow>();
           if (error) throw error;
+          if (!data) {
+            return reply.status(409).send({ error: "Submission already reviewed" });
+          }
           return { submission: data };
         }
 

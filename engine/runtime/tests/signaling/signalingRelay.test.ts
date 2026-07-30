@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import test from "node:test";
 import {
   createSignalingPeerRegistry,
+  isValidWebRtcOffer,
   registerSignalingRelayHandlers,
 } from "../../src/signaling/signalingRelay";
 import { joinSession, normalizeSessionId } from "../../src/signaling/sessionRooms";
@@ -43,6 +44,26 @@ class FakeSocket extends EventEmitter {
 test("session ids are bounded before becoming socket rooms", () => {
   assert.equal(normalizeSessionId("session-1"), "session-1");
   assert.equal(normalizeSessionId("s".repeat(129)), null);
+});
+
+test("WebRTC offers are structurally validated before acquiring peer capacity", () => {
+  assert.equal(isValidWebRtcOffer({ sdp: "offer", type: "offer" }), true);
+  assert.equal(isValidWebRtcOffer({ type: "offer" }), false);
+  assert.equal(isValidWebRtcOffer({ sdp: "", type: "offer" }), false);
+  assert.equal(isValidWebRtcOffer({ sdp: "offer", type: "answer" }), false);
+  assert.equal(
+    isValidWebRtcOffer({ sdp: "s".repeat(64 * 1024 + 1), type: "offer" }),
+    false,
+  );
+
+  const socket = new FakeSocket("browser-1");
+  socket.data.sessionId = "session-1";
+  registerSignalingRelayHandlers(socket as never);
+  socket.emit("webrtc-offer", { peerId: "peer-1", type: "offer" });
+
+  assert.deepEqual(socket.joins, []);
+  assert.deepEqual(socket.relays, []);
+  assert.deepEqual(socket.data.webrtcPeerIds || [], []);
 });
 
 test("switching sessions leaves the previous session and peer rooms", () => {

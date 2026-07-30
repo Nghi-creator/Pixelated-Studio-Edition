@@ -1,4 +1,6 @@
 (function () {
+  const MAX_LOG_ENTRIES = 500;
+
   type LogControllerElements = {
     logBox: HTMLElement;
   };
@@ -13,6 +15,10 @@
         document.createTextNode(plainMessage),
         document.createElement("br"),
       );
+      while (logBox.childNodes.length > MAX_LOG_ENTRIES * 2) {
+        if (logBox.firstChild) logBox.removeChild(logBox.firstChild);
+        if (logBox.firstChild) logBox.removeChild(logBox.firstChild);
+      }
       logBox.scrollTop = logBox.scrollHeight;
     }
 
@@ -34,8 +40,10 @@
   (window as unknown as Window & {
     PixelatedLogs: {
       createLogController: typeof createLogController;
+      maxEntries: number;
     };
   }).PixelatedLogs = {
     createLogController,
+    maxEntries: MAX_LOG_ENTRIES,
   };
 })();

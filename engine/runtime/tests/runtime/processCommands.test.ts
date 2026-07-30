@@ -28,3 +28,18 @@ test("camera bridge enforces a bounded global WebRTC peer limit", () => {
   assert.match(cameraSource, /PIXELATED_MAX_STREAM_PEERS/);
   assert.match(cameraSource, /len\(peers\) >= MAX_ACTIVE_PEERS/);
 });
+
+test("camera bridge validates and parses offers before allocating pipelines", () => {
+  const cameraSource = fs.readFileSync(
+    path.resolve(process.cwd(), "camera.py"),
+    "utf8",
+  );
+
+  const validationIndex = cameraSource.indexOf("validation_error = validate_offer");
+  const sdpParseIndex = cameraSource.indexOf("SDPMessage.new_from_text");
+  const pipelineIndex = cameraSource.indexOf("Gst.parse_launch");
+
+  assert.ok(validationIndex >= 0);
+  assert.ok(sdpParseIndex > validationIndex);
+  assert.ok(pipelineIndex > sdpParseIndex);
+});

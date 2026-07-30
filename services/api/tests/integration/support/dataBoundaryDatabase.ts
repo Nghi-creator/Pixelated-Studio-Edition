@@ -694,6 +694,8 @@ class FakeQueryBuilder {
   }
 
   private async executeRows() {
+    let updatedRows: RecordRow[] | null = null;
+
     if (this.action === "insert" && this.payload) {
       this.db.rows[this.table].push({
         id: `${this.table}-${this.db.rows[this.table].length + 1}`,
@@ -724,7 +726,8 @@ class FakeQueryBuilder {
     }
 
     if (this.action === "update" && this.payload) {
-      for (const row of this.filteredRows()) {
+      updatedRows = this.filteredRows();
+      for (const row of updatedRows) {
         Object.assign(row, this.payload);
       }
     }
@@ -737,7 +740,7 @@ class FakeQueryBuilder {
       return [];
     }
 
-    let rows = this.filteredRows();
+    let rows = updatedRows || this.filteredRows();
     if (this.orderConfig) {
       rows = [...rows].sort((left, right) => {
         const leftRawValue = left[this.orderConfig?.field || ""];

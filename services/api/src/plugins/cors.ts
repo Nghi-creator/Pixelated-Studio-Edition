@@ -20,7 +20,10 @@ export async function registerCors(app: FastifyInstance) {
         return;
       }
 
-      callback(new Error(`Origin not allowed by API CORS: ${origin}`), false);
+      // CORS is a browser response policy, not request authentication. Returning
+      // an error here bypasses later onRequest hooks and lets hostile origins
+      // generate unlimited 500 responses before the global rate limiter runs.
+      callback(null, false);
     },
   });
 }

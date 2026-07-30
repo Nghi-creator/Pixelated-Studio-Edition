@@ -94,6 +94,39 @@ test("admins can reject game submissions with review notes", async () => {
   await app.close();
 });
 
+test("concurrent submission reviews cannot overwrite the winning decision", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.rows.game_submissions.push({
+    author_name: "Pixel Dev",
+    created_at: "2026-07-02T10:00:00.000Z",
+    email: "dev@example.com",
+    game_title: "Tiny Quest",
+    id: SUBMISSION_ID,
+    rom_url: `${STORAGE_BASE}/storage/v1/object/public/submissions/user/roms/tiny.nes`,
+    status: "pending",
+    submitter_id: USER_ID,
+  });
+  const app = await createDataBoundaryApp(db, ADMIN_ID);
+
+  const responses = await Promise.all(
+    ["First decision", "Conflicting decision"].map((notes) =>
+      app.inject({
+        method: "PATCH",
+        payload: { action: "reject", notes },
+        url: `/admin/submissions/${SUBMISSION_ID}`,
+      }),
+    ),
+  );
+
+  assert.deepEqual(
+    responses.map((response) => response.statusCode).sort(),
+    [200, 409],
+  );
+  assert.equal(db.rows.game_submissions[0]?.review_notes, "First decision");
+  await app.close();
+});
+
 test("admins can turn a game submission into a catalog candidate", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);

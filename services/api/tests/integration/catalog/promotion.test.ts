@@ -102,13 +102,21 @@ test("admin can promote a catalog ingestion candidate without deleting existing 
   });
   const app = await createDataBoundaryApp(db, ADMIN_ID, artifactBytes);
 
-  const response = await app.inject({
-    method: "PATCH",
-    payload: { action: "promote", notes: "reviewed" },
-    url: "/admin/catalog-candidates/88888888-8888-4888-8888-888888888888",
-  });
+  const [response, concurrentResponse] = await Promise.all([
+    app.inject({
+      method: "PATCH",
+      payload: { action: "promote", notes: "reviewed" },
+      url: "/admin/catalog-candidates/88888888-8888-4888-8888-888888888888",
+    }),
+    app.inject({
+      method: "PATCH",
+      payload: { action: "promote", notes: "concurrent review" },
+      url: "/admin/catalog-candidates/88888888-8888-4888-8888-888888888888",
+    }),
+  ]);
 
   assert.equal(response.statusCode, 200);
+  assert.equal(concurrentResponse.statusCode, 409);
   assert.equal(db.rows.games.length, 1);
   assert.equal(db.rows.games[0]?.id, GAME_ID);
   assert.equal(db.rows.games[0]?.publication_status, "published");
