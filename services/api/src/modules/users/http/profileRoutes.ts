@@ -4,7 +4,6 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../../auth/supabaseAuth.js";
-import { clearCachedUserRole } from "../../auth/roleCache.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import {
   createRateLimiter,
@@ -89,13 +88,12 @@ async function listStorageObjects(
   }
 }
 
-async function removeOwnedStorage(
+async function removeStorageObjects(
   service: SupabaseServiceLike,
   bucket: string,
-  userId: string,
+  objectPaths: string[],
 ) {
   const storage = service.storage.from(bucket);
-  const objectPaths = await listStorageObjects(service, bucket, userId);
 
   for (let index = 0; index < objectPaths.length; index += STORAGE_LIST_PAGE_SIZE) {
     const { error } = await storage.remove(
@@ -292,13 +290,18 @@ export async function registerProfileRoutes(
         });
       }
 
+      let ownedStorage: { bucket: string; paths: string[] }[];
       try {
-        await removeOwnedStorage(service, "avatars", user.id);
-        await removeOwnedStorage(service, "submissions", user.id);
+        ownedStorage = await Promise.all(
+          ["avatars", "submissions"].map(async (bucket) => ({
+            bucket,
+            paths: await listStorageObjects(service, bucket, user.id),
+          })),
+        );
       } catch (error) {
-        request.log.error({ err: error }, "Failed to clean account storage");
+        request.log.error({ err: error }, "Failed to inspect account storage");
         return reply.status(500).send({
-          error: "Failed to clean account files. Your account was not deleted.",
+          error: "Failed to inspect account files. Your account was not deleted.",
         });
       }
 
@@ -308,7 +311,28 @@ export async function registerProfileRoutes(
         return reply.status(500).send({ error: "Failed to delete account" });
       }
 
-      clearCachedUserRole(user.id);
+      const cleanupResults = await Promise.allSettled(
+        ownedStorage.map(({ bucket, paths }) =>
+          removeStorageObjects(service, bucket, paths),
+        ),
+      );
+      const cleanupFailures = cleanupResults.flatMap((result, index) =>
+        result.status === "rejected"
+          ? [{ bucket: ownedStorage[index]?.bucket, error: result.reason }]
+          : [],
+      );
+      if (cleanupFailures.length > 0) {
+        request.log.error(
+          { cleanupFailures },
+          "Account deleted but storage cleanup is incomplete",
+        );
+        return reply.status(200).send({
+          accountDeleted: true,
+          cleanupIncomplete: true,
+          code: "account_storage_cleanup_incomplete",
+        });
+      }
+
       request.log.info("User account deleted");
       return reply.status(204).send();
     },

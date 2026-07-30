@@ -4,10 +4,7 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../../auth/supabaseAuth.js";
-import {
-  clearCachedUserRole,
-  getCachedUserRole,
-} from "../../auth/roleCache.js";
+import { getAuthoritativeUserRole } from "../../auth/roleAuthorization.js";
 import { logTiming, timed } from "../../observability/timing.js";
 
 const usersQuerySchema = z.object({
@@ -44,7 +41,7 @@ async function requireSuperAdmin(
 ) {
   if (!service) return false;
 
-  const { error, role } = await getCachedUserRole(service, userId);
+  const { error, role } = await getAuthoritativeUserRole(service, userId);
 
   if (error) throw error;
   return isSuperAdminRole(role);
@@ -73,7 +70,7 @@ export async function registerAdminUserRoutes(
 
       const timings = {};
       const roleLookup = await timed(timings, "admin_role_check_ms", () =>
-        getCachedUserRole(service, user.id),
+        getAuthoritativeUserRole(service, user.id),
       );
 
       if (roleLookup.error) {
@@ -119,7 +116,7 @@ export async function registerAdminUserRoutes(
         page,
         pageSize,
         resultCount: data?.length || 0,
-        roleCache: roleLookup.cache,
+        roleSource: "database",
         search: Boolean(search),
         total,
       });
@@ -187,8 +184,6 @@ export async function registerAdminUserRoutes(
         return reply.status(500).send({ error: "Failed to update user" });
       }
 
-      clearCachedUserRole(params.data.userId);
-      clearCachedUserRole(user.id);
       return { user: data };
     },
   );

@@ -140,6 +140,27 @@ test("malformed CORS origins are denied without crashing the API", async () => {
   await app.close();
 });
 
+test("disallowed CORS origins flow through global rate limiting without 500s", async () => {
+  const app = Fastify();
+  await registerCors(app);
+  await registerGlobalRateLimit(app, {
+    globalLimiter: createTestLimiter(1),
+    healthLimiter: createTestLimiter(10),
+    publicReadLimiter: createTestLimiter(10),
+  });
+  app.get("/ok", async () => ({ ok: true }));
+  const headers = { origin: "https://attacker.invalid" };
+
+  const first = await app.inject({ headers, method: "GET", url: "/ok" });
+  const blocked = await app.inject({ headers, method: "GET", url: "/ok" });
+
+  assert.equal(first.statusCode, 200);
+  assert.equal(first.headers["access-control-allow-origin"], undefined);
+  assert.equal(blocked.statusCode, 429);
+  assert.equal(blocked.headers["access-control-allow-origin"], undefined);
+  await app.close();
+});
+
 test("security headers are attached to API responses", async () => {
   const app = Fastify();
   await registerSecurityHeaders(app);

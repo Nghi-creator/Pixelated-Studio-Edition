@@ -3,7 +3,7 @@ import {
   requireSupabaseUser,
   supabaseService,
 } from "../../auth/supabaseAuth.js";
-import { getCachedUserRole } from "../../auth/roleCache.js";
+import { getAuthoritativeUserRole } from "../../auth/roleAuthorization.js";
 import {
   adminReportActionSchema,
   adminReportParamsSchema,
@@ -118,7 +118,7 @@ export async function registerModerationRoutes(
       const roleLookup = await timed(
         timings,
         "admin_role_check_ms",
-        () => getCachedUserRole(authenticatedService, user.id),
+        () => getAuthoritativeUserRole(authenticatedService, user.id),
       );
 
       if (roleLookup.error) {
@@ -184,7 +184,7 @@ export async function registerModerationRoutes(
         page,
         pageSize,
         resultCount: data?.length || 0,
-        roleCache: roleLookup.cache,
+        roleSource: "database",
         targetRole,
         total,
       });

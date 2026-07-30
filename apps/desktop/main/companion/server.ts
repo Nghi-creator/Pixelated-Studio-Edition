@@ -44,6 +44,46 @@ export {
 let companionServer: https.Server | null = null;
 let companionHttpServer: http.Server | null = null;
 
+export const COMPANION_SERVER_LIMITS = Object.freeze({
+  headersTimeoutMs: 10_000,
+  keepAliveTimeoutMs: 5_000,
+  maxConnections: 128,
+  maxConnectionsPerAddress: 16,
+  maxHeadersCount: 100,
+  maxRequestsPerSocket: 100,
+  requestTimeoutMs: 120_000,
+  tlsHandshakeTimeoutMs: 10_000,
+});
+
+export function hardenCompanionServer(server: http.Server | https.Server) {
+  server.headersTimeout = COMPANION_SERVER_LIMITS.headersTimeoutMs;
+  server.keepAliveTimeout = COMPANION_SERVER_LIMITS.keepAliveTimeoutMs;
+  server.maxConnections = COMPANION_SERVER_LIMITS.maxConnections;
+  server.maxHeadersCount = COMPANION_SERVER_LIMITS.maxHeadersCount;
+  server.maxRequestsPerSocket = COMPANION_SERVER_LIMITS.maxRequestsPerSocket;
+  server.requestTimeout = COMPANION_SERVER_LIMITS.requestTimeoutMs;
+
+  const connectionsByAddress = new Map<string, number>();
+  server.on("connection", (socket) => {
+    const address = socket.remoteAddress || "unknown";
+    const connectionCount = (connectionsByAddress.get(address) || 0) + 1;
+    connectionsByAddress.set(address, connectionCount);
+
+    socket.once("close", () => {
+      const remaining = (connectionsByAddress.get(address) || 1) - 1;
+      if (remaining > 0) {
+        connectionsByAddress.set(address, remaining);
+      } else {
+        connectionsByAddress.delete(address);
+      }
+    });
+
+    if (connectionCount > COMPANION_SERVER_LIMITS.maxConnectionsPerAddress) {
+      socket.destroy();
+    }
+  });
+}
+
 export function startCompanionServer({
   certDir,
   engineToken,
@@ -71,6 +111,7 @@ export function startCompanionServer({
   const server = https.createServer(
     {
       cert: fs.readFileSync(certPath),
+      handshakeTimeout: COMPANION_SERVER_LIMITS.tlsHandshakeTimeoutMs,
       key: fs.readFileSync(keyPath),
     },
     (req, res) => {
@@ -80,6 +121,8 @@ export function startCompanionServer({
   const httpServer = http.createServer((req, res) => {
     void handleCompanionRequest(req, res, requestOptions);
   });
+  hardenCompanionServer(server);
+  hardenCompanionServer(httpServer);
 
   server.on("upgrade", (req, socket, head) =>
     proxyWebSocket(req, socket as Socket, head, engineToken),

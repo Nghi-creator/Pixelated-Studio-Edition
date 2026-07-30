@@ -175,7 +175,7 @@ export async function registerCatalogCandidateRoutes(
         pageSize,
         platformId,
         resultCount: data?.length || 0,
-        roleCache: roleLookup.cache,
+        roleSource: "database",
         search: Boolean(search),
         sourceKind,
         status,
@@ -237,8 +237,8 @@ export async function registerCatalogCandidateRoutes(
         if (!candidate) {
           return reply.status(404).send({ error: "Candidate not found" });
         }
-        if (candidate.import_status === "promoted") {
-          return reply.status(409).send({ error: "Candidate already promoted" });
+        if (candidate.import_status !== "needs_review") {
+          return reply.status(409).send({ error: "Candidate already reviewed" });
         }
 
         const now = new Date().toISOString();
@@ -253,21 +253,64 @@ export async function registerCatalogCandidateRoutes(
               updated_at: now,
             })
             .eq("id", candidate.id)
+            .eq("import_status", "needs_review")
             .select(CANDIDATE_COLUMNS)
-            .single<CandidateRow>();
+            .maybeSingle<CandidateRow>();
           if (error) throw error;
+          if (!data) {
+            return reply.status(409).send({ error: "Candidate already reviewed" });
+          }
           return { candidate: data };
         }
 
-        return await promoteCandidate(
-          service,
-          candidate,
-          user.id,
-          body.data.notes || null,
-          body.data.genreSlug,
-          fetchArtifact,
-          captureGameplayArtwork,
-        );
+        const { data: claimedCandidate, error: claimError } = await service
+          .from("catalog_ingestion_candidates")
+          .update({
+            import_status: "approved",
+            reviewed_at: now,
+            reviewed_by: user.id,
+            updated_at: now,
+          })
+          .eq("id", candidate.id)
+          .eq("import_status", "needs_review")
+          .select(CANDIDATE_COLUMNS)
+          .maybeSingle<CandidateRow>();
+        if (claimError) throw claimError;
+        if (!claimedCandidate) {
+          return reply.status(409).send({ error: "Candidate already reviewed" });
+        }
+
+        try {
+          return await promoteCandidate(
+            service,
+            claimedCandidate,
+            user.id,
+            body.data.notes || null,
+            body.data.genreSlug,
+            fetchArtifact,
+            captureGameplayArtwork,
+          );
+        } catch (error) {
+          const { error: releaseError } = await service
+            .from("catalog_ingestion_candidates")
+            .update({
+              import_status: "needs_review",
+              reviewed_at: null,
+              reviewed_by: null,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("id", candidate.id)
+            .eq("import_status", "approved")
+            .eq("reviewed_by", user.id)
+            .eq("updated_at", now);
+          if (releaseError) {
+            request.log.error(
+              { err: releaseError },
+              "Failed to release catalog candidate review claim",
+            );
+          }
+          throw error;
+        }
       } catch (err) {
         request.log.error({ err }, "Failed to review catalog candidate");
         if (err instanceof CandidateValidationError) {

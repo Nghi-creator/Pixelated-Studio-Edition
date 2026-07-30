@@ -27,6 +27,7 @@ def parse_max_active_peers():
     return min(max(configured, 1), 16)
 
 MAX_ACTIVE_PEERS = parse_max_active_peers()
+MAX_WEBRTC_SDP_LENGTH = 64 * 1024
 
 def write_peer_state():
     try:
@@ -126,6 +127,26 @@ def normalize_peer_id(payload):
     peer_id = payload.get('peerId') if isinstance(payload, dict) else None
     return peer_id if isinstance(peer_id, str) and peer_id else 'default'
 
+def validate_offer(offer):
+    if not isinstance(offer, dict):
+        return "Offer must be an object."
+    if offer.get('type') != 'offer':
+        return "Offer type must be 'offer'."
+
+    peer_id = offer.get('peerId')
+    if (
+        not isinstance(peer_id, str)
+        or not peer_id
+        or len(peer_id) > 128
+        or not all(character.isalnum() or character in '_-' for character in peer_id)
+    ):
+        return "Offer peer id is invalid."
+
+    sdp = offer.get('sdp')
+    if not isinstance(sdp, str) or not sdp or len(sdp) > MAX_WEBRTC_SDP_LENGTH:
+        return "Offer SDP is missing or too large."
+    return None
+
 def cleanup_peer(peer_id):
     peer = peers.pop(peer_id, None)
     if not peer:
@@ -137,7 +158,21 @@ def cleanup_peer(peer_id):
     write_peer_state()
 
 def handle_offer(offer):
+    validation_error = validate_offer(offer)
+    if validation_error:
+        emit_engine_error(f"Invalid WebRTC offer: {validation_error}")
+        return
+
     peer_id = normalize_peer_id(offer)
+    try:
+        result, sdp_msg = GstSdp.SDPMessage.new_from_text(offer['sdp'])
+    except Exception as exc:
+        emit_engine_error(f"Invalid WebRTC offer SDP: {exc}")
+        return
+    if result != GstSdp.SDPResult.OK or sdp_msg is None:
+        emit_engine_error("Invalid WebRTC offer SDP.")
+        return
+
     print(f"[Python] Received React Offer for peer {peer_id}! Building WebRTC Pipeline...")
 
     if peer_id in peers:
@@ -225,7 +260,6 @@ def handle_offer(offer):
         promise = Gst.Promise.new_with_change_func(on_answer_created, None, None)
         webrtcbin.emit('create-answer', None, promise)
 
-    res, sdp_msg = GstSdp.SDPMessage.new_from_text(offer['sdp'])
     offer_sdp = GstWebRTC.WebRTCSessionDescription.new(GstWebRTC.WebRTCSDPType.OFFER, sdp_msg)
     promise = Gst.Promise.new_with_change_func(on_offer_set, None, None)
     webrtcbin.emit('set-remote-description', offer_sdp, promise)

@@ -171,6 +171,7 @@ type PixelatedWindow = Window &
     };
     PixelatedLogs: {
       createLogController: (elements: { logBox: HTMLElement }) => LogController;
+      maxEntries: number;
     };
     PixelatedModal: {
       bindDocsModal: (elements: {

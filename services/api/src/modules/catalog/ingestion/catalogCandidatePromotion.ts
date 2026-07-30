@@ -253,6 +253,7 @@ export async function promoteCandidate(
       updated_at: now,
     })
     .eq("id", candidate.id)
+    .eq("import_status", "approved")
     .select(CANDIDATE_COLUMNS)
     .single<CandidateRow>();
   if (candidateError) throw candidateError;

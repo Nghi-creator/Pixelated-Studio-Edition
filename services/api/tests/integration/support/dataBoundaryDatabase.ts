@@ -26,11 +26,13 @@ type Filter = {
 };
 
 export class FakeSupabase {
+  authDeleteError: Error | null = null;
   authListUsersCalls = 0;
   authUsers: User[] = [];
   browserSmokeArtifactClaims = new Set<string>();
   deletedUsers: string[] = [];
   storageErrors = new Set<string>();
+  storageRemoveErrors = new Set<string>();
   signedStorageUrls: { bucket: string; expiresIn: number; path: string }[] = [];
   storageObjects: Record<string, string[]> = {
     avatars: [],
@@ -64,6 +66,9 @@ export class FakeSupabase {
   auth = {
     admin: {
       deleteUser: async (userId: string) => {
+        if (this.authDeleteError) {
+          return { error: this.authDeleteError };
+        }
         this.deletedUsers.push(userId);
         return { error: null };
       },
@@ -111,7 +116,10 @@ export class FakeSupabase {
         return { data: [...childEntries.values()], error: null };
       },
       remove: async (paths: string[]) => {
-        if (this.storageErrors.has(bucket)) {
+        if (
+          this.storageErrors.has(bucket) ||
+          this.storageRemoveErrors.has(bucket)
+        ) {
           return { data: null, error: new Error(`${bucket} storage unavailable`) };
         }
 
@@ -169,6 +177,27 @@ export class FakeSupabase {
     this.rpcCalls.push({ fn, params });
     const rpcError = this.rpcErrors.get(fn);
     if (rpcError) return { data: null, error: rpcError };
+
+    if (fn === "reject_game_submission") {
+      const submission = this.rows.game_submissions.find(
+        (row) => row.id === params.p_submission_id,
+      );
+      if (!submission) {
+        return { data: null, error: new Error("submission_not_found") };
+      }
+      if (submission.status !== "pending") {
+        return { data: null, error: new Error("submission_already_reviewed") };
+      }
+
+      Object.assign(submission, {
+        review_notes: String(params.p_review_notes).trim(),
+        reviewed_at: new Date().toISOString(),
+        reviewed_by: params.p_reviewer_id,
+        status: "rejected",
+        updated_at: new Date().toISOString(),
+      });
+      return { data: { ...submission }, error: null };
+    }
 
     if (fn === "set_game_reaction") {
       this.setReaction("likes", "game_id", params.p_game_id, params);
@@ -686,6 +715,8 @@ class FakeQueryBuilder {
   }
 
   private async executeRows() {
+    let updatedRows: RecordRow[] | null = null;
+
     if (this.action === "insert" && this.payload) {
       this.db.rows[this.table].push({
         id: `${this.table}-${this.db.rows[this.table].length + 1}`,
@@ -716,7 +747,8 @@ class FakeQueryBuilder {
     }
 
     if (this.action === "update" && this.payload) {
-      for (const row of this.filteredRows()) {
+      updatedRows = this.filteredRows();
+      for (const row of updatedRows) {
         Object.assign(row, this.payload);
       }
     }
@@ -729,7 +761,7 @@ class FakeQueryBuilder {
       return [];
     }
 
-    let rows = this.filteredRows();
+    let rows = updatedRows || this.filteredRows();
     if (this.orderConfig) {
       rows = [...rows].sort((left, right) => {
         const leftRawValue = left[this.orderConfig?.field || ""];

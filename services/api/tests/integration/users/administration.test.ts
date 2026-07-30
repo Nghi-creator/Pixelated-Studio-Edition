@@ -98,3 +98,27 @@ test("admin users are paginated and searchable server-side", async () => {
   assert.equal(body.totalPages, 3);
   await app.close();
 });
+
+test("demoted administrators lose access on the next request", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const app = await createDataBoundaryApp(db, SUPER_ADMIN_ID);
+
+  const authorized = await app.inject({
+    method: "GET",
+    url: "/admin/users",
+  });
+  assert.equal(authorized.statusCode, 200);
+
+  Object.assign(
+    db.rows.profiles.find((row) => row.id === SUPER_ADMIN_ID) || {},
+    { role: "user" },
+  );
+
+  const demoted = await app.inject({
+    method: "GET",
+    url: "/admin/users",
+  });
+  assert.equal(demoted.statusCode, 403);
+  await app.close();
+});

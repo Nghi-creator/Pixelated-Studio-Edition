@@ -19,6 +19,7 @@ type CandidateEnvelope = {
 
 const MAX_PEER_ID_LENGTH = 128;
 const MAX_PEERS_PER_SOCKET = 1;
+const MAX_WEBRTC_SDP_LENGTH = 64 * 1024;
 const DEFAULT_MAX_ACTIVE_PEERS = 8;
 const DEFAULT_SIGNALING_EVENTS_PER_SECOND = 120;
 
@@ -99,6 +100,17 @@ function getPeerId(payload: unknown) {
     /^[a-zA-Z0-9_-]+$/.test(peerId)
     ? peerId
     : null;
+}
+
+export function isValidWebRtcOffer(payload: unknown) {
+  if (!payload || typeof payload !== "object") return false;
+  const { sdp, type } = payload as { sdp?: unknown; type?: unknown };
+  return (
+    typeof sdp === "string" &&
+    sdp.length > 0 &&
+    sdp.length <= MAX_WEBRTC_SDP_LENGTH &&
+    (type === undefined || type === "offer")
+  );
 }
 
 function payloadMatchesActiveSession(socket: Socket, payload: SessionPayload) {
@@ -241,6 +253,7 @@ export function registerSignalingRelayHandlers(
   socket.on("webrtc-offer", (offer: SessionPayload = {}) => {
     if (!consumeSignalingBudget()) return;
     if (!payloadMatchesActiveSession(socket, offer)) return;
+    if (!isValidWebRtcOffer(offer)) return;
     const sessionId = normalizeSessionId(socket.data.sessionId);
     const peerId = getPeerId(offer);
     if (

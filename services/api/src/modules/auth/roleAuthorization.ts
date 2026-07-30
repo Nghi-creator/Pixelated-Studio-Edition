@@ -1,5 +1,4 @@
 import type { PostgrestError } from "@supabase/supabase-js";
-import { TtlCache } from "../cache/ttlCache.js";
 import { supabaseService } from "./supabaseAuth.js";
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
@@ -9,21 +8,19 @@ type ProfileRole = {
 };
 
 type RoleLookupResult = {
-  cache: "hit" | "miss";
   error: PostgrestError | null;
   role: string | null;
 };
 
-const roleCache = new TtlCache<string | null>(45_000);
-
-export async function getCachedUserRole(
+/**
+ * Privileged authorization must be read from shared database state for every
+ * request. A process-local cache allows a demoted administrator to retain
+ * access until every API instance expires or invalidates its own entry.
+ */
+export async function getAuthoritativeUserRole(
   service: SupabaseServiceLike,
   userId: string,
 ): Promise<RoleLookupResult> {
-  if (roleCache.has(userId)) {
-    return { cache: "hit", error: null, role: roleCache.get(userId) };
-  }
-
   const { data, error } = await service
     .from("profiles")
     .select("role")
@@ -31,14 +28,8 @@ export async function getCachedUserRole(
     .maybeSingle<ProfileRole>();
 
   if (error) {
-    return { cache: "miss", error, role: null };
+    return { error, role: null };
   }
 
-  const role = data?.role || null;
-  roleCache.set(userId, role);
-  return { cache: "miss", error: null, role };
-}
-
-export function clearCachedUserRole(userId: string) {
-  roleCache.delete(userId);
+  return { error: null, role: data?.role || null };
 }

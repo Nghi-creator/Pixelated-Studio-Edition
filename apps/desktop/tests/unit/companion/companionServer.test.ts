@@ -1,22 +1,56 @@
 import assert from "node:assert/strict";
+import http from "node:http";
 import { describe, it } from "node:test";
 import { createCompanionAccessToken } from "../../../main/companion/invite/inviteState";
 import { normalizeInviteCode } from "../../../main/companion/invite/inviteCode";
 import {
   canUseRuntimeSwitchToken,
   canProxyCompanionRequest,
+  COMPANION_SERVER_LIMITS,
   companionSecretsEqual,
   consumeCompanionRequestLimit,
   createCompanionLaunchTicket,
   getCompanionStatusPage,
   getCompanionInviteStatus,
   hasValidCompanionLaunchTicket,
+  hardenCompanionServer,
   matchesCompanionRequestPath,
   recordCompanionInviteFailure,
   redeemCompanionLaunchTicket,
   revokeCompanionInvite,
   shouldProxy,
 } from "../../../main/companion/server";
+
+describe("desktop companion connection hardening", () => {
+  it("bounds connections, headers, keep-alive reuse, and request duration", () => {
+    const server = http.createServer();
+    const initialConnectionListeners = server.listenerCount("connection");
+    hardenCompanionServer(server);
+
+    assert.equal(
+      server.headersTimeout,
+      COMPANION_SERVER_LIMITS.headersTimeoutMs,
+    );
+    assert.equal(
+      server.keepAliveTimeout,
+      COMPANION_SERVER_LIMITS.keepAliveTimeoutMs,
+    );
+    assert.equal(server.maxConnections, COMPANION_SERVER_LIMITS.maxConnections);
+    assert.equal(server.maxHeadersCount, COMPANION_SERVER_LIMITS.maxHeadersCount);
+    assert.equal(
+      server.maxRequestsPerSocket,
+      COMPANION_SERVER_LIMITS.maxRequestsPerSocket,
+    );
+    assert.equal(
+      server.requestTimeout,
+      COMPANION_SERVER_LIMITS.requestTimeoutMs,
+    );
+    assert.equal(
+      server.listenerCount("connection"),
+      initialConnectionListeners + 1,
+    );
+  });
+});
 
 describe("desktop companion preflight", () => {
   it("normalizes invite codes through one shared boundary", () => {
