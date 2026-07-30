@@ -180,9 +180,11 @@ test("account deletion blocks privileged roles, stale sessions, and invalid conf
   await staleApp.close();
 });
 
-test("account deletion aborts when owned storage cannot be cleaned", async () => {
+test("account deletion aborts without mutating storage when preflight fails", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
+  db.storageObjects.avatars.push(`${USER_ID}/avatar.png`);
+  db.storageObjects.submissions.push(`${USER_ID}/roms/tiny.nes`);
   db.storageErrors.add("submissions");
   const app = await createDataBoundaryApp(db, USER_ID);
 
@@ -194,6 +196,57 @@ test("account deletion aborts when owned storage cannot be cleaned", async () =>
 
   assert.equal(response.statusCode, 500);
   assert.deepEqual(db.deletedUsers, []);
+  assert.deepEqual(db.storageObjects.avatars, [`${USER_ID}/avatar.png`]);
+  assert.deepEqual(db.storageObjects.submissions, [`${USER_ID}/roms/tiny.nes`]);
+  assert.deepEqual(db.removedStorageObjects, []);
+  await app.close();
+});
+
+test("account deletion leaves storage intact when identity deletion fails", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.storageObjects.avatars.push(`${USER_ID}/avatar.png`);
+  db.storageObjects.submissions.push(`${USER_ID}/roms/tiny.nes`);
+  db.authDeleteError = new Error("auth service unavailable");
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "DELETE",
+    payload: { confirmation: "DELETE" },
+    url: "/me/account",
+  });
+
+  assert.equal(response.statusCode, 500);
+  assert.deepEqual(db.deletedUsers, []);
+  assert.deepEqual(db.storageObjects.avatars, [`${USER_ID}/avatar.png`]);
+  assert.deepEqual(db.storageObjects.submissions, [`${USER_ID}/roms/tiny.nes`]);
+  assert.deepEqual(db.removedStorageObjects, []);
+  await app.close();
+});
+
+test("account deletion reports incomplete cleanup only after identity deletion succeeds", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  db.storageObjects.avatars.push(`${USER_ID}/avatar.png`);
+  db.storageObjects.submissions.push(`${USER_ID}/roms/tiny.nes`);
+  db.storageRemoveErrors.add("submissions");
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  const response = await app.inject({
+    method: "DELETE",
+    payload: { confirmation: "DELETE" },
+    url: "/me/account",
+  });
+
+  assert.equal(response.statusCode, 200);
+  assert.deepEqual(response.json(), {
+    accountDeleted: true,
+    cleanupIncomplete: true,
+    code: "account_storage_cleanup_incomplete",
+  });
+  assert.deepEqual(db.deletedUsers, [USER_ID]);
+  assert.deepEqual(db.storageObjects.avatars, []);
+  assert.deepEqual(db.storageObjects.submissions, [`${USER_ID}/roms/tiny.nes`]);
   await app.close();
 });
 
@@ -246,4 +299,3 @@ test("me permissions are loaded from backend-owned profile state", async () => {
   );
   await app.close();
 });
-

@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { getCachedUserRole } from "../../auth/roleCache.js";
+import { getAuthoritativeUserRole } from "../../auth/roleAuthorization.js";
 import {
   requireSupabaseUser,
   supabaseService,
@@ -162,7 +162,7 @@ async function requireAdminRole(
   service: SupabaseServiceLike,
   userId: string,
 ) {
-  const roleLookup = await getCachedUserRole(service, userId);
+  const roleLookup = await getAuthoritativeUserRole(service, userId);
   if (roleLookup.error) throw roleLookup.error;
   return ["admin", "super_admin"].includes(roleLookup.role || "");
 }

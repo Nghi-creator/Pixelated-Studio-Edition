@@ -6,7 +6,7 @@ import {
   supabaseAnon,
   supabaseService,
 } from "../../auth/supabaseAuth.js";
-import { getCachedUserRole } from "../../auth/roleCache.js";
+import { getAuthoritativeUserRole } from "../../auth/roleAuthorization.js";
 import { logTiming, timed } from "../timing.js";
 import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
@@ -188,7 +188,7 @@ export async function registerAccessLogRoutes(
       const roleLookup = await timed(
         timings,
         "admin_role_check_ms",
-        () => getCachedUserRole(service, user.id),
+        () => getAuthoritativeUserRole(service, user.id),
       );
       if (roleLookup.error) {
         request.log.error({ err: roleLookup.error }, "Failed to load admin profile");
@@ -230,7 +230,7 @@ export async function registerAccessLogRoutes(
         page,
         pageSize,
         resultCount: logs.length,
-        roleCache: roleLookup.cache,
+        roleSource: "database",
         total,
       });
 

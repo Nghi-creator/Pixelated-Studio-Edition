@@ -26,11 +26,13 @@ type Filter = {
 };
 
 export class FakeSupabase {
+  authDeleteError: Error | null = null;
   authListUsersCalls = 0;
   authUsers: User[] = [];
   browserSmokeArtifactClaims = new Set<string>();
   deletedUsers: string[] = [];
   storageErrors = new Set<string>();
+  storageRemoveErrors = new Set<string>();
   signedStorageUrls: { bucket: string; expiresIn: number; path: string }[] = [];
   storageObjects: Record<string, string[]> = {
     avatars: [],
@@ -64,6 +66,9 @@ export class FakeSupabase {
   auth = {
     admin: {
       deleteUser: async (userId: string) => {
+        if (this.authDeleteError) {
+          return { error: this.authDeleteError };
+        }
         this.deletedUsers.push(userId);
         return { error: null };
       },
@@ -111,7 +116,10 @@ export class FakeSupabase {
         return { data: [...childEntries.values()], error: null };
       },
       remove: async (paths: string[]) => {
-        if (this.storageErrors.has(bucket)) {
+        if (
+          this.storageErrors.has(bucket) ||
+          this.storageRemoveErrors.has(bucket)
+        ) {
           return { data: null, error: new Error(`${bucket} storage unavailable`) };
         }
 

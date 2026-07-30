@@ -175,7 +175,7 @@ export async function registerCatalogCandidateRoutes(
         pageSize,
         platformId,
         resultCount: data?.length || 0,
-        roleCache: roleLookup.cache,
+        roleSource: "database",
         search: Boolean(search),
         sourceKind,
         status,
