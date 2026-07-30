@@ -20,11 +20,12 @@ export type ConnectedClient = {
 export type PublicConnectedClient = Omit<ConnectedClient, "accessId">;
 
 const CLIENT_TTL_MS = 120_000;
+const MAX_CONNECTED_CLIENTS = 10_000;
 const MAX_REVOKED_IDENTIFIERS = 10_000;
 const clients = new Map<string, ConnectedClient>();
+const socketIdsByClient = new Map<string, Set<string>>();
 const revokedAccessIds = new Set<string>();
 const revokedClientIds = new Set<string>();
-let ioRef: Server | null = null;
 
 function getHeaderValue(value: string | string[] | undefined) {
   if (Array.isArray(value)) return value[0] || "";
@@ -115,6 +116,23 @@ function upsertClient(
 ) {
   const now = new Date().toISOString();
   const existing = clients.get(clientId);
+  if (!existing && clients.size >= MAX_CONNECTED_CLIENTS) {
+    for (const [storedClientId, storedClient] of clients) {
+      if (
+        !socketIdsByClient.has(storedClientId) &&
+        Date.now() - Date.parse(storedClient.lastSeenAt) > CLIENT_TTL_MS
+      ) {
+        clients.delete(storedClientId);
+      }
+    }
+  }
+  while (!existing && clients.size >= MAX_CONNECTED_CLIENTS) {
+    const inactiveClientId = Array.from(clients.keys()).find(
+      (storedClientId) => !socketIdsByClient.has(storedClientId),
+    );
+    if (!inactiveClientId) return null;
+    clients.delete(inactiveClientId);
+  }
   const next: ConnectedClient = {
     accessId: patch.accessId || existing?.accessId || "",
     accessScope: patch.accessScope || existing?.accessScope || "raw",
@@ -161,6 +179,19 @@ export function trackConnectedClient(socket: Socket) {
     fallbackClientId(remoteAddress, userAgent);
 
   socket.data.engineClientId = clientId;
+  const socketIds = socketIdsByClient.get(clientId) || new Set<string>();
+  socketIds.add(socket.id);
+  socketIdsByClient.set(clientId, socketIds);
+  socket.once("disconnect", () => {
+    const activeSocketIds = socketIdsByClient.get(clientId);
+    activeSocketIds?.delete(socket.id);
+    if (activeSocketIds?.size === 0) socketIdsByClient.delete(clientId);
+    const client = clients.get(clientId);
+    if (client) {
+      client.socketCount = activeSocketIds?.size || 0;
+      client.lastSeenAt = new Date().toISOString();
+    }
+  });
   refreshConnectedClient(socket);
 }
 
@@ -177,9 +208,7 @@ export function refreshConnectedClient(socket: Socket) {
     return;
   }
 
-  const socketCount = Array.from(socket.nsp.sockets.values()).filter(
-    (entry) => entry.data.engineClientId === clientId,
-  ).length;
+  const socketCount = socketIdsByClient.get(clientId)?.size || 0;
 
   upsertClient(clientId, {
     accessId,
@@ -196,17 +225,12 @@ export function refreshConnectedClient(socket: Socket) {
 export function listConnectedClients(now = Date.now()): PublicConnectedClient[] {
   for (const [clientId, client] of clients) {
     if (now - Date.parse(client.lastSeenAt) > CLIENT_TTL_MS) {
-      const hasActiveSocket =
-        ioRef &&
-        Array.from(ioRef.sockets.sockets.values()).some(
-          (socket) => socket.data.engineClientId === clientId,
-        );
+      const socketCount = socketIdsByClient.get(clientId)?.size || 0;
+      const hasActiveSocket = socketCount > 0;
 
       if (hasActiveSocket) {
         client.lastSeenAt = new Date(now).toISOString();
-        client.socketCount = Array.from(ioRef!.sockets.sockets.values()).filter(
-          (socket) => socket.data.engineClientId === clientId,
-        ).length;
+        client.socketCount = socketCount;
       } else {
         clients.delete(clientId);
       }
@@ -261,7 +285,6 @@ export function registerConnectedClientRoutes(
     requireEngineToken: RequestHandler;
   },
 ) {
-  ioRef = options.io;
   app.get("/clients", options.requireEngineToken, (_req: Request, res: Response) => {
     res.json({ clients: listConnectedClients() });
   });

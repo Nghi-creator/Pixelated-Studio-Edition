@@ -16,6 +16,21 @@ import {
 
 const WARMUP_PAGE = 1;
 const WARMUP_PAGE_SIZE = 15;
+const FEATURED_CACHE_KEY = "featured";
+
+async function getCachedFeaturedGames(
+  context: CatalogRouteContext,
+  timings: Record<string, number>,
+) {
+  const { featuredGamesCache, service } = context;
+  const cached = featuredGamesCache.get(FEATURED_CACHE_KEY);
+  if (cached) return cached;
+  if (!service) return [];
+
+  const featuredGames = await fetchFeaturedGames(service, timings);
+  featuredGamesCache.set(FEATURED_CACHE_KEY, featuredGames);
+  return featuredGames;
+}
 
 async function buildCachedGamesPage(
   service: NonNullable<CatalogRouteContext["service"]>,
@@ -58,7 +73,7 @@ export async function warmGamesCatalogCache(context: CatalogRouteContext) {
   const [cachedPage, featuredGames] = await Promise.all([
     cachedResponse ||
       buildCachedGamesPage(service, timings, WARMUP_PAGE, WARMUP_PAGE_SIZE),
-    fetchFeaturedGames(service, timings),
+    getCachedFeaturedGames(context, timings),
   ]);
   gamesCatalogCache.set(cacheKey, {
     ...cachedPage,
@@ -120,7 +135,7 @@ export function registerGamesCatalogRoutes(
       let featuredGames = cachedResponse.featuredGames || [];
       if (!cachedResponse.featuredGames) {
         try {
-          featuredGames = await fetchFeaturedGames(service, timings);
+          featuredGames = await getCachedFeaturedGames(context, timings);
         } catch (err) {
           request.log.warn({ err }, "Failed to load featured games");
         }
@@ -161,7 +176,7 @@ export function registerGamesCatalogRoutes(
 
     let featuredGames: unknown[] = [];
     try {
-      featuredGames = await fetchFeaturedGames(service, timings);
+      featuredGames = await getCachedFeaturedGames(context, timings);
     } catch (err) {
       request.log.warn({ err }, "Failed to load featured games");
     }
@@ -217,12 +232,16 @@ export function registerGamesCatalogRoutes(
     const timings = {};
     let featuredGames: unknown[] = [];
     try {
-      featuredGames = await fetchFeaturedGames(service, timings);
+      featuredGames = await getCachedFeaturedGames(context, timings);
     } catch (err) {
       request.log.warn({ err }, "Failed to load featured games");
     }
 
-    reply.header("Cache-Control", "no-store");
+    reply.header("Cache-Control", "public, max-age=15, s-maxage=30");
+    reply.header(
+      "X-Pixelated-Cache",
+      Object.hasOwn(timings, "featured_games_query_ms") ? "MISS" : "HIT",
+    );
     logTiming(request.log, "Featured games timing", timings, {
       resultCount: featuredGames.length,
     });

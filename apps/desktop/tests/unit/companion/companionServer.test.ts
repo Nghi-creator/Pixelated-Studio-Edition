@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import http from "node:http";
 import { describe, it } from "node:test";
-import { createCompanionAccessToken } from "../../../main/companion/invite/inviteState";
+import {
+  createCompanionAccessToken,
+  MAX_COMPANION_ACCESS_TOKENS,
+  pruneCompanionAccessTokens,
+  resetCompanionSecurityState,
+} from "../../../main/companion/invite/inviteState";
 import { normalizeInviteCode } from "../../../main/companion/invite/inviteCode";
 import {
   canUseRuntimeSwitchToken,
@@ -222,6 +227,25 @@ describe("desktop companion launch tickets", () => {
       hasValidCompanionLaunchTicket(expiredTicket, now + 60_000),
       false,
     );
+  });
+});
+
+describe("desktop companion access token storage", () => {
+  it("prunes expired tokens and enforces a hard cardinality bound", () => {
+    const now = 10_000;
+    resetCompanionSecurityState();
+    createCompanionAccessToken(now + 1, "guest", now);
+    assert.equal(pruneCompanionAccessTokens(now + 1), 0);
+
+    for (let index = 0; index < MAX_COMPANION_ACCESS_TOKENS + 10; index += 1) {
+      createCompanionAccessToken(now + 60_000, "host", now);
+    }
+
+    assert.equal(
+      pruneCompanionAccessTokens(now),
+      MAX_COMPANION_ACCESS_TOKENS,
+    );
+    resetCompanionSecurityState();
   });
 });
 
