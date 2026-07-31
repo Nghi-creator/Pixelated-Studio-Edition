@@ -283,7 +283,18 @@ export default function CatalogCandidates() {
               onReview={(candidateId, action) =>
                 void reviewCandidate(candidateId, action)
               }
-              onSmokeRecorded={() => void candidatesQuery.refetch()}
+              onSmokeRecorded={async () => {
+                const result = await candidatesQuery.refetch();
+                const updatedCandidate = result.data?.candidates.find(
+                  (updated) => updated.id === candidate.id,
+                );
+                return updatedCandidate
+                  ? {
+                      status: updatedCandidate.browser_smoke_status,
+                      testedAt: updatedCandidate.browser_smoke_tested_at,
+                    }
+                  : null;
+              }}
               pending={pendingCandidateId === candidate.id}
             />
           ))}

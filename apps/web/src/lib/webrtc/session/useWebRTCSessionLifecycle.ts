@@ -14,6 +14,7 @@ import { cleanupWebRTCSession } from "./webrtcSessionCleanup";
 
 export function useWebRTCSessionLifecycle(params: UseWebRTCSessionLifecycleParams) {
   const {
+    cleanupRef,
     gameId,
     inputCapabilitiesRef,
     lastMetricSentAtRef,
@@ -87,6 +88,7 @@ export function useWebRTCSessionLifecycle(params: UseWebRTCSessionLifecycleParam
     const socket = createEngineSocket(engineToken);
     socketRef.current = socket;
     const lifecycleParams: UseWebRTCSessionLifecycleParams = {
+      cleanupRef,
       gameId,
       inputCapabilitiesRef,
       lastMetricSentAtRef,
@@ -151,10 +153,17 @@ export function useWebRTCSessionLifecycle(params: UseWebRTCSessionLifecycleParam
       runtime,
     });
 
-    return () => {
+    const cleanup = () => {
       cleanupWebRTCSession({ config, params: lifecycleParams, runtime });
+      if (cleanupRef.current === cleanup) cleanupRef.current = null;
+    };
+    cleanupRef.current = cleanup;
+
+    return () => {
+      cleanup();
     };
   }, [
+    cleanupRef,
     gameId,
     inputCapabilitiesRef,
     lastMetricSentAtRef,
@@ -187,4 +196,3 @@ export function useWebRTCSessionLifecycle(params: UseWebRTCSessionLifecycleParam
     streamProfileRef,
   ]);
 }
-

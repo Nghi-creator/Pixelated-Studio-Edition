@@ -27,25 +27,25 @@ type GitHubRelease = {
 const DESKTOP_RELEASE_API_URL =
   "https://api.github.com/repos/Nghi-creator/Pixelated-Studio-Edition/releases/latest";
 const DESKTOP_RELEASE_FALLBACK_URL =
-  "https://github.com/Nghi-creator/Pixelated-Studio-Edition/releases/download/v1.0.1";
+  "https://github.com/Nghi-creator/Pixelated-Studio-Edition/releases/latest/download";
 
 const desktopDownloads: DesktopDownload[] = [
   {
     assetNamePattern: /\.dmg$/i,
-    fallbackFileName: "Pixelated.Studio-1.0.1-arm64.dmg",
-    fallbackHref: `${DESKTOP_RELEASE_FALLBACK_URL}/Pixelated.Studio-1.0.1-arm64.dmg`,
+    fallbackFileName: "Pixelated-Studio-mac.dmg",
+    fallbackHref: `${DESKTOP_RELEASE_FALLBACK_URL}/Pixelated-Studio-mac.dmg`,
     label: "macOS",
   },
   {
     assetNamePattern: /\.exe$/i,
-    fallbackFileName: "Pixelated.Studio.Setup.1.0.1.exe",
-    fallbackHref: `${DESKTOP_RELEASE_FALLBACK_URL}/Pixelated.Studio.Setup.1.0.1.exe`,
+    fallbackFileName: "Pixelated-Studio-windows.exe",
+    fallbackHref: `${DESKTOP_RELEASE_FALLBACK_URL}/Pixelated-Studio-windows.exe`,
     label: "Windows",
   },
   {
     assetNamePattern: /\.AppImage$/i,
-    fallbackFileName: "Pixelated.Studio-1.0.1.AppImage",
-    fallbackHref: `${DESKTOP_RELEASE_FALLBACK_URL}/Pixelated.Studio-1.0.1.AppImage`,
+    fallbackFileName: "Pixelated-Studio-linux.AppImage",
+    fallbackHref: `${DESKTOP_RELEASE_FALLBACK_URL}/Pixelated-Studio-linux.AppImage`,
     label: "Linux",
   },
 ];

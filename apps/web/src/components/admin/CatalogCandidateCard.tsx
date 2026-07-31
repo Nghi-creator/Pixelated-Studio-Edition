@@ -10,6 +10,7 @@ import {
   type CatalogCandidateReviewDetail,
 } from "../../features/admin/catalogCandidateReviewState";
 import { CatalogCandidateBrowserSmoke } from "../../features/admin/CatalogCandidateBrowserSmoke";
+import type { BrowserSmokePollResult } from "../../features/admin/browserSmokePolling";
 import {
   CATALOG_GENRES,
   formatGenre,
@@ -27,7 +28,7 @@ type CatalogCandidateCardProps = {
     action: ApiCatalogCandidateReviewAction,
   ) => void;
   pending: boolean;
-  onSmokeRecorded: () => void;
+  onSmokeRecorded: () => Promise<BrowserSmokePollResult | null>;
 };
 
 function toneClass(tone: CatalogCandidateReviewDetail["tone"]) {

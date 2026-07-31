@@ -60,6 +60,7 @@ export function useWebRTC(
   const onResearchEvent = options.onResearchEvent;
 
   const pcRef = useRef<RTCPeerConnection | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
   const peerIdRef = useRef(createWebRTCSessionId());
   const sessionIdRef = useRef(sessionId);
   const socketRef = useRef<EngineSocket | null>(null);
@@ -92,6 +93,7 @@ export function useWebRTC(
   }, [shareContext]);
 
   useWebRTCSessionLifecycle({
+    cleanupRef,
     gameId,
     inputCapabilitiesRef,
     lastMetricSentAtRef,
@@ -150,13 +152,7 @@ export function useWebRTC(
   });
 
   const stop = useCallback(() => {
-    const activeSessionId = sessionIdRef.current;
-    if (activeSessionId) {
-      socketRef.current?.emit("stop-session", { sessionId: activeSessionId });
-    }
-    pcRef.current?.close();
-    pcRef.current = null;
-    setStream(null);
+    cleanupRef.current?.();
     setStatus("idle");
   }, []);
 

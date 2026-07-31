@@ -5,6 +5,7 @@ import type {
   WebRTCSessionConfig,
   WebRTCSessionRuntime,
 } from "./webrtcLifecycleTypes";
+import { beginWebRTCSessionDisposal } from "./webrtcSessionDisposal";
 
 const SOCKET_EVENTS = [
   "webrtc-answer",
@@ -26,7 +27,7 @@ export function cleanupWebRTCSession({
   params: UseWebRTCSessionLifecycleParams;
   runtime: WebRTCSessionRuntime;
 }) {
-  runtime.disposed = true;
+  if (!beginWebRTCSessionDisposal(runtime)) return;
   const preserveActiveSession =
     config.seamlessRestart || params.seamlessRestartRef.current;
   runtime.stopTelemetry();
@@ -68,4 +69,3 @@ export function cleanupWebRTCSession({
     params.setTelemetry(INITIAL_WEBRTC_TELEMETRY);
   }
 }
-

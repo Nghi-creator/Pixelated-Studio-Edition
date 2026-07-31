@@ -1,7 +1,11 @@
 import { useEffect, useRef } from "react";
 import { useCountPlayMutation } from "./playerMutations";
+import { shouldSchedulePlayCount } from "./playCountState";
 
-export function usePlayCount(gameId: string | undefined) {
+export function usePlayCount(
+  gameId: string | undefined,
+  playbackStarted: boolean,
+) {
   const eventRef = useRef<{ gameId: string; playEventId: string } | null>(null);
   const { mutate } = useCountPlayMutation({
     onError: (err) => {
@@ -13,7 +17,7 @@ export function usePlayCount(gameId: string | undefined) {
   });
 
   useEffect(() => {
-    if (!gameId) return;
+    if (!shouldSchedulePlayCount(gameId, playbackStarted) || !gameId) return;
 
     if (eventRef.current?.gameId !== gameId) {
       eventRef.current = {
@@ -22,9 +26,9 @@ export function usePlayCount(gameId: string | undefined) {
       };
     }
     const event = eventRef.current;
+    if (!event) return;
     const timer = setTimeout(() => mutate(event), 30000);
 
     return () => clearTimeout(timer);
-  }, [gameId, mutate]);
+  }, [gameId, mutate, playbackStarted]);
 }
-

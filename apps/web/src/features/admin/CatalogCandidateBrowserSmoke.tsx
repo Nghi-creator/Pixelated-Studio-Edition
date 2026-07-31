@@ -3,11 +3,19 @@ import { CheckCircle2, ExternalLink, FlaskConical, Loader2, XCircle } from "luci
 import { api } from "../../lib/api/apiClient";
 import type { ApiCatalogCandidate } from "../../lib/api/apiTypes";
 import { getAdminApiErrorMessage } from "./adminState";
+import {
+  getNextBrowserSmokePollDelay,
+  hasNewTerminalBrowserSmokeResult,
+  type BrowserSmokePollResult,
+} from "./browserSmokePolling";
 
 type Props = {
   candidate: ApiCatalogCandidate;
-  onRecorded: () => void;
+  onRecorded: () => Promise<BrowserSmokePollResult | null>;
 };
+
+const POLL_DURATION_MS = 5 * 60 * 1000;
+const INITIAL_POLL_DELAY_MS = 2_500;
 
 const USER_EDITION_ORIGIN = (
   import.meta.env.VITE_USER_EDITION_ORIGIN ||
@@ -19,11 +27,18 @@ const USER_EDITION_ORIGIN = (
 export function CatalogCandidateBrowserSmoke({ candidate, onRecorded }: Props) {
   const [opening, setOpening] = useState(false);
   const [localError, setLocalError] = useState("");
-  const pollRef = useRef<number | null>(null);
+  const pollTimeoutRef = useRef<number | null>(null);
+  const pollGenerationRef = useRef(0);
 
-  useEffect(() => () => {
-    if (pollRef.current) window.clearInterval(pollRef.current);
-  }, []);
+  const cancelPolling = () => {
+    pollGenerationRef.current += 1;
+    if (pollTimeoutRef.current !== null) {
+      window.clearTimeout(pollTimeoutRef.current);
+      pollTimeoutRef.current = null;
+    }
+  };
+
+  useEffect(() => () => cancelPolling(), []);
 
   const compatibility = candidate.browser_compatibility;
   const canRun =
@@ -46,12 +61,27 @@ export function CatalogCandidateBrowserSmoke({ candidate, onRecorded }: Props) {
       const runnerUrl = `${USER_EDITION_ORIGIN}/internal/browser-smoke#ticket=${encodeURIComponent(ticket)}`;
       popup.location.replace(runnerUrl);
 
-      if (pollRef.current) window.clearInterval(pollRef.current);
-      pollRef.current = window.setInterval(onRecorded, 2_500);
-      window.setTimeout(() => {
-        if (pollRef.current) window.clearInterval(pollRef.current);
-        pollRef.current = null;
-      }, 5 * 60 * 1000);
+      cancelPolling();
+      const generation = pollGenerationRef.current;
+      const deadline = Date.now() + POLL_DURATION_MS;
+      const baselineTestedAt = candidate.browser_smoke_tested_at;
+      const schedulePoll = (delayMs: number) => {
+        pollTimeoutRef.current = window.setTimeout(async () => {
+          pollTimeoutRef.current = null;
+          const result = await onRecorded().catch(() => null);
+          if (generation !== pollGenerationRef.current) return;
+          if (hasNewTerminalBrowserSmokeResult(baselineTestedAt, result)) {
+            cancelPolling();
+            return;
+          }
+          if (Date.now() >= deadline) {
+            cancelPolling();
+            return;
+          }
+          schedulePoll(getNextBrowserSmokePollDelay(delayMs));
+        }, delayMs);
+      };
+      schedulePoll(INITIAL_POLL_DELAY_MS);
     } catch (error) {
       popup.close();
       setLocalError(getAdminApiErrorMessage(error, "Could not open browser smoke test."));
