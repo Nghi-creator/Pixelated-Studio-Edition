@@ -46,6 +46,7 @@ export type WebRTCSessionRuntime = {
 export type FailStream = (message: string) => void;
 
 export type UseWebRTCSessionLifecycleParams = {
+  cleanupRef: RefValue<(() => void) | null>;
   gameId: string;
   inputCapabilitiesRef: RefValue<EngineInputCapabilities>;
   lastMetricSentAtRef: RefValue<number>;
@@ -74,4 +75,3 @@ export type UseWebRTCSessionLifecycleParams = {
   socketRef: RefValue<EngineSocket | null>;
   streamProfileRef: RefValue<StreamProfile>;
 };
-

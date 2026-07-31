@@ -1,7 +1,10 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
 import { Lock, Loader2, CheckCircle2 } from "lucide-react";
-import { supabase } from "../../lib/auth/supabaseClient";
+import {
+  passwordRecoveryAuthorization,
+  supabase,
+} from "../../lib/auth/supabaseClient";
 import {
   getPasswordPolicyError,
   PASSWORD_MIN_LENGTH,
@@ -16,33 +19,34 @@ export default function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [recoveryVerified, setRecoveryVerified] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
-    const hasAuthHash =
-      window.location.hash.includes("access_token") ||
-      window.location.hash.includes("type=recovery");
     const clearAuthHash = () => {
-      if (hasAuthHash) {
+      if (window.location.hash) {
         window.history.replaceState(null, "", window.location.pathname);
       }
     };
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!isMounted) return;
-      if (session) {
+      if (passwordRecoveryAuthorization.permits(session)) {
+        setRecoveryVerified(true);
         clearAuthHash();
         return;
       }
-      if (!hasAuthHash) {
-        navigate("/login");
-      }
+      navigate("/login", { replace: true });
     });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (
+        passwordRecoveryAuthorization.observe(event, session) &&
+        passwordRecoveryAuthorization.permits(session)
+      ) {
+        setRecoveryVerified(true);
         clearAuthHash();
       }
     });
@@ -78,6 +82,7 @@ export default function ResetPassword() {
 
       if (updateError) throw updateError;
 
+      passwordRecoveryAuthorization.clear();
       setSuccess(true);
 
       setTimeout(() => {
@@ -93,6 +98,15 @@ export default function ResetPassword() {
       setLoading(false);
     }
   };
+
+  if (!recoveryVerified) {
+    return (
+      <div className="min-h-[85vh] flex items-center justify-center" role="status">
+        <Loader2 className="h-8 w-8 animate-spin text-synth-secondary" />
+        <span className="sr-only">Verifying password recovery link</span>
+      </div>
+    );
+  }
 
   if (success) {
     return (

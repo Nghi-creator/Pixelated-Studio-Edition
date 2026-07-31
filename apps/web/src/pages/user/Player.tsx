@@ -54,6 +54,7 @@ export default function Player() {
   const streamStageRef = useRef<HTMLDivElement>(null);
   const [isPlaybackPaused, setIsPlaybackPaused] = useState(false);
   const [pixelPerfect, setPixelPerfect] = useState(true);
+  const [visibleFrameGameId, setVisibleFrameGameId] = useState<string | null>(null);
   const [activePlayerTool, setActivePlayerTool] = useState<
     "keyboard" | "lobby" | null
   >(null);
@@ -131,10 +132,11 @@ export default function Player() {
   });
   const { authorName, gameRights, gameTitle } = useGameMetadata(id);
 
-  usePlayCount(id);
+  usePlayCount(id, Boolean(id && visibleFrameGameId === id));
   const handleFirstVisibleFrame = useCallback(() => {
+    setVisibleFrameGameId(id || null);
     recordResearchEvent("first_non_black_frame");
-  }, [recordResearchEvent]);
+  }, [id, recordResearchEvent]);
   const fallbackActive = useStreamPlayback({
     isMuted,
     onBlackFrameStall: reportBlackFrameStall,
