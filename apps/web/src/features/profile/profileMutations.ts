@@ -10,7 +10,7 @@ type SaveProfileOptions = {
   currentAvatarUrl: string;
   removeAvatar: (path: string) => Promise<void>;
   updateAuthMetadata: (avatarUrl: string, username: string) => Promise<void>;
-  updateProfile: (avatarUrl: string, username: string) => Promise<void>;
+  updateProfile: (avatarUrl: string | undefined, username: string) => Promise<void>;
   uploadAvatar: (file: File, path: string) => Promise<string>;
   userId: string;
   username: string;
@@ -71,7 +71,7 @@ export async function saveProfile({
   }
 
   try {
-    await updateProfile(avatarUrl, normalizedUsername);
+    await updateProfile(uploadedPath ? avatarUrl : undefined, normalizedUsername);
   } catch (error) {
     if (uploadedPath) {
       await removeAvatar(uploadedPath).catch(() => undefined);

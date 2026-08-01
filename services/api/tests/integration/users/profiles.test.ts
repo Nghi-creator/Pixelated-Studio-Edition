@@ -66,7 +66,7 @@ test("profile routes update only the authenticated profile and safely delete aut
   const updateResponse = await app.inject({
     method: "PATCH",
     payload: {
-      avatarUrl: "https://example.com/avatar.png",
+      avatarUrl: `https://example.com/storage/v1/object/public/avatars/${USER_ID}/avatar.png`,
       username: "new-name",
     },
     url: "/profile",
@@ -84,6 +84,33 @@ test("profile routes update only the authenticated profile and safely delete aut
   assert.deepEqual(db.deletedUsers, [USER_ID]);
   assert.deepEqual(db.storageObjects.avatars, []);
   assert.deepEqual(db.storageObjects.submissions, [`${OTHER_USER_ID}/roms/other.nes`]);
+  await app.close();
+});
+
+test("profile updates reject external and other-user avatar URLs", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const originalUsername = db.rows.profiles.find(
+    (row) => row.id === USER_ID,
+  )?.username;
+  const app = await createDataBoundaryApp(db, USER_ID);
+
+  for (const avatarUrl of [
+    "https://attacker.example/tracker.png",
+    `https://example.com/storage/v1/object/public/avatars/${OTHER_USER_ID}/avatar.png`,
+  ]) {
+    const response = await app.inject({
+      method: "PATCH",
+      payload: { avatarUrl, username: "new-name" },
+      url: "/profile",
+    });
+    assert.equal(response.statusCode, 400);
+  }
+
+  assert.equal(
+    db.rows.profiles.find((row) => row.id === USER_ID)?.username,
+    originalUsername,
+  );
   await app.close();
 });
 

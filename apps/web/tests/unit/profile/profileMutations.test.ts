@@ -100,3 +100,26 @@ test("profile save reports partial cleanup and metadata failures clearly", async
   assert.equal(result.warnings.length, 2);
   assert.match(result.avatarUrl, /user-1\/avatar-\d+\.jpg$/);
 });
+
+test("profile save omits an unchanged external avatar from the API update", async () => {
+  let submittedAvatar: string | undefined = "unexpected";
+  const currentAvatarUrl = "https://oauth.example/avatar.png";
+
+  const result = await saveProfile({
+    avatarFile: null,
+    currentAvatarUrl,
+    removeAvatar: async () => undefined,
+    updateAuthMetadata: async () => undefined,
+    updateProfile: async (avatarUrl) => {
+      submittedAvatar = avatarUrl;
+    },
+    uploadAvatar: async () => {
+      throw new Error("upload should not run");
+    },
+    userId: "user-1",
+    username: "updated-name",
+  });
+
+  assert.equal(submittedAvatar, undefined);
+  assert.equal(result.avatarUrl, currentAvatarUrl);
+});

@@ -64,6 +64,14 @@ function getSha256(filePath: string) {
   return hash.digest("hex");
 }
 
+async function getSha256Async(filePath: string) {
+  const hash = crypto.createHash("sha256");
+  for await (const chunk of fs.createReadStream(filePath)) {
+    hash.update(chunk);
+  }
+  return hash.digest("hex");
+}
+
 function validateHeader(filePath: string, extension: string) {
   const header = readPrefix(filePath, 0x160);
 
@@ -150,7 +158,7 @@ function hasValidSnesHeader(filePath: string) {
   });
 }
 
-export function validateGameArtifact(
+function validateGameArtifactStructure(
   filePath: string,
   options: ArtifactValidationOptions,
 ) {
@@ -185,10 +193,37 @@ export function validateGameArtifact(
   validateHeader(filePath, extension);
 
   const expectedSha256 = options.expectedSha256?.toLowerCase() || "";
+  return { expectedSha256, label };
+}
+
+export function validateGameArtifact(
+  filePath: string,
+  options: ArtifactValidationOptions,
+) {
+  const { expectedSha256, label } = validateGameArtifactStructure(
+    filePath,
+    options,
+  );
   if (expectedSha256) {
     const actualSha256 = getSha256(filePath);
     if (actualSha256 !== expectedSha256) {
       throw new Error(`${label} checksum mismatch.`);
     }
+  }
+}
+
+export async function validateGameArtifactAsync(
+  filePath: string,
+  options: ArtifactValidationOptions,
+) {
+  const { expectedSha256, label } = validateGameArtifactStructure(
+    filePath,
+    options,
+  );
+  if (!expectedSha256) return;
+
+  const actualSha256 = await getSha256Async(filePath);
+  if (actualSha256 !== expectedSha256) {
+    throw new Error(`${label} checksum mismatch.`);
   }
 }

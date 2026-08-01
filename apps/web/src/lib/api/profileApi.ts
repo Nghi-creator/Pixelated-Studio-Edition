@@ -25,7 +25,7 @@ export function createProfileApi({
     permissions: () => getCachedPermissions(),
     profile: () => apiRequest<{ profile: ApiProfile | null }>("/profile"),
     updateProfile: async (payload: {
-      avatarUrl: string | null;
+      avatarUrl?: string | null;
       username: string;
     }) => {
       const result = await apiRequest<{ success: true }>("/profile", {

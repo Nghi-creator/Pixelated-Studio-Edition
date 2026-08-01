@@ -28,6 +28,8 @@ def parse_max_active_peers():
 
 MAX_ACTIVE_PEERS = parse_max_active_peers()
 MAX_WEBRTC_SDP_LENGTH = 64 * 1024
+MAX_ICE_CANDIDATE_LENGTH = 4 * 1024
+MAX_ICE_FIELD_LENGTH = 256
 
 def write_peer_state():
     try:
@@ -126,6 +128,41 @@ def emit_engine_error(message):
 def normalize_peer_id(payload):
     peer_id = payload.get('peerId') if isinstance(payload, dict) else None
     return peer_id if isinstance(peer_id, str) and peer_id else 'default'
+
+def normalize_ice_candidate(payload):
+    if not isinstance(payload, dict):
+        return None
+
+    peer_id = payload.get('peerId')
+    candidate = payload.get('candidate')
+    sdp_mline_index = payload.get('sdpMLineIndex')
+    sdp_mid = payload.get('sdpMid')
+
+    if (
+        not isinstance(peer_id, str)
+        or not peer_id
+        or len(peer_id) > 128
+        or not all(character.isalnum() or character in '_-' for character in peer_id)
+        or not isinstance(candidate, str)
+        or not candidate
+        or len(candidate) > MAX_ICE_CANDIDATE_LENGTH
+        or not isinstance(sdp_mline_index, int)
+        or isinstance(sdp_mline_index, bool)
+        or sdp_mline_index < 0
+        or sdp_mline_index > 65535
+        or (
+            sdp_mid is not None
+            and (not isinstance(sdp_mid, str) or len(sdp_mid) > MAX_ICE_FIELD_LENGTH)
+        )
+    ):
+        return None
+
+    return {
+        'candidate': candidate,
+        'peerId': peer_id,
+        'sdpMLineIndex': sdp_mline_index,
+        'sdpMid': sdp_mid,
+    }
 
 def validate_offer(offer):
     if not isinstance(offer, dict):
@@ -276,13 +313,24 @@ def on_offer(offer):
     GLib.idle_add(handle_offer, offer)
 
 @sio.on('webrtc-ice-candidate')
-def on_ice(candidate):
+def on_ice(payload):
+    candidate = normalize_ice_candidate(payload)
+    if not candidate:
+        emit_engine_error("Invalid WebRTC ICE candidate.")
+        return
     peer_id = normalize_peer_id(candidate)
     def handle_ice():
         peer = peers.get(peer_id)
         webrtcbin = peer.get('webrtcbin') if peer else None
         if webrtcbin:
-            webrtcbin.emit('add-ice-candidate', candidate['sdpMLineIndex'], candidate['candidate'])
+            try:
+                webrtcbin.emit(
+                    'add-ice-candidate',
+                    candidate['sdpMLineIndex'],
+                    candidate['candidate'],
+                )
+            except Exception as exc:
+                emit_engine_error(f"Invalid WebRTC ICE candidate: {exc}")
     GLib.idle_add(handle_ice)
 
 @sio.on('webrtc-peer-disconnect')

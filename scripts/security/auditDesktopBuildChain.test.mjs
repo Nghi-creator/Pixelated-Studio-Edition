@@ -11,7 +11,7 @@ const globCliAdvisory = {
   url: "https://github.com/advisories/GHSA-5j98-mcp5-4vw2",
 };
 
-test("allows the known brace expansion advisory only on development nodes", () => {
+test("blocks the former brace expansion exception on development nodes", () => {
   const report = {
     vulnerabilities: {
       "brace-expansion": {
@@ -33,10 +33,13 @@ test("allows the known brace expansion advisory only on development nodes", () =
     },
   };
 
-  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), [
+    "brace-expansion",
+    "minimatch",
+  ]);
 });
 
-test("allows GitHub URL context on the known development-only advisory", () => {
+test("does not allow URL context to revive the former brace exception", () => {
   const report = {
     vulnerabilities: {
       "brace-expansion": {
@@ -63,7 +66,10 @@ test("allows GitHub URL context on the known development-only advisory", () => {
     },
   };
 
-  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), [
+    "brace-expansion",
+    "glob",
+  ]);
 });
 
 test("follows npm reverse effects when a meta-vulnerability omits via", () => {
@@ -96,10 +102,14 @@ test("follows npm reverse effects when a meta-vulnerability omits via", () => {
     },
   };
 
-  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), [
+    "brace-expansion",
+    "minimatch",
+    "glob",
+  ]);
 });
 
-test("allows detached npm meta-vulnerabilities when every direct leaf is known", () => {
+test("blocks detached npm meta-vulnerabilities when the direct leaf is no longer allowed", () => {
   const report = {
     vulnerabilities: {
       "brace-expansion": {
@@ -127,7 +137,11 @@ test("allows detached npm meta-vulnerabilities when every direct leaf is known",
     },
   };
 
-  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), [
+    "brace-expansion",
+    "glob",
+    "electron-builder",
+  ]);
 });
 
 test("does not treat object-shaped dependency causes as direct advisories", () => {
@@ -158,7 +172,11 @@ test("does not treat object-shaped dependency causes as direct advisories", () =
     },
   };
 
-  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), []);
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), [
+    "brace-expansion",
+    "minimatch",
+    "glob",
+  ]);
 });
 
 test("blocks a report containing only untraceable object metadata", () => {
@@ -208,10 +226,13 @@ test("does not use reverse effects to allow an unknown direct advisory", () => {
     },
   };
 
-  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), ["glob"]);
+  assert.deepEqual(getBlockingVulnerabilities(report, packageLock), [
+    "brace-expansion",
+    "glob",
+  ]);
 });
 
-test("blocks the allowlisted advisory if it reaches production", () => {
+test("blocks the former brace exception if it reaches production", () => {
   const report = {
     vulnerabilities: {
       "brace-expansion": {

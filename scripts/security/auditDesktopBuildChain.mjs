@@ -3,7 +3,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const ALLOWED_DEV_ADVISORY_IDS = new Set(["GHSA-MH99-V99M-4GVG"]);
 const GLOB_CLI_ADVISORY_ID = "GHSA-5J98-MCP5-4VW2";
 const HIGH_SEVERITIES = new Set(["high", "critical"]);
 
@@ -61,9 +60,6 @@ function resolveLockedPackage(node, packageLock) {
 
 function isAllowedDirectAdvisory(via, vulnerability, packageLock) {
   const advisoryId = getGithubAdvisoryId(via?.url);
-  if (advisoryId !== null && ALLOWED_DEV_ADVISORY_IDS.has(advisoryId)) {
-    return true;
-  }
   if (advisoryId !== GLOB_CLI_ADVISORY_ID) {
     return false;
   }
@@ -173,8 +169,8 @@ export function getBlockingVulnerabilities(report, packageLock) {
   );
 
   // npm occasionally omits or truncates the `via`/`effects` links on
-  // meta-vulnerabilities. If every direct high-severity leaf is the one
-  // explicitly accepted advisory, parent entries are safe to classify by
+  // meta-vulnerabilities. If every direct high-severity leaf is an explicitly
+  // accepted false positive, parent entries are safe to classify by
   // their lockfile scope instead of depending on those unstable links.
   if (
     directAdvisories.length > 0 &&

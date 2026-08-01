@@ -42,7 +42,7 @@ jobs:
         with:
           cache: npm
           cache-dependency-path: ${{ matrix.path }}/package-lock.json
-          node-version: 22
+          node-version-file: .nvmrc
 
       - name: Audit ${{ matrix.label }} production dependencies
         working-directory: ${{ matrix.path }}
@@ -55,8 +55,7 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: node ../../scripts/security/auditDesktopBuildChain.mjs
 
-      - name: Record full dependency audit for review
-        continue-on-error: true
+      - name: Audit all dependencies
         working-directory: ${{ matrix.path }}
         run: npm audit --audit-level=high
 

@@ -2,7 +2,7 @@ import fs from "fs";
 import https from "https";
 import net from "net";
 import { promises as dns } from "dns";
-import { validateGameArtifact } from "./artifactValidation";
+import { validateGameArtifactAsync } from "./artifactValidation";
 
 type ResolvedAddress = { address: string; family: number };
 type ResolveHost = (
@@ -214,9 +214,14 @@ export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
           if (settled) return;
           settled = true;
           clearTimeout(deadline);
-          file.close(() => {
+          file.close(async (closeError) => {
+            if (closeError) {
+              removeFileIfExists(destinationPath);
+              reject(closeError);
+              return;
+            }
             try {
-              validateGameArtifact(destinationPath, {
+              await validateGameArtifactAsync(destinationPath, {
                 ...validation,
                 fileLabel: "Cloud ROM",
               });

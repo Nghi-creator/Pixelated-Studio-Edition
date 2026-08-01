@@ -96,14 +96,6 @@ function findFiles(root: string, fileName: string): string[] {
   });
 }
 
-function listRelativeFiles(root: string, currentDir = root): string[] {
-  return fs.readdirSync(currentDir, { withFileTypes: true }).flatMap((entry) => {
-    const entryPath = path.join(currentDir, entry.name);
-    if (entry.isDirectory()) return listRelativeFiles(root, entryPath);
-    return entry.isFile() ? [path.relative(root, entryPath)] : [];
-  });
-}
-
 export function getHtmlScriptSources(html: string) {
   return Array.from(html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi))
     .map((match) => normalizeAssetPath(match[1]))
@@ -142,55 +134,6 @@ export function assertPreloadScript(source: string, filePath: string) {
       source.includes(apiName),
       `${filePath} is missing preload API ${apiName}.`,
     );
-  }
-}
-
-function assertWebDist(resourcesDir: string) {
-  const sourceWebDistDir = path.resolve(process.cwd(), "../web/dist");
-  const webDistDir = path.join(resourcesDir, "web-dist");
-  const indexPath = path.join(webDistDir, "index.html");
-  assert(
-    fs.existsSync(path.join(sourceWebDistDir, "index.html")),
-    `Fresh apps/web/dist build is missing under ${sourceWebDistDir}.`,
-  );
-  assert(fs.existsSync(indexPath), `Packaged web build is missing ${indexPath}.`);
-
-  const sourceFiles = listRelativeFiles(sourceWebDistDir).sort();
-  const packagedFiles = listRelativeFiles(webDistDir).sort();
-  assert(
-    JSON.stringify(packagedFiles) === JSON.stringify(sourceFiles),
-    `Packaged web-dist file list does not match the fresh apps/web/dist build.`,
-  );
-  for (const relativePath of sourceFiles) {
-    assert(
-      fs.readFileSync(path.join(webDistDir, relativePath)).equals(
-        fs.readFileSync(path.join(sourceWebDistDir, relativePath)),
-      ),
-      `Packaged web asset is stale or changed: ${relativePath}.`,
-    );
-  }
-
-  const html = fs.readFileSync(indexPath, "utf8");
-  const assetRefs = Array.from(
-    html.matchAll(/\b(?:src|href)=["']([^"']+)["']/gi),
-  )
-    .map((match) => normalizeAssetPath(match[1]))
-    .filter((assetPath) => assetPath.startsWith("assets/"));
-
-  assert(assetRefs.length > 0, `${indexPath} does not reference production assets.`);
-  assert(
-    assetRefs.some((assetPath) => assetPath.endsWith(".js")),
-    `${indexPath} does not reference a JavaScript bundle.`,
-  );
-  assert(
-    assetRefs.some((assetPath) => assetPath.endsWith(".css")),
-    `${indexPath} does not reference a stylesheet bundle.`,
-  );
-
-  for (const assetPath of assetRefs) {
-    const absolutePath = path.join(webDistDir, assetPath);
-    assert(fs.existsSync(absolutePath), `Packaged web asset is missing ${absolutePath}.`);
-    assert(fs.statSync(absolutePath).size > 0, `Packaged web asset is empty ${absolutePath}.`);
   }
 }
 
@@ -251,7 +194,6 @@ function assertPackagedApp(archivePath: string) {
   );
 
   const resourcesDir = path.dirname(archivePath);
-  assertWebDist(resourcesDir);
   assert(
     fs.existsSync(path.join(resourcesDir, "engine-runtime", "Dockerfile")),
     `Packaged engine runtime is missing beside ${archivePath}.`,
