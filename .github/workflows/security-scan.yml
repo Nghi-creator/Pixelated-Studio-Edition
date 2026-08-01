@@ -35,10 +35,10 @@ jobs:
             path: engine/runtime
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           cache: npm
           cache-dependency-path: ${{ matrix.path }}/package-lock.json
@@ -65,7 +65,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Scan for committed secret-like tokens
         run: |
@@ -85,13 +85,13 @@ jobs:
       security-events: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4.37.3
         with:
           languages: javascript-typescript
           queries: security-extended,security-and-quality
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4.37.3
