@@ -5,15 +5,14 @@
   "author": "Pixelated Studio",
   "main": "dist/main.js",
   "scripts": {
-    "build:styles": "npm exec --prefix ../web tailwindcss -- -c tailwind.config.cjs -i styles.input.css -o styles.css --minify",
+    "build:styles": "tailwindcss -c tailwind.config.cjs -i styles.input.css -o styles.css --minify",
     "clean": "node -e \"require('fs').rmSync('dist', { force: true, recursive: true })\"",
     "build": "npm run build:styles && npm run clean && tsc -p tsconfig.json",
     "test": "npm run build && node --test \"dist/tests/**/*.test.js\"",
     "start": "npm run build && electron .",
-    "prepare:web": "npm run build && npm --prefix ../web run build && node dist/scripts/prepareWebDist.js",
     "smoke:release": "npm run build && node dist/scripts/releaseSmoke.js",
-    "dist": "npm run prepare:web && electron-builder && npm run smoke:release",
-    "dist:ci": "npm run prepare:web && electron-builder --publish never && npm run smoke:release"
+    "dist": "npm run build && electron-builder && npm run smoke:release",
+    "dist:ci": "npm run build && electron-builder --publish never && npm run smoke:release"
   },
   "devDependencies": {
     "@electron/asar": "^4.2.1",
@@ -21,6 +20,7 @@
     "@types/qrcode": "^1.5.6",
     "electron": "43.1.1",
     "electron-builder": "^26.15.3",
+    "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3"
   },
   "dependencies": {
@@ -66,13 +66,6 @@
       "!dist/builder-effective-config.yaml"
     ],
     "extraResources": [
-      {
-        "from": "../web/dist",
-        "to": "web-dist",
-        "filter": [
-          "**/*"
-        ]
-      },
       {
         "from": "../../engine/runtime",
         "to": "engine-runtime",

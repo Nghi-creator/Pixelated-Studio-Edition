@@ -4,7 +4,10 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { validateGameArtifact } from "../../src/roms/artifactValidation";
+import {
+  validateGameArtifact,
+  validateGameArtifactAsync,
+} from "../../src/roms/artifactValidation";
 
 function writeTempRom(filename: string, bytes: Buffer) {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "pixelated-rom-"));
@@ -26,6 +29,26 @@ test("validates NES iNES headers and optional checksum", () => {
     expectedSizeBytes: bytes.length,
     runtimeId: "mesen",
   });
+});
+
+test("validates cloud checksums through asynchronous file I/O", async () => {
+  const bytes = Buffer.concat([
+    Buffer.from([0x4e, 0x45, 0x53, 0x1a]),
+    Buffer.alloc(2 * 1024 * 1024),
+  ]);
+  const filePath = writeTempRom("cloud-game.nes", bytes);
+  let eventLoopProgressed = false;
+  const validation = validateGameArtifactAsync(filePath, {
+    expectedSha256: sha256(bytes),
+    expectedSizeBytes: bytes.length,
+    runtimeId: "mesen",
+  });
+  setImmediate(() => {
+    eventLoopProgressed = true;
+  });
+
+  await validation;
+  assert.equal(eventLoopProgressed, true);
 });
 
 test("rejects mismatched runtime extensions", () => {

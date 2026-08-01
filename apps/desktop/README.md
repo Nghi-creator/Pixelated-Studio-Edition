@@ -119,12 +119,6 @@ Override trusted browser origins:
 PIXELATED_ALLOWED_ORIGINS=https://pixelated-studio-edition.vercel.app,http://localhost:5173,http://127.0.0.1:5173
 ```
 
-Override the companion web bundle path for custom layouts:
-
-```txt
-PIXELATED_WEB_DIST_DIR=/absolute/path/to/apps/web/dist
-```
-
 ## Packaging
 
 Package a release from this folder:
@@ -136,11 +130,9 @@ npm run dist
 The `dist` script:
 
 1. Builds the desktop TypeScript.
-2. Builds `apps/web`.
-3. Copies the web bundle for packaging.
-4. Runs electron-builder for DMG, NSIS, or AppImage targets.
-5. Runs the packaged release smoke against the unpacked app.
+2. Runs electron-builder for DMG, NSIS, or AppImage targets.
+3. Runs the packaged release smoke against the unpacked app.
 
-The release smoke verifies required main/preload/renderer files, sandbox-safe preload behavior, bundled `resources/web-dist`, and bundled engine runtime resources.
+The release smoke verifies required main/preload/renderer files, sandbox-safe preload behavior, and bundled engine runtime resources. The desktop opens the configured hosted web application rather than shipping a duplicate web bundle.
 
 Cross-platform packaging is validated by `.github/workflows/desktop-release-validation.yml`.

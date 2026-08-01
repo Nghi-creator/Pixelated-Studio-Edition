@@ -4,41 +4,12 @@ import path from "path";
 
 export type EngineRuntimeKind = "libretro" | "native_linux";
 
-function hasWebIndex(dir: string) {
-  return fs.existsSync(path.join(dir, "index.html"));
-}
-
 function hasEngineRuntime(dir: string) {
   return fs.existsSync(path.join(dir, "Dockerfile"));
 }
 
-function firstAvailablePath(paths: string[]) {
-  return paths.find(hasWebIndex) || paths[0];
-}
-
 function firstAvailableEngineRuntimePath(paths: string[]) {
   return paths.find(hasEngineRuntime) || paths[0];
-}
-
-function isPackagedElectronRuntime() {
-  return Boolean(process.resourcesPath) && process.defaultApp !== true;
-}
-
-function resolveWebDistDir() {
-  if (process.env.PIXELATED_WEB_DIST_DIR) {
-    return path.resolve(process.env.PIXELATED_WEB_DIST_DIR);
-  }
-
-  const bundledWebDistDir = process.resourcesPath
-    ? path.join(process.resourcesPath, "web-dist")
-    : path.resolve(__dirname, "../../web-dist");
-  const sourceWebDistDir = path.resolve(__dirname, "../../../../apps/web/dist");
-  const isPackaged = isPackagedElectronRuntime();
-  const candidates = isPackaged
-    ? [bundledWebDistDir, sourceWebDistDir]
-    : [sourceWebDistDir, bundledWebDistDir];
-
-  return firstAvailablePath(candidates);
 }
 
 export const engineRuntimeDir =
@@ -125,8 +96,6 @@ export const pullEngineImage = shouldPullEngineImage({
   pullSetting: process.env.PIXELATED_ENGINE_PULL,
 });
 export const buildFallback = process.env.PIXELATED_ENGINE_BUILD_FALLBACK !== "0";
-export const webDistDir = resolveWebDistDir();
-
 export type EngineRuntimeConfig = {
   defaultEngineImage: string;
   engineImage: string;

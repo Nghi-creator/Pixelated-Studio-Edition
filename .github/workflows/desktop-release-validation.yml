@@ -5,7 +5,6 @@ on:
     paths:
       - ".github/workflows/desktop-release-validation.yml"
       - "apps/desktop/**"
-      - "apps/web/**"
       - "engine/runtime/**"
   push:
     branches:
@@ -13,7 +12,6 @@ on:
     paths:
       - ".github/workflows/desktop-release-validation.yml"
       - "apps/desktop/**"
-      - "apps/web/**"
       - "engine/runtime/**"
   workflow_dispatch:
     inputs:
@@ -76,27 +74,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           cache: npm
-          cache-dependency-path: |
-            apps/desktop/package-lock.json
-            apps/web/package-lock.json
-          node-version: 22
+          cache-dependency-path: apps/desktop/package-lock.json
+          node-version-file: .nvmrc
 
-      - name: Install desktop and web dependencies
-        run: |
-          npm ci --prefix apps/desktop
-          npm ci --prefix apps/web
+      - name: Install desktop dependencies
+        run: npm ci --prefix apps/desktop
 
       - name: Run desktop diagnostic and release contracts
         run: npm test --prefix apps/desktop
-
-      - name: Lint web app
-        run: npm run lint --prefix apps/web
-
-      - name: Run web regression contracts
-        run: npm test --prefix apps/web
-
-      - name: Build web app
-        run: npm run build --prefix apps/web
 
       - name: Build native installer and run packaged smoke
         run: npm run dist:ci --prefix apps/desktop

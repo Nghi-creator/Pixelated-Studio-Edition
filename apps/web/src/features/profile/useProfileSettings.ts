@@ -113,7 +113,9 @@ export function useProfileSettings() {
         },
         updateProfile: async (finalAvatarUrl, finalUsername) => {
           await api.updateProfile({
-            avatarUrl: finalAvatarUrl,
+            ...(finalAvatarUrl !== undefined
+              ? { avatarUrl: finalAvatarUrl }
+              : {}),
             username: finalUsername,
           });
           await invalidateProfileQueries(queryClient);

@@ -1,5 +1,6 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { env } from "../../../config/env.js";
 import {
   requireSupabaseUser,
   supabaseService,
@@ -47,7 +48,44 @@ type ProfileRouteOptions = {
   deleteLimiter?: RateLimiter;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
+  supabaseUrl?: string;
 };
+
+export function isOwnedAvatarUrl(
+  value: string,
+  userId: string,
+  supabaseUrl = env.SUPABASE_URL,
+) {
+  if (!supabaseUrl) return false;
+
+  const rawPath = value.split(/[?#]/, 1)[0] || "";
+  if (/(?:^|\/)(?:\.{1,2}|%2e(?:%2e)?)(?:\/|$)/i.test(rawPath)) {
+    return false;
+  }
+
+  try {
+    const avatarUrl = new URL(value);
+    if (avatarUrl.origin !== new URL(supabaseUrl).origin) return false;
+
+    const match = avatarUrl.pathname.match(
+      /^\/storage\/v1\/object\/public\/avatars\/(.+)$/,
+    );
+    if (!match?.[1]) return false;
+
+    const objectSegments = match[1]
+      .split("/")
+      .map((segment) => decodeURIComponent(segment));
+    return (
+      objectSegments.length >= 2 &&
+      objectSegments[0] === userId &&
+      !objectSegments.some(
+        (segment) => !segment || segment === "." || segment === "..",
+      )
+    );
+  } catch {
+    return false;
+  }
+}
 
 function hasRecentSignIn(lastSignInAt: string | undefined, now = Date.now()) {
   if (!lastSignInAt) return false;
@@ -109,6 +147,7 @@ export async function registerProfileRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
+  const supabaseUrl = options.supabaseUrl || env.SUPABASE_URL;
   const deleteLimiter =
     options.deleteLimiter ||
     createRateLimiter({
@@ -218,11 +257,21 @@ export async function registerProfileRoutes(
       if (!body.success) {
         return reply.status(400).send({ error: "Invalid profile update" });
       }
+      if (
+        body.data.avatarUrl &&
+        !isOwnedAvatarUrl(body.data.avatarUrl, user.id, supabaseUrl)
+      ) {
+        return reply.status(400).send({
+          error: "Avatar must be an owned avatar storage object.",
+        });
+      }
 
       const { error } = await service
         .from("profiles")
         .update({
-          avatar_url: body.data.avatarUrl || null,
+          ...(body.data.avatarUrl !== undefined
+            ? { avatar_url: body.data.avatarUrl }
+            : {}),
           username: body.data.username,
         })
         .eq("id", user.id);

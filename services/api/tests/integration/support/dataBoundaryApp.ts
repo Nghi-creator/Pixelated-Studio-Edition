@@ -58,6 +58,7 @@ export async function createDataBoundaryApp(
         ? (extraOptions.hasLiveMetricSession as never)
         : async () => true,
     smokeTicketSecret: "test-browser-smoke-secret-at-least-32-characters",
+    supabaseUrl: "https://example.com",
     ...extraOptions,
     fetchArtifact,
     requireUser: requireUser(userId),

@@ -61,7 +61,7 @@ describe("desktop package config", () => {
     );
 
     assert.equal(packageJson.build.asar, true);
-    assert.equal(webResource?.from, "../web/dist");
+    assert.equal(webResource, undefined);
     assert.equal(engineResource?.from, "../../engine/runtime");
     assert.ok(engineResource?.filter?.includes("!node_modules/**"));
     assert.ok(engineResource?.filter?.includes("!dist/**"));
@@ -225,6 +225,7 @@ describe("desktop package config", () => {
 
     assert.match(packageJson.scripts?.["smoke:release"] || "", /releaseSmoke\.js/);
     assert.match(packageJson.scripts?.dist || "", /npm run smoke:release/);
+    assert.doesNotMatch(packageJson.scripts?.dist || "", /prepare:web/);
   });
 
   it("allows hosted, local development, and companion web origins for the engine", () => {
