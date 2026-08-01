@@ -5,12 +5,15 @@ import {
   passwordRecoveryAuthorization,
   supabase,
 } from "../../lib/auth/supabaseClient";
+import { isPotentialPasswordRecoveryCallback } from "../../lib/auth/passwordRecoveryAuthorization";
 import {
   getPasswordPolicyError,
   PASSWORD_MIN_LENGTH,
   PASSWORD_POLICY_HINT,
 } from "../../lib/auth/passwordPolicy";
 import { PixelIcon } from "../../components/ui/PixelIcon";
+
+const RECOVERY_EVENT_WAIT_MS = 5_000;
 
 export default function ResetPassword() {
   const navigate = useNavigate();
@@ -23,21 +26,26 @@ export default function ResetPassword() {
 
   useEffect(() => {
     let isMounted = true;
+    let redirectTimeoutId: number | null = null;
+    let recoveryAuthorized = false;
+    const callbackPending = isPotentialPasswordRecoveryCallback({
+      hash: window.location.hash,
+      search: window.location.search,
+    });
     const clearAuthHash = () => {
-      if (window.location.hash) {
+      if (window.location.hash || window.location.search) {
         window.history.replaceState(null, "", window.location.pathname);
       }
     };
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!isMounted) return;
-      if (passwordRecoveryAuthorization.permits(session)) {
-        setRecoveryVerified(true);
-        clearAuthHash();
-        return;
+    const authorizeRecovery = () => {
+      recoveryAuthorized = true;
+      if (redirectTimeoutId !== null) {
+        window.clearTimeout(redirectTimeoutId);
+        redirectTimeoutId = null;
       }
-      navigate("/login", { replace: true });
-    });
+      setRecoveryVerified(true);
+      clearAuthHash();
+    };
 
     const {
       data: { subscription },
@@ -46,13 +54,32 @@ export default function ResetPassword() {
         passwordRecoveryAuthorization.observe(event, session) &&
         passwordRecoveryAuthorization.permits(session)
       ) {
-        setRecoveryVerified(true);
-        clearAuthHash();
+        authorizeRecovery();
       }
+    });
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!isMounted) return;
+      if (passwordRecoveryAuthorization.permits(session)) {
+        authorizeRecovery();
+        return;
+      }
+      if (callbackPending) {
+        redirectTimeoutId = window.setTimeout(() => {
+          if (isMounted && !recoveryAuthorized) {
+            navigate("/login", { replace: true });
+          }
+        }, RECOVERY_EVENT_WAIT_MS);
+        return;
+      }
+      navigate("/login", { replace: true });
     });
 
     return () => {
       isMounted = false;
+      if (redirectTimeoutId !== null) {
+        window.clearTimeout(redirectTimeoutId);
+      }
       subscription.unsubscribe();
     };
   }, [navigate]);

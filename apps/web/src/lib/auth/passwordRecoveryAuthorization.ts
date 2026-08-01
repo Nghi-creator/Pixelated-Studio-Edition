@@ -7,6 +7,22 @@ type RecoveryAuthorization = {
   observedAt: number;
 };
 
+export function isPotentialPasswordRecoveryCallback({
+  hash,
+  search,
+}: {
+  hash: string;
+  search: string;
+}) {
+  const hashParameters = new URLSearchParams(hash.replace(/^#/, ""));
+  const searchParameters = new URLSearchParams(search);
+  return (
+    hashParameters.get("type") === "recovery" ||
+    searchParameters.get("type") === "recovery" ||
+    searchParameters.has("code")
+  );
+}
+
 export function createPasswordRecoveryAuthorization() {
   let authorization: RecoveryAuthorization | null = null;
 
@@ -40,4 +56,3 @@ export function createPasswordRecoveryAuthorization() {
     },
   };
 }
-
