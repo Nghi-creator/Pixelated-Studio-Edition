@@ -68,10 +68,10 @@ jobs:
     timeout-minutes: 35
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           cache: npm
           cache-dependency-path: apps/desktop/package-lock.json
@@ -87,7 +87,7 @@ jobs:
         run: npm run dist:ci --prefix apps/desktop
 
       - name: Upload native desktop release
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           if-no-files-found: error
           name: pixelated-desktop-${{ matrix.artifact }}-${{ github.run_id }}-${{ github.run_attempt }}
@@ -107,10 +107,10 @@ jobs:
       contents: write
     steps:
       - name: Check out release notes
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download validated desktop artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           merge-multiple: true
           path: .artifacts/desktop-release-assets

@@ -145,7 +145,7 @@ jobs:
 
       - name: Upload Render deploy proof artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           if-no-files-found: warn
           include-hidden-files: true
@@ -233,7 +233,7 @@ jobs:
 
       - name: Upload Vercel deploy proof artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           if-no-files-found: warn
           include-hidden-files: true
@@ -261,10 +261,10 @@ jobs:
       HOSTED_WEB_URL: ${{ vars.HOSTED_WEB_URL }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           cache: npm
           node-version-file: .nvmrc
@@ -342,7 +342,7 @@ jobs:
 
       - name: Upload hosted pairing smoke bundle
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           if-no-files-found: warn
           include-hidden-files: true
@@ -363,10 +363,10 @@ jobs:
       HOSTED_WEB_URL: ${{ vars.HOSTED_WEB_URL }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           cache: npm
           node-version-file: .nvmrc
@@ -417,7 +417,7 @@ jobs:
 
       - name: Upload hosted auth smoke bundle
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           if-no-files-found: warn
           include-hidden-files: true
