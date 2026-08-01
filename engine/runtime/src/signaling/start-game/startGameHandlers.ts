@@ -6,9 +6,7 @@ import {
   normalizeSessionId,
 } from "../sessionRooms";
 import { sanitizeUserId } from "../../roms/localRomStore";
-import {
-  getRuntimeDefinition,
-} from "../../runtime/runtimeRegistry";
+import { getRuntimeDefinition } from "../../runtime/runtimeRegistry";
 import {
   launchCloudRomSession,
   launchLocalVaultSession,
@@ -39,9 +37,30 @@ type RegisterStartGameOptions = {
   cloudRomStagingRoot?: string;
   downloadCloudRom: DownloadCloudRom;
   getVaultOwnerId?: (socket: Socket) => string;
+  launchCoordinator?: GameLaunchCoordinator;
   runtime: Runtime;
   verifyBackendSession: VerifyBackendSession;
 };
+
+export type GameLaunchCoordinator = ReturnType<
+  typeof createGameLaunchCoordinator
+>;
+
+export function createGameLaunchCoordinator() {
+  let generation = 0;
+
+  return {
+    begin() {
+      const launchGeneration = ++generation;
+      return {
+        isCurrent: () => launchGeneration === generation,
+      };
+    },
+    invalidate() {
+      generation += 1;
+    },
+  };
+}
 
 export function registerStartGameHandler(
   socket: Socket,
@@ -53,6 +72,7 @@ export function registerStartGameHandler(
     cloudRomStagingRoot,
     downloadCloudRom,
     getVaultOwnerId,
+    launchCoordinator = createGameLaunchCoordinator(),
     runtime,
     verifyBackendSession,
   } = options;
@@ -73,6 +93,11 @@ export function registerStartGameHandler(
     socket.join(getSessionRoom(sessionId));
     const iceServers = normalizeIceServers(payload.iceServers);
     const streamProfile = normalizeStreamProfile(payload.streamProfile);
+    const cloudSessionIntent = hasCloudSessionIntent(payload);
+    const sessionToken =
+      typeof payload.sessionToken === "string" && payload.sessionToken
+        ? payload.sessionToken
+        : null;
 
     if (canStartGame && !canStartGame(socket, sessionId)) {
       socket.emit("engine-error", {
@@ -85,27 +110,37 @@ export function registerStartGameHandler(
       `\n[Node.js] React requested game boot for session ${sessionId}: ${romFileOrUrl}`,
     );
 
-    if (!romFileOrUrl && !hasCloudSessionIntent(payload)) {
+    if (!romFileOrUrl && !cloudSessionIntent) {
       console.warn("[Node.js] Ignoring start-game without a game target");
       return;
     }
 
-    if (hasCloudSessionIntent(payload)) {
-      if (typeof payload.sessionToken !== "string" || !payload.sessionToken) {
+    if (cloudSessionIntent) {
+      if (!sessionToken) {
         socket.emit("engine-error", {
           message: "Cloud games require a backend session token.",
         });
         return;
       }
+    } else if (romFileOrUrl.startsWith("http")) {
+      socket.emit("engine-error", {
+        message: "Cloud games require a backend session token.",
+      });
+      return;
+    }
 
+    const launch = launchCoordinator.begin();
+
+    if (cloudSessionIntent && sessionToken) {
       try {
         const verifiedBoot = await resolveVerifiedCloudBoot({
           apiUrl,
           safeUserId,
           sessionId,
-          sessionToken: payload.sessionToken,
+          sessionToken,
           verifyBackendSession,
         });
+        if (!launch.isCurrent()) return;
         romFileOrUrl = verifiedBoot.romFileOrUrl;
         runtimeId = verifiedBoot.runtimeId;
         launchManifestId = verifiedBoot.launchManifestId;
@@ -113,6 +148,7 @@ export function registerStartGameHandler(
         expectedSizeBytes = verifiedBoot.expectedSizeBytes;
         safeUserId = verifiedBoot.safeUserId;
       } catch (err) {
+        if (!launch.isCurrent()) return;
         console.error("[Engine] Cloud session verification failed:", err);
         socket.emit("engine-error", {
           message:
@@ -122,11 +158,6 @@ export function registerStartGameHandler(
         });
         return;
       }
-    } else if (romFileOrUrl.startsWith("http")) {
-      socket.emit("engine-error", {
-        message: "Cloud games require a backend session token.",
-      });
-      return;
     }
 
     const verifiedRuntime = getRuntimeDefinition(runtimeId);
@@ -149,6 +180,7 @@ export function registerStartGameHandler(
     } else if (romFileOrUrl?.startsWith("http")) {
       try {
         await launchCloudRomSession({
+          canLaunch: launch.isCurrent,
           downloadCloudRom,
           expectedSha256,
           expectedSizeBytes,
@@ -161,6 +193,7 @@ export function registerStartGameHandler(
           streamProfile,
         });
       } catch (err) {
+        if (!launch.isCurrent()) return;
         console.error("[Engine] Failed to prepare cloud ROM:", err);
         socket.emit("engine-error", {
           message: err instanceof Error ? err.message : "Cloud ROM failed",
@@ -168,8 +201,7 @@ export function registerStartGameHandler(
       }
     } else if (romFileOrUrl) {
       try {
-        const localVaultOwnerId =
-          getVaultOwnerId?.(socket) || safeUserId;
+        const localVaultOwnerId = getVaultOwnerId?.(socket) || safeUserId;
         if (!localVaultOwnerId) {
           throw new Error("Missing authenticated Local Vault identity.");
         }

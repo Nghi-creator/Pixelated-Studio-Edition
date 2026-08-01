@@ -51,7 +51,10 @@ import {
   registerSignalingRelayHandlers,
 } from "./src/signaling/signalingRelay";
 import { createEngineTokenAuth } from "./src/signaling/socketAuth";
-import { registerStartGameHandler } from "./src/signaling/start-game/startGameHandlers";
+import {
+  createGameLaunchCoordinator,
+  registerStartGameHandler,
+} from "./src/signaling/start-game/startGameHandlers";
 import { verifyBackendSession } from "./src/sessions/verifyBackendSession";
 import {
   createHealthSnapshot,
@@ -112,6 +115,7 @@ const getPublicHealthSnapshot = createPublicHealthSnapshot(
 );
 const lobby = createLobbyManager();
 const signalingPeers = createSignalingPeerRegistry();
+const gameLaunchCoordinator = createGameLaunchCoordinator();
 
 registerHealthRoutes(app, getHealthSnapshot, {
   canReadDetails: (request) =>
@@ -198,6 +202,7 @@ io.on("connection", (socket) => {
     canStartGame: lobby.canControlSession,
     downloadCloudRom: cloudRoms.downloadCloudRom,
     getVaultOwnerId: getSocketVaultOwnerId,
+    launchCoordinator: gameLaunchCoordinator,
     runtime,
     verifyBackendSession,
   });
@@ -222,6 +227,7 @@ io.on("connection", (socket) => {
       });
       return;
     }
+    gameLaunchCoordinator.invalidate();
     runtime.cleanupActiveSession(sessionId);
   });
 });

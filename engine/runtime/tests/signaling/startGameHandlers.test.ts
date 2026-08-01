@@ -202,6 +202,57 @@ test("verified mGBA cloud sessions use a matching temporary extension", async ()
   assert.equal(booted[0]?.options.runtimeId, "mgba");
 });
 
+test("a superseded cloud launch cannot replace a newer game", async () => {
+  let resolveFirstDownload: () => void = () => {
+    throw new Error("First download did not start.");
+  };
+  let downloadCount = 0;
+  const downloadedPaths: string[] = [];
+  const { booted, socket } = createHarness({
+    downloadCloudRom: (_romUrl, destinationPath) => {
+      downloadCount += 1;
+      downloadedPaths.push(destinationPath);
+      fs.writeFileSync(destinationPath, "temporary-rom");
+      if (downloadCount === 1) {
+        return new Promise<void>((resolve) => {
+          resolveFirstDownload = resolve;
+        });
+      }
+      return Promise.resolve();
+    },
+    verifyBackendSession: ({ sessionId }) =>
+      Promise.resolve({
+        mode: "cloud",
+        romTarget: `https://cdn.example.test/${sessionId}.nes`,
+        runtimeId: "mesen",
+        userId: "verified-user",
+      }),
+  });
+
+  socket.emit("start-game", {
+    mode: "cloud",
+    sessionId: "session-slow",
+    sessionToken: "token-slow",
+  });
+  await flushStartGame();
+
+  socket.emit("start-game", {
+    mode: "cloud",
+    sessionId: "session-new",
+    sessionToken: "token-new",
+  });
+  await flushStartGame();
+
+  assert.equal(booted.length, 1);
+  assert.equal(booted[0]?.sessionId, "session-new");
+
+  resolveFirstDownload();
+  await flushStartGame();
+
+  assert.equal(booted.length, 1);
+  assert.equal(fs.existsSync(downloadedPaths[0] || ""), false);
+});
+
 test("cloud temporary ROM is removed when launch fails after download", async () => {
   let downloadedPath = "";
   const { socket } = createHarness({

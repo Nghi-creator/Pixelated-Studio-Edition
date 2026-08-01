@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   createSignalingPeerRegistry,
   isValidWebRtcOffer,
+  normalizeIceCandidate,
   registerSignalingRelayHandlers,
 } from "../../src/signaling/signalingRelay";
 import { joinSession, normalizeSessionId } from "../../src/signaling/sessionRooms";
@@ -128,6 +129,7 @@ test("camera answer with a peer id relays only to that peer room", () => {
 test("camera ICE candidate preserves peer id when unwrapping candidate envelopes", () => {
   const socket = new FakeSocket("camera-1");
   socket.data.sessionId = "session-1";
+  socket.data.role = "camera";
   registerSignalingRelayHandlers(socket as never);
 
   socket.emit("webrtc-ice-candidate-backend", {
@@ -147,6 +149,66 @@ test("camera ICE candidate preserves peer id when unwrapping candidate envelopes
       room: "session:session-1:peer:peer-1",
     },
   ]);
+});
+
+test("ICE candidates are bounded and structurally validated", () => {
+  assert.deepEqual(
+    normalizeIceCandidate({
+      candidate: {
+        candidate: "candidate:1 1 UDP 1 192.0.2.1 5000 typ host",
+        sdpMLineIndex: 0,
+        sdpMid: "0",
+      },
+      peerId: "peer-1",
+    }),
+    {
+      candidate: "candidate:1 1 UDP 1 192.0.2.1 5000 typ host",
+      peerId: "peer-1",
+      sdpMLineIndex: 0,
+      sdpMid: "0",
+    },
+  );
+  assert.equal(normalizeIceCandidate({ candidate: {}, peerId: "peer-1" }), null);
+  assert.equal(
+    normalizeIceCandidate({
+      candidate: "c".repeat(4 * 1024 + 1),
+      peerId: "peer-1",
+      sdpMLineIndex: 0,
+    }),
+    null,
+  );
+  assert.equal(
+    normalizeIceCandidate({
+      candidate: "candidate",
+      peerId: "peer-1",
+      sdpMLineIndex: -1,
+    }),
+    null,
+  );
+});
+
+test("ICE candidates require an acquired peer and camera-only backend direction", () => {
+  const browser = new FakeSocket("browser-1");
+  browser.data.sessionId = "session-1";
+  registerSignalingRelayHandlers(browser as never);
+
+  browser.emit("webrtc-ice-candidate", {
+    candidate: { candidate: "candidate", sdpMLineIndex: 0 },
+    peerId: "peer-1",
+  });
+  browser.emit("webrtc-ice-candidate-backend", {
+    candidate: { candidate: "candidate", sdpMLineIndex: 0 },
+    peerId: "peer-1",
+  });
+  assert.deepEqual(browser.relays, []);
+
+  browser.emit("webrtc-offer", { peerId: "peer-1", sdp: "offer" });
+  browser.relays.length = 0;
+  browser.emit("webrtc-ice-candidate", {
+    candidate: { candidate: "candidate", sdpMLineIndex: 0 },
+    peerId: "peer-1",
+  });
+  assert.equal(browser.relays.length, 1);
 });
 
 test("browser peer disconnect relays only a peer cleanup event to the session", () => {
@@ -172,7 +234,11 @@ test("peer disconnect releases remembered rooms", () => {
   const socket = new FakeSocket("browser-1");
   socket.data.sessionId = "session-1";
   registerSignalingRelayHandlers(socket as never);
-  socket.emit("webrtc-offer", { peerId: "peer-1", sdp: "offer" });
+  socket.emit("webrtc-offer", {
+    peerId: "peer-1",
+    sdp: "offer",
+    type: "offer",
+  });
   socket.emit("webrtc-peer-disconnect", { peerId: "peer-1" });
 
   assert.deepEqual(socket.leaves, ["session:session-1:peer:peer-1"]);
@@ -200,7 +266,11 @@ test("signaling rejects offers from sockets outside the active lobby", () => {
     canCreatePeer: () => false,
   });
 
-  socket.emit("webrtc-offer", { peerId: "peer-1", sdp: "offer" });
+  socket.emit("webrtc-offer", {
+    peerId: "peer-1",
+    sdp: "offer",
+    type: "offer",
+  });
 
   assert.deepEqual(socket.joins, []);
   assert.deepEqual(socket.relays, []);
@@ -236,21 +306,38 @@ test("signaling bounds active peers across sockets and releases capacity", () =>
 test("signaling events share a bounded per-socket rate limit", () => {
   const socket = new FakeSocket("browser-1");
   socket.data.sessionId = "session-1";
+  socket.data.webrtcPeerIds = ["peer-1"];
   let now = 1_000;
   registerSignalingRelayHandlers(socket as never, {
     eventLimitPerSecond: 2,
     now: () => now,
   });
 
-  socket.emit("webrtc-ice-candidate", { candidate: "candidate-1" });
-  socket.emit("webrtc-ice-candidate", { candidate: "candidate-2" });
-  socket.emit("webrtc-ice-candidate", { candidate: "candidate-3" });
+  socket.emit("webrtc-ice-candidate", {
+    candidate: "candidate-1",
+    peerId: "peer-1",
+    sdpMLineIndex: 0,
+  });
+  socket.emit("webrtc-ice-candidate", {
+    candidate: "candidate-2",
+    peerId: "peer-1",
+    sdpMLineIndex: 0,
+  });
+  socket.emit("webrtc-ice-candidate", {
+    candidate: "candidate-3",
+    peerId: "peer-1",
+    sdpMLineIndex: 0,
+  });
   socket.emit("webrtc-answer", { type: "answer" });
 
   assert.equal(socket.relays.length, 2);
 
   now += 1_000;
-  socket.emit("webrtc-ice-candidate", { candidate: "candidate-4" });
+  socket.emit("webrtc-ice-candidate", {
+    candidate: "candidate-4",
+    peerId: "peer-1",
+    sdpMLineIndex: 0,
+  });
   assert.equal(socket.relays.length, 3);
 });
 

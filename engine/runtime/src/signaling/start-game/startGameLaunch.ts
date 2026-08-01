@@ -67,6 +67,7 @@ export function launchNativeSession(options: {
 }
 
 export async function launchCloudRomSession(options: {
+  canLaunch?: () => boolean;
   downloadCloudRom: DownloadCloudRom;
   expectedSha256?: string | null;
   expectedSizeBytes?: number | null;
@@ -79,6 +80,7 @@ export async function launchCloudRomSession(options: {
   streamProfile: StreamProfile;
 }) {
   const {
+    canLaunch = () => true,
     downloadCloudRom,
     expectedSha256,
     expectedSizeBytes,
@@ -105,6 +107,10 @@ export async function launchCloudRomSession(options: {
       expectedSizeBytes,
       runtimeId,
     });
+    if (!canLaunch()) {
+      removeCloudRomStagingArtifact(tmpPath, stagingRoot);
+      return false;
+    }
     console.log("[Engine] Download complete. Booting Cloud Game.");
     runtime.bootGame(tmpPath, sessionId, {
       ...withIceServers(iceServers),
@@ -112,6 +118,7 @@ export async function launchCloudRomSession(options: {
       runtimeId,
       streamProfile,
     });
+    return true;
   } catch (err) {
     removeCloudRomStagingArtifact(tmpPath, stagingRoot);
     throw err;
