@@ -16,6 +16,7 @@ import {
   consumeCompanionRequestLimit,
   createCompanionLaunchTicket,
   getCompanionStatusPage,
+  getCompanionListenHost,
   getCompanionInviteStatus,
   hasValidCompanionLaunchTicket,
   hardenCompanionServer,
@@ -27,6 +28,11 @@ import {
 } from "../../../main/companion/server";
 
 describe("desktop companion connection hardening", () => {
+  it("binds local mode to loopback and LAN mode to every interface", () => {
+    assert.equal(getCompanionListenHost("local"), "127.0.0.1");
+    assert.equal(getCompanionListenHost("lan"), "0.0.0.0");
+  });
+
   it("bounds connections, headers, keep-alive reuse, and request duration", () => {
     const server = http.createServer();
     const initialConnectionListeners = server.listenerCount("connection");

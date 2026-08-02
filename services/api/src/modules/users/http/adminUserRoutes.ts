@@ -20,6 +20,29 @@ const userUpdateSchema = z
   })
   .refine((value) => value.role !== undefined || value.is_banned !== undefined);
 
+const ADMIN_USER_COLUMNS =
+  "id,username,avatar_url,created_at,role,is_banned";
+
+type AdminUserRow = {
+  avatar_url: string | null;
+  created_at: string;
+  id: string;
+  is_banned: boolean;
+  role: string;
+  username: string | null;
+};
+
+function toAdminUser(row: AdminUserRow) {
+  return {
+    avatar_url: row.avatar_url,
+    created_at: row.created_at,
+    id: row.id,
+    is_banned: row.is_banned,
+    role: row.role,
+    username: row.username,
+  };
+}
+
 type ProfileRole = {
   role: string | null;
 };
@@ -93,7 +116,7 @@ export async function registerAdminUserRoutes(
 
       let usersQuery = service
         .from("profiles")
-        .select("*", { count: "exact" })
+        .select(ADMIN_USER_COLUMNS, { count: "exact" })
         .order("created_at", { ascending: false });
 
       if (search) {
@@ -126,7 +149,7 @@ export async function registerAdminUserRoutes(
         pageSize,
         total,
         totalPages: Math.max(1, Math.ceil(total / pageSize)),
-        users: data || [],
+        users: ((data || []) as AdminUserRow[]).map(toAdminUser),
       };
     },
   );
@@ -176,15 +199,15 @@ export async function registerAdminUserRoutes(
         .from("profiles")
         .update(body.data)
         .eq("id", params.data.userId)
-        .select()
-        .single();
+        .select(ADMIN_USER_COLUMNS)
+        .single<AdminUserRow>();
 
       if (error || !data) {
         request.log.error({ err: error }, "Failed to update user");
         return reply.status(500).send({ error: "Failed to update user" });
       }
 
-      return { user: data };
+      return { user: toAdminUser(data) };
     },
   );
 }

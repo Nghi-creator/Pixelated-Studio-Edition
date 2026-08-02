@@ -55,6 +55,10 @@ export const COMPANION_SERVER_LIMITS = Object.freeze({
   tlsHandshakeTimeoutMs: 10_000,
 });
 
+export function getCompanionListenHost(exposureMode: "local" | "lan") {
+  return exposureMode === "lan" ? "0.0.0.0" : "127.0.0.1";
+}
+
 export function hardenCompanionServer(server: http.Server | https.Server) {
   server.headersTimeout = COMPANION_SERVER_LIMITS.headersTimeoutMs;
   server.keepAliveTimeout = COMPANION_SERVER_LIMITS.keepAliveTimeoutMs;
@@ -87,6 +91,7 @@ export function hardenCompanionServer(server: http.Server | https.Server) {
 export function startCompanionServer({
   certDir,
   engineToken,
+  exposureMode,
   inviteCode,
   inviteExpiresAt,
   lanAddresses,
@@ -158,7 +163,7 @@ export function startCompanionServer({
       httpReady = true;
       maybeResolve();
     });
-    server.listen(port, "0.0.0.0", () => {
+    server.listen(port, getCompanionListenHost(exposureMode), () => {
       server.off("error", handleListenError);
       httpsReady = true;
       maybeResolve();

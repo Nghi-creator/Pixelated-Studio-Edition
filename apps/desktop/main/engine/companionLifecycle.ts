@@ -34,6 +34,7 @@ export async function startCompanionForEngine({
     const companion: CompanionServerResult = await dependencies.startCompanionServer({
       certDir: path.join(dependencies.getUserDataPath(), "certificates"),
       engineToken,
+      exposureMode: launchContext.exposureMode,
       inviteCode: launchContext.inviteCode,
       inviteExpiresAt: launchContext.inviteExpiresAt,
       lanAddresses: getLanIpv4Addresses(),

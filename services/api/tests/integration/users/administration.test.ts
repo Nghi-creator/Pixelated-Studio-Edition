@@ -18,6 +18,9 @@ type TestRequest = FastifyRequest & {
 test("admin user and access-log routes require privileged roles", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
+  Object.assign(db.rows.profiles.find((row) => row.id === USER_ID) || {}, {
+    internal_note: "must-not-cross-api-boundary",
+  });
   db.rows.access_logs.push({
     created_at: "2026-05-27T00:00:00.000Z",
     id: "log-1",
@@ -42,6 +45,11 @@ test("admin user and access-log routes require privileged roles", async () => {
     url: "/admin/users",
   });
   assert.equal(usersResponse.statusCode, 200);
+  const listedUser = usersResponse
+    .json<{ users: Record<string, unknown>[] }>()
+    .users.find((user) => user.id === USER_ID);
+  assert.ok(listedUser);
+  assert.equal("internal_note" in listedUser, false);
 
   const updateResponse = await superAdminApp.inject({
     method: "PATCH",
@@ -49,6 +57,10 @@ test("admin user and access-log routes require privileged roles", async () => {
     url: `/admin/users/${USER_ID}`,
   });
   assert.equal(updateResponse.statusCode, 200);
+  assert.equal(
+    "internal_note" in updateResponse.json<{ user: Record<string, unknown> }>().user,
+    false,
+  );
   assert.equal(db.rows.profiles.find((row) => row.id === USER_ID)?.is_banned, true);
 
   const logsResponse = await createDataBoundaryApp(db, ADMIN_ID).then((app) =>
