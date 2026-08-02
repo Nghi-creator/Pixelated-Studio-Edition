@@ -31,6 +31,7 @@ export type CompanionRequestOptions = {
 
 export type CompanionServerOptions = CompanionRequestOptions & {
   certDir: string;
+  exposureMode: "local" | "lan";
   inviteCode?: string;
   inviteExpiresAt?: number;
   lanAddresses: string[];

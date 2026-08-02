@@ -49,7 +49,6 @@ export function FallbackFrameCanvas({ active }: FallbackFrameCanvasProps) {
         }, 3_000);
         if (!response.ok || disposed) {
           delayMs = Math.min(MAX_FRAME_DELAY_MS, delayMs + 250);
-          scheduleNextFrame();
           return;
         }
 
@@ -84,4 +83,3 @@ export function FallbackFrameCanvas({ active }: FallbackFrameCanvasProps) {
     />
   );
 }
-

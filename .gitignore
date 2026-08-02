@@ -16,3 +16,4 @@ supabase/.temp/
 docs_research/
 user-edition/
 research-papers-latency-fingerprinting/
+latency_fingerprinting/ 
