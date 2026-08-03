@@ -13,6 +13,8 @@ import {
   useSearchParams,
 } from "react-router";
 import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPanel";
+import { DesktopLaunchStep } from "../../features/local-engine/DesktopLaunchStep";
+import { getInviteCompanionUrl } from "../../features/local-engine/inviteUtils";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import { useEngineConnectionStatus } from "../../lib/engine/useEngineConnectionStatus";
 
@@ -71,6 +73,7 @@ export default function EngineConnection() {
   const desktopLaunchError = getDesktopLaunchErrorMessage(
     searchParams.get("desktopLaunchError"),
   );
+  const isHostJoin = Boolean(getInviteCompanionUrl(location.search));
   const locationState =
     typeof location.state === "object" && location.state !== null
       ? (location.state as EngineLocationState)
@@ -116,8 +119,8 @@ export default function EngineConnection() {
       )}
 
       <div className="mb-6 grid gap-3 sm:grid-cols-3">
+        <DesktopLaunchStep isHostJoin={isHostJoin} />
         {[
-          "Open the desktop app or host join link",
           "Confirm the desktop engine is running",
           "Pair locally or join with an invite code",
         ].map((step, index) => (
@@ -126,7 +129,7 @@ export default function EngineConnection() {
             key={step}
           >
             <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-[#D03A79] bg-[#A6004B] text-xs font-bold text-white">
-              {index + 1}
+              {index + 2}
             </span>
             <span className="text-sm font-semibold text-white">{step}</span>
           </div>

@@ -30,6 +30,14 @@
   "build": {
     "appId": "com.pixelated.studio",
     "productName": "Pixelated Studio",
+    "protocols": [
+      {
+        "name": "Open Pixelated Studio",
+        "schemes": [
+          "pixelated-studio"
+        ]
+      }
+    ],
     "asar": true,
     "directories": {
       "output": "release"
