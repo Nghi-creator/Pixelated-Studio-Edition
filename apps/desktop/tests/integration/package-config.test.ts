@@ -17,6 +17,10 @@ type DesktopPackageJson = {
     };
     extraResources?: ExtraResource[];
     files?: string[];
+    protocols?: Array<{
+      name: string;
+      schemes: string[];
+    }>;
     mac?: {
       artifactName?: string;
       icon?: string;
@@ -101,6 +105,17 @@ describe("desktop package config", () => {
     assert.match(packageJson.scripts?.["dist:ci"] || "", /smoke:release/);
   });
 
+  it("registers the browser-to-desktop launch protocol", () => {
+    const packageJson = readPackageJson();
+
+    assert.deepEqual(packageJson.build.protocols, [
+      {
+        name: "Open Pixelated Studio",
+        schemes: ["pixelated-studio"],
+      },
+    ]);
+  });
+
   it("validates native releases on macOS, Windows, and Ubuntu runners", () => {
     const workflowPath = path.resolve(
       __dirname,
@@ -148,6 +163,10 @@ describe("desktop package config", () => {
     assert.match(main, /sandbox:\s*true/);
     assert.match(main, /setWindowOpenHandler/);
     assert.match(main, /will-navigate/);
+    assert.match(main, /requestSingleInstanceLock/);
+    assert.match(main, /setAsDefaultProtocolClient/);
+    assert.match(main, /second-instance/);
+    assert.match(main, /open-url/);
     assert.doesNotMatch(preload, /require\("\.\/main\/companion\/qr"\)/);
     assert.match(preload, /ipcRenderer\.invoke|electron_1\.ipcRenderer\.invoke/);
     assert.doesNotMatch(renderer, /\bexports\b/);
