@@ -1,26 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { StreamProfile } from "../engine/streamProfiles";
+import type { StreamProfile } from "../../../../lib/engine/streamProfiles";
 import {
   CHECKING_INPUT_CAPABILITIES,
-} from "./engine/engineContext";
+} from "../../../../lib/webrtc/engine/engineContext";
 import type {
   EngineInputCapabilities,
   EngineShareContext,
   LobbyParticipant,
   LobbyState,
   UseWebRTCOptions,
-} from "./types";
+} from "../../../../lib/webrtc/types";
 import { useEnginePairingVersion } from "./engine/useEnginePairingVersion";
 import { useWebRTCLobbyControls } from "./controls/useWebRTCLobbyControls";
 import { useWebRTCProfileRestart } from "./controls/useWebRTCProfileRestart";
 import { useWebRTCRecoveryControls } from "./controls/useWebRTCRecoveryControls";
 import { useWebRTCSessionLifecycle } from "./session/useWebRTCSessionLifecycle";
-import { createWebRTCSessionId, type WebRTCStatus } from "./session/webrtcSession";
-import type { EngineSocket } from "./transport/webrtcSocket";
+import { createWebRTCSessionId, type WebRTCStatus } from "../../../../lib/webrtc/session/webrtcSession";
+import type { EngineSocket } from "../../../../lib/webrtc/transport/webrtcSocket";
 import {
   INITIAL_WEBRTC_TELEMETRY,
   type WebRTCTelemetry,
-} from "./telemetry/webrtcTelemetry";
+} from "../../../../lib/webrtc/telemetry/webrtcTelemetry";
 
 export type {
   EngineInputCapabilities,
@@ -29,7 +29,7 @@ export type {
   LobbyRole,
   LobbyState,
   WebRTCMode,
-} from "./types";
+} from "../../../../lib/webrtc/types";
 
 export function useWebRTC(
   gameId: string,

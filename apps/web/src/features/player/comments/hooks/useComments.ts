@@ -5,7 +5,7 @@ import {
   usePostCommentMutation,
   useSetCommentReactionMutation,
 } from "./commentMutations";
-import { useGameCommentsQuery } from "../../../../lib/api/apiQueries";
+import { useGameCommentsQuery } from "../../../../hooks/queryHooks";
 import type { GameComment } from "../../types";
 import { getSocialErrorMessage } from "../../socialFeedback";
 

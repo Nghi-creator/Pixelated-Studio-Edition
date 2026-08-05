@@ -5,10 +5,10 @@ import {
   ENGINE_PAIRING_EVENT,
   getEngineToken,
   hasEngineToken,
-} from "./engineAuth";
-import { setEngineConnectionStatus } from "./engineConnectionState";
-import { engineEndpoint } from "./engineConfig";
-import { shouldClearEnginePairingAfterProbe } from "./engineConnectionMonitorPolicy";
+} from "../../lib/engine/engineAuth";
+import { setEngineConnectionStatus } from "../../lib/engine/engineConnectionState";
+import { engineEndpoint } from "../../lib/engine/engineConfig";
+import { shouldClearEnginePairingAfterProbe } from "../../lib/engine/engineConnectionMonitorPolicy";
 
 const ENGINE_PROBE_INTERVAL_MS = 5_000;
 const ENGINE_PROBE_TIMEOUT_MS = 1_500;

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { ApiError, api } from "../../lib/api/apiClient";
 import { supabase } from "../../lib/auth/supabaseClient";
-import { isAuthCaptchaEnabled } from "../auth/captchaConfig";
+import { isAuthCaptchaEnabled } from "../../lib/auth/captchaConfig";
 import { buildPasswordReauthPayload } from "./profileAuthCaptcha";
 
 export function useDeleteAccount({

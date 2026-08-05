@@ -3,10 +3,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
 import { ArrowLeft, Plus } from "lucide-react";
 import GameCard from "../../components/user/GameCard";
-import { useFavoritesQuery } from "../../lib/api/apiQueries";
+import { useFavoritesQuery } from "../../hooks/queryHooks";
 import { queryKeys } from "../../lib/api/queryClient";
 import { FavoritesPageSkeleton } from "../../components/ui/skeleton/UserSkeletons";
-import { replaceFavoriteIds } from "../../features/favorites/favoriteState";
+import { replaceFavoriteIds } from "../../lib/favoriteState";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import {
   LibraryGamePicker,

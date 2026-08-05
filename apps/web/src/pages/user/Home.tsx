@@ -6,7 +6,7 @@ import {
   useCatalogFiltersQuery,
   useFeaturedGamesQuery,
   useGameCatalogQuery,
-} from "../../lib/api/apiQueries";
+} from "../../hooks/queryHooks";
 import {
   GameGridSkeleton,
   GamesCatalogSkeleton,
@@ -14,11 +14,11 @@ import {
 } from "../../components/ui/skeleton/UserSkeletons";
 import { Pagination } from "../../components/ui/Pagination";
 import { AdminSelect } from "../../components/ui/AdminSelect";
-import { useDebouncedValue } from "../../lib/useDebouncedValue";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 import {
   CATALOG_PLATFORM_OPTIONS,
   formatGenre,
-} from "../../features/catalog/catalogMetadata";
+} from "../../lib/catalogMetadata";
 
 const GAMES_PER_PAGE = 15;
 const ZERO_PLAY_FEATURED_REFRESH_MS = 30_000;

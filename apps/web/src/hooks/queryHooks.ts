@@ -1,6 +1,6 @@
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
-import { getPermanentAuthSession, api } from "./apiClient";
-import { queryKeys } from "./queryClient";
+import { getPermanentAuthSession, api } from "../lib/api/apiClient";
+import { queryKeys } from "../lib/api/queryClient";
 import type {
   ApiGame,
   ApiCatalogCandidateSourceKind,
@@ -11,7 +11,7 @@ import type {
   ApiPaginatedAccessLogsResponse,
   ApiPaginatedReportsResponse,
   ApiPaginatedUsersResponse,
-} from "./apiTypes";
+} from "../lib/api/apiTypes";
 
 export function useAccessLogsQuery<TLog>(page: number, pageSize: number) {
   return useQuery({

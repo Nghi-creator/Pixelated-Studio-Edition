@@ -1,6 +1,6 @@
 import { Loader2 } from "lucide-react";
 import { Navigate, Outlet, useLocation } from "react-router";
-import { useEngineConnectionStatus } from "../../lib/engine/useEngineConnectionStatus";
+import { useEngineConnectionStatus } from "../../hooks/engine/useEngineConnectionStatus";
 
 export function RequireEngineConnection() {
   const location = useLocation();

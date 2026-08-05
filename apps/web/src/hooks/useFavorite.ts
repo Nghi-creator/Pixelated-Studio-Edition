@@ -1,17 +1,17 @@
 import { useCallback, useEffect, useSyncExternalStore } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router";
-import { api, getPermanentAuthSession } from "../../lib/api/apiClient";
-import { useFavoriteIdsQuery } from "../../lib/api/apiQueries";
-import { invalidateFavoriteQueries } from "../../lib/api/queryClient";
-import { supabase } from "../../lib/auth/supabaseClient";
+import { api, getPermanentAuthSession } from "../lib/api/apiClient";
+import { useFavoriteIdsQuery } from "./queryHooks";
+import { invalidateFavoriteQueries } from "../lib/api/queryClient";
+import { supabase } from "../lib/auth/supabaseClient";
 import {
   getFavoriteSnapshot,
   mutateFavorite,
   replaceFavoriteIds,
   resetFavoriteState,
   subscribeToFavorites,
-} from "./favoriteState";
+} from "../lib/favoriteState";
 
 supabase.auth.onAuthStateChange(() => {
   resetFavoriteState();

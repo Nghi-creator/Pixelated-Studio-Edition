@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router";
-import { useFavorite } from "../../features/favorites/useFavorite";
+import { useFavorite } from "../../hooks/useFavorite";
 import {
   GameArtworkFallback,
 } from "./GameArtworkFallback";

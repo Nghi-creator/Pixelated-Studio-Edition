@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { useGameCatalogQuery } from "../../lib/api/apiQueries";
-import { useEngineConnectionStatus } from "../../lib/engine/useEngineConnectionStatus";
-import { getLocalVaultErrorMessage } from "../local-vault/localVaultClient";
+import { useGameCatalogQuery } from "../../hooks/queryHooks";
+import { useEngineConnectionStatus } from "../../hooks/engine/useEngineConnectionStatus";
+import { getLocalVaultErrorMessage } from "../../lib/local-vault/localVaultClient";
 import { getPageSlice } from "../../components/ui/paginationUtils";
-import { searchAndRankGames } from "../search/gameSearch";
+import { searchAndRankGames } from "../../lib/search/gameSearch";
 import {
   getJoinInvite,
   getSessionFromInvite,

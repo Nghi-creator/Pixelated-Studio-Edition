@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, Filter } from "lucide-react";
-import ReportCard, { type Report } from "../../components/admin/ReportCard";
+import ReportCard, { type Report } from "../../features/admin/components/ReportCard";
 import {
   AdminConfirmDialog,
   type AdminConfirmation,
@@ -11,7 +11,7 @@ import {
   useAdminReportsQuery,
   useAuthSessionQuery,
   usePermissionsQuery,
-} from "../../lib/api/apiQueries";
+} from "../../hooks/queryHooks";
 import { ModerationQueueSkeleton } from "../../components/ui/skeleton/AdminSkeletons";
 import { Pagination } from "../../components/ui/Pagination";
 import { PixelIcon } from "../../components/ui/PixelIcon";

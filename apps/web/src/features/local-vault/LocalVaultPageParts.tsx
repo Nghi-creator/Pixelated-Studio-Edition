@@ -14,7 +14,7 @@ import { PixelIcon } from "../../components/ui/PixelIcon";
 import {
   getLocalGamePlayPath,
   getLocalGameTitle,
-} from "./localVaultClient";
+} from "../../lib/local-vault/localVaultClient";
 
 export type LocalVaultMessage = {
   tone: "error" | "success";

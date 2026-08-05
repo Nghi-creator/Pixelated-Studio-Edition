@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ApiError } from "../../lib/api/apiClient";
-import { useAccessLogsQuery } from "../../lib/api/apiQueries";
+import { useAccessLogsQuery } from "../../hooks/queryHooks";
 import { AdminTablePageSkeleton } from "../../components/ui/skeleton/AdminSkeletons";
 import { Pagination } from "../../components/ui/Pagination";
 import { getPageRangeLabel } from "../../features/admin/adminState";

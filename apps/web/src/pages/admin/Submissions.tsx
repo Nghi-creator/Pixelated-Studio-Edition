@@ -17,13 +17,13 @@ import {
   type SubmissionFormState,
 } from "../../features/admin/submissionReviewState";
 import { useReviewGameSubmissionMutation } from "../../features/admin/adminMutations";
-import { useGameSubmissionsQuery } from "../../lib/api/apiQueries";
+import { useGameSubmissionsQuery } from "../../hooks/queryHooks";
 import type {
   ApiGameSubmission,
   ApiGameSubmissionStatus,
   ApiSubmissionCandidatePayload,
 } from "../../lib/api/apiTypes";
-import { useDebouncedValue } from "../../lib/useDebouncedValue";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 
 const SUBMISSIONS_PER_PAGE = 15;
 const STATUS_OPTIONS: ApiGameSubmissionStatus[] = [

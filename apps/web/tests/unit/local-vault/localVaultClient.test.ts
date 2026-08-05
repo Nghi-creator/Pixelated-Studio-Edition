@@ -8,7 +8,7 @@ import {
   normalizeLocalGameFilenames,
   toLocalVaultGames,
   validateLocalRomFile,
-} from "../../../src/features/local-vault/localVaultState.ts";
+} from "../../../src/lib/local-vault/localVaultState.ts";
 
 function fileLike(name: string, size: number) {
   return { name, size } as File;

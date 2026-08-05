@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { PixelIcon } from "../../../../components/ui/PixelIcon";
-import type { LobbyParticipant } from "../../../../lib/webrtc/useWebRTC";
+import type { LobbyParticipant } from "../../hooks/webrtc/useWebRTC";
 
 function getRoleIconName(participant: LobbyParticipant) {
   if (participant.role === "host") return "engine-on";

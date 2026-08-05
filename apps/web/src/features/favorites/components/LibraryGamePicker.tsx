@@ -5,7 +5,7 @@ import { GameArtworkFallback } from "../../../components/user/GameArtworkFallbac
 import { isGeneratedCatalogArtworkUrl } from "../../../components/user/gameArtworkUtils";
 import { api } from "../../../lib/api/apiClient";
 import { queryKeys } from "../../../lib/api/queryClient";
-import { useFavorite } from "../useFavorite";
+import { useFavorite } from "../../../hooks/useFavorite";
 
 const LIBRARY_PICKER_PAGE_SIZE = 10;
 

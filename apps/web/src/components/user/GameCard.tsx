@@ -1,7 +1,7 @@
 import { Heart, Loader2 } from "lucide-react";
 import { Link } from "react-router";
 import { useState } from "react";
-import { useFavorite } from "../../features/favorites/useFavorite";
+import { useFavorite } from "../../hooks/useFavorite";
 import {
   GameArtworkFallback,
 } from "./GameArtworkFallback";

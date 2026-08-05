@@ -6,11 +6,11 @@ import {
   AdminConfirmDialog,
   type AdminConfirmation,
 } from "../../src/components/admin/AdminConfirmDialog";
-import ReportCard, { type Report } from "../../src/components/admin/ReportCard";
+import ReportCard, { type Report } from "../../src/features/admin/components/ReportCard";
 import {
   INVALID_ENGINE_TOKEN_MESSAGE,
   validateLocalRomFile,
-} from "../../src/features/local-vault/localVaultClient";
+} from "../../src/lib/local-vault/localVaultClient";
 import { LobbyPanel } from "../../src/features/player/components/stream/LobbyPanel";
 import { KeyboardMappingDrawer } from "../../src/features/player/components/stream/KeyboardMappingDrawer";
 import { PlayerControls } from "../../src/features/player/components/shell/PlayerControls";

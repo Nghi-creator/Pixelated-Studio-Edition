@@ -5,7 +5,7 @@ import {
   ENGINE_PAIRING_EVENT,
   getEngineToken,
 } from "../../lib/engine/engineAuth";
-import { useEngineConnectionStatus } from "../../lib/engine/useEngineConnectionStatus";
+import { useEngineConnectionStatus } from "../../hooks/engine/useEngineConnectionStatus";
 import {
   clearEngineUrl,
   DEFAULT_ENGINE_URL,

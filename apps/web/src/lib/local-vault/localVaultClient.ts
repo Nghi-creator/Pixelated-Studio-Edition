@@ -1,11 +1,11 @@
-import { getPermanentAuthSession } from "../../lib/api/apiClient";
+import { getPermanentAuthSession } from "../api/apiClient";
 import {
   clearEngineToken,
   engineAuthHeaders,
   hasEngineToken,
-} from "../../lib/engine/engineAuth";
-import { engineEndpoint } from "../../lib/engine/engineConfig";
-import { engineFetch } from "../../lib/engine/engineRequest";
+} from "../engine/engineAuth";
+import { engineEndpoint } from "../engine/engineConfig";
+import { engineFetch } from "../engine/engineRequest";
 export {
   getLocalGameTitle,
   getLocalGamePlayPath,

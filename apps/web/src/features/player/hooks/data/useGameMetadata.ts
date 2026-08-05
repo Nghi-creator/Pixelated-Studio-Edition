@@ -1,5 +1,5 @@
 import type { ApiGame } from "../../../../lib/api/apiClient";
-import { useGameMetadataQuery } from "../../../../lib/api/apiQueries";
+import { useGameMetadataQuery } from "../../../../hooks/queryHooks";
 
 type GameRights = NonNullable<ApiGame["game_rights"]>[number];
 
@@ -17,4 +17,3 @@ export function useGameMetadata(gameId: string | undefined) {
 
   return { authorName, gameRights, gameTitle };
 }
-

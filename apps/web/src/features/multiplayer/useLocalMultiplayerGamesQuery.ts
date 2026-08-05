@@ -4,7 +4,7 @@ import {
   fetchLocalVaultFilenames,
   getLocalVaultUserId,
   toLocalVaultGames,
-} from "../local-vault/localVaultClient";
+} from "../../lib/local-vault/localVaultClient";
 
 export function useLocalMultiplayerGamesQuery({
   enabled,

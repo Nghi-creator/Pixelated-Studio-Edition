@@ -13,7 +13,7 @@ import { supabase } from "../../lib/auth/supabaseClient";
 import {
   useAuthSessionQuery,
   usePermissionsQuery,
-} from "../../lib/api/apiQueries";
+} from "../../hooks/queryHooks";
 import { PixelIcon } from "../ui/PixelIcon";
 
 export default function AdminLayout() {
