@@ -19,7 +19,7 @@ import {
   LOCAL_ENGINE_UNREACHABLE_MESSAGE,
   uploadLocalVaultRom,
   validateLocalRomFile,
-} from "../../features/local-vault/localVaultClient";
+} from "../../lib/local-vault/localVaultClient";
 import {
   LocalVaultDeleteDialog,
   LocalVaultDropzone,

@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import type { User as SupabaseUser } from "@supabase/supabase-js";
 import { supabase } from "../../lib/auth/supabaseClient";
 import { getPasswordPolicyError } from "../../lib/auth/passwordPolicy";
-import { isAuthCaptchaEnabled } from "../auth/captchaConfig";
+import { isAuthCaptchaEnabled } from "../../lib/auth/captchaConfig";
 import { buildPasswordReauthPayload } from "./profileAuthCaptcha";
 import type { PasswordMessage } from "./profileSettingsTypes";
 

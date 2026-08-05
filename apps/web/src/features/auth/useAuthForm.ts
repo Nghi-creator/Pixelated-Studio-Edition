@@ -5,7 +5,7 @@ import { supabase } from "../../lib/auth/supabaseClient";
 import { getPublicAppUrl } from "../../lib/navigation/appUrl";
 import { getPasswordPolicyError } from "../../lib/auth/passwordPolicy";
 import { isAnonymousUser } from "../../lib/auth/authIdentity";
-import { isAuthCaptchaEnabled } from "./captchaConfig";
+import { isAuthCaptchaEnabled } from "../../lib/auth/captchaConfig";
 
 export type HostedAuthOptions = {
   captchaToken?: string;

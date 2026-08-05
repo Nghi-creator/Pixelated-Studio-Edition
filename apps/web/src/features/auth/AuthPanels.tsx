@@ -11,7 +11,7 @@ import {
   PASSWORD_MIN_LENGTH,
   PASSWORD_POLICY_HINT,
 } from "../../lib/auth/passwordPolicy";
-import { AuthCaptcha } from "./AuthCaptcha";
+import { AuthCaptcha } from "../../components/auth/AuthCaptcha";
 import { AuthSocialActions } from "./AuthSocialActions";
 
 export function AuthMessagePanel({

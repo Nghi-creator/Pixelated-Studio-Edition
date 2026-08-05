@@ -1,10 +1,10 @@
 import { useCallback } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import { loadEngineLaunchFailureMessage } from "../engine/engineContext";
-import type { UseWebRTCOptions } from "../types";
-import { createWebRTCRetryIdentity } from "../session/webrtcIdentity";
-import type { WebRTCStatus } from "../session/webrtcSession";
-import type { WebRTCTelemetry } from "../telemetry/webrtcTelemetry";
+import { loadEngineLaunchFailureMessage } from "../../../../../lib/webrtc/engine/engineContext";
+import type { UseWebRTCOptions } from "../../../../../lib/webrtc/types";
+import { createWebRTCRetryIdentity } from "../../../../../lib/webrtc/session/webrtcIdentity";
+import type { WebRTCStatus } from "../../../../../lib/webrtc/session/webrtcSession";
+import type { WebRTCTelemetry } from "../../../../../lib/webrtc/telemetry/webrtcTelemetry";
 
 const BLACK_FRAME_STALL_MESSAGE =
   "The stream connected, but the video stayed black. Retry the stream; if this only happens on cellular data, configure a TURN relay or use Wi-Fi.";
@@ -82,4 +82,3 @@ export function useWebRTCRecoveryControls({
     retry,
   };
 }
-

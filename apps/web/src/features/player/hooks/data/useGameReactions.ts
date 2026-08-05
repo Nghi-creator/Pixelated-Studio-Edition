@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { useSetGameReactionMutation } from "./playerMutations";
-import { useGameReactionsQuery } from "../../../../lib/api/apiQueries";
+import { useGameReactionsQuery } from "../../../../hooks/queryHooks";
 import { getSocialErrorMessage } from "../../socialFeedback";
 
 export function useGameReactions(gameId: string | undefined, currentUser: User | null) {
@@ -67,4 +67,3 @@ export function useGameReactions(gameId: string | undefined, currentUser: User |
     userReaction: gameId ? reactionSummary.userReaction : null,
   };
 }
-

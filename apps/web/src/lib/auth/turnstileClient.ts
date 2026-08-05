@@ -1,7 +1,7 @@
 import {
   authCaptchaSiteKey,
   isAuthCaptchaEnabled,
-} from "../../features/auth/captchaConfig";
+} from "./captchaConfig";
 
 const TURNSTILE_SCRIPT_SRC =
   "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";

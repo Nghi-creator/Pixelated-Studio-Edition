@@ -1,8 +1,8 @@
 import { useCallback } from "react";
 import type { Dispatch, SetStateAction } from "react";
-import type { EngineInputCapabilities } from "../types";
-import type { WebRTCTelemetry } from "../telemetry/webrtcTelemetry";
-import type { EngineSocket } from "../transport/webrtcSocket";
+import type { EngineInputCapabilities } from "../../../../../lib/webrtc/types";
+import type { WebRTCTelemetry } from "../../../../../lib/webrtc/telemetry/webrtcTelemetry";
+import type { EngineSocket } from "../../../../../lib/webrtc/transport/webrtcSocket";
 
 export function useWebRTCLobbyControls({
   inputCapabilitiesRef,
@@ -54,4 +54,3 @@ export function useWebRTCLobbyControls({
     requestPlayerSlot,
   };
 }
-

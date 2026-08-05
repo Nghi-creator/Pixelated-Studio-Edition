@@ -21,7 +21,7 @@ import { useResearchRunState } from "../../features/player/hooks/research/useRes
 import { useStreamTelemetryRecording } from "../../features/player/hooks/telemetry/useStreamTelemetryRecording";
 import { usePreventGameInputScroll } from "../../features/player/hooks/playback/usePreventGameInputScroll";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
-import { useWebRTC } from "../../lib/webrtc/useWebRTC";
+import { useWebRTC } from "../../features/player/hooks/webrtc/useWebRTC";
 
 const PlayerCommunitySection = lazy(() =>
   import("../../features/player/components/community/PlayerCommunitySection").then(

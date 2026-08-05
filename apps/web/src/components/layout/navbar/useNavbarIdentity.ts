@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { User } from "@supabase/supabase-js";
 import { getAuthSession } from "../../../lib/api/apiClient";
-import { usePermissionsQuery } from "../../../lib/api/apiQueries";
+import { usePermissionsQuery } from "../../../hooks/queryHooks";
 import { supabase } from "../../../lib/auth/supabaseClient";
 import { isAnonymousUser } from "../../../lib/auth/authIdentity";
-import { useEngineConnectionStatus } from "../../../lib/engine/useEngineConnectionStatus";
+import { useEngineConnectionStatus } from "../../../hooks/engine/useEngineConnectionStatus";
 
 export function useNavbarIdentity() {
   const [user, setUser] = useState<User | null>(null);

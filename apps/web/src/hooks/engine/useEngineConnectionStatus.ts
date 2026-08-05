@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import {
   ENGINE_CONNECTION_EVENT,
   getEngineConnectionStatus,
-} from "./engineConnectionState";
+} from "../../lib/engine/engineConnectionState";
 
 export function useEngineConnectionStatus() {
   const [status, setStatus] = useState(getEngineConnectionStatus);

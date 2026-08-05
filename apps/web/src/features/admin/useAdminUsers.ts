@@ -4,13 +4,13 @@ import {
   useAdminUsersQuery,
   useAuthSessionQuery,
   usePermissionsQuery,
-} from "../../lib/api/apiQueries";
+} from "../../hooks/queryHooks";
 import type { AdminConfirmation } from "../../components/admin/AdminConfirmDialog";
 import {
   getAdminApiErrorMessage,
   getPageRangeLabel,
 } from "./adminState";
-import { useDebouncedValue } from "../../lib/useDebouncedValue";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
 
 export const USERS_PER_PAGE = 25;
 

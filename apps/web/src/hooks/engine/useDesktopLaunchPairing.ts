@@ -1,15 +1,15 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
-import { api } from "../api/apiClient";
-import { pairFromDesktopLaunchUrl } from "./desktopLaunchPairing";
+import { api } from "../../lib/api/apiClient";
+import { pairFromDesktopLaunchUrl } from "../../lib/engine/desktopLaunchPairing";
 import {
   createCompanionEngineToken,
   engineAuthHeaders,
   setEngineControlToken,
   setEngineToken,
-} from "./engineAuth";
-import { setEngineConnectionStatus } from "./engineConnectionState";
-import { setEngineControlUrl, setEngineUrl } from "./engineConfig";
+} from "../../lib/engine/engineAuth";
+import { setEngineConnectionStatus } from "../../lib/engine/engineConnectionState";
+import { setEngineControlUrl, setEngineUrl } from "../../lib/engine/engineConfig";
 
 export function useDesktopLaunchPairing() {
   const navigate = useNavigate();

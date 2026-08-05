@@ -2,20 +2,20 @@ import { AlertTriangle, CheckCircle2, ExternalLink, XCircle } from "lucide-react
 import type {
   ApiCatalogCandidate,
   ApiCatalogCandidateReviewAction,
-} from "../../lib/api/apiTypes";
+} from "../../../lib/api/apiTypes";
 import {
   getCatalogCandidateRightsDetails,
   getCatalogCandidateRuntimeDetails,
   getCatalogCandidateWarnings,
   type CatalogCandidateReviewDetail,
-} from "../../features/admin/catalogCandidateReviewState";
-import { CatalogCandidateBrowserSmoke } from "../../features/admin/CatalogCandidateBrowserSmoke";
-import type { BrowserSmokePollResult } from "../../features/admin/browserSmokePolling";
+} from "../catalogCandidateReviewState";
+import { CatalogCandidateBrowserSmoke } from "../CatalogCandidateBrowserSmoke";
+import type { BrowserSmokePollResult } from "../browserSmokePolling";
 import {
   CATALOG_GENRES,
   formatGenre,
   type CatalogGenre,
-} from "../../features/catalog/catalogMetadata";
+} from "../../../lib/catalogMetadata";
 
 type CatalogCandidateCardProps = {
   candidate: ApiCatalogCandidate;

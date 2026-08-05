@@ -9,9 +9,9 @@ import {
 import Navbar from "./components/layout/Navbar";
 import Footer from "./components/layout/Footer";
 import AdminLayout from "./components/layout/AdminLayout";
-import { useSessionTracker } from "./lib/session/useSessionTracker";
-import { useEngineConnectionMonitor } from "./lib/engine/useEngineConnectionMonitor";
-import { useDesktopLaunchPairing } from "./lib/engine/useDesktopLaunchPairing";
+import { useSessionTracker } from "./hooks/useSessionTracker";
+import { useEngineConnectionMonitor } from "./hooks/engine/useEngineConnectionMonitor";
+import { useDesktopLaunchPairing } from "./hooks/engine/useDesktopLaunchPairing";
 
 import { RequireEngineConnection } from "./features/local-engine/RequireEngineConnection";
 

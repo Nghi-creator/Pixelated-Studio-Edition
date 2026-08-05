@@ -1,7 +1,7 @@
 import type {
   EngineInputCapabilities,
   LobbyParticipant,
-} from "../../../../lib/webrtc/useWebRTC";
+} from "../../hooks/webrtc/useWebRTC";
 
 export function LobbyPlayerSlots({
   currentParticipant,

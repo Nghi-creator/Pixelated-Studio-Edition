@@ -5,7 +5,7 @@ import type {
   EngineInputCapabilities,
   LobbyParticipant,
   LobbyState,
-} from "../../../../lib/webrtc/useWebRTC";
+} from "../../hooks/webrtc/useWebRTC";
 import { LobbyParticipants } from "./LobbyParticipants";
 import { LobbyPlayerSlots } from "./LobbyPlayerSlots";
 

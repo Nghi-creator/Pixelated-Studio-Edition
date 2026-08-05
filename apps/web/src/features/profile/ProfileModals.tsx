@@ -1,6 +1,6 @@
 import { AlertOctagon, Loader2, X } from "lucide-react";
 import Cropper from "react-easy-crop";
-import { AuthCaptcha } from "../auth/AuthCaptcha";
+import { AuthCaptcha } from "../../components/auth/AuthCaptcha";
 import type { CropArea } from "./avatarCrop";
 
 export function AvatarCropModal({

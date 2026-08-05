@@ -16,7 +16,7 @@ import { EnginePairingPanel } from "../../features/local-engine/EnginePairingPan
 import { DesktopLaunchPanel } from "../../features/local-engine/DesktopLaunchPanel";
 import { getInviteCompanionUrl } from "../../features/local-engine/inviteUtils";
 import { PixelIcon } from "../../components/ui/PixelIcon";
-import { useEngineConnectionStatus } from "../../lib/engine/useEngineConnectionStatus";
+import { useEngineConnectionStatus } from "../../hooks/engine/useEngineConnectionStatus";
 
 type EngineLocationState = {
   returnState?: unknown;

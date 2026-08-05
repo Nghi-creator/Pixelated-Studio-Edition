@@ -1,16 +1,16 @@
 import { useEffect } from "react";
-import { ensureEngineToken } from "../../engine/engineAuth";
-import { FALLBACK_ICE_SERVERS } from "../transport/webrtcConfig";
-import { createEngineSocket } from "../transport/webrtcSocket";
+import { ensureEngineToken } from "../../../../../lib/engine/engineAuth";
+import { FALLBACK_ICE_SERVERS } from "../../../../../lib/webrtc/transport/webrtcConfig";
+import { createEngineSocket } from "../../../../../lib/webrtc/transport/webrtcSocket";
 import type {
   UseWebRTCSessionLifecycleParams,
   WebRTCSessionConfig,
   WebRTCSessionRuntime,
-} from "./webrtcLifecycleTypes";
-import { createFailStream } from "./webrtcSessionFailure";
-import { initializeWebRTCPeerSession } from "../transport/webrtcPeerLifecycle";
-import { bindWebRTCSocketEvents } from "../transport/webrtcSocketEvents";
-import { cleanupWebRTCSession } from "./webrtcSessionCleanup";
+} from "../../../../../lib/webrtc/session/webrtcLifecycleTypes";
+import { createFailStream } from "../../../../../lib/webrtc/session/webrtcSessionFailure";
+import { initializeWebRTCPeerSession } from "../../../../../lib/webrtc/transport/webrtcPeerLifecycle";
+import { bindWebRTCSocketEvents } from "../../../../../lib/webrtc/transport/webrtcSocketEvents";
+import { cleanupWebRTCSession } from "../../../../../lib/webrtc/session/webrtcSessionCleanup";
 
 export function useWebRTCSessionLifecycle(params: UseWebRTCSessionLifecycleParams) {
   const {

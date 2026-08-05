@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AlertCircle, Filter, RefreshCw, X } from "lucide-react";
-import { CatalogCandidateCard } from "../../components/admin/CatalogCandidateCard";
+import { CatalogCandidateCard } from "../../features/admin/components/CatalogCandidateCard";
 import { Pagination } from "../../components/ui/Pagination";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import { AdminSelect } from "../../components/ui/AdminSelect";
@@ -11,15 +11,15 @@ import {
   getPageRangeLabel,
 } from "../../features/admin/adminState";
 import { useReviewCatalogCandidateMutation } from "../../features/admin/adminMutations";
-import { useCatalogCandidatesQuery } from "../../lib/api/apiQueries";
+import { useCatalogCandidatesQuery } from "../../hooks/queryHooks";
 import type {
   ApiCatalogCandidate,
   ApiCatalogCandidateReviewAction,
   ApiCatalogCandidateSourceKind,
   ApiCatalogCandidateStatus,
 } from "../../lib/api/apiTypes";
-import { useDebouncedValue } from "../../lib/useDebouncedValue";
-import type { CatalogGenre } from "../../features/catalog/catalogMetadata";
+import { useDebouncedValue } from "../../hooks/useDebouncedValue";
+import type { CatalogGenre } from "../../lib/catalogMetadata";
 
 const CANDIDATES_PER_PAGE = 15;
 const PLATFORM_OPTIONS = [

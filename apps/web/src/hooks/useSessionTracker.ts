@@ -1,6 +1,6 @@
 import { useEffect } from "react";
-import { supabase } from "../auth/supabaseClient";
-import { api, getAuthSession } from "../api/apiClient";
+import { supabase } from "../lib/auth/supabaseClient";
+import { api, getAuthSession } from "../lib/api/apiClient";
 
 const SESSION_ID_KEY = "pixelated_access_session_id";
 const LOGGED_STATE_PREFIX = "pixelated_logged_user_";
