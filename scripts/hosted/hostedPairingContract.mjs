@@ -66,7 +66,7 @@ export function assertHostedPairingContract(rootDir) {
       "apps",
       "web",
       "src",
-      "lib",
+      "hooks",
       "engine",
       "useDesktopLaunchPairing.ts",
     ),
