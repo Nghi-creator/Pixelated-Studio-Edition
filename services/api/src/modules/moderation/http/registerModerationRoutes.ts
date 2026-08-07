@@ -2,8 +2,22 @@ import type { FastifyInstance } from "fastify";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../auth/supabaseAuth.js";
-import { getAuthoritativeUserRole } from "../../auth/roleAuthorization.js";
+} from "../../auth/http/supabaseAuth.js";
+import { getAuthoritativeUserRole } from "../../auth/infrastructure/roleAuthorization.js";
+import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
+import { createRateLimiter } from "../../security/sharedRateLimiter.js";
+import { requireAuthenticatedService } from "../../security/authenticatedService.js";
+import { createResolveModerationReport } from "../application/resolveModerationReport.js";
+import { createListModerationReports } from "../application/listModerationReports.js";
+import {
+  deleteReport,
+  findCommentAuthor,
+  findModerationProfile,
+  findModerationReports,
+  findReport,
+  insertCommentReport,
+  resolveReportTransaction,
+} from "../infrastructure/supabaseModerationRepository.js";
 import {
   adminReportActionSchema,
   adminReportParamsSchema,
@@ -11,37 +25,20 @@ import {
   commentParamsSchema,
   reportBodySchema,
 } from "./contracts.js";
-import {
-  canResolveTargetRole,
-  canReviewOwnReport,
-  getPageRange,
-  isAdminRole,
-} from "../domain/moderationPolicy.js";
-import { logTiming, timed } from "../../observability/timing.js";
-import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
-import { createRateLimiter } from "../../security/sharedRateLimiter.js";
-import { requireAuthenticatedService } from "../../security/authenticatedService.js";
-
-type ProfileRole = {
-  is_banned?: boolean;
-  role: string | null;
-};
-
-type ReportRow = {
-  comment_id: string | null;
-  reporter_id: string | null;
-};
-
-type CommentRow = {
-  user_id: string | null;
-};
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
-
 type ModerationRouteOptions = {
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
 };
+
+function errorCode(error: unknown) {
+  return (error as { code?: string } | null)?.code;
+}
+
+function errorMessage(error: unknown) {
+  return (error as { message?: string } | null)?.message;
+}
 
 export async function registerModerationRoutes(
   app: FastifyInstance,
@@ -54,6 +51,23 @@ export async function registerModerationRoutes(
     namespace: "report-write",
     windowMs: 60 * 60 * 1000,
   });
+  const resolveReport = service
+    ? createResolveModerationReport({
+        deleteReport: (reportId) => deleteReport(service, reportId),
+        findCommentAuthor: (commentId) => findCommentAuthor(service, commentId),
+        findProfile: (userId) => findModerationProfile(service, userId),
+        findReport: (reportId) => findReport(service, reportId),
+        resolve: (input) => resolveReportTransaction(service, input),
+      })
+    : null;
+  const listReports = service ? createListModerationReports({
+    findRole: async (userId) => {
+      const lookup = await getAuthoritativeUserRole(service, userId);
+      if (lookup.error) throw lookup.error;
+      return lookup.role;
+    },
+    findReports: (query) => findModerationReports(service, query),
+  }) : null;
 
   app.post(
     "/moderation/comments/:commentId/report",
@@ -62,17 +76,11 @@ export async function registerModerationRoutes(
       const context = requireAuthenticatedService(request, reply, service);
       if (!context) return;
       const { service: authenticatedService, user } = context;
-
-      const parsedParams = commentParamsSchema.safeParse(request.params);
-      if (!parsedParams.success) {
-        return reply.status(400).send({ error: "Invalid comment id" });
-      }
-
-      const parsedBody = reportBodySchema.safeParse(request.body);
-      if (!parsedBody.success) {
-        return reply.status(400).send({
-          error: "Report reason is required",
-        });
+      const params = commentParamsSchema.safeParse(request.params);
+      if (!params.success) return reply.status(400).send({ error: "Invalid comment id" });
+      const body = reportBodySchema.safeParse(request.body);
+      if (!body.success) {
+        return reply.status(400).send({ error: "Report reason is required" });
       }
       if (
         rejectRateLimitedRequest(
@@ -80,270 +88,100 @@ export async function registerModerationRoutes(
           await reportWriteLimiter.consume(user.id),
           "Report limit reached. Please try again later.",
         )
-      ) {
-        return;
-      }
+      ) return;
 
-      const { error } = await authenticatedService.from("reported_comments").insert({
-        comment_id: parsedParams.data.commentId,
-        reporter_id: user.id,
-        reason: parsedBody.data.reason,
-      });
-
-      if (error) {
-        if (error.code === "23505") {
+      try {
+        await insertCommentReport(authenticatedService, {
+          commentId: params.data.commentId,
+          reason: body.data.reason,
+          reporterId: user.id,
+        });
+        return { success: true };
+      } catch (error) {
+        if (errorCode(error) === "23505") {
           return reply.status(409).send({
-            error:
-              "You have already reported this comment. Our moderators are reviewing it.",
+            error: "You have already reported this comment. Our moderators are reviewing it.",
           });
         }
-
         request.log.error(error, "Failed to submit comment report");
         return reply.status(500).send({ error: "Failed to submit report" });
       }
-
-      return { success: true };
     },
   );
 
-  app.get(
-    "/admin/reports",
-    { preHandler: requireUser },
-    async (request, reply) => {
-      const context = requireAuthenticatedService(request, reply, service);
-      if (!context) return;
-      const { service: authenticatedService, user } = context;
+  app.get("/admin/reports", { preHandler: requireUser }, async (request, reply) => {
+    const context = requireAuthenticatedService(request, reply, service);
+    if (!context) return;
+    const { user } = context;
 
-      const timings = {};
-      const roleLookup = await timed(
-        timings,
-        "admin_role_check_ms",
-        () => getAuthoritativeUserRole(authenticatedService, user.id),
-      );
-
-      if (roleLookup.error) {
-        request.log.error(roleLookup.error, "Failed to load moderator profile");
-        return reply.status(500).send({ error: "Failed to authorize reports" });
-      }
-
-      if (!isAdminRole(roleLookup.role)) {
-        return reply.status(403).send({ error: "Admin access required" });
-      }
-
-      const parsedQuery = adminReportsQuerySchema.safeParse(request.query);
-      if (!parsedQuery.success) {
-        return reply.status(400).send({ error: "Invalid reports query" });
-      }
-
-      const { page, pageSize, targetRole } = parsedQuery.data;
-      const { end, start } = getPageRange(page, pageSize);
-      let reportsQuery = authenticatedService
-        .from("reported_comments")
-        .select(
-          `
-              id,
-              reason,
-              created_at,
-              comments (
-                id,
-                content,
-                profiles ( id, username, role )
-              ),
-              profiles ( id, username )
-            `,
-          { count: "exact" },
-        )
-        .order("created_at", { ascending: false });
-
-      if (targetRole === "admins") {
-        reportsQuery = reportsQuery.in("comments.profiles.role", [
-          "admin",
-          "super_admin",
-        ]);
-      } else if (targetRole === "users") {
-        reportsQuery = reportsQuery.not(
-          "comments.profiles.role",
-          "in",
-          "(admin,super_admin)",
-        );
-      }
-
-      const { data, count, error } = await timed(
-        timings,
-        "admin_reports_query_ms",
-        () => reportsQuery.range(start, end),
-      );
-
-      if (error) {
-        request.log.error(error, "Failed to load moderation reports");
-        return reply.status(500).send({ error: "Failed to load reports" });
-      }
-
-      const total = count || 0;
-      logTiming(request.log, "Admin reports timing", timings, {
-        page,
-        pageSize,
-        resultCount: data?.length || 0,
-        roleSource: "database",
-        targetRole,
-        total,
-      });
-
-      return {
-        page,
-        pageSize,
-        reports: data || [],
-        targetRole,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / pageSize)),
-      };
-    },
-  );
+    const query = adminReportsQuerySchema.safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: "Invalid reports query" });
+    try {
+      const result = await listReports!({ ...query.data, userId: user.id });
+      if (result.status === "forbidden") return reply.status(403).send({ error: "Admin access required" });
+      return { page: result.page, pageSize: result.pageSize, reports: result.reports, targetRole: result.targetRole, total: result.total, totalPages: result.totalPages };
+    } catch (error) {
+      request.log.error(error, "Failed to load moderation reports");
+      return reply.status(500).send({ error: "Failed to load reports" });
+    }
+  });
 
   app.post(
     "/admin/reports/:reportId/action",
     { preHandler: requireUser },
     async (request, reply) => {
       const context = requireAuthenticatedService(request, reply, service);
-      if (!context) return;
-      const { service: authenticatedService, user } = context;
+      if (!context || !resolveReport) return;
+      const { user } = context;
+      const params = adminReportParamsSchema.safeParse(request.params);
+      if (!params.success) return reply.status(400).send({ error: "Invalid report id" });
+      const body = adminReportActionSchema.safeParse(request.body);
+      if (!body.success) return reply.status(400).send({ error: "Invalid report action" });
 
-      const parsedParams = adminReportParamsSchema.safeParse(request.params);
-      if (!parsedParams.success) {
-        return reply.status(400).send({ error: "Invalid report id" });
-      }
-
-      const parsedBody = adminReportActionSchema.safeParse(request.body);
-      if (!parsedBody.success) {
-        return reply.status(400).send({ error: "Invalid report action" });
-      }
-
-      const { data: actorProfile, error: actorError } = await authenticatedService
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle<ProfileRole>();
-
-      if (actorError) {
-        request.log.error(actorError, "Failed to load moderator profile");
-        return reply.status(500).send({ error: "Failed to authorize action" });
-      }
-
-      if (!isAdminRole(actorProfile?.role)) {
-        return reply.status(403).send({ error: "Admin access required" });
-      }
-
-      const { data: report, error: reportError } = await authenticatedService
-        .from("reported_comments")
-        .select("comment_id, reporter_id")
-        .eq("id", parsedParams.data.reportId)
-        .maybeSingle<ReportRow>();
-
-      if (reportError) {
-        request.log.error(reportError, "Failed to load report");
-        return reply.status(500).send({ error: "Failed to load report" });
-      }
-
-      if (!report?.comment_id) {
-        return reply.status(404).send({ error: "Report not found" });
-      }
-
-      if (!canReviewOwnReport(actorProfile?.role, user.id, report.reporter_id)) {
-        return reply.status(403).send({
-          error: "Another admin must review reports you submitted",
+      try {
+        const result = await resolveReport({
+          action: body.data.action,
+          actorId: user.id,
+          reportId: params.data.reportId,
         });
-      }
-
-      const { data: comment, error: commentError } = await authenticatedService
-        .from("comments")
-        .select("user_id")
-        .eq("id", report.comment_id)
-        .maybeSingle<CommentRow>();
-
-      if (commentError) {
-        request.log.error(commentError, "Failed to load reported comment");
-        return reply.status(500).send({ error: "Failed to load comment" });
-      }
-
-      if (!comment?.user_id) {
-        await authenticatedService
-          .from("reported_comments")
-          .delete()
-          .eq("id", parsedParams.data.reportId);
-        return reply.status(404).send({ error: "Comment not found" });
-      }
-
-      const { data: targetProfile, error: targetError } = await authenticatedService
-        .from("profiles")
-        .select("role, is_banned")
-        .eq("id", comment.user_id)
-        .maybeSingle<ProfileRole>();
-
-      if (targetError) {
-        request.log.error(targetError, "Failed to load reported user profile");
-        return reply.status(500).send({ error: "Failed to load user profile" });
-      }
-
-      if (!canResolveTargetRole(actorProfile?.role, targetProfile?.role)) {
-        return reply.status(403).send({
-          error: "Only super admins can resolve reports against admins",
-        });
-      }
-
-      if (parsedBody.data.action === "ignore") {
-        const { error } = await authenticatedService
-          .from("reported_comments")
-          .delete()
-          .eq("id", parsedParams.data.reportId);
-
-        if (error) {
-          request.log.error(error, "Failed to ignore report");
-          return reply.status(500).send({ error: "Failed to ignore report" });
+        if (result.status === "admin_required") {
+          return reply.status(403).send({ error: "Admin access required" });
         }
-
-        return {
-          action: parsedBody.data.action,
-          commentId: report.comment_id,
-          reportId: parsedParams.data.reportId,
-          success: true,
-        };
-      }
-
-      if (parsedBody.data.action === "ban_user") {
-        if (comment.user_id === user.id) {
+        if (result.status === "report_not_found") {
+          return reply.status(404).send({ error: "Report not found" });
+        }
+        if (result.status === "own_report_forbidden") {
+          return reply.status(403).send({
+            error: "Another admin must review reports you submitted",
+          });
+        }
+        if (result.status === "comment_not_found") {
+          return reply.status(404).send({ error: "Comment not found" });
+        }
+        if (result.status === "target_role_forbidden") {
+          return reply.status(403).send({
+            error: "Only super admins can resolve reports against admins",
+          });
+        }
+        if (result.status === "self_ban_forbidden") {
           return reply.status(403).send({ error: "Admins cannot ban themselves" });
         }
-      }
-
-      const { error: resolutionError } = await authenticatedService.rpc(
-        "resolve_comment_report",
-        {
-          p_action: parsedBody.data.action,
-          p_comment_id: report.comment_id,
-          p_report_id: parsedParams.data.reportId,
-          p_target_user_id: comment.user_id,
-        },
-      );
-
-      if (resolutionError) {
-        request.log.error(resolutionError, "Failed to resolve reported comment");
+        return {
+          action: result.action,
+          commentId: result.commentId,
+          reportId: result.reportId,
+          success: true,
+          ...(result.action === "ignore" ? {} : { targetUserId: result.targetUserId }),
+        };
+      } catch (error) {
+        request.log.error(error, "Failed to resolve reported comment");
         if (
           ["comment_not_found", "report_not_found", "target_user_not_found"].includes(
-            resolutionError.message,
+            errorMessage(error) || "",
           )
-        ) {
-          return reply.status(404).send({ error: "Report target not found" });
-        }
+        ) return reply.status(404).send({ error: "Report target not found" });
         return reply.status(500).send({ error: "Failed to resolve report" });
       }
-
-      return {
-        action: parsedBody.data.action,
-        commentId: report.comment_id,
-        reportId: parsedParams.data.reportId,
-        success: true,
-        targetUserId: comment.user_id,
-      };
     },
   );
 }

@@ -3,11 +3,11 @@ import test from "node:test";
 import {
   createCuratedRomManifestStub,
   inferPinnedGitHubRawArtifact,
-} from "../../../src/modules/catalog/ingestion/curatedRomManifestGenerator.js";
+} from "../../../src/modules/catalog/ingestion/application/curatedRomManifestGenerator.js";
 import {
   collectCuratedRomCandidateReport,
   type CuratedRomManifest,
-} from "../../../src/modules/catalog/ingestion/curatedRomManifestImporter.js";
+} from "../../../src/modules/catalog/ingestion/application/curatedRomManifestImporter.js";
 
 function makeNesRom() {
   return Buffer.from([

@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import { env } from "../../../config/env.js";
-import { requireSupabaseIdentity } from "../../auth/supabaseAuth.js";
+import { requireSupabaseIdentity } from "../../auth/http/supabaseAuth.js";
 
 type IceServer = {
   credential?: string;

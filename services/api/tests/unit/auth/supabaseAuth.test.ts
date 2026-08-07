@@ -5,7 +5,7 @@ import {
   getBearerToken,
   getAuthoritativeUserBanStatus,
   isAnonymousSupabaseUser,
-} from "../../../src/modules/auth/supabaseAuth.js";
+} from "../../../src/modules/auth/http/supabaseAuth.js";
 
 function requestWithAuthorization(authorization?: string) {
   return {

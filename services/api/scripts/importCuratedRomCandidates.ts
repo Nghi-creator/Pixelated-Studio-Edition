@@ -6,7 +6,7 @@ import {
   collectCuratedRomCandidates,
   collectCuratedRomCandidateReport,
   readCuratedRomManifest,
-} from "../src/modules/catalog/ingestion/curatedRomManifestImporter.js";
+} from "../src/modules/catalog/ingestion/application/curatedRomManifestImporter.js";
 
 dotenv.config();
 

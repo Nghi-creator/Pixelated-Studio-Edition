@@ -4,7 +4,7 @@ import type { User } from "@supabase/supabase-js";
 import { registerAccessLogRoutes } from "../../../src/modules/observability/http/accessLogRoutes.js";
 import { registerAdminSubmissionRoutes } from "../../../src/modules/catalog/http/adminSubmissionRoutes.js";
 import { registerAdminUserRoutes } from "../../../src/modules/users/http/adminUserRoutes.js";
-import { registerCatalogCandidateRoutes } from "../../../src/modules/catalog/http/catalogCandidateRoutes.js";
+import { registerCatalogCandidateRoutes } from "../../../src/modules/catalog/ingestion/http/catalogCandidateRoutes.js";
 import { registerAuthMethodsRoutes } from "../../../src/modules/auth/http/authMethodsRoutes.js";
 import { registerCatalogRoutes } from "../../../src/modules/catalog/http/registerCatalogRoutes.js";
 import { registerPlayCountRoutes } from "../../../src/modules/catalog/http/playCountRoutes.js";

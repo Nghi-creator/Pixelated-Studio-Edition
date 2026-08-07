@@ -1,21 +1,25 @@
-import crypto from "node:crypto";
-import path from "node:path";
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { getAuthoritativeUserRole } from "../../auth/roleAuthorization.js";
-import {
-  requireSupabaseUser,
-  supabaseService,
-} from "../../auth/supabaseAuth.js";
-import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
+import { getAuthoritativeUserRole } from "../../auth/infrastructure/roleAuthorization.js";
+import { requireSupabaseUser, supabaseService } from "../../auth/http/supabaseAuth.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
+import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
 import { requireAuthenticatedService } from "../../security/authenticatedService.js";
-import { getSubmissionRomPlatform } from "../domain/submissionRom.js";
-import { createSignedSubmissionUrl } from "../domain/submissionStorage.js";
 import {
-  type CandidateRow,
-  type SupabaseServiceLike,
-} from "../ingestion/catalogCandidatePromotion.js";
+  createAdminSubmissionUseCases,
+  fetchSubmissionArtifactBytes,
+} from "../application/adminSubmissions.js";
+import { createSignedSubmissionUrl } from "../infrastructure/submissionStorage.js";
+import {
+  createSubmissionCandidate,
+  findSubmission,
+  findSubmissions,
+  rejectSubmission,
+  SubmissionTransitionError,
+} from "../infrastructure/supabaseSubmissionRepository.js";
+import type { SupabaseServiceLike } from "../ingestion/infrastructure/supabaseCandidatePromotion.js";
+
+export { fetchSubmissionArtifactBytes };
 
 const submissionQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -25,10 +29,7 @@ const submissionQuerySchema = z.object({
 });
 const submissionParamsSchema = z.object({ submissionId: z.string().uuid() });
 const submissionReviewBodySchema = z.discriminatedUnion("action", [
-  z.object({
-    action: z.literal("reject"),
-    notes: z.string().trim().min(1).max(2000),
-  }),
+  z.object({ action: z.literal("reject"), notes: z.string().trim().min(1).max(2000) }),
   z.object({
     action: z.literal("create_candidate"),
     asset_license_spdx: z.string().trim().max(80).nullable().optional(),
@@ -43,53 +44,6 @@ const submissionReviewBodySchema = z.discriminatedUnion("action", [
     source_repo_url: z.string().trim().url(),
   }),
 ]);
-const SUBMISSION_REVIEW_ARTIFACT_MAX_BYTES = 64 * 1024 * 1024;
-const SUBMISSION_REVIEW_ARTIFACT_TIMEOUT_MS = 15_000;
-
-type SubmissionRow = {
-  author_name: string;
-  banner_url: string | null;
-  catalog_candidate_id?: string | null;
-  cover_url: string | null;
-  created_at: string;
-  description: string | null;
-  email: string;
-  game_title: string;
-  id: string;
-  review_notes?: string | null;
-  reviewed_at?: string | null;
-  reviewed_by?: string | null;
-  rom_url: string;
-  status: string;
-  submitter_id: string | null;
-};
-
-function getSubmissionTransitionError(error: { message?: string } | null) {
-  if (error?.message === "submission_not_found") {
-    return { message: "Submission not found", statusCode: 404 };
-  }
-  if (error?.message === "submission_already_reviewed") {
-    return { message: "Submission already reviewed", statusCode: 409 };
-  }
-  return null;
-}
-
-async function signSubmissionReviewUrls(
-  service: SupabaseServiceLike,
-  submission: SubmissionRow,
-) {
-  const [romUrl, coverUrl, bannerUrl] = await Promise.all([
-    createSignedSubmissionUrl(service, submission.rom_url),
-    createSignedSubmissionUrl(service, submission.cover_url),
-    createSignedSubmissionUrl(service, submission.banner_url),
-  ]);
-  return {
-    ...submission,
-    banner_url: bannerUrl,
-    cover_url: coverUrl,
-    rom_url: romUrl || submission.rom_url,
-  };
-}
 
 type AdminSubmissionRouteOptions = {
   adminSubmissionReviewLimiter?: RateLimiter;
@@ -98,327 +52,62 @@ type AdminSubmissionRouteOptions = {
   supabase?: SupabaseServiceLike | null;
 };
 
-function candidateSourceRevisionFor(submission: SubmissionRow) {
-  return crypto
-    .createHash("sha1")
-    .update(["user_submission", submission.id, submission.rom_url].join("\0"))
-    .digest("hex");
-}
-
-function sha256(bytes: Buffer) {
-  return crypto.createHash("sha256").update(bytes).digest("hex");
-}
-
-function artifactFilenameFor(url: string) {
-  const parsed = new URL(url);
-  const filename = path.basename(parsed.pathname);
-  return filename || "submission.rom";
-}
-
-async function readArtifactResponse(
-  response: Response,
-  maxBytes = SUBMISSION_REVIEW_ARTIFACT_MAX_BYTES,
-) {
-  const contentLength = Number(response.headers.get("content-length") || 0);
-  if (contentLength > maxBytes) {
-    throw new Error(`Submitted ROM is too large. Max size is ${maxBytes} bytes.`);
-  }
-
-  if (!response.body) {
-    const bytes = Buffer.from(await response.arrayBuffer());
-    if (bytes.length > maxBytes) {
-      throw new Error(`Submitted ROM is too large. Max size is ${maxBytes} bytes.`);
-    }
-    return bytes;
-  }
-
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let receivedBytes = 0;
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (!value) continue;
-
-    receivedBytes += value.byteLength;
-    if (receivedBytes > maxBytes) {
-      await reader.cancel();
-      throw new Error(`Submitted ROM is too large. Max size is ${maxBytes} bytes.`);
-    }
-    chunks.push(value);
-  }
-
-  return Buffer.concat(chunks);
-}
-
-export async function fetchSubmissionArtifactBytes(
-  fetchArtifact: typeof fetch,
-  url: string,
-  maxBytes = SUBMISSION_REVIEW_ARTIFACT_MAX_BYTES,
-  timeoutMs = SUBMISSION_REVIEW_ARTIFACT_TIMEOUT_MS,
-) {
-  const response = await fetchArtifact(url, {
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch submitted ROM: status ${response.status}`);
-  }
-
-  return readArtifactResponse(response, maxBytes);
-}
-
-async function requireAdminRole(
-  service: SupabaseServiceLike,
-  userId: string,
-) {
-  const roleLookup = await getAuthoritativeUserRole(service, userId);
-  if (roleLookup.error) throw roleLookup.error;
-  return ["admin", "super_admin"].includes(roleLookup.role || "");
-}
-
-export async function registerAdminSubmissionRoutes(
-  app: FastifyInstance,
-  options: AdminSubmissionRouteOptions = {},
-) {
+export async function registerAdminSubmissionRoutes(app: FastifyInstance, options: AdminSubmissionRouteOptions = {}) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
-  const fetchArtifact = options.fetchArtifact || fetch;
-  const adminSubmissionReviewLimiter =
-    options.adminSubmissionReviewLimiter ||
-    createRateLimiter({
-      limit: 30,
-      namespace: "admin-submission-review-user",
-      windowMs: 60_000,
-    });
-
-  app.get(
-    "/admin/submissions",
-    { preHandler: requireUser },
-    async (request, reply) => {
-      const context = requireAuthenticatedService(request, reply, service);
-      if (!context) return;
-      const { service: authenticatedService, user } = context;
-      if (
-        rejectRateLimitedRequest(
-          reply,
-          await adminSubmissionReviewLimiter.consume(user.id),
-          "Admin submission review rate limit reached. Please try again shortly.",
-        )
-      ) {
-        return;
-      }
-
-      try {
-        const isAdmin = await requireAdminRole(authenticatedService, user.id);
-        if (!isAdmin) {
-          return reply.status(403).send({ error: "Admin access required" });
-        }
-      } catch (err) {
-        request.log.error({ err }, "Failed to authorize submissions");
-        return reply.status(500).send({ error: "Failed to authorize submissions" });
-      }
-
-      const parsedQuery = submissionQuerySchema.safeParse(request.query);
-      if (!parsedQuery.success) {
-        return reply.status(400).send({ error: "Invalid submission query" });
-      }
-
-      const { page, pageSize, search, status } = parsedQuery.data;
-      const start = (page - 1) * pageSize;
-      const end = start + pageSize - 1;
-      let query = authenticatedService
-        .from("game_submissions")
-        .select("*", { count: "exact" })
-        .eq("status", status)
-        .order("created_at", { ascending: false })
-        .range(start, end);
-      if (search) query = query.ilike("game_title", `%${search}%`);
-
-      const { count, data, error } = await query;
-      if (error) {
-        request.log.error({ err: error }, "Failed to load submissions");
-        return reply.status(500).send({ error: "Failed to load submissions" });
-      }
-
-      const total = count || 0;
-      let submissions: SubmissionRow[];
-      try {
-        submissions = await Promise.all(
-          ((data || []) as SubmissionRow[]).map((submission) =>
-            signSubmissionReviewUrls(authenticatedService, submission),
-          ),
-        );
-      } catch (err) {
-        request.log.error({ err }, "Failed to sign submission review URLs");
-        return reply
-          .status(503)
-          .send({ error: "Submission files are temporarily unavailable" });
-      }
-
-      return {
-        page,
-        pageSize,
-        submissions,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / pageSize)),
-      };
+  const limiter = options.adminSubmissionReviewLimiter || createRateLimiter({ limit: 30, namespace: "admin-submission-review-user", windowMs: 60_000 });
+  const useCases = service ? createAdminSubmissionUseCases({
+    authorize: async (userId) => {
+      const lookup = await getAuthoritativeUserRole(service, userId);
+      if (lookup.error) throw lookup.error;
+      return ["admin", "super_admin"].includes(lookup.role || "");
     },
-  );
+    createCandidate: (input) => createSubmissionCandidate(service, input),
+    fetchArtifact: options.fetchArtifact || fetch,
+    findOne: (id) => findSubmission(service, id),
+    findPage: (query) => findSubmissions(service, query),
+    reject: (input) => rejectSubmission(service, input),
+    signUrl: (url) => createSignedSubmissionUrl(service, url),
+  }) : null;
 
-  app.patch(
-    "/admin/submissions/:submissionId",
-    { preHandler: requireUser },
-    async (request, reply) => {
-      const context = requireAuthenticatedService(request, reply, service);
-      if (!context) return;
-      const { service: authenticatedService, user } = context;
-      if (
-        rejectRateLimitedRequest(
-          reply,
-          await adminSubmissionReviewLimiter.consume(user.id),
-          "Admin submission review rate limit reached. Please try again shortly.",
-        )
-      ) {
-        return;
-      }
-      const params = submissionParamsSchema.safeParse(request.params);
-      const body = submissionReviewBodySchema.safeParse(request.body);
-      if (!params.success || !body.success) {
-        return reply.status(400).send({ error: "Invalid submission review" });
-      }
+  app.get("/admin/submissions", { preHandler: requireUser }, async (request, reply) => {
+    const context = requireAuthenticatedService(request, reply, service);
+    if (!context) return;
+    if (rejectRateLimitedRequest(reply, await limiter.consume(context.user.id), "Admin submission review rate limit reached. Please try again shortly.")) return;
+    const query = submissionQuerySchema.safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: "Invalid submission query" });
+    try {
+      const result = await useCases!.list({ ...query.data, userId: context.user.id });
+      if (result.status === "forbidden") return reply.status(403).send({ error: "Admin access required" });
+      return { page: result.page, pageSize: result.pageSize, submissions: result.submissions, total: result.total, totalPages: result.totalPages };
+    } catch (err) {
+      request.log.error({ err }, "Failed to load submissions");
+      return reply.status(500).send({ error: "Failed to load submissions" });
+    }
+  });
 
-      try {
-        const isAdmin = await requireAdminRole(authenticatedService, user.id);
-        if (!isAdmin) {
-          return reply.status(403).send({ error: "Admin access required" });
-        }
-
-        if (body.data.action === "reject") {
-          const { data, error } = await authenticatedService.rpc(
-            "reject_game_submission",
-            {
-              p_review_notes: body.data.notes,
-              p_reviewer_id: user.id,
-              p_submission_id: params.data.submissionId,
-            },
-          );
-          const transitionError = getSubmissionTransitionError(error);
-          if (transitionError) {
-            return reply
-              .status(transitionError.statusCode)
-              .send({ error: transitionError.message });
-          }
-          if (error) throw error;
-          if (!data) {
-            throw new Error("Submission rejection returned no submission");
-          }
-          return { submission: data as unknown as SubmissionRow };
-        }
-
-        const { data: submission, error: submissionError } = await authenticatedService
-          .from("game_submissions")
-          .select("*")
-          .eq("id", params.data.submissionId)
-          .maybeSingle<SubmissionRow>();
-        if (submissionError) throw submissionError;
-        if (!submission) {
-          return reply.status(404).send({ error: "Submission not found" });
-        }
-        if (submission.status !== "pending") {
-          return reply.status(409).send({ error: "Submission already reviewed" });
-        }
-
-        const platform = getSubmissionRomPlatform(
-          new URL(submission.rom_url).pathname,
-        );
-        if (!platform) {
-          return reply.status(422).send({ error: "Unsupported submitted ROM type" });
-        }
-
-        const signedRomUrl = await createSignedSubmissionUrl(
-          authenticatedService,
-          submission.rom_url,
-        );
-        if (!signedRomUrl) {
-          return reply.status(422).send({ error: "Submitted ROM is unavailable" });
-        }
-        const artifactBytes = await fetchSubmissionArtifactBytes(
-          fetchArtifact,
-          signedRomUrl,
-        );
-        const now = new Date().toISOString();
-        const artifactFilename = artifactFilenameFor(submission.rom_url);
-        const sourceCommit = candidateSourceRevisionFor(submission);
-
-        const candidatePayload = {
-          artifact_filename: artifactFilename,
-          artifact_sha256: sha256(artifactBytes),
-          artifact_size: artifactBytes.length,
-          artifact_url: submission.rom_url,
-          asset_license_spdx: body.data.asset_license_spdx || null,
-          attribution_text: body.data.attribution_text,
-          code_license_spdx: body.data.code_license_spdx,
-          cover_license_spdx: null,
-          developer_name: submission.author_name,
-          developer_url: body.data.original_release_url || body.data.source_repo_url,
-          import_status: "needs_review",
-          last_seen_at: now,
-          license_url: body.data.license_url,
-          noncommercial_hosting_allowed: body.data.noncommercial_hosting_allowed,
-          original_release_url:
-            body.data.original_release_url || body.data.source_repo_url,
-          permission_evidence_url: body.data.permission_evidence_url || null,
-          platform_id: platform.platformId,
-          rights_warnings: body.data.rights_warnings,
-          runtime_id: platform.runtimeId,
-          runtime_kind: "libretro",
-          source_commit: sourceCommit,
-          source_entry_path: `game_submissions/${submission.id}#${artifactFilename}`,
-          source_kind: "user_submission",
-          source_metadata: {
-            bannerUrl: submission.banner_url,
-            coverUrl: submission.cover_url,
-            description: submission.description,
-            email: submission.email,
-            submitterId: submission.submitter_id,
-          },
-          source_repo_url: body.data.source_repo_url,
-          title: submission.game_title,
-        };
-
-        const { data: transaction, error: transactionError } = await authenticatedService.rpc(
-          "create_submission_candidate",
-          {
-            p_candidate: candidatePayload,
-            p_review_notes: body.data.notes || null,
-            p_reviewer_id: user.id,
-            p_submission_id: submission.id,
-          },
-        );
-        const transitionError = getSubmissionTransitionError(transactionError);
-        if (transitionError) {
-          return reply
-            .status(transitionError.statusCode)
-            .send({ error: transitionError.message });
-        }
-        if (transactionError) throw transactionError;
-
-        const result = transaction as unknown as {
-          candidate: CandidateRow;
-          submission: SubmissionRow;
-        };
-        return { candidate: result.candidate, submission: result.submission };
-      } catch (err) {
-        request.log.error({ err }, "Failed to review submission");
-        if (err instanceof Error && err.message.includes("too large")) {
-          return reply.status(413).send({ error: err.message });
-        }
-        if (err instanceof Error && err.message.startsWith("Failed to fetch")) {
-          return reply.status(502).send({ error: "Failed to fetch submitted ROM" });
-        }
-        return reply.status(500).send({ error: "Failed to review submission" });
-      }
-    },
-  );
+  app.patch("/admin/submissions/:submissionId", { preHandler: requireUser }, async (request, reply) => {
+    const context = requireAuthenticatedService(request, reply, service);
+    if (!context) return;
+    if (rejectRateLimitedRequest(reply, await limiter.consume(context.user.id), "Admin submission review rate limit reached. Please try again shortly.")) return;
+    const params = submissionParamsSchema.safeParse(request.params);
+    const body = submissionReviewBodySchema.safeParse(request.body);
+    if (!params.success || !body.success) return reply.status(400).send({ error: "Invalid submission review" });
+    try {
+      const result = await useCases!.review({ body: body.data, submissionId: params.data.submissionId, userId: context.user.id });
+      if (result.status === "forbidden") return reply.status(403).send({ error: "Admin access required" });
+      if (result.status === "not_found") return reply.status(404).send({ error: "Submission not found" });
+      if (result.status === "already_reviewed") return reply.status(409).send({ error: "Submission already reviewed" });
+      if (result.status === "unsupported") return reply.status(422).send({ error: "Unsupported submitted ROM type" });
+      if (result.status === "unavailable") return reply.status(422).send({ error: "Submitted ROM is unavailable" });
+      if (result.status === "rejected") return { submission: result.submission };
+      return { candidate: result.candidate, submission: result.submission };
+    } catch (err) {
+      request.log.error({ err }, "Failed to review submission");
+      if (err instanceof SubmissionTransitionError) return reply.status(err.message === "submission_not_found" ? 404 : 409).send({ error: err.message === "submission_not_found" ? "Submission not found" : "Submission already reviewed" });
+      if (err instanceof Error && err.message.includes("too large")) return reply.status(413).send({ error: err.message });
+      if (err instanceof Error && err.message.startsWith("Failed to fetch")) return reply.status(502).send({ error: "Failed to fetch submitted ROM" });
+      return reply.status(500).send({ error: "Failed to review submission" });
+    }
+  });
 }

@@ -4,7 +4,7 @@ import process from "node:process";
 import {
   createCuratedRomManifestStub,
   type CuratedRomManifestStubOptions,
-} from "../src/modules/catalog/ingestion/curatedRomManifestGenerator.js";
+} from "../src/modules/catalog/ingestion/application/curatedRomManifestGenerator.js";
 
 function getArgValue(name: string) {
   const index = process.argv.indexOf(name);

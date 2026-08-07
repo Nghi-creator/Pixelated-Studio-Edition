@@ -1,8 +1,8 @@
 import {
   assertCandidateRuntimeAllowed,
   CandidateValidationError,
-} from "../../catalog/ingestion/catalogCandidateValidation.js";
-import type { BackendSessionRow } from "../services/backendSessions.js";
+} from "../../catalog/ingestion/domain/catalogCandidateValidation.js";
+import type { BackendSessionRow } from "./backendSession.js";
 
 export function mapBoot(
   row: BackendSessionRow,

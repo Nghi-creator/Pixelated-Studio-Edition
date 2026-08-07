@@ -7,7 +7,7 @@ import {
   collectHomebrewHubCandidates,
   type HomebrewHubRepository,
   type HomebrewHubSourceKind,
-} from "../src/modules/catalog/ingestion/homebrewHubImporter.js";
+} from "../src/modules/catalog/ingestion/application/homebrewHubImporter.js";
 
 dotenv.config();
 

@@ -1,12 +1,17 @@
 import type { FastifyInstance } from "fastify";
+import { createCatalogSocialUseCases } from "../application/catalogSocial.js";
 import { z } from "zod";
 import {
   requireSupabaseIdentity,
   supabaseService,
-} from "../../auth/supabaseAuth.js";
+} from "../../auth/http/supabaseAuth.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import { createRateLimiter } from "../../security/sharedRateLimiter.js";
 import { requireAuthenticatedService } from "../../security/authenticatedService.js";
+import {
+  hasMatchingLiveSession,
+  recordGamePlay,
+} from "../infrastructure/supabaseSocialRepository.js";
 
 const gameParamsSchema = z.object({
   gameId: z.string().uuid(),
@@ -36,27 +41,22 @@ export async function registerPlayCountRoutes(
 ) {
   const requireUser = options.requireUser || requireSupabaseIdentity;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
-  const hasLivePlaySession = options.hasLivePlaySession || (async (input) => {
-    if (!service) return false;
-    const { data, error } = await service
-      .from("backend_sessions")
-      .select("id")
-      .eq("user_id", input.userId)
-      .eq("game_id", input.gameId)
-      .eq("client_edition", input.clientEdition)
-      .eq("client_runtime_kind", input.runtimeKind)
-      .is("deleted_at", null)
-      .gt("expires_at", new Date().toISOString())
-      .limit(1)
-      .maybeSingle<{ id: string }>();
-    if (error) throw error;
-    return Boolean(data);
-  });
+  const hasLivePlaySession =
+    options.hasLivePlaySession ||
+    (async (input) => (service ? hasMatchingLiveSession(service, input) : false));
   const playCountWriteLimiter = createRateLimiter({
     limit: 60,
     namespace: "play-count-write",
     windowMs: 60_000,
   });
+  const social = service ? createCatalogSocialUseCases({
+    deleteComment: async () => {},
+    findCommentAuthor: async () => null,
+    findRole: async () => null,
+    hasLivePlay: hasLivePlaySession,
+    recordPlay: (input) => recordGamePlay(service, input),
+    saveCommentReaction: async () => null,
+  }) : null;
 
   app.post(
     "/games/:gameId/play-count",
@@ -64,7 +64,7 @@ export async function registerPlayCountRoutes(
     async (request, reply) => {
       const authenticated = requireAuthenticatedService(request, reply, service);
       if (!authenticated) return;
-      const { service: authenticatedService, user } = authenticated;
+      const { user } = authenticated;
 
       const parsedParams = gameParamsSchema.safeParse(request.params);
       if (!parsedParams.success) {
@@ -84,35 +84,23 @@ export async function registerPlayCountRoutes(
         return;
       }
       try {
-        const hasEvidence = await hasLivePlaySession({
+        const result = await social!.recordPlay({
           clientEdition: parsedBody.data.clientEdition,
+          eventId: parsedBody.data.playEventId,
           gameId: parsedParams.data.gameId,
           runtimeKind: parsedBody.data.runtimeKind,
           userId: user.id,
         });
-        if (!hasEvidence) {
+        if (result.status === "missing_evidence") {
           return reply.status(409).send({
             error: "A matching live game session is required to count play activity.",
           });
         }
+        return { success: true };
       } catch (error) {
-        request.log.error({ err: error }, "Failed to verify play session");
+        request.log.error({ err: error }, "Failed to count play");
         return reply.status(500).send({ error: "Failed to count play" });
       }
-      const { error } = await authenticatedService.rpc("record_game_play", {
-        p_client_edition: parsedBody.data.clientEdition,
-        p_event_id: parsedBody.data.playEventId,
-        p_game_id: parsedParams.data.gameId,
-        p_runtime_kind: parsedBody.data.runtimeKind,
-        p_user_id: user.id,
-      });
-
-      if (error) {
-        request.log.error(error, "Failed to increment play count");
-        return reply.status(500).send({ error: "Failed to count play" });
-      }
-
-      return { success: true };
     },
   );
 }

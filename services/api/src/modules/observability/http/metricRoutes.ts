@@ -1,17 +1,23 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { createRecordStreamMetric } from "../application/streamMetrics.js";
 import {
   requireSupabaseIdentity,
   supabaseService,
-} from "../../auth/supabaseAuth.js";
+} from "../../auth/http/supabaseAuth.js";
 import {
   createRateLimiter,
   type RateLimiter,
 } from "../../security/sharedRateLimiter.js";
-import { getLiveSession } from "../../auth/services/backendSessions.js";
+import { getLiveSession } from "../../auth/infrastructure/backendSessions.js";
+import {
+  findLatestMetricAt,
+  findRecentStreamMetrics,
+  insertStreamMetric,
+  type StreamMetricRow,
+} from "../infrastructure/supabaseMetricRepository.js";
 
 const METRIC_MIN_INTERVAL_MS = 5_000;
-const METRIC_MAX_CLOCK_SKEW_MS = 24 * 60 * 60_000;
 
 const streamMetricSchema = z.object({
   bitrateKbps: z.number().min(0).max(1_000_000).nullable(),
@@ -38,18 +44,6 @@ const streamMetricSchema = z.object({
   sessionId: z.string().min(1).max(128).regex(/^[a-zA-Z0-9_-]+$/),
   timestamp: z.string().datetime(),
 });
-
-type StreamMetricRow = {
-  bitrate_kbps: number | null;
-  connection_state: string;
-  fps: number | null;
-  ice_connection_state: string;
-  jitter_ms: number | null;
-  metric_timestamp: string;
-  packets_lost: number;
-  received_at: string;
-  session_id: string;
-};
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
@@ -104,6 +98,14 @@ export async function registerMetricRoutes(
       namespace: "stream-metric-write-user",
       windowMs: 60_000,
     });
+  const recordMetric = service ? createRecordStreamMetric({
+    consumeSession: (key, now) => metricWriteLimiter.consume(key, now),
+    consumeUser: (key, now) => metricUserWriteLimiter.consume(key, now),
+    findLatest: (userId, sessionId) => findLatestMetricAt(service, userId, sessionId),
+    hasLiveSession: hasLiveMetricSession,
+    insert: (input) => insertStreamMetric(service, input as Parameters<typeof insertStreamMetric>[1]),
+    now: Date.now,
+  }) : null;
 
   app.post(
     "/metrics/stream",
@@ -125,91 +127,16 @@ export async function registerMetricRoutes(
         });
       }
 
-      const now = Date.now();
-      if (
-        Math.abs(Date.parse(parsedMetric.data.timestamp) - now) >
-        METRIC_MAX_CLOCK_SKEW_MS
-      ) {
-        return reply.status(400).send({ error: "Invalid stream metric timestamp" });
-      }
-
-      const userRateLimit = await metricUserWriteLimiter.consume(user.id, now);
-      if (!userRateLimit.allowed) {
-        return reply.status(202).send({
-          accepted: false,
-          reason: "rate_limited",
-        });
-      }
-
       try {
-        if (
-          !(await hasLiveMetricSession(parsedMetric.data.sessionId, user.id))
-        ) {
-          return reply.status(404).send({ error: "Stream session is not active" });
-        }
+        const result = await recordMetric!(parsedMetric.data, user.id);
+        if (result.status === "invalid_timestamp") return reply.status(400).send({ error: "Invalid stream metric timestamp" });
+        if (result.status === "missing_session") return reply.status(404).send({ error: "Stream session is not active" });
+        if (result.status === "rate_limited") return reply.status(202).send({ accepted: false, reason: "rate_limited" });
+        return reply.status(202).send({ accepted: true });
       } catch (error) {
-        request.log.error({ err: error }, "Failed to verify stream session");
-        return reply.status(500).send({ error: "Failed to save stream metric" });
-      }
-
-      const sessionRateLimit = await metricWriteLimiter.consume(
-        `${user.id}:${parsedMetric.data.sessionId}`,
-        now,
-      );
-      if (!sessionRateLimit.allowed) {
-        return reply.status(202).send({
-          accepted: false,
-          reason: "rate_limited",
-        });
-      }
-
-      const { data: latestMetric, error: latestMetricError } =
-        await service
-          .from("stream_metrics")
-          .select("received_at")
-          .eq("user_id", user.id)
-          .eq("session_id", parsedMetric.data.sessionId)
-          .order("received_at", { ascending: false })
-          .limit(1)
-          .maybeSingle<{ received_at: string }>();
-
-      if (latestMetricError) {
-        request.log.error(
-          { err: latestMetricError },
-          "Failed to read latest stream metric",
-        );
-        return reply.status(500).send({ error: "Failed to save stream metric" });
-      }
-
-      const lastMetricAt = latestMetric
-        ? Date.parse(latestMetric.received_at)
-        : 0;
-      if (now - lastMetricAt < METRIC_MIN_INTERVAL_MS) {
-        return reply.status(202).send({
-          accepted: false,
-          reason: "rate_limited",
-        });
-      }
-
-      const { error } = await service.from("stream_metrics").insert({
-        bitrate_kbps: parsedMetric.data.bitrateKbps,
-        connection_state: parsedMetric.data.connectionState,
-        fps: parsedMetric.data.fps,
-        ice_connection_state: parsedMetric.data.iceConnectionState,
-        jitter_ms: parsedMetric.data.jitterMs,
-        metric_timestamp: parsedMetric.data.timestamp,
-        packets_lost: parsedMetric.data.packetsLost,
-        received_at: new Date(now).toISOString(),
-        session_id: parsedMetric.data.sessionId,
-        user_id: user.id,
-      });
-
-      if (error) {
         request.log.error({ err: error }, "Failed to save stream metric");
         return reply.status(500).send({ error: "Failed to save stream metric" });
       }
-
-      return reply.status(202).send({ accepted: true });
     },
   );
 
@@ -228,24 +155,13 @@ export async function registerMetricRoutes(
         });
       }
 
-      const { data, error } = await service
-        .from("stream_metrics")
-        .select(
-          "session_id,fps,bitrate_kbps,packets_lost,jitter_ms,ice_connection_state,connection_state,metric_timestamp,received_at",
-        )
-        .eq("user_id", user.id)
-        .order("received_at", { ascending: false })
-        .limit(50)
-        .returns<StreamMetricRow[]>();
-
-      if (error) {
+      try {
+        const metrics = await findRecentStreamMetrics(service, user.id);
+        return { metrics: metrics.reverse().map(mapMetric) };
+      } catch (error) {
         request.log.error({ err: error }, "Failed to load stream metrics");
         return reply.status(500).send({ error: "Failed to load stream metrics" });
       }
-
-      return {
-        metrics: (data || []).reverse().map(mapMetric),
-      };
     },
   );
 }

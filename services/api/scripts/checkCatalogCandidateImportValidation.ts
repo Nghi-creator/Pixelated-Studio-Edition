@@ -4,15 +4,15 @@ import { fileURLToPath } from "node:url";
 import {
   assertCandidateRightsEvidence,
   assertCandidateRuntimeAllowed,
-} from "../src/modules/catalog/ingestion/catalogCandidateValidation.js";
+} from "../src/modules/catalog/ingestion/domain/catalogCandidateValidation.js";
 import {
   collectCuratedRomCandidateReport,
   readCuratedRomManifest,
-} from "../src/modules/catalog/ingestion/curatedRomManifestImporter.js";
+} from "../src/modules/catalog/ingestion/application/curatedRomManifestImporter.js";
 import {
   collectDebianNativeCandidates,
   readDebianNativeLockManifest,
-} from "../src/modules/catalog/ingestion/debianNativeImporter.js";
+} from "../src/modules/catalog/ingestion/application/debianNativeImporter.js";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(scriptDir, "../../..");

@@ -2,6 +2,12 @@ import type { FastifyInstance } from "fastify";
 import type { CatalogRouteContext } from "./catalogRouteContext.js";
 import { gameParamsSchema } from "./contracts.js";
 import { requireAuthenticatedService } from "../../security/authenticatedService.js";
+import {
+  deleteFavorite,
+  findFavorites,
+  hasFavorite,
+  saveFavorite,
+} from "../infrastructure/supabaseSocialRepository.js";
 
 export function registerFavoriteRoutes(
   app: FastifyInstance,
@@ -14,16 +20,12 @@ export function registerFavoriteRoutes(
     if (!authenticated) return;
     const { service: authenticatedService, user } = authenticated;
 
-    const { data, error } = await authenticatedService
-      .from("favorites")
-      .select("game_id,games(id,title,cover_url)")
-      .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
-    if (error) {
+    try {
+      return { favorites: await findFavorites(authenticatedService, user.id) };
+    } catch (error) {
       request.log.error({ err: error }, "Failed to load favorites");
       return reply.status(500).send({ error: "Failed to load favorites" });
     }
-    return { favorites: (data || []).map((row) => row.games).filter(Boolean) };
   });
 
   app.get(
@@ -36,17 +38,14 @@ export function registerFavoriteRoutes(
       const params = gameParamsSchema.safeParse(request.params);
       if (!params.success) return reply.status(400).send({ error: "Invalid game id" });
 
-      const { data, error } = await authenticatedService
-        .from("favorites")
-        .select("game_id")
-        .eq("user_id", user.id)
-        .eq("game_id", params.data.gameId)
-        .maybeSingle();
-      if (error) {
+      try {
+        return {
+          favorited: await hasFavorite(authenticatedService, user.id, params.data.gameId),
+        };
+      } catch (error) {
         request.log.error({ err: error }, "Failed to load favorite");
         return reply.status(500).send({ error: "Failed to load favorite" });
       }
-      return { favorited: Boolean(data) };
     },
   );
 
@@ -60,14 +59,13 @@ export function registerFavoriteRoutes(
       const params = gameParamsSchema.safeParse(request.params);
       if (!params.success) return reply.status(400).send({ error: "Invalid game id" });
 
-      const { error } = await authenticatedService
-        .from("favorites")
-        .upsert({ game_id: params.data.gameId, user_id: user.id });
-      if (error) {
+      try {
+        await saveFavorite(authenticatedService, user.id, params.data.gameId);
+        return { favorited: true };
+      } catch (error) {
         request.log.error({ err: error }, "Failed to save favorite");
         return reply.status(500).send({ error: "Failed to save favorite" });
       }
-      return { favorited: true };
     },
   );
 
@@ -81,16 +79,13 @@ export function registerFavoriteRoutes(
       const params = gameParamsSchema.safeParse(request.params);
       if (!params.success) return reply.status(400).send({ error: "Invalid game id" });
 
-      const { error } = await authenticatedService
-        .from("favorites")
-        .delete()
-        .eq("user_id", user.id)
-        .eq("game_id", params.data.gameId);
-      if (error) {
+      try {
+        await deleteFavorite(authenticatedService, user.id, params.data.gameId);
+        return reply.status(204).send();
+      } catch (error) {
         request.log.error({ err: error }, "Failed to delete favorite");
         return reply.status(500).send({ error: "Failed to delete favorite" });
       }
-      return reply.status(204).send();
     },
   );
 }

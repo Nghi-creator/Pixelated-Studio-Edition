@@ -5,7 +5,7 @@ import process from "node:process";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import { z } from "zod";
-import { uploadGameplayArtworkFromFile } from "../src/modules/catalog/ingestion/catalogArtworkCapture.js";
+import { uploadGameplayArtworkFromFile } from "../src/modules/catalog/ingestion/infrastructure/catalogArtworkCapture.js";
 
 dotenv.config({ path: new URL("../.env", import.meta.url) });
 

@@ -4,11 +4,11 @@ import { registerAuthMethodsRoutes } from "./modules/auth/http/authMethodsRoutes
 import { registerMeRoutes } from "./modules/auth/http/meRoutes.js";
 import { registerSessionRoutes } from "./modules/auth/http/sessionRoutes.js";
 import { registerAdminSubmissionRoutes } from "./modules/catalog/http/adminSubmissionRoutes.js";
-import { registerCatalogCandidateRoutes } from "./modules/catalog/http/catalogCandidateRoutes.js";
+import { registerCatalogCandidateRoutes } from "./modules/catalog/ingestion/http/catalogCandidateRoutes.js";
 import { registerCatalogRoutes } from "./modules/catalog/http/registerCatalogRoutes.js";
 import { registerPlayCountRoutes } from "./modules/catalog/http/playCountRoutes.js";
 import { registerSubmissionRoutes } from "./modules/catalog/http/registerSubmissionRoutes.js";
-import { scheduleControlPlaneCleanup } from "./modules/maintenance/controlPlaneCleanup.js";
+import { scheduleControlPlaneCleanup } from "./modules/maintenance/infrastructure/scheduleControlPlaneCleanup.js";
 import { registerModerationRoutes } from "./modules/moderation/http/registerModerationRoutes.js";
 import { registerLocalPairingRoutes } from "./modules/multiplayer/http/localPairingRoutes.js";
 import { registerMultiplayerRoutes } from "./modules/multiplayer/http/multiplayerRoutes.js";

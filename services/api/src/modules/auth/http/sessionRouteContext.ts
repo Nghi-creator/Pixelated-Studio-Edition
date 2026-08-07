@@ -1,14 +1,14 @@
 import { z } from "zod";
 import { env } from "../../../config/env.js";
 import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
-import { createSignedCatalogRomUrl } from "../domain/browserArtifact.js";
+import { createSignedCatalogRomUrl } from "../infrastructure/catalogRomStorage.js";
 import {
   attachOptionalSupabaseUser,
   requireSupabaseIdentity,
   requireSupabaseUser,
   supabaseService,
-} from "../supabaseAuth.js";
-import type { SupabaseServiceLike } from "../services/backendSessions.js";
+} from "./supabaseAuth.js";
+import type { SupabaseServiceLike } from "../infrastructure/backendSessions.js";
 
 export const SESSION_TTL_MS = 15 * 60 * 1000;
 export const sessionIdSchema = z.string().regex(/^[a-zA-Z0-9_-]+$/).max(80);

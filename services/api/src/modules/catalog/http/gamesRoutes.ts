@@ -1,242 +1,124 @@
 import type { FastifyInstance } from "fastify";
-import { getCatalogCacheKey } from "../domain/catalogPolicy.js";
+import { createCatalogQueries } from "../application/catalogQueries.js";
 import {
   fetchFeaturedGames,
   fetchPublishedCatalogFilters,
   fetchPublishedCatalogPage,
   fetchPublishedGameById,
-} from "../services/catalogService.js";
-import { logTiming } from "../../observability/timing.js";
+} from "../infrastructure/supabaseCatalogRepository.js";
+import { logTiming } from "../../observability/infrastructure/timing.js";
 import type { CatalogRouteContext } from "./catalogRouteContext.js";
-import {
-  gameParamsSchema,
-  gamesQuerySchema,
-  type CachedGamesCatalogResponse,
-} from "./contracts.js";
+import { gameParamsSchema, gamesQuerySchema } from "./contracts.js";
 
-const WARMUP_PAGE = 1;
-const WARMUP_PAGE_SIZE = 15;
-const FEATURED_CACHE_KEY = "featured";
-
-async function getCachedFeaturedGames(
-  context: CatalogRouteContext,
-  timings: Record<string, number>,
-) {
-  const { featuredGamesCache, service } = context;
-  const cached = featuredGamesCache.get(FEATURED_CACHE_KEY);
-  if (cached) return cached;
-  if (!service) return [];
-
-  const featuredGames = await fetchFeaturedGames(service, timings);
-  featuredGamesCache.set(FEATURED_CACHE_KEY, featuredGames);
-  return featuredGames;
-}
-
-async function buildCachedGamesPage(
-  service: NonNullable<CatalogRouteContext["service"]>,
-  timings: Record<string, number>,
-  page: number,
-  pageSize: number,
-  search?: string,
-  genre?: string,
-  license?: string,
-  platform?: string,
-): Promise<CachedGamesCatalogResponse> {
-  const offset = (page - 1) * pageSize;
-  const { games, total } = await fetchPublishedCatalogPage(service, timings, {
-    genre,
-    license,
-    offset,
-    pageSize,
-    platform,
-    search,
+function createQueries(context: CatalogRouteContext) {
+  if (!context.service) return null;
+  const service = context.service;
+  return createCatalogQueries({
+    featuredGamesCache: context.featuredGamesCache,
+    fetchFeaturedGames: (timings) => fetchFeaturedGames(service, timings),
+    fetchFilters: (timings) => fetchPublishedCatalogFilters(service, timings),
+    fetchGameById: (gameId) => fetchPublishedGameById(service, gameId),
+    fetchPage: (timings, query) =>
+      fetchPublishedCatalogPage(service, timings, {
+        genre: query.genre,
+        license: query.license,
+        offset: query.offset,
+        pageSize: query.pageSize,
+        platform: query.platform,
+        search: query.search,
+      }),
+    gamesCatalogCache: context.gamesCatalogCache,
   });
-
-  return {
-    games,
-    page,
-    pageSize,
-    total,
-    totalPages: Math.max(1, Math.ceil(total / pageSize)),
-  };
 }
 
 export async function warmGamesCatalogCache(context: CatalogRouteContext) {
-  const { gamesCatalogCache, service } = context;
-  if (!service) return null;
-
-  const cacheKey = getCatalogCacheKey(WARMUP_PAGE, WARMUP_PAGE_SIZE);
-  const cachedResponse = gamesCatalogCache.get(cacheKey);
-  if (cachedResponse?.featuredGames) return null;
-
-  const timings = {};
-  const [cachedPage, featuredGames] = await Promise.all([
-    cachedResponse ||
-      buildCachedGamesPage(service, timings, WARMUP_PAGE, WARMUP_PAGE_SIZE),
-    getCachedFeaturedGames(context, timings),
-  ]);
-  gamesCatalogCache.set(cacheKey, {
-    ...cachedPage,
-    featuredGames,
-  });
-
-  return {
-    page: WARMUP_PAGE,
-    pageSize: WARMUP_PAGE_SIZE,
-    timings,
-  };
+  return createQueries(context)?.warm() || null;
 }
 
 export function registerGamesCatalogRoutes(
   app: FastifyInstance,
   context: CatalogRouteContext,
 ) {
-  const { gamesCatalogCache, service } = context;
+  const queries = createQueries(context);
 
   app.addHook("onListen", async () => {
-    if (!service) return;
-
+    if (!queries) return;
     try {
-      const warmup = await warmGamesCatalogCache(context);
-      if (!warmup) return;
-      logTiming(app.log, "Games catalog warmup timing", warmup.timings, {
-        page: warmup.page,
-        pageSize: warmup.pageSize,
-      });
-    } catch (err) {
-      app.log.warn({ err }, "Failed to warm games catalog cache");
+      const warmup = await queries.warm();
+      if (warmup) {
+        logTiming(app.log, "Games catalog warmup timing", warmup.timings, {
+          page: warmup.page,
+          pageSize: warmup.pageSize,
+        });
+      }
+    } catch (error) {
+      app.log.warn({ err: error }, "Failed to warm games catalog cache");
     }
   });
 
   app.get("/games", async (request, reply) => {
-    if (!service) {
+    if (!queries) {
       return reply.status(503).send({
         error: "Supabase service client is not configured for the API.",
       });
     }
-
     const query = gamesQuerySchema.safeParse(request.query);
-    if (!query.success) {
-      return reply.status(400).send({ error: "Invalid games query" });
-    }
+    if (!query.success) return reply.status(400).send({ error: "Invalid games query" });
 
-    const { genre, license, page, pageSize, platform, search } = query.data;
-    const timings = {};
-    const cacheKey = getCatalogCacheKey(
-      page,
-      pageSize,
-      search,
-      genre,
-      license,
-      platform,
-    );
-    const cachedResponse = gamesCatalogCache.get(cacheKey);
-    if (cachedResponse) {
-      let featuredGames = cachedResponse.featuredGames || [];
-      if (!cachedResponse.featuredGames) {
-        try {
-          featuredGames = await getCachedFeaturedGames(context, timings);
-        } catch (err) {
-          request.log.warn({ err }, "Failed to load featured games");
-        }
-      }
-
-      reply.header("Cache-Control", "public, max-age=30, s-maxage=60");
-      reply.header("X-Pixelated-Cache", "HIT");
-      logTiming(request.log, "Games catalog timing", timings, {
-        cache: "hit",
-        page,
-        pageSize,
-        resultCount: cachedResponse.games.length,
-        search: Boolean(search),
-        genre: genre || null,
-        license: license || null,
-        platform: platform || null,
-        total: cachedResponse.total,
-      });
-      return { ...cachedResponse, featuredGames };
-    }
-
-    let cachedPage: CachedGamesCatalogResponse;
     try {
-      cachedPage = await buildCachedGamesPage(
-        service,
-        timings,
-        page,
-        pageSize,
-        search,
-        genre,
-        license,
-        platform,
-      );
-    } catch (err) {
-      request.log.error({ err }, "Failed to load games");
+      const result = await queries.getPage(query.data);
+      if (result.featuredError) {
+        request.log.warn({ err: result.featuredError }, "Failed to load featured games");
+      }
+      reply.header("Cache-Control", "public, max-age=30, s-maxage=60");
+      reply.header("X-Pixelated-Cache", result.cache.toUpperCase());
+      logTiming(request.log, "Games catalog timing", result.timings, {
+        cache: result.cache,
+        page: query.data.page,
+        pageSize: query.data.pageSize,
+        resultCount: result.response.games.length,
+        search: Boolean(query.data.search),
+        genre: query.data.genre || null,
+        license: query.data.license || null,
+        platform: query.data.platform || null,
+        total: result.response.total,
+      });
+      return result.response;
+    } catch (error) {
+      request.log.error({ err: error }, "Failed to load games");
       return reply.status(500).send({ error: "Failed to load games" });
     }
-
-    let featuredGames: unknown[] = [];
-    try {
-      featuredGames = await getCachedFeaturedGames(context, timings);
-    } catch (err) {
-      request.log.warn({ err }, "Failed to load featured games");
-    }
-
-    const response = {
-      featuredGames,
-      ...cachedPage,
-    };
-
-    gamesCatalogCache.set(cacheKey, response);
-    reply.header("Cache-Control", "public, max-age=30, s-maxage=60");
-    reply.header("X-Pixelated-Cache", "MISS");
-    logTiming(request.log, "Games catalog timing", timings, {
-      cache: "miss",
-      page,
-      pageSize,
-      resultCount: cachedPage.games.length,
-      search: Boolean(search),
-      genre: genre || null,
-      license: license || null,
-      platform: platform || null,
-      total: cachedPage.total,
-    });
-
-    return response;
   });
 
   app.get("/games/filters", async (request, reply) => {
-    if (!service) {
+    if (!queries) {
       return reply.status(503).send({
         error: "Supabase service client is not configured for the API.",
       });
     }
-
-    const timings = {};
     try {
-      const filters = await fetchPublishedCatalogFilters(service, timings);
+      const filters = await queries.getFilters({});
       reply.header("Cache-Control", "public, max-age=60, s-maxage=300");
       return filters;
-    } catch (err) {
-      request.log.error({ err }, "Failed to load catalog filters");
+    } catch (error) {
+      request.log.error({ err: error }, "Failed to load catalog filters");
       return reply.status(500).send({ error: "Failed to load catalog filters" });
     }
   });
 
   app.get("/games/featured", async (request, reply) => {
-    if (!service) {
+    if (!queries) {
       return reply.status(503).send({
         error: "Supabase service client is not configured for the API.",
       });
     }
-
-    const timings = {};
+    const timings: Record<string, number> = {};
     let featuredGames: unknown[] = [];
     try {
-      featuredGames = await getCachedFeaturedGames(context, timings);
-    } catch (err) {
-      request.log.warn({ err }, "Failed to load featured games");
+      featuredGames = await queries.getFeaturedGames(timings);
+    } catch (error) {
+      request.log.warn({ err: error }, "Failed to load featured games");
     }
-
     reply.header("Cache-Control", "public, max-age=15, s-maxage=30");
     reply.header(
       "X-Pixelated-Cache",
@@ -249,25 +131,19 @@ export function registerGamesCatalogRoutes(
   });
 
   app.get("/games/:gameId", async (request, reply) => {
-    if (!service) {
+    if (!queries) {
       return reply.status(503).send({
         error: "Supabase service client is not configured for the API.",
       });
     }
-
     const params = gameParamsSchema.safeParse(request.params);
-    if (!params.success) {
-      return reply.status(400).send({ error: "Invalid game id" });
-    }
-
-    let data = null;
+    if (!params.success) return reply.status(400).send({ error: "Invalid game id" });
     try {
-      data = await fetchPublishedGameById(service, params.data.gameId);
-    } catch (err) {
-      request.log.error({ err }, "Failed to load game");
+      const game = await queries.getGameById(params.data.gameId);
+      return game ? { game } : reply.status(404).send({ error: "Game not found" });
+    } catch (error) {
+      request.log.error({ err: error }, "Failed to load game");
       return reply.status(500).send({ error: "Failed to load game" });
     }
-    if (!data) return reply.status(404).send({ error: "Game not found" });
-    return { game: data };
   });
 }

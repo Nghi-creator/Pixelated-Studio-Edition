@@ -13,7 +13,7 @@ import {
   isGeneratedCatalogArtworkUrl,
   parseCaptureCommand,
   uploadGameplayArtworkFromFile,
-} from "../src/modules/catalog/ingestion/catalogArtworkCapture.js";
+} from "../src/modules/catalog/ingestion/infrastructure/catalogArtworkCapture.js";
 
 dotenv.config();
 

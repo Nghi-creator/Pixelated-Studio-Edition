@@ -1,15 +1,20 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
+import { createAccessLogUseCases } from "../application/accessLogs.js";
 import {
   getBearerToken,
   requireSupabaseUser,
   supabaseAnon,
   supabaseService,
-} from "../../auth/supabaseAuth.js";
-import { getAuthoritativeUserRole } from "../../auth/roleAuthorization.js";
-import { logTiming, timed } from "../timing.js";
+} from "../../auth/http/supabaseAuth.js";
+import { getAuthoritativeUserRole } from "../../auth/infrastructure/roleAuthorization.js";
 import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
+import {
+  findAccessLogSummary,
+  findTokenUserId,
+  recordAccessLog,
+} from "../infrastructure/supabaseAccessLogRepository.js";
 
 const accessLogBodySchema = z.object({
   path: z.string().trim().min(1).max(2048),
@@ -23,15 +28,6 @@ const accessLogQuerySchema = z.object({
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 type SupabaseAnonLike = NonNullable<typeof supabaseAnon>;
-
-type AccessLogRow = {
-  first_seen_at: string;
-  last_seen_at: string;
-  sessions_count: number;
-  total_count: number;
-  user_id: string | null;
-  username: string | null;
-};
 
 type SupabaseErrorDetails = {
   code?: string;
@@ -110,6 +106,16 @@ export async function registerAccessLogRoutes(
       namespace: "access-log-write-ip",
       windowMs: 60_000,
     });
+  const useCases = service ? createAccessLogUseCases({
+    authorize: async (userId) => {
+      const lookup = await getAuthoritativeUserRole(service, userId);
+      if (lookup.error) throw lookup.error;
+      return ["admin", "super_admin"].includes(lookup.role || "");
+    },
+    findSummary: (page, pageSize) => findAccessLogSummary(service, page, pageSize),
+    findTokenUser: (token) => anon ? findTokenUserId(anon, token) : Promise.resolve(null),
+    record: (input) => recordAccessLog(service, input),
+  }) : null;
 
   app.post("/access-logs", async (request, reply) => {
     if (
@@ -133,39 +139,15 @@ export async function registerAccessLogRoutes(
       return reply.status(400).send({ error: "Invalid access log" });
     }
 
-    let userId: string | null = null;
-    const timings = {};
     const token = getBearerToken(request);
-    if (token && anon) {
-      const { data, error } = await timed(timings, "auth_user_lookup_ms", () =>
-        anon.auth.getUser(token),
-      );
-      if (!error && data.user) {
-        userId = data.user.id;
-      }
-    }
-
-    const { error } = await timed(
-      timings,
-      "access_log_upsert_ms",
-      () =>
-        service.rpc("record_access_log", {
-          p_path: parsedBody.data.path,
-          p_session_id: parsedBody.data.sessionId,
-          p_user_id: userId,
-        }),
-    );
-
-    if (error) {
+    try {
+      await useCases!.record({ ...parsedBody.data, token: token || undefined });
+    } catch (error) {
       request.log.error({ err: error }, "Failed to create access log");
       return reply
         .status(500)
         .send(getAccessLogStorageErrorResponse(error, "Failed to create access log"));
     }
-
-    logTiming(request.log, "Access log write timing", timings, {
-      authenticated: Boolean(userId),
-    });
 
     return reply.status(202).send({ success: true });
   });
@@ -184,69 +166,21 @@ export async function registerAccessLogRoutes(
         });
       }
 
-      const timings = {};
-      const roleLookup = await timed(
-        timings,
-        "admin_role_check_ms",
-        () => getAuthoritativeUserRole(service, user.id),
-      );
-      if (roleLookup.error) {
-        request.log.error({ err: roleLookup.error }, "Failed to load admin profile");
-        return reply.status(500).send({
-          details: getSupabaseErrorDetails(roleLookup.error),
-          error: "Failed to authorize logs",
-        });
-      }
-      if (!["admin", "super_admin"].includes(roleLookup.role || "")) {
-        return reply.status(403).send({ error: "Admin access required" });
-      }
-
       const parsedQuery = accessLogQuerySchema.safeParse(request.query);
       if (!parsedQuery.success) {
         return reply.status(400).send({ error: "Invalid access log query" });
       }
 
-      const { page, pageSize } = parsedQuery.data;
-      const { data, error } = await timed(
-        timings,
-        "access_log_summary_rpc_ms",
-        () =>
-          service.rpc("admin_access_log_summary", {
-            p_page: page,
-            p_page_size: pageSize,
-          }),
-      );
-
-      if (error) {
+      try {
+        const result = await useCases!.list({ ...parsedQuery.data, userId: user.id });
+        if (result.status === "forbidden") return reply.status(403).send({ error: "Admin access required" });
+        return { logs: result.logs, page: result.page, pageSize: result.pageSize, total: result.total, totalPages: result.totalPages };
+      } catch (error) {
         request.log.error({ err: error }, "Failed to load access logs");
         return reply
           .status(500)
           .send(getAccessLogStorageErrorResponse(error, "Failed to load access logs"));
       }
-
-      const logs = (data || []) as AccessLogRow[];
-      const total = logs[0]?.total_count || 0;
-      logTiming(request.log, "Admin access logs timing", timings, {
-        page,
-        pageSize,
-        resultCount: logs.length,
-        roleSource: "database",
-        total,
-      });
-
-      return {
-        logs: logs.map((log) => ({
-          first_seen_at: log.first_seen_at,
-          last_seen_at: log.last_seen_at,
-          sessions_count: log.sessions_count,
-          user_id: log.user_id,
-          username: log.username,
-        })),
-        page,
-        pageSize,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / pageSize)),
-      };
     },
   );
 }

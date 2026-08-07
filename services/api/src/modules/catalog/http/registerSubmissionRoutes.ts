@@ -1,20 +1,26 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
-import { env } from "../../../config/env.js";
+import {
+  createGameSubmissionUseCase,
+  type GameSubmissionInput,
+} from "../application/createGameSubmission.js";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../auth/supabaseAuth.js";
+} from "../../auth/http/supabaseAuth.js";
 import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
-import {
-  getSupportedSubmissionRomExtension,
-  SUPPORTED_SUBMISSION_ROM_LABEL,
-} from "../domain/submissionRom.js";
+import { SUPPORTED_SUBMISSION_ROM_LABEL } from "../domain/submissionRom.js";
 import {
   createSignedSubmissionUrl,
   getSubmissionObjectPath,
-} from "../domain/submissionStorage.js";
+} from "../infrastructure/submissionStorage.js";
+import { notifyGameSubmission } from "../infrastructure/formspreeSubmissionNotifier.js";
+import {
+  countRecentSubmissions,
+  findSubmitterRole,
+  insertGameSubmission,
+} from "../infrastructure/supabaseSubmissionRepository.js";
 
 const submissionBodySchema = z.object({
   assetLicenseSpdx: z.string().trim().max(80).nullable().optional(),
@@ -109,28 +115,7 @@ const submissionBodySchema = z.object({
   }
 });
 
-const SUBMISSION_RATE_LIMIT = 3;
-const SUBMISSION_RATE_WINDOW_MS = 60 * 60 * 1000;
-
 type SubmissionPayload = z.infer<typeof submissionBodySchema>;
-
-function normalizeOptionalUrl(value: string | null | undefined) {
-  return value || null;
-}
-
-function isSubmissionStorageUrl(url: string, userId: string) {
-  const objectPath = getSubmissionObjectPath(url);
-  if (!objectPath) return false;
-
-  return objectPath.startsWith(`${userId}/`);
-}
-
-function getSubmissionRomExtension(url: string) {
-  const objectPath = getSubmissionObjectPath(url);
-  if (!objectPath) return null;
-
-  return getSupportedSubmissionRomExtension(objectPath);
-}
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
@@ -141,87 +126,13 @@ type SubmissionRouteOptions = {
   supabase?: SupabaseServiceLike | null;
 };
 
-async function getSubmitterRole(
-  service: SupabaseServiceLike,
-  userId: string,
-) {
-  const { data, error } = await service
-    .from("profiles")
-    .select("role")
-    .eq("id", userId)
-    .maybeSingle<{ role: string | null }>();
-
-  if (error) throw error;
-
-  return data?.role || "user";
-}
-
-async function defaultNotifySubmission(submission: SubmissionPayload) {
-  if (!env.FORMSPREE_SUBMISSION_URL) return;
-
-  const response = await fetch(env.FORMSPREE_SUBMISSION_URL, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      subject: `New Game Submission: ${submission.gameTitle}`,
-      developer: submission.authorName,
-      contact_email: submission.email,
-      game: submission.gameTitle,
-      description: submission.description || "No description provided.",
-      rom_download: submission.romUrl,
-      cover_art: submission.coverUrl || "None provided",
-      banner_art: submission.bannerUrl || "None provided",
-      rights: {
-        asset_license_spdx: submission.assetLicenseSpdx || null,
-        attribution_text: submission.attributionText,
-        code_license_spdx: submission.codeLicenseSpdx || null,
-        hosting_permission: submission.hostingPermission,
-        license_url: submission.licenseUrl || null,
-        original_release_url: submission.originalReleaseUrl || null,
-        ownership_status: submission.ownershipStatus,
-        permission_evidence_url: submission.permissionEvidenceUrl || null,
-        public_license_scope: submission.publicLicenseScope,
-        rights_notes: submission.rightsNotes || null,
-        source_repo_url: submission.sourceRepoUrl || null,
-        third_party_content: submission.thirdPartyContent,
-      },
-    }),
-    signal: AbortSignal.timeout(5_000),
-  });
-
-  if (!response.ok) {
-    throw new Error(`Formspree notification failed with ${response.status}`);
-  }
-}
-
-async function createReviewNotificationSubmission(
-  service: SupabaseServiceLike,
-  submission: SubmissionPayload,
-): Promise<SubmissionPayload> {
-  const [romUrl, coverUrl, bannerUrl] = await Promise.all([
-    createSignedSubmissionUrl(service, submission.romUrl),
-    createSignedSubmissionUrl(service, submission.coverUrl),
-    createSignedSubmissionUrl(service, submission.bannerUrl),
-  ]);
-
-  return {
-    ...submission,
-    bannerUrl,
-    coverUrl,
-    romUrl: romUrl || submission.romUrl,
-  };
-}
-
 export async function registerSubmissionRoutes(
   app: FastifyInstance,
   options: SubmissionRouteOptions = {},
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
-  const notifySubmission = options.notifySubmission || defaultNotifySubmission;
+  const notifySubmission = options.notifySubmission || notifyGameSubmission;
   const submissionWriteLimiter =
     options.submissionWriteLimiter ||
     createRateLimiter({
@@ -229,6 +140,19 @@ export async function registerSubmissionRoutes(
       namespace: "submission-write-user",
       windowMs: 60 * 60 * 1000,
     });
+  const createSubmission = service
+    ? createGameSubmissionUseCase({
+        countRecent: (userId, createdAfter) =>
+          countRecentSubmissions(service, userId, createdAfter),
+        findRole: (userId) => findSubmitterRole(service, userId),
+        insert: (values) => insertGameSubmission(service, values),
+        isOwnedStorageUrl: (url, userId) =>
+          getSubmissionObjectPath(url)?.startsWith(`${userId}/`) === true,
+        now: Date.now,
+        notify: notifySubmission,
+        signUrl: (url) => createSignedSubmissionUrl(service, url),
+      })
+    : null;
 
   app.post(
     "/submissions/games",
@@ -254,121 +178,42 @@ export async function registerSubmissionRoutes(
         });
       }
 
-      let submitterRole = "user";
-      try {
-        submitterRole = await getSubmitterRole(service, user.id);
-      } catch (err) {
-        request.log.error({ err }, "Failed to load submitter role");
-        return reply.status(500).send({ error: "Failed to create submission" });
-      }
-
-      if (submitterRole === "super_admin") {
-        return reply.status(403).send({
-          error: "Super admins cannot submit games for review",
-        });
-      }
-
       const parsedBody = submissionBodySchema.safeParse(request.body);
       if (!parsedBody.success) {
         return reply.status(400).send({ error: "Invalid game submission" });
       }
 
-      const submission = parsedBody.data;
-      const urls = [
-        submission.romUrl,
-        normalizeOptionalUrl(submission.coverUrl),
-        normalizeOptionalUrl(submission.bannerUrl),
-      ].filter((url): url is string => Boolean(url));
-
-      if (!getSubmissionRomExtension(submission.romUrl)) {
+      try {
+        const result = await createSubmission!({
+          submission: parsedBody.data as GameSubmissionInput,
+          userId: user.id,
+        });
+        if (result.status === "role_forbidden") {
+          return reply.status(403).send({ error: "Super admins cannot submit games for review" });
+        }
+        if (result.status === "unsupported_rom") {
         return reply.status(400).send({
           error: `ROM URL must point to a supported game file: ${SUPPORTED_SUBMISSION_ROM_LABEL}`,
         });
-      }
-
-      if (!urls.every((url) => isSubmissionStorageUrl(url, user.id))) {
+        }
+        if (result.status === "unowned_files") {
         return reply.status(400).send({
           error: "Submission files must be uploaded to your submissions folder",
         });
-      }
-
-      const rateWindowStart = new Date(
-        Date.now() - SUBMISSION_RATE_WINDOW_MS,
-      ).toISOString();
-      const { count, error: rateError } = await service
-        .from("game_submissions")
-        .select("id", { count: "exact" })
-        .eq("submitter_id", user.id)
-        .gte("created_at", rateWindowStart);
-
-      if (rateError) {
-        request.log.error({ err: rateError }, "Failed to check submission rate");
-        return reply.status(500).send({ error: "Failed to create submission" });
-      }
-
-      if ((count || 0) >= SUBMISSION_RATE_LIMIT) {
+        }
+        if (result.status === "rate_limited") {
         return reply.status(429).send({
           error: "Submission limit reached. Please try again later.",
         });
-      }
-
-      const { data, error } = await service
-        .from("game_submissions")
-        .insert({
-          asset_license_spdx: submission.assetLicenseSpdx || null,
-          attribution_text: submission.attributionText,
-          author_name: submission.authorName,
-          banner_url: normalizeOptionalUrl(submission.bannerUrl),
-          code_license_spdx: submission.codeLicenseSpdx || null,
-          cover_url: normalizeOptionalUrl(submission.coverUrl),
-          description: submission.description || null,
-          email: submission.email,
-          game_title: submission.gameTitle,
-          hosting_confirmed: submission.hostingConfirmed,
-          hosting_permission: submission.hostingPermission,
-          license_url: normalizeOptionalUrl(submission.licenseUrl),
-          no_release_url_explanation:
-            submission.noReleaseUrlExplanation || null,
-          original_release_url: normalizeOptionalUrl(
-            submission.originalReleaseUrl,
-          ),
-          ownership_confirmed: submission.ownershipConfirmed,
-          ownership_status: submission.ownershipStatus,
-          permission_evidence_url: normalizeOptionalUrl(
-            submission.permissionEvidenceUrl,
-          ),
-          public_license_scope: submission.publicLicenseScope,
-          rom_url: submission.romUrl,
-          rights_confirmed: submission.rightsConfirmed,
-          rights_notes: submission.rightsNotes || null,
-          source_repo_url: normalizeOptionalUrl(submission.sourceRepoUrl),
-          submitter_id: user.id,
-          third_party_content: submission.thirdPartyContent,
-        })
-        .select("id")
-        .single<{ id: string }>();
-
-      if (error || !data) {
+        }
+        if (result.notificationError) {
+          request.log.warn({ err: result.notificationError }, "Failed to send submission notification");
+        }
+        return reply.status(201).send({ submission: { id: result.id, status: "pending" } });
+      } catch (error) {
         request.log.error({ err: error }, "Failed to create game submission");
         return reply.status(500).send({ error: "Failed to create submission" });
       }
-
-      try {
-        const reviewSubmission = await createReviewNotificationSubmission(
-          service,
-          submission,
-        );
-        await notifySubmission(reviewSubmission);
-      } catch (err) {
-        request.log.warn({ err }, "Failed to send submission notification");
-      }
-
-      return reply.status(201).send({
-        submission: {
-          id: data.id,
-          status: "pending",
-        },
-      });
     },
   );
 }

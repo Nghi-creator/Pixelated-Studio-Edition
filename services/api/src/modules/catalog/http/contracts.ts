@@ -47,11 +47,4 @@ export const reactionBodySchema = z.object({
   isLike: z.boolean().nullable(),
 });
 
-export type CachedGamesCatalogResponse = {
-  featuredGames?: unknown[];
-  games: unknown[];
-  page: number;
-  pageSize: number;
-  total: number;
-  totalPages: number;
-};
+export type { CachedGamesCatalogResponse } from "../application/catalogQueries.js";
