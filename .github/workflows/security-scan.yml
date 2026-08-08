@@ -35,10 +35,10 @@ jobs:
             path: engine/runtime
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           cache: npm
           cache-dependency-path: ${{ matrix.path }}/package-lock.json
@@ -47,6 +47,10 @@ jobs:
       - name: Audit ${{ matrix.label }} production dependencies
         working-directory: ${{ matrix.path }}
         run: npm audit --omit=dev --audit-level=high
+
+      - name: Check workspace lockfile consistency
+        if: matrix.label == 'root'
+        run: npm run check:lockfiles
 
       # Electron is declared as a development dependency because it is used by
       # the packager, but the resulting Electron runtime ships to users.
@@ -65,7 +69,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Scan for committed secret-like tokens
         run: |
@@ -85,13 +89,13 @@ jobs:
       security-events: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@c3400c2f38909e0dcf3c3a41f2030a8217be5d3e # v3
         with:
           languages: javascript-typescript
           queries: security-extended,security-and-quality
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@c3400c2f38909e0dcf3c3a41f2030a8217be5d3e # v3

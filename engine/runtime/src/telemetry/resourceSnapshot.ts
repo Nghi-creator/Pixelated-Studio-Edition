@@ -28,7 +28,7 @@ export type CameraPeerState = {
 export function readNumberFile(filePath: string): number | null {
   try {
     return Number(fs.readFileSync(filePath, "utf8").trim());
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -36,7 +36,7 @@ export function readNumberFile(filePath: string): number | null {
 function readSystemUptimeSeconds(): number | null {
   try {
     return Number(fs.readFileSync("/proc/uptime", "utf8").split(" ")[0]);
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -75,7 +75,7 @@ export function readProcessSnapshot(
         ((residentPages * PAGE_SIZE_BYTES) / 1024 / 1024).toFixed(2),
       ),
     };
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -107,7 +107,7 @@ export function readCameraPeerState(
         : [],
       sessionId: typeof parsed.sessionId === "string" ? parsed.sessionId : null,
     };
-  } catch (err) {
+  } catch {
     return {
       peerCount: 0,
       peerIds: [],

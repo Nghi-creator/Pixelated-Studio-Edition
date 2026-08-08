@@ -28,10 +28,7 @@ import {
   revokeEngineClient as revokeEngineClientControl,
   stopActiveEngineSession as stopActiveEngineSessionControl,
 } from "./controlClient";
-import type {
-  EngineClientPayload,
-  EngineControllerDependencies,
-} from "./controllerTypes";
+import type { EngineControllerDependencies } from "./controllerTypes";
 import {
   createEngineControllerState,
   resetEngineControllerState,

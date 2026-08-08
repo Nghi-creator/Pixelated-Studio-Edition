@@ -28,6 +28,7 @@ const DESKTOP_RELEASE_API_URL =
   "https://api.github.com/repos/Nghi-creator/Pixelated-Studio-Edition/releases/latest";
 const DESKTOP_RELEASE_FALLBACK_URL =
   "https://github.com/Nghi-creator/Pixelated-Studio-Edition/releases/latest/download";
+const DESKTOP_RELEASE_LOOKUP_TIMEOUT_MS = 5_000;
 
 const desktopDownloads: DesktopDownload[] = [
   {
@@ -59,6 +60,7 @@ async function downloadLatestDesktopAsset(
   try {
     const response = await fetch(DESKTOP_RELEASE_API_URL, {
       headers: { accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(DESKTOP_RELEASE_LOOKUP_TIMEOUT_MS),
     });
     if (!response.ok) {
       throw new Error(`GitHub release lookup failed: ${response.status}`);

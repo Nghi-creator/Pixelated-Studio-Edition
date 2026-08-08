@@ -124,7 +124,7 @@ test("revocation rejects malformed client ids", () => {
 
 test("socket counts are maintained incrementally on connect and disconnect", () => {
   const createSocket = (id: string) => {
-    const socket = new EventEmitter() as EventEmitter & Record<string, any>;
+    const socket = new EventEmitter() as EventEmitter & Record<string, unknown>;
     socket.id = id;
     socket.data = {};
     socket.handshake = {

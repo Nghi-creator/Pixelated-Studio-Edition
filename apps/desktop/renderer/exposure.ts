@@ -96,7 +96,7 @@
         companionQr.classList.remove("hidden");
         companionQrPlaceholder.classList.add("hidden");
         companionQrStatus.classList.add("hidden");
-      } catch (err) {
+      } catch {
         if (renderId !== qrRenderId) return;
         companionQrStatus.innerText =
           "QR code unavailable. Copy the HTTPS join page instead.";
