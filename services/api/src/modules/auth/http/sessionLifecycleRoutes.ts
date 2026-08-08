@@ -2,14 +2,15 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import { env } from "../../../config/env.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
-import { isPrivateCatalogRomUrl } from "../domain/browserArtifact.js";
-import { mapBoot } from "../domain/sessionBoot.js";
-import { sessionTokenMatches } from "../domain/sessionTokens.js";
-import { getLiveSession } from "../services/backendSessions.js";
 import {
-  sessionIdSchema,
-  type SessionRouteContext,
-} from "./sessionRouteContext.js";
+  createGetOwnedSession,
+  createStopSession,
+  createVerifySession,
+  SessionUseCaseError,
+} from "../application/sessionUseCases.js";
+import { isPrivateCatalogRomUrl } from "../domain/browserArtifact.js";
+import { getLiveSession, stopSession } from "../infrastructure/backendSessions.js";
+import { sessionIdSchema, type SessionRouteContext } from "./sessionRouteContext.js";
 
 const sessionParamsSchema = z.object({ sessionId: sessionIdSchema });
 const verifySessionBodySchema = z.object({
@@ -32,26 +33,39 @@ export function registerSessionLifecycleRoutes(
     verificationIpLimiter,
     verificationSessionLimiter,
   } = context;
+  const findSession = service ? (id: string) => getLiveSession(service, id) : null;
+  const getOwnedSession = findSession
+    ? createGetOwnedSession({ findLiveSession: findSession })
+    : null;
+  const stopSessionUseCase = findSession
+    ? createStopSession({
+        findLiveSession: findSession,
+        stopSession: (id) => stopSession(service!, id),
+      })
+    : null;
+  const verifySession = findSession
+    ? createVerifySession({
+        authorizeArtifactSign: (identity) => artifactUrlLimiter.consume(identity),
+        findLiveSession: findSession,
+        isPrivateCatalogRomUrl,
+        now: () => Date.now(),
+        signCatalogRom,
+      })
+    : null;
 
   app.get(
     "/sessions/:sessionId",
     { preHandler: requireSessionUser },
     async (request, reply) => {
       const params = sessionParamsSchema.safeParse(request.params);
-      if (!params.success) {
-        return reply.status(400).send({ error: "Invalid session id" });
-      }
-      if (!service) {
+      if (!params.success) return reply.status(400).send({ error: "Invalid session id" });
+      if (!getOwnedSession) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
-
-      const session = await getLiveSession(service, params.data.sessionId);
-      if (!session || session.user_id !== request.user?.id) {
-        return reply.status(404).send({ error: "Session not found" });
-      }
-
+      const session = await getOwnedSession(params.data.sessionId, request.user?.id);
+      if (!session) return reply.status(404).send({ error: "Session not found" });
       return {
         expiresAt: session.expires_at,
         gameId: session.game_id,
@@ -66,56 +80,35 @@ export function registerSessionLifecycleRoutes(
     { preHandler: attachOptionalUser },
     async (request, reply) => {
       const params = sessionParamsSchema.safeParse(request.params);
-      if (!params.success) {
-        return reply.status(400).send({ error: "Invalid session id" });
-      }
-      if (!service) {
+      if (!params.success) return reply.status(400).send({ error: "Invalid session id" });
+      if (!stopSessionUseCase) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
-
       const body = stopSessionBodySchema.safeParse(request.body || {});
-      if (!body.success) {
-        return reply.status(400).send({ error: "Invalid session token" });
-      }
+      if (!body.success) return reply.status(400).send({ error: "Invalid session token" });
 
-      const session = await getLiveSession(service, params.data.sessionId);
-      const ownedByUser = Boolean(
-        request.user && session?.user_id === request.user.id,
-      );
-      const authorizedBySessionToken = Boolean(
-        session &&
-          body.data.sessionToken &&
-          sessionTokenMatches(
-            session.session_token_hash,
-            body.data.sessionToken,
-          ),
-      );
-      if (session && (ownedByUser || authorizedBySessionToken)) {
-        const { error } = await service
-          .from("backend_sessions")
-          .update({ deleted_at: new Date().toISOString() })
-          .eq("id", params.data.sessionId);
-        if (error) {
-          request.log.error({ err: error }, "Failed to stop session");
-          return reply.status(500).send({ error: "Failed to stop session" });
-        }
+      try {
+        await stopSessionUseCase({
+          sessionId: params.data.sessionId,
+          sessionToken: body.data.sessionToken,
+          userId: request.user?.id,
+        });
+        return reply.status(204).send();
+      } catch (error) {
+        request.log.error({ err: error }, "Failed to stop session");
+        return reply.status(500).send({ error: "Failed to stop session" });
       }
-      return reply.status(204).send();
     },
   );
 
   app.post("/sessions/:sessionId/verify", async (request, reply) => {
     const params = sessionParamsSchema.safeParse(request.params);
-    if (!params.success) {
-      return reply.status(400).send({ error: "Invalid session id" });
-    }
+    if (!params.success) return reply.status(400).send({ error: "Invalid session id" });
     const body = verifySessionBodySchema.safeParse(request.body);
-    if (!body.success) {
-      return reply.status(400).send({ error: "Invalid session token" });
-    }
-    if (!service) {
+    if (!body.success) return reply.status(400).send({ error: "Invalid session token" });
+    if (!verifySession) {
       return reply.status(503).send({
         error: "Supabase service client is not configured for the API.",
       });
@@ -131,57 +124,43 @@ export function registerSessionLifecycleRoutes(
         "Retry-After",
         Math.max(1, Math.ceil((blockedRateLimit.resetAt - Date.now()) / 1000)),
       );
-      return reply.status(429).send({
-        error: "Too many session verification attempts",
+      return reply.status(429).send({ error: "Too many session verification attempts" });
+    }
+
+    try {
+      const result = await verifySession({
+        artifactUrlTtlSeconds: env.BROWSER_ARTIFACT_URL_TTL_SECONDS,
+        sessionId: params.data.sessionId,
+        sessionToken: body.data.sessionToken,
       });
-    }
-
-    const session = await getLiveSession(service, params.data.sessionId);
-    if (
-      !session ||
-      !sessionTokenMatches(session.session_token_hash, body.data.sessionToken)
-    ) {
-      return reply.status(401).send({ error: "Invalid or expired session" });
-    }
-
-    let verifiedRomUrl = session.boot_rom_url;
-    let artifactUrlExpiresAt: string | null = null;
-    if (verifiedRomUrl && isPrivateCatalogRomUrl(verifiedRomUrl)) {
-      if (
+      if (result.status === "invalid") {
+        return reply.status(401).send({ error: "Invalid or expired session" });
+      }
+      if (result.status === "artifact_rate_limited") {
         rejectRateLimitedRequest(
           reply,
-          await artifactUrlLimiter.consume(session.user_id || session.id),
+          result.rateLimit,
           "Catalog ROM URL limit reached. Please try again shortly.",
-        )
-      ) {
+        );
         return;
       }
-      try {
-        verifiedRomUrl = await signCatalogRom(
-          verifiedRomUrl,
-          env.BROWSER_ARTIFACT_URL_TTL_SECONDS,
-        );
-        artifactUrlExpiresAt = new Date(
-          Date.now() + env.BROWSER_ARTIFACT_URL_TTL_SECONDS * 1000,
-        ).toISOString();
-      } catch (err) {
-        request.log.error(
-          { err, sessionId: session.id },
-          "Failed to sign catalog ROM URL",
-        );
+      const { session } = result;
+      return {
+        boot: result.boot,
+        expiresAt: session.expires_at,
+        gameId: session.game_id,
+        mode: session.mode,
+        sessionId: session.id,
+        user: { id: session.user_id },
+      };
+    } catch (error) {
+      request.log.error({ err: error }, "Failed to sign catalog ROM URL");
+      if (error instanceof SessionUseCaseError && error.stage === "sign_artifact") {
         return reply.status(503).send({
           error: "The catalog ROM is temporarily unavailable.",
         });
       }
+      return reply.status(500).send({ error: "Failed to verify session" });
     }
-
-    return {
-      boot: mapBoot(session, { artifactUrlExpiresAt, romUrl: verifiedRomUrl }),
-      expiresAt: session.expires_at,
-      gameId: session.game_id,
-      mode: session.mode,
-      sessionId: session.id,
-      user: { id: session.user_id },
-    };
   });
 }

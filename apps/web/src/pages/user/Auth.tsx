@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { getPublicAppUrl } from "../../lib/navigation/appUrl";
+import { getPublicAppUrl } from "../../lib/appUrl";
 import { PixelIcon } from "../../components/ui/PixelIcon";
 import {
   AuthMessagePanel,

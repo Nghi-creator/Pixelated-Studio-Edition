@@ -168,6 +168,26 @@ test("admin reports are paginated server-side", async () => {
   await app.close();
 });
 
+test("admin report reads have a dedicated per-user rate limit", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const app = await createDataBoundaryApp(db, ADMIN_ID, undefined, {
+    adminReportReadLimiter: {
+      consume: async () => ({ allowed: false, resetAt: Date.now() + 60_000 }),
+    },
+  });
+
+  const response = await app.inject({ method: "GET", url: "/admin/reports" });
+
+  assert.equal(response.statusCode, 429);
+  const retryAfter = Number(response.headers["retry-after"]);
+  assert.ok(retryAfter >= 59 && retryAfter <= 60);
+  assert.deepEqual(response.json(), {
+    error: "Admin report read limit reached. Please try again shortly.",
+  });
+  await app.close();
+});
+
 test("admin reports filter target roles before pagination", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);

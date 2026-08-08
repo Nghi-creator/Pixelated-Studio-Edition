@@ -1,10 +1,10 @@
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../auth/supabaseAuth.js";
+} from "../../auth/http/supabaseAuth.js";
 import { TtlCache } from "../../cache/ttlCache.js";
 import { createRateLimiter } from "../../security/sharedRateLimiter.js";
-import type { CatalogService } from "../services/catalogService.js";
+import type { CatalogService } from "../infrastructure/supabaseCatalogRepository.js";
 import type { CachedGamesCatalogResponse } from "./contracts.js";
 
 export type CatalogRouteOptions = {

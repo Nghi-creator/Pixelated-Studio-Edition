@@ -1,17 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { env } from "../../../config/env.js";
-import { CandidateValidationError } from "../../catalog/ingestion/catalogCandidateValidation.js";
-import { fetchPublishedGameById } from "../../catalog/services/catalogService.js";
+import { fetchPublishedGameById } from "../../catalog/infrastructure/supabaseCatalogRepository.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
-import { getBrowserEligibility } from "../domain/browserArtifact.js";
-import { assertBuildBootable } from "../domain/sessionBoot.js";
 import {
-  createSessionId,
-  createSessionToken,
-  hashSessionToken,
-} from "../domain/sessionTokens.js";
-import { getLiveSession } from "../services/backendSessions.js";
-import { isAnonymousSupabaseUser } from "../supabaseAuth.js";
+  createCreateSession,
+  SessionUseCaseError,
+} from "../application/sessionUseCases.js";
+import { getLiveSession, insertSession } from "../infrastructure/backendSessions.js";
+import { isAnonymousSupabaseUser } from "./supabaseAuth.js";
 import {
   createSessionBodySchema,
   SESSION_TTL_MS,
@@ -30,34 +26,44 @@ export function registerSessionCreationRoute(
     sessionCreateLimiter,
     signCatalogRom,
   } = context;
+  const createSession = service
+    ? createCreateSession({
+        authorizeArtifactSign: (identity) => artifactUrlLimiter.consume(identity),
+        findGame: (gameId) => fetchPublishedGameById(service, gameId),
+        findLiveSession: (sessionId) => getLiveSession(service, sessionId),
+        insertSession: (row) => insertSession(service, row),
+        now: () => Date.now(),
+        signCatalogRom,
+      })
+    : null;
 
   app.post(
     "/sessions",
     { preHandler: attachOptionalUser },
     async (request, reply) => {
       const user = request.user;
-      if (!service) {
+      if (!createSession) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
 
-      const parsedBody = createSessionBodySchema.safeParse(request.body);
-      if (!parsedBody.success) {
+      const body = createSessionBodySchema.safeParse(request.body);
+      if (!body.success) {
         return reply.status(400).send({ error: "Invalid session request" });
       }
 
       const requestsBrowserArtifact =
-        parsedBody.data.clientEdition === "user" &&
-        parsedBody.data.runtimeKind === "wasm" &&
-        parsedBody.data.mode === "cloud";
+        body.data.clientEdition === "user" &&
+        body.data.runtimeKind === "wasm" &&
+        body.data.mode === "cloud";
       const isAnonymousUser = isAnonymousSupabaseUser(user);
       if (!user && !requestsBrowserArtifact) {
         return reply.status(401).send({
-          error:
-            "Authentication is required for Studio, WebRTC, and native sessions.",
+          error: "Authentication is required for Studio, WebRTC, and native sessions.",
         });
       }
+
       const rateLimitIdentity = user
         ? `${isAnonymousUser ? "guest-user" : "user"}:${user.id}`
         : `guest-ip:${request.ip}`;
@@ -68,149 +74,74 @@ export function registerSessionCreationRoute(
           ? [anonymousSessionCreateIpLimiter.consume(request.ip)]
           : []),
       ]);
-      const blockedSessionRateLimit = sessionRateLimits.find(
-        (result) => !result.allowed,
-      );
+      const blockedRateLimit = sessionRateLimits.find((result) => !result.allowed);
       if (
-        blockedSessionRateLimit &&
+        blockedRateLimit &&
         rejectRateLimitedRequest(
           reply,
-          blockedSessionRateLimit,
+          blockedRateLimit,
           usesAnonymousAccess
             ? "Guest session creation rate limit reached. Please try again shortly."
             : "Session creation rate limit reached. Please try again shortly.",
         )
-      ) {
-        return;
-      }
+      ) return;
 
-      let game = null;
       try {
-        game = await fetchPublishedGameById(service, parsedBody.data.gameId);
-      } catch (err) {
-        request.log.error({ err }, "Failed to load session game");
-        return reply.status(500).send({ error: "Failed to create session" });
-      }
-      if (!game) return reply.status(404).send({ error: "Game not found" });
-
-      const build = game.game_builds[0];
-      if (!build) {
-        return reply.status(422).send({ error: "Game has no approved build" });
-      }
-      try {
-        assertBuildBootable(build);
-      } catch (err) {
-        if (err instanceof CandidateValidationError) {
-          request.log.warn(
-            { err, gameId: parsedBody.data.gameId },
-            "Rejected unbootable game build",
-          );
-          return reply.status(422).send({ error: err.message });
-        }
-        throw err;
-      }
-
-      const browser = getBrowserEligibility(build);
-      if (requestsBrowserArtifact && !browser.eligible) {
-        return reply.status(422).send({
-          error: browser.reason || "This build is not browser compatible.",
+        const result = await createSession({
+          artifactUrlTtlSeconds: env.BROWSER_ARTIFACT_URL_TTL_SECONDS,
+          clientEdition: body.data.clientEdition,
+          clientRuntimeKind: body.data.runtimeKind,
+          clientSessionId: body.data.clientSessionId,
+          gameId: body.data.gameId,
+          isAnonymousUser,
+          mode: body.data.mode,
+          rateLimitIdentity,
+          sessionTtlMs: SESSION_TTL_MS,
+          userId: user?.id || null,
         });
-      }
 
-      const sessionId = createSessionId(parsedBody.data.clientSessionId);
-      if (await getLiveSession(service, sessionId)) {
-        return reply.status(409).send({ error: "Session id is already active" });
-      }
-
-      let signedArtifactUrl: string | null = null;
-      let artifactUrlExpiresAt: string | null = null;
-      const shouldSignArtifact = Boolean(
-        build.artifact_url && (requestsBrowserArtifact || isAnonymousUser),
-      );
-      if (shouldSignArtifact) {
-        if (
+        if (result.status === "game_not_found") {
+          return reply.status(404).send({ error: "Game not found" });
+        }
+        if (result.status === "build_not_found") {
+          return reply.status(422).send({ error: "Game has no approved build" });
+        }
+        if (result.status === "unbootable" || result.status === "browser_ineligible") {
+          request.log.warn({ gameId: body.data.gameId }, "Rejected unbootable game build");
+          return reply.status(422).send({ error: result.error });
+        }
+        if (result.status === "active_conflict") {
+          return reply.status(409).send({ error: "Session id is already active" });
+        }
+        if (result.status === "id_conflict") {
+          return reply.status(409).send({ error: "Session id is already in use" });
+        }
+        if (result.status === "artifact_rate_limited") {
           rejectRateLimitedRequest(
             reply,
-            await artifactUrlLimiter.consume(rateLimitIdentity),
+            result.rateLimit,
             "Catalog ROM URL limit reached. Please try again shortly.",
-          )
-        ) {
+          );
           return;
         }
-        try {
-          signedArtifactUrl = await signCatalogRom(
-            build.artifact_url || "",
-            env.BROWSER_ARTIFACT_URL_TTL_SECONDS,
-          );
-          artifactUrlExpiresAt = new Date(
-            Date.now() + env.BROWSER_ARTIFACT_URL_TTL_SECONDS * 1000,
-          ).toISOString();
-        } catch (err) {
-          request.log.error(
-            { err, gameId: parsedBody.data.gameId },
-            "Failed to sign browser catalog ROM URL",
-          );
+
+        return {
+          boot: result.boot,
+          engineUrl: "http://localhost:8080",
+          expiresAt: result.expiresAt,
+          sessionId: result.sessionId,
+          sessionToken: result.sessionToken,
+          user: { id: user?.id || null, isAnonymous: isAnonymousUser },
+        };
+      } catch (error) {
+        request.log.error({ err: error }, "Failed to create session");
+        if (error instanceof SessionUseCaseError && error.stage === "sign_artifact") {
           return reply.status(503).send({
             error: "The catalog ROM is temporarily unavailable.",
           });
         }
-      }
-
-      const sessionToken = createSessionToken();
-      const expiresAt = new Date(Date.now() + SESSION_TTL_MS).toISOString();
-      const storedBoot = {
-        artifactSha256: build.artifact_sha256 || null,
-        artifactSize: build.artifact_size || null,
-        launchManifestId: build.launch_manifest_id || null,
-        romFilename: build.artifact_filename || null,
-        romUrl: build.artifact_url || null,
-        runtimeId: build.runtime_id,
-        runtimeKind: build.runtime_kind,
-      };
-      const boot = {
-        ...storedBoot,
-        browser: { ...browser, artifactUrlExpiresAt },
-        romUrl: signedArtifactUrl || storedBoot.romUrl,
-      };
-
-      const { error: sessionError } = await service
-        .from("backend_sessions")
-        .insert({
-          boot_artifact_sha256: storedBoot.artifactSha256,
-          boot_artifact_size: storedBoot.artifactSize,
-          boot_launch_manifest_id: storedBoot.launchManifestId,
-          boot_rom_filename: storedBoot.romFilename,
-          boot_rom_url: storedBoot.romUrl,
-          boot_runtime_id: storedBoot.runtimeId,
-          browser_core_id: requestsBrowserArtifact ? browser.coreId : null,
-          browser_system_id: requestsBrowserArtifact ? browser.systemId : null,
-          client_edition: parsedBody.data.clientEdition,
-          client_runtime_kind: parsedBody.data.runtimeKind,
-          deleted_at: null,
-          expires_at: expiresAt,
-          game_id: parsedBody.data.gameId,
-          id: sessionId,
-          mode: parsedBody.data.mode,
-          session_token_hash: hashSessionToken(sessionToken),
-          user_id: user?.id || null,
-        });
-
-      if (sessionError) {
-        if (sessionError.code === "23505") {
-          return reply.status(409).send({ error: "Session id is already in use" });
-        }
-        request.log.error({ err: sessionError }, "Failed to create session");
         return reply.status(500).send({ error: "Failed to create session" });
       }
-
-      return {
-        boot,
-        engineUrl: "http://localhost:8080",
-        expiresAt,
-        sessionId,
-        sessionToken,
-        user: { id: user?.id || null, isAnonymous: isAnonymousUser },
-      };
     },
   );
 }

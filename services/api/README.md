@@ -25,11 +25,17 @@ The local engine still runs separately on `localhost:8080` and verifies cloud se
 ```text
 src/config/        Environment parsing
 src/plugins/       Fastify plugins for CORS, logging, security, and rate limits
-src/modules/       Auth, catalog, maintenance, moderation, multiplayer, observability, security, system, and users
+src/modules/       Product modules organized into domain, application, infrastructure, and HTTP layers
 tests/unit/        Unit/contract tests grouped by auth, catalog, infrastructure, and security
 tests/integration/ Fastify injection tests grouped by API domain with shared support harnesses
 scripts/           Hosted checks, importers, catalog artwork, and staging smoke
 ```
+
+Modules create only the layers they need. `domain/` holds product rules,
+`application/` coordinates use cases, `infrastructure/` owns Supabase and other
+external systems, and `http/` maps Fastify requests and responses. Catalog
+ingestion is a nested capability with the same separation. See
+`src/modules/README.md` for dependency rules.
 
 ## Local development
 

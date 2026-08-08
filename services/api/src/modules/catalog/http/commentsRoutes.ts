@@ -1,8 +1,13 @@
 import type { FastifyInstance } from "fastify";
-import { isAdminRole } from "../domain/catalogPolicy.js";
-import { getUserRole } from "../services/catalogService.js";
+import { createDeleteComment } from "../application/catalogSocial.js";
+import { getUserRole } from "../infrastructure/supabaseCatalogRepository.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import { requireAuthenticatedService } from "../../security/authenticatedService.js";
+import {
+  deleteComment,
+  findComments,
+  insertComment,
+} from "../infrastructure/supabaseSocialRepository.js";
 import type { CatalogRouteContext } from "./catalogRouteContext.js";
 import {
   commentBodySchema,
@@ -16,6 +21,10 @@ export function registerCommentRoutes(
   context: CatalogRouteContext,
 ) {
   const { commentWriteLimiter, requireUser, service } = context;
+  const deleteCommentUseCase = service ? createDeleteComment({
+    deleteComment: (commentId, ownerId) => deleteComment(service, commentId, ownerId),
+    findRole: (userId) => getUserRole(service, userId),
+  }) : null;
 
   app.get("/games/:gameId/comments", async (request, reply) => {
     if (!service) {
@@ -33,22 +42,16 @@ export function registerCommentRoutes(
     const { page, pageSize } = query.data;
     const start = (page - 1) * pageSize;
     const end = start + pageSize;
-    const { data, error } = await service
-      .from("comments")
-      .select(
-        "id,content,created_at,user_id,profiles(username,avatar_url),comment_likes(user_id,is_like)",
-      )
-      .eq("game_id", params.data.gameId)
-      .order("created_at", { ascending: false })
-      .range(start, end);
-    if (error) {
+    try {
+      const comments = await findComments(service, params.data.gameId, start, end);
+      return {
+        comments: comments.slice(0, pageSize),
+        hasMore: comments.length > pageSize,
+      };
+    } catch (error) {
       request.log.error({ err: error }, "Failed to load comments");
       return reply.status(500).send({ error: "Failed to load comments" });
     }
-    return {
-      comments: (data || []).slice(0, pageSize),
-      hasMore: (data || []).length > pageSize,
-    };
   });
 
   app.post(
@@ -74,16 +77,17 @@ export function registerCommentRoutes(
         return;
       }
 
-      const { error } = await authenticatedService.from("comments").insert({
-        content: body.data.content,
-        game_id: params.data.gameId,
-        user_id: user.id,
-      });
-      if (error) {
+      try {
+        await insertComment(authenticatedService, {
+          content: body.data.content,
+          gameId: params.data.gameId,
+          userId: user.id,
+        });
+        return reply.status(201).send({ success: true });
+      } catch (error) {
         request.log.error({ err: error }, "Failed to post comment");
         return reply.status(500).send({ error: "Failed to post comment" });
       }
-      return reply.status(201).send({ success: true });
     },
   );
 
@@ -93,22 +97,17 @@ export function registerCommentRoutes(
     async (request, reply) => {
       const authenticated = requireAuthenticatedService(request, reply, service);
       if (!authenticated) return;
-      const { service: authenticatedService, user } = authenticated;
+      const { user } = authenticated;
       const params = commentParamsSchema.safeParse(request.params);
       if (!params.success) return reply.status(400).send({ error: "Invalid comment id" });
 
-      const role = await getUserRole(authenticatedService, user.id);
-      let query = authenticatedService
-        .from("comments")
-        .delete()
-        .eq("id", params.data.commentId);
-      if (!isAdminRole(role)) query = query.eq("user_id", user.id);
-      const { error } = await query;
-      if (error) {
+      try {
+        await deleteCommentUseCase!(params.data.commentId, user.id);
+        return reply.status(204).send();
+      } catch (error) {
         request.log.error({ err: error }, "Failed to delete comment");
         return reply.status(500).send({ error: "Failed to delete comment" });
       }
-      return reply.status(204).send();
     },
   );
 }

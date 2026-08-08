@@ -1,6 +1,13 @@
 import type { FastifyInstance } from "fastify";
+import { createReactToComment } from "../application/catalogSocial.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import { requireAuthenticatedService } from "../../security/authenticatedService.js";
+import {
+  findCommentAuthorId,
+  findGameReactions,
+  setCommentReaction,
+  setGameReaction,
+} from "../infrastructure/supabaseSocialRepository.js";
 import type { CatalogRouteContext } from "./catalogRouteContext.js";
 import {
   commentParamsSchema,
@@ -13,6 +20,10 @@ export function registerReactionRoutes(
   context: CatalogRouteContext,
 ) {
   const { reactionWriteLimiter, requireUser, service } = context;
+  const reactToComment = service ? createReactToComment({
+    findCommentAuthor: (commentId) => findCommentAuthorId(service, commentId),
+    saveCommentReaction: (input) => setCommentReaction(service, input),
+  }) : null;
 
   app.get("/games/:gameId/reactions", async (request, reply) => {
     if (!service) {
@@ -23,15 +34,12 @@ export function registerReactionRoutes(
     const params = gameParamsSchema.safeParse(request.params);
     if (!params.success) return reply.status(400).send({ error: "Invalid game id" });
 
-    const { data, error } = await service
-      .from("likes")
-      .select("user_id,is_like")
-      .eq("game_id", params.data.gameId);
-    if (error) {
+    try {
+      return { reactions: await findGameReactions(service, params.data.gameId) };
+    } catch (error) {
       request.log.error({ err: error }, "Failed to load reactions");
       return reply.status(500).send({ error: "Failed to load reactions" });
     }
-    return { reactions: data || [] };
   });
 
   app.put(
@@ -56,16 +64,17 @@ export function registerReactionRoutes(
         return;
       }
 
-      const { error } = await authenticatedService.rpc("set_game_reaction", {
-        p_game_id: params.data.gameId,
-        p_is_like: body.data.isLike,
-        p_user_id: user.id,
-      });
-      if (error) {
+      try {
+        await setGameReaction(authenticatedService, {
+          gameId: params.data.gameId,
+          isLike: body.data.isLike,
+          userId: user.id,
+        });
+        return { success: true };
+      } catch (error) {
         request.log.error({ err: error }, "Failed to save reaction");
         return reply.status(500).send({ error: "Failed to save reaction" });
       }
-      return { success: true };
     },
   );
 
@@ -75,25 +84,13 @@ export function registerReactionRoutes(
     async (request, reply) => {
       const authenticated = requireAuthenticatedService(request, reply, service);
       if (!authenticated) return;
-      const { service: authenticatedService, user } = authenticated;
+      const { user } = authenticated;
       const params = commentParamsSchema.safeParse(request.params);
       const body = reactionBodySchema.safeParse(request.body);
       if (!params.success || !body.success) {
         return reply.status(400).send({ error: "Invalid comment reaction" });
       }
 
-      const { data: comment, error: commentError } = await authenticatedService
-        .from("comments")
-        .select("user_id")
-        .eq("id", params.data.commentId)
-        .maybeSingle<{ user_id: string | null }>();
-      if (commentError) {
-        request.log.error({ err: commentError }, "Failed to load comment");
-        return reply.status(500).send({ error: "Failed to save comment reaction" });
-      }
-      if (!comment || comment.user_id === user.id) {
-        return reply.status(403).send({ error: "Cannot react to this comment" });
-      }
       if (
         rejectRateLimitedRequest(
           reply,
@@ -104,25 +101,18 @@ export function registerReactionRoutes(
         return;
       }
 
-      const { error: reactionError } = await authenticatedService.rpc("set_comment_reaction", {
-        p_comment_id: params.data.commentId,
-        p_is_like: body.data.isLike,
-        p_user_id: user.id,
-      });
-      if (reactionError) {
-        request.log.error({ err: reactionError }, "Failed to save comment reaction");
+      try {
+        const result = await reactToComment!({
+          commentId: params.data.commentId,
+          isLike: body.data.isLike,
+          userId: user.id,
+        });
+        if (result.status === "forbidden") return reply.status(403).send({ error: "Cannot react to this comment" });
+        return { reactions: result.reactions };
+      } catch (error) {
+        request.log.error({ err: error }, "Failed to save comment reaction");
         return reply.status(500).send({ error: "Failed to save comment reaction" });
       }
-
-      const { data, error: loadError } = await authenticatedService
-        .from("comment_likes")
-        .select("user_id,is_like")
-        .eq("comment_id", params.data.commentId);
-      if (loadError) {
-        request.log.error({ err: loadError }, "Failed to load comment reactions");
-        return reply.status(500).send({ error: "Failed to load comment reactions" });
-      }
-      return { reactions: data || [] };
     },
   );
 }

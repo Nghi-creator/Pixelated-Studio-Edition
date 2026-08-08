@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
-  createSignedCatalogRomUrl,
   getBrowserEligibility,
   MAX_BROWSER_ARTIFACT_BYTES,
   parseSupabaseStorageObjectUrl,
 } from "../../../src/modules/auth/domain/browserArtifact.js";
+import { createSignedCatalogRomUrl } from "../../../src/modules/auth/infrastructure/catalogRomStorage.js";
 
 const validBuild = {
   artifact_filename: "game.nes",

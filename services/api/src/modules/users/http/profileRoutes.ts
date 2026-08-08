@@ -4,43 +4,40 @@ import { env } from "../../../config/env.js";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../auth/supabaseAuth.js";
+} from "../../auth/http/supabaseAuth.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import {
   createRateLimiter,
   type RateLimiter,
 } from "../../security/sharedRateLimiter.js";
+import {
+  createDeleteAccount,
+  DeleteAccountError,
+} from "../application/deleteAccount.js";
+import { isOwnedAvatarUrl as checkOwnedAvatarUrl } from "../domain/avatarPolicy.js";
+import {
+  findOwnedAccountStorage,
+  removeOwnedAccountStorage,
+} from "../infrastructure/supabaseAccountStorage.js";
+import { deleteSupabaseIdentity } from "../infrastructure/supabaseIdentityAdmin.js";
+import {
+  findAccountRole,
+  findProfile,
+  findProfileActivity,
+  updateProfile,
+} from "../infrastructure/supabaseProfileRepository.js";
 
 const profileUpdateSchema = z.object({
   avatarUrl: z.string().url().nullable().optional(),
   username: z.string().trim().min(1).max(80),
 });
-
-const deleteAccountSchema = z.object({
-  confirmation: z.literal("DELETE"),
-});
+const deleteAccountSchema = z.object({ confirmation: z.literal("DELETE") });
 const profileActivityQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(20).default(8),
 });
 
-type GameActivityRow = {
-  client_edition: "studio" | "user";
-  game_id: string;
-  last_played_at: string;
-  play_count: number;
-  runtime_kind: "wasm" | "webrtc" | "native";
-};
-
-type ActivityGameRow = {
-  cover_url: string | null;
-  id: string;
-  title: string;
-};
-
-const ACCOUNT_DELETE_RECENT_SIGN_IN_MS = 10 * 60 * 1000;
 const ACCOUNT_DELETE_RATE_LIMIT = 3;
 const ACCOUNT_DELETE_RATE_WINDOW_MS = 60 * 60 * 1000;
-const STORAGE_LIST_PAGE_SIZE = 100;
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 
@@ -56,89 +53,7 @@ export function isOwnedAvatarUrl(
   userId: string,
   supabaseUrl = env.SUPABASE_URL,
 ) {
-  if (!supabaseUrl) return false;
-
-  const rawPath = value.split(/[?#]/, 1)[0] || "";
-  if (/(?:^|\/)(?:\.{1,2}|%2e(?:%2e)?)(?:\/|$)/i.test(rawPath)) {
-    return false;
-  }
-
-  try {
-    const avatarUrl = new URL(value);
-    if (avatarUrl.origin !== new URL(supabaseUrl).origin) return false;
-
-    const match = avatarUrl.pathname.match(
-      /^\/storage\/v1\/object\/public\/avatars\/(.+)$/,
-    );
-    if (!match?.[1]) return false;
-
-    const objectSegments = match[1]
-      .split("/")
-      .map((segment) => decodeURIComponent(segment));
-    return (
-      objectSegments.length >= 2 &&
-      objectSegments[0] === userId &&
-      !objectSegments.some(
-        (segment) => !segment || segment === "." || segment === "..",
-      )
-    );
-  } catch {
-    return false;
-  }
-}
-
-function hasRecentSignIn(lastSignInAt: string | undefined, now = Date.now()) {
-  if (!lastSignInAt) return false;
-
-  const signedInAt = Date.parse(lastSignInAt);
-  return Number.isFinite(signedInAt) && now - signedInAt <= ACCOUNT_DELETE_RECENT_SIGN_IN_MS;
-}
-
-async function listStorageObjects(
-  service: SupabaseServiceLike,
-  bucket: string,
-  prefix: string,
-): Promise<string[]> {
-  const storage = service.storage.from(bucket);
-  const objectPaths: string[] = [];
-  let offset = 0;
-
-  while (true) {
-    const { data, error } = await storage.list(prefix, {
-      limit: STORAGE_LIST_PAGE_SIZE,
-      offset,
-      sortBy: { column: "name", order: "asc" },
-    });
-    if (error) throw error;
-
-    const entries = data || [];
-    for (const entry of entries) {
-      const path = `${prefix}/${entry.name}`;
-      if (entry.id) {
-        objectPaths.push(path);
-      } else {
-        objectPaths.push(...(await listStorageObjects(service, bucket, path)));
-      }
-    }
-
-    if (entries.length < STORAGE_LIST_PAGE_SIZE) return objectPaths;
-    offset += STORAGE_LIST_PAGE_SIZE;
-  }
-}
-
-async function removeStorageObjects(
-  service: SupabaseServiceLike,
-  bucket: string,
-  objectPaths: string[],
-) {
-  const storage = service.storage.from(bucket);
-
-  for (let index = 0; index < objectPaths.length; index += STORAGE_LIST_PAGE_SIZE) {
-    const { error } = await storage.remove(
-      objectPaths.slice(index, index + STORAGE_LIST_PAGE_SIZE),
-    );
-    if (error) throw error;
-  }
+  return checkOwnedAvatarUrl(value, userId, supabaseUrl);
 }
 
 export async function registerProfileRoutes(
@@ -155,44 +70,38 @@ export async function registerProfileRoutes(
       namespace: "account-delete",
       windowMs: ACCOUNT_DELETE_RATE_WINDOW_MS,
     });
+  const deleteAccount = service
+    ? createDeleteAccount({
+        deleteIdentity: (userId) => deleteSupabaseIdentity(service, userId),
+        findOwnedStorage: (userId) => findOwnedAccountStorage(service, userId),
+        findRole: (userId) => findAccountRole(service, userId),
+        removeOwnedStorage: (storage) => removeOwnedAccountStorage(service, storage),
+      })
+    : null;
 
-  app.get(
-    "/profile",
-    { preHandler: requireUser },
-    async (request, reply) => {
-      const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+  app.get("/profile", { preHandler: requireUser }, async (request, reply) => {
+    const user = request.user;
+    if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
+    if (!service) {
+      return reply.status(503).send({
+        error: "Supabase service client is not configured for the API.",
+      });
+    }
 
-      const { data, error } = await service
-        .from("profiles")
-        .select("username, avatar_url, role")
-        .eq("id", user.id)
-        .maybeSingle();
-
-      if (error) {
-        request.log.error({ err: error }, "Failed to load profile");
-        return reply.status(500).send({ error: "Failed to load profile" });
-      }
-
-      return { profile: data || null };
-    },
-  );
+    try {
+      return { profile: await findProfile(service, user.id) };
+    } catch (error) {
+      request.log.error({ err: error }, "Failed to load profile");
+      return reply.status(500).send({ error: "Failed to load profile" });
+    }
+  });
 
   app.get(
     "/profile/activity",
     { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
+      if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
       if (!service) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
@@ -204,111 +113,65 @@ export async function registerProfileRoutes(
         return reply.status(400).send({ error: "Invalid profile activity query" });
       }
 
-      const { data: activityRows, error: activityError } = await service
-        .from("user_game_activity")
-        .select("game_id,client_edition,runtime_kind,play_count,last_played_at")
-        .eq("user_id", user.id)
-        .order("last_played_at", { ascending: false })
-        .limit(query.data.limit)
-        .returns<GameActivityRow[]>();
-      if (activityError) {
-        request.log.error({ err: activityError }, "Failed to load profile activity");
+      try {
+        return {
+          activity: await findProfileActivity(service, user.id, query.data.limit),
+        };
+      } catch (error) {
+        request.log.error({ err: error }, "Failed to load profile activity");
         return reply.status(500).send({ error: "Failed to load profile activity" });
       }
-
-      const rows = activityRows || [];
-      if (rows.length === 0) return { activity: [] };
-
-      const { data: games, error: gamesError } = await service
-        .from("games")
-        .select("id,title,cover_url")
-        .in("id", [...new Set(rows.map((row) => row.game_id))])
-        .returns<ActivityGameRow[]>();
-      if (gamesError) {
-        request.log.error({ err: gamesError }, "Failed to load activity games");
-        return reply.status(500).send({ error: "Failed to load profile activity" });
-      }
-
-      const gamesById = new Map((games || []).map((game) => [game.id, game]));
-      return {
-        activity: rows.flatMap((row) => {
-          const game = gamesById.get(row.game_id);
-          return game ? [{ ...row, game }] : [];
-        }),
-      };
     },
   );
 
-  app.patch(
-    "/profile",
-    { preHandler: requireUser },
-    async (request, reply) => {
-      const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
+  app.patch("/profile", { preHandler: requireUser }, async (request, reply) => {
+    const user = request.user;
+    if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
+    if (!service) {
+      return reply.status(503).send({
+        error: "Supabase service client is not configured for the API.",
+      });
+    }
 
-      const body = profileUpdateSchema.safeParse(request.body);
-      if (!body.success) {
-        return reply.status(400).send({ error: "Invalid profile update" });
-      }
-      if (
-        body.data.avatarUrl &&
-        !isOwnedAvatarUrl(body.data.avatarUrl, user.id, supabaseUrl)
-      ) {
-        return reply.status(400).send({
-          error: "Avatar must be an owned avatar storage object.",
-        });
-      }
+    const body = profileUpdateSchema.safeParse(request.body);
+    if (!body.success) return reply.status(400).send({ error: "Invalid profile update" });
+    if (
+      body.data.avatarUrl &&
+      !isOwnedAvatarUrl(body.data.avatarUrl, user.id, supabaseUrl)
+    ) {
+      return reply.status(400).send({
+        error: "Avatar must be an owned avatar storage object.",
+      });
+    }
 
-      const { error } = await service
-        .from("profiles")
-        .update({
-          ...(body.data.avatarUrl !== undefined
-            ? { avatar_url: body.data.avatarUrl }
-            : {}),
-          username: body.data.username,
-        })
-        .eq("id", user.id);
-
-      if (error) {
-        request.log.error({ err: error }, "Failed to update profile");
-        return reply.status(500).send({ error: "Failed to update profile" });
-      }
-
+    try {
+      await updateProfile(service, user.id, body.data);
       return { success: true };
-    },
-  );
+    } catch (error) {
+      request.log.error({ err: error }, "Failed to update profile");
+      return reply.status(500).send({ error: "Failed to update profile" });
+    }
+  });
 
   app.delete(
     "/me/account",
     { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
-      if (!service) {
+      if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
+      if (!deleteAccount) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
 
-      const rateLimit = await deleteLimiter.consume(user.id);
       if (
         rejectRateLimitedRequest(
           reply,
-          rateLimit,
+          await deleteLimiter.consume(user.id),
           "Too many account deletion attempts. Try again later.",
         )
-      ) {
-        return;
-      }
+      ) return;
 
       const body = deleteAccountSchema.safeParse(request.body);
       if (!body.success) {
@@ -317,73 +180,51 @@ export async function registerProfileRoutes(
         });
       }
 
-      const { data: profile, error: profileError } = await service
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .maybeSingle<{ role: string | null }>();
-      if (profileError) {
-        request.log.error({ err: profileError }, "Failed to verify deletion role");
-        return reply.status(500).send({ error: "Failed to verify account role" });
-      }
-      if (profile?.role === "admin" || profile?.role === "super_admin") {
-        return reply.status(403).send({
-          error: "Admin and super admin accounts cannot be self-deleted.",
-        });
-      }
-
-      if (!hasRecentSignIn(user.last_sign_in_at)) {
-        return reply.status(403).send({
-          error: "Sign in again before deleting your account.",
-          code: "recent_sign_in_required",
-        });
-      }
-
-      let ownedStorage: { bucket: string; paths: string[] }[];
       try {
-        ownedStorage = await Promise.all(
-          ["avatars", "submissions"].map(async (bucket) => ({
-            bucket,
-            paths: await listStorageObjects(service, bucket, user.id),
-          })),
-        );
-      } catch (error) {
-        request.log.error({ err: error }, "Failed to inspect account storage");
-        return reply.status(500).send({
-          error: "Failed to inspect account files. Your account was not deleted.",
+        const result = await deleteAccount({
+          lastSignInAt: user.last_sign_in_at,
+          userId: user.id,
         });
-      }
 
-      const { error } = await service.auth.admin.deleteUser(user.id);
-      if (error) {
-        request.log.error({ err: error }, "Failed to delete account");
+        if (result.status === "admin_forbidden") {
+          return reply.status(403).send({
+            error: "Admin and super admin accounts cannot be self-deleted.",
+          });
+        }
+        if (result.status === "recent_sign_in_required") {
+          return reply.status(403).send({
+            error: "Sign in again before deleting your account.",
+            code: "recent_sign_in_required",
+          });
+        }
+        if (result.status === "deleted_with_incomplete_cleanup") {
+          request.log.error(
+            { cleanupFailures: result.cleanupFailures },
+            "Account deleted but storage cleanup is incomplete",
+          );
+          return reply.status(200).send({
+            accountDeleted: true,
+            cleanupIncomplete: true,
+            code: "account_storage_cleanup_incomplete",
+          });
+        }
+
+        request.log.info("User account deleted");
+        return reply.status(204).send();
+      } catch (error) {
+        if (error instanceof DeleteAccountError) {
+          request.log.error({ err: error.cause }, "Account deletion failed");
+          if (error.stage === "authorize") {
+            return reply.status(500).send({ error: "Failed to verify account role" });
+          }
+          if (error.stage === "inspect_storage") {
+            return reply.status(500).send({
+              error: "Failed to inspect account files. Your account was not deleted.",
+            });
+          }
+        }
         return reply.status(500).send({ error: "Failed to delete account" });
       }
-
-      const cleanupResults = await Promise.allSettled(
-        ownedStorage.map(({ bucket, paths }) =>
-          removeStorageObjects(service, bucket, paths),
-        ),
-      );
-      const cleanupFailures = cleanupResults.flatMap((result, index) =>
-        result.status === "rejected"
-          ? [{ bucket: ownedStorage[index]?.bucket, error: result.reason }]
-          : [],
-      );
-      if (cleanupFailures.length > 0) {
-        request.log.error(
-          { cleanupFailures },
-          "Account deleted but storage cleanup is incomplete",
-        );
-        return reply.status(200).send({
-          accountDeleted: true,
-          cleanupIncomplete: true,
-          code: "account_storage_cleanup_incomplete",
-        });
-      }
-
-      request.log.info("User account deleted");
-      return reply.status(204).send();
     },
   );
 }

@@ -6,7 +6,7 @@ import dotenv from "dotenv";
 import {
   collectDebianNativeCandidates,
   readDebianNativeLockManifest,
-} from "../src/modules/catalog/ingestion/debianNativeImporter.js";
+} from "../src/modules/catalog/ingestion/application/debianNativeImporter.js";
 
 dotenv.config();
 

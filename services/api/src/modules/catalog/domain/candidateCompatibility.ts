@@ -7,7 +7,7 @@ import {
   assertCandidateRuntimeAllowed,
   CandidateValidationError,
   type CandidateValidationInput,
-} from "../ingestion/catalogCandidateValidation.js";
+} from "../ingestion/domain/catalogCandidateValidation.js";
 
 export const MAX_BROWSER_CANDIDATE_BYTES = 64 * 1024 * 1024;
 

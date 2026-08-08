@@ -3,7 +3,7 @@ import test from "node:test";
 import {
   getGameSearchScore,
   searchAndRankGames,
-} from "../../../src/lib/search/gameSearch.ts";
+} from "../../../src/lib/gameSearch.ts";
 
 test("game search ranks exact, prefix, token, initials, and typo matches", () => {
   const games = [

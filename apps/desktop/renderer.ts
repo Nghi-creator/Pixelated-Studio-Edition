@@ -6,23 +6,16 @@ function requiredElement<T extends HTMLElement>(id: string, type?: {
   new (): T;
 }): T {
   const element = document.getElementById(id);
-  if (!element) {
-    throw new Error(`Missing desktop UI element: #${id}`);
-  }
-
+  if (!element) throw new Error(`Missing desktop UI element: #${id}`);
   if (type && !(element instanceof type)) {
     throw new Error(`Desktop UI element #${id} has an unexpected type.`);
   }
-
   return element as T;
 }
 
 function requiredQuery<T extends Element>(selector: string): T {
   const element = document.querySelector(selector);
-  if (!element) {
-    throw new Error(`Missing desktop UI element: ${selector}`);
-  }
-
+  if (!element) throw new Error(`Missing desktop UI element: ${selector}`);
   return element as T;
 }
 
@@ -32,15 +25,6 @@ const powerSpinner = requiredElement("power-spinner");
 const powerText = requiredElement("power-text");
 const launchWebBtn = requiredElement("launch-web", HTMLButtonElement);
 const startupPanel = requiredElement("startup-panel");
-const statusBadge = requiredQuery<HTMLElement>(".status-badge");
-const statusDot = requiredElement("status-dot");
-const statusText = requiredElement("status-text");
-const setStatusPresentation =
-  pixelatedWindow.PixelatedStatus.createStatusPresenter({
-    statusBadge,
-    statusDot,
-    statusText,
-  });
 const tokenPanel = requiredElement("token-panel");
 const tokenValue = requiredElement("engine-token");
 const copyTokenBtn = requiredElement("copy-token", HTMLButtonElement);
@@ -52,45 +36,12 @@ const regenerateInviteBtn = requiredElement(
 );
 const revokeInviteBtn = requiredElement("revoke-invite", HTMLButtonElement);
 
-let isRunning = false;
-let pendingCompanionPayload: EngineCompanionPayload | null = null;
-
-function initializeEngine() {
-  recovery.setDockerRecoveryVisible(false);
-  recovery.setImageRecoveryVisible(false);
-  logs.clear();
-  tokenPanel.classList.add("hidden");
-  tokenValue.innerText = "";
-  exposure.renderUrls([]);
-  exposure.renderCompanionUrls([]);
-  exposure.resetInviteCode();
-  pendingCompanionPayload = null;
-  logs.append(
-    '<span class="text-gray-400">>></span> Initializing WebRTC node...',
-  );
-  phases.render({
-    detail: "Queued",
-    phase: "docker",
-    status: "starting",
+const setStatusPresentation =
+  pixelatedWindow.PixelatedStatus.createStatusPresenter({
+    statusBadge: requiredQuery<HTMLElement>(".status-badge"),
+    statusDot: requiredElement("status-dot"),
+    statusText: requiredElement("status-text"),
   });
-  setStatusPresentation("Initializing Engine - Queued", "running");
-  setPowerPending(true);
-  powerText.innerText = "Initialize Engine";
-  pixelatedWindow.electronAPI.startDocker({ exposureMode: exposure.getMode() });
-}
-
-function setInviteButtonsPending(isPending: boolean) {
-  regenerateInviteBtn.disabled = isPending;
-  revokeInviteBtn.disabled = isPending;
-  if (isPending) {
-    regenerateInviteBtn.innerText = "Updating...";
-    return;
-  }
-
-  regenerateInviteBtn.innerText = "Regenerate";
-  revokeInviteBtn.innerText = "Revoke";
-}
-
 const logs = pixelatedWindow.PixelatedLogs.createLogController({
   logBox: requiredElement("log"),
 });
@@ -119,6 +70,7 @@ const phases = pixelatedWindow.PixelatedPhases.createPhaseTracker({
   phaseList: requiredElement("phase-list"),
   phaseSummary: requiredElement("phase-summary"),
 });
+
 const guestAccessPanel = requiredElement("guest-access-panel");
 const desktopPanels = requiredElement("desktop-panels");
 const syncPanelHeights = () => {
@@ -144,6 +96,12 @@ pixelatedWindow.PixelatedModal.bindDocsModal({
   modal: requiredElement("docs-modal"),
   openButton: requiredElement("open-docs"),
 });
+
+let lifecycle: DesktopLifecycleController | null = null;
+const initializeEngine = () => {
+  if (!lifecycle) throw new Error("Desktop lifecycle has not been initialized.");
+  lifecycle.initializeEngine();
+};
 
 const recovery = pixelatedWindow.PixelatedRecovery.createDockerRecoveryController({
   buildEngineImage: pixelatedWindow.electronAPI.buildEngineImage,
@@ -174,151 +132,33 @@ const clients = pixelatedWindow.PixelatedClients.createClientAccessController({
   clientsList: requiredElement("clients-list"),
   clientsStatus: requiredElement("clients-status"),
   getExposureMode: exposure.getMode,
-  getIsRunning: () => isRunning,
+  getIsRunning: () => lifecycle?.getIsRunning() || false,
   listEngineClients: pixelatedWindow.electronAPI.listEngineClients,
   revokeEngineClient: pixelatedWindow.electronAPI.revokeEngineClient,
   rotateEngineToken: pixelatedWindow.electronAPI.rotateEngineToken,
   rotateTokenButton: requiredElement("rotate-token", HTMLButtonElement),
 });
 
-function setPowerPending(pending: boolean) {
-  powerIcon.classList.toggle("hidden", pending);
-  powerSpinner.classList.toggle("hidden", !pending);
-  powerBtn.disabled = pending;
-}
-
-function setLaunchWebVisible(visible: boolean) {
-  launchWebBtn.classList.toggle("hidden", !visible);
-  launchWebBtn.classList.toggle("flex", visible);
-}
-
-function setStatusBadge(active: boolean) {
-  if (active) {
-    setStatusPresentation("Engine Ready", "ready");
-    powerBtn.classList.replace("bg-synth-primary", "bg-synth-action");
-    powerBtn.classList.replace(
-      "hover:bg-synth-primary-hover",
-      "hover:bg-synth-action-hover",
-    );
-    powerBtn.classList.remove("shadow-panel");
-    powerText.innerText = "Shutdown Engine";
-    setPowerPending(false);
-    setLaunchWebVisible(true);
-    isRunning = true;
-    clients.startPolling();
-    if (pendingCompanionPayload) {
-      exposure.setCompanionStatus(pendingCompanionPayload);
-      setInviteButtonsPending(false);
-      regenerateInviteBtn.disabled = !pendingCompanionPayload.enabled;
-      revokeInviteBtn.disabled =
-        !pendingCompanionPayload.enabled ||
-        Boolean(pendingCompanionPayload.inviteRevoked);
-      pendingCompanionPayload = null;
-    }
-    return;
-  }
-
-  setStatusPresentation("Engine Offline", "offline");
-  powerBtn.classList.replace("bg-synth-action", "bg-synth-primary");
-  powerBtn.classList.replace(
-    "hover:bg-synth-action-hover",
-    "hover:bg-synth-primary-hover",
-  );
-  powerBtn.classList.add("shadow-panel");
-  powerText.innerText = "Initialize Engine";
-  setPowerPending(false);
-  setLaunchWebVisible(false);
-  tokenPanel.classList.add("hidden");
-  tokenValue.innerText = "";
-  exposure.renderUrls([]);
-  exposure.renderCompanionUrls([]);
-  exposure.resetInviteCode();
-  pendingCompanionPayload = null;
-  regenerateInviteBtn.disabled = true;
-  revokeInviteBtn.disabled = true;
-  exposure.setEnabled(true);
-  phases.render({ status: "stopped", phase: "idle" });
-  isRunning = false;
-  clients.stopPolling();
-}
-
-function resetFailedUi() {
-  powerBtn.classList.replace("bg-synth-action", "bg-synth-primary");
-  powerBtn.classList.replace(
-    "hover:bg-synth-action-hover",
-    "hover:bg-synth-primary-hover",
-  );
-  powerBtn.classList.add("shadow-panel");
-  powerText.innerText = "Initialize Engine";
-  setPowerPending(false);
-  setLaunchWebVisible(false);
-  tokenPanel.classList.add("hidden");
-  tokenValue.innerText = "";
-  exposure.renderUrls([]);
-  exposure.renderCompanionUrls([]);
-  exposure.resetInviteCode();
-  pendingCompanionPayload = null;
-  regenerateInviteBtn.disabled = true;
-  revokeInviteBtn.disabled = true;
-  exposure.setEnabled(true);
-  isRunning = false;
-  clients.stopPolling();
-}
-
-function setLifecycleState(state: EngineStatePayload) {
-  const statusLabel =
-    pixelatedWindow.PixelatedStatus.getCompactLifecycleStatus(state);
-  phases.render(state);
-
-  if (state.status === "ready") {
-    recovery.setDockerRecoveryVisible(false);
-    setStatusBadge(true);
-    powerBtn.disabled = false;
-    exposure.setEnabled(false);
-    return;
-  }
-
-  if (state.status === "failed") {
-    setStatusPresentation(statusLabel, "offline");
-    resetFailedUi();
-    return;
-  }
-
-  if (state.status === "stopped") {
-    setStatusBadge(false);
-    powerBtn.disabled = false;
-    exposure.setEnabled(true);
-    return;
-  }
-
-  if (state.status === "starting") {
-    setLaunchWebVisible(false);
-    setStatusPresentation(statusLabel, "running");
-    setPowerPending(true);
-    exposure.setEnabled(false);
-    powerText.innerText = "Initialize Engine";
-  }
-
-  if (state.status === "stopping") {
-    setLaunchWebVisible(false);
-    setStatusPresentation(statusLabel, "running");
-    setPowerPending(true);
-    exposure.setEnabled(false);
-    powerText.innerText = "Shutdown Engine";
-  }
-}
-
-function handleEngineCompanion(payload: EngineCompanionPayload) {
-  if (!isRunning) {
-    pendingCompanionPayload = payload;
-    return;
-  }
-
-  exposure.setCompanionStatus(payload);
-  setInviteButtonsPending(false);
-  regenerateInviteBtn.disabled = !payload.enabled;
-  revokeInviteBtn.disabled = !payload.enabled || Boolean(payload.inviteRevoked);
-}
+lifecycle = pixelatedWindow.PixelatedLifecycle.createLifecycleController({
+  clients,
+  electronApi: pixelatedWindow.electronAPI,
+  exposure,
+  getCompactLifecycleStatus:
+    pixelatedWindow.PixelatedStatus.getCompactLifecycleStatus,
+  launchWebButton: launchWebBtn,
+  logs,
+  phases,
+  powerButton: powerBtn,
+  powerIcon,
+  powerSpinner,
+  powerText,
+  recovery,
+  regenerateInviteButton: regenerateInviteBtn,
+  revokeInviteButton: revokeInviteBtn,
+  setStatusPresentation,
+  tokenPanel,
+  tokenValue,
+});
 
 pixelatedWindow.PixelatedEvents.bindRendererEvents({
   clearLogsButton: clearLogsBtn,
@@ -326,9 +166,9 @@ pixelatedWindow.PixelatedEvents.bindRendererEvents({
   companionCopyButton: copyCompanionBtn,
   electronApi: pixelatedWindow.electronAPI,
   exposure,
-  getIsRunning: () => isRunning,
-  handleEngineCompanion,
-  initializeEngine,
+  getIsRunning: lifecycle.getIsRunning,
+  handleEngineCompanion: lifecycle.handleEngineCompanion,
+  initializeEngine: lifecycle.initializeEngine,
   launchWebButton: launchWebBtn,
   logs,
   powerButton: powerBtn,
@@ -336,8 +176,8 @@ pixelatedWindow.PixelatedEvents.bindRendererEvents({
   recovery,
   regenerateInviteButton: regenerateInviteBtn,
   revokeInviteButton: revokeInviteBtn,
-  setLifecycleState,
-  setPowerPending,
+  setLifecycleState: lifecycle.setLifecycleState,
+  setPowerPending: lifecycle.setPowerPending,
   setStatusPresentation,
   tokenPanel,
   tokenCopyButton: copyTokenBtn,

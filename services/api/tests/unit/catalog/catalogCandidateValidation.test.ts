@@ -8,11 +8,11 @@ import {
   assertCandidateRuntimeAllowed,
   CandidateValidationError,
   getNativeRuntimeManifestIds,
-} from "../../../src/modules/catalog/ingestion/catalogCandidateValidation.js";
+} from "../../../src/modules/catalog/ingestion/domain/catalogCandidateValidation.js";
 import {
   fetchVerifiedCandidateArtifact,
   MAX_CANDIDATE_ARTIFACT_BYTES,
-} from "../../../src/modules/catalog/ingestion/catalogCandidateStorage.js";
+} from "../../../src/modules/catalog/ingestion/infrastructure/catalogCandidateStorage.js";
 
 function validNesRom() {
   return Buffer.concat([Buffer.from([0x4e, 0x45, 0x53, 0x1a]), Buffer.alloc(32)]);

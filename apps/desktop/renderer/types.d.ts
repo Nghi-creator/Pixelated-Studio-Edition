@@ -101,6 +101,14 @@ type DockerRecoveryController = {
   ) => void;
 };
 
+type DesktopLifecycleController = {
+  getIsRunning: () => boolean;
+  handleEngineCompanion: (payload: EngineCompanionPayload) => void;
+  initializeEngine: () => void;
+  setLifecycleState: (state: EngineStatePayload) => void;
+  setPowerPending: (pending: boolean) => void;
+};
+
 type ElectronApi = {
   createCompanionQrDataUrl: (url: string) => Promise<string>;
   launchWeb: () => Promise<void>;
@@ -172,6 +180,27 @@ type PixelatedWindow = Window &
     PixelatedLogs: {
       createLogController: (elements: { logBox: HTMLElement }) => LogController;
       maxEntries: number;
+    };
+    PixelatedLifecycle: {
+      createLifecycleController: (elements: {
+        clients: ClientAccessController;
+        electronApi: ElectronApi;
+        exposure: ExposureController;
+        getCompactLifecycleStatus: (state: EngineStatePayload) => string;
+        launchWebButton: HTMLButtonElement;
+        logs: LogController;
+        phases: PhaseTracker;
+        powerButton: HTMLButtonElement;
+        powerIcon: HTMLElement;
+        powerSpinner: HTMLElement;
+        powerText: HTMLElement;
+        recovery: DockerRecoveryController;
+        regenerateInviteButton: HTMLButtonElement;
+        revokeInviteButton: HTMLButtonElement;
+        setStatusPresentation: (text: string, tone: StatusTone) => void;
+        tokenPanel: HTMLElement;
+        tokenValue: HTMLElement;
+      }) => DesktopLifecycleController;
     };
     PixelatedModal: {
       bindDocsModal: (elements: {

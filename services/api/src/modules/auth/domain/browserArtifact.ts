@@ -1,4 +1,3 @@
-import type { SupabaseServiceLike } from "../services/backendSessions.js";
 import {
   getBrowserCoreTarget,
   type BrowserCoreId,
@@ -73,24 +72,4 @@ export function isPrivateCatalogRomUrl(value: string) {
   } catch {
     return false;
   }
-}
-
-export async function createSignedCatalogRomUrl({
-  artifactUrl,
-  expiresInSeconds,
-  service,
-  supabaseUrl,
-}: {
-  artifactUrl: string;
-  expiresInSeconds: number;
-  service: SupabaseServiceLike;
-  supabaseUrl: string;
-}) {
-  const { bucket, path } = parseSupabaseStorageObjectUrl(artifactUrl, supabaseUrl);
-  if (bucket !== "catalog_roms") {
-    throw new Error("Catalog ROMs must use the private catalog_roms bucket.");
-  }
-  const { data, error } = await service.storage.from(bucket).createSignedUrl(path, expiresInSeconds);
-  if (error || !data?.signedUrl) throw error || new Error("Supabase did not return a signed ROM URL.");
-  return data.signedUrl;
 }

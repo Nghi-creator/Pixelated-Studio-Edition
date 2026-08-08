@@ -153,6 +153,7 @@ describe("desktop package config", () => {
     const rendererPath = path.resolve(__dirname, "../../renderer.js");
     const rendererHelperPaths = [
       "../../renderer/events.js",
+      "../../renderer/lifecycle.js",
       "../../renderer/logs.js",
       "../../renderer/status.js",
     ];

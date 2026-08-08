@@ -3,9 +3,16 @@ import { z } from "zod";
 import {
   requireSupabaseUser,
   supabaseService,
-} from "../../auth/supabaseAuth.js";
-import { getAuthoritativeUserRole } from "../../auth/roleAuthorization.js";
-import { logTiming, timed } from "../../observability/timing.js";
+} from "../../auth/http/supabaseAuth.js";
+import { getAuthoritativeUserRole } from "../../auth/infrastructure/roleAuthorization.js";
+import { logTiming, timed } from "../../observability/infrastructure/timing.js";
+import { createListAdminUsers, createUpdateAdminUser } from "../application/updateAdminUser.js";
+import {
+  type AdminUserRow,
+  findAdminUsers,
+  findUserRole,
+  updateAdminUser,
+} from "../infrastructure/supabaseAdminUserRepository.js";
 
 const usersQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -20,16 +27,10 @@ const userUpdateSchema = z
   })
   .refine((value) => value.role !== undefined || value.is_banned !== undefined);
 
-const ADMIN_USER_COLUMNS =
-  "id,username,avatar_url,created_at,role,is_banned";
-
-type AdminUserRow = {
-  avatar_url: string | null;
-  created_at: string;
-  id: string;
-  is_banned: boolean;
-  role: string;
-  username: string | null;
+type SupabaseServiceLike = NonNullable<typeof supabaseService>;
+type AdminUserRouteOptions = {
+  requireUser?: typeof requireSupabaseUser;
+  supabase?: SupabaseServiceLike | null;
 };
 
 function toAdminUser(row: AdminUserRow) {
@@ -43,171 +44,102 @@ function toAdminUser(row: AdminUserRow) {
   };
 }
 
-type ProfileRole = {
-  role: string | null;
-};
-
-type SupabaseServiceLike = NonNullable<typeof supabaseService>;
-
-type AdminUserRouteOptions = {
-  requireUser?: typeof requireSupabaseUser;
-  supabase?: SupabaseServiceLike | null;
-};
-
-function isSuperAdminRole(role: string | null | undefined) {
-  return role === "super_admin";
-}
-
-async function requireSuperAdmin(
-  service: SupabaseServiceLike | null,
-  userId: string,
-) {
-  if (!service) return false;
-
-  const { error, role } = await getAuthoritativeUserRole(service, userId);
-
-  if (error) throw error;
-  return isSuperAdminRole(role);
-}
-
 export async function registerAdminUserRoutes(
   app: FastifyInstance,
   options: AdminUserRouteOptions = {},
 ) {
   const requireUser = options.requireUser || requireSupabaseUser;
   const service = options.supabase === undefined ? supabaseService : options.supabase;
-
-  app.get(
-    "/admin/users",
-    { preHandler: requireUser },
-    async (request, reply) => {
-      const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
-      if (!service) {
-        return reply.status(503).send({
-          error: "Supabase service client is not configured for the API.",
-        });
-      }
-
-      const timings = {};
-      const roleLookup = await timed(timings, "admin_role_check_ms", () =>
-        getAuthoritativeUserRole(service, user.id),
+  const updateUser = service
+    ? createUpdateAdminUser({
+        findRole: (userId) => findUserRole(service, userId),
+        update: (userId, values) => updateAdminUser(service, userId, values),
+      })
+    : null;
+  const listUsers = service ? createListAdminUsers({
+    findRole: async (userId, timings) => {
+      const lookup = await timed(timings, "admin_role_check_ms", () =>
+        getAuthoritativeUserRole(service, userId),
       );
-
-      if (roleLookup.error) {
-        request.log.error({ err: roleLookup.error }, "Failed to load admin role");
-        return reply.status(500).send({ error: "Failed to authorize users" });
-      }
-
-      if (!isSuperAdminRole(roleLookup.role)) {
-        return reply.status(403).send({ error: "Super admin access required" });
-      }
-
-      const parsedQuery = usersQuerySchema.safeParse(request.query);
-      if (!parsedQuery.success) {
-        return reply.status(400).send({ error: "Invalid users query" });
-      }
-
-      const { page, pageSize, search } = parsedQuery.data;
-      const start = (page - 1) * pageSize;
-      const end = start + pageSize - 1;
-
-      let usersQuery = service
-        .from("profiles")
-        .select(ADMIN_USER_COLUMNS, { count: "exact" })
-        .order("created_at", { ascending: false });
-
-      if (search) {
-        usersQuery = usersQuery.ilike("username", `%${search}%`);
-      }
-
-      const { data, count, error } = await timed(
-        timings,
-        "admin_users_query_ms",
-        () => usersQuery.range(start, end),
-      );
-
-      if (error) {
-        request.log.error({ err: error }, "Failed to load users");
-        return reply.status(500).send({ error: "Failed to load users" });
-      }
-
-      const total = count || 0;
-      logTiming(request.log, "Admin users timing", timings, {
-        page,
-        pageSize,
-        resultCount: data?.length || 0,
-        roleSource: "database",
-        search: Boolean(search),
-        total,
-      });
-
-      return {
-        page,
-        pageSize,
-        total,
-        totalPages: Math.max(1, Math.ceil(total / pageSize)),
-        users: ((data || []) as AdminUserRow[]).map(toAdminUser),
-      };
+      if (lookup.error) throw lookup.error;
+      return lookup.role;
     },
-  );
+    findUsers: (query, timings) => timed(
+      timings,
+      "admin_users_query_ms",
+      () => findAdminUsers(service, query),
+    ),
+  }) : null;
+
+  app.get("/admin/users", { preHandler: requireUser }, async (request, reply) => {
+    const user = request.user;
+    if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
+    if (!service) {
+      return reply.status(503).send({
+        error: "Supabase service client is not configured for the API.",
+      });
+    }
+
+    const query = usersQuerySchema.safeParse(request.query);
+    if (!query.success) return reply.status(400).send({ error: "Invalid users query" });
+    try {
+      const timings = {};
+      const result = await listUsers!({ ...query.data, timings, userId: user.id });
+      if (result.status === "forbidden") return reply.status(403).send({ error: "Super admin access required" });
+      logTiming(request.log, "Admin users timing", timings, {
+        page: result.page,
+        pageSize: result.pageSize,
+        resultCount: result.users.length,
+        roleSource: "database",
+        search: Boolean(query.data.search),
+        total: result.total,
+      });
+      return { page: result.page, pageSize: result.pageSize, total: result.total, totalPages: result.totalPages, users: result.users.map(toAdminUser) };
+    } catch (error) {
+      request.log.error({ err: error }, "Failed to load users");
+      return reply.status(500).send({ error: "Failed to load users" });
+    }
+  });
 
   app.patch(
     "/admin/users/:userId",
     { preHandler: requireUser },
     async (request, reply) => {
       const user = request.user;
-      if (!user) {
-        return reply.status(401).send({ error: "Missing authenticated user" });
-      }
-      if (!service) {
+      if (!user) return reply.status(401).send({ error: "Missing authenticated user" });
+      if (!service || !updateUser) {
         return reply.status(503).send({
           error: "Supabase service client is not configured for the API.",
         });
       }
 
-      if (!(await requireSuperAdmin(service, user.id))) {
-        return reply.status(403).send({ error: "Super admin access required" });
-      }
+      try {
+        const params = userParamsSchema.safeParse(request.params);
+        const body = userUpdateSchema.safeParse(request.body);
+        if (!params.success || !body.success) {
+          return reply.status(400).send({ error: "Invalid user update" });
+        }
 
-      const params = userParamsSchema.safeParse(request.params);
-      const body = userUpdateSchema.safeParse(request.body);
-      if (!params.success || !body.success) {
-        return reply.status(400).send({ error: "Invalid user update" });
-      }
-
-      if (params.data.userId === user.id) {
-        return reply.status(403).send({ error: "Cannot modify yourself" });
-      }
-
-      const { data: target, error: targetError } = await service
-        .from("profiles")
-        .select("role")
-        .eq("id", params.data.userId)
-        .maybeSingle<ProfileRole>();
-      if (targetError) {
-        request.log.error({ err: targetError }, "Failed to load target user role");
-        return reply.status(500).send({ error: "Failed to authorize user update" });
-      }
-      if (target?.role === "super_admin") {
-        return reply.status(403).send({ error: "Cannot modify super admins" });
-      }
-
-      const { data, error } = await service
-        .from("profiles")
-        .update(body.data)
-        .eq("id", params.data.userId)
-        .select(ADMIN_USER_COLUMNS)
-        .single<AdminUserRow>();
-
-      if (error || !data) {
+        const result = await updateUser({
+          actorId: user.id,
+          targetId: params.data.userId,
+          values: body.data,
+        });
+        if (!result.allowed) {
+          return reply.status(403).send({
+            error:
+              result.reason === "actor"
+                ? "Super admin access required"
+                : result.reason === "self"
+                ? "Cannot modify yourself"
+                : "Cannot modify super admins",
+          });
+        }
+        return { user: toAdminUser(result.user as AdminUserRow) };
+      } catch (error) {
         request.log.error({ err: error }, "Failed to update user");
         return reply.status(500).send({ error: "Failed to update user" });
       }
-
-      return { user: toAdminUser(data) };
     },
   );
 }
