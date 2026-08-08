@@ -6,7 +6,10 @@ import {
 import { getAuthoritativeUserRole } from "../../auth/infrastructure/roleAuthorization.js";
 import { logTiming, timed } from "../../observability/infrastructure/timing.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
-import { createRateLimiter } from "../../security/sharedRateLimiter.js";
+import {
+  createRateLimiter,
+  type RateLimiter,
+} from "../../security/sharedRateLimiter.js";
 import { requireAuthenticatedService } from "../../security/authenticatedService.js";
 import { createResolveModerationReport } from "../application/resolveModerationReport.js";
 import { createListModerationReports } from "../application/listModerationReports.js";
@@ -29,6 +32,7 @@ import {
 
 type SupabaseServiceLike = NonNullable<typeof supabaseService>;
 type ModerationRouteOptions = {
+  adminReportReadLimiter?: RateLimiter;
   requireUser?: typeof requireSupabaseUser;
   supabase?: SupabaseServiceLike | null;
 };
@@ -52,6 +56,13 @@ export async function registerModerationRoutes(
     namespace: "report-write",
     windowMs: 60 * 60 * 1000,
   });
+  const adminReportReadLimiter =
+    options.adminReportReadLimiter ||
+    createRateLimiter({
+      limit: 60,
+      namespace: "admin-report-read-user",
+      windowMs: 60_000,
+    });
   const resolveReport = service
     ? createResolveModerationReport({
         deleteReport: (reportId) => deleteReport(service, reportId),
@@ -120,6 +131,13 @@ export async function registerModerationRoutes(
     const context = requireAuthenticatedService(request, reply, service);
     if (!context) return;
     const { user } = context;
+    if (
+      rejectRateLimitedRequest(
+        reply,
+        await adminReportReadLimiter.consume(user.id),
+        "Admin report read limit reached. Please try again shortly.",
+      )
+    ) return;
 
     const query = adminReportsQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "Invalid reports query" });

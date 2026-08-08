@@ -32,7 +32,9 @@ function createQueries(context: CatalogRouteContext) {
 }
 
 export async function warmGamesCatalogCache(context: CatalogRouteContext) {
-  return createQueries(context)?.warm() || null;
+  const queries = createQueries(context);
+  if (!queries) return null;
+  return (await queries.warm()) || null;
 }
 
 export function registerGamesCatalogRoutes(

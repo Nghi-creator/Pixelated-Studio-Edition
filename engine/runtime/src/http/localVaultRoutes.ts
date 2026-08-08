@@ -5,7 +5,6 @@ import {
   deleteVaultGame,
   listVaultGames,
   resolveVaultFolder,
-  sanitizeLocalVaultLogValue,
   validateVaultUpload,
   type VaultOwnerContext,
 } from "../roms/localVaultService";
@@ -14,7 +13,7 @@ import { createLocalVaultRateLimiter } from "../security/localVaultRateLimiter";
 
 const multer = require("multer");
 
-export { createLocalVaultRateLimiter, sanitizeLocalVaultLogValue };
+export { createLocalVaultRateLimiter };
 
 type MulterError = Error & { code?: string };
 type MulterFile = { filename: string; originalname: string; path: string };
@@ -146,9 +145,7 @@ export function registerLocalVaultRoutes(
         }
         if (!result.ok) return res.status(400).json({ error: result.error });
 
-        console.log(
-          `[Library] New local game added for user: ${sanitizeLocalVaultLogValue(uploadedFile.originalname)}`,
-        );
+        console.log("[Library] New local game added");
         return res.json({ success: true, filename: result.filename });
       });
     },

@@ -139,10 +139,3 @@ export async function deleteVaultGame(
     throw error;
   }
 }
-
-export function sanitizeLocalVaultLogValue(value: unknown) {
-  return String(value)
-    .replace(/\r|\n/g, " ")
-    .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
-    .slice(0, 200);
-}
