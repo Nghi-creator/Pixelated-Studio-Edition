@@ -64,7 +64,7 @@ function canWriteDirectory(dirPath: string): boolean {
   try {
     fs.accessSync(dirPath, fs.constants.W_OK);
     return true;
-  } catch (err) {
+  } catch {
     return false;
   }
 }

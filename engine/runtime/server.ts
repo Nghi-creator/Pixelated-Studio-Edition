@@ -1,5 +1,6 @@
 import express from "express";
 import http from "http";
+import cors from "cors";
 import { Server } from "socket.io";
 import {
   allowedRomHosts,
@@ -61,8 +62,6 @@ import {
   createPublicHealthSnapshot,
   type HealthSnapshotOptions,
 } from "./src/telemetry/healthSnapshot";
-
-const cors = require("cors");
 
 type SocketPayload = Record<string, unknown>;
 

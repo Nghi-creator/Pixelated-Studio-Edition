@@ -48,6 +48,10 @@ jobs:
         working-directory: ${{ matrix.path }}
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Check workspace lockfile consistency
+        if: matrix.label == 'root'
+        run: npm run check:lockfiles
+
       # Electron is declared as a development dependency because it is used by
       # the packager, but the resulting Electron runtime ships to users.
       - name: Audit packaged desktop runtime and build chain

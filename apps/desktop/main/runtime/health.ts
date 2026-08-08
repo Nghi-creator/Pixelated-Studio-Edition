@@ -38,7 +38,7 @@ export function waitForEngineHealth(attempts = 30, delayMs = 1000) {
                 resolve(payload);
                 return;
               }
-            } catch (err) {
+            } catch {
               // Fall through to retry with a clearer timeout error later.
             }
           }

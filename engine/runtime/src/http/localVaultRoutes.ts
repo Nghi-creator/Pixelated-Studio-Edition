@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import multer from "multer";
 import path from "path";
 import type { Express, Request, RequestHandler, Response } from "express";
 import {
@@ -11,11 +12,8 @@ import {
 import { getSupportedExtensions } from "../runtime/runtimeRegistry";
 import { createLocalVaultRateLimiter } from "../security/localVaultRateLimiter";
 
-const multer = require("multer");
-
 export { createLocalVaultRateLimiter };
 
-type MulterError = Error & { code?: string };
 type MulterFile = { filename: string; originalname: string; path: string };
 type RequestWithFile = Request & { file?: MulterFile };
 
@@ -121,7 +119,7 @@ export function registerLocalVaultRoutes(
     requireEngineToken,
     uploadRateLimit,
     (req: Request, res: Response) => {
-      upload.single("romFile")(req, res, async (error?: MulterError) => {
+      upload.single("romFile")(req, res, async (error?: unknown) => {
         if (error && error instanceof multer.MulterError) {
           const message =
             error.code === "LIMIT_FILE_SIZE"
@@ -129,7 +127,10 @@ export function registerLocalVaultRoutes(
               : error.message;
           return res.status(400).json({ error: message });
         }
-        if (error) return res.status(400).json({ error: error.message });
+        if (error) {
+          const message = error instanceof Error ? error.message : "Upload failed";
+          return res.status(400).json({ error: message });
+        }
 
         const uploadedFile = (req as RequestWithFile).file;
         if (!uploadedFile) return res.status(400).json({ error: "No file uploaded" });

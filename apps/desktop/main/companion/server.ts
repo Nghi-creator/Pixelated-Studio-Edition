@@ -14,7 +14,6 @@ import type {
   CompanionRequestOptions,
   CompanionServerOptions,
   CompanionServerResult,
-  RuntimeSwitchResult,
 } from "./types";
 
 export type {

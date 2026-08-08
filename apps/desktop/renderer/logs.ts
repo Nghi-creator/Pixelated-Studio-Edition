@@ -1,5 +1,9 @@
 (function () {
   const MAX_LOG_ENTRIES = 500;
+  const ANSI_ESCAPE_PATTERN = new RegExp(
+    `${String.fromCharCode(27)}\\[[0-?]*[ -/]*[@-~]`,
+    "g",
+  );
 
   type LogControllerElements = {
     logBox: HTMLElement;
@@ -27,7 +31,7 @@
     }
 
     function sanitize(message: string) {
-      return message.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, "");
+      return message.replace(ANSI_ESCAPE_PATTERN, "");
     }
 
     return {

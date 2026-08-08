@@ -113,7 +113,7 @@ export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
 
     try {
       parsedUrl = new URL(romUrl);
-    } catch (err) {
+    } catch {
       throw new Error("Invalid cloud ROM URL");
     }
 

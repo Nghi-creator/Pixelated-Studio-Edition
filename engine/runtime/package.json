@@ -11,6 +11,7 @@
     "build:native": "node scripts/buildNativeRuntime.mjs",
     "check": "npm run check:source && npm run build && node --check dist/server.js && find dist/src dist/tests -name '*.js' -exec node --check {} \\;",
     "check:source": "test -z \"$(find src tests -name '*.js' -print -quit)\"",
+    "lint": "eslint .",
     "smoke:native": "node scripts/smokeNativeRuntime.mjs",
     "test": "npm run build && node --test dist/tests/**/*.test.js",
     "start": "node dist/server.js"
@@ -22,8 +23,14 @@
     "socket.io": "^4.8.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
+    "@types/multer": "^2.0.0",
     "@types/node": "^24.10.13",
-    "typescript": "^6.0.3"
+    "eslint": "^9.39.4",
+    "globals": "^16.5.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.62.1"
   }
 }
