@@ -38,3 +38,18 @@ test("engine fingerprints change with runtime content but ignore build output", 
   fs.writeFileSync(path.join(runtimeDir, "src", "server.ts"), "export const changed = true;\n");
   assert.notEqual(computeEngineRuntimeFingerprint(runtimeDir, "libretro"), initial);
 });
+
+test("engine fingerprints hash symlink destinations without reading their targets", (t) => {
+  const runtimeDir = createRuntimeFixture();
+  const outsideDir = fs.mkdtempSync(path.join(os.tmpdir(), "pixelated-fingerprint-outside-"));
+  t.after(() => fs.rmSync(runtimeDir, { force: true, recursive: true }));
+  t.after(() => fs.rmSync(outsideDir, { force: true, recursive: true }));
+
+  const outsideFile = path.join(outsideDir, "outside.txt");
+  fs.writeFileSync(outsideFile, "first\n");
+  fs.symlinkSync(outsideFile, path.join(runtimeDir, "external-link"));
+  const initial = computeEngineRuntimeFingerprint(runtimeDir, "libretro");
+
+  fs.writeFileSync(outsideFile, "changed outside content\n");
+  assert.equal(computeEngineRuntimeFingerprint(runtimeDir, "libretro"), initial);
+});

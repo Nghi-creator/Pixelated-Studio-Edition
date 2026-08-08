@@ -14,7 +14,12 @@ function shouldIgnoreFile(name: string) {
   return name === ".DS_Store" || name.endsWith(".pyc") || name.startsWith("npm-debug.log");
 }
 
-function listRuntimeFiles(rootDir: string, currentDir = rootDir): string[] {
+type RuntimeFile = {
+  kind: "file" | "symlink";
+  relativePath: string;
+};
+
+function listRuntimeFiles(rootDir: string, currentDir = rootDir): RuntimeFile[] {
   return fs.readdirSync(currentDir, { withFileTypes: true }).flatMap((entry) => {
     if (entry.isDirectory() && IGNORED_DIRECTORIES.has(entry.name)) return [];
     if (entry.isFile() && shouldIgnoreFile(entry.name)) return [];
@@ -22,28 +27,50 @@ function listRuntimeFiles(rootDir: string, currentDir = rootDir): string[] {
     const entryPath = path.join(currentDir, entry.name);
     if (entry.isDirectory()) return listRuntimeFiles(rootDir, entryPath);
     if (entry.isFile() || entry.isSymbolicLink()) {
-      return [path.relative(rootDir, entryPath).split(path.sep).join("/")];
+      return [{
+        kind: entry.isSymbolicLink() ? "symlink" as const : "file" as const,
+        relativePath: path.relative(rootDir, entryPath).split(path.sep).join("/"),
+      }];
     }
     return [];
   });
+}
+
+function readRegularFileWithoutFollowingLinks(filePath: string) {
+  const descriptor = fs.openSync(
+    filePath,
+    fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW,
+  );
+  try {
+    const stat = fs.fstatSync(descriptor);
+    if (!stat.isFile()) {
+      throw new Error(`Engine runtime entry is not a regular file: ${filePath}`);
+    }
+    return fs.readFileSync(descriptor);
+  } finally {
+    fs.closeSync(descriptor);
+  }
 }
 
 export function computeEngineRuntimeFingerprint(
   runtimeDir: string,
   runtimeKind: EngineRuntimeKind,
 ) {
-  const files = listRuntimeFiles(runtimeDir).sort();
+  const files = listRuntimeFiles(runtimeDir).sort((left, right) =>
+    left.relativePath.localeCompare(right.relativePath),
+  );
   if (!files.length) throw new Error(`Engine runtime is empty: ${runtimeDir}`);
 
   const hash = crypto.createHash("sha256");
   hash.update(`runtime-kind:${runtimeKind}\0`);
-  for (const relativePath of files) {
+  for (const { kind, relativePath } of files) {
     const filePath = path.join(runtimeDir, relativePath);
-    const stat = fs.lstatSync(filePath);
-    const bytes = stat.isSymbolicLink()
+    const bytes = kind === "symlink"
       ? Buffer.from(fs.readlinkSync(filePath))
-      : fs.readFileSync(filePath);
+      : readRegularFileWithoutFollowingLinks(filePath);
     hash.update(relativePath);
+    hash.update("\0");
+    hash.update(kind);
     hash.update("\0");
     hash.update(String(bytes.length));
     hash.update("\0");
