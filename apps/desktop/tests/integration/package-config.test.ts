@@ -134,7 +134,7 @@ describe("desktop package config", () => {
     assert.match(workflow, /release_body_path:/);
     assert.match(workflow, /docs\/releases\/v1\.0\.1\.md/);
     assert.match(workflow, /publish-github-release:/);
-    assert.match(workflow, /actions\/download-artifact@v4/);
+    assert.match(workflow, /actions\/download-artifact@[0-9a-f]{40}/);
     assert.match(workflow, /--notes-file "\$RELEASE_BODY_PATH"/);
     assert.match(workflow, /gh release edit "\$RELEASE_TAG" --title "\$title" "\$\{notes_args\[@\]\}"/);
     assert.match(workflow, /gh release upload "\$RELEASE_TAG" "\$\{assets\[@\]\}" --clobber/);

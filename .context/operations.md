@@ -106,7 +106,8 @@ The two-device LAN procedure remains in `lan-manual-smoke-checklist.md`.
 - PRs do not run secret-backed staging predeploy or production browser smokes.
 - Desktop packaging includes the web build, so web changes can break Electron
   release validation.
-- CI uses Node 22 and `npm ci`; package/lock drift is a hard failure.
+- CI uses the Node 24 version pinned in `.nvmrc` and `npm ci`;
+  package/lock drift is a hard failure.
 - A passing proof-mode deploy is not evidence that production auth and pairing
   work end to end.
 
