@@ -108,7 +108,7 @@ export const resolveGameBootTarget = async (
     : backendSession.boot.romUrl || backendSession.boot.romFilename;
   if (!romFilename) throw new Error("Game has no boot target");
 
-  console.log(`[WebRTC] Cloud Game found. Sending boot string: ${romFilename}`);
+  console.log("[WebRTC] Cloud game boot target resolved");
 
   return {
     mode: "cloud",
@@ -118,4 +118,3 @@ export const resolveGameBootTarget = async (
     userId: backendSession.user.id,
   };
 };
-

@@ -170,7 +170,7 @@ export function registerLocalVaultRoutes(
           res.status(404).json({ error: "File not found" });
           return;
         }
-        console.log(`[Library] Deleted local game: ${result.filename}`);
+        console.log("[Library] Local game deleted");
         res.json({ success: true });
       } catch (error) {
         console.error("Failed to delete file:", error);
