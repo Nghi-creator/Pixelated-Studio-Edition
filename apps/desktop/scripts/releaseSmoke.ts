@@ -20,6 +20,7 @@ export const EXPECTED_RENDERER_SCRIPTS = [
   "dist/renderer/status.js",
   "dist/renderer/recovery.js",
   "dist/renderer/clients.js",
+  "dist/renderer/lifecycle.js",
   "dist/renderer/events.js",
   "dist/renderer.js",
 ];
