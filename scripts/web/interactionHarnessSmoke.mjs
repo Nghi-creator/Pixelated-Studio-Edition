@@ -398,6 +398,7 @@ async function run() {
     );
     await page.getByText("local-boot-recovered").waitFor();
 
+    await page.getByRole("button", { name: "Game settings" }).click();
     await page.getByRole("button", { name: /Lobby/ }).click();
     await page.getByText("LAN Invite").waitFor();
     await page
