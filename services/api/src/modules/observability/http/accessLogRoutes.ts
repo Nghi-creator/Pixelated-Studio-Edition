@@ -15,6 +15,7 @@ import {
   findTokenUserId,
   recordAccessLog,
 } from "../infrastructure/supabaseAccessLogRepository.js";
+import { logTiming, timed } from "../infrastructure/timing.js";
 
 const accessLogBodySchema = z.object({
   path: z.string().trim().min(1).max(2048),
@@ -107,14 +108,23 @@ export async function registerAccessLogRoutes(
       windowMs: 60_000,
     });
   const useCases = service ? createAccessLogUseCases({
-    authorize: async (userId) => {
-      const lookup = await getAuthoritativeUserRole(service, userId);
+    authorize: async (userId, timings) => {
+      const lookup = await timed(timings, "admin_role_check_ms", () =>
+        getAuthoritativeUserRole(service, userId),
+      );
       if (lookup.error) throw lookup.error;
       return ["admin", "super_admin"].includes(lookup.role || "");
     },
-    findSummary: (page, pageSize) => findAccessLogSummary(service, page, pageSize),
-    findTokenUser: (token) => anon ? findTokenUserId(anon, token) : Promise.resolve(null),
-    record: (input) => recordAccessLog(service, input),
+    findSummary: (page, pageSize, timings) =>
+      timed(timings, "access_log_summary_rpc_ms", () =>
+        findAccessLogSummary(service, page, pageSize),
+      ),
+    findTokenUser: (token, timings) => anon
+      ? timed(timings, "auth_user_lookup_ms", () => findTokenUserId(anon, token))
+      : Promise.resolve(null),
+    record: (input, timings) => timed(timings, "access_log_upsert_ms", () =>
+      recordAccessLog(service, input),
+    ),
   }) : null;
 
   app.post("/access-logs", async (request, reply) => {
@@ -140,8 +150,16 @@ export async function registerAccessLogRoutes(
     }
 
     const token = getBearerToken(request);
+    const timings = {};
     try {
-      await useCases!.record({ ...parsedBody.data, token: token || undefined });
+      const result = await useCases!.record({
+        ...parsedBody.data,
+        timings,
+        token: token || undefined,
+      });
+      logTiming(request.log, "Access log write timing", timings, {
+        authenticated: result.authenticated,
+      });
     } catch (error) {
       request.log.error({ err: error }, "Failed to create access log");
       return reply
@@ -172,8 +190,20 @@ export async function registerAccessLogRoutes(
       }
 
       try {
-        const result = await useCases!.list({ ...parsedQuery.data, userId: user.id });
+        const timings = {};
+        const result = await useCases!.list({
+          ...parsedQuery.data,
+          timings,
+          userId: user.id,
+        });
         if (result.status === "forbidden") return reply.status(403).send({ error: "Admin access required" });
+        logTiming(request.log, "Admin access logs timing", timings, {
+          page: result.page,
+          pageSize: result.pageSize,
+          resultCount: result.logs.length,
+          roleSource: "database",
+          total: result.total,
+        });
         return { logs: result.logs, page: result.page, pageSize: result.pageSize, total: result.total, totalPages: result.totalPages };
       } catch (error) {
         request.log.error({ err: error }, "Failed to load access logs");

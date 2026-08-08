@@ -6,6 +6,7 @@ import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import { createRateLimiter, type RateLimiter } from "../../security/sharedRateLimiter.js";
 import { requireAuthenticatedService } from "../../security/authenticatedService.js";
 import {
+  AdminSubmissionUseCaseError,
   createAdminSubmissionUseCases,
   fetchSubmissionArtifactBytes,
 } from "../application/adminSubmissions.js";
@@ -82,6 +83,14 @@ export async function registerAdminSubmissionRoutes(app: FastifyInstance, option
       return { page: result.page, pageSize: result.pageSize, submissions: result.submissions, total: result.total, totalPages: result.totalPages };
     } catch (err) {
       request.log.error({ err }, "Failed to load submissions");
+      if (
+        err instanceof AdminSubmissionUseCaseError &&
+        err.stage === "sign_review_urls"
+      ) {
+        return reply.status(503).send({
+          error: "Submission files are temporarily unavailable",
+        });
+      }
       return reply.status(500).send({ error: "Failed to load submissions" });
     }
   });

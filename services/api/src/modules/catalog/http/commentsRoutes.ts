@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { createCatalogSocialUseCases } from "../application/catalogSocial.js";
+import { createDeleteComment } from "../application/catalogSocial.js";
 import { getUserRole } from "../infrastructure/supabaseCatalogRepository.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import { requireAuthenticatedService } from "../../security/authenticatedService.js";
@@ -21,13 +21,9 @@ export function registerCommentRoutes(
   context: CatalogRouteContext,
 ) {
   const { commentWriteLimiter, requireUser, service } = context;
-  const social = service ? createCatalogSocialUseCases({
+  const deleteCommentUseCase = service ? createDeleteComment({
     deleteComment: (commentId, ownerId) => deleteComment(service, commentId, ownerId),
-    findCommentAuthor: async () => null,
     findRole: (userId) => getUserRole(service, userId),
-    hasLivePlay: async () => false,
-    recordPlay: async () => {},
-    saveCommentReaction: async () => null,
   }) : null;
 
   app.get("/games/:gameId/comments", async (request, reply) => {
@@ -106,7 +102,7 @@ export function registerCommentRoutes(
       if (!params.success) return reply.status(400).send({ error: "Invalid comment id" });
 
       try {
-        await social!.deleteComment(params.data.commentId, user.id);
+        await deleteCommentUseCase!(params.data.commentId, user.id);
         return reply.status(204).send();
       } catch (error) {
         request.log.error({ err: error }, "Failed to delete comment");

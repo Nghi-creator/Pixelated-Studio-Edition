@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { createCatalogSocialUseCases } from "../application/catalogSocial.js";
+import { createReactToComment } from "../application/catalogSocial.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import { requireAuthenticatedService } from "../../security/authenticatedService.js";
 import {
@@ -20,12 +20,8 @@ export function registerReactionRoutes(
   context: CatalogRouteContext,
 ) {
   const { reactionWriteLimiter, requireUser, service } = context;
-  const social = service ? createCatalogSocialUseCases({
-    deleteComment: async () => {},
+  const reactToComment = service ? createReactToComment({
     findCommentAuthor: (commentId) => findCommentAuthorId(service, commentId),
-    findRole: async () => null,
-    hasLivePlay: async () => false,
-    recordPlay: async () => {},
     saveCommentReaction: (input) => setCommentReaction(service, input),
   }) : null;
 
@@ -106,7 +102,7 @@ export function registerReactionRoutes(
       }
 
       try {
-        const result = await social!.reactToComment({
+        const result = await reactToComment!({
           commentId: params.data.commentId,
           isLike: body.data.isLike,
           userId: user.id,

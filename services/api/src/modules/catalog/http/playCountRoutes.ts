@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { createCatalogSocialUseCases } from "../application/catalogSocial.js";
+import { createRecordPlay } from "../application/catalogSocial.js";
 import { z } from "zod";
 import {
   requireSupabaseIdentity,
@@ -49,13 +49,9 @@ export async function registerPlayCountRoutes(
     namespace: "play-count-write",
     windowMs: 60_000,
   });
-  const social = service ? createCatalogSocialUseCases({
-    deleteComment: async () => {},
-    findCommentAuthor: async () => null,
-    findRole: async () => null,
+  const recordPlayUseCase = service ? createRecordPlay({
     hasLivePlay: hasLivePlaySession,
     recordPlay: (input) => recordGamePlay(service, input),
-    saveCommentReaction: async () => null,
   }) : null;
 
   app.post(
@@ -84,7 +80,7 @@ export async function registerPlayCountRoutes(
         return;
       }
       try {
-        const result = await social!.recordPlay({
+        const result = await recordPlayUseCase!({
           clientEdition: parsedBody.data.clientEdition,
           eventId: parsedBody.data.playEventId,
           gameId: parsedParams.data.gameId,

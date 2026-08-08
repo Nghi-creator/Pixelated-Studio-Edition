@@ -5,6 +5,7 @@ import {
   supabaseService,
 } from "../../auth/http/supabaseAuth.js";
 import { getAuthoritativeUserRole } from "../../auth/infrastructure/roleAuthorization.js";
+import { logTiming, timed } from "../../observability/infrastructure/timing.js";
 import { createListAdminUsers, createUpdateAdminUser } from "../application/updateAdminUser.js";
 import {
   type AdminUserRow,
@@ -56,12 +57,18 @@ export async function registerAdminUserRoutes(
       })
     : null;
   const listUsers = service ? createListAdminUsers({
-    findRole: async (userId) => {
-      const lookup = await getAuthoritativeUserRole(service, userId);
+    findRole: async (userId, timings) => {
+      const lookup = await timed(timings, "admin_role_check_ms", () =>
+        getAuthoritativeUserRole(service, userId),
+      );
       if (lookup.error) throw lookup.error;
       return lookup.role;
     },
-    findUsers: (query) => findAdminUsers(service, query),
+    findUsers: (query, timings) => timed(
+      timings,
+      "admin_users_query_ms",
+      () => findAdminUsers(service, query),
+    ),
   }) : null;
 
   app.get("/admin/users", { preHandler: requireUser }, async (request, reply) => {
@@ -76,8 +83,17 @@ export async function registerAdminUserRoutes(
     const query = usersQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "Invalid users query" });
     try {
-      const result = await listUsers!({ ...query.data, userId: user.id });
+      const timings = {};
+      const result = await listUsers!({ ...query.data, timings, userId: user.id });
       if (result.status === "forbidden") return reply.status(403).send({ error: "Super admin access required" });
+      logTiming(request.log, "Admin users timing", timings, {
+        page: result.page,
+        pageSize: result.pageSize,
+        resultCount: result.users.length,
+        roleSource: "database",
+        search: Boolean(query.data.search),
+        total: result.total,
+      });
       return { page: result.page, pageSize: result.pageSize, total: result.total, totalPages: result.totalPages, users: result.users.map(toAdminUser) };
     } catch (error) {
       request.log.error({ err: error }, "Failed to load users");

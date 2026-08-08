@@ -4,6 +4,7 @@ import {
   supabaseService,
 } from "../../auth/http/supabaseAuth.js";
 import { getAuthoritativeUserRole } from "../../auth/infrastructure/roleAuthorization.js";
+import { logTiming, timed } from "../../observability/infrastructure/timing.js";
 import { rejectRateLimitedRequest } from "../../security/rateLimitResponse.js";
 import { createRateLimiter } from "../../security/sharedRateLimiter.js";
 import { requireAuthenticatedService } from "../../security/authenticatedService.js";
@@ -61,12 +62,18 @@ export async function registerModerationRoutes(
       })
     : null;
   const listReports = service ? createListModerationReports({
-    findRole: async (userId) => {
-      const lookup = await getAuthoritativeUserRole(service, userId);
+    findRole: async (userId, timings) => {
+      const lookup = await timed(timings, "admin_role_check_ms", () =>
+        getAuthoritativeUserRole(service, userId),
+      );
       if (lookup.error) throw lookup.error;
       return lookup.role;
     },
-    findReports: (query) => findModerationReports(service, query),
+    findReports: (query, timings) => timed(
+      timings,
+      "admin_reports_query_ms",
+      () => findModerationReports(service, query),
+    ),
   }) : null;
 
   app.post(
@@ -117,8 +124,17 @@ export async function registerModerationRoutes(
     const query = adminReportsQuerySchema.safeParse(request.query);
     if (!query.success) return reply.status(400).send({ error: "Invalid reports query" });
     try {
-      const result = await listReports!({ ...query.data, userId: user.id });
+      const timings = {};
+      const result = await listReports!({ ...query.data, timings, userId: user.id });
       if (result.status === "forbidden") return reply.status(403).send({ error: "Admin access required" });
+      logTiming(request.log, "Admin reports timing", timings, {
+        page: result.page,
+        pageSize: result.pageSize,
+        resultCount: result.reports.length,
+        roleSource: "database",
+        targetRole: result.targetRole,
+        total: result.total,
+      });
       return { page: result.page, pageSize: result.pageSize, reports: result.reports, targetRole: result.targetRole, total: result.total, totalPages: result.totalPages };
     } catch (error) {
       request.log.error(error, "Failed to load moderation reports");

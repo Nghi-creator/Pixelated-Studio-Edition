@@ -58,6 +58,15 @@ type ReviewBody =
       source_repo_url: string;
     };
 
+export class AdminSubmissionUseCaseError extends Error {
+  constructor(
+    readonly stage: "sign_review_urls",
+    override readonly cause: unknown,
+  ) {
+    super(`Admin submission operation failed during ${stage}`);
+  }
+}
+
 export function createAdminSubmissionUseCases(dependencies: {
   authorize(userId: string): Promise<boolean>;
   createCandidate(input: { candidate: Record<string, unknown>; notes: string | null; reviewerId: string; submissionId: string }): Promise<{ candidate: unknown; submission: unknown }>;
@@ -71,14 +80,23 @@ export function createAdminSubmissionUseCases(dependencies: {
     if (!(await dependencies.authorize(input.userId))) return { status: "forbidden" } as const;
     const start = (input.page - 1) * input.pageSize;
     const result = await dependencies.findPage({ end: start + input.pageSize - 1, search: input.search, start, status: input.status });
-    const submissions = await Promise.all(result.submissions.map(async (submission) => {
-      const [romUrl, coverUrl, bannerUrl] = await Promise.all([
-        dependencies.signUrl(submission.rom_url),
-        dependencies.signUrl(submission.cover_url),
-        dependencies.signUrl(submission.banner_url),
-      ]);
-      return { ...submission, banner_url: bannerUrl, cover_url: coverUrl, rom_url: romUrl || submission.rom_url };
-    }));
+    let submissions: Array<SubmissionRow & {
+      banner_url: string | null;
+      cover_url: string | null;
+      rom_url: string;
+    }>;
+    try {
+      submissions = await Promise.all(result.submissions.map(async (submission) => {
+        const [romUrl, coverUrl, bannerUrl] = await Promise.all([
+          dependencies.signUrl(submission.rom_url),
+          dependencies.signUrl(submission.cover_url),
+          dependencies.signUrl(submission.banner_url),
+        ]);
+        return { ...submission, banner_url: bannerUrl, cover_url: coverUrl, rom_url: romUrl || submission.rom_url };
+      }));
+    } catch (error) {
+      throw new AdminSubmissionUseCaseError("sign_review_urls", error);
+    }
     return { status: "ok", page: input.page, pageSize: input.pageSize, submissions, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / input.pageSize)) } as const;
   }
 
