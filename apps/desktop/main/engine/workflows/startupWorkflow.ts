@@ -232,6 +232,8 @@ export async function buildEngineImageWorkflow({
       event,
       safeEnv,
       launchContext.runtimeConfig,
+      undefined,
+      true,
     );
     if (attempt !== state.activeStartupAttempt) return;
 
