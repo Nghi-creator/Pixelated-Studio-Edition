@@ -5,6 +5,7 @@ import { promises as dns } from "dns";
 import { validateGameArtifactAsync } from "./artifactValidation";
 
 type ResolvedAddress = { address: string; family: number };
+type HttpsLookup = NonNullable<https.RequestOptions["lookup"]>;
 type ResolveHost = (
   hostname: string,
   options: { all: true; verbatim: true },
@@ -55,6 +56,19 @@ const blockedAddresses = new net.BlockList();
 ].forEach(([address, prefix]) =>
   blockedAddresses.addSubnet(address as string, prefix as number, "ipv6"),
 );
+
+export function createPinnedAddressLookup(
+  pinnedAddress: ResolvedAddress,
+): HttpsLookup {
+  return (_hostname, lookupOptions, callback) => {
+    if (lookupOptions.all) {
+      callback(null, [pinnedAddress]);
+      return;
+    }
+
+    callback(null, pinnedAddress.address, pinnedAddress.family);
+  };
+}
 
 export function isPublicNetworkAddress(address: string): boolean {
   const family = net.isIP(address);
@@ -171,9 +185,7 @@ export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
       const request = get(
         parsedUrl,
         {
-          lookup: (_hostname, _options, callback) => {
-            callback(null, pinnedAddress.address, pinnedAddress.family);
-          },
+          lookup: createPinnedAddressLookup(pinnedAddress),
         },
         (response) => {
         if (response.statusCode !== 200) {

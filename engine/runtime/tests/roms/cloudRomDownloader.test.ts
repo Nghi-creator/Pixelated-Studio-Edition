@@ -7,6 +7,7 @@ import path from "node:path";
 import test from "node:test";
 import {
   createCloudRomDownloader,
+  createPinnedAddressLookup,
   isPublicNetworkAddress,
 } from "../../src/roms/cloudRomDownloader";
 
@@ -46,6 +47,30 @@ test("classifies private and reserved network addresses as unsafe", () => {
 
   assert.equal(isPublicNetworkAddress("1.1.1.1"), true);
   assert.equal(isPublicNetworkAddress("2606:4700:4700::1111"), true);
+});
+
+test("pinned DNS lookup supports Node's all-address callback mode", () => {
+  const pinnedAddress = { address: "1.1.1.1", family: 4 };
+  const lookup = createPinnedAddressLookup(pinnedAddress);
+
+  lookup("roms.example", { all: true }, (error, addresses, family) => {
+    assert.ifError(error);
+    assert.deepEqual(addresses, [pinnedAddress]);
+    assert.equal(family, undefined);
+  });
+});
+
+test("pinned DNS lookup retains the single-address callback mode", () => {
+  const lookup = createPinnedAddressLookup({
+    address: "2606:4700:4700::1111",
+    family: 6,
+  });
+
+  lookup("roms.example", { all: false }, (error, address, family) => {
+    assert.ifError(error);
+    assert.equal(address, "2606:4700:4700::1111");
+    assert.equal(family, 6);
+  });
 });
 
 test("rejects an allowed host when DNS includes a private address", async () => {

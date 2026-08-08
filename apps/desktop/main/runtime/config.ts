@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import { computeEngineRuntimeFingerprint } from "./fingerprint";
 
 export type EngineRuntimeKind = "libretro" | "native_linux";
 
@@ -98,6 +99,7 @@ export const pullEngineImage = shouldPullEngineImage({
 export const buildFallback = process.env.PIXELATED_ENGINE_BUILD_FALLBACK !== "0";
 export type EngineRuntimeConfig = {
   defaultEngineImage: string;
+  engineFingerprint: string;
   engineImage: string;
   engineRuntimeKind: EngineRuntimeKind;
   nativeRuntimeLock: { hash: string; runtimeId: string } | null;
@@ -120,9 +122,14 @@ export function resolveEngineRuntimeConfig(
       : process.env.PIXELATED_ENGINE_IMAGE || defaultLibretroEngineImage;
   const resolvedNativeRuntimeLock =
     resolvedRuntimeKind === "native_linux" ? readNativeRuntimeLock() : null;
+  const resolvedEngineFingerprint = computeEngineRuntimeFingerprint(
+    engineRuntimeDir,
+    resolvedRuntimeKind,
+  );
 
   return {
     defaultEngineImage: resolvedDefaultEngineImage,
+    engineFingerprint: resolvedEngineFingerprint,
     engineImage: resolvedEngineImage,
     engineRuntimeKind: resolvedRuntimeKind,
     nativeRuntimeLock: resolvedNativeRuntimeLock,

@@ -19,6 +19,8 @@ type ExecCommandResult = {
   stdout: string;
 };
 
+const ENGINE_FINGERPRINT_LABEL = "com.pixelated.runtime.fingerprint";
+
 export function getSafeEnv() {
   if (process.platform === "win32") {
     return process.env;
@@ -76,13 +78,49 @@ export function execFileCommand(
   });
 }
 
+async function readEngineImageFingerprint(
+  engineImage: string,
+  safeEnv: NodeJS.ProcessEnv,
+) {
+  try {
+    const result = await execFileCommand(
+      "docker",
+      [
+        "image",
+        "inspect",
+        "--format",
+        `{{ index .Config.Labels "${ENGINE_FINGERPRINT_LABEL}" }}`,
+        engineImage,
+      ],
+      { env: safeEnv },
+    );
+    const fingerprint = result.stdout.trim();
+    return fingerprint && fingerprint !== "<no value>" ? fingerprint : null;
+  } catch {
+    return null;
+  }
+}
+
+type PrepareEngineImageDependencies = {
+  readImageFingerprint: typeof readEngineImageFingerprint;
+  runCommand: typeof streamFile;
+};
+
+const defaultPrepareEngineImageDependencies: PrepareEngineImageDependencies = {
+  readImageFingerprint: readEngineImageFingerprint,
+  runCommand: streamFile,
+};
+
 export async function prepareEngineImage(
   event: IpcMainEvent,
   safeEnv: NodeJS.ProcessEnv,
   runtimeConfig: EngineRuntimeConfig = resolveEngineRuntimeConfig(),
+  dependencies: PrepareEngineImageDependencies = defaultPrepareEngineImageDependencies,
+  forceBuild = false,
 ) {
   const {
     engineImage,
+    engineFingerprint,
     engineRuntimeKind,
     nativeRuntimeLock,
     pullEngineImage,
@@ -96,7 +134,9 @@ export async function prepareEngineImage(
     emitEngineState(event, "PULLING_IMAGE", engineImage);
     event.reply("server-log", `Pulling engine image: ${engineImage}`);
     try {
-      await streamFile(event, "docker", ["pull", engineImage], { env: safeEnv });
+      await dependencies.runCommand(event, "docker", ["pull", engineImage], {
+        env: safeEnv,
+      });
       return;
     } catch (err) {
       if (!buildFallback) throw err;
@@ -104,6 +144,17 @@ export async function prepareEngineImage(
         "server-log",
         "Pull failed. Falling back to local engine image build.",
       );
+    }
+  }
+
+  if (!forceBuild) {
+    const existingFingerprint = await dependencies.readImageFingerprint(
+      engineImage,
+      safeEnv,
+    );
+    if (existingFingerprint === engineFingerprint) {
+      event.reply("server-log", `Reusing cached engine image: ${engineImage}`);
+      return;
     }
   }
 
@@ -116,6 +167,8 @@ export async function prepareEngineImage(
     engineRuntimeKind === "native_linux"
       ? [
           "build",
+          "--label",
+          `${ENGINE_FINGERPRINT_LABEL}=${engineFingerprint}`,
           "-t",
           engineImage,
           "-f",
@@ -126,9 +179,16 @@ export async function prepareEngineImage(
           `NATIVE_RUNTIME_LOCK_SHA256=${nativeRuntimeLock?.hash || "unknown"}`,
           ".",
         ]
-      : ["build", "-t", engineImage, "."];
+      : [
+          "build",
+          "--label",
+          `${ENGINE_FINGERPRINT_LABEL}=${engineFingerprint}`,
+          "-t",
+          engineImage,
+          ".",
+        ];
 
-  await streamFile(event, "docker", buildArgs, {
+  await dependencies.runCommand(event, "docker", buildArgs, {
     cwd: engineRuntimeDir,
     env: safeEnv,
   });
