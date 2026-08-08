@@ -3,7 +3,7 @@ import { useGameCatalogQuery } from "../../hooks/queryHooks";
 import { useEngineConnectionStatus } from "../../hooks/engine/useEngineConnectionStatus";
 import { getLocalVaultErrorMessage } from "../../lib/local-vault/localVaultClient";
 import { getPageSlice } from "../../components/ui/paginationUtils";
-import { searchAndRankGames } from "../../lib/search/gameSearch";
+import { searchAndRankGames } from "../../lib/gameSearch";
 import {
   getJoinInvite,
   getSessionFromInvite,
