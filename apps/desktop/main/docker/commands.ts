@@ -28,6 +28,8 @@ export function buildPrepareEngineVolumeArgs(engineImage: string) {
     "ALL",
     "--cap-add",
     "CHOWN",
+    "--cap-add",
+    "DAC_READ_SEARCH",
     "--security-opt",
     "no-new-privileges:true",
     "-v",

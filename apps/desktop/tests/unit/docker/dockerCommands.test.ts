@@ -34,7 +34,7 @@ test("Docker run arguments preserve environment values without shell quoting", (
   assert.equal(args.at(-1), "pixelated-engine:test");
 });
 
-test("ROM volume migration has no network and only the chown capability", () => {
+test("ROM volume migration has no network and only ownership migration capabilities", () => {
   assert.deepEqual(buildPrepareEngineVolumeArgs("pixelated-engine:test"), [
     "run",
     "--rm",
@@ -46,6 +46,8 @@ test("ROM volume migration has no network and only the chown capability", () => 
     "ALL",
     "--cap-add",
     "CHOWN",
+    "--cap-add",
+    "DAC_READ_SEARCH",
     "--security-opt",
     "no-new-privileges:true",
     "-v",
