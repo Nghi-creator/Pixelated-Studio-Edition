@@ -63,6 +63,18 @@ test("normal player policy preserves current controls and social behavior", () =
   });
 });
 
+test("research player policy keeps gameplay controls and suppresses social effects", () => {
+  assert.deepEqual(getPlayerExperiencePolicy("research"), {
+    allowAudioControls: true,
+    allowFullscreen: true,
+    allowKeyboardMapping: true,
+    allowLobbyAndSharing: false,
+    recordPlayCount: false,
+    showCommunity: false,
+    showStreamTelemetryControls: true,
+  });
+});
+
 test("research run config accepts a complete versioned configuration", () => {
   assert.equal(isResearchRunConfig(validConfig), true);
   assert.deepEqual(validateResearchRunConfig(validConfig), []);
@@ -131,4 +143,3 @@ test("bundle manifest v2 declares additive files and privacy omissions", () => {
   assert.equal(manifest.privacy.omittedFields.includes("shareUrl"), true);
   assert.equal(manifest.privacy.omittedFields.includes("engineToken"), true);
 });
-

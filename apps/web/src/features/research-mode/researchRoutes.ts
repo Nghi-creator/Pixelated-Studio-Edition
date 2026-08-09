@@ -9,3 +9,6 @@ export function getGameDestination(
     : `/play/${gameId}`;
 }
 
+export function getResearchPlayerDestination(gameId: string) {
+  return `/research/play/${gameId}`;
+}

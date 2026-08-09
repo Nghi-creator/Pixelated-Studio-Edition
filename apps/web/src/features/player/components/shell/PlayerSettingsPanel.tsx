@@ -22,6 +22,7 @@ export function PlayerSettingsPanel({
   onStop,
   onStreamProfileChange,
   selectedStreamProfileId,
+  showLobbyControls,
   streamProfiles,
 }: {
   canPauseStream: boolean;
@@ -38,6 +39,7 @@ export function PlayerSettingsPanel({
   onStop: () => void;
   onStreamProfileChange: (profileId: StreamProfileId) => void;
   selectedStreamProfileId: StreamProfileId;
+  showLobbyControls: boolean;
   streamProfiles: StreamProfile[];
 }) {
   const openTool = (callback: () => void) => {
@@ -101,17 +103,23 @@ export function PlayerSettingsPanel({
           {canRestartSession ? "Restart" : "Stop"}
         </button>
       </div>
-      <div className="relative mx-auto mt-4 grid w-full grid-cols-2 gap-2 border-t border-synth-border pt-4">
-        <button
-          className={menuButtonClass}
-          onClick={() => openTool(onOpenLobby)}
-          type="button"
-        >
-          Lobby
-          <span className="rounded-full border border-synth-border bg-synth-surface px-2 py-0.5 text-[10px] font-semibold text-gray-300">
-            {lobbyParticipantCount}
-          </span>
-        </button>
+      <div
+        className={`relative mx-auto mt-4 grid w-full gap-2 border-t border-synth-border pt-4 ${
+          showLobbyControls ? "grid-cols-2" : "grid-cols-1"
+        }`}
+      >
+        {showLobbyControls && (
+          <button
+            className={menuButtonClass}
+            onClick={() => openTool(onOpenLobby)}
+            type="button"
+          >
+            Lobby
+            <span className="rounded-full border border-synth-border bg-synth-surface px-2 py-0.5 text-[10px] font-semibold text-gray-300">
+              {lobbyParticipantCount}
+            </span>
+          </button>
+        )}
         <button
           className={menuButtonClass}
           onClick={() => openTool(onOpenKeyboard)}

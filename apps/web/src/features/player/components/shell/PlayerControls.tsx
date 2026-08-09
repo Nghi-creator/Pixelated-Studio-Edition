@@ -36,6 +36,7 @@ type PlayerControlsProps = {
   onVolumeChange: (volume: number) => void;
   pixelPerfect: boolean;
   selectedStreamProfileId: StreamProfileId;
+  showLobbyControls?: boolean;
   showStreamTelemetry: boolean;
   streamProfiles: StreamProfile[];
   volume: number;
@@ -63,6 +64,7 @@ export function PlayerControls({
   onVolumeChange,
   pixelPerfect,
   selectedStreamProfileId,
+  showLobbyControls = true,
   showStreamTelemetry,
   streamProfiles,
   volume,
@@ -222,6 +224,7 @@ export function PlayerControls({
             onStop={onStop}
             onStreamProfileChange={onStreamProfileChange}
             selectedStreamProfileId={selectedStreamProfileId}
+            showLobbyControls={showLobbyControls}
             streamProfiles={streamProfiles}
           />
         )}

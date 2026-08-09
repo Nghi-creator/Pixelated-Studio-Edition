@@ -12,8 +12,10 @@ import {
   LibraryGamePicker,
   type SavedGame,
 } from "../../features/favorites/components/LibraryGamePicker";
+import { useResearchMode } from "../../features/research-mode/useResearchMode";
 
 export default function Favorites() {
+  const { isResearchMode } = useResearchMode();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
@@ -116,6 +118,7 @@ export default function Favorites() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {favorites.map((game) => (
               <GameCard
+                experience={isResearchMode ? "research" : "normal"}
                 key={game.id}
                 id={game.id}
                 onFavoriteChange={(favorited) =>

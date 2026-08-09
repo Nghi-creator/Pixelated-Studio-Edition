@@ -19,6 +19,9 @@ import {
   CATALOG_PLATFORM_OPTIONS,
   formatGenre,
 } from "../../lib/catalogMetadata";
+import { ResearchModeToggle } from "../../features/research-mode/ResearchModeToggle";
+import { useResearchMode } from "../../features/research-mode/useResearchMode";
+import { ResearchModeBanner } from "../../features/research-mode/components/ResearchModeBanner";
 
 const GAMES_PER_PAGE = 15;
 const ZERO_PLAY_FEATURED_REFRESH_MS = 30_000;
@@ -51,6 +54,7 @@ function CatalogRefreshPanel({ label }: { label: string }) {
 }
 
 export default function Home() {
+  const { isResearchMode } = useResearchMode();
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [genreFilter, setGenreFilter] = useState("");
@@ -154,7 +158,10 @@ export default function Home() {
       {loading && featuredGames.length === 0 ? (
         <HeroSkeleton />
       ) : (
-        <HeroBanner featuredGames={featuredGames} />
+        <HeroBanner
+          experience={isResearchMode ? "research" : "normal"}
+          featuredGames={featuredGames}
+        />
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 w-full">
@@ -188,15 +195,18 @@ export default function Home() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <button
-                className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg border border-synth-secondary/40 bg-synth-bg px-4 text-sm font-semibold text-white transition-colors hover:border-synth-secondary hover:bg-synth-elevated disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-synth-bg"
-                disabled={!hasActiveFilters}
-                onClick={resetFilters}
-                type="button"
-              >
-                <RotateCcw className="h-4 w-4" />
-                Reset filters
-              </button>
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  className="inline-flex h-10 items-center justify-center gap-2 self-start rounded-lg border border-synth-secondary/40 bg-synth-bg px-4 text-sm font-semibold text-white transition-colors hover:border-synth-secondary hover:bg-synth-elevated disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-synth-bg"
+                  disabled={!hasActiveFilters}
+                  onClick={resetFilters}
+                  type="button"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  Reset filters
+                </button>
+                <ResearchModeToggle />
+              </div>
               <div className="grid w-full gap-3 sm:grid-cols-3 lg:max-w-3xl">
                 <AdminSelect
                   ariaLabel="Game system"
@@ -248,6 +258,7 @@ export default function Home() {
                 />
               </div>
             </div>
+            {isResearchMode && <ResearchModeBanner />}
           </div>
         )}
 
@@ -282,6 +293,7 @@ export default function Home() {
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
             {games.map((game) => (
               <GameCard
+                experience={isResearchMode ? "research" : "normal"}
                 key={game.id}
                 id={game.id}
                 title={game.title}

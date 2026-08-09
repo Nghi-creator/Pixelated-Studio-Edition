@@ -22,6 +22,9 @@ import { useStreamTelemetryRecording } from "../../features/player/hooks/telemet
 import { usePreventGameInputScroll } from "../../features/player/hooks/playback/usePreventGameInputScroll";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
 import { useWebRTC } from "../../features/player/hooks/webrtc/useWebRTC";
+import { ResearchModeBanner } from "../../features/research-mode/components/ResearchModeBanner";
+import { getPlayerExperiencePolicy } from "../../features/research-mode/playerExperience";
+import type { PlayerExperience } from "../../features/research-mode/researchRoutes";
 
 const PlayerCommunitySection = lazy(() =>
   import("../../features/player/components/community/PlayerCommunitySection").then(
@@ -46,7 +49,11 @@ function PlayerSectionLoading({ label }: { label: string }) {
   );
 }
 
-export default function Player() {
+export default function Player({
+  experience = "normal",
+}: {
+  experience?: PlayerExperience;
+}) {
   const { id } = useParams<{ id: string }>();
   const location = useLocation();
   const navigate = useNavigate();
@@ -58,6 +65,7 @@ export default function Player() {
   const [activePlayerTool, setActivePlayerTool] = useState<
     "keyboard" | "lobby" | null
   >(null);
+  const experiencePolicy = getPlayerExperiencePolicy(experience);
   const currentUser = useAuthUser();
   const { backRoute, backText, lobbySearch } = usePlayerNavigation(
     location,
@@ -132,7 +140,10 @@ export default function Player() {
   });
   const { authorName, gameRights, gameTitle } = useGameMetadata(id);
 
-  usePlayCount(id, Boolean(id && visibleFrameGameId === id));
+  usePlayCount(
+    id,
+    experiencePolicy.recordPlayCount && Boolean(id && visibleFrameGameId === id),
+  );
   const handleFirstVisibleFrame = useCallback(() => {
     setVisibleFrameGameId(id || null);
     recordResearchEvent("first_non_black_frame");
@@ -195,6 +206,11 @@ export default function Player() {
 
   return (
     <div className="flex flex-col items-center pt-24 pb-24 px-4 min-h-screen">
+      {experience === "research" && (
+        <div className="mb-3 w-full max-w-5xl">
+          <ResearchModeBanner allowExit={false} compact />
+        </div>
+      )}
       <PlayerHeader
         backRoute={backRoute}
         backText={backText}
@@ -234,7 +250,9 @@ export default function Player() {
               recordedCsvSamples={recordedCsvSamples}
               recordedCsvRevision={recordedCsvRevision}
               sessionId={sessionId}
-              shareUrl={shareInvite.url}
+              shareUrl={
+                experiencePolicy.allowLobbyAndSharing ? shareInvite.url : ""
+              }
               status={status}
               streamProfile={streamProfile}
               telemetry={telemetry}
@@ -252,6 +270,7 @@ export default function Player() {
               gameTitle={gameTitle}
               isPlaybackPaused={status === "playing" && isPlaybackPaused}
               isMuted={isMuted}
+              showLobbyControls={experiencePolicy.allowLobbyAndSharing}
               lobbyParticipantCount={
                 status === "playing" ? lobbyState?.participants.length || 0 : 0
               }
@@ -305,31 +324,35 @@ export default function Player() {
         />
       </div>
 
-      <LobbyPanel
-        currentParticipant={localParticipant}
-        inputCapabilities={inputCapabilities}
-        isOpen={activePlayerTool === "lobby"}
-        lobbyState={lobbyState}
-        onClose={() => setActivePlayerTool(null)}
-        onKickParticipant={kickParticipant}
-        onReleaseSlot={releasePlayerSlot}
-        onRequestSlot={requestPlayerSlot}
-        shareGuidance={shareInvite.guidance}
-        shareText={shareInvite.text}
-        shareUrl={shareInvite.url}
-      />
+      {experiencePolicy.allowLobbyAndSharing && (
+        <LobbyPanel
+          currentParticipant={localParticipant}
+          inputCapabilities={inputCapabilities}
+          isOpen={activePlayerTool === "lobby"}
+          lobbyState={lobbyState}
+          onClose={() => setActivePlayerTool(null)}
+          onKickParticipant={kickParticipant}
+          onReleaseSlot={releasePlayerSlot}
+          onRequestSlot={requestPlayerSlot}
+          shareGuidance={shareInvite.guidance}
+          shareText={shareInvite.text}
+          shareUrl={shareInvite.url}
+        />
+      )}
       {activePlayerTool === "keyboard" && (
         <KeyboardMappingDrawer onClose={() => setActivePlayerTool(null)} />
       )}
 
-      <Suspense fallback={<PlayerSectionLoading label="Loading community…" />}>
-        <PlayerCommunitySection
-          currentUser={currentUser}
-          gameId={id}
-          layoutClassName={playerLayoutClassName}
-          onSignIn={() => navigate("/login")}
-        />
-      </Suspense>
+      {experiencePolicy.showCommunity && (
+        <Suspense fallback={<PlayerSectionLoading label="Loading community…" />}>
+          <PlayerCommunitySection
+            currentUser={currentUser}
+            gameId={id}
+            layoutClassName={playerLayoutClassName}
+            onSignIn={() => navigate("/login")}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
