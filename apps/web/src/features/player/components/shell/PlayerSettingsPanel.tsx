@@ -9,6 +9,7 @@ const menuButtonClass =
 
 export function PlayerSettingsPanel({
   canPauseStream,
+  canRestartSession,
   canResetSession,
   canStopSession,
   isPlaybackPaused,
@@ -24,6 +25,7 @@ export function PlayerSettingsPanel({
   streamProfiles,
 }: {
   canPauseStream: boolean;
+  canRestartSession: boolean;
   canResetSession: boolean;
   canStopSession: boolean;
   isPlaybackPaused: boolean;
@@ -82,13 +84,21 @@ export function PlayerSettingsPanel({
         </button>
         <button
           className={menuButtonClass}
-          disabled={!canStopSession}
-          onClick={onStop}
-          title="Stop the remote game session"
+          disabled={canRestartSession ? false : !canStopSession}
+          onClick={canRestartSession ? onReset : onStop}
+          title={
+            canRestartSession
+              ? "Restart the stopped game session"
+              : "Stop the remote game session"
+          }
           type="button"
         >
-          <Square aria-hidden="true" className="h-4 w-4" />
-          Stop
+          {canRestartSession ? (
+            <RotateCcw aria-hidden="true" className="h-4 w-4" />
+          ) : (
+            <Square aria-hidden="true" className="h-4 w-4" />
+          )}
+          {canRestartSession ? "Restart" : "Stop"}
         </button>
       </div>
       <div className="relative mx-auto mt-4 grid w-full grid-cols-2 gap-2 border-t border-synth-border pt-4">
