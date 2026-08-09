@@ -11,19 +11,26 @@ import { useResearchRunEvents } from "./useResearchRunEvents";
 
 export function useResearchRunState({
   gameId,
+  initialMetadataForm,
   playerMode,
+  requestedRunId,
 }: {
   gameId: string | undefined;
+  initialMetadataForm?: ResearchRunMetadataForm;
   playerMode: "guest" | "host";
+  requestedRunId?: string;
 }) {
-  const [runId] = useState(() => createResearchRunId());
+  const [runId] = useState(() => requestedRunId || createResearchRunId());
   const sessionIdRef = useRef("");
-  const [metadataForm, setMetadataForm] = useState<ResearchRunMetadataForm>({
-    coldStart: false,
-    networkType: "",
-    notes: "",
-    scenario: "localhost",
-  });
+  const [metadataForm, setMetadataForm] = useState<ResearchRunMetadataForm>(
+    () =>
+      initialMetadataForm || {
+        coldStart: false,
+        networkType: "",
+        notes: "",
+        scenario: "localhost",
+      },
+  );
   const [baselineForm, setBaselineForm] = useState<ResearchBaselineForm>(() =>
     createEmptyResearchBaselineForm(),
   );
@@ -60,4 +67,3 @@ export function useResearchRunState({
     setSessionId,
   };
 }
-

@@ -3,7 +3,12 @@ import type { WebRTCResearchEventName } from "../../../lib/webrtc/types";
 export type ResearchRunEventName =
   | WebRTCResearchEventName
   | "first_non_black_frame"
-  | "play_clicked";
+  | "play_clicked"
+  | "research_recording_completed"
+  | "research_recording_started"
+  | "research_run_cancelled"
+  | "research_run_invalidated"
+  | "research_warmup_started";
 
 export type ResearchRunEvent = {
   capturedAt: string;

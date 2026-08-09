@@ -1,5 +1,6 @@
 import type { StreamProfileId } from "../../lib/engine/streamProfiles";
-import type { ResearchRunScenario } from "../player/research/researchRunMetadata";
+import type { ResearchRunScenario } from "../player/research/researchRunMetadata.ts";
+import { createResearchRunId } from "../player/research/researchRunMetadata.ts";
 
 export const RESEARCH_RUN_CONFIG_SCHEMA_VERSION = 1 as const;
 export const DEFAULT_RESEARCH_WARMUP_DURATION_MS = 10_000;
@@ -14,6 +15,8 @@ export type ResearchRunPhase =
   | "custom";
 
 export type ResearchRunConfig = {
+  audioMuted: boolean;
+  audioVolume: number;
   coldStart: boolean;
   comparisonCaseId: string;
   gameId: string;
@@ -66,6 +69,30 @@ function isBoundedInteger(value: unknown, minimum: number, maximum: number) {
   );
 }
 
+export function createDefaultResearchRunConfig(
+  gameId: string,
+): ResearchRunConfig {
+  return {
+    audioMuted: false,
+    audioVolume: 1,
+    coldStart: false,
+    comparisonCaseId: "",
+    gameId,
+    interventionLabel: "none",
+    networkType: "Localhost",
+    nodeLabel: "local-edge-node",
+    notes: "",
+    phase: "healthy",
+    recordingDurationMs: DEFAULT_RESEARCH_RECORDING_DURATION_MS,
+    runId: createResearchRunId(),
+    runtimeLabel: "docker-libretro",
+    scenario: "localhost",
+    schemaVersion: RESEARCH_RUN_CONFIG_SCHEMA_VERSION,
+    streamProfileId: "balanced",
+    warmupDurationMs: DEFAULT_RESEARCH_WARMUP_DURATION_MS,
+  };
+}
+
 export function validateResearchRunConfig(value: unknown): string[] {
   if (!isRecord(value)) return ["Run configuration must be an object."];
 
@@ -115,6 +142,17 @@ export function validateResearchRunConfig(value: unknown): string[] {
   if (typeof value.coldStart !== "boolean") {
     errors.push("Cold-start state is required.");
   }
+  if (typeof value.audioMuted !== "boolean") {
+    errors.push("Audio mute state is required.");
+  }
+  if (
+    typeof value.audioVolume !== "number" ||
+    !Number.isFinite(value.audioVolume) ||
+    value.audioVolume < 0 ||
+    value.audioVolume > 1
+  ) {
+    errors.push("Audio volume must be between zero and one.");
+  }
 
   const textFields = [
     "networkType",
@@ -126,11 +164,47 @@ export function validateResearchRunConfig(value: unknown): string[] {
   textFields.forEach((field) => {
     if (!isString(value[field])) errors.push(`${field} must be text.`);
   });
+  if (!isString(value.nodeLabel) || value.nodeLabel.trim().length === 0) {
+    errors.push("An anonymized node label is required.");
+  }
+  if (!isString(value.runtimeLabel) || value.runtimeLabel.trim().length === 0) {
+    errors.push("A runtime label is required.");
+  }
 
   return errors;
+}
+
+export function researchRunConfigForPhase(
+  config: ResearchRunConfig,
+  phase: ResearchRunPhase,
+): ResearchRunConfig {
+  if (phase === "healthy") {
+    return {
+      ...config,
+      interventionLabel: "none",
+      phase,
+      streamProfileId: "balanced",
+    };
+  }
+  if (phase === "degraded") {
+    return {
+      ...config,
+      interventionLabel: "bounded_cpu_pressure",
+      phase,
+      streamProfileId: "balanced",
+    };
+  }
+  if (phase === "relief") {
+    return {
+      ...config,
+      interventionLabel: "stream_profile_relief",
+      phase,
+      streamProfileId: "performance",
+    };
+  }
+  return { ...config, phase };
 }
 
 export function isResearchRunConfig(value: unknown): value is ResearchRunConfig {
   return validateResearchRunConfig(value).length === 0;
 }
-

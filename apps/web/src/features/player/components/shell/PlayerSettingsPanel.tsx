@@ -23,6 +23,7 @@ export function PlayerSettingsPanel({
   onStreamProfileChange,
   selectedStreamProfileId,
   showLobbyControls,
+  streamProfileLocked,
   streamProfiles,
 }: {
   canPauseStream: boolean;
@@ -40,6 +41,7 @@ export function PlayerSettingsPanel({
   onStreamProfileChange: (profileId: StreamProfileId) => void;
   selectedStreamProfileId: StreamProfileId;
   showLobbyControls: boolean;
+  streamProfileLocked: boolean;
   streamProfiles: StreamProfile[];
 }) {
   const openTool = (callback: () => void) => {
@@ -139,12 +141,18 @@ export function PlayerSettingsPanel({
               key={profile.id}
               type="button"
               onClick={() => onStreamProfileChange(profile.id)}
-              className={`min-h-14 rounded-lg border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary ${
+              disabled={streamProfileLocked}
+              className={`min-h-14 rounded-lg border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary disabled:cursor-not-allowed disabled:opacity-60 ${
                 isSelected
                   ? "border-synth-action-hover bg-synth-action text-white"
                   : "border-synth-border bg-synth-bg text-gray-400 hover:text-white"
               }`}
               aria-pressed={isSelected}
+              title={
+                streamProfileLocked
+                  ? "The stream profile is fixed for this research run"
+                  : undefined
+              }
             >
               <span className="block text-xs font-semibold sm:text-sm">
                 {profile.label}

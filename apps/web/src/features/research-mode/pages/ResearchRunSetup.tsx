@@ -1,13 +1,48 @@
 import { ArrowLeft, FlaskConical, Play } from "lucide-react";
+import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useGameMetadata } from "../../player/hooks/data/useGameMetadata";
 import { ResearchModeBanner } from "../components/ResearchModeBanner";
+import { ResearchRunSetupForm } from "../components/ResearchRunSetupForm";
 import { getResearchPlayerDestination } from "../researchRoutes";
+import {
+  createDefaultResearchRunConfig,
+  validateResearchRunConfig,
+} from "../researchRunConfig";
+import {
+  readActiveResearchRun,
+  writeActiveResearchRun,
+} from "../researchRunConfigStorage";
 
 export default function ResearchRunSetup() {
   const { id = "" } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { gameTitle } = useGameMetadata(id);
+  const [config, setConfig] = useState(() =>
+    readActiveResearchRun(window.sessionStorage, id) ||
+    createDefaultResearchRunConfig(id),
+  );
+  const [errors, setErrors] = useState<string[]>([]);
+
+  const startRun = () => {
+    const validationErrors = validateResearchRunConfig(config);
+    if (validationErrors.length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+    if (!writeActiveResearchRun(window.sessionStorage, config)) {
+      setErrors([
+        "The browser could not save this run configuration for the player.",
+      ]);
+      return;
+    }
+    navigate(getResearchPlayerDestination(id), {
+      state: {
+        backRoute: `/research/games/${id}/setup`,
+        backText: "Back to Research Setup",
+      },
+    });
+  };
 
   return (
     <div className="mx-auto min-h-[calc(100vh-4rem)] w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
@@ -35,17 +70,21 @@ export default function ResearchRunSetup() {
               {gameTitle || "Loading game…"}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-gray-300">
-              Open the shared player in Research Mode. This slice keeps the
-              existing Stream Stats recorder and TAR export while the automated
-              run form and countdown are added next.
+              Configure a reproducible run. The player waits for a connected,
+              visible stream, performs the warm-up and records automatically.
             </p>
           </div>
         </div>
 
-        <div className="mt-6 rounded-lg border border-synth-border bg-synth-bg p-4 text-sm text-gray-300">
-          Recording is currently manual: choose the stream profile in player
-          settings, then use Stream Stats to reset, record and export the bundle.
-        </div>
+        <ResearchRunSetupForm
+          config={config}
+          errors={errors}
+          onChange={(nextConfig) => {
+            setConfig(nextConfig);
+            setErrors([]);
+          }}
+          onSubmit={startRun}
+        />
 
         <div className="mt-6 flex flex-wrap justify-end gap-3">
           <button
@@ -57,14 +96,7 @@ export default function ResearchRunSetup() {
           </button>
           <button
             className="inline-flex items-center gap-2 rounded-lg border border-synth-action-hover bg-synth-action px-5 py-2.5 font-bold text-white transition-colors hover:brightness-110"
-            onClick={() =>
-              navigate(getResearchPlayerDestination(id), {
-                state: {
-                  backRoute: `/research/games/${id}/setup`,
-                  backText: "Back to Research Setup",
-                },
-              })
-            }
+            onClick={startRun}
             type="button"
           >
             <Play aria-hidden="true" className="h-5 w-5 fill-current" />
@@ -75,4 +107,3 @@ export default function ResearchRunSetup() {
     </div>
   );
 }
-

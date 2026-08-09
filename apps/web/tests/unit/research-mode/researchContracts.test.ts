@@ -25,6 +25,8 @@ import {
 } from "../../../src/features/player/research/researchBundleManifest.ts";
 
 const validConfig: ResearchRunConfig = {
+  audioMuted: false,
+  audioVolume: 1,
   coldStart: false,
   comparisonCaseId: "controlled-run-001",
   gameId: "fixture-game",

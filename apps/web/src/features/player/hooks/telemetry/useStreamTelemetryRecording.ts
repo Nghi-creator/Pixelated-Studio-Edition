@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WebRTCTelemetry } from "../../../../lib/webrtc/telemetry/webrtcTelemetry";
 import {
   createTelemetryCsvSample,
@@ -97,27 +97,34 @@ export function useStreamTelemetryRecording({
     status,
   ]);
 
-  const toggleCsvRecording = () => {
-    if (isRecordingCsv) {
-      setIsRecordingCsv(false);
-      setRecordingStartedAt(null);
-      return;
-    }
-
+  const startCsvRecording = useCallback(() => {
     recordingBuffer.clear();
     recordedRowCountRef.current = 0;
     setRecordedCsvRevision((revision) => revision + 1);
     setRecordingStartedAt(Date.now());
     setIsRecordingCsv(true);
-  };
+  }, [recordingBuffer]);
 
-  const clearTelemetryCsv = () => {
+  const stopCsvRecording = useCallback(() => {
+    setIsRecordingCsv(false);
+    setRecordingStartedAt(null);
+  }, []);
+
+  const toggleCsvRecording = useCallback(() => {
+    if (isRecordingCsv) {
+      stopCsvRecording();
+      return;
+    }
+    startCsvRecording();
+  }, [isRecordingCsv, startCsvRecording, stopCsvRecording]);
+
+  const clearTelemetryCsv = useCallback(() => {
     setIsRecordingCsv(false);
     recordingBuffer.clear();
     recordedRowCountRef.current = 0;
     setRecordedCsvRevision((revision) => revision + 1);
     setRecordingStartedAt(null);
-  };
+  }, [recordingBuffer]);
 
   const recordedCsvSamples = recordingBuffer.samples;
   const recordedCsvRowLabel = `${recordedCsvSamples.length} row${
@@ -145,7 +152,8 @@ export function useStreamTelemetryRecording({
     isRecordingCsv,
     recordedCsvSamples,
     recordedCsvRevision,
+    startCsvRecording,
+    stopCsvRecording,
     toggleCsvRecording,
   };
 }
-

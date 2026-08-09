@@ -15,6 +15,7 @@ import type {
 import { PlayerSettingsPanel } from "./PlayerSettingsPanel";
 
 type PlayerControlsProps = {
+  audioControlsDisabled?: boolean;
   canPauseStream: boolean;
   canRestartSession: boolean;
   canResetSession: boolean;
@@ -37,12 +38,14 @@ type PlayerControlsProps = {
   pixelPerfect: boolean;
   selectedStreamProfileId: StreamProfileId;
   showLobbyControls?: boolean;
+  streamProfileLocked?: boolean;
   showStreamTelemetry: boolean;
   streamProfiles: StreamProfile[];
   volume: number;
 };
 
 export function PlayerControls({
+  audioControlsDisabled = false,
   canPauseStream,
   canRestartSession,
   canResetSession,
@@ -67,6 +70,7 @@ export function PlayerControls({
   showLobbyControls = true,
   showStreamTelemetry,
   streamProfiles,
+  streamProfileLocked = false,
   volume,
 }: PlayerControlsProps) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -101,6 +105,7 @@ export function PlayerControls({
   }, [volume]);
 
   const handleMuteToggle = () => {
+    if (audioControlsDisabled) return;
     if (isMuted && volume === 0) {
       onVolumeChange(lastAudibleVolumeRef.current);
     } else if (!isMuted) {
@@ -109,6 +114,7 @@ export function PlayerControls({
     onMuteToggle();
   };
   const handleVolumeChange = (nextVolume: number) => {
+    if (audioControlsDisabled) return;
     onVolumeChange(nextVolume);
     if ((nextVolume === 0 && !isMuted) || (nextVolume > 0 && isMuted)) {
       onMuteToggle();
@@ -135,7 +141,8 @@ export function PlayerControls({
         <button
           type="button"
           onClick={handleMuteToggle}
-          className="inline-flex h-full w-10 shrink-0 items-center justify-center rounded-l-lg text-white transition-colors hover:bg-[#2B1720] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary"
+          disabled={audioControlsDisabled}
+          className="inline-flex h-full w-10 shrink-0 items-center justify-center rounded-l-lg text-white transition-colors hover:bg-[#2B1720] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={isMuted ? "Unmute game audio" : "Mute game audio"}
           title={isMuted ? "Unmute game audio" : "Mute game audio"}
         >
@@ -148,6 +155,7 @@ export function PlayerControls({
         <input
           aria-label="Game volume"
           className="mx-3 h-1.5 w-20 cursor-pointer accent-synth-secondary lg:w-28"
+          disabled={audioControlsDisabled}
           max="1"
           min="0"
           onChange={(event) =>
@@ -226,6 +234,7 @@ export function PlayerControls({
             selectedStreamProfileId={selectedStreamProfileId}
             showLobbyControls={showLobbyControls}
             streamProfiles={streamProfiles}
+            streamProfileLocked={streamProfileLocked}
           />
         )}
       </div>
