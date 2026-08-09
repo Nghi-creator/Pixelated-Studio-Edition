@@ -42,6 +42,7 @@ import { createCloudRomDownloader } from "./src/roms/cloudRomDownloader";
 import { createProcessManager } from "./src/runtime/processes/processManager";
 import { registerEngineErrorHandlers } from "./src/signaling/engineErrorHandlers";
 import { registerInputHandlers } from "./src/signaling/inputHandlers";
+import { canClaimTrustedCamera } from "./src/signaling/cameraAuthorization";
 import { createLobbyManager } from "./src/signaling/lobby/lobby";
 import {
   joinSession,
@@ -164,7 +165,19 @@ io.on("connection", (socket) => {
   socket.on("join-session", (rawPayload: unknown = {}) => {
     const payload = normalizeSocketPayload(rawPayload);
     const role = normalizeSocketRole(payload.role);
+    const accessScope = getSocketAccessScope(socket);
+    const trustedCamera = canClaimTrustedCamera(accessScope, role);
+
+    if (role === "camera" && !trustedCamera) {
+      socket.emit("engine-error", {
+        code: "engine_camera_role_forbidden",
+        message: "This connection cannot claim the camera role.",
+      });
+      return;
+    }
+
     socket.data.role = role;
+    socket.data.trustedCamera = trustedCamera;
     let sessionId: string | null;
 
     if (role === "camera") {

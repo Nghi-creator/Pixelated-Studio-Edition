@@ -183,6 +183,17 @@ export function isValidWebRtcOffer(payload: unknown) {
   );
 }
 
+export function isValidWebRtcAnswer(payload: unknown) {
+  if (!payload || typeof payload !== "object") return false;
+  const { sdp, type } = payload as { sdp?: unknown; type?: unknown };
+  return (
+    typeof sdp === "string" &&
+    sdp.length > 0 &&
+    sdp.length <= MAX_WEBRTC_SDP_LENGTH &&
+    type === "answer"
+  );
+}
+
 function payloadMatchesActiveSession(socket: Socket, payload: SessionPayload) {
   const activeSessionId = normalizeSessionId(socket.data.sessionId);
   const requestedSessionId = normalizeSessionId(payload.sessionId);
@@ -299,9 +310,8 @@ export function registerSignalingRelayHandlers(
 
   socket.on("python-ready", (payload: SessionPayload = {}) => {
     if (!consumeSignalingBudget()) return;
-    const accessScope = socket.handshake.headers["x-pixelated-access-scope"];
-    if (accessScope === "companion-guest" || accessScope === "companion-host") {
-      console.warn("[Node.js] Dropping python-ready from a browser companion");
+    if (socket.data.trustedCamera !== true) {
+      console.warn("[Node.js] Dropping python-ready from an untrusted socket");
       return;
     }
 
@@ -358,6 +368,9 @@ export function registerSignalingRelayHandlers(
 
   socket.on("webrtc-answer", (answer: SessionPayload = {}) => {
     if (!consumeSignalingBudget()) return;
+    if (socket.data.trustedCamera !== true) return;
+    if (!payloadMatchesActiveSession(socket, answer)) return;
+    if (!isValidWebRtcAnswer(answer)) return;
     relayToPeerOrSession(socket, "webrtc-answer", answer);
   });
 
@@ -376,7 +389,7 @@ export function registerSignalingRelayHandlers(
     "webrtc-ice-candidate-backend",
     (payload: CandidateEnvelope = {}) => {
       if (!consumeSignalingBudget()) return;
-      if (socket.data.role !== "camera") return;
+      if (socket.data.trustedCamera !== true) return;
       if (!payloadMatchesActiveSession(socket, payload)) return;
       const candidate = normalizeIceCandidate(payload);
       if (!candidate) return;
