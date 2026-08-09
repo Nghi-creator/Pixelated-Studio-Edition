@@ -16,6 +16,7 @@ import { PlayerSettingsPanel } from "./PlayerSettingsPanel";
 
 type PlayerControlsProps = {
   canPauseStream: boolean;
+  canRestartSession: boolean;
   canResetSession: boolean;
   canStopSession: boolean;
   gameTitle: string;
@@ -42,6 +43,7 @@ type PlayerControlsProps = {
 
 export function PlayerControls({
   canPauseStream,
+  canRestartSession,
   canResetSession,
   canStopSession,
   gameTitle,
@@ -99,6 +101,8 @@ export function PlayerControls({
   const handleMuteToggle = () => {
     if (isMuted && volume === 0) {
       onVolumeChange(lastAudibleVolumeRef.current);
+    } else if (!isMuted) {
+      onVolumeChange(0);
     }
     onMuteToggle();
   };
@@ -205,6 +209,7 @@ export function PlayerControls({
         {isSettingsOpen && (
           <PlayerSettingsPanel
             canPauseStream={canPauseStream}
+            canRestartSession={canRestartSession}
             canResetSession={canResetSession}
             canStopSession={canStopSession}
             isPlaybackPaused={isPlaybackPaused}

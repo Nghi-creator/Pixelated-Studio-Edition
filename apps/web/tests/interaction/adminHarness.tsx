@@ -295,6 +295,7 @@ export function AdminHarness() {
           controls={
             <PlayerControls
               canPauseStream={false}
+              canRestartSession={false}
               canResetSession
               canStopSession={false}
               gameTitle="Harness Game"

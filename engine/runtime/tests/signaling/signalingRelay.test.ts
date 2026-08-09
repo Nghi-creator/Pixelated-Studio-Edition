@@ -3,10 +3,12 @@ import { EventEmitter } from "node:events";
 import test from "node:test";
 import {
   createSignalingPeerRegistry,
+  isValidWebRtcAnswer,
   isValidWebRtcOffer,
   normalizeIceCandidate,
   registerSignalingRelayHandlers,
 } from "../../src/signaling/signalingRelay";
+import { canClaimTrustedCamera } from "../../src/signaling/cameraAuthorization";
 import { joinSession, normalizeSessionId } from "../../src/signaling/sessionRooms";
 
 class FakeSocket extends EventEmitter {
@@ -67,6 +69,26 @@ test("WebRTC offers are structurally validated before acquiring peer capacity", 
   assert.deepEqual(socket.data.webrtcPeerIds || [], []);
 });
 
+test("only raw engine connections can claim the camera role", () => {
+  assert.equal(canClaimTrustedCamera("raw", "camera"), true);
+  assert.equal(canClaimTrustedCamera("companion-host", "camera"), false);
+  assert.equal(canClaimTrustedCamera("companion-guest", "camera"), false);
+  assert.equal(canClaimTrustedCamera("raw", "host"), false);
+});
+
+test("WebRTC answers require a bounded answer SDP", () => {
+  assert.equal(isValidWebRtcAnswer({ sdp: "answer", type: "answer" }), true);
+  assert.equal(isValidWebRtcAnswer({ sdp: "answer", type: "offer" }), false);
+  assert.equal(isValidWebRtcAnswer({ type: "answer" }), false);
+  assert.equal(
+    isValidWebRtcAnswer({
+      sdp: "s".repeat(64 * 1024 + 1),
+      type: "answer",
+    }),
+    false,
+  );
+});
+
 test("switching sessions leaves the previous session and peer rooms", () => {
   const socket = new FakeSocket("browser-1");
   joinSession(socket as never, "session-1", "browser");
@@ -108,6 +130,7 @@ test("browser offer joins a peer room and relays to the session room", () => {
 test("camera answer with a peer id relays only to that peer room", () => {
   const socket = new FakeSocket("camera-1");
   socket.data.sessionId = "session-1";
+  socket.data.trustedCamera = true;
   registerSignalingRelayHandlers(socket as never);
 
   socket.emit("webrtc-answer", {
@@ -129,7 +152,7 @@ test("camera answer with a peer id relays only to that peer room", () => {
 test("camera ICE candidate preserves peer id when unwrapping candidate envelopes", () => {
   const socket = new FakeSocket("camera-1");
   socket.data.sessionId = "session-1";
-  socket.data.role = "camera";
+  socket.data.trustedCamera = true;
   registerSignalingRelayHandlers(socket as never);
 
   socket.emit("webrtc-ice-candidate-backend", {
@@ -363,11 +386,22 @@ test("signaling cannot target a different session than the active socket", () =>
 test("browser companions cannot impersonate the camera bridge", () => {
   const socket = new FakeSocket("guest-1");
   socket.handshake.headers["x-pixelated-access-scope"] = "companion-guest";
+  socket.data.sessionId = "session-1";
   registerSignalingRelayHandlers(socket as never);
 
   socket.emit("python-ready", { sessionId: "session-1" });
+  socket.emit("webrtc-answer", {
+    peerId: "peer-1",
+    sessionId: "session-1",
+    sdp: "answer",
+    type: "answer",
+  });
+  socket.emit("webrtc-ice-candidate-backend", {
+    candidate: { candidate: "candidate", sdpMLineIndex: 0 },
+    peerId: "peer-1",
+    sessionId: "session-1",
+  });
 
-  assert.equal(socket.data.sessionId, undefined);
   assert.deepEqual(socket.joins, []);
   assert.deepEqual(socket.relays, []);
 });

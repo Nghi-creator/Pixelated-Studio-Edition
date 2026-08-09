@@ -246,12 +246,15 @@ export default function Player() {
           controls={
             <PlayerControls
               canPauseStream={status === "playing"}
+              canRestartSession={playerMode === "host" && status === "idle"}
               canResetSession={playerMode === "host"}
               canStopSession={playerMode === "host" && status === "playing"}
               gameTitle={gameTitle}
               isPlaybackPaused={status === "playing" && isPlaybackPaused}
               isMuted={isMuted}
-              lobbyParticipantCount={lobbyState?.participants.length || 0}
+              lobbyParticipantCount={
+                status === "playing" ? lobbyState?.participants.length || 0 : 0
+              }
               onFullscreen={() => void streamStageRef.current?.requestFullscreen()}
               onMuteToggle={() => setIsMuted((muted) => !muted)}
               onOpenKeyboard={() => setActivePlayerTool("keyboard")}
