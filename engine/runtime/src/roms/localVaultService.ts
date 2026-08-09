@@ -20,6 +20,33 @@ export type VaultOwnerContext = {
 };
 
 type FileSystemError = Error & { code?: string };
+export const VAULT_STAT_CONCURRENCY = 16;
+
+export async function mapWithConcurrency<T, Result>(
+  items: T[],
+  concurrency: number,
+  mapper: (item: T, index: number) => Promise<Result>,
+) {
+  if (!Number.isInteger(concurrency) || concurrency <= 0) {
+    throw new Error("Concurrency must be a positive integer");
+  }
+
+  const results = new Array<Result>(items.length);
+  let nextIndex = 0;
+  const worker = async () => {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(items[index], index);
+    }
+  };
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker(),
+  );
+  await Promise.all(workers);
+  return results;
+}
 
 async function isRealDirectory(folderPath: string) {
   try {
@@ -72,19 +99,22 @@ export async function listVaultGames(context: VaultOwnerContext) {
   const userFolder = await resolveVaultFolder(context);
   const supportedExtensions = getSupportedExtensions();
   const entries = await fs.promises.readdir(userFolder, { withFileTypes: true });
-  const files = await Promise.all(
-    entries
-      .filter(
-        (entry) =>
-          entry.isFile() &&
-          supportedExtensions.some((extension) =>
-            entry.name.toLowerCase().endsWith(extension),
-          ),
-      )
-      .map(async (entry) => ({
-        name: entry.name,
-        time: (await fs.promises.stat(getVaultFilePath(userFolder, entry.name))).mtime.getTime(),
-      })),
+  const supportedFiles = entries.filter(
+    (entry) =>
+      entry.isFile() &&
+      supportedExtensions.some((extension) =>
+        entry.name.toLowerCase().endsWith(extension),
+      ),
+  );
+  const files = await mapWithConcurrency(
+    supportedFiles,
+    VAULT_STAT_CONCURRENCY,
+    async (entry) => ({
+      name: entry.name,
+      time: (
+        await fs.promises.stat(getVaultFilePath(userFolder, entry.name))
+      ).mtime.getTime(),
+    }),
   );
   return files.sort((a, b) => b.time - a.time).map((file) => file.name);
 }
