@@ -6,8 +6,10 @@ import {
   GameArtworkFallback,
 } from "./GameArtworkFallback";
 import { isGeneratedCatalogArtworkUrl } from "./gameArtworkUtils";
+import { getGameDestination } from "../../features/research-mode/researchRoutes";
 
 interface GameCardProps {
+  destination?: string;
   id: string;
   onFavoriteChange?: (favorited: boolean) => void;
   title: string;
@@ -15,6 +17,7 @@ interface GameCardProps {
 }
 
 export default function GameCard({
+  destination,
   id,
   onFavoriteChange,
   title,
@@ -48,7 +51,7 @@ export default function GameCard({
 
   return (
     <Link
-      to={`/play/${id}`}
+      to={destination || getGameDestination(id)}
       className="group relative block overflow-hidden rounded-lg border border-synth-border bg-synth-surface transition-colors hover:bg-synth-elevated"
     >
       <div className="overflow-hidden bg-synth-bg">

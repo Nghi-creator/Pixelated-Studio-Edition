@@ -13,6 +13,7 @@ import {
   GameArtworkFallback,
 } from "./GameArtworkFallback";
 import { isGeneratedCatalogArtworkUrl } from "./gameArtworkUtils";
+import { getGameDestination } from "../../features/research-mode/researchRoutes";
 
 interface Game {
   id: string;
@@ -151,7 +152,7 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
 
             <div className="flex flex-wrap gap-4">
               <button
-                onClick={() => navigate(`/play/${currentGame.id}`)}
+                onClick={() => navigate(getGameDestination(currentGame.id))}
                 type="button"
                 className="flex items-center gap-2 rounded-lg border border-synth-border bg-synth-primary px-6 py-2.5 font-bold text-white transition-colors hover:bg-synth-primary-hover active:scale-[0.98]"
               >

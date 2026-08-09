@@ -1,0 +1,4 @@
+captured_at,elapsed_ms,run_id,session_id,event,details_json
+2026-07-04T02:03:08.000Z,0,fixture-run-v1,fixture-session-v1,start_game_emitted,"{""streamProfileId"":""balanced""}"
+2026-07-04T02:03:09.000Z,1000,fixture-run-v1,fixture-session-v1,first_non_black_frame,
+

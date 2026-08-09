@@ -1,0 +1,28 @@
+{
+  "capturedAt": "2026-07-04T02:04:10.000Z",
+  "client": {
+    "userAgent": "Pixelated research bundle v1 fixture"
+  },
+  "game": {
+    "id": "fixture-game",
+    "title": "Fixture Game"
+  },
+  "networkType": "Ethernet",
+  "notes": "Sanitized compatibility fixture",
+  "playerMode": "host",
+  "runId": "fixture-run-v1",
+  "scenario": "localhost",
+  "schemaVersion": 1,
+  "sessionId": "fixture-session-v1",
+  "shareUrl": null,
+  "status": "playing",
+  "streamProfile": {
+    "bitrateKbps": 1400,
+    "fps": 60,
+    "id": "balanced"
+  },
+  "trial": {
+    "coldStart": false
+  }
+}
+
