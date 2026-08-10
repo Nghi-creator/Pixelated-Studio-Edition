@@ -44,7 +44,7 @@ export function ResearchRunHud({
   return (
     <section
       aria-live="polite"
-      className="mb-3 flex w-full flex-wrap items-center gap-3 rounded-lg border border-synth-border bg-synth-surface px-3 py-2 shadow-panel"
+      className="mt-3 flex w-full flex-wrap items-center gap-3 rounded-lg border border-synth-border bg-synth-surface px-3 py-2 shadow-panel"
       data-ignore-game-input
     >
       <span

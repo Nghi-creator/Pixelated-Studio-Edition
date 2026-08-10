@@ -342,19 +342,6 @@ function PlayerExperience({
 
   return (
     <div className="flex flex-col items-center pt-24 pb-24 px-4 min-h-screen">
-      {experience === "research" && (
-        <div className="w-full max-w-5xl">
-          <ResearchRunHud
-            config={controllerConfig}
-            computeSampleCount={engineTelemetryRecording.validComputeSampleCount}
-            onCancel={researchController.cancel}
-            onStop={researchController.stopEarly}
-            remainingMs={researchController.remainingMs}
-            sampleCount={recordedCsvSamples.length}
-            state={researchController.state}
-          />
-        </div>
-      )}
       <PlayerHeader
         backRoute={backRoute}
         backText={backText}
@@ -451,6 +438,20 @@ function PlayerExperience({
           videoRef={videoRef}
         />
       </PlayerStreamGrid>
+
+      {experience === "research" && (
+        <div className={`w-full ${playerLayoutClassName}`}>
+          <ResearchRunHud
+            config={controllerConfig}
+            computeSampleCount={engineTelemetryRecording.validComputeSampleCount}
+            onCancel={researchController.cancel}
+            onStop={researchController.stopEarly}
+            remainingMs={researchController.remainingMs}
+            sampleCount={recordedCsvSamples.length}
+            state={researchController.state}
+          />
+        </div>
+      )}
 
       <div
         className={`mt-3 flex w-full flex-wrap items-center justify-between gap-2 ${playerLayoutClassName}`}
