@@ -46,7 +46,7 @@ export default function ResearchRunSetup() {
   return (
     <div className="mx-auto min-h-[calc(100vh-4rem)] w-full max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
       <button
-        className="mb-6 inline-flex items-center gap-2 text-gray-400 transition-colors hover:text-white"
+        className="mb-3 inline-flex items-center gap-2 text-gray-400 transition-colors hover:text-white"
         onClick={() => navigate("/home")}
         type="button"
       >
@@ -54,7 +54,7 @@ export default function ResearchRunSetup() {
         Back to Cloud Library
       </button>
 
-      <section className="mt-6 rounded-lg border border-synth-border bg-synth-surface p-6 shadow-panel sm:p-8">
+      <section className="rounded-lg border border-synth-border bg-synth-surface p-6 shadow-panel sm:p-8">
         <div className="flex items-start gap-4">
           <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-synth-action-hover bg-synth-action text-white">
             <FlaskConical aria-hidden="true" className="h-6 w-6" />
