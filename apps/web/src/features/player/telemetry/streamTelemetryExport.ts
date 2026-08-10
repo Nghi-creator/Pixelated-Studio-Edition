@@ -1,18 +1,27 @@
 import type { WebRTCTelemetry } from "../../../lib/webrtc/telemetry/webrtcTelemetry";
 
 export type StreamTelemetryCsvSample = {
+  availableIncomingBitrateKbps: number | null;
   bitrateKbps: number | null;
   capturedAt: string;
   connectionState: string;
   elapsedMs: number;
+  decodeTimeMeanMs: number | null;
   fps: number | null;
+  framesDecoded: number | null;
+  framesDropped: number | null;
+  freezeCount: number | null;
+  freezeDurationTotalMs: number | null;
   gameId: string | null;
   iceConnectionState: string;
   jitterMs: number | null;
+  jitterBufferDelayMeanMs: number | null;
+  keyFramesDecoded: number | null;
   lastEngineError: string | null;
   packetsLostDelta: number;
   packetsLostTotal: number;
   playerMode: "guest" | "host";
+  roundTripTimeMs: number | null;
   sessionId: string;
   status: string;
 };
@@ -43,6 +52,15 @@ export const STREAM_TELEMETRY_CSV_HEADERS = [
   "ice_connection_state",
   "connection_state",
   "last_engine_error",
+  "round_trip_time_ms",
+  "frames_decoded",
+  "frames_dropped",
+  "decode_time_mean_ms",
+  "jitter_buffer_delay_mean_ms",
+  "freeze_count",
+  "freeze_duration_total_ms",
+  "key_frames_decoded",
+  "available_incoming_bitrate_kbps",
 ] as const;
 
 function csvCell(value: number | string | null) {
@@ -71,18 +89,27 @@ export function createTelemetryCsvSample({
   const capturedAtMs = Date.now();
 
   return {
+    availableIncomingBitrateKbps: telemetry.availableIncomingBitrateKbps,
     bitrateKbps: telemetry.bitrateKbps,
     capturedAt: new Date(capturedAtMs).toISOString(),
     connectionState: telemetry.connectionState,
+    decodeTimeMeanMs: telemetry.decodeTimeMeanMs,
     elapsedMs: Math.max(0, capturedAtMs - recordingStartedAt),
     fps: telemetry.fps,
+    framesDecoded: telemetry.framesDecoded,
+    framesDropped: telemetry.framesDropped,
+    freezeCount: telemetry.freezeCount,
+    freezeDurationTotalMs: telemetry.freezeDurationTotalMs,
     gameId: gameId || null,
     iceConnectionState: telemetry.iceConnectionState,
     jitterMs: telemetry.jitterMs,
+    jitterBufferDelayMeanMs: telemetry.jitterBufferDelayMeanMs,
+    keyFramesDecoded: telemetry.keyFramesDecoded,
     lastEngineError: telemetry.lastEngineError,
     packetsLostDelta: telemetry.packetsLost,
     packetsLostTotal: telemetry.packetsLost,
     playerMode,
+    roundTripTimeMs: telemetry.roundTripTimeMs,
     sessionId,
     status,
   };
@@ -107,6 +134,15 @@ export function streamTelemetrySamplesToCsv(
       sample.iceConnectionState,
       sample.connectionState,
       sample.lastEngineError,
+      sample.roundTripTimeMs,
+      sample.framesDecoded,
+      sample.framesDropped,
+      sample.decodeTimeMeanMs,
+      sample.jitterBufferDelayMeanMs,
+      sample.freezeCount,
+      sample.freezeDurationTotalMs,
+      sample.keyFramesDecoded,
+      sample.availableIncomingBitrateKbps,
     ]
       .map(csvCell)
       .join(","),

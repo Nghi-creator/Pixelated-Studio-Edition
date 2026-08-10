@@ -1,8 +1,17 @@
 export type WebRTCTelemetry = {
+  availableIncomingBitrateKbps: number | null;
   fps: number | null;
   bitrateKbps: number | null;
+  decodeTimeMeanMs: number | null;
+  framesDecoded: number | null;
+  framesDropped: number | null;
+  freezeCount: number | null;
+  freezeDurationTotalMs: number | null;
+  jitterBufferDelayMeanMs: number | null;
+  keyFramesDecoded: number | null;
   packetsLost: number;
   jitterMs: number | null;
+  roundTripTimeMs: number | null;
   iceConnectionState: RTCIceConnectionState;
   connectionState: RTCPeerConnectionState;
   lastEngineError: string | null;
@@ -10,31 +19,36 @@ export type WebRTCTelemetry = {
 };
 
 export const INITIAL_WEBRTC_TELEMETRY: WebRTCTelemetry = {
+  availableIncomingBitrateKbps: null,
   fps: null,
   bitrateKbps: null,
+  decodeTimeMeanMs: null,
+  framesDecoded: null,
+  framesDropped: null,
+  freezeCount: null,
+  freezeDurationTotalMs: null,
+  jitterBufferDelayMeanMs: null,
+  keyFramesDecoded: null,
   packetsLost: 0,
   jitterMs: null,
+  roundTripTimeMs: null,
   iceConnectionState: "new",
   connectionState: "new",
   lastEngineError: null,
   lastUpdatedAt: null,
 };
 
-type InboundRtpStats = RTCStats & {
-  bytesReceived?: number;
-  framesPerSecond?: number;
-  jitter?: number;
-  kind?: string;
-  mediaType?: string;
-  packetsLost?: number;
-};
+import {
+  createWebRTCStatsParserState,
+  parseWebRTCStats,
+  type WebRTCStatsRecord,
+} from "./webrtcStatsParser.ts";
 
 export const startWebRTCTelemetry = (
   peerConnection: RTCPeerConnection,
   onTelemetry: (telemetry: Partial<WebRTCTelemetry>) => void,
 ) => {
-  let previousBytesReceived: number | null = null;
-  let previousTimestamp: number | null = null;
+  let parserState = createWebRTCStatsParserState();
   let pollInFlight = false;
   let stopped = false;
 
@@ -57,57 +71,15 @@ export const startWebRTCTelemetry = (
       pollInFlight = false;
     }
     if (stopped) return;
-    let inboundBytesReceived = 0;
-    let fps: number | null = null;
-    let packetsLost = 0;
-    let jitterSeconds: number | null = null;
-    let newestTimestamp: number | null = null;
-
+    const reports: WebRTCStatsRecord[] = [];
     stats.forEach((report) => {
-      if (report.type !== "inbound-rtp") return;
-
-      const inbound = report as InboundRtpStats;
-      const kind = inbound.kind || inbound.mediaType;
-
-      if (Number.isFinite(inbound.bytesReceived)) {
-        inboundBytesReceived += inbound.bytesReceived || 0;
-      }
-      if (Number.isFinite(inbound.packetsLost)) {
-        packetsLost += inbound.packetsLost || 0;
-      }
-      if (Number.isFinite(inbound.timestamp)) {
-        newestTimestamp = Math.max(newestTimestamp || 0, inbound.timestamp);
-      }
-
-      if (kind === "video" && typeof inbound.framesPerSecond === "number") {
-        fps = inbound.framesPerSecond;
-      }
-
-      if (typeof inbound.jitter === "number") {
-        jitterSeconds = Math.max(jitterSeconds || 0, inbound.jitter);
-      }
+      reports.push(report as WebRTCStatsRecord);
     });
-
-    let bitrateKbps: number | null = null;
-    if (
-      previousBytesReceived !== null &&
-      previousTimestamp !== null &&
-      newestTimestamp !== null &&
-      newestTimestamp > previousTimestamp
-    ) {
-      const bytesDelta = inboundBytesReceived - previousBytesReceived;
-      const secondsDelta = (newestTimestamp - previousTimestamp) / 1000;
-      bitrateKbps = Math.max(0, (bytesDelta * 8) / secondsDelta / 1000);
-    }
-
-    previousBytesReceived = inboundBytesReceived;
-    previousTimestamp = newestTimestamp;
+    const parsed = parseWebRTCStats(reports, parserState);
+    parserState = parsed.state;
 
     onTelemetry({
-      fps,
-      bitrateKbps,
-      packetsLost: Math.max(0, Math.round(packetsLost)),
-      jitterMs: jitterSeconds === null ? null : jitterSeconds * 1000,
+      ...parsed.metrics,
       iceConnectionState: peerConnection.iceConnectionState,
       connectionState: peerConnection.connectionState,
       lastUpdatedAt: Date.now(),
@@ -142,4 +114,3 @@ export const startWebRTCTelemetry = (
     );
   };
 };
-

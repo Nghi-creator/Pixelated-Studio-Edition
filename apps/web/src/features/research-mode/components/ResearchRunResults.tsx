@@ -72,6 +72,19 @@ export function ResearchRunResults({
           ["Latest FPS", formatMetric(telemetry.fps)],
           ["Latest bitrate", formatMetric(telemetry.bitrateKbps, " kbps")],
           ["Latest jitter", formatMetric(telemetry.jitterMs, " ms")],
+          ["Latest RTT", formatMetric(telemetry.roundTripTimeMs, " ms")],
+          ["Mean decode", formatMetric(telemetry.decodeTimeMeanMs, " ms")],
+          [
+            "Mean jitter buffer",
+            formatMetric(telemetry.jitterBufferDelayMeanMs, " ms"),
+          ],
+          ["Frames decoded", formatMetric(telemetry.framesDecoded)],
+          ["Frames dropped", formatMetric(telemetry.framesDropped)],
+          ["Freeze count", formatMetric(telemetry.freezeCount)],
+          [
+            "Available incoming",
+            formatMetric(telemetry.availableIncomingBitrateKbps, " kbps"),
+          ],
           ["Packet loss total", String(telemetry.packetsLost)],
           ["ICE", telemetry.iceConnectionState],
           ["Completion", state.completionKind || state.stage],
@@ -118,4 +131,3 @@ export function ResearchRunResults({
     </section>
   );
 }
-

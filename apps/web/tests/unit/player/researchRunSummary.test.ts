@@ -12,18 +12,27 @@ import {
 import type { StreamTelemetryCsvSample } from "../../../src/features/player/telemetry/streamTelemetryExport.ts";
 
 const baseSample: StreamTelemetryCsvSample = {
+  availableIncomingBitrateKbps: null,
   bitrateKbps: 1000,
   capturedAt: "2026-07-04T02:03:04.000Z",
   connectionState: "connected",
+  decodeTimeMeanMs: null,
   elapsedMs: 0,
   fps: 60,
+  framesDecoded: null,
+  framesDropped: null,
+  freezeCount: null,
+  freezeDurationTotalMs: null,
   gameId: "beat-beast",
   iceConnectionState: "connected",
   jitterMs: 4,
+  jitterBufferDelayMeanMs: null,
+  keyFramesDecoded: null,
   lastEngineError: null,
   packetsLostDelta: 0,
   packetsLostTotal: 0,
   playerMode: "host",
+  roundTripTimeMs: null,
   sessionId: "session-1",
   status: "playing",
 };

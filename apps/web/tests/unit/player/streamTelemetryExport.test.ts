@@ -10,20 +10,42 @@ import {
 } from "../../../src/features/player/telemetry/streamTelemetryExport.ts";
 import { renderStreamTelemetryGraphPng } from "../../../src/features/player/telemetry/streamTelemetryGraphPng.ts";
 
+const unsupportedBrowserMetrics = {
+  availableIncomingBitrateKbps: null,
+  decodeTimeMeanMs: null,
+  framesDecoded: null,
+  framesDropped: null,
+  freezeCount: null,
+  freezeDurationTotalMs: null,
+  jitterBufferDelayMeanMs: null,
+  keyFramesDecoded: null,
+  roundTripTimeMs: null,
+} as const;
+
 test("stream telemetry csv export includes stable research columns", () => {
   const sample: StreamTelemetryCsvSample = {
+    ...unsupportedBrowserMetrics,
+    availableIncomingBitrateKbps: 2400,
     bitrateKbps: 991.2,
     capturedAt: "2026-07-04T00:46:56.000Z",
     connectionState: "connected",
     elapsedMs: 1000,
+    decodeTimeMeanMs: 2.5,
     fps: 60,
+    framesDecoded: 600,
+    framesDropped: 2,
+    freezeCount: 1,
+    freezeDurationTotalMs: 120,
     gameId: "beat-beast",
     iceConnectionState: "connected",
     jitterMs: 4,
+    jitterBufferDelayMeanMs: 3,
+    keyFramesDecoded: 4,
     lastEngineError: null,
     packetsLostDelta: 0,
     packetsLostTotal: 1,
     playerMode: "host",
+    roundTripTimeMs: 12,
     sessionId: "session-1",
     status: "running",
   };
@@ -31,14 +53,15 @@ test("stream telemetry csv export includes stable research columns", () => {
   assert.equal(
     streamTelemetrySamplesToCsv([sample]),
     [
-      "captured_at,elapsed_ms,session_id,game_id,player_mode,status,fps,bitrate_kbps,packets_lost_total,packets_lost_delta,jitter_ms,ice_connection_state,connection_state,last_engine_error",
-      "2026-07-04T00:46:56.000Z,1000,session-1,beat-beast,host,running,60,991.2,1,1,4,connected,connected,",
+      "captured_at,elapsed_ms,session_id,game_id,player_mode,status,fps,bitrate_kbps,packets_lost_total,packets_lost_delta,jitter_ms,ice_connection_state,connection_state,last_engine_error,round_trip_time_ms,frames_decoded,frames_dropped,decode_time_mean_ms,jitter_buffer_delay_mean_ms,freeze_count,freeze_duration_total_ms,key_frames_decoded,available_incoming_bitrate_kbps",
+      "2026-07-04T00:46:56.000Z,1000,session-1,beat-beast,host,running,60,991.2,1,1,4,connected,connected,,12,600,2,2.5,3,1,120,4,2400",
     ].join("\n"),
   );
 });
 
 test("stream telemetry csv export quotes comma and newline values", () => {
   const sample: StreamTelemetryCsvSample = {
+    ...unsupportedBrowserMetrics,
     bitrateKbps: null,
     capturedAt: "2026-07-04T00:46:56.000Z",
     connectionState: "failed",
@@ -63,6 +86,7 @@ test("stream telemetry csv export quotes comma and newline values", () => {
 
 test("stream telemetry csv neutralizes spreadsheet formulas", () => {
   const sample: StreamTelemetryCsvSample = {
+    ...unsupportedBrowserMetrics,
     bitrateKbps: null,
     capturedAt: "2026-07-04T00:46:56.000Z",
     connectionState: "failed",
@@ -81,11 +105,12 @@ test("stream telemetry csv neutralizes spreadsheet formulas", () => {
 
   const csv = streamTelemetrySamplesToCsv([sample]);
   assert.match(csv, /"'=HYPERLINK\(""https:\/\/example\.test""\)"/);
-  assert.match(csv, /,'\+cmd$/);
+  assert.match(csv, /,failed,'\+cmd,/);
 });
 
 test("stream telemetry csv export adds packet loss deltas", () => {
   const baseSample: StreamTelemetryCsvSample = {
+    ...unsupportedBrowserMetrics,
     bitrateKbps: 900,
     capturedAt: "2026-07-04T00:46:56.000Z",
     connectionState: "connected",
@@ -109,10 +134,10 @@ test("stream telemetry csv export adds packet loss deltas", () => {
       { ...baseSample, capturedAt: "2026-07-04T00:46:58.000Z", packetsLostTotal: 4 },
     ]),
     [
-      "captured_at,elapsed_ms,session_id,game_id,player_mode,status,fps,bitrate_kbps,packets_lost_total,packets_lost_delta,jitter_ms,ice_connection_state,connection_state,last_engine_error",
-      "2026-07-04T00:46:56.000Z,0,session-1,beat-beast,host,playing,60,900,1,1,4,connected,connected,",
-      "2026-07-04T00:46:57.000Z,0,session-1,beat-beast,host,playing,60,900,1,0,4,connected,connected,",
-      "2026-07-04T00:46:58.000Z,0,session-1,beat-beast,host,playing,60,900,4,3,4,connected,connected,",
+      "captured_at,elapsed_ms,session_id,game_id,player_mode,status,fps,bitrate_kbps,packets_lost_total,packets_lost_delta,jitter_ms,ice_connection_state,connection_state,last_engine_error,round_trip_time_ms,frames_decoded,frames_dropped,decode_time_mean_ms,jitter_buffer_delay_mean_ms,freeze_count,freeze_duration_total_ms,key_frames_decoded,available_incoming_bitrate_kbps",
+      "2026-07-04T00:46:56.000Z,0,session-1,beat-beast,host,playing,60,900,1,1,4,connected,connected,,,,,,,,,,",
+      "2026-07-04T00:46:57.000Z,0,session-1,beat-beast,host,playing,60,900,1,0,4,connected,connected,,,,,,,,,,",
+      "2026-07-04T00:46:58.000Z,0,session-1,beat-beast,host,playing,60,900,4,3,4,connected,connected,,,,,,,,,,",
     ].join("\n"),
   );
 });
