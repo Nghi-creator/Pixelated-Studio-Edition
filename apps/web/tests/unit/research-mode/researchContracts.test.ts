@@ -127,6 +127,9 @@ test("bundle manifest v2 declares additive files and privacy omissions", () => {
       name,
       required: true,
     })),
+    measurementSupport: {
+      "encoder_pipeline.pipelineDelayProxyMs": "unsupported",
+    },
     phase: "degraded",
     runId: "run-001-degraded",
     telemetrySources: {
@@ -144,4 +147,9 @@ test("bundle manifest v2 declares additive files and privacy omissions", () => {
   assert.equal(manifest.privacy.sanitized, true);
   assert.equal(manifest.privacy.omittedFields.includes("shareUrl"), true);
   assert.equal(manifest.privacy.omittedFields.includes("engineToken"), true);
+  assert.equal(manifest.privacy.omittedFields.includes("notes"), true);
+  assert.equal(
+    manifest.measurementSupport["encoder_pipeline.pipelineDelayProxyMs"],
+    "unsupported",
+  );
 });

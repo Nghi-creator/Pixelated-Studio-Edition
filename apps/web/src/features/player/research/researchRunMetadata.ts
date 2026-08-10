@@ -41,6 +41,11 @@ export type ResearchRunMetadata = {
   };
 };
 
+export type SanitizedResearchRunMetadata = Omit<
+  ResearchRunMetadata,
+  "notes" | "shareUrl"
+>;
+
 function createResearchRunRandomPart(recordedAt: Date) {
   const cryptoApi =
     typeof globalThis !== "undefined" ? globalThis.crypto : undefined;
@@ -128,6 +133,22 @@ export function createResearchRunMetadata({
 }
 
 export function researchRunMetadataToJson(metadata: ResearchRunMetadata) {
+  return `${JSON.stringify(metadata, null, 2)}\n`;
+}
+
+export function sanitizeResearchRunMetadata(
+  metadata: ResearchRunMetadata,
+): SanitizedResearchRunMetadata {
+  return Object.fromEntries(
+    Object.entries(metadata).filter(
+      ([key]) => key !== "notes" && key !== "shareUrl",
+    ),
+  ) as SanitizedResearchRunMetadata;
+}
+
+export function sanitizedResearchRunMetadataToJson(
+  metadata: SanitizedResearchRunMetadata,
+) {
   return `${JSON.stringify(metadata, null, 2)}\n`;
 }
 

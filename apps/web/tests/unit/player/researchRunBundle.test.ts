@@ -8,7 +8,10 @@ import {
 } from "../../../src/features/player/research/researchRunBundle.ts";
 import {
   RESEARCH_BUNDLE_V1_REQUIRED_FILES,
+  RESEARCH_BUNDLE_V2_REQUIRED_FILES,
 } from "../../../src/features/player/research/researchBundleManifest.ts";
+import { createResearchBundleV2Files } from "../../../src/features/player/research/researchBundleV2.ts";
+import { createResearchRunExportArtifacts } from "../../../src/features/player/research/researchRunExportArtifacts.ts";
 
 const v1FixtureDirectory = fileURLToPath(
   new URL("../../fixtures/research-bundle-v1/", import.meta.url),
@@ -77,6 +80,84 @@ test("research run bundle filenames are filesystem-safe tar names", () => {
       runId: "edge:run:1",
     }),
     "pixelated-research-bundle-Beat-Beast-edge-study-edge-run-1-2026-07-04T02-03-04-000Z.tar",
+  );
+  assert.equal(
+    createResearchRunBundleFilename({
+      gameId: "Beat Beast",
+      phase: "degraded",
+      recordedAt: new Date("2026-07-04T02:03:04.000Z"),
+      runId: "edge:run:1",
+    }),
+    "pixelated-research-bundle-Beat-Beast-degraded-edge-run-1-2026-07-04T02-03-04-000Z.tar",
+  );
+});
+
+test("research bundle v2 composer adds a matching manifest", () => {
+  const contentFiles = RESEARCH_BUNDLE_V2_REQUIRED_FILES.filter(
+    (name) => name !== "bundle-manifest.json",
+  ).map((name) => ({ data: `${name}\n`, name }));
+  const files = createResearchBundleV2Files({
+    comparisonCaseId: "case-1",
+    contentFiles,
+    createdAt: new Date("2026-08-10T00:00:00.000Z"),
+    measurementSupport: {
+      "encoder_pipeline.pipelineDelayProxyMs": "unsupported",
+    },
+    phase: "relief",
+    runId: "run-1",
+    telemetrySources: {
+      browser_webrtc: "supported",
+      encoder_pipeline: "supported",
+      engine_runtime: "supported",
+    },
+  });
+  const manifest = JSON.parse(String(files[0].data)) as {
+    files: Array<{ name: string }>;
+    measurementSupport: Record<string, string>;
+    phase: string;
+    schemaVersion: number;
+  };
+
+  assert.deepEqual(
+    manifest.files.map((file) => file.name),
+    files.map((file) => file.name),
+  );
+  assert.equal(manifest.schemaVersion, 2);
+  assert.equal(manifest.phase, "relief");
+  assert.equal(
+    manifest.measurementSupport["encoder_pipeline.pipelineDelayProxyMs"],
+    "unsupported",
+  );
+});
+
+test("research export artifacts preserve browser-only missing evidence", () => {
+  const files = createResearchRunExportArtifacts({
+    baselineJson: "{}\n",
+    comparisonCaseId: "case-1",
+    engineSamples: [],
+    events: [],
+    graphPng: null,
+    metadataJson: "{}\n",
+    phase: "healthy",
+    recordedAt: new Date("2026-08-10T00:00:00.000Z"),
+    runId: "run-1",
+    samples: [],
+    summaryJson: "{}\n",
+  });
+  const manifest = JSON.parse(String(files[0].data)) as {
+    measurementSupport: Record<string, string>;
+    telemetrySources: Record<string, string>;
+  };
+
+  assert.deepEqual(
+    files.map((file) => file.name),
+    [...RESEARCH_BUNDLE_V2_REQUIRED_FILES, "browser-baseline.json"],
+  );
+  assert.equal(manifest.telemetrySources.engine_runtime, "unavailable");
+  assert.equal(manifest.telemetrySources.encoder_pipeline, "unavailable");
+  assert.equal(
+    manifest.measurementSupport["encoder_pipeline.pipelineDelayProxyMs"],
+    "unsupported",
   );
 });
 

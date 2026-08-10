@@ -1,5 +1,6 @@
 import { useCallback, useMemo } from "react";
 import type { StreamProfile } from "../../../../lib/engine/streamProfiles";
+import type { ResearchRunPhase } from "../../../research-mode/researchRunConfig";
 import { downloadBlob, downloadText } from "../../downloadFile";
 import {
   createResearchBaseline,
@@ -10,8 +11,11 @@ import {
 import {
   createResearchRunBundleFilename,
   createResearchRunBundleTar,
-  type ResearchRunBundleFile,
 } from "../../research/researchRunBundle";
+import {
+  buildResearchRunGraphPng,
+  createResearchRunExportArtifacts,
+} from "../../research/researchRunExportArtifacts";
 import {
   createResearchRunEventsFilename,
   findFirstEventElapsedMs,
@@ -22,6 +26,8 @@ import {
   createResearchRunMetadata,
   createResearchRunMetadataFilename,
   researchRunMetadataToJson,
+  sanitizeResearchRunMetadata,
+  sanitizedResearchRunMetadataToJson,
   type ResearchRunMetadataForm,
 } from "../../research/researchRunMetadata";
 import {
@@ -29,28 +35,23 @@ import {
   createResearchRunSummaryFilename,
   researchRunSummaryToJson,
 } from "../../research/researchRunSummary";
-import { createStreamTelemetryGraphPngBytes } from "../../telemetry/streamTelemetryGraphPng";
 import {
-  addPacketLossDeltas,
   createStreamTelemetryGraphFilename,
-  streamTelemetrySamplesToCsv,
   type StreamTelemetryCsvSample,
-  type StreamTelemetryGraphSample,
 } from "../../telemetry/streamTelemetryExport";
 import type { StreamTelemetryHistorySample } from "../telemetry/useStreamTelemetryHistory";
-import {
-  engineResearchTelemetrySamplesToCsv,
-  type EngineResearchTelemetrySample,
-} from "../../telemetry/engineResearchTelemetry";
+import type { EngineResearchTelemetrySample } from "../../telemetry/engineResearchTelemetry";
 
 export function useResearchRunExports({
   baselineForm,
+  comparisonCaseId,
   events,
   form,
   gameId,
   gameTitle,
   history,
   playerMode,
+  phase = "custom",
   recordedEngineSamples = [],
   recordedCsvSnapshot,
   runId,
@@ -60,12 +61,14 @@ export function useResearchRunExports({
   streamProfile,
 }: {
   baselineForm: ResearchBaselineForm;
+  comparisonCaseId?: string;
   events: ResearchRunEvent[];
   form: ResearchRunMetadataForm;
   gameId: string | undefined;
   gameTitle: string;
   history: StreamTelemetryHistorySample[];
   playerMode: "guest" | "host";
+  phase?: ResearchRunPhase;
   recordedEngineSamples?: EngineResearchTelemetrySample[];
   recordedCsvSnapshot: {
     revision: number;
@@ -78,7 +81,10 @@ export function useResearchRunExports({
   streamProfile: StreamProfile;
 }) {
   const isBrowserBaseline = form.scenario === "browser_only_baseline";
+  const requiresComputeTelemetry = !isBrowserBaseline;
+  const resolvedComparisonCaseId = comparisonCaseId?.trim() || runId;
   const recordedCsvSamples = recordedCsvSnapshot.samples;
+  const latestCapturedAt = recordedCsvSamples.at(-1)?.capturedAt;
   const getRecordedCsvSamples = useCallback(
     () => recordedCsvSnapshot.samples,
     [recordedCsvSnapshot],
@@ -114,6 +120,18 @@ export function useResearchRunExports({
     [createMetadata],
   );
 
+  const sanitizedBundleMetadata = useMemo(
+    () =>
+      sanitizeResearchRunMetadata(
+        createMetadata(latestCapturedAt ? new Date(latestCapturedAt) : new Date()),
+      ),
+    [createMetadata, latestCapturedAt],
+  );
+  const bundleMetadataJson = useMemo(
+    () => sanitizedResearchRunMetadataToJson(sanitizedBundleMetadata),
+    [sanitizedBundleMetadata],
+  );
+
   const buildBaselineJson = useCallback(
     (capturedAt: Date) => researchBaselineToJson(
       createResearchBaseline({
@@ -128,12 +146,21 @@ export function useResearchRunExports({
 
   const createSummary = useCallback((generatedAt = new Date()) =>
     createResearchRunSummary({
+      engineSamples: recordedEngineSamples,
       events,
       generatedAt,
+      requiresComputeTelemetry,
       runId,
       samples: getRecordedCsvSamples(),
       sessionId,
-    }), [events, getRecordedCsvSamples, runId, sessionId]);
+    }), [
+      events,
+      getRecordedCsvSamples,
+      recordedEngineSamples,
+      requiresComputeTelemetry,
+      runId,
+      sessionId,
+    ]);
 
   const buildSummaryJson = useCallback(
     (generatedAt: Date) => researchRunSummaryToJson(createSummary(generatedAt)),
@@ -141,28 +168,11 @@ export function useResearchRunExports({
   );
 
   const buildGraphPng = useCallback(() => {
-    const samples = getRecordedCsvSamples();
-    const graphSamples: StreamTelemetryGraphSample[] =
-      samples.length > 0
-        ? addPacketLossDeltas(samples)
-        : history.map((sample, index) => ({
-            bitrateKbps: sample.bitrateKbps,
-            elapsedMs: index * 1000,
-            fps: sample.fps,
-            jitterMs: sample.jitterMs,
-            packetsLostDelta:
-              index === 0
-                ? sample.packetsLost
-                : Math.max(
-                    0,
-                    sample.packetsLost - history[index - 1].packetsLost,
-                  ),
-            packetsLostTotal: sample.packetsLost,
-          }));
-
-    return createStreamTelemetryGraphPngBytes(graphSamples, {
+    return buildResearchRunGraphPng({
       gameTitle,
+      history,
       playerMode,
+      samples: getRecordedCsvSamples(),
       status,
     });
   }, [
@@ -224,49 +234,22 @@ export function useResearchRunExports({
   const exportBundle = useCallback(async () => {
     const recordedAt = new Date();
     const samples = getRecordedCsvSamples();
-    const files: ResearchRunBundleFile[] = [
-      {
-        data: buildMetadataJson(recordedAt),
-        name: "run-metadata.json",
-      },
-      {
-        data: streamTelemetrySamplesToCsv(samples),
-        name: "stream-telemetry.csv",
-      },
-      {
-        data: researchRunEventsToCsv(events),
-        name: "stream-events.csv",
-      },
-      {
-        data: buildSummaryJson(recordedAt),
-        name: "summary.json",
-      },
-    ];
-
-    if (recordedEngineSamples.length > 0) {
-      files.push({
-        data: engineResearchTelemetrySamplesToCsv(recordedEngineSamples),
-        name: "engine-telemetry.csv",
-      });
-    }
-
-    if (isBrowserBaseline) {
-      files.push({
-        data: buildBaselineJson(recordedAt),
-        name: "browser-baseline.json",
-      });
-    }
-
-    const graphPng = buildGraphPng();
-    if (graphPng) {
-      files.push({
-        data: graphPng,
-        name: "performance-network.png",
-      });
-    }
+    const files = createResearchRunExportArtifacts({
+      baselineJson: isBrowserBaseline ? buildBaselineJson(recordedAt) : undefined,
+      comparisonCaseId: resolvedComparisonCaseId,
+      engineSamples: recordedEngineSamples,
+      events,
+      graphPng: buildGraphPng(),
+      metadataJson: bundleMetadataJson,
+      phase,
+      recordedAt,
+      runId,
+      samples,
+      summaryJson: buildSummaryJson(recordedAt),
+    });
 
     await downloadBlob(
-      createResearchRunBundleFilename({ gameId, recordedAt, runId }),
+      createResearchRunBundleFilename({ gameId, phase, recordedAt, runId }),
       new Blob([createResearchRunBundleTar(files, recordedAt)], {
         type: "application/x-tar",
       }),
@@ -274,13 +257,15 @@ export function useResearchRunExports({
   }, [
     buildBaselineJson,
     buildGraphPng,
-    buildMetadataJson,
     buildSummaryJson,
+    bundleMetadataJson,
     events,
     gameId,
     getRecordedCsvSamples,
     isBrowserBaseline,
+    phase,
     recordedEngineSamples,
+    resolvedComparisonCaseId,
     runId,
   ]);
 
@@ -293,6 +278,7 @@ export function useResearchRunExports({
     canExportEvents: events.length > 0,
     canExportGraph: recordedCsvSamples.length > 0 || history.length > 0,
     canExportSummary: events.length > 0 || recordedCsvSamples.length > 0,
+    bundleMetadataJson,
     exportBaseline,
     exportBundle,
     exportEvents,

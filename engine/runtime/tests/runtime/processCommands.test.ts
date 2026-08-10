@@ -49,9 +49,13 @@ test("camera bridge publishes bounded atomic encoder telemetry", () => {
     path.resolve(process.cwd(), "camera.py"),
     "utf8",
   );
+  const cameraStateSource = fs.readFileSync(
+    path.resolve(process.cwd(), "camera_state.py"),
+    "utf8",
+  );
 
   assert.match(cameraSource, /PIXELATED_CAMERA_TELEMETRY_STATE_PATH/);
-  assert.match(cameraSource, /os\.replace\(temporary_path, file_path\)/);
-  assert.match(cameraSource, /framesDroppedTotal/);
-  assert.match(cameraSource, /pipelineDelayProxyMs': None/);
+  assert.match(cameraStateSource, /os\.replace\(temporary_path, file_path\)/);
+  assert.match(cameraStateSource, /framesDroppedTotal/);
+  assert.match(cameraStateSource, /["']pipelineDelayProxyMs["']:\s*None/);
 });

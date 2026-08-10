@@ -1,3 +1,9 @@
+import type { ResearchRunPhase } from "../../research-mode/researchRunConfig.ts";
+import {
+  createPlayerArtifactFilename,
+  sanitizeArtifactFilenamePart,
+} from "../artifactFilename.ts";
+
 export type ResearchRunBundleFile = {
   data: string | Uint8Array;
   name: string;
@@ -90,21 +96,19 @@ export function createResearchRunBundleTar(
 
 export function createResearchRunBundleFilename({
   gameId,
+  phase,
   recordedAt = new Date(),
   runId,
 }: {
   gameId: string | undefined;
+  phase?: ResearchRunPhase;
   recordedAt?: Date;
   runId: string;
 }) {
   return createPlayerArtifactFilename({
     extension: "tar",
-    identity: [gameId || "game", runId],
+    identity: [gameId || "game", ...(phase ? [phase] : []), runId],
     prefix: "pixelated-research-bundle",
     recordedAt,
   });
 }
-import {
-  createPlayerArtifactFilename,
-  sanitizeArtifactFilenamePart,
-} from "../artifactFilename.ts";

@@ -64,7 +64,7 @@ COPY --from=app-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=app-builder /app/dist /app/dist
 COPY --from=app-builder /app/node_modules /app/node_modules
 COPY --from=python-builder /out /usr/local/lib/pixelated-python
-COPY camera.py input_gamepad.py input_keyboard.py /app/
+COPY camera.py camera_config.py camera_protocol.py camera_state.py input_gamepad.py input_keyboard.py /app/
 COPY native-runtime.lock.json /app/native-runtime.lock.json
 
 WORKDIR /app

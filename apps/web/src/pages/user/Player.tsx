@@ -317,14 +317,16 @@ function PlayerExperience({
     sessionId,
     shareContext,
   });
-  const { canExportBundle, exportBundle } = useResearchRunExports({
+  const { bundleMetadataJson, canExportBundle, exportBundle } = useResearchRunExports({
     baselineForm: researchBaselineForm,
+    comparisonCaseId: controllerConfig.comparisonCaseId,
     events: researchEvents,
     form: researchMetadataForm,
     gameId: id,
     gameTitle,
     history: [],
     playerMode,
+    phase: controllerConfig.phase,
     recordedEngineSamples: engineTelemetryRecording.recordedEngineSamples,
     recordedCsvSnapshot: {
       revision: recordedCsvRevision,
@@ -481,6 +483,7 @@ function PlayerExperience({
             computeSampleCount={engineTelemetryRecording.validComputeSampleCount}
             latestEncoderSample={engineTelemetryRecording.latestEncoderSample}
             latestEngineSample={engineTelemetryRecording.latestEngineSample}
+            metadataPreviewJson={bundleMetadataJson}
             onExport={() => void exportBundle()}
             onRetake={() => {
               const nextConfig = {

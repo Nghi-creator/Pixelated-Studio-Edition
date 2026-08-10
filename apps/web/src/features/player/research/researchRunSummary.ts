@@ -3,6 +3,9 @@ import type {
   ResearchRunEventName,
 } from "./researchRunEvents";
 import type { StreamTelemetryCsvSample } from "../telemetry/streamTelemetryExport";
+import type { EngineResearchTelemetrySample } from "../telemetry/engineResearchTelemetry";
+
+export const RESEARCH_RUN_SUMMARY_SCHEMA_VERSION = 2 as const;
 
 export type ResearchRunMetricSummary = {
   max: number | null;
@@ -17,8 +20,18 @@ export type ResearchRunSummary = {
   generatedAt: string;
   metrics: {
     bitrateKbps: ResearchRunMetricSummary;
+    decodeTimeMeanMs: ResearchRunMetricSummary;
     fps: ResearchRunMetricSummary;
     jitterMs: ResearchRunMetricSummary;
+    jitterBufferDelayMeanMs: ResearchRunMetricSummary;
+    roundTripTimeMs: ResearchRunMetricSummary;
+  };
+  compute: {
+    cameraCpuPercent: ResearchRunMetricSummary;
+    emulatorCpuPercent: ResearchRunMetricSummary;
+    encoderFramesDroppedLatest: number | null;
+    encoderQueueLevelBuffers: ResearchRunMetricSummary;
+    nodeCpuPercent: ResearchRunMetricSummary;
   };
   packetLoss: {
     lossPerMinute: number | null;
@@ -30,6 +43,7 @@ export type ResearchRunSummary = {
     sampleCount: number;
   };
   runId: string;
+  schemaVersion: typeof RESEARCH_RUN_SUMMARY_SCHEMA_VERSION;
   sessionId: string;
   stability: {
     disconnectCount: number;
@@ -40,6 +54,15 @@ export type ResearchRunSummary = {
     firstFrameMs: number | null;
     pythonReadyMs: number | null;
     startGameMs: number | null;
+  };
+  validity: {
+    isValid: boolean;
+    reasons: string[];
+    sources: {
+      browserWebrtc: { availableSampleCount: number; sampleCount: number };
+      encoderPipeline: { availableSampleCount: number; sampleCount: number };
+      engineRuntime: { availableSampleCount: number; sampleCount: number };
+    };
   };
 };
 
@@ -115,12 +138,16 @@ function findFirstEventElapsedMs(
 export function createResearchRunSummary({
   events,
   generatedAt = new Date(),
+  engineSamples = [],
+  requiresComputeTelemetry = false,
   runId,
   samples,
   sessionId,
 }: {
   events: ResearchRunEvent[];
+  engineSamples?: EngineResearchTelemetrySample[];
   generatedAt?: Date;
+  requiresComputeTelemetry?: boolean;
   runId: string;
   samples: StreamTelemetryCsvSample[];
   sessionId: string;
@@ -133,14 +160,59 @@ export function createResearchRunSummary({
     0,
   );
   const durationMinutes = durationMs / 60_000;
+  const engineRuntimeSamples = engineSamples.filter(
+    (sample) => sample.source === "engine_runtime",
+  );
+  const encoderPipelineSamples = engineSamples.filter(
+    (sample) => sample.source === "encoder_pipeline",
+  );
+  const availableEngineSamples = engineRuntimeSamples.filter(
+    (sample) => sample.available,
+  );
+  const availableEncoderSamples = encoderPipelineSamples.filter(
+    (sample) => sample.available,
+  );
+  const validityReasons: string[] = [];
+  if (samples.length === 0) validityReasons.push("Browser WebRTC telemetry is unavailable.");
+  if (requiresComputeTelemetry && availableEngineSamples.length === 0) {
+    validityReasons.push("Engine runtime telemetry is unavailable.");
+  }
+  if (requiresComputeTelemetry && availableEncoderSamples.length === 0) {
+    validityReasons.push("Encoder pipeline telemetry is unavailable.");
+  }
 
   return {
+    compute: {
+      cameraCpuPercent: metricSummary(
+        engineRuntimeSamples.map((sample) => sample.cameraCpuPercent),
+      ),
+      emulatorCpuPercent: metricSummary(
+        engineRuntimeSamples.map((sample) => sample.emulatorCpuPercent),
+      ),
+      encoderFramesDroppedLatest:
+        encoderPipelineSamples.at(-1)?.framesDroppedTotal ?? null,
+      encoderQueueLevelBuffers: metricSummary(
+        encoderPipelineSamples.map((sample) => sample.queueLevelBuffers),
+      ),
+      nodeCpuPercent: metricSummary(
+        engineRuntimeSamples.map((sample) => sample.nodeCpuPercent),
+      ),
+    },
     eventCount: events.length,
     generatedAt: generatedAt.toISOString(),
     metrics: {
       bitrateKbps: metricSummary(samples.map((sample) => sample.bitrateKbps)),
+      decodeTimeMeanMs: metricSummary(
+        samples.map((sample) => sample.decodeTimeMeanMs),
+      ),
       fps: metricSummary(samples.map((sample) => sample.fps)),
       jitterMs: metricSummary(samples.map((sample) => sample.jitterMs)),
+      jitterBufferDelayMeanMs: metricSummary(
+        samples.map((sample) => sample.jitterBufferDelayMeanMs),
+      ),
+      roundTripTimeMs: metricSummary(
+        samples.map((sample) => sample.roundTripTimeMs),
+      ),
     },
     packetLoss: {
       lossPerMinute:
@@ -155,6 +227,7 @@ export function createResearchRunSummary({
       sampleCount: samples.length,
     },
     runId,
+    schemaVersion: RESEARCH_RUN_SUMMARY_SCHEMA_VERSION,
     sessionId,
     stability: {
       disconnectCount: countEvents(
@@ -176,6 +249,24 @@ export function createResearchRunSummary({
       firstFrameMs: findFirstEventElapsedMs(events, "first_non_black_frame"),
       pythonReadyMs: findFirstEventElapsedMs(events, "python_ready"),
       startGameMs: findFirstEventElapsedMs(events, "start_game_emitted"),
+    },
+    validity: {
+      isValid: validityReasons.length === 0,
+      reasons: validityReasons,
+      sources: {
+        browserWebrtc: {
+          availableSampleCount: samples.length,
+          sampleCount: samples.length,
+        },
+        encoderPipeline: {
+          availableSampleCount: availableEncoderSamples.length,
+          sampleCount: encoderPipelineSamples.length,
+        },
+        engineRuntime: {
+          availableSampleCount: availableEngineSamples.length,
+          sampleCount: engineRuntimeSamples.length,
+        },
+      },
     },
   };
 }

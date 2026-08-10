@@ -17,6 +17,7 @@ export function ResearchRunResults({
   computeSampleCount = 0,
   latestEncoderSample = null,
   latestEngineSample = null,
+  metadataPreviewJson,
   onExport,
   onReturnToLibrary,
   onRetake,
@@ -28,6 +29,7 @@ export function ResearchRunResults({
   computeSampleCount?: number;
   latestEncoderSample?: EngineResearchTelemetrySample | null;
   latestEngineSample?: EngineResearchTelemetrySample | null;
+  metadataPreviewJson: string;
   onExport: () => void;
   onReturnToLibrary: () => void;
   onRetake: () => void;
@@ -128,6 +130,15 @@ export function ResearchRunResults({
           </div>
         ))}
       </dl>
+
+      <details className="mt-5 rounded-lg border border-synth-border bg-synth-bg">
+        <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-white">
+          Preview sanitized bundle metadata
+        </summary>
+        <pre className="max-h-64 overflow-auto border-t border-synth-border px-4 py-3 text-xs text-gray-300">
+          {metadataPreviewJson}
+        </pre>
+      </details>
 
       <div className="mt-5 flex flex-wrap justify-end gap-3">
         <button

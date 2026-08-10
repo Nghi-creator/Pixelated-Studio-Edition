@@ -37,6 +37,7 @@ export type ResearchBundleManifest = {
   };
   runId: string;
   schemaVersion: typeof RESEARCH_BUNDLE_SCHEMA_VERSION;
+  measurementSupport: Record<string, ResearchMeasurementSupport>;
   telemetrySources: Record<ResearchTelemetrySource, ResearchMeasurementSupport>;
 };
 
@@ -44,6 +45,7 @@ export function createResearchBundleManifest({
   comparisonCaseId,
   createdAt = new Date(),
   files,
+  measurementSupport = {},
   phase,
   runId,
   telemetrySources,
@@ -51,6 +53,7 @@ export function createResearchBundleManifest({
   comparisonCaseId: string;
   createdAt?: Date;
   files: ResearchBundleManifest["files"];
+  measurementSupport?: ResearchBundleManifest["measurementSupport"];
   phase: ResearchRunPhase;
   runId: string;
   telemetrySources: ResearchBundleManifest["telemetrySources"];
@@ -65,6 +68,7 @@ export function createResearchBundleManifest({
       omittedFields: [
         "engineToken",
         "shareUrl",
+        "notes",
         "hostname",
         "username",
         "absolutePath",
@@ -74,7 +78,7 @@ export function createResearchBundleManifest({
     },
     runId,
     schemaVersion: RESEARCH_BUNDLE_SCHEMA_VERSION,
+    measurementSupport,
     telemetrySources,
   };
 }
-
