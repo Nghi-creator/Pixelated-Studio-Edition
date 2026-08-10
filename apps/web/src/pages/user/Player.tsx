@@ -24,7 +24,6 @@ import { useEngineResearchTelemetryRecording } from "../../features/player/hooks
 import { usePreventGameInputScroll } from "../../features/player/hooks/playback/usePreventGameInputScroll";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
 import { useWebRTC } from "../../features/player/hooks/webrtc/useWebRTC";
-import { ResearchModeBanner } from "../../features/research-mode/components/ResearchModeBanner";
 import { ResearchRunHud } from "../../features/research-mode/components/ResearchRunHud";
 import { ResearchRunResults } from "../../features/research-mode/components/ResearchRunResults";
 import { getPlayerExperiencePolicy } from "../../features/research-mode/playerExperience";
@@ -94,7 +93,6 @@ function MissingResearchRunSetup({ gameId }: { gameId?: string }) {
 
   return (
     <div className="mx-auto min-h-screen w-full max-w-3xl px-4 pt-28">
-      <ResearchModeBanner allowExit={false} />
       <section className="mt-6 rounded-lg border border-synth-border bg-synth-surface p-6 text-center shadow-panel">
         <h1 className="text-2xl font-extrabold text-white">
           Research setup required
@@ -346,7 +344,6 @@ function PlayerExperience({
     <div className="flex flex-col items-center pt-24 pb-24 px-4 min-h-screen">
       {experience === "research" && (
         <div className="w-full max-w-5xl">
-          <ResearchModeBanner allowExit={false} compact />
           <ResearchRunHud
             config={controllerConfig}
             computeSampleCount={engineTelemetryRecording.validComputeSampleCount}

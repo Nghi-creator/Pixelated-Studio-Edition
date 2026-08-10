@@ -21,7 +21,6 @@ import {
 } from "../../lib/catalogMetadata";
 import { ResearchModeToggle } from "../../features/research-mode/ResearchModeToggle";
 import { useResearchMode } from "../../features/research-mode/useResearchMode";
-import { ResearchModeBanner } from "../../features/research-mode/components/ResearchModeBanner";
 
 const GAMES_PER_PAGE = 15;
 const ZERO_PLAY_FEATURED_REFRESH_MS = 30_000;
@@ -258,7 +257,6 @@ export default function Home() {
                 />
               </div>
             </div>
-            {isResearchMode && <ResearchModeBanner />}
           </div>
         )}
 

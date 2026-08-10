@@ -2,7 +2,6 @@ import { ArrowLeft, FlaskConical, Play } from "lucide-react";
 import { useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useGameMetadata } from "../../player/hooks/data/useGameMetadata";
-import { ResearchModeBanner } from "../components/ResearchModeBanner";
 import { ResearchRunSetupForm } from "../components/ResearchRunSetupForm";
 import { getResearchPlayerDestination } from "../researchRoutes";
 import {
@@ -54,8 +53,6 @@ export default function ResearchRunSetup() {
         <ArrowLeft aria-hidden="true" className="h-5 w-5" />
         Back to Cloud Library
       </button>
-
-      <ResearchModeBanner />
 
       <section className="mt-6 rounded-lg border border-synth-border bg-synth-surface p-6 shadow-panel sm:p-8">
         <div className="flex items-start gap-4">

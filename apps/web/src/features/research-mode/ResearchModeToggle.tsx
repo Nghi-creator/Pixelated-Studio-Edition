@@ -1,4 +1,3 @@
-import { FlaskConical } from "lucide-react";
 import { useResearchMode } from "./useResearchMode";
 
 export function ResearchModeToggle() {
@@ -16,11 +15,7 @@ export function ResearchModeToggle() {
       role="switch"
       type="button"
     >
-      <FlaskConical aria-hidden="true" className="h-4 w-4" />
-      Research Mode
-      <span className="text-xs text-current/70">
-        {isResearchMode ? "On" : "Off"}
-      </span>
+      {isResearchMode ? "Research mode" : "Normal mode"}
     </button>
   );
 }
