@@ -77,3 +77,14 @@ test("encoder telemetry state rejects stale and cross-session payloads", () => {
   assert.equal(stale.available, false);
   assert.match(stale.error || "", /stale/);
 });
+
+test("encoder telemetry state rejects oversized payloads", () => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), "encoder-state-"));
+  const filePath = path.join(directory, "telemetry.json");
+  fs.writeFileSync(filePath, "x".repeat(64 * 1024 + 1));
+
+  const state = readEncoderTelemetryState(filePath, "session-1");
+
+  assert.equal(state.available, false);
+  assert.match(state.error || "", /too large/);
+});

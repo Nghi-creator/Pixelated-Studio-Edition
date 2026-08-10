@@ -49,14 +49,15 @@ export function readEncoderTelemetryState(
   const now = options.now || Date.now;
   const staleAfterMs =
     options.staleAfterMs ?? DEFAULT_ENCODER_TELEMETRY_STALE_MS;
+  let fileDescriptor: number | null = null;
   try {
-    if (fs.statSync(filePath).size > MAX_ENCODER_TELEMETRY_BYTES) {
+    fileDescriptor = fs.openSync(filePath, "r");
+    if (fs.fstatSync(fileDescriptor).size > MAX_ENCODER_TELEMETRY_BYTES) {
       return unavailable("Encoder telemetry state is too large.");
     }
-    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as Record<
-      string,
-      unknown
-    >;
+    const parsed = JSON.parse(
+      fs.readFileSync(fileDescriptor, "utf8"),
+    ) as Record<string, unknown>;
     if (parsed.schemaVersion !== 1 || parsed.sessionId !== expectedSessionId) {
       return unavailable("Encoder telemetry does not match the active session.");
     }
@@ -83,5 +84,9 @@ export function readEncoderTelemetryState(
     };
   } catch {
     return unavailable("Encoder telemetry state is unavailable.");
+  } finally {
+    if (fileDescriptor !== null) {
+      fs.closeSync(fileDescriptor);
+    }
   }
 }
