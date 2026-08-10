@@ -38,6 +38,10 @@ import {
   type StreamTelemetryGraphSample,
 } from "../../telemetry/streamTelemetryExport";
 import type { StreamTelemetryHistorySample } from "../telemetry/useStreamTelemetryHistory";
+import {
+  engineResearchTelemetrySamplesToCsv,
+  type EngineResearchTelemetrySample,
+} from "../../telemetry/engineResearchTelemetry";
 
 export function useResearchRunExports({
   baselineForm,
@@ -47,6 +51,7 @@ export function useResearchRunExports({
   gameTitle,
   history,
   playerMode,
+  recordedEngineSamples = [],
   recordedCsvSnapshot,
   runId,
   sessionId,
@@ -61,6 +66,7 @@ export function useResearchRunExports({
   gameTitle: string;
   history: StreamTelemetryHistorySample[];
   playerMode: "guest" | "host";
+  recordedEngineSamples?: EngineResearchTelemetrySample[];
   recordedCsvSnapshot: {
     revision: number;
     samples: StreamTelemetryCsvSample[];
@@ -237,6 +243,13 @@ export function useResearchRunExports({
       },
     ];
 
+    if (recordedEngineSamples.length > 0) {
+      files.push({
+        data: engineResearchTelemetrySamplesToCsv(recordedEngineSamples),
+        name: "engine-telemetry.csv",
+      });
+    }
+
     if (isBrowserBaseline) {
       files.push({
         data: buildBaselineJson(recordedAt),
@@ -267,6 +280,7 @@ export function useResearchRunExports({
     gameId,
     getRecordedCsvSamples,
     isBrowserBaseline,
+    recordedEngineSamples,
     runId,
   ]);
 
@@ -295,4 +309,3 @@ export function useResearchRunExports({
     summary,
   };
 }
-

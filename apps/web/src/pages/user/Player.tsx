@@ -20,6 +20,7 @@ import { useStreamPlayback } from "../../features/player/hooks/playback/useStrea
 import { useResearchRunState } from "../../features/player/hooks/research/useResearchRunState";
 import { useResearchRunExports } from "../../features/player/hooks/research/useResearchRunExports";
 import { useStreamTelemetryRecording } from "../../features/player/hooks/telemetry/useStreamTelemetryRecording";
+import { useEngineResearchTelemetryRecording } from "../../features/player/hooks/telemetry/useEngineResearchTelemetryRecording";
 import { usePreventGameInputScroll } from "../../features/player/hooks/playback/usePreventGameInputScroll";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
 import { useWebRTC } from "../../features/player/hooks/webrtc/useWebRTC";
@@ -280,8 +281,16 @@ function PlayerExperience({
   const [controllerConfig] = useState(() =>
     researchConfig || createDefaultResearchRunConfig(id || ""),
   );
+  const engineTelemetryRecording = useEngineResearchTelemetryRecording({
+    enabled: experience === "research",
+    gameId: id || "",
+    isRecording: isRecordingCsv,
+    runId: researchRunId,
+    sessionId,
+  });
   const researchController = useResearchRunController({
     config: controllerConfig,
+    computeSampleCount: engineTelemetryRecording.validComputeSampleCount,
     currentProfileId: streamProfileId,
     enabled: experience === "research",
     firstFrameObserved: visibleFrameGameId === id,
@@ -294,6 +303,9 @@ function PlayerExperience({
     onStartRecording: startCsvRecording,
     onStopRecording: stopCsvRecording,
     recordEvent: recordResearchEvent,
+    requiresComputeTelemetry:
+      experience === "research" &&
+      controllerConfig.scenario !== "browser_only_baseline",
     sampleCount: recordedCsvSamples.length,
     sessionId,
   });
@@ -313,6 +325,7 @@ function PlayerExperience({
     gameTitle,
     history: [],
     playerMode,
+    recordedEngineSamples: engineTelemetryRecording.recordedEngineSamples,
     recordedCsvSnapshot: {
       revision: recordedCsvRevision,
       samples: recordedCsvSamples,
@@ -334,6 +347,7 @@ function PlayerExperience({
           <ResearchModeBanner allowExit={false} compact />
           <ResearchRunHud
             config={controllerConfig}
+            computeSampleCount={engineTelemetryRecording.validComputeSampleCount}
             onCancel={researchController.cancel}
             onStop={researchController.stopEarly}
             remainingMs={researchController.remainingMs}
@@ -464,6 +478,9 @@ function PlayerExperience({
           <ResearchRunResults
             canExport={canExportBundle}
             config={controllerConfig}
+            computeSampleCount={engineTelemetryRecording.validComputeSampleCount}
+            latestEncoderSample={engineTelemetryRecording.latestEncoderSample}
+            latestEngineSample={engineTelemetryRecording.latestEngineSample}
             onExport={() => void exportBundle()}
             onRetake={() => {
               const nextConfig = {

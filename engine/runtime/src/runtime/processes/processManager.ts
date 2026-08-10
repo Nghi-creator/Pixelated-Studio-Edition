@@ -28,6 +28,7 @@ type IceServer = {
 type ProcessManagerOptions = {
   cameraPath: string;
   cameraPeerStatePath: string;
+  cameraTelemetryStatePath?: string;
   engineToken: string;
   fileExists?: (path: string) => boolean;
   gamepadBridgePath: string;
@@ -63,6 +64,7 @@ type RuntimeState = {
   activeCloudRomPath: string | null;
   activeSessionId: string | null;
   cameraPeerStatePath: string;
+  cameraTelemetryStatePath: string;
   cameraProcess: ChildProcess | null;
   gamepads: ReturnType<ReturnType<typeof createGamepadBridge>["getState"]>;
   keyboard: ReturnType<ReturnType<typeof createKeyboardBridge>["getState"]>;
@@ -80,6 +82,8 @@ export function createProcessManager(options: ProcessManagerOptions) {
     gamepadBridgePath,
     keyboardBridgePath,
   } = options;
+  const cameraTelemetryStatePath =
+    options.cameraTelemetryStatePath || "/tmp/pixelated_camera_telemetry.json";
   const fileExists = options.fileExists || fs.existsSync;
   const spawnProcess = options.spawnProcess || spawn;
   const gamepads = createGamepadBridge({ gamepadBridgePath });
@@ -251,6 +255,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
       cameraProcess = launchCameraBridge({
         cameraPath,
         cameraPeerStatePath,
+        cameraTelemetryStatePath,
         engineToken,
         iceServers: bootOptions.iceServers,
         sessionId,
@@ -286,6 +291,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
     cameraProcess = launchCameraBridge({
       cameraPath,
       cameraPeerStatePath,
+      cameraTelemetryStatePath,
       engineToken,
       iceServers: restartOptions.iceServers,
       sessionId,
@@ -310,6 +316,7 @@ export function createProcessManager(options: ProcessManagerOptions) {
       gamepads: gamepads.getState(),
       keyboard: keyboard.getState(),
       cameraPeerStatePath,
+      cameraTelemetryStatePath,
       lastLaunchFailure,
     };
   }

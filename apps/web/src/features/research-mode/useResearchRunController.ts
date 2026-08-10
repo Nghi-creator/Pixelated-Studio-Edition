@@ -15,6 +15,7 @@ type RecordResearchEvent = (
 
 export function useResearchRunController({
   config,
+  computeSampleCount,
   currentProfileId,
   enabled,
   firstFrameObserved,
@@ -24,10 +25,12 @@ export function useResearchRunController({
   onStartRecording,
   onStopRecording,
   recordEvent,
+  requiresComputeTelemetry,
   sampleCount,
   sessionId,
 }: {
   config: ResearchRunConfig;
+  computeSampleCount: number;
   currentProfileId: StreamProfileId;
   enabled: boolean;
   firstFrameObserved: boolean;
@@ -37,6 +40,7 @@ export function useResearchRunController({
   onStartRecording: () => void;
   onStopRecording: () => void;
   recordEvent: RecordResearchEvent;
+  requiresComputeTelemetry: boolean;
   sampleCount: number;
   sessionId: string;
 }) {
@@ -49,10 +53,50 @@ export function useResearchRunController({
   const sessionAtReadyRef = useRef<string | null>(null);
   const recordingObservedRef = useRef(false);
   const sampleCountRef = useRef(sampleCount);
+  const computeSampleCountRef = useRef(computeSampleCount);
 
   useEffect(() => {
     sampleCountRef.current = sampleCount;
   }, [sampleCount]);
+
+  useEffect(() => {
+    computeSampleCountRef.current = computeSampleCount;
+  }, [computeSampleCount]);
+
+  const finishRecording = useCallback(
+    (completionKind: "automatic" | "manual") => {
+      const completedAt = performance.now();
+      onStopRecording();
+      const completedSampleCount = sampleCountRef.current;
+      const invalidReason =
+        completedSampleCount <= 0
+          ? "Recording completed without browser telemetry samples."
+          : requiresComputeTelemetry && computeSampleCountRef.current <= 0
+            ? "Recording completed without required engine and encoder telemetry."
+            : null;
+      if (invalidReason) {
+        recordEvent("research_run_invalidated", { reason: invalidReason });
+        dispatch({
+          nowMs: completedAt,
+          reason: invalidReason,
+          sampleCount: completedSampleCount,
+          type: "invalidate",
+        });
+        return;
+      }
+      recordEvent("research_recording_completed", {
+        completionKind,
+        computeSampleCount: computeSampleCountRef.current,
+        sampleCount: completedSampleCount,
+      });
+      dispatch({
+        completionKind,
+        nowMs: completedAt,
+        sampleCount: completedSampleCount,
+        type: "finish_recording",
+      });
+    }, [onStopRecording, recordEvent, requiresComputeTelemetry],
+  );
 
   const invalidate = useCallback(
     (reason: string) => {
@@ -132,26 +176,13 @@ export function useResearchRunController({
     if (!enabled || state.stage !== "recording") return;
     const elapsedMs = performance.now() - state.stageStartedAtMs;
     const timeoutId = window.setTimeout(() => {
-      const completedAt = performance.now();
-      onStopRecording();
-      const completedSampleCount = sampleCountRef.current;
-      recordEvent("research_recording_completed", {
-        completionKind: "automatic",
-        sampleCount: completedSampleCount,
-      });
-      dispatch({
-        completionKind: "automatic",
-        nowMs: completedAt,
-        sampleCount: completedSampleCount,
-        type: "finish_recording",
-      });
+      finishRecording("automatic");
     }, Math.max(0, config.recordingDurationMs - elapsedMs));
     return () => window.clearTimeout(timeoutId);
   }, [
     config.recordingDurationMs,
     enabled,
-    onStopRecording,
-    recordEvent,
+    finishRecording,
     state.stage,
     state.stageStartedAtMs,
   ]);
@@ -214,20 +245,8 @@ export function useResearchRunController({
 
   const stopEarly = useCallback(() => {
     if (state.stage !== "recording") return;
-    const completedAt = performance.now();
-    onStopRecording();
-    const completedSampleCount = sampleCountRef.current;
-    recordEvent("research_recording_completed", {
-      completionKind: "manual",
-      sampleCount: completedSampleCount,
-    });
-    dispatch({
-      completionKind: "manual",
-      nowMs: completedAt,
-      sampleCount: completedSampleCount,
-      type: "finish_recording",
-    });
-  }, [onStopRecording, recordEvent, state.stage]);
+    finishRecording("manual");
+  }, [finishRecording, state.stage]);
 
   const cancel = useCallback(() => {
     if (isRecording) onStopRecording();

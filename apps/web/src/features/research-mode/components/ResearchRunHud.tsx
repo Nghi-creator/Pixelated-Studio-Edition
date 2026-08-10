@@ -20,6 +20,7 @@ function formatRemaining(remainingMs: number | null) {
 
 export function ResearchRunHud({
   config,
+  computeSampleCount,
   onCancel,
   onStop,
   remainingMs,
@@ -27,6 +28,7 @@ export function ResearchRunHud({
   state,
 }: {
   config: ResearchRunConfig;
+  computeSampleCount?: number;
   onCancel: () => void;
   onStop: () => void;
   remainingMs: number | null;
@@ -61,7 +63,7 @@ export function ResearchRunHud({
             {config.phase}
           </span>
           <span className="text-xs text-gray-400">
-            {config.streamProfileId} · {sampleCount} samples
+            {config.streamProfileId} · {sampleCount} browser · {computeSampleCount || 0} compute samples
           </span>
         </div>
         <p className="mt-0.5 truncate text-xs text-gray-400">
@@ -97,4 +99,3 @@ export function ResearchRunHud({
     </section>
   );
 }
-

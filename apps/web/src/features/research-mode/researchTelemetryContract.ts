@@ -30,6 +30,7 @@ export type BrowserResearchMetrics = {
 export type EngineResearchMetrics = {
   cameraCpuPercent: number | null;
   cameraRssMb: number | null;
+  cpuCapacityCores: number | null;
   emulatorCpuPercent: number | null;
   emulatorRssMb: number | null;
   logicalCpuCount: number | null;
@@ -70,6 +71,7 @@ export const ENGINE_RESEARCH_METRIC_KEYS = [
   "cameraCpuPercent",
   "cameraRssMb",
   "logicalCpuCount",
+  "cpuCapacityCores",
   "runtimeKind",
 ] as const satisfies readonly (keyof EngineResearchMetrics)[];
 
@@ -84,4 +86,3 @@ export const ENCODER_RESEARCH_METRIC_KEYS = [
   "cpuUsed",
   "maxQuantizer",
 ] as const satisfies readonly (keyof EncoderResearchMetrics)[];
-

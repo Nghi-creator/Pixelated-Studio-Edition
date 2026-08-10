@@ -1,6 +1,7 @@
 import socketio
 import os
 import json
+from datetime import datetime, timezone
 from urllib.parse import quote, urlparse, urlunparse
 import gi
 gi.require_version('Gst', '1.0')
@@ -17,6 +18,10 @@ ENGINE_TOKEN = os.environ.get('PIXELATED_ENGINE_TOKEN', '')
 ICE_SERVERS = os.environ.get('PIXELATED_ICE_SERVERS', '[]')
 STREAM_PROFILE = os.environ.get('PIXELATED_STREAM_PROFILE', '{}')
 PEER_STATE_PATH = os.environ.get('PIXELATED_CAMERA_PEER_STATE_PATH', '/tmp/pixelated_camera_peers.json')
+TELEMETRY_STATE_PATH = os.environ.get(
+    'PIXELATED_CAMERA_TELEMETRY_STATE_PATH',
+    '/tmp/pixelated_camera_telemetry.json',
+)
 peers = {}
 
 def parse_max_active_peers():
@@ -31,16 +36,75 @@ MAX_WEBRTC_SDP_LENGTH = 64 * 1024
 MAX_ICE_CANDIDATE_LENGTH = 4 * 1024
 MAX_ICE_FIELD_LENGTH = 256
 
-def write_peer_state():
+def atomic_write_json(file_path, payload):
+    temporary_path = f"{file_path}.{os.getpid()}.tmp"
     try:
-        with open(PEER_STATE_PATH, 'w', encoding='utf-8') as state_file:
-            json.dump({
-                'peerCount': len(peers),
-                'peerIds': sorted(peers.keys()),
-                'sessionId': SESSION_ID
-            }, state_file)
+        with open(temporary_path, 'w', encoding='utf-8') as state_file:
+            json.dump(payload, state_file, separators=(',', ':'))
+            state_file.flush()
+            os.fsync(state_file.fileno())
+        os.replace(temporary_path, file_path)
     except Exception as exc:
-        print(f"[Python] Failed to write peer state: {exc}")
+        try:
+            os.unlink(temporary_path)
+        except Exception:
+            pass
+        print(f"[Python] Failed to write state file {file_path}: {exc}")
+
+def write_peer_state():
+    atomic_write_json(PEER_STATE_PATH, {
+        'peerCount': len(peers),
+        'peerIds': sorted(peers.keys()),
+        'sessionId': SESSION_ID,
+    })
+
+def utc_timestamp():
+    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
+
+def element_queue_level(element):
+    try:
+        return max(0, int(element.get_property('current-level-buffers')))
+    except Exception:
+        return 0
+
+def write_encoder_telemetry():
+    active_peers = list(peers.values())
+    profiles = [peer.get('stream_profile') for peer in active_peers]
+    profiles = [profile for profile in profiles if isinstance(profile, dict)]
+    profile = profiles[0] if profiles else None
+    queue_levels = []
+    for peer in active_peers:
+        for queue_name in ['pre_encoder_queue', 'post_encoder_queue']:
+            queue = peer.get(queue_name)
+            if queue is not None:
+                queue_levels.append(element_queue_level(queue))
+
+    atomic_write_json(TELEMETRY_STATE_PATH, {
+        'cpuUsed': profile.get('cpu_used') if profile else None,
+        'framesDroppedTotal': sum(
+            int(peer.get('frames_dropped_total', 0)) for peer in active_peers
+        ),
+        'framesInTotal': sum(
+            int(peer.get('frames_in_total', 0)) for peer in active_peers
+        ),
+        'framesOutTotal': sum(
+            int(peer.get('frames_out_total', 0)) for peer in active_peers
+        ),
+        'maxQuantizer': profile.get('max_quantizer') if profile else None,
+        # A direct encoder processing duration is not exposed by this pipeline.
+        # Leave the proxy null until a separately validated timing probe exists.
+        'pipelineDelayProxyMs': None,
+        'queueLevelBuffers': max(queue_levels) if queue_levels else 0,
+        'schemaVersion': 1,
+        'sessionId': SESSION_ID,
+        'targetBitrateKbps': profile.get('bitrate_kbps') if profile else None,
+        'targetFps': profile.get('fps') if profile else None,
+        'updatedAt': utc_timestamp(),
+    })
+
+def publish_encoder_telemetry():
+    write_encoder_telemetry()
+    return True
 
 def parse_ice_servers():
     try:
@@ -193,6 +257,7 @@ def cleanup_peer(peer_id):
     if pipeline:
         pipeline.set_state(Gst.State.NULL)
     write_peer_state()
+    write_encoder_telemetry()
 
 def handle_offer(offer):
     validation_error = validate_offer(offer)
@@ -234,10 +299,10 @@ def handle_offer(offer):
         ximagesrc display-name=:99 use-damage=false show-pointer=false ! 
         video/x-raw,framerate={stream_profile['fps']}/1 ! 
         videoconvert ! video/x-raw,format=I420 ! 
-        queue max-size-buffers=1 leaky=downstream ! 
-        vp8enc deadline=1 cpu-used={stream_profile['cpu_used']} threads=4 end-usage=cbr target-bitrate={stream_profile['bitrate']} max-quantizer={stream_profile['max_quantizer']} min-quantizer=4 keyframe-max-dist=120 error-resilient=1 !
+        queue name=pre_encoder_queue max-size-buffers=1 leaky=downstream !
+        vp8enc name=video_encoder deadline=1 cpu-used={stream_profile['cpu_used']} threads=4 end-usage=cbr target-bitrate={stream_profile['bitrate']} max-quantizer={stream_profile['max_quantizer']} min-quantizer=4 keyframe-max-dist=120 error-resilient=1 !
         rtpvp8pay pt=96 ! 
-        queue max-size-buffers=1 leaky=downstream ! 
+        queue name=post_encoder_queue max-size-buffers=1 leaky=downstream !
         application/x-rtp,media=video,encoding-name=VP8,payload=96 ! sendrecv.
         
         pulsesrc device=auto_null.monitor provide-clock=false ! 
@@ -247,12 +312,51 @@ def handle_offer(offer):
     """
     pipeline = Gst.parse_launch(pipeline_str)
     webrtcbin = pipeline.get_by_name('sendrecv')
+    pre_encoder_queue = pipeline.get_by_name('pre_encoder_queue')
+    video_encoder = pipeline.get_by_name('video_encoder')
+    post_encoder_queue = pipeline.get_by_name('post_encoder_queue')
     configure_ice_servers(webrtcbin)
     peers[peer_id] = {
+        'frames_dropped_total': 0,
+        'frames_in_total': 0,
+        'frames_out_total': 0,
         'pipeline': pipeline,
+        'post_encoder_queue': post_encoder_queue,
+        'pre_encoder_queue': pre_encoder_queue,
+        'stream_profile': stream_profile,
+        'video_encoder': video_encoder,
         'webrtcbin': webrtcbin,
     }
+
+    def count_frame_in(_pad, _info):
+        peer = peers.get(peer_id)
+        if peer is not None:
+            peer['frames_in_total'] += 1
+        return Gst.PadProbeReturn.OK
+
+    def count_frame_out(_pad, _info):
+        peer = peers.get(peer_id)
+        if peer is not None:
+            peer['frames_out_total'] += 1
+        return Gst.PadProbeReturn.OK
+
+    def count_queue_drop(_queue):
+        peer = peers.get(peer_id)
+        if peer is not None:
+            peer['frames_dropped_total'] += 1
+
+    pre_encoder_queue.get_static_pad('sink').add_probe(
+        Gst.PadProbeType.BUFFER,
+        count_frame_in,
+    )
+    video_encoder.get_static_pad('src').add_probe(
+        Gst.PadProbeType.BUFFER,
+        count_frame_out,
+    )
+    pre_encoder_queue.connect('overrun', count_queue_drop)
+    post_encoder_queue.connect('overrun', count_queue_drop)
     write_peer_state()
+    write_encoder_telemetry()
 
     bus = pipeline.get_bus()
     bus.add_signal_watch()
@@ -305,6 +409,7 @@ def handle_offer(offer):
 def connect():
     print("[Python] Connected to Node.js Switchboard!")
     write_peer_state()
+    write_encoder_telemetry()
     sio.emit('join-session', {'sessionId': SESSION_ID, 'role': 'camera'})
     sio.emit('python-ready', {'sessionId': SESSION_ID})
 
@@ -342,5 +447,6 @@ def on_peer_disconnect(payload):
     GLib.idle_add(handle_disconnect)
 
 sio.connect('http://localhost:8080', auth={'token': ENGINE_TOKEN})
+GLib.timeout_add_seconds(1, publish_encoder_telemetry)
 loop = GLib.MainLoop()
 loop.run()

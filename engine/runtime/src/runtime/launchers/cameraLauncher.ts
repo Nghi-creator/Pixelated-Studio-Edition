@@ -10,6 +10,7 @@ type IceServer = {
 type LaunchCameraBridgeOptions = {
   cameraPath: string;
   cameraPeerStatePath: string;
+  cameraTelemetryStatePath: string;
   engineToken: string;
   iceServers?: IceServer[];
   sessionId: string;
@@ -21,6 +22,7 @@ export function launchCameraBridge(options: LaunchCameraBridgeOptions) {
   const {
     cameraPath,
     cameraPeerStatePath,
+    cameraTelemetryStatePath,
     engineToken,
     iceServers,
     sessionId,
@@ -36,6 +38,7 @@ export function launchCameraBridge(options: LaunchCameraBridgeOptions) {
       PIXELATED_SESSION_ID: sessionId,
       PIXELATED_ENGINE_TOKEN: engineToken,
       PIXELATED_CAMERA_PEER_STATE_PATH: cameraPeerStatePath,
+      PIXELATED_CAMERA_TELEMETRY_STATE_PATH: cameraTelemetryStatePath,
       PIXELATED_ICE_SERVERS: JSON.stringify(iceServers || []),
       PIXELATED_STREAM_PROFILE: JSON.stringify(streamProfile || {}),
     },

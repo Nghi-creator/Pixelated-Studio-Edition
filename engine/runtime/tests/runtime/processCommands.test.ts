@@ -43,3 +43,15 @@ test("camera bridge validates and parses offers before allocating pipelines", ()
   assert.ok(sdpParseIndex > validationIndex);
   assert.ok(pipelineIndex > sdpParseIndex);
 });
+
+test("camera bridge publishes bounded atomic encoder telemetry", () => {
+  const cameraSource = fs.readFileSync(
+    path.resolve(process.cwd(), "camera.py"),
+    "utf8",
+  );
+
+  assert.match(cameraSource, /PIXELATED_CAMERA_TELEMETRY_STATE_PATH/);
+  assert.match(cameraSource, /os\.replace\(temporary_path, file_path\)/);
+  assert.match(cameraSource, /framesDroppedTotal/);
+  assert.match(cameraSource, /pipelineDelayProxyMs': None/);
+});

@@ -1,5 +1,6 @@
 import { ArrowLeft, Download, RotateCcw, TriangleAlert } from "lucide-react";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/telemetry/webrtcTelemetry";
+import type { EngineResearchTelemetrySample } from "../../player/telemetry/engineResearchTelemetry";
 import type { ResearchRunConfig } from "../researchRunConfig";
 import {
   getResearchRecordingDurationMs,
@@ -13,6 +14,9 @@ function formatMetric(value: number | null, suffix = "") {
 export function ResearchRunResults({
   canExport,
   config,
+  computeSampleCount = 0,
+  latestEncoderSample = null,
+  latestEngineSample = null,
   onExport,
   onReturnToLibrary,
   onRetake,
@@ -21,6 +25,9 @@ export function ResearchRunResults({
 }: {
   canExport: boolean;
   config: ResearchRunConfig;
+  computeSampleCount?: number;
+  latestEncoderSample?: EngineResearchTelemetrySample | null;
+  latestEngineSample?: EngineResearchTelemetrySample | null;
   onExport: () => void;
   onReturnToLibrary: () => void;
   onRetake: () => void;
@@ -69,6 +76,27 @@ export function ResearchRunResults({
         {[
           ["Duration", `${Number(durationSeconds.toFixed(2))}s`],
           ["Samples", String(state.sampleCount)],
+          ["Compute samples", String(computeSampleCount)],
+          [
+            "Node CPU",
+            formatMetric(latestEngineSample?.nodeCpuPercent ?? null, "%"),
+          ],
+          [
+            "Game CPU",
+            formatMetric(latestEngineSample?.emulatorCpuPercent ?? null, "%"),
+          ],
+          [
+            "Camera/GStreamer CPU",
+            formatMetric(latestEngineSample?.cameraCpuPercent ?? null, "%"),
+          ],
+          [
+            "Encoder-path drops",
+            formatMetric(latestEncoderSample?.framesDroppedTotal ?? null),
+          ],
+          [
+            "Encoder queue",
+            formatMetric(latestEncoderSample?.queueLevelBuffers ?? null, " buffers"),
+          ],
           ["Latest FPS", formatMetric(telemetry.fps)],
           ["Latest bitrate", formatMetric(telemetry.bitrateKbps, " kbps")],
           ["Latest jitter", formatMetric(telemetry.jitterMs, " ms")],
