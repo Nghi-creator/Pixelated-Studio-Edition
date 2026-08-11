@@ -133,6 +133,24 @@ test("research run summary preserves nulls when samples and events are absent", 
   ]);
 });
 
+test("research run summary treats the first packet-loss total as its baseline", () => {
+  const summary = createResearchRunSummary({
+    events: [],
+    runId: "edge-run-1",
+    samples: [
+      { ...baseSample, packetsLostTotal: 180 },
+      { ...baseSample, elapsedMs: 60_000, packetsLostTotal: 180 },
+    ],
+    sessionId: "session-1",
+  });
+
+  assert.deepEqual(summary.packetLoss, {
+    lossPerMinute: 0,
+    totalDelta: 0,
+    totalLatest: 180,
+  });
+});
+
 test("research run summary JSON is pretty printed with trailing newline", () => {
   const json = researchRunSummaryToJson(
     createResearchRunSummary({

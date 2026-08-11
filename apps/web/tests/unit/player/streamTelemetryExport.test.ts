@@ -54,7 +54,7 @@ test("stream telemetry csv export includes stable research columns", () => {
     streamTelemetrySamplesToCsv([sample]),
     [
       "captured_at,elapsed_ms,session_id,game_id,player_mode,status,fps,bitrate_kbps,packets_lost_total,packets_lost_delta,jitter_ms,ice_connection_state,connection_state,last_engine_error,round_trip_time_ms,frames_decoded,frames_dropped,decode_time_mean_ms,jitter_buffer_delay_mean_ms,freeze_count,freeze_duration_total_ms,key_frames_decoded,available_incoming_bitrate_kbps",
-      "2026-07-04T00:46:56.000Z,1000,session-1,beat-beast,host,running,60,991.2,1,1,4,connected,connected,,12,600,2,2.5,3,1,120,4,2400",
+      "2026-07-04T00:46:56.000Z,1000,session-1,beat-beast,host,running,60,991.2,1,0,4,connected,connected,,12,600,2,2.5,3,1,120,4,2400",
     ].join("\n"),
   );
 });
@@ -135,7 +135,7 @@ test("stream telemetry csv export adds packet loss deltas", () => {
     ]),
     [
       "captured_at,elapsed_ms,session_id,game_id,player_mode,status,fps,bitrate_kbps,packets_lost_total,packets_lost_delta,jitter_ms,ice_connection_state,connection_state,last_engine_error,round_trip_time_ms,frames_decoded,frames_dropped,decode_time_mean_ms,jitter_buffer_delay_mean_ms,freeze_count,freeze_duration_total_ms,key_frames_decoded,available_incoming_bitrate_kbps",
-      "2026-07-04T00:46:56.000Z,0,session-1,beat-beast,host,playing,60,900,1,1,4,connected,connected,,,,,,,,,,",
+      "2026-07-04T00:46:56.000Z,0,session-1,beat-beast,host,playing,60,900,1,0,4,connected,connected,,,,,,,,,,",
       "2026-07-04T00:46:57.000Z,0,session-1,beat-beast,host,playing,60,900,1,0,4,connected,connected,,,,,,,,,,",
       "2026-07-04T00:46:58.000Z,0,session-1,beat-beast,host,playing,60,900,4,3,4,connected,connected,,,,,,,,,,",
     ].join("\n"),

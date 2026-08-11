@@ -5,6 +5,7 @@ import {
   createResearchRunEventsFilename,
   findFirstEventElapsedMs,
   researchRunEventsToCsv,
+  sanitizeResearchRunEventDetails,
 } from "../../../src/features/player/research/researchRunEvents.ts";
 
 test("research run events capture elapsed time and optional details", () => {
@@ -45,6 +46,44 @@ test("research run events csv quotes details JSON", () => {
       '2026-07-04T02:03:05.000Z,1000,edge-run-1,session-1,engine_error,"{""message"":""line one\\nline two"",""source"":""engine-error""}"',
     ].join("\n"),
   );
+});
+
+test("research run events recursively omit private peer identities", () => {
+  const details = sanitizeResearchRunEventDetails({
+    peerId: "peer-top-level",
+    reason: "runtime-switch",
+    signaling: {
+      attempt: 2,
+      rawPeerId: "peer-nested",
+    },
+  });
+  const event = createResearchRunEvent({
+    details: {
+      peerId: "peer-top-level",
+      reason: "runtime-switch",
+      signaling: { attempt: 2, rawPeerId: "peer-nested" },
+    },
+    name: "offer_sent",
+    nowMs: Date.parse("2026-07-04T02:03:05.000Z"),
+    runId: "edge-run-1",
+    runStartedAt: Date.parse("2026-07-04T02:03:04.000Z"),
+    sessionId: "session-1",
+  });
+  const csv = researchRunEventsToCsv([
+    {
+      ...event,
+      details: { ...event.details, rawPeerId: "defense-in-depth" },
+    },
+  ]);
+
+  assert.deepEqual(details, {
+    reason: "runtime-switch",
+    signaling: { attempt: 2 },
+  });
+  assert.equal(csv.includes("peer-top-level"), false);
+  assert.equal(csv.includes("peer-nested"), false);
+  assert.equal(csv.includes("defense-in-depth"), false);
+  assert.match(csv, /runtime-switch/);
 });
 
 test("research run event csv neutralizes spreadsheet formulas", () => {

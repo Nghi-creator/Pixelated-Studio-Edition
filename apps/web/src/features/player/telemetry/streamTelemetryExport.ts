@@ -106,7 +106,7 @@ export function createTelemetryCsvSample({
     jitterBufferDelayMeanMs: telemetry.jitterBufferDelayMeanMs,
     keyFramesDecoded: telemetry.keyFramesDecoded,
     lastEngineError: telemetry.lastEngineError,
-    packetsLostDelta: telemetry.packetsLost,
+    packetsLostDelta: 0,
     packetsLostTotal: telemetry.packetsLost,
     playerMode,
     roundTripTimeMs: telemetry.roundTripTimeMs,
@@ -152,12 +152,12 @@ export function streamTelemetrySamplesToCsv(
 }
 
 export function addPacketLossDeltas(samples: StreamTelemetryCsvSample[]) {
-  let previousTotal = 0;
+  let previousTotal: number | null = null;
 
-  return samples.map((sample, index) => {
+  return samples.map((sample) => {
     const packetsLostDelta =
-      index === 0
-        ? sample.packetsLostTotal
+      previousTotal === null
+        ? 0
         : Math.max(0, sample.packetsLostTotal - previousTotal);
     previousTotal = sample.packetsLostTotal;
 
