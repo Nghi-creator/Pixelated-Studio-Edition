@@ -481,6 +481,7 @@ function PlayerExperience({
             computeSampleCount={engineTelemetryRecording.validComputeSampleCount}
             latestEncoderSample={engineTelemetryRecording.latestEncoderSample}
             latestEngineSample={engineTelemetryRecording.latestEngineSample}
+            layoutClassName={playerLayoutClassName}
             metadataPreviewJson={bundleMetadataJson}
             onExport={() => void exportBundle()}
             onRetake={() => {

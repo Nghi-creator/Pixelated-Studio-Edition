@@ -17,6 +17,7 @@ export function ResearchRunResults({
   computeSampleCount = 0,
   latestEncoderSample = null,
   latestEngineSample = null,
+  layoutClassName,
   metadataPreviewJson,
   onExport,
   onReturnToLibrary,
@@ -29,6 +30,7 @@ export function ResearchRunResults({
   computeSampleCount?: number;
   latestEncoderSample?: EngineResearchTelemetrySample | null;
   latestEngineSample?: EngineResearchTelemetrySample | null;
+  layoutClassName: string;
   metadataPreviewJson: string;
   onExport: () => void;
   onReturnToLibrary: () => void;
@@ -41,7 +43,7 @@ export function ResearchRunResults({
 
   return (
     <section
-      className="mt-6 w-full max-w-5xl rounded-lg border border-synth-border bg-synth-surface p-5 shadow-panel"
+      className={`mt-6 w-full rounded-lg border border-synth-border bg-synth-surface p-5 shadow-panel ${layoutClassName}`}
       data-ignore-game-input
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
