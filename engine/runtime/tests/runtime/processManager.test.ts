@@ -32,6 +32,7 @@ function createManager(options: {
     manager: createProcessManager({
       cameraPath: "/app/camera.py",
       cameraPeerStatePath: "/tmp/camera-peers.json",
+      cameraTelemetryStatePath: "/tmp/camera-telemetry.json",
       engineToken: "engine-token",
       fileExists: options.fileExists || (() => true),
       gamepadBridgePath: "/app/gamepadBridge",

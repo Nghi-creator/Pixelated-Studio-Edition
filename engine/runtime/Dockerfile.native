@@ -57,8 +57,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 --user-group pixelated \
     && usermod -aG pulse-access pixelated \
-    && mkdir -p /app /roms \
-    && chown -R 10001:10001 /roms /home/pixelated
+    && mkdir -p /app /roms /run/pixelated \
+    && chown -R 10001:10001 /roms /run/pixelated /home/pixelated \
+    && chmod 0700 /run/pixelated
 
 COPY --from=app-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=app-builder /app/dist /app/dist

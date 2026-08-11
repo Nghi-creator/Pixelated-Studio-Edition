@@ -86,10 +86,16 @@ export const allowedRomHosts = (process.env.PIXELATED_ALLOWED_ROM_HOSTS || "")
   .map((host) => host.trim().toLowerCase())
   .filter(Boolean);
 
+const runtimeStateDirectory =
+  process.env.PIXELATED_RUNTIME_STATE_DIRECTORY || "/run/pixelated";
+
 export const HEALTH_PATHS = {
   cameraBridge: path.join(process.cwd(), "camera.py"),
-  cameraPeerState: "/tmp/pixelated_camera_peers.json",
-  cameraTelemetryState: "/tmp/pixelated_camera_telemetry.json",
+  cameraPeerState: path.join(runtimeStateDirectory, "camera-peers.json"),
+  cameraTelemetryState: path.join(
+    runtimeStateDirectory,
+    "camera-telemetry.json",
+  ),
   gamepadBridge: path.join(process.cwd(), "input_gamepad.py"),
   keyboardBridge: path.join(process.cwd(), "input_keyboard.py"),
   gstreamerBinary: "/usr/bin/gst-launch-1.0",

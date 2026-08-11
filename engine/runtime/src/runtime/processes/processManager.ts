@@ -28,7 +28,7 @@ type IceServer = {
 type ProcessManagerOptions = {
   cameraPath: string;
   cameraPeerStatePath: string;
-  cameraTelemetryStatePath?: string;
+  cameraTelemetryStatePath: string;
   engineToken: string;
   fileExists?: (path: string) => boolean;
   gamepadBridgePath: string;
@@ -78,12 +78,11 @@ export function createProcessManager(options: ProcessManagerOptions) {
   const {
     cameraPath,
     cameraPeerStatePath,
+    cameraTelemetryStatePath,
     engineToken,
     gamepadBridgePath,
     keyboardBridgePath,
   } = options;
-  const cameraTelemetryStatePath =
-    options.cameraTelemetryStatePath || "/tmp/pixelated_camera_telemetry.json";
   const fileExists = options.fileExists || fs.existsSync;
   const spawnProcess = options.spawnProcess || spawn;
   const gamepads = createGamepadBridge({ gamepadBridgePath });

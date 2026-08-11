@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { HEALTH_PATHS } from "../../src/config";
 import { pulseAudioArgs } from "../../src/runtime/processes/processCommands";
 import { RETROARCH_CONFIG } from "../../src/runtime/processes/runtimeHostProcesses";
 
@@ -58,4 +59,9 @@ test("camera bridge publishes bounded atomic encoder telemetry", () => {
   assert.match(cameraStateSource, /os\.replace\(temporary_path, file_path\)/);
   assert.match(cameraStateSource, /framesDroppedTotal/);
   assert.match(cameraStateSource, /["']pipelineDelayProxyMs["']:\s*None/);
+});
+
+test("camera state stays outside the shared operating-system temp directory", () => {
+  assert.equal(path.dirname(HEALTH_PATHS.cameraPeerState), "/run/pixelated");
+  assert.equal(path.dirname(HEALTH_PATHS.cameraTelemetryState), "/run/pixelated");
 });
