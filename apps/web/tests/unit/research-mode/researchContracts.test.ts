@@ -53,7 +53,7 @@ test("normal game destinations preserve the existing play route", () => {
   );
 });
 
-test("normal player policy preserves current controls and social behavior", () => {
+test("normal player policy preserves gameplay and hides research telemetry", () => {
   assert.deepEqual(getPlayerExperiencePolicy("normal"), {
     allowAudioControls: true,
     allowFullscreen: true,
@@ -61,7 +61,7 @@ test("normal player policy preserves current controls and social behavior", () =
     allowLobbyAndSharing: true,
     recordPlayCount: true,
     showCommunity: true,
-    showStreamTelemetryControls: true,
+    showStreamTelemetryControls: false,
   });
 });
 

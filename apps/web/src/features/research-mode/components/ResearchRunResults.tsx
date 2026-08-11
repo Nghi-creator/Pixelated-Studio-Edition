@@ -1,4 +1,10 @@
-import { ArrowLeft, Download, RotateCcw, TriangleAlert } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  FileSpreadsheet,
+  RotateCcw,
+  TriangleAlert,
+} from "lucide-react";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/telemetry/webrtcTelemetry";
 import type { EngineResearchTelemetrySample } from "../../player/telemetry/engineResearchTelemetry";
 import type { ResearchRunConfig } from "../researchRunConfig";
@@ -20,6 +26,7 @@ export function ResearchRunResults({
   layoutClassName,
   metadataPreviewJson,
   onExport,
+  onExportCsv,
   onReturnToLibrary,
   onRetake,
   state,
@@ -33,6 +40,7 @@ export function ResearchRunResults({
   layoutClassName: string;
   metadataPreviewJson: string;
   onExport: () => void;
+  onExportCsv: () => void;
   onReturnToLibrary: () => void;
   onRetake: () => void;
   state: ResearchRunControllerState;
@@ -160,13 +168,23 @@ export function ResearchRunResults({
           Retake phase
         </button>
         <button
+          className="inline-flex items-center gap-2 rounded-lg border border-synth-border bg-synth-bg px-4 py-2.5 font-semibold text-white transition-colors hover:bg-synth-elevated disabled:cursor-not-allowed disabled:opacity-45"
+          disabled={!canExport}
+          onClick={onExportCsv}
+          title="Download the run CSV files"
+          type="button"
+        >
+          <FileSpreadsheet aria-hidden="true" className="h-4 w-4" />
+          Download CSVs
+        </button>
+        <button
           className="inline-flex items-center gap-2 rounded-lg border border-synth-action-hover bg-synth-action px-4 py-2.5 font-bold text-white transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"
           disabled={!canExport}
           onClick={onExport}
           type="button"
         >
           <Download aria-hidden="true" className="h-4 w-4" />
-          Export Bundle
+          Download TAR
         </button>
       </div>
     </section>

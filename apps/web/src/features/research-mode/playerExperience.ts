@@ -17,7 +17,7 @@ const NORMAL_PLAYER_POLICY = Object.freeze({
   allowLobbyAndSharing: true,
   recordPlayCount: true,
   showCommunity: true,
-  showStreamTelemetryControls: true,
+  showStreamTelemetryControls: false,
 }) satisfies PlayerExperiencePolicy;
 
 const RESEARCH_PLAYER_POLICY = Object.freeze({
@@ -37,4 +37,3 @@ export function getPlayerExperiencePolicy(
     ? RESEARCH_PLAYER_POLICY
     : NORMAL_PLAYER_POLICY;
 }
-
