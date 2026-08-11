@@ -38,6 +38,7 @@ type PlayerControlsProps = {
   pixelPerfect: boolean;
   selectedStreamProfileId: StreamProfileId;
   showLobbyControls?: boolean;
+  showTelemetryControl: boolean;
   streamProfileLocked?: boolean;
   showStreamTelemetry: boolean;
   streamProfiles: StreamProfile[];
@@ -68,6 +69,7 @@ export function PlayerControls({
   pixelPerfect,
   selectedStreamProfileId,
   showLobbyControls = true,
+  showTelemetryControl,
   showStreamTelemetry,
   streamProfiles,
   streamProfileLocked = false,
@@ -167,16 +169,18 @@ export function PlayerControls({
         />
       </div>
 
-      <button
-        type="button"
-        onClick={onToggleTelemetry}
-        className={controlButtonClass}
-        aria-label="Toggle stream telemetry"
-        aria-pressed={showStreamTelemetry}
-        title="Toggle stream telemetry"
-      >
-        <PixelIcon aria-hidden="true" className="h-5 w-5" name="logs" />
-      </button>
+      {showTelemetryControl && (
+        <button
+          type="button"
+          onClick={onToggleTelemetry}
+          className={controlButtonClass}
+          aria-label="Toggle stream telemetry"
+          aria-pressed={showStreamTelemetry}
+          title="Toggle stream telemetry"
+        >
+          <PixelIcon aria-hidden="true" className="h-5 w-5" name="logs" />
+        </button>
+      )}
 
       <button
         type="button"

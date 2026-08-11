@@ -11,10 +11,12 @@ import {
 import {
   createResearchRunBundleFilename,
   createResearchRunBundleTar,
+  createResearchRunCsvFilename,
 } from "../../research/researchRunBundle";
 import {
   buildResearchRunGraphPng,
   createResearchRunExportArtifacts,
+  selectResearchRunCsvFiles,
 } from "../../research/researchRunExportArtifacts";
 import {
   createResearchRunEventsFilename,
@@ -231,10 +233,8 @@ export function useResearchRunExports({
     );
   }, [buildGraphPng, gameId, sessionId]);
 
-  const exportBundle = useCallback(async () => {
-    const recordedAt = new Date();
-    const samples = getRecordedCsvSamples();
-    const files = createResearchRunExportArtifacts({
+  const buildExportArtifacts = useCallback(
+    (recordedAt: Date) => createResearchRunExportArtifacts({
       baselineJson: isBrowserBaseline ? buildBaselineJson(recordedAt) : undefined,
       comparisonCaseId: resolvedComparisonCaseId,
       engineSamples: recordedEngineSamples,
@@ -244,30 +244,60 @@ export function useResearchRunExports({
       phase,
       recordedAt,
       runId,
-      samples,
+      samples: getRecordedCsvSamples(),
       summaryJson: buildSummaryJson(recordedAt),
-    });
+    }),
+    [
+      buildBaselineJson,
+      buildGraphPng,
+      buildSummaryJson,
+      bundleMetadataJson,
+      events,
+      getRecordedCsvSamples,
+      isBrowserBaseline,
+      phase,
+      recordedEngineSamples,
+      resolvedComparisonCaseId,
+      runId,
+    ],
+  );
+
+  const exportBundle = useCallback(async () => {
+    const recordedAt = new Date();
 
     await downloadBlob(
       createResearchRunBundleFilename({ gameId, phase, recordedAt, runId }),
-      new Blob([createResearchRunBundleTar(files, recordedAt)], {
+      new Blob([createResearchRunBundleTar(buildExportArtifacts(recordedAt), recordedAt)], {
         type: "application/x-tar",
       }),
     );
   }, [
-    buildBaselineJson,
-    buildGraphPng,
-    buildSummaryJson,
-    bundleMetadataJson,
-    events,
+    buildExportArtifacts,
     gameId,
-    getRecordedCsvSamples,
-    isBrowserBaseline,
     phase,
-    recordedEngineSamples,
-    resolvedComparisonCaseId,
     runId,
   ]);
+
+  const exportCsvFiles = useCallback(async () => {
+    const recordedAt = new Date();
+    const csvFiles = selectResearchRunCsvFiles(
+      buildExportArtifacts(recordedAt),
+    );
+
+    for (const file of csvFiles) {
+      await downloadText(
+        createResearchRunCsvFilename({
+          artifactName: file.name,
+          gameId,
+          phase,
+          recordedAt,
+          runId,
+        }),
+        file.data,
+        "text/csv;charset=utf-8",
+      );
+    }
+  }, [buildExportArtifacts, gameId, phase, runId]);
 
   return {
     canExportBundle:
@@ -281,6 +311,7 @@ export function useResearchRunExports({
     bundleMetadataJson,
     exportBaseline,
     exportBundle,
+    exportCsvFiles,
     exportEvents,
     exportGraph,
     exportMetadata,

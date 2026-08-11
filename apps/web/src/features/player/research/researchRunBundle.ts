@@ -112,3 +112,26 @@ export function createResearchRunBundleFilename({
     recordedAt,
   });
 }
+
+export function createResearchRunCsvFilename({
+  artifactName,
+  gameId,
+  phase,
+  recordedAt = new Date(),
+  runId,
+}: {
+  artifactName: string;
+  gameId: string | undefined;
+  phase?: ResearchRunPhase;
+  recordedAt?: Date;
+  runId: string;
+}) {
+  return createPlayerArtifactFilename({
+    extension: "csv",
+    identity: [gameId || "game", ...(phase ? [phase] : []), runId],
+    prefix: `pixelated-research-${sanitizeArtifactFilenamePart(
+      artifactName.replace(/\.csv$/i, ""),
+    )}`,
+    recordedAt,
+  });
+}

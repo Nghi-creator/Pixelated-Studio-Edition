@@ -27,7 +27,6 @@ import {
 } from "../../src/lib/webrtc/telemetry/webrtcTelemetry";
 import type { WebRTCStatus } from "../../src/lib/webrtc/session/webrtcSession";
 import {
-  DEFAULT_STREAM_PROFILE,
   STREAM_PROFILES,
   type StreamProfileId,
 } from "../../src/lib/engine/streamProfiles";
@@ -151,8 +150,6 @@ function BootRecoveryHarness({
         backRoute={mode === "cloud" ? "/home" : "/local"}
         backText={mode === "cloud" ? "Back to Cloud Library" : "Back to Local Vault"}
         gameTitle={title}
-        onToggleTelemetry={() => onRecord(`${mode}-boot-telemetry-toggle`)}
-        showStreamTelemetry
         status={state.status}
       />
       <StreamStage
@@ -284,11 +281,6 @@ export function AdminHarness() {
           backRoute="/home"
           backText="Back to Cloud Library"
           gameTitle="Harness Game"
-          onToggleTelemetry={() => {
-            record(showTelemetry ? "telemetry-toggle-off" : "telemetry-toggle-on");
-            setShowTelemetry((isVisible) => !isVisible);
-          }}
-          showStreamTelemetry={showTelemetry}
           status="error"
         />
         <StreamStage
@@ -316,6 +308,7 @@ export function AdminHarness() {
               pixelPerfect
               selectedStreamProfileId={streamProfileId}
               showStreamTelemetry={showTelemetry}
+              showTelemetryControl
               streamProfiles={STREAM_PROFILES}
               volume={1}
             />
@@ -330,43 +323,10 @@ export function AdminHarness() {
         />
         {showTelemetry && (
           <StreamTelemetryPanel
-            gameId="harness-game"
-            gameTitle="Harness Game"
-            isRecordingCsv={false}
-            onClearTelemetryCsv={() => record("telemetry-csv-clear")}
             onClose={() => {
               record("telemetry-hidden");
               setShowTelemetry(false);
             }}
-            onResetTelemetryData={() => record("telemetry-reset")}
-            onToggleCsvRecording={() => record("telemetry-csv-toggle")}
-            playerMode="host"
-            researchRun={{
-              baselineForm: {
-                browserMemoryMb: "",
-                cpuNotes: "",
-                deviceNotes: "",
-                emulatorId: "",
-                fps: "",
-                startupMs: "",
-              },
-              events: [],
-              metadataForm: {
-                coldStart: false,
-                networkType: "",
-                notes: "",
-                scenario: "localhost",
-              },
-              onBaselineFormChange: () => record("baseline-form-change"),
-              onMetadataFormChange: () => record("research-form-change"),
-              runId: "edge-run-harness",
-            }}
-            recordedCsvSamples={[]}
-            recordedCsvRevision={0}
-            sessionId="session-1"
-            shareUrl="https://engine.local/play/demo?session=session-1"
-            status="error"
-            streamProfile={DEFAULT_STREAM_PROFILE}
             telemetry={streamTelemetry}
           />
         )}

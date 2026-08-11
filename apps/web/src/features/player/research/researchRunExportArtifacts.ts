@@ -163,3 +163,10 @@ export function createResearchRunExportArtifacts({
     },
   });
 }
+
+export function selectResearchRunCsvFiles(files: ResearchRunBundleFile[]) {
+  return files.filter(
+    (file): file is ResearchRunBundleFile & { data: string } =>
+      file.name.toLowerCase().endsWith(".csv") && typeof file.data === "string",
+  );
+}

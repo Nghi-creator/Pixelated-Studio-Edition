@@ -1,6 +1,5 @@
 import { ArrowLeft } from "lucide-react";
 import { Link } from "react-router";
-import { PixelIcon } from "../../../../components/ui/PixelIcon";
 import type { ApiGame } from "../../../../lib/api/apiClient";
 import type { WebRTCStatus } from "../../../../lib/webrtc/session/webrtcSession";
 
@@ -10,9 +9,7 @@ type PlayerHeaderProps = {
   gameRights?: NonNullable<ApiGame["game_rights"]>;
   gameTitle: string;
   layoutClassName?: string;
-  showStreamTelemetry: boolean;
   status: WebRTCStatus;
-  onToggleTelemetry: () => void;
   hideGameChrome?: boolean;
 };
 
@@ -23,8 +20,6 @@ export function PlayerHeader({
   gameTitle,
   hideGameChrome = false,
   layoutClassName = "max-w-5xl",
-  onToggleTelemetry,
-  showStreamTelemetry,
   status,
 }: PlayerHeaderProps) {
   const statusLabel =
@@ -121,23 +116,7 @@ export function PlayerHeader({
           {rightsLinks}
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={onToggleTelemetry}
-            aria-pressed={showStreamTelemetry}
-            aria-label="Toggle stream telemetry"
-            title="Toggle stream telemetry"
-            className={`inline-flex h-10 w-10 items-center justify-center rounded-full border transition-colors ${
-              showStreamTelemetry
-                ? "border-synth-border bg-synth-elevated text-white"
-                : "border-synth-border bg-synth-surface text-gray-400 hover:text-white"
-            }`}
-          >
-            <PixelIcon className="h-4 w-4" name="logs" />
-          </button>
-          {statusBadge}
-        </div>
+        {statusBadge}
       </div>
     </div>
   );

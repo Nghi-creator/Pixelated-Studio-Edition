@@ -1,4 +1,5 @@
 import type { WebRTCResearchEventName } from "../../../lib/webrtc/types";
+import { createPlayerArtifactFilename } from "../artifactFilename.ts";
 
 export type ResearchRunEventName =
   | WebRTCResearchEventName
@@ -28,6 +29,27 @@ export const RESEARCH_RUN_EVENT_CSV_HEADERS = [
   "details_json",
 ] as const;
 
+const PRIVATE_EVENT_DETAIL_KEYS = new Set(["peerId", "rawPeerId"]);
+
+function sanitizeDetailValue(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sanitizeDetailValue);
+  if (!value || typeof value !== "object") return value;
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([key]) => !PRIVATE_EVENT_DETAIL_KEYS.has(key))
+      .map(([key, nestedValue]) => [key, sanitizeDetailValue(nestedValue)]),
+  );
+}
+
+export function sanitizeResearchRunEventDetails(
+  details: Record<string, unknown> | null | undefined,
+) {
+  if (!details) return null;
+  const sanitized = sanitizeDetailValue(details) as Record<string, unknown>;
+  return Object.keys(sanitized).length > 0 ? sanitized : null;
+}
+
 function csvCell(value: number | string | null) {
   if (value === null) return "";
   const text =
@@ -53,7 +75,7 @@ export function createResearchRunEvent({
 }): ResearchRunEvent {
   return {
     capturedAt: new Date(nowMs).toISOString(),
-    details: details && Object.keys(details).length > 0 ? details : null,
+    details: sanitizeResearchRunEventDetails(details),
     elapsedMs: Math.max(0, nowMs - runStartedAt),
     name,
     runId,
@@ -62,18 +84,19 @@ export function createResearchRunEvent({
 }
 
 export function researchRunEventsToCsv(events: ResearchRunEvent[]) {
-  const rows = events.map((event) =>
-    [
+  const rows = events.map((event) => {
+    const details = sanitizeResearchRunEventDetails(event.details);
+    return [
       event.capturedAt,
       event.elapsedMs,
       event.runId,
       event.sessionId,
       event.name,
-      event.details ? JSON.stringify(event.details) : null,
+      details ? JSON.stringify(details) : null,
     ]
       .map(csvCell)
-      .join(","),
-  );
+      .join(",");
+  });
 
   return [RESEARCH_RUN_EVENT_CSV_HEADERS.join(","), ...rows].join("\n");
 }
@@ -101,4 +124,3 @@ export function findFirstEventElapsedMs(
 ) {
   return events.find((event) => event.name === name)?.elapsedMs ?? null;
 }
-import { createPlayerArtifactFilename } from "../artifactFilename.ts";

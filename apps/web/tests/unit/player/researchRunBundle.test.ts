@@ -5,13 +5,17 @@ import { fileURLToPath } from "node:url";
 import {
   createResearchRunBundleFilename,
   createResearchRunBundleTar,
+  createResearchRunCsvFilename,
 } from "../../../src/features/player/research/researchRunBundle.ts";
 import {
   RESEARCH_BUNDLE_V1_REQUIRED_FILES,
   RESEARCH_BUNDLE_V2_REQUIRED_FILES,
 } from "../../../src/features/player/research/researchBundleManifest.ts";
 import { createResearchBundleV2Files } from "../../../src/features/player/research/researchBundleV2.ts";
-import { createResearchRunExportArtifacts } from "../../../src/features/player/research/researchRunExportArtifacts.ts";
+import {
+  createResearchRunExportArtifacts,
+  selectResearchRunCsvFiles,
+} from "../../../src/features/player/research/researchRunExportArtifacts.ts";
 
 const v1FixtureDirectory = fileURLToPath(
   new URL("../../fixtures/research-bundle-v1/", import.meta.url),
@@ -92,6 +96,19 @@ test("research run bundle filenames are filesystem-safe tar names", () => {
   );
 });
 
+test("research CSV downloads keep distinct filesystem-safe filenames", () => {
+  assert.equal(
+    createResearchRunCsvFilename({
+      artifactName: "stream-telemetry.csv",
+      gameId: "Beat Beast",
+      phase: "degraded",
+      recordedAt: new Date("2026-07-04T02:03:04.000Z"),
+      runId: "edge:run:1",
+    }),
+    "pixelated-research-stream-telemetry-Beat-Beast-degraded-edge-run-1-2026-07-04T02-03-04-000Z.csv",
+  );
+});
+
 test("research bundle v2 composer adds a matching manifest", () => {
   const contentFiles = RESEARCH_BUNDLE_V2_REQUIRED_FILES.filter(
     (name) => name !== "bundle-manifest.json",
@@ -158,6 +175,10 @@ test("research export artifacts preserve browser-only missing evidence", () => {
   assert.equal(
     manifest.measurementSupport["encoder_pipeline.pipelineDelayProxyMs"],
     "unsupported",
+  );
+  assert.deepEqual(
+    selectResearchRunCsvFiles(files).map((file) => file.name),
+    ["stream-telemetry.csv", "stream-events.csv", "engine-telemetry.csv"],
   );
 });
 

@@ -2,7 +2,10 @@ import type {
   ResearchRunEvent,
   ResearchRunEventName,
 } from "./researchRunEvents";
-import type { StreamTelemetryCsvSample } from "../telemetry/streamTelemetryExport";
+import {
+  addPacketLossDeltas,
+  type StreamTelemetryCsvSample,
+} from "../telemetry/streamTelemetryExport.ts";
 import type { EngineResearchTelemetrySample } from "../telemetry/engineResearchTelemetry";
 
 export const RESEARCH_RUN_SUMMARY_SCHEMA_VERSION = 2 as const;
@@ -109,23 +112,6 @@ function countEvents(
   predicate: (event: ResearchRunEvent) => boolean,
 ) {
   return events.filter(predicate).length;
-}
-
-function addPacketLossDeltas(samples: StreamTelemetryCsvSample[]) {
-  let previousTotal = 0;
-
-  return samples.map((sample, index) => {
-    const packetsLostDelta =
-      index === 0
-        ? sample.packetsLostTotal
-        : Math.max(0, sample.packetsLostTotal - previousTotal);
-    previousTotal = sample.packetsLostTotal;
-
-    return {
-      ...sample,
-      packetsLostDelta,
-    };
-  });
 }
 
 function findFirstEventElapsedMs(

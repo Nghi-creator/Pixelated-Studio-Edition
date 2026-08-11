@@ -166,8 +166,6 @@ function PlayerExperience({
     metadataForm: researchMetadataForm,
     recordEvent: recordResearchEvent,
     runId: researchRunId,
-    setBaselineForm: setResearchBaselineForm,
-    setMetadataForm: setResearchMetadataForm,
     setSessionId: setResearchSessionId,
   } = useResearchRunState({
     gameId: id,
@@ -213,7 +211,6 @@ function PlayerExperience({
     recordedCsvRevision,
     startCsvRecording,
     stopCsvRecording,
-    toggleCsvRecording,
   } = useStreamTelemetryRecording({
     gameId: id,
     playerMode,
@@ -315,7 +312,12 @@ function PlayerExperience({
     sessionId,
     shareContext,
   });
-  const { bundleMetadataJson, canExportBundle, exportBundle } = useResearchRunExports({
+  const {
+    bundleMetadataJson,
+    canExportBundle,
+    exportBundle,
+    exportCsvFiles,
+  } = useResearchRunExports({
     baselineForm: researchBaselineForm,
     comparisonCaseId: controllerConfig.comparisonCaseId,
     events: researchEvents,
@@ -336,7 +338,9 @@ function PlayerExperience({
     status,
     streamProfile,
   });
-  const playerLayoutClassName = showStreamTelemetry
+  const isStreamTelemetryVisible =
+    experiencePolicy.showStreamTelemetryControls && showStreamTelemetry;
+  const playerLayoutClassName = isStreamTelemetryVisible
     ? "max-w-7xl"
     : "max-w-5xl";
 
@@ -349,43 +353,16 @@ function PlayerExperience({
         gameTitle={gameTitle}
         hideGameChrome
         layoutClassName={playerLayoutClassName}
-        onToggleTelemetry={() =>
-          setShowStreamTelemetry((isVisible) => !isVisible)
-        }
-        showStreamTelemetry={showStreamTelemetry}
         status={status}
       />
 
       <PlayerStreamGrid
         layoutClassName={playerLayoutClassName}
-        showStreamTelemetry={showStreamTelemetry}
+        showStreamTelemetry={isStreamTelemetryVisible}
         telemetryPanel={
           <Suspense fallback={<PlayerSectionLoading label="Loading stream stats…" />}>
             <StreamTelemetryPanel
-              gameId={id || ""}
-              gameTitle={gameTitle}
-              isRecordingCsv={isRecordingCsv}
-              onClearTelemetryCsv={clearTelemetryCsv}
               onClose={() => setShowStreamTelemetry(false)}
-              onResetTelemetryData={resetTelemetryData}
-              onToggleCsvRecording={toggleCsvRecording}
-              playerMode={playerMode}
-              researchRun={{
-                baselineForm: researchBaselineForm,
-                events: researchEvents,
-                metadataForm: researchMetadataForm,
-                onBaselineFormChange: setResearchBaselineForm,
-                onMetadataFormChange: setResearchMetadataForm,
-                runId: researchRunId,
-              }}
-              recordedCsvSamples={recordedCsvSamples}
-              recordedCsvRevision={recordedCsvRevision}
-              sessionId={sessionId}
-              shareUrl={
-                experiencePolicy.allowLobbyAndSharing ? shareInvite.url : ""
-              }
-              status={status}
-              streamProfile={streamProfile}
               telemetry={telemetry}
             />
           </Suspense>
@@ -422,7 +399,10 @@ function PlayerExperience({
               onVolumeChange={setVolume}
               pixelPerfect={pixelPerfect}
               selectedStreamProfileId={streamProfileId}
-              showStreamTelemetry={showStreamTelemetry}
+              showStreamTelemetry={isStreamTelemetryVisible}
+              showTelemetryControl={
+                experiencePolicy.showStreamTelemetryControls
+              }
               streamProfiles={STREAM_PROFILES}
               volume={volume}
             />
@@ -431,7 +411,7 @@ function PlayerExperience({
           isMuted={isMuted}
           onRetry={retry}
           pixelPerfect={pixelPerfect}
-          showStreamTelemetry={showStreamTelemetry}
+          showStreamTelemetry={isStreamTelemetryVisible}
           stageRef={streamStageRef}
           status={status}
           telemetry={telemetry}
@@ -466,7 +446,10 @@ function PlayerExperience({
         <PlayerRecordingStatusButton
           csvStatusText={csvStatusText}
           csvStatusTitle={csvStatusTitle}
-          isVisible={isRecordingCsv || recordedCsvSamples.length > 0}
+          isVisible={
+            experience === "research" &&
+            (isRecordingCsv || recordedCsvSamples.length > 0)
+          }
           onOpen={() => setShowStreamTelemetry(true)}
         />
       </div>
@@ -481,8 +464,10 @@ function PlayerExperience({
             computeSampleCount={engineTelemetryRecording.validComputeSampleCount}
             latestEncoderSample={engineTelemetryRecording.latestEncoderSample}
             latestEngineSample={engineTelemetryRecording.latestEngineSample}
+            layoutClassName={playerLayoutClassName}
             metadataPreviewJson={bundleMetadataJson}
             onExport={() => void exportBundle()}
+            onExportCsv={() => void exportCsvFiles()}
             onRetake={() => {
               const nextConfig = {
                 ...controllerConfig,

@@ -1,4 +1,10 @@
-import { ArrowLeft, Download, RotateCcw, TriangleAlert } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  FileSpreadsheet,
+  RotateCcw,
+  TriangleAlert,
+} from "lucide-react";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/telemetry/webrtcTelemetry";
 import type { EngineResearchTelemetrySample } from "../../player/telemetry/engineResearchTelemetry";
 import type { ResearchRunConfig } from "../researchRunConfig";
@@ -17,8 +23,10 @@ export function ResearchRunResults({
   computeSampleCount = 0,
   latestEncoderSample = null,
   latestEngineSample = null,
+  layoutClassName,
   metadataPreviewJson,
   onExport,
+  onExportCsv,
   onReturnToLibrary,
   onRetake,
   state,
@@ -29,8 +37,10 @@ export function ResearchRunResults({
   computeSampleCount?: number;
   latestEncoderSample?: EngineResearchTelemetrySample | null;
   latestEngineSample?: EngineResearchTelemetrySample | null;
+  layoutClassName: string;
   metadataPreviewJson: string;
   onExport: () => void;
+  onExportCsv: () => void;
   onReturnToLibrary: () => void;
   onRetake: () => void;
   state: ResearchRunControllerState;
@@ -41,7 +51,7 @@ export function ResearchRunResults({
 
   return (
     <section
-      className="mt-6 w-full max-w-5xl rounded-lg border border-synth-border bg-synth-surface p-5 shadow-panel"
+      className={`mt-6 w-full rounded-lg border border-synth-border bg-synth-surface p-5 shadow-panel ${layoutClassName}`}
       data-ignore-game-input
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -158,13 +168,23 @@ export function ResearchRunResults({
           Retake phase
         </button>
         <button
+          className="inline-flex items-center gap-2 rounded-lg border border-synth-border bg-synth-bg px-4 py-2.5 font-semibold text-white transition-colors hover:bg-synth-elevated disabled:cursor-not-allowed disabled:opacity-45"
+          disabled={!canExport}
+          onClick={onExportCsv}
+          title="Download the run CSV files"
+          type="button"
+        >
+          <FileSpreadsheet aria-hidden="true" className="h-4 w-4" />
+          Download CSVs
+        </button>
+        <button
           className="inline-flex items-center gap-2 rounded-lg border border-synth-action-hover bg-synth-action px-4 py-2.5 font-bold text-white transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"
           disabled={!canExport}
           onClick={onExport}
           type="button"
         >
           <Download aria-hidden="true" className="h-4 w-4" />
-          Export Bundle
+          Download TAR
         </button>
       </div>
     </section>
