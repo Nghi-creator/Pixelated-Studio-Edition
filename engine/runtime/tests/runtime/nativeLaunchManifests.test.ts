@@ -70,6 +70,15 @@ test("runtime images pin the Python camera WebRTC dependencies", () => {
     /node:24\.18\.0-bullseye-slim@sha256:[a-f0-9]{64}/,
   );
   assert.match(libretroDockerfile, /-r \/tmp\/python-requirements\.lock/);
+  for (const source of [dockerfile, libretroDockerfile]) {
+    assert.match(source, /mkdir -p [^\n]*\/run\/pixelated/);
+    assert.match(source, /chown -R 10001:10001 [^\n]*\/run\/pixelated/);
+    assert.match(source, /chmod 0700 \/run\/pixelated/);
+  }
+  for (const helper of ["camera_config.py", "camera_protocol.py", "camera_state.py"]) {
+    assert.match(dockerfile, new RegExp(`COPY [^\\n]*${helper}`));
+    assert.match(libretroDockerfile, new RegExp(`COPY [^\\n]*${helper}`));
+  }
   assert.match(requirements, /^python-socketio==\d+\.\d+\.\d+$/m);
   for (const requirement of requirements
     .split("\n")

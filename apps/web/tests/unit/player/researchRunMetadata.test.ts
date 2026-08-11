@@ -4,6 +4,8 @@ import {
   createResearchRunMetadata,
   createResearchRunMetadataFilename,
   researchRunMetadataToJson,
+  sanitizeResearchRunMetadata,
+  sanitizedResearchRunMetadataToJson,
   type ResearchRunMetadataForm,
 } from "../../../src/features/player/research/researchRunMetadata.ts";
 
@@ -113,6 +115,29 @@ test("research run metadata JSON is pretty printed with trailing newline", () =>
 
   assert.match(json, /\n {2}"schemaVersion": 1,\n/);
   assert.equal(json.endsWith("\n"), true);
+});
+
+test("bundle metadata omits free text and active sharing data", () => {
+  const sanitized = sanitizeResearchRunMetadata(
+    createResearchRunMetadata({
+      capturedAt: new Date("2026-07-04T02:03:04.000Z"),
+      form,
+      gameId: "beat-beast",
+      gameTitle: "Beat Beast",
+      playerMode: "host",
+      runId: "edge-run-1",
+      sessionId: "session-1",
+      shareUrl: "https://private-host.test/join?token=secret",
+      status: "playing",
+      streamProfile: { id: "balanced" },
+      userAgent: "unit-test-browser",
+    }),
+  );
+  const json = sanitizedResearchRunMetadataToJson(sanitized);
+
+  assert.equal("shareUrl" in sanitized, false);
+  assert.equal("notes" in sanitized, false);
+  assert.doesNotMatch(json, /private-host|secret|LAN client/);
 });
 
 test("research run metadata filenames are filesystem-safe", () => {

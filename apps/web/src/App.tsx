@@ -14,6 +14,7 @@ import { useEngineConnectionMonitor } from "./hooks/engine/useEngineConnectionMo
 import { useDesktopLaunchPairing } from "./hooks/engine/useDesktopLaunchPairing";
 
 import { RequireEngineConnection } from "./features/local-engine/RequireEngineConnection";
+import { ResearchModeProvider } from "./features/research-mode/ResearchModeProvider";
 
 const AccessLogs = lazy(() => import("./pages/admin/AccessLogs"));
 const CatalogCandidates = lazy(() => import("./pages/admin/CatalogCandidates"));
@@ -31,6 +32,9 @@ const Player = lazy(() => import("./pages/user/Player"));
 const Profile = lazy(() => import("./pages/user/Profile"));
 const Publish = lazy(() => import("./pages/user/Publish"));
 const ResetPassword = lazy(() => import("./pages/user/ResetPassword"));
+const ResearchRunSetup = lazy(
+  () => import("./features/research-mode/pages/ResearchRunSetup"),
+);
 
 function RouteLoading() {
   return (
@@ -86,10 +90,11 @@ const DesktopLaunchPairing = () => {
 export default function App() {
   return (
     <Router>
-      <SessionTracker />
-      <DesktopLaunchPairing />
-      <EngineConnectionMonitor />
-      <Routes>
+      <ResearchModeProvider>
+        <SessionTracker />
+        <DesktopLaunchPairing />
+        <EngineConnectionMonitor />
+        <Routes>
         {/* ADMIN ROUTES */}
         <Route element={<AdminLayout />}>
           <Route path="/admin" element={lazyRoute(Dashboard)} />
@@ -113,12 +118,25 @@ export default function App() {
           <Route path="/engine" element={lazyRoute(EngineConnection)} />
           <Route element={<RequireEngineConnection />}>
             <Route path="/play/:id" element={lazyRoute(Player)} />
+            <Route
+              path="/research/games/:id/setup"
+              element={lazyRoute(ResearchRunSetup)}
+            />
+            <Route
+              path="/research/play/:id"
+              element={
+                <Suspense fallback={<RouteLoading />}>
+                  <Player experience="research" />
+                </Suspense>
+              }
+            />
             <Route path="/local" element={lazyRoute(LocalVault)} />
             <Route path="/multiplayer" element={lazyRoute(Multiplayer)} />
           </Route>
           <Route path="/publish" element={lazyRoute(Publish)} />
         </Route>
-      </Routes>
+        </Routes>
+      </ResearchModeProvider>
     </Router>
   );
 }

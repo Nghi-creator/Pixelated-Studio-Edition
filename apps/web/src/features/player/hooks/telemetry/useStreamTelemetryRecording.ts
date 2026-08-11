@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WebRTCTelemetry } from "../../../../lib/webrtc/telemetry/webrtcTelemetry";
 import {
   createTelemetryCsvSample,
@@ -59,14 +59,24 @@ export function useStreamTelemetryRecording({
           sessionId,
           status,
           telemetry: {
+            availableIncomingBitrateKbps:
+              telemetry.availableIncomingBitrateKbps,
             bitrateKbps: telemetry.bitrateKbps,
             connectionState: telemetry.connectionState,
+            decodeTimeMeanMs: telemetry.decodeTimeMeanMs,
             fps: telemetry.fps,
+            framesDecoded: telemetry.framesDecoded,
+            framesDropped: telemetry.framesDropped,
+            freezeCount: telemetry.freezeCount,
+            freezeDurationTotalMs: telemetry.freezeDurationTotalMs,
             iceConnectionState: telemetry.iceConnectionState,
+            jitterBufferDelayMeanMs: telemetry.jitterBufferDelayMeanMs,
             jitterMs: telemetry.jitterMs,
+            keyFramesDecoded: telemetry.keyFramesDecoded,
             lastEngineError: telemetry.lastEngineError,
             lastUpdatedAt: telemetry.lastUpdatedAt,
             packetsLost: telemetry.packetsLost,
+            roundTripTimeMs: telemetry.roundTripTimeMs,
           },
         }),
       );
@@ -80,14 +90,23 @@ export function useStreamTelemetryRecording({
 
     return () => window.clearTimeout(sampleTimer);
   }, [
+    telemetry.availableIncomingBitrateKbps,
     telemetry.bitrateKbps,
     telemetry.connectionState,
+    telemetry.decodeTimeMeanMs,
     telemetry.fps,
+    telemetry.framesDecoded,
+    telemetry.framesDropped,
+    telemetry.freezeCount,
+    telemetry.freezeDurationTotalMs,
     telemetry.iceConnectionState,
+    telemetry.jitterBufferDelayMeanMs,
     telemetry.jitterMs,
+    telemetry.keyFramesDecoded,
     telemetry.lastEngineError,
     telemetry.lastUpdatedAt,
     telemetry.packetsLost,
+    telemetry.roundTripTimeMs,
     gameId,
     isRecordingCsv,
     playerMode,
@@ -97,27 +116,34 @@ export function useStreamTelemetryRecording({
     status,
   ]);
 
-  const toggleCsvRecording = () => {
-    if (isRecordingCsv) {
-      setIsRecordingCsv(false);
-      setRecordingStartedAt(null);
-      return;
-    }
-
+  const startCsvRecording = useCallback(() => {
     recordingBuffer.clear();
     recordedRowCountRef.current = 0;
     setRecordedCsvRevision((revision) => revision + 1);
     setRecordingStartedAt(Date.now());
     setIsRecordingCsv(true);
-  };
+  }, [recordingBuffer]);
 
-  const clearTelemetryCsv = () => {
+  const stopCsvRecording = useCallback(() => {
+    setIsRecordingCsv(false);
+    setRecordingStartedAt(null);
+  }, []);
+
+  const toggleCsvRecording = useCallback(() => {
+    if (isRecordingCsv) {
+      stopCsvRecording();
+      return;
+    }
+    startCsvRecording();
+  }, [isRecordingCsv, startCsvRecording, stopCsvRecording]);
+
+  const clearTelemetryCsv = useCallback(() => {
     setIsRecordingCsv(false);
     recordingBuffer.clear();
     recordedRowCountRef.current = 0;
     setRecordedCsvRevision((revision) => revision + 1);
     setRecordingStartedAt(null);
-  };
+  }, [recordingBuffer]);
 
   const recordedCsvSamples = recordingBuffer.samples;
   const recordedCsvRowLabel = `${recordedCsvSamples.length} row${
@@ -145,7 +171,8 @@ export function useStreamTelemetryRecording({
     isRecordingCsv,
     recordedCsvSamples,
     recordedCsvRevision,
+    startCsvRecording,
+    stopCsvRecording,
     toggleCsvRecording,
   };
 }
-

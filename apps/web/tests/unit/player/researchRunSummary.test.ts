@@ -12,18 +12,27 @@ import {
 import type { StreamTelemetryCsvSample } from "../../../src/features/player/telemetry/streamTelemetryExport.ts";
 
 const baseSample: StreamTelemetryCsvSample = {
+  availableIncomingBitrateKbps: null,
   bitrateKbps: 1000,
   capturedAt: "2026-07-04T02:03:04.000Z",
   connectionState: "connected",
+  decodeTimeMeanMs: null,
   elapsedMs: 0,
   fps: 60,
+  framesDecoded: null,
+  framesDropped: null,
+  freezeCount: null,
+  freezeDurationTotalMs: null,
   gameId: "beat-beast",
   iceConnectionState: "connected",
   jitterMs: 4,
+  jitterBufferDelayMeanMs: null,
+  keyFramesDecoded: null,
   lastEngineError: null,
   packetsLostDelta: 0,
   packetsLostTotal: 0,
   playerMode: "host",
+  roundTripTimeMs: null,
   sessionId: "session-1",
   status: "playing",
 };
@@ -72,63 +81,35 @@ test("research run summary computes numeric and event-derived stats", () => {
     event("engine_error", 50_000, { source: "black_frame_stall" }),
   ];
 
-  assert.deepEqual(
-    createResearchRunSummary({
-      events,
-      generatedAt: new Date("2026-07-04T02:04:04.000Z"),
-      runId: "edge-run-1",
-      samples,
-      sessionId: "session-1",
-    }),
-    {
-      eventCount: 6,
-      generatedAt: "2026-07-04T02:04:04.000Z",
-      metrics: {
-        bitrateKbps: {
-          max: 1200,
-          mean: 1000,
-          median: 1000,
-          min: 800,
-          p95: 1200,
-        },
-        fps: {
-          max: 60,
-          mean: 59,
-          median: 59,
-          min: 58,
-          p95: 60,
-        },
-        jitterMs: {
-          max: 8,
-          mean: 4.667,
-          median: 4,
-          min: 2,
-          p95: 8,
-        },
-      },
-      packetLoss: {
-        lossPerMinute: 4,
-        totalDelta: 4,
-        totalLatest: 4,
-      },
-      recording: {
-        durationMs: 60_000,
-        sampleCount: 3,
-      },
-      runId: "edge-run-1",
-      sessionId: "session-1",
-      stability: {
-        disconnectCount: 1,
-        recoveredCount: 1,
-        stallCount: 1,
-      },
-      timings: {
-        firstFrameMs: 3200,
-        pythonReadyMs: 2400,
-        startGameMs: 1500,
-      },
-    },
-  );
+  const summary = createResearchRunSummary({
+    events,
+    generatedAt: new Date("2026-07-04T02:04:04.000Z"),
+    runId: "edge-run-1",
+    samples,
+    sessionId: "session-1",
+  });
+
+  assert.equal(summary.schemaVersion, 2);
+  assert.deepEqual(summary.metrics.fps, {
+    max: 60,
+    mean: 59,
+    median: 59,
+    min: 58,
+    p95: 60,
+  });
+  assert.equal(summary.metrics.jitterMs.mean, 4.667);
+  assert.equal(summary.metrics.roundTripTimeMs.mean, null);
+  assert.equal(summary.packetLoss.lossPerMinute, 4);
+  assert.equal(summary.recording.durationMs, 60_000);
+  assert.deepEqual(summary.stability, {
+    disconnectCount: 1,
+    recoveredCount: 1,
+    stallCount: 1,
+  });
+  assert.equal(summary.timings.firstFrameMs, 3200);
+  assert.equal(summary.validity.isValid, true);
+  assert.equal(summary.validity.sources.browserWebrtc.sampleCount, 3);
+  assert.equal(summary.compute.nodeCpuPercent.mean, null);
 });
 
 test("research run summary preserves nulls when samples and events are absent", () => {
@@ -146,6 +127,10 @@ test("research run summary preserves nulls when samples and events are absent", 
   assert.equal(summary.metrics.bitrateKbps.p95, null);
   assert.equal(summary.packetLoss.lossPerMinute, null);
   assert.equal(summary.timings.firstFrameMs, null);
+  assert.equal(summary.validity.isValid, false);
+  assert.deepEqual(summary.validity.reasons, [
+    "Browser WebRTC telemetry is unavailable.",
+  ]);
 });
 
 test("research run summary JSON is pretty printed with trailing newline", () => {

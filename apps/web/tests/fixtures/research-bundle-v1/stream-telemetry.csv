@@ -1,0 +1,4 @@
+captured_at,elapsed_ms,session_id,game_id,player_mode,status,fps,bitrate_kbps,packets_lost_total,packets_lost_delta,jitter_ms,ice_connection_state,connection_state,last_engine_error
+2026-07-04T02:03:09.000Z,0,fixture-session-v1,fixture-game,host,playing,60,1401.5,0,0,4,connected,connected,
+2026-07-04T02:04:09.000Z,60000,fixture-session-v1,fixture-game,host,playing,60,1398.5,1,1,5,connected,connected,
+

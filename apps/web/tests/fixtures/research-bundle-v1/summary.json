@@ -1,0 +1,49 @@
+{
+  "eventCount": 2,
+  "generatedAt": "2026-07-04T02:04:10.000Z",
+  "metrics": {
+    "bitrateKbps": {
+      "max": 1401.5,
+      "mean": 1400,
+      "median": 1400,
+      "min": 1398.5,
+      "p95": 1401.35
+    },
+    "fps": {
+      "max": 60,
+      "mean": 60,
+      "median": 60,
+      "min": 60,
+      "p95": 60
+    },
+    "jitterMs": {
+      "max": 5,
+      "mean": 4.5,
+      "median": 4.5,
+      "min": 4,
+      "p95": 4.95
+    }
+  },
+  "packetLoss": {
+    "lossPerMinute": 1,
+    "totalDelta": 1,
+    "totalLatest": 1
+  },
+  "recording": {
+    "durationMs": 60000,
+    "sampleCount": 2
+  },
+  "runId": "fixture-run-v1",
+  "sessionId": "fixture-session-v1",
+  "stability": {
+    "disconnectCount": 0,
+    "recoveredCount": 0,
+    "stallCount": 0
+  },
+  "timings": {
+    "firstFrameMs": 1000,
+    "pythonReadyMs": null,
+    "startGameMs": 0
+  }
+}
+

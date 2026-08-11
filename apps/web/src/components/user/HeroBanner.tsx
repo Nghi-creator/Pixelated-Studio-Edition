@@ -4,6 +4,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  FlaskConical,
   Loader2,
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -13,6 +14,8 @@ import {
   GameArtworkFallback,
 } from "./GameArtworkFallback";
 import { isGeneratedCatalogArtworkUrl } from "./gameArtworkUtils";
+import { getGameDestination } from "../../features/research-mode/researchRoutes";
+import type { PlayerExperience } from "../../features/research-mode/researchRoutes";
 
 interface Game {
   id: string;
@@ -22,26 +25,71 @@ interface Game {
 }
 
 interface HeroBannerProps {
+  experience?: PlayerExperience;
   featuredGames: Game[];
 }
 
-export default function HeroBanner({ featuredGames }: HeroBannerProps) {
+function HeroFavoriteAction({ gameId }: { gameId: string }) {
+  const [favoriteError, setFavoriteError] = useState("");
+  const {
+    isFavorited,
+    isPending,
+    toggleFavorite: toggleFavoriteState,
+  } = useFavorite(gameId);
+
+  const toggleFavorite = async () => {
+    if (isPending) return;
+    setFavoriteError("");
+    try {
+      await toggleFavoriteState();
+    } catch {
+      setFavoriteError("Could not update your library. Try again.");
+    }
+  };
+
+  return (
+    <button
+      onClick={toggleFavorite}
+      disabled={isPending}
+      title={favoriteError || undefined}
+      type="button"
+      className={`border font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2 disabled:cursor-wait disabled:opacity-60 ${
+        isFavorited
+          ? "bg-synth-elevated border-synth-border text-white hover:bg-synth-surface"
+          : "bg-synth-surface hover:bg-synth-elevated border-synth-border text-white"
+      }`}
+    >
+      {isPending ? (
+        <>
+          <Loader2 className="h-5 w-5 animate-spin" /> Updating...
+        </>
+      ) : isFavorited ? (
+        <>
+          <Check className="w-5 h-5" /> Saved to Library
+        </>
+      ) : (
+        <>
+          <Plus className="w-5 h-5" /> Add to List
+        </>
+      )}
+    </button>
+  );
+}
+
+export default function HeroBanner({
+  experience = "normal",
+  featuredGames,
+}: HeroBannerProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [failedArtworkIds, setFailedArtworkIds] = useState<Set<string>>(
     () => new Set(),
   );
-  const [favoriteError, setFavoriteError] = useState("");
   const navigate = useNavigate();
   const safeCurrentIndex = Math.min(
     currentIndex,
     Math.max(0, featuredGames.length - 1),
   );
   const currentGame = featuredGames[safeCurrentIndex];
-  const {
-    isFavorited,
-    isPending,
-    toggleFavorite: toggleFavoriteState,
-  } = useFavorite(currentGame?.id || "");
 
   // Automatically rotate the banner every 5 seconds
   useEffect(() => {
@@ -51,16 +99,6 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
     }, 5000);
     return () => clearInterval(interval);
   }, [featuredGames]);
-
-  const toggleFavorite = async () => {
-    if (!currentGame || isPending) return;
-    setFavoriteError("");
-    try {
-      await toggleFavoriteState();
-    } catch {
-      setFavoriteError("Could not update your library. Try again.");
-    }
-  };
 
   // Manual Navigation Handlers
   const handlePrev = () => {
@@ -151,38 +189,23 @@ export default function HeroBanner({ featuredGames }: HeroBannerProps) {
 
             <div className="flex flex-wrap gap-4">
               <button
-                onClick={() => navigate(`/play/${currentGame.id}`)}
+                onClick={() =>
+                  navigate(getGameDestination(currentGame.id, experience))
+                }
                 type="button"
                 className="flex items-center gap-2 rounded-lg border border-synth-border bg-synth-primary px-6 py-2.5 font-bold text-white transition-colors hover:bg-synth-primary-hover active:scale-[0.98]"
               >
-                <Play className="w-5 h-5 fill-white" /> Play Now
+                {experience === "research" ? (
+                  <FlaskConical className="h-5 w-5" />
+                ) : (
+                  <Play className="w-5 h-5 fill-white" />
+                )}
+                {experience === "research" ? "Set up research run" : "Play Now"}
               </button>
 
-              <button
-                onClick={toggleFavorite}
-                disabled={isPending}
-                title={favoriteError || undefined}
-                type="button"
-                className={`border font-bold py-2.5 px-6 rounded-lg transition-all flex items-center gap-2 disabled:cursor-wait disabled:opacity-60 ${
-                  isFavorited
-                    ? "bg-synth-elevated border-synth-border text-white hover:bg-synth-surface"
-                    : "bg-synth-surface hover:bg-synth-elevated border-synth-border text-white"
-                }`}
-              >
-                {isPending ? (
-                  <>
-                    <Loader2 className="h-5 w-5 animate-spin" /> Updating...
-                  </>
-                ) : isFavorited ? (
-                  <>
-                    <Check className="w-5 h-5" /> Saved to Library
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-5 h-5" /> Add to List
-                  </>
-                )}
-              </button>
+              {experience === "normal" && (
+                <HeroFavoriteAction gameId={currentGame.id} />
+              )}
             </div>
 
             <div className="flex gap-2 mt-6">

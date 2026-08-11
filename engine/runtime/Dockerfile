@@ -153,8 +153,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 10001 --user-group pixelated \
     && usermod -aG pulse-access pixelated \
-    && mkdir -p /app /cores /roms \
-    && chown -R 10001:10001 /roms /home/pixelated
+    && mkdir -p /app /cores /roms /run/pixelated \
+    && chown -R 10001:10001 /roms /run/pixelated /home/pixelated \
+    && chmod 0700 /run/pixelated
 
 COPY --from=app-builder /usr/local/bin/node /usr/local/bin/node
 COPY --from=app-builder /app/dist /app/dist
@@ -164,7 +165,7 @@ COPY --from=mgba-builder /out/mgba_libretro.so /cores/mgba_libretro.so
 COPY --from=bsnes-builder /out/bsnes_libretro.so /cores/bsnes_libretro.so
 COPY --from=picodrive-builder /out/picodrive_libretro.so /cores/picodrive_libretro.so
 COPY --from=python-builder /out /usr/local/lib/python3.10/dist-packages
-COPY camera.py input_gamepad.py input_keyboard.py /app/
+COPY camera.py camera_config.py camera_protocol.py camera_state.py input_gamepad.py input_keyboard.py /app/
 
 WORKDIR /app
 ENV HOME=/home/pixelated

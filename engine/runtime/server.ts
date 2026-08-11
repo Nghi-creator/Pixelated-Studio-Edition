@@ -35,6 +35,7 @@ import { registerDisplayFrameRoutes } from "./src/http/displayFrameRoutes";
 import { registerErrorHandlers } from "./src/http/errorHandlers";
 import { registerHealthRoutes } from "./src/http/healthRoutes";
 import { registerLocalVaultRoutes } from "./src/http/localVaultRoutes";
+import { registerResearchTelemetryRoutes } from "./src/http/researchTelemetryRoutes";
 import { registerSessionControlRoutes } from "./src/http/sessionControlRoutes";
 import { hardenEngineHttpServer } from "./src/http/serverHardening";
 import { registerSmokeTelemetryRoutes } from "./src/http/smokeTelemetryRoutes";
@@ -63,6 +64,7 @@ import {
   createPublicHealthSnapshot,
   type HealthSnapshotOptions,
 } from "./src/telemetry/healthSnapshot";
+import { createResearchTelemetrySnapshot } from "./src/telemetry/researchTelemetrySnapshot";
 
 type SocketPayload = Record<string, unknown>;
 
@@ -91,6 +93,7 @@ const auth = createEngineTokenAuth(ENGINE_TOKEN, {
 const runtime = createProcessManager({
   cameraPath: HEALTH_PATHS.cameraBridge,
   cameraPeerStatePath: HEALTH_PATHS.cameraPeerState,
+  cameraTelemetryStatePath: HEALTH_PATHS.cameraTelemetryState,
   engineToken: ENGINE_TOKEN,
   gamepadBridgePath: HEALTH_PATHS.gamepadBridge,
   keyboardBridgePath: HEALTH_PATHS.keyboardBridge,
@@ -116,6 +119,11 @@ const getPublicHealthSnapshot = createPublicHealthSnapshot(
 const lobby = createLobbyManager();
 const signalingPeers = createSignalingPeerRegistry();
 const gameLaunchCoordinator = createGameLaunchCoordinator();
+const getResearchTelemetrySnapshot = createResearchTelemetrySnapshot({
+  cameraTelemetryStatePath: HEALTH_PATHS.cameraTelemetryState,
+  getRuntimeState: runtime.getRuntimeState,
+  runtimeKind: ENGINE_RUNTIME_KIND,
+});
 
 registerHealthRoutes(app, getHealthSnapshot, {
   canReadDetails: (request) =>
@@ -131,6 +139,10 @@ registerLocalVaultRoutes(app, {
 });
 registerSmokeTelemetryRoutes(app, {
   getActiveSessionId: runtime.getActiveSessionId,
+  requireEngineToken: auth.requireEngineToken,
+});
+registerResearchTelemetryRoutes(app, {
+  getResearchTelemetrySnapshot,
   requireEngineToken: auth.requireEngineToken,
 });
 registerDisplayFrameRoutes(app, {

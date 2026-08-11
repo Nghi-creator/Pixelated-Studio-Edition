@@ -18,10 +18,27 @@ import { usePlayerStreamSettings } from "../../features/player/hooks/playback/us
 import { usePlayCount } from "../../features/player/hooks/data/usePlayCount";
 import { useStreamPlayback } from "../../features/player/hooks/playback/useStreamPlayback";
 import { useResearchRunState } from "../../features/player/hooks/research/useResearchRunState";
+import { useResearchRunExports } from "../../features/player/hooks/research/useResearchRunExports";
 import { useStreamTelemetryRecording } from "../../features/player/hooks/telemetry/useStreamTelemetryRecording";
+import { useEngineResearchTelemetryRecording } from "../../features/player/hooks/telemetry/useEngineResearchTelemetryRecording";
 import { usePreventGameInputScroll } from "../../features/player/hooks/playback/usePreventGameInputScroll";
 import { STREAM_PROFILES } from "../../lib/engine/streamProfiles";
 import { useWebRTC } from "../../features/player/hooks/webrtc/useWebRTC";
+import { ResearchRunHud } from "../../features/research-mode/components/ResearchRunHud";
+import { ResearchRunResults } from "../../features/research-mode/components/ResearchRunResults";
+import { getPlayerExperiencePolicy } from "../../features/research-mode/playerExperience";
+import type { PlayerExperience } from "../../features/research-mode/researchRoutes";
+import {
+  createDefaultResearchRunConfig,
+  type ResearchRunConfig,
+} from "../../features/research-mode/researchRunConfig";
+import {
+  clearActiveResearchRun,
+  readActiveResearchRun,
+  writeActiveResearchRun,
+} from "../../features/research-mode/researchRunConfigStorage";
+import { useResearchRunController } from "../../features/research-mode/useResearchRunController";
+import { createResearchRunId } from "../../features/player/research/researchRunMetadata";
 
 const PlayerCommunitySection = lazy(() =>
   import("../../features/player/components/community/PlayerCommunitySection").then(
@@ -46,8 +63,65 @@ function PlayerSectionLoading({ label }: { label: string }) {
   );
 }
 
-export default function Player() {
+export default function Player({
+  experience = "normal",
+}: {
+  experience?: PlayerExperience;
+}) {
   const { id } = useParams<{ id: string }>();
+  const [researchConfig] = useState<ResearchRunConfig | null>(() =>
+    experience === "research"
+      ? readActiveResearchRun(window.sessionStorage, id)
+      : null,
+  );
+
+  if (experience === "research" && !researchConfig) {
+    return <MissingResearchRunSetup gameId={id} />;
+  }
+
+  return (
+    <PlayerExperience
+      experience={experience}
+      gameId={id}
+      researchConfig={researchConfig}
+    />
+  );
+}
+
+function MissingResearchRunSetup({ gameId }: { gameId?: string }) {
+  const navigate = useNavigate();
+
+  return (
+    <div className="mx-auto min-h-screen w-full max-w-3xl px-4 pt-28">
+      <section className="mt-6 rounded-lg border border-synth-border bg-synth-surface p-6 text-center shadow-panel">
+        <h1 className="text-2xl font-extrabold text-white">
+          Research setup required
+        </h1>
+        <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-gray-300">
+          This player only starts from a validated, session-scoped run setup.
+          Configure the phase and capture timing before connecting to the game.
+        </p>
+        <button
+          className="mt-5 rounded-lg border border-synth-action-hover bg-synth-action px-5 py-2.5 font-bold text-white transition-colors hover:brightness-110"
+          onClick={() => navigate(`/research/games/${gameId || ""}/setup`)}
+          type="button"
+        >
+          Open run setup
+        </button>
+      </section>
+    </div>
+  );
+}
+
+function PlayerExperience({
+  experience,
+  gameId: id,
+  researchConfig,
+}: {
+  experience: PlayerExperience;
+  gameId: string | undefined;
+  researchConfig: ResearchRunConfig | null;
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -58,6 +132,7 @@ export default function Player() {
   const [activePlayerTool, setActivePlayerTool] = useState<
     "keyboard" | "lobby" | null
   >(null);
+  const experiencePolicy = getPlayerExperiencePolicy(experience);
   const currentUser = useAuthUser();
   const { backRoute, backText, lobbySearch } = usePlayerNavigation(
     location,
@@ -78,7 +153,12 @@ export default function Player() {
     streamProfileId,
     setVolume,
     volume,
-  } = usePlayerStreamSettings();
+  } = usePlayerStreamSettings({
+    isMuted: researchConfig?.audioMuted,
+    persistStreamProfile: experience !== "research",
+    streamProfileId: researchConfig?.streamProfileId,
+    volume: researchConfig?.audioVolume,
+  });
   const {
     baselineForm: researchBaselineForm,
     clearEvents: clearResearchEvents,
@@ -91,7 +171,16 @@ export default function Player() {
     setSessionId: setResearchSessionId,
   } = useResearchRunState({
     gameId: id,
+    initialMetadataForm: researchConfig
+      ? {
+          coldStart: researchConfig.coldStart,
+          networkType: researchConfig.networkType,
+          notes: researchConfig.notes,
+          scenario: researchConfig.scenario,
+        }
+      : undefined,
     playerMode,
+    requestedRunId: researchConfig?.runId,
   });
   const {
     inputCapabilities,
@@ -122,6 +211,8 @@ export default function Player() {
     isRecordingCsv,
     recordedCsvSamples,
     recordedCsvRevision,
+    startCsvRecording,
+    stopCsvRecording,
     toggleCsvRecording,
   } = useStreamTelemetryRecording({
     gameId: id,
@@ -132,7 +223,10 @@ export default function Player() {
   });
   const { authorName, gameRights, gameTitle } = useGameMetadata(id);
 
-  usePlayCount(id, Boolean(id && visibleFrameGameId === id));
+  usePlayCount(
+    id,
+    experiencePolicy.recordPlayCount && Boolean(id && visibleFrameGameId === id),
+  );
   const handleFirstVisibleFrame = useCallback(() => {
     setVisibleFrameGameId(id || null);
     recordResearchEvent("first_non_black_frame");
@@ -177,10 +271,42 @@ export default function Player() {
     stop();
   };
 
-  const resetTelemetryData = () => {
+  const resetTelemetryData = useCallback(() => {
     clearTelemetryCsv();
     clearResearchEvents();
-  };
+  }, [clearResearchEvents, clearTelemetryCsv]);
+
+  const [controllerConfig] = useState(() =>
+    researchConfig || createDefaultResearchRunConfig(id || ""),
+  );
+  const engineTelemetryRecording = useEngineResearchTelemetryRecording({
+    enabled: experience === "research",
+    gameId: id || "",
+    isRecording: isRecordingCsv,
+    runId: researchRunId,
+    sessionId,
+  });
+  const researchController = useResearchRunController({
+    config: controllerConfig,
+    computeSampleCount: engineTelemetryRecording.validComputeSampleCount,
+    currentProfileId: streamProfileId,
+    enabled: experience === "research",
+    firstFrameObserved: visibleFrameGameId === id,
+    isConnectionReady:
+      status === "playing" &&
+      telemetry.connectionState === "connected" &&
+      telemetry.iceConnectionState === "connected",
+    isRecording: isRecordingCsv,
+    onResetCapture: resetTelemetryData,
+    onStartRecording: startCsvRecording,
+    onStopRecording: stopCsvRecording,
+    recordEvent: recordResearchEvent,
+    requiresComputeTelemetry:
+      experience === "research" &&
+      controllerConfig.scenario !== "browser_only_baseline",
+    sampleCount: recordedCsvSamples.length,
+    sessionId,
+  });
 
   usePreventGameInputScroll();
 
@@ -188,6 +314,27 @@ export default function Player() {
     location,
     sessionId,
     shareContext,
+  });
+  const { bundleMetadataJson, canExportBundle, exportBundle } = useResearchRunExports({
+    baselineForm: researchBaselineForm,
+    comparisonCaseId: controllerConfig.comparisonCaseId,
+    events: researchEvents,
+    form: researchMetadataForm,
+    gameId: id,
+    gameTitle,
+    history: [],
+    playerMode,
+    phase: controllerConfig.phase,
+    recordedEngineSamples: engineTelemetryRecording.recordedEngineSamples,
+    recordedCsvSnapshot: {
+      revision: recordedCsvRevision,
+      samples: recordedCsvSamples,
+    },
+    runId: researchRunId,
+    sessionId,
+    shareUrl: experiencePolicy.allowLobbyAndSharing ? shareInvite.url : "",
+    status,
+    streamProfile,
   });
   const playerLayoutClassName = showStreamTelemetry
     ? "max-w-7xl"
@@ -234,7 +381,9 @@ export default function Player() {
               recordedCsvSamples={recordedCsvSamples}
               recordedCsvRevision={recordedCsvRevision}
               sessionId={sessionId}
-              shareUrl={shareInvite.url}
+              shareUrl={
+                experiencePolicy.allowLobbyAndSharing ? shareInvite.url : ""
+              }
               status={status}
               streamProfile={streamProfile}
               telemetry={telemetry}
@@ -252,6 +401,9 @@ export default function Player() {
               gameTitle={gameTitle}
               isPlaybackPaused={status === "playing" && isPlaybackPaused}
               isMuted={isMuted}
+              audioControlsDisabled={experience === "research"}
+              showLobbyControls={experiencePolicy.allowLobbyAndSharing}
+              streamProfileLocked={experience === "research"}
               lobbyParticipantCount={
                 status === "playing" ? lobbyState?.participants.length || 0 : 0
               }
@@ -287,6 +439,20 @@ export default function Player() {
         />
       </PlayerStreamGrid>
 
+      {experience === "research" && (
+        <div className={`w-full ${playerLayoutClassName}`}>
+          <ResearchRunHud
+            config={controllerConfig}
+            computeSampleCount={engineTelemetryRecording.validComputeSampleCount}
+            onCancel={researchController.cancel}
+            onStop={researchController.stopEarly}
+            remainingMs={researchController.remainingMs}
+            sampleCount={recordedCsvSamples.length}
+            state={researchController.state}
+          />
+        </div>
+      )}
+
       <div
         className={`mt-3 flex w-full flex-wrap items-center justify-between gap-2 ${playerLayoutClassName}`}
       >
@@ -305,31 +471,64 @@ export default function Player() {
         />
       </div>
 
-      <LobbyPanel
-        currentParticipant={localParticipant}
-        inputCapabilities={inputCapabilities}
-        isOpen={activePlayerTool === "lobby"}
-        lobbyState={lobbyState}
-        onClose={() => setActivePlayerTool(null)}
-        onKickParticipant={kickParticipant}
-        onReleaseSlot={releasePlayerSlot}
-        onRequestSlot={requestPlayerSlot}
-        shareGuidance={shareInvite.guidance}
-        shareText={shareInvite.text}
-        shareUrl={shareInvite.url}
-      />
+      {experience === "research" &&
+        (researchController.state.stage === "completed" ||
+          researchController.state.stage === "invalid" ||
+          researchController.state.stage === "cancelled") && (
+          <ResearchRunResults
+            canExport={canExportBundle}
+            config={controllerConfig}
+            computeSampleCount={engineTelemetryRecording.validComputeSampleCount}
+            latestEncoderSample={engineTelemetryRecording.latestEncoderSample}
+            latestEngineSample={engineTelemetryRecording.latestEngineSample}
+            metadataPreviewJson={bundleMetadataJson}
+            onExport={() => void exportBundle()}
+            onRetake={() => {
+              const nextConfig = {
+                ...controllerConfig,
+                runId: createResearchRunId(),
+              };
+              writeActiveResearchRun(window.sessionStorage, nextConfig);
+              navigate(`/research/games/${id || ""}/setup`);
+            }}
+            onReturnToLibrary={() => {
+              clearActiveResearchRun(window.sessionStorage);
+              navigate("/home");
+            }}
+            state={researchController.state}
+            telemetry={telemetry}
+          />
+        )}
+
+      {experiencePolicy.allowLobbyAndSharing && (
+        <LobbyPanel
+          currentParticipant={localParticipant}
+          inputCapabilities={inputCapabilities}
+          isOpen={activePlayerTool === "lobby"}
+          lobbyState={lobbyState}
+          onClose={() => setActivePlayerTool(null)}
+          onKickParticipant={kickParticipant}
+          onReleaseSlot={releasePlayerSlot}
+          onRequestSlot={requestPlayerSlot}
+          shareGuidance={shareInvite.guidance}
+          shareText={shareInvite.text}
+          shareUrl={shareInvite.url}
+        />
+      )}
       {activePlayerTool === "keyboard" && (
         <KeyboardMappingDrawer onClose={() => setActivePlayerTool(null)} />
       )}
 
-      <Suspense fallback={<PlayerSectionLoading label="Loading community…" />}>
-        <PlayerCommunitySection
-          currentUser={currentUser}
-          gameId={id}
-          layoutClassName={playerLayoutClassName}
-          onSignIn={() => navigate("/login")}
-        />
-      </Suspense>
+      {experiencePolicy.showCommunity && (
+        <Suspense fallback={<PlayerSectionLoading label="Loading community…" />}>
+          <PlayerCommunitySection
+            currentUser={currentUser}
+            gameId={id}
+            layoutClassName={playerLayoutClassName}
+            onSignIn={() => navigate("/login")}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }
