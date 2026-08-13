@@ -111,7 +111,15 @@ export function usePlayerResearchSession({
     streamProfile,
   });
 
-  return { config, controller, engineTelemetry, exports, recording };
+  return {
+    baselineForm: researchState.baselineForm,
+    config,
+    controller,
+    engineTelemetry,
+    exports,
+    recording,
+    setBaselineForm: researchState.setBaselineForm,
+  };
 }
 
 export type PlayerResearchSession = ReturnType<

@@ -16,7 +16,15 @@ export function ResearchPlayerOutput({
   session: PlayerResearchSession;
   telemetry: WebRTCTelemetry;
 }) {
-  const { config, controller, engineTelemetry, exports, recording } = session;
+  const {
+    baselineForm,
+    config,
+    controller,
+    engineTelemetry,
+    exports,
+    recording,
+    setBaselineForm,
+  } = session;
   const showResults =
     controller.state.stage === "completed" ||
     controller.state.stage === "invalid" ||
@@ -39,12 +47,14 @@ export function ResearchPlayerOutput({
       {showResults && (
         <ResearchRunResults
           canExport={exports.canExportBundle}
+          baselineForm={baselineForm}
           config={config}
           computeSampleCount={engineTelemetry.validComputeSampleCount}
           latestEncoderSample={engineTelemetry.latestEncoderSample}
           latestEngineSample={engineTelemetry.latestEngineSample}
           layoutClassName={layoutClassName}
           metadataPreviewJson={exports.bundleMetadataJson}
+          onBaselineFormChange={setBaselineForm}
           onExport={() => void exports.exportBundle()}
           onExportCsv={() => void exports.exportCsvFiles()}
           onRetake={onRetake}

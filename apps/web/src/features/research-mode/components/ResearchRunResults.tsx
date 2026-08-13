@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import type { WebRTCTelemetry } from "../../../lib/webrtc/telemetry/webrtcTelemetry";
 import type { EngineResearchTelemetrySample } from "../../player/telemetry/engineResearchTelemetry";
+import { ResearchBaselineFields } from "../../player/components/research/ResearchBaselineFields";
+import type { ResearchBaselineForm } from "../../player/research/researchBaseline";
 import type { ResearchRunConfig } from "../researchRunConfig";
 import {
   getResearchRecordingDurationMs,
@@ -18,6 +20,7 @@ function formatMetric(value: number | null, suffix = "") {
 }
 
 export function ResearchRunResults({
+  baselineForm,
   canExport,
   config,
   computeSampleCount = 0,
@@ -25,6 +28,7 @@ export function ResearchRunResults({
   latestEngineSample = null,
   layoutClassName,
   metadataPreviewJson,
+  onBaselineFormChange,
   onExport,
   onExportCsv,
   onReturnToLibrary,
@@ -32,6 +36,7 @@ export function ResearchRunResults({
   state,
   telemetry,
 }: {
+  baselineForm: ResearchBaselineForm;
   canExport: boolean;
   config: ResearchRunConfig;
   computeSampleCount?: number;
@@ -39,6 +44,7 @@ export function ResearchRunResults({
   latestEngineSample?: EngineResearchTelemetrySample | null;
   layoutClassName: string;
   metadataPreviewJson: string;
+  onBaselineFormChange: (form: ResearchBaselineForm) => void;
   onExport: () => void;
   onExportCsv: () => void;
   onReturnToLibrary: () => void;
@@ -140,6 +146,13 @@ export function ResearchRunResults({
           </div>
         ))}
       </dl>
+
+      {config.scenario === "browser_only_baseline" && (
+        <ResearchBaselineFields
+          form={baselineForm}
+          onChange={onBaselineFormChange}
+        />
+      )}
 
       <details className="mt-5 rounded-lg border border-synth-border bg-synth-bg">
         <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-white">

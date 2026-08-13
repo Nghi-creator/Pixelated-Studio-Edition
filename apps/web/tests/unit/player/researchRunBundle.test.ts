@@ -16,6 +16,9 @@ import {
   createResearchRunExportArtifacts,
   selectResearchRunCsvFiles,
 } from "../../../src/features/player/research/researchRunExportArtifacts.ts";
+import { createResearchRunEvent } from "../../../src/features/player/research/researchRunEvents.ts";
+import { createUnavailableEngineTelemetrySamples } from "../../../src/features/player/telemetry/engineResearchTelemetry.ts";
+import type { StreamTelemetryCsvSample } from "../../../src/features/player/telemetry/streamTelemetryExport.ts";
 
 const v1FixtureDirectory = fileURLToPath(
   new URL("../../fixtures/research-bundle-v1/", import.meta.url),
@@ -180,6 +183,73 @@ test("research export artifacts preserve browser-only missing evidence", () => {
     selectResearchRunCsvFiles(files).map((file) => file.name),
     ["stream-telemetry.csv", "stream-events.csv", "engine-telemetry.csv"],
   );
+});
+
+test("formal research artifacts omit diagnostic error text", () => {
+  const browserSample: StreamTelemetryCsvSample = {
+    availableIncomingBitrateKbps: null,
+    bitrateKbps: null,
+    capturedAt: "2026-08-10T00:00:01.000Z",
+    connectionState: "failed",
+    decodeTimeMeanMs: null,
+    elapsedMs: 1_000,
+    fps: null,
+    framesDecoded: null,
+    framesDropped: null,
+    freezeCount: null,
+    freezeDurationTotalMs: null,
+    gameId: "game-1",
+    iceConnectionState: "failed",
+    jitterBufferDelayMeanMs: null,
+    jitterMs: null,
+    keyFramesDecoded: null,
+    lastEngineError: "open /Users/alice/private/game.nes failed",
+    packetsLostDelta: 0,
+    packetsLostTotal: 0,
+    playerMode: "host",
+    roundTripTimeMs: null,
+    sessionId: "session-1",
+    status: "error",
+  };
+  const engineSamples = createUnavailableEngineTelemetrySamples({
+    capturedAt: "2026-08-10T00:00:01.000Z",
+    elapsedMs: 1_000,
+    error: "read C:\\Users\\alice\\private failed",
+    gameId: "game-1",
+    runId: "run-1",
+    sessionId: "session-1",
+  });
+  const event = createResearchRunEvent({
+    details: {
+      message: "open /Users/alice/private/game.nes failed",
+      source: "engine-error",
+    },
+    name: "engine_error",
+    nowMs: Date.parse("2026-08-10T00:00:01.000Z"),
+    runId: "run-1",
+    runStartedAt: Date.parse("2026-08-10T00:00:00.000Z"),
+    sessionId: "session-1",
+  });
+  const files = createResearchRunExportArtifacts({
+    comparisonCaseId: "case-1",
+    engineSamples,
+    events: [event],
+    graphPng: null,
+    metadataJson: "{}\n",
+    phase: "healthy",
+    recordedAt: new Date("2026-08-10T00:00:02.000Z"),
+    runId: "run-1",
+    samples: [browserSample],
+    summaryJson: "{}\n",
+  });
+  const exportedText = files
+    .filter((file) => typeof file.data === "string")
+    .map((file) => file.data)
+    .join("\n");
+
+  assert.equal(exportedText.includes("/Users/alice"), false);
+  assert.equal(exportedText.includes("C:\\Users\\alice"), false);
+  assert.match(exportedText, /engine-error/);
 });
 
 test("research run bundle entries cannot escape through tar paths", () => {

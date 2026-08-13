@@ -29,24 +29,62 @@ export const RESEARCH_RUN_EVENT_CSV_HEADERS = [
   "details_json",
 ] as const;
 
-const PRIVATE_EVENT_DETAIL_KEYS = new Set(["peerId", "rawPeerId"]);
+const SAFE_DETAIL_KEYS_BY_EVENT: Partial<
+  Record<ResearchRunEventName, ReadonlySet<string>>
+> = {
+  backend_session_created: new Set(["mode", "runtimeId"]),
+  backend_session_requested: new Set(["gameId"]),
+  connection_disconnected: new Set(["connectionState", "iceConnectionState"]),
+  connection_failed: new Set(["connectionState", "iceConnectionState"]),
+  connection_recovered: new Set(["connectionState", "iceConnectionState"]),
+  engine_error: new Set(["code", "reason", "source"]),
+  engine_reconnect_waiting: new Set(["reason"]),
+  play_clicked: new Set(["gameId", "playerMode"]),
+  remote_track_received: new Set(["kind"]),
+  research_recording_completed: new Set([
+    "completionKind",
+    "computeSampleCount",
+    "sampleCount",
+  ]),
+  research_recording_started: new Set(["durationMs"]),
+  research_run_invalidated: new Set(["reason"]),
+  research_warmup_started: new Set(["durationMs"]),
+  retry_started: new Set(["reason"]),
+  start_game_emitted: new Set([
+    "mode",
+    "restart",
+    "runtimeId",
+    "streamProfileId",
+  ]),
+  stream_playing: new Set(["trackKind"]),
+};
 
-function sanitizeDetailValue(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sanitizeDetailValue);
-  if (!value || typeof value !== "object") return value;
+const SAFE_IDENTIFIER = /^[A-Za-z0-9_.:-]{1,128}$/;
+const SAFE_REASON = /^[A-Za-z0-9 _.,:'()-]{1,256}$/;
 
-  return Object.fromEntries(
-    Object.entries(value)
-      .filter(([key]) => !PRIVATE_EVENT_DETAIL_KEYS.has(key))
-      .map(([key, nestedValue]) => [key, sanitizeDetailValue(nestedValue)]),
-  );
+function sanitizeDetailValue(key: string, value: unknown): unknown {
+  if (value === null || typeof value === "boolean") return value;
+  if (typeof value === "number") return Number.isFinite(value) ? value : undefined;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim();
+  if (key === "reason") return SAFE_REASON.test(normalized) ? normalized : undefined;
+  return SAFE_IDENTIFIER.test(normalized) ? normalized : undefined;
 }
 
 export function sanitizeResearchRunEventDetails(
+  name: ResearchRunEventName,
   details: Record<string, unknown> | null | undefined,
 ) {
   if (!details) return null;
-  const sanitized = sanitizeDetailValue(details) as Record<string, unknown>;
+  const allowedKeys = SAFE_DETAIL_KEYS_BY_EVENT[name];
+  if (!allowedKeys) return null;
+  const sanitized = Object.fromEntries(
+    Object.entries(details).flatMap(([key, value]) => {
+      if (!allowedKeys.has(key)) return [];
+      const sanitizedValue = sanitizeDetailValue(key, value);
+      return sanitizedValue === undefined ? [] : [[key, sanitizedValue]];
+    }),
+  );
   return Object.keys(sanitized).length > 0 ? sanitized : null;
 }
 
@@ -75,7 +113,7 @@ export function createResearchRunEvent({
 }): ResearchRunEvent {
   return {
     capturedAt: new Date(nowMs).toISOString(),
-    details: sanitizeResearchRunEventDetails(details),
+    details: sanitizeResearchRunEventDetails(name, details),
     elapsedMs: Math.max(0, nowMs - runStartedAt),
     name,
     runId,
@@ -85,7 +123,7 @@ export function createResearchRunEvent({
 
 export function researchRunEventsToCsv(events: ResearchRunEvent[]) {
   const rows = events.map((event) => {
-    const details = sanitizeResearchRunEventDetails(event.details);
+    const details = sanitizeResearchRunEventDetails(event.name, event.details);
     return [
       event.capturedAt,
       event.elapsedMs,

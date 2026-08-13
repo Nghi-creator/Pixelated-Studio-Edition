@@ -73,6 +73,8 @@ export function createResearchBundleManifest({
         "username",
         "absolutePath",
         "rawPeerId",
+        "lastEngineError",
+        "telemetryError",
       ],
       sanitized: true,
     },

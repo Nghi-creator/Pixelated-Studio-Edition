@@ -2,6 +2,7 @@
 
 **Status:** Implemented and verified for the P0 controlled-run workflow  
 **Consumer:** `latency_fingerprinting` Pixelated bundle adapter
+**Last verified:** 2026-08-13
 
 ## Purpose and scope
 
@@ -162,13 +163,18 @@ adapter. They contain complete browser, engine and encoder evidence. The
 degraded run shows repeated compute/encoder pressure and a partial response to
 the Performance-profile relief.
 
-Remaining work belongs to the experiment record rather than this application:
+The downstream P0 record is complete. Controlled run 001 produced a valid
+observation and correctly returned `unknown` against incompatible synthetic
+references; its response was then frozen as an explicitly unvalidated
+controlled-real seed. Independently captured run 002 matched that seed with
+provisional strength `0.9819067687174997`, 22 shared features and full feature
+coverage.
 
-- finalize the anonymized `context.json`;
-- record the intervention/probe and restoration evidence;
-- derive the observation and match result;
-- preserve the conclusion as controlled-real P0 feasibility evidence, not a
-  general product-accuracy claim.
+That result is preliminary within-context repeatability evidence only. One
+compatible seed and deterministic effects from applying the same composite
+Performance preset do not establish cause discrimination, diagnosis accuracy,
+recovery benefit or generalization. The authoritative derived records and
+limitations live in the `latency_fingerprinting` repository.
 
 ## Deferred work
 

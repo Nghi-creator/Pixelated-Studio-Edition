@@ -29,9 +29,12 @@ test("research run events capture elapsed time and optional details", () => {
   );
 });
 
-test("research run events csv quotes details JSON", () => {
+test("research run events keep allowlisted details and omit raw error messages", () => {
   const event = createResearchRunEvent({
-    details: { message: "line one\nline two", source: "engine-error" },
+    details: {
+      message: "open /Users/alice/private/game.nes failed",
+      source: "engine-error",
+    },
     name: "engine_error",
     nowMs: Date.parse("2026-07-04T02:03:05.000Z"),
     runId: "edge-run-1",
@@ -43,13 +46,14 @@ test("research run events csv quotes details JSON", () => {
     researchRunEventsToCsv([event]),
     [
       "captured_at,elapsed_ms,run_id,session_id,event,details_json",
-      '2026-07-04T02:03:05.000Z,1000,edge-run-1,session-1,engine_error,"{""message"":""line one\\nline two"",""source"":""engine-error""}"',
+      '2026-07-04T02:03:05.000Z,1000,edge-run-1,session-1,engine_error,"{""source"":""engine-error""}"',
     ].join("\n"),
   );
+  assert.equal(researchRunEventsToCsv([event]).includes("/Users/alice"), false);
 });
 
-test("research run events recursively omit private peer identities", () => {
-  const details = sanitizeResearchRunEventDetails({
+test("research run events allowlist bounded non-identifying details", () => {
+  const details = sanitizeResearchRunEventDetails("retry_started", {
     peerId: "peer-top-level",
     reason: "runtime-switch",
     signaling: {
@@ -63,7 +67,7 @@ test("research run events recursively omit private peer identities", () => {
       reason: "runtime-switch",
       signaling: { attempt: 2, rawPeerId: "peer-nested" },
     },
-    name: "offer_sent",
+    name: "retry_started",
     nowMs: Date.parse("2026-07-04T02:03:05.000Z"),
     runId: "edge-run-1",
     runStartedAt: Date.parse("2026-07-04T02:03:04.000Z"),
@@ -78,7 +82,6 @@ test("research run events recursively omit private peer identities", () => {
 
   assert.deepEqual(details, {
     reason: "runtime-switch",
-    signaling: { attempt: 2 },
   });
   assert.equal(csv.includes("peer-top-level"), false);
   assert.equal(csv.includes("peer-nested"), false);
