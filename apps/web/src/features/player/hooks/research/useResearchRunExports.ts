@@ -202,8 +202,6 @@ export function useResearchRunExports({
     status,
   ]);
 
-  const summary = useMemo(() => createSummary(), [createSummary]);
-
   const exportMetadata = useCallback(async () => {
     const capturedAt = new Date();
     await downloadText(
@@ -342,6 +340,5 @@ export function useResearchRunExports({
     isBrowserBaseline,
     pythonReadyElapsedMs: findFirstEventElapsedMs(events, "python_ready"),
     startGameElapsedMs: findFirstEventElapsedMs(events, "start_game_emitted"),
-    summary,
   };
 }
