@@ -32,6 +32,8 @@ export type ResearchBaseline = {
   };
 };
 
+export type SanitizedResearchBaseline = Omit<ResearchBaseline, "notes">;
+
 function optionalNumber(value: string) {
   const trimmed = value.trim();
   if (!trimmed) return null;
@@ -90,6 +92,20 @@ export function createResearchBaseline({
 }
 
 export function researchBaselineToJson(baseline: ResearchBaseline) {
+  return `${JSON.stringify(baseline, null, 2)}\n`;
+}
+
+export function sanitizeResearchBaseline(
+  baseline: ResearchBaseline,
+): SanitizedResearchBaseline {
+  return Object.fromEntries(
+    Object.entries(baseline).filter(([key]) => key !== "notes"),
+  ) as SanitizedResearchBaseline;
+}
+
+export function sanitizedResearchBaselineToJson(
+  baseline: SanitizedResearchBaseline,
+) {
   return `${JSON.stringify(baseline, null, 2)}\n`;
 }
 

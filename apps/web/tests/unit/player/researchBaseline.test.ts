@@ -5,6 +5,8 @@ import {
   createResearchBaseline,
   createResearchBaselineFilename,
   researchBaselineToJson,
+  sanitizeResearchBaseline,
+  sanitizedResearchBaselineToJson,
   type ResearchBaselineForm,
 } from "../../../src/features/player/research/researchBaseline.ts";
 import type { ResearchRunMetadata } from "../../../src/features/player/research/researchRunMetadata.ts";
@@ -131,6 +133,29 @@ test("research baseline JSON is pretty printed with trailing newline", () => {
 
   assert.match(json, /\n {2}"scenario": "browser_only_baseline",\n/);
   assert.equal(json.endsWith("\n"), true);
+});
+
+test("formal research baseline omits free-text notes", () => {
+  const baseline = createResearchBaseline({
+    form: {
+      browserMemoryMb: "512",
+      cpuNotes: "username alice on host workstation.local",
+      deviceNotes: "/Users/alice/private",
+      emulatorId: "wasm-nes",
+      fps: "60",
+      startupMs: "1000",
+    },
+    metadata,
+    userAgent: "unit-test-browser",
+  });
+  const sanitized = sanitizeResearchBaseline(baseline);
+  const json = sanitizedResearchBaselineToJson(sanitized);
+
+  assert.equal("notes" in sanitized, false);
+  assert.equal(json.includes("alice"), false);
+  assert.equal(json.includes("/Users/"), false);
+  assert.equal(sanitized.measurements.browserMemoryMb, 512);
+  assert.equal(sanitized.wasmRuntime.emulatorId, "wasm-nes");
 });
 
 test("research baseline filenames are filesystem-safe", () => {

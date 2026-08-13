@@ -325,7 +325,7 @@ async function run() {
     await page.getByRole("button", { name: "Hide stream stats" }).click();
     await page.getByText("telemetry-hidden").waitFor();
     await streamStage
-      .locator('button.rounded-full[aria-label="Toggle stream telemetry"]')
+      .getByRole("button", { name: "Toggle stream telemetry" })
       .click();
     await page.getByText("telemetry-toggle-on").waitFor();
     await page.getByText("Stream Stats").waitFor();

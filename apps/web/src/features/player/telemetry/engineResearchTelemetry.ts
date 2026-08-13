@@ -44,6 +44,68 @@ export type EngineResearchTelemetryResponse = {
   sessionId: string;
 };
 
+export const MAX_ENGINE_RESEARCH_TELEMETRY_ROWS = 10_000;
+
+export class EngineResearchTelemetryBuffer {
+  private readonly maxRows: number;
+  private readonly values: EngineResearchTelemetrySample[] = [];
+  private engineCpuSampleCount = 0;
+  private encoderSampleCount = 0;
+  private latestEncoderSample: EngineResearchTelemetrySample | null = null;
+  private latestEngineSample: EngineResearchTelemetrySample | null = null;
+
+  constructor(maxRows = MAX_ENGINE_RESEARCH_TELEMETRY_ROWS) {
+    if (!Number.isInteger(maxRows) || maxRows <= 0) {
+      throw new Error("Engine research telemetry row limit must be positive.");
+    }
+    this.maxRows = maxRows;
+  }
+
+  append(samples: EngineResearchTelemetrySample[]) {
+    let appended = false;
+    for (const sample of samples) {
+      if (this.values.length >= this.maxRows) break;
+      this.values.push(sample);
+      appended = true;
+      if (sample.source === "engine_runtime") {
+        this.latestEngineSample = sample;
+        if (
+          sample.available &&
+          sample.nodeCpuPercent !== null &&
+          sample.emulatorCpuPercent !== null &&
+          sample.cameraCpuPercent !== null
+        ) {
+          this.engineCpuSampleCount += 1;
+        }
+      } else {
+        this.latestEncoderSample = sample;
+        if (sample.available) this.encoderSampleCount += 1;
+      }
+    }
+    return appended;
+  }
+
+  clear() {
+    this.values.length = 0;
+    this.engineCpuSampleCount = 0;
+    this.encoderSampleCount = 0;
+    this.latestEncoderSample = null;
+    this.latestEngineSample = null;
+  }
+
+  get snapshot() {
+    return {
+      latestEncoderSample: this.latestEncoderSample,
+      latestEngineSample: this.latestEngineSample,
+      recordedEngineSamples: this.values,
+      validComputeSampleCount: Math.min(
+        this.engineCpuSampleCount,
+        this.encoderSampleCount,
+      ),
+    };
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }

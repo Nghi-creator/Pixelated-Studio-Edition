@@ -6,6 +6,8 @@ import {
   createResearchBaseline,
   createResearchBaselineFilename,
   researchBaselineToJson,
+  sanitizeResearchBaseline,
+  sanitizedResearchBaselineToJson,
   type ResearchBaselineForm,
 } from "../../research/researchBaseline";
 import {
@@ -146,6 +148,21 @@ export function useResearchRunExports({
     [baselineForm, createMetadata],
   );
 
+  const buildSanitizedBaselineJson = useCallback(
+    (capturedAt: Date) =>
+      sanitizedResearchBaselineToJson(
+        sanitizeResearchBaseline(
+          createResearchBaseline({
+            capturedAt,
+            form: baselineForm,
+            metadata: createMetadata(capturedAt),
+            userAgent: navigator.userAgent,
+          }),
+        ),
+      ),
+    [baselineForm, createMetadata],
+  );
+
   const createSummary = useCallback((generatedAt = new Date()) =>
     createResearchRunSummary({
       engineSamples: recordedEngineSamples,
@@ -184,8 +201,6 @@ export function useResearchRunExports({
     playerMode,
     status,
   ]);
-
-  const summary = useMemo(() => createSummary(), [createSummary]);
 
   const exportMetadata = useCallback(async () => {
     const capturedAt = new Date();
@@ -235,7 +250,9 @@ export function useResearchRunExports({
 
   const buildExportArtifacts = useCallback(
     (recordedAt: Date) => createResearchRunExportArtifacts({
-      baselineJson: isBrowserBaseline ? buildBaselineJson(recordedAt) : undefined,
+      baselineJson: isBrowserBaseline
+        ? buildSanitizedBaselineJson(recordedAt)
+        : undefined,
       comparisonCaseId: resolvedComparisonCaseId,
       engineSamples: recordedEngineSamples,
       events,
@@ -248,7 +265,7 @@ export function useResearchRunExports({
       summaryJson: buildSummaryJson(recordedAt),
     }),
     [
-      buildBaselineJson,
+      buildSanitizedBaselineJson,
       buildGraphPng,
       buildSummaryJson,
       bundleMetadataJson,
@@ -323,6 +340,5 @@ export function useResearchRunExports({
     isBrowserBaseline,
     pythonReadyElapsedMs: findFirstEventElapsedMs(events, "python_ready"),
     startGameElapsedMs: findFirstEventElapsedMs(events, "start_game_emitted"),
-    summary,
   };
 }

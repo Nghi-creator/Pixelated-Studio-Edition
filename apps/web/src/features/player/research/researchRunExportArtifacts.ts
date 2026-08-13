@@ -124,13 +124,24 @@ export function createResearchRunExportArtifacts({
   samples: StreamTelemetryCsvSample[];
   summaryJson: string;
 }): ResearchRunBundleFile[] {
+  const sanitizedSamples = samples.map((sample) => ({
+    ...sample,
+    lastEngineError: null,
+  }));
+  const sanitizedEngineSamples = engineSamples.map((sample) => ({
+    ...sample,
+    error: null,
+  }));
   const contentFiles: ResearchRunBundleFile[] = [
     { data: metadataJson, name: "run-metadata.json" },
-    { data: streamTelemetrySamplesToCsv(samples), name: "stream-telemetry.csv" },
+    {
+      data: streamTelemetrySamplesToCsv(sanitizedSamples),
+      name: "stream-telemetry.csv",
+    },
     { data: researchRunEventsToCsv(events), name: "stream-events.csv" },
     { data: summaryJson, name: "summary.json" },
     {
-      data: engineResearchTelemetrySamplesToCsv(engineSamples),
+      data: engineResearchTelemetrySamplesToCsv(sanitizedEngineSamples),
       name: "engine-telemetry.csv",
     },
   ];

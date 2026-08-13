@@ -13,8 +13,8 @@ cross-package, workflow, deploy, smoke-test, lockfile, or PR-scale changes.
 - `agent-rules.md`: persistent agent/Git ownership rules for this repository.
 - `operations.md`: verification matrix, deploy/smoke commands, CI tripwires,
   artifact policy, and remaining desktop release validation.
-- `research-validation.md`: implemented research evidence contract and current
-  experiment procedure.
+- `research-mode.md`: implemented research-mode workflow, v2 evidence contract,
+  downstream P0 result, and deferred product work.
 
 ## Active Operational Checklists
 

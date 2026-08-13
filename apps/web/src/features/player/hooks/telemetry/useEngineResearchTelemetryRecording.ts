@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { engineAuthHeaders } from "../../../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../../../lib/engine/engineConfig";
 import { engineFetch } from "../../../../lib/engine/engineRequest";
 import {
   createEngineResearchTelemetrySamples,
   createUnavailableEngineTelemetrySamples,
+  EngineResearchTelemetryBuffer,
   parseEngineResearchTelemetryResponse,
   type EngineResearchTelemetrySample,
 } from "../../telemetry/engineResearchTelemetry";
@@ -25,7 +26,8 @@ export function useEngineResearchTelemetryRecording({
   sessionId: string;
 }) {
   const recordingStartedAtRef = useRef<number | null>(null);
-  const [samples, setSamples] = useState<EngineResearchTelemetrySample[]>([]);
+  const [buffer] = useState(() => new EngineResearchTelemetryBuffer());
+  const [snapshot, setSnapshot] = useState(() => buffer.snapshot);
 
   useEffect(() => {
     if (!enabled || !isRecording) {
@@ -33,9 +35,12 @@ export function useEngineResearchTelemetryRecording({
       return;
     }
     recordingStartedAtRef.current = Date.now();
-    const resetId = window.setTimeout(() => setSamples([]), 0);
+    const resetId = window.setTimeout(() => {
+      buffer.clear();
+      setSnapshot(buffer.snapshot);
+    }, 0);
     return () => window.clearTimeout(resetId);
-  }, [enabled, isRecording]);
+  }, [buffer, enabled, isRecording]);
 
   useEffect(() => {
     if (!enabled || !isRecording || !sessionId) return;
@@ -44,7 +49,7 @@ export function useEngineResearchTelemetryRecording({
 
     const append = (samples: EngineResearchTelemetrySample[]) => {
       if (!active) return;
-      setSamples((current) => [...current, ...samples]);
+      if (buffer.append(samples)) setSnapshot(buffer.snapshot);
     };
     const poll = async () => {
       if (pollInFlight || !recordingStartedAtRef.current) return;
@@ -98,31 +103,7 @@ export function useEngineResearchTelemetryRecording({
       active = false;
       window.clearInterval(intervalId);
     };
-  }, [enabled, gameId, isRecording, runId, sessionId]);
+  }, [buffer, enabled, gameId, isRecording, runId, sessionId]);
 
-  return useMemo(() => {
-    const engineCpuSamples = samples.filter(
-      (sample) =>
-        sample.source === "engine_runtime" &&
-        sample.available &&
-        sample.nodeCpuPercent !== null &&
-        sample.emulatorCpuPercent !== null &&
-        sample.cameraCpuPercent !== null,
-    ).length;
-    const encoderSamples = samples.filter(
-      (sample) => sample.source === "encoder_pipeline" && sample.available,
-    ).length;
-    const latestEngineSample = [...samples]
-      .reverse()
-      .find((sample) => sample.source === "engine_runtime") || null;
-    const latestEncoderSample = [...samples]
-      .reverse()
-      .find((sample) => sample.source === "encoder_pipeline") || null;
-    return {
-      latestEncoderSample,
-      latestEngineSample,
-      recordedEngineSamples: samples,
-      validComputeSampleCount: Math.min(engineCpuSamples, encoderSamples),
-    };
-  }, [samples]);
+  return snapshot;
 }

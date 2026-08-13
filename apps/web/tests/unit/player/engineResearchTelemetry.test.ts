@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   createEngineResearchTelemetrySamples,
   createUnavailableEngineTelemetrySamples,
+  EngineResearchTelemetryBuffer,
   engineResearchTelemetrySamplesToCsv,
   parseEngineResearchTelemetryResponse,
 } from "../../../src/features/player/telemetry/engineResearchTelemetry.ts";
@@ -114,4 +115,36 @@ test("engine telemetry CSV keeps contract metric order", () => {
       "2026-08-10T01:02:03.000Z,1000,1,run-1,session-1,game-1,encoder_pipeline,true,,,,,,,,,,,,,,,101,99,2,3,,1500,60,6,48",
     ].join("\n"),
   );
+});
+
+test("engine telemetry buffer updates summaries incrementally and stays bounded", () => {
+  const buffer = new EngineResearchTelemetryBuffer(3);
+  const firstPoll = createEngineResearchTelemetrySamples({
+    elapsedMs: 1_000,
+    gameId: "game-1",
+    response,
+    runId: "run-1",
+  });
+  const secondPoll = createEngineResearchTelemetrySamples({
+    elapsedMs: 2_000,
+    gameId: "game-1",
+    response,
+    runId: "run-1",
+  });
+
+  assert.equal(buffer.append(firstPoll), true);
+  assert.equal(buffer.snapshot.validComputeSampleCount, 1);
+  assert.equal(buffer.append(secondPoll), true);
+  assert.equal(buffer.snapshot.recordedEngineSamples.length, 3);
+  assert.equal(buffer.snapshot.latestEngineSample?.elapsedMs, 2_000);
+  assert.equal(buffer.snapshot.latestEncoderSample?.elapsedMs, 1_000);
+  assert.equal(buffer.snapshot.validComputeSampleCount, 1);
+  assert.equal(buffer.append(secondPoll), false);
+
+  const stableSamples = buffer.snapshot.recordedEngineSamples;
+  buffer.clear();
+  assert.equal(buffer.snapshot.recordedEngineSamples, stableSamples);
+  assert.equal(buffer.snapshot.recordedEngineSamples.length, 0);
+  assert.equal(buffer.snapshot.validComputeSampleCount, 0);
+  assert.equal(buffer.snapshot.latestEngineSample, null);
 });
