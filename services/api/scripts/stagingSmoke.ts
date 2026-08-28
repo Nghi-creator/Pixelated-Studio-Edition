@@ -493,7 +493,8 @@ async function predeploySubmissionCleanupPolicyCheck() {
   if (upload.error) {
     throw new Error(
       "Hosted submission storage upload probe failed before cleanup could be verified. " +
-        "Verify the authenticated submissions upload policy and staging smoke account. " +
+        "Apply migration supabase/migrations/20260828170000_repair_account_asset_storage_policies.sql " +
+        "and verify the staging smoke account is a permanent authenticated user. " +
         `details=${formatStorageError(upload.error)}`,
     );
   }
@@ -503,7 +504,7 @@ async function predeploySubmissionCleanupPolicyCheck() {
   if (removal.error) {
     throw new Error(
       "Hosted submission cleanup storage policy is missing or denying authenticated cleanup. " +
-        "Apply migration supabase/migrations/20260828130000_harden_profile_and_account_storage.sql " +
+        "Apply migration supabase/migrations/20260828170000_repair_account_asset_storage_policies.sql " +
         "to the hosted Supabase project before deploying. " +
         `Delete failed for submissions/${objectPath}; details=${formatStorageError(removal.error)}`,
     );

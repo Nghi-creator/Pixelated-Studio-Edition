@@ -83,7 +83,7 @@ Hosted predeploy gate:
 npm run predeploy:hosted
 ```
 
-`predeploy:hosted` checks hosted access-log schema, submission cleanup policy, catalog RPC shape, catalog candidate import validation, typecheck, lint, and build.
+`predeploy:hosted` checks hosted access-log schema, submission cleanup policy, catalog RPC shape, catalog candidate import validation, typecheck, lint, and build. It runs every check and reports all failures together instead of stopping at the first failed check.
 
 ## Maintenance scripts
 
