@@ -39,7 +39,23 @@ test("native lock manifest matches allowlisted launch manifests and Docker pins"
     const manifest = getNativeLaunchManifest(pkg.manifestId);
     assert.equal(manifest?.executable, pkg.executable);
     assert.deepEqual(manifest?.args, pkg.args);
-    assert.match(dockerfile, new RegExp(`${pkg.packageName}=${pkg.packageVersion.replaceAll("+", "\\+")}`));
+    if (pkg.packageName === "neverball") {
+      assert.match(dockerfile, /amd64\) neverball_version='1\.6\.0\+git20180603-3\+b1'/);
+      assert.match(
+        dockerfile,
+        new RegExp(
+          `arm64\\) neverball_version='${pkg.packageVersion.replaceAll("+", "\\+")}'`,
+        ),
+      );
+      assert.match(dockerfile, /"neverball=\$\{neverball_version\}"/);
+      continue;
+    }
+    assert.match(
+      dockerfile,
+      new RegExp(
+        `${pkg.packageName}=${pkg.packageVersion.replaceAll("+", "\\+")}`,
+      ),
+    );
   }
 });
 
