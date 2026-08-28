@@ -24,6 +24,14 @@ and admin workflows, stale-account cleanup, and anonymous-play restrictions.
 Executable ROMs live in the private `catalog_roms` bucket; public artwork stays
 in `catalog_artifacts`.
 
+Profiles are API-owned: browser roles have no direct table privileges and the
+table is not published through Realtime. Direct signed-in uploads remain enabled
+only for account assets. Avatar storage is limited to 10 objects and 50 MiB per
+account; submission storage is limited to 60 objects and 1 GiB per account.
+Uploads are serialized per account and bucket so concurrent requests cannot race
+past those limits. The unused `default_library` bucket is private and retained
+only so operators can inventory any legacy objects before deleting it manually.
+
 Anonymous Studio play additionally requires the hosted Supabase project to
 enable Anonymous Sign-Ins and Cloudflare Turnstile CAPTCHA. The Turnstile
 secret belongs only in Supabase; clients receive the public site key. Follow

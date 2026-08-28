@@ -1,7 +1,7 @@
-ARG DEBIAN_IMAGE=debian:trixie-slim@sha256:020c0d20b9880058cbe785a9db107156c3c75c2ac944a6aa7ab59f2add76a7bd
+ARG DEBIAN_IMAGE=debian:trixie-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
 ARG NATIVE_RUNTIME_ID=debian-native-v1
 ARG NATIVE_RUNTIME_LOCK_SHA256=unknown
-ARG NODE_IMAGE=node:24.18.0-bookworm-slim@sha256:6f7b03f7c2c8e2e784dcf9295400527b9b1270fd37b7e9a7285cf83b6951452d
+ARG NODE_IMAGE=node:24.18.1-bookworm-slim@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7
 
 FROM ${NODE_IMAGE} AS app-builder
 
@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 FROM ${DEBIAN_IMAGE} AS runtime
 
+ARG TARGETARCH
 ARG NATIVE_RUNTIME_ID=debian-native-v1
 ARG NATIVE_RUNTIME_LOCK_SHA256=unknown
 ENV DEBIAN_FRONTEND=noninteractive
@@ -35,7 +36,16 @@ LABEL com.pixelated.runtime.kind="native_linux" \
       com.pixelated.runtime.id="${NATIVE_RUNTIME_ID}" \
       com.pixelated.runtime.lock_sha256="${NATIVE_RUNTIME_LOCK_SHA256}"
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Debian binNMU revisions are architecture-specific even when their source
+# package version is identical. Keep both supported binary revisions explicit.
+RUN case "${TARGETARCH}" in \
+      amd64) neverball_version='1.6.0+git20180603-3+b1' ;; \
+      arm64) neverball_version='1.6.0+git20180603-3+b2' ;; \
+      *) printf 'Unsupported native runtime architecture: %s\n' "${TARGETARCH}" >&2; exit 1 ;; \
+    esac \
+    && apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
     frozen-bubble=2.212-13+b1 \
     gir1.2-gst-plugins-bad-1.0 \
     gir1.2-gst-plugins-base-1.0 \
@@ -46,7 +56,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-ugly \
     gstreamer1.0-pulseaudio \
     gstreamer1.0-tools \
-    neverball=1.6.0+git20180603-3+b2 \
+    "neverball=${neverball_version}" \
     pulseaudio \
     python3 \
     python3-evdev \

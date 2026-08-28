@@ -1,5 +1,5 @@
-ARG UBUNTU_IMAGE=ubuntu:22.04@sha256:4f838adc7181d9039ac795a7d0aba05a9bd9ecd480d294483169c5def983b64d
-ARG NODE_IMAGE=node:24.18.0-bullseye-slim@sha256:aca89821b1f09df223227ff2abe075fc3161f05604d3b61309f46820a5938020
+ARG UBUNTU_IMAGE=ubuntu:22.04@sha256:2edbbc5dc405e9612ba3584ce95480277e3eb374407b5505fe26f17df77c7dbc
+ARG NODE_IMAGE=node:24.18.1-bullseye-slim@sha256:0527cf34f5753822dd7b0e6fd84cc2e81d9d10d60bed88af4dd7efb870317c6b
 
 FROM ${UBUNTU_IMAGE} AS mesen-builder
 
@@ -23,7 +23,7 @@ RUN git init /tmp/mesen && \
 
 FROM ${UBUNTU_IMAGE} AS mgba-builder
 
-ARG MGBA_REF=0.10.5
+ARG MGBA_REF=26b7884bc25a5933960f3cdcd98bac1ae14d42e2
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -132,7 +132,9 @@ FROM ${UBUNTU_IMAGE} AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
     gir1.2-gst-plugins-bad-1.0 \
     gir1.2-gst-plugins-base-1.0 \
     gstreamer1.0-nice \

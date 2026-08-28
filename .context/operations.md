@@ -38,7 +38,9 @@ npm --prefix apps/desktop run dist:ci
 - `desktop-release-validation.yml` packages and tests macOS, Windows, and Linux
   desktop artifacts.
 - `security-scan.yml` audits production dependency trees and the complete
-  packaged desktop runtime/build chain.
+  packaged desktop runtime/build chain. It also rebuilds both final engine
+  images, emits SPDX SBOMs, and blocks fixable high/critical image
+  vulnerabilities on every change and on a weekly schedule.
 
 Local contract-only smoke does not prove production propagation timing, real
 Supabase auth, browser/device behavior, or desktop runtime switching.
@@ -119,7 +121,8 @@ readiness still requires:
 1. Confirming the macOS, Windows, and Ubuntu release matrix.
 2. Manual missing/stopped/ready Docker flows on Windows 11 + WSL 2 and Ubuntu.
 3. A full macOS **Initialize Engine → Start Docker → automatic resume** run.
-4. Code signing and notarization before public macOS distribution.
+4. Confirming the public-release workflow's macOS notarization, Windows
+   Authenticode verification, checksums, and provenance on downloaded assets.
 
 Record OS/app versions, observed diagnostic, recovery action, and result. Do
 not mark a platform validated from classifier fixtures alone.

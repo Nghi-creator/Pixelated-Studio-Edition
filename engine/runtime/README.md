@@ -105,7 +105,7 @@ addresses, and use the timeout as a total download deadline. Local Vault uploads
 
 ## Native Debian runtime
 
-The native proof-of-concept image is separate from the libretro image. It installs only the pinned Debian `main` packages listed in `native-runtime.lock.json`, embeds that lock file at `/app/native-runtime.lock.json`, and launches games through engine-owned manifests instead of database-supplied commands.
+The native proof-of-concept image is separate from the libretro image. It installs only the pinned Debian `main` packages listed in `native-runtime.lock.json`, embeds that lock file at `/app/native-runtime.lock.json`, and launches games through engine-owned manifests instead of database-supplied commands. Debian binary rebuild suffixes can differ by architecture, so the Dockerfile selects the corresponding pinned Neverball build for `amd64` or `arm64` and rejects unsupported architectures.
 
 ```sh
 npm run build:native

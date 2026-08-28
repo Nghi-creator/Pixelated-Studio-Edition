@@ -24,6 +24,7 @@ type DesktopPackageJson = {
     mac?: {
       artifactName?: string;
       icon?: string;
+      notarize?: boolean;
       target?: string;
     };
     linux?: {
@@ -76,6 +77,7 @@ describe("desktop package config", () => {
     const packageJson = readPackageJson();
 
     assert.equal(packageJson.build.mac?.icon, "build/icon.png");
+    assert.equal(packageJson.build.mac?.notarize, true);
   });
 
   it("keeps desktop release artifact names stable for direct downloads", () => {
@@ -103,6 +105,10 @@ describe("desktop package config", () => {
     assert.equal(packageJson.build.linux?.target, "AppImage");
     assert.match(packageJson.scripts?.["dist:ci"] || "", /electron-builder/);
     assert.match(packageJson.scripts?.["dist:ci"] || "", /smoke:release/);
+    assert.match(
+      packageJson.scripts?.["dist:ci:signed"] || "",
+      /forceCodeSigning=true/,
+    );
   });
 
   it("registers the browser-to-desktop launch protocol", () => {
@@ -135,9 +141,17 @@ describe("desktop package config", () => {
     assert.match(workflow, /docs\/releases\/v1\.0\.1\.md/);
     assert.match(workflow, /publish-github-release:/);
     assert.match(workflow, /actions\/download-artifact@[0-9a-f]{40}/);
+    assert.match(workflow, /npm run dist:ci:signed --prefix apps\/desktop/);
+    assert.match(workflow, /inputs\.release_draft == false/);
+    assert.match(workflow, /xcrun stapler validate/);
+    assert.match(workflow, /Get-AuthenticodeSignature/);
+    assert.match(workflow, /actions\/attest@[0-9a-f]{40}/);
+    assert.match(workflow, /sha256sum .*SHA256SUMS/);
+    assert.match(workflow, /desktop-release-provenance\.sigstore\.json/);
+    assert.match(workflow, /Refusing to overwrite public release/);
     assert.match(workflow, /--notes-file "\$RELEASE_BODY_PATH"/);
-    assert.match(workflow, /gh release edit "\$RELEASE_TAG" --title "\$title" "\$\{notes_args\[@\]\}"/);
-    assert.match(workflow, /gh release upload "\$RELEASE_TAG" "\$\{assets\[@\]\}" --clobber/);
+    assert.match(workflow, /--draft="\$RELEASE_DRAFT"/);
+    assert.match(workflow, /gh release upload "\$RELEASE_TAG" "\$\{release_assets\[@\]\}" --clobber/);
     assert.match(workflow, /gh "\$\{args\[@\]\}"/);
   });
 
