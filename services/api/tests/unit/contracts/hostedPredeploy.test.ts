@@ -13,6 +13,10 @@ const stagingSmoke = readFileSync(
   new URL("../../../scripts/stagingSmoke.ts", import.meta.url),
   "utf8",
 );
+const hostedPredeploy = readFileSync(
+  new URL("../../../scripts/hostedPredeploy.mjs", import.meta.url),
+  "utf8",
+);
 
 test("hosted predeploy fails fast on hosted Supabase schema drift", () => {
   const scripts = packageJson.scripts || {};
@@ -22,10 +26,22 @@ test("hosted predeploy fails fast on hosted Supabase schema drift", () => {
     /--submission-cleanup-policy-only/,
   );
   assert.match(scripts["check:catalog-rpc"] || "", /--catalog-rpc-only/);
-  assert.match(
-    scripts["predeploy:hosted"] || "",
-    /check:access-log-schema && npm run check:submission-cleanup-policy && npm run check:catalog-rpc && npm run check:catalog-candidate-imports && npm run typecheck/,
+  assert.equal(
+    scripts["predeploy:hosted"],
+    "node scripts/hostedPredeploy.mjs",
   );
+  for (const check of [
+    "check:access-log-schema",
+    "check:submission-cleanup-policy",
+    "check:catalog-rpc",
+    "check:catalog-candidate-imports",
+    "typecheck",
+    "lint",
+    "build",
+  ]) {
+    assert.match(hostedPredeploy, new RegExp(`"${check}"`));
+  }
+  assert.match(hostedPredeploy, /Hosted predeploy failed checks:/);
   assert.match(stagingSmoke, /STAGING_STUDIO_ORIGIN/);
   assert.match(stagingSmoke, /Origin: stagingStudioOrigin/);
   assert.match(
@@ -35,6 +51,6 @@ test("hosted predeploy fails fast on hosted Supabase schema drift", () => {
   assert.doesNotMatch(stagingSmoke, /\$\{userId\}\/staging-smoke\//);
   assert.match(
     stagingSmoke,
-    /20260828130000_harden_profile_and_account_storage\.sql/,
+    /20260828170000_repair_account_asset_storage_policies\.sql/,
   );
 });
