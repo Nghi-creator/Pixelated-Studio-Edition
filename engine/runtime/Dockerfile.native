@@ -43,7 +43,9 @@ RUN case "${TARGETARCH}" in \
       arm64) neverball_version='1.6.0+git20180603-3+b2' ;; \
       *) printf 'Unsupported native runtime architecture: %s\n' "${TARGETARCH}" >&2; exit 1 ;; \
     esac \
-    && apt-get update && apt-get install -y --no-install-recommends \
+    && apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
     frozen-bubble=2.212-13+b1 \
     gir1.2-gst-plugins-bad-1.0 \
     gir1.2-gst-plugins-base-1.0 \

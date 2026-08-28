@@ -102,6 +102,10 @@ test("runtime images pin the Python camera WebRTC dependencies", () => {
     assert.match(requirement, /^[a-z0-9-]+==[a-zA-Z0-9.]+$/);
   }
   assert.match(dockerfile, /PYTHONPATH=\/usr\/local\/lib\/pixelated-python/);
+  for (const source of [dockerfile, libretroDockerfile]) {
+    const runtimeStage = source.slice(source.lastIndexOf(" AS runtime"));
+    assert.match(runtimeStage, /apt-get update[\s\\]*&& apt-get upgrade -y/);
+  }
   assert.match(smoke, /GstWebRTC/);
   assert.match(smoke, /GstSdp/);
 });

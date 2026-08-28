@@ -132,7 +132,9 @@ FROM ${UBUNTU_IMAGE} AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update \
+    && apt-get upgrade -y \
+    && apt-get install -y --no-install-recommends \
     gir1.2-gst-plugins-bad-1.0 \
     gir1.2-gst-plugins-base-1.0 \
     gstreamer1.0-nice \
