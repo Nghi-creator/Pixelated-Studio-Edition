@@ -28,4 +28,13 @@ test("hosted predeploy fails fast on hosted Supabase schema drift", () => {
   );
   assert.match(stagingSmoke, /STAGING_STUDIO_ORIGIN/);
   assert.match(stagingSmoke, /Origin: stagingStudioOrigin/);
+  assert.match(
+    stagingSmoke,
+    /`\$\{userId\}\/roms\/\$\{uniqueId\("cleanup-policy"\)\}\.nes`/,
+  );
+  assert.doesNotMatch(stagingSmoke, /\$\{userId\}\/staging-smoke\//);
+  assert.match(
+    stagingSmoke,
+    /20260828130000_harden_profile_and_account_storage\.sql/,
+  );
 });
