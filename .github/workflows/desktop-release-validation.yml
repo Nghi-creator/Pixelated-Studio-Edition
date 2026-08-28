@@ -65,7 +65,7 @@ jobs:
             os: ubuntu-latest
             artifact: ubuntu-appimage
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
+    timeout-minutes: 50
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -83,8 +83,89 @@ jobs:
       - name: Run desktop diagnostic and release contracts
         run: npm test --prefix apps/desktop
 
-      - name: Build native installer and run packaged smoke
+      - name: Build validation or Linux installer and run packaged smoke
+        if: github.event_name != 'workflow_dispatch' || inputs.release_tag == '' || inputs.release_draft || runner.os == 'Linux'
         run: npm run dist:ci --prefix apps/desktop
+
+      - name: Build, sign, notarize, and verify public macOS installer
+        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != '' && inputs.release_draft == false && runner.os == 'macOS'
+        env:
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+        run: |
+          set -euo pipefail
+
+          required=(
+            APPLE_APP_SPECIFIC_PASSWORD
+            APPLE_ID
+            APPLE_TEAM_ID
+            CSC_KEY_PASSWORD
+            CSC_LINK
+          )
+          for variable in "${required[@]}"; do
+            if [ -z "${!variable:-}" ]; then
+              printf '::error::Missing required public-release secret: %s\n' "$variable"
+              exit 1
+            fi
+          done
+
+          npm run dist:ci:signed --prefix apps/desktop
+
+          shopt -s nullglob
+          installers=(apps/desktop/release/*.dmg)
+          if [ "${#installers[@]}" -ne 1 ]; then
+            printf 'Expected one signed macOS DMG, found %s.\n' "${#installers[@]}" >&2
+            exit 1
+          fi
+          xcrun stapler validate "${installers[0]}"
+
+          mount_dir="$(mktemp -d)"
+          attached=false
+          cleanup() {
+            if [ "$attached" = true ]; then
+              hdiutil detach "$mount_dir" -quiet || true
+            fi
+            rmdir "$mount_dir" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          hdiutil attach "${installers[0]}" -nobrowse -readonly -mountpoint "$mount_dir"
+          attached=true
+
+          apps=("$mount_dir"/*.app)
+          if [ "${#apps[@]}" -ne 1 ]; then
+            printf 'Expected one application in the signed DMG, found %s.\n' "${#apps[@]}" >&2
+            exit 1
+          fi
+          codesign --verify --deep --strict --verbose=2 "${apps[0]}"
+          spctl --assess --type execute --verbose=2 "${apps[0]}"
+
+      - name: Build, sign, and verify public Windows installer
+        if: github.event_name == 'workflow_dispatch' && inputs.release_tag != '' && inputs.release_draft == false && runner.os == 'Windows'
+        shell: pwsh
+        env:
+          WIN_CSC_KEY_PASSWORD: ${{ secrets.WIN_CSC_KEY_PASSWORD }}
+          WIN_CSC_LINK: ${{ secrets.WIN_CSC_LINK }}
+        run: |
+          $ErrorActionPreference = "Stop"
+          foreach ($variable in @("WIN_CSC_KEY_PASSWORD", "WIN_CSC_LINK")) {
+            if ([string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($variable))) {
+              Write-Error "Missing required public-release secret: $variable"
+            }
+          }
+
+          npm run dist:ci:signed --prefix apps/desktop
+
+          $installers = @(Get-ChildItem "apps/desktop/release/*.exe")
+          if ($installers.Count -ne 1) {
+            Write-Error "Expected one signed Windows installer, found $($installers.Count)."
+          }
+          $signature = Get-AuthenticodeSignature -FilePath $installers[0].FullName
+          if ($signature.Status -ne "Valid") {
+            Write-Error "Windows installer signature is not valid: $($signature.Status)"
+          }
 
       - name: Upload native desktop release
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -104,7 +185,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
+      attestations: write
       contents: write
+      id-token: write
     steps:
       - name: Check out release notes
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -115,6 +198,54 @@ jobs:
           merge-multiple: true
           path: .artifacts/desktop-release-assets
           pattern: pixelated-desktop-*-${{ github.run_id }}-${{ github.run_attempt }}
+
+      - name: Validate release mode and generate checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_DRAFT: ${{ inputs.release_draft }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          shopt -s nullglob
+          assets=(
+            .artifacts/desktop-release-assets/*.dmg
+            .artifacts/desktop-release-assets/*.exe
+            .artifacts/desktop-release-assets/*.AppImage
+          )
+          if [ "${#assets[@]}" -ne 3 ]; then
+            printf 'Expected 3 desktop release assets (.dmg, .exe, .AppImage), found %s.\n' "${#assets[@]}" >&2
+            exit 1
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            existing_draft="$(gh release view "$RELEASE_TAG" --json isDraft --jq .isDraft)"
+            if [ "$existing_draft" != "true" ] && [ "$RELEASE_DRAFT" != "false" ]; then
+              printf 'Refusing to overwrite public release %s from an unsigned draft build. Rerun with release_draft=false.\n' "$RELEASE_TAG" >&2
+              exit 1
+            fi
+          fi
+
+          (
+            cd .artifacts/desktop-release-assets
+            sha256sum ./*.dmg ./*.exe ./*.AppImage > SHA256SUMS
+          )
+
+      - name: Attest desktop release provenance
+        id: attest
+        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        with:
+          create-storage-record: false
+          subject-path: |
+            .artifacts/desktop-release-assets/*.dmg
+            .artifacts/desktop-release-assets/*.exe
+            .artifacts/desktop-release-assets/*.AppImage
+            .artifacts/desktop-release-assets/SHA256SUMS
+
+      - name: Bundle provenance with release assets
+        env:
+          ATTESTATION_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$ATTESTATION_BUNDLE" .artifacts/desktop-release-assets/desktop-release-provenance.sigstore.json
 
       - name: Publish desktop installers to GitHub release
         env:
@@ -138,6 +269,17 @@ jobs:
             find .artifacts/desktop-release-assets -maxdepth 1 -type f -print >&2
             exit 1
           fi
+          integrity_assets=(
+            .artifacts/desktop-release-assets/SHA256SUMS
+            .artifacts/desktop-release-assets/desktop-release-provenance.sigstore.json
+          )
+          for integrity_asset in "${integrity_assets[@]}"; do
+            if [ ! -s "$integrity_asset" ]; then
+              printf 'Missing release integrity asset: %s\n' "$integrity_asset" >&2
+              exit 1
+            fi
+          done
+          release_assets=("${assets[@]}" "${integrity_assets[@]}")
 
           title="${RELEASE_NAME:-$RELEASE_TAG}"
           notes_args=()
@@ -150,14 +292,16 @@ jobs:
           fi
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            edit_args=(release edit "$RELEASE_TAG" --title "$title" --draft="$RELEASE_DRAFT" --prerelease="$RELEASE_PRERELEASE")
             if [ "${#notes_args[@]}" -gt 0 ]; then
-              gh release edit "$RELEASE_TAG" --title "$title" "${notes_args[@]}"
+              edit_args+=("${notes_args[@]}")
             fi
-            gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
+            gh release upload "$RELEASE_TAG" "${release_assets[@]}" --clobber
+            gh "${edit_args[@]}"
             exit 0
           fi
 
-          args=(release create "$RELEASE_TAG" "${assets[@]}" --target "$GITHUB_SHA" --title "$title")
+          args=(release create "$RELEASE_TAG" "${release_assets[@]}" --target "$GITHUB_SHA" --title "$title")
           if [ "$RELEASE_DRAFT" = "true" ]; then
             args+=(--draft)
           fi

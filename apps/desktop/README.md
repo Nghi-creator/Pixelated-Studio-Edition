@@ -136,3 +136,13 @@ The `dist` script:
 The release smoke verifies required main/preload/renderer files, sandbox-safe preload behavior, and bundled engine runtime resources. The desktop opens the configured hosted web application rather than shipping a duplicate web bundle.
 
 Cross-platform packaging is validated by `.github/workflows/desktop-release-validation.yml`.
+
+Manual workflow runs may create unsigned draft releases for review. A public
+release (`release_draft=false`) takes a stricter path: macOS requires the
+`MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD`, `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`, and `APPLE_TEAM_ID` secrets; Windows requires
+`WIN_CSC_LINK` and `WIN_CSC_KEY_PASSWORD`. CI verifies the notarization staple
+and embedded macOS signature and validates the Windows Authenticode signature
+before upload. Every draft or public release also includes `SHA256SUMS` and a
+GitHub OIDC/Sigstore provenance bundle that can be checked with
+`gh attestation verify`.

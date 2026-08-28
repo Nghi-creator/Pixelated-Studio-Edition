@@ -13,7 +13,8 @@
     "start": "npm run build && electron .",
     "smoke:release": "npm run build && node dist/scripts/releaseSmoke.js",
     "dist": "npm run build && electron-builder && npm run smoke:release",
-    "dist:ci": "npm run build && electron-builder --publish never && npm run smoke:release"
+    "dist:ci": "npm run build && electron-builder --publish never && npm run smoke:release",
+    "dist:ci:signed": "npm run build && electron-builder --publish never --config.forceCodeSigning=true && npm run smoke:release"
   },
   "devDependencies": {
     "@electron/asar": "^4.2.1",
@@ -50,6 +51,7 @@
     "mac": {
       "artifactName": "Pixelated-Studio-mac.${ext}",
       "icon": "build/icon.png",
+      "notarize": true,
       "target": "dmg"
     },
     "win": {

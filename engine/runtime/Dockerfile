@@ -23,7 +23,7 @@ RUN git init /tmp/mesen && \
 
 FROM ${UBUNTU_IMAGE} AS mgba-builder
 
-ARG MGBA_REF=0.10.5
+ARG MGBA_REF=26b7884bc25a5933960f3cdcd98bac1ae14d42e2
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
