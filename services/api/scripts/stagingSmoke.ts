@@ -464,7 +464,7 @@ async function predeploySubmissionCleanupPolicyCheck() {
     throw new Error("Submission cleanup policy check requires /me to return user.id.");
   }
 
-  const objectPath = `${userId}/staging-smoke/${uniqueId("cleanup-policy")}.txt`;
+  const objectPath = `${userId}/roms/${uniqueId("cleanup-policy")}.nes`;
   const supabase = createClient(stagingSupabaseUrl, stagingSupabaseAnonKey, {
     auth: {
       autoRefreshToken: false,
@@ -482,9 +482,11 @@ async function predeploySubmissionCleanupPolicyCheck() {
   logStep("checking hosted submission storage upload policy");
   const upload = await storage.upload(
     objectPath,
-    new Blob(["staging smoke cleanup policy\n"], { type: "text/plain" }),
+    new Blob(["NES\x1a staging smoke cleanup policy\n"], {
+      type: "application/octet-stream",
+    }),
     {
-      contentType: "text/plain",
+      contentType: "application/octet-stream",
       upsert: false,
     },
   );
@@ -501,7 +503,7 @@ async function predeploySubmissionCleanupPolicyCheck() {
   if (removal.error) {
     throw new Error(
       "Hosted submission cleanup storage policy is missing or denying authenticated cleanup. " +
-        "Apply migration supabase/migrations/20260614153000_allow_own_submission_cleanup.sql " +
+        "Apply migration supabase/migrations/20260828130000_harden_profile_and_account_storage.sql " +
         "to the hosted Supabase project before deploying. " +
         `Delete failed for submissions/${objectPath}; details=${formatStorageError(removal.error)}`,
     );
