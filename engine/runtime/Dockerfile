@@ -173,4 +173,7 @@ WORKDIR /app
 ENV HOME=/home/pixelated
 USER 10001:10001
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["node", "-e", "fetch('http://127.0.0.1:8080/health').then((response) => { if (!response.ok) process.exit(1); }).catch(() => process.exit(1));"]
+
 CMD ["node", "dist/server.js"]

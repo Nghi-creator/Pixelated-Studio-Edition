@@ -70,6 +70,10 @@ describe("desktop package config", () => {
     assert.equal(engineResource?.from, "../../engine/runtime");
     assert.ok(engineResource?.filter?.includes("!node_modules/**"));
     assert.ok(engineResource?.filter?.includes("!dist/**"));
+    assert.ok(engineResource?.filter?.includes("!tests/**"));
+    assert.ok(engineResource?.filter?.includes("!scripts/**"));
+    assert.ok(engineResource?.filter?.includes("!README.md"));
+    assert.ok(engineResource?.filter?.includes("!eslint.config.mjs"));
     assert.ok(engineResource?.filter?.includes("!**/*.pyc"));
   });
 

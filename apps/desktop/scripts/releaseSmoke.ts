@@ -199,6 +199,19 @@ function assertPackagedApp(archivePath: string) {
     fs.existsSync(path.join(resourcesDir, "engine-runtime", "Dockerfile")),
     `Packaged engine runtime is missing beside ${archivePath}.`,
   );
+  for (const developmentOnlyPath of [
+    "README.md",
+    "eslint.config.mjs",
+    "scripts",
+    "tests",
+  ]) {
+    assert(
+      !fs.existsSync(
+        path.join(resourcesDir, "engine-runtime", developmentOnlyPath),
+      ),
+      `Packaged engine runtime includes development-only ${developmentOnlyPath}.`,
+    );
+  }
 }
 
 export async function runReleaseSmoke(releaseDir = RELEASE_DIR) {

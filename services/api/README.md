@@ -154,7 +154,9 @@ NODE_VERSION=24.18.0
 NODE_ENV=production
 HOST=0.0.0.0
 PORT=<provider port>
-TRUST_PROXY_HOPS=1
+# Replace with the IP/CIDR ranges of the reverse proxy that connects to the API.
+# Fastify intentionally rejects hop-count-only trust because clients can spoof it.
+TRUST_PROXY_CIDRS=loopback,linklocal,uniquelocal
 WEB_ORIGIN=https://pixelated-studio-edition.vercel.app,https://pixelated-user-edition.vercel.app
 STUDIO_WEB_ORIGINS=https://pixelated-studio-edition.vercel.app
 BROWSER_SMOKE_TICKET_SECRET=<at least 32 random characters>

@@ -16,6 +16,10 @@ const engineDockerfile = fs.readFileSync(
   path.join(repositoryRoot, "engine/runtime/Dockerfile"),
   "utf8",
 );
+const nativeEngineDockerfile = fs.readFileSync(
+  path.join(repositoryRoot, "engine/runtime/Dockerfile.native"),
+  "utf8",
+);
 
 test("security CI rebuilds and scans both final engine images", () => {
   assert.match(securityWorkflow, /schedule:[\s\S]*cron:/);
@@ -37,4 +41,14 @@ test("security CI rebuilds and scans both final engine images", () => {
 test("native emulator source refs are immutable", () => {
   assert.match(engineDockerfile, /ARG MGBA_REF=[0-9a-f]{40}/);
   assert.doesNotMatch(engineDockerfile, /ARG MGBA_REF=0\.10\.5/);
+});
+
+test("final engine images expose bounded health checks", () => {
+  for (const dockerfile of [engineDockerfile, nativeEngineDockerfile]) {
+    assert.match(
+      dockerfile,
+      /HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3/,
+    );
+    assert.match(dockerfile, /127\.0\.0\.1:8080\/health/);
+  }
 });

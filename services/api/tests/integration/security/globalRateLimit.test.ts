@@ -27,7 +27,7 @@ async function createApp(limits: {
   health: number;
   publicRead: number;
 }) {
-  const app = Fastify({ trustProxy: 1 });
+  const app = Fastify({ trustProxy: "127.0.0.1" });
   await registerGlobalRateLimit(app, {
     globalLimiter: createTestLimiter(limits.global),
     healthLimiter: createTestLimiter(limits.health),
