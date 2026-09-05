@@ -16,11 +16,10 @@ type RecordResearchEvent = (
 
 export function useResearchRunController({
   config,
-  computeSampleCount,
-  hasUnavailableComputeSamples,
   currentProfileId,
   enabled,
   firstFrameObserved,
+  getCompletionSnapshot,
   isConnectionReady,
   isRecording,
   onResetCapture,
@@ -28,15 +27,17 @@ export function useResearchRunController({
   onStopRecording,
   recordEvent,
   requiresComputeTelemetry,
-  sampleCount,
   sessionId,
 }: {
   config: ResearchRunConfig;
-  computeSampleCount: number;
-  hasUnavailableComputeSamples: boolean;
   currentProfileId: StreamProfileId;
   enabled: boolean;
   firstFrameObserved: boolean;
+  getCompletionSnapshot: () => {
+    hasUnavailableComputeSamples: boolean;
+    sampleCount: number;
+    validComputeSampleCount: number;
+  };
   isConnectionReady: boolean;
   isRecording: boolean;
   onResetCapture: () => void;
@@ -44,7 +45,6 @@ export function useResearchRunController({
   onStopRecording: () => void;
   recordEvent: RecordResearchEvent;
   requiresComputeTelemetry: boolean;
-  sampleCount: number;
   sessionId: string;
 }) {
   const [state, dispatch] = useReducer(
@@ -55,32 +55,18 @@ export function useResearchRunController({
   const [nowMs, setNowMs] = useState(() => performance.now());
   const sessionAtReadyRef = useRef<string | null>(null);
   const recordingObservedRef = useRef(false);
-  const sampleCountRef = useRef(sampleCount);
-  const computeSampleCountRef = useRef(computeSampleCount);
-  const hasUnavailableComputeSamplesRef = useRef(hasUnavailableComputeSamples);
-
-  useEffect(() => {
-    sampleCountRef.current = sampleCount;
-  }, [sampleCount]);
-
-  useEffect(() => {
-    computeSampleCountRef.current = computeSampleCount;
-  }, [computeSampleCount]);
-
-  useEffect(() => {
-    hasUnavailableComputeSamplesRef.current = hasUnavailableComputeSamples;
-  }, [hasUnavailableComputeSamples]);
-
   const finishRecording = useCallback(
     (completionKind: "automatic" | "manual") => {
       const completedAt = performance.now();
+      const completionSnapshot = getCompletionSnapshot();
       onStopRecording();
-      const completedSampleCount = sampleCountRef.current;
+      const completedSampleCount = completionSnapshot.sampleCount;
       const invalidReason = getResearchCompletionInvalidReason({
-        hasUnavailableComputeSamples: hasUnavailableComputeSamplesRef.current,
+        hasUnavailableComputeSamples:
+          completionSnapshot.hasUnavailableComputeSamples,
         requiresComputeTelemetry,
         sampleCount: completedSampleCount,
-        validComputeSampleCount: computeSampleCountRef.current,
+        validComputeSampleCount: completionSnapshot.validComputeSampleCount,
       });
       if (invalidReason) {
         recordEvent("research_run_invalidated", { reason: invalidReason });
@@ -94,7 +80,7 @@ export function useResearchRunController({
       }
       recordEvent("research_recording_completed", {
         completionKind,
-        computeSampleCount: computeSampleCountRef.current,
+        computeSampleCount: completionSnapshot.validComputeSampleCount,
         sampleCount: completedSampleCount,
       });
       dispatch({
@@ -103,7 +89,12 @@ export function useResearchRunController({
         sampleCount: completedSampleCount,
         type: "finish_recording",
       });
-    }, [onStopRecording, recordEvent, requiresComputeTelemetry],
+    }, [
+      getCompletionSnapshot,
+      onStopRecording,
+      recordEvent,
+      requiresComputeTelemetry,
+    ],
   );
 
   const invalidate = useCallback(
@@ -113,11 +104,11 @@ export function useResearchRunController({
       dispatch({
         nowMs: performance.now(),
         reason,
-        sampleCount: sampleCountRef.current,
+        sampleCount: getCompletionSnapshot().sampleCount,
         type: "invalidate",
       });
     },
-    [isRecording, onStopRecording, recordEvent],
+    [getCompletionSnapshot, isRecording, onStopRecording, recordEvent],
   );
 
   useEffect(() => {
@@ -261,10 +252,10 @@ export function useResearchRunController({
     recordEvent("research_run_cancelled");
     dispatch({
       nowMs: performance.now(),
-      sampleCount: sampleCountRef.current,
+      sampleCount: getCompletionSnapshot().sampleCount,
       type: "cancel",
     });
-  }, [isRecording, onStopRecording, recordEvent]);
+  }, [getCompletionSnapshot, isRecording, onStopRecording, recordEvent]);
 
   return {
     cancel,

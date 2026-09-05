@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { engineAuthHeaders } from "../../../../lib/engine/engineAuth";
 import { engineEndpoint } from "../../../../lib/engine/engineConfig";
 import { engineFetch } from "../../../../lib/engine/engineRequest";
@@ -36,8 +36,8 @@ export function useEngineResearchTelemetryRecording({
       return;
     }
     recordingStartedAtRef.current = Date.now();
+    buffer.clear();
     const resetId = window.setTimeout(() => {
-      buffer.clear();
       setSnapshot(buffer.snapshot);
     }, 0);
     return () => window.clearTimeout(resetId);
@@ -113,5 +113,7 @@ export function useEngineResearchTelemetryRecording({
     };
   }, [buffer, enabled, gameId, isRecording, runId, sessionId]);
 
-  return snapshot;
+  const getSnapshot = useCallback(() => buffer.snapshot, [buffer]);
+
+  return { ...snapshot, getSnapshot };
 }

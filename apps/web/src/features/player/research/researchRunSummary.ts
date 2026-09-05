@@ -6,7 +6,10 @@ import {
   addPacketLossDeltas,
   type StreamTelemetryCsvSample,
 } from "../telemetry/streamTelemetryExport.ts";
-import type { EngineResearchTelemetrySample } from "../telemetry/engineResearchTelemetry";
+import {
+  hasExactlyPairedEngineTelemetrySamples,
+  type EngineResearchTelemetrySample,
+} from "../telemetry/engineResearchTelemetry.ts";
 
 export const RESEARCH_RUN_SUMMARY_SCHEMA_VERSION = 2 as const;
 
@@ -167,6 +170,14 @@ export function createResearchRunSummary({
     validityReasons.push("Browser WebRTC telemetry is unavailable.");
   } else if (samples.length < 2) {
     validityReasons.push("Browser WebRTC telemetry requires at least two samples.");
+  }
+  if (
+    engineSamples.length > 0 &&
+    !hasExactlyPairedEngineTelemetrySamples(engineSamples)
+  ) {
+    validityReasons.push(
+      "Engine and encoder telemetry samples are not paired by poll.",
+    );
   }
   if (requiresComputeTelemetry && availableEngineSamples.length === 0) {
     validityReasons.push("Engine runtime telemetry is unavailable.");
