@@ -5,6 +5,7 @@ import { engineFetch } from "../../../../lib/engine/engineRequest";
 import {
   createEngineResearchTelemetrySamples,
   createUnavailableEngineTelemetrySamples,
+  elapsedMsFromCapturedAt,
   EngineResearchTelemetryBuffer,
   parseEngineResearchTelemetryResponse,
   type EngineResearchTelemetrySample,
@@ -52,13 +53,9 @@ export function useEngineResearchTelemetryRecording({
       if (buffer.append(samples)) setSnapshot(buffer.snapshot);
     };
     const poll = async () => {
-      if (pollInFlight || !recordingStartedAtRef.current) return;
+      const recordingStartedAt = recordingStartedAtRef.current;
+      if (pollInFlight || recordingStartedAt === null) return;
       pollInFlight = true;
-      const capturedAt = new Date().toISOString();
-      const elapsedMs = Math.max(
-        0,
-        Date.now() - recordingStartedAtRef.current,
-      );
       try {
         const response = await engineFetch(
           engineEndpoint(
@@ -73,6 +70,13 @@ export function useEngineResearchTelemetryRecording({
           sessionId,
         );
         if (!parsed) throw new Error("Engine telemetry response was invalid");
+        const elapsedMs = elapsedMsFromCapturedAt(
+          parsed.capturedAt,
+          recordingStartedAt,
+        );
+        if (elapsedMs === null) {
+          throw new Error("Engine telemetry timestamp predates the recording");
+        }
         append(
           createEngineResearchTelemetrySamples({
             elapsedMs,
@@ -82,10 +86,14 @@ export function useEngineResearchTelemetryRecording({
           }),
         );
       } catch (error) {
+        const capturedAtMs = Date.now();
         append(
           createUnavailableEngineTelemetrySamples({
-            capturedAt,
-            elapsedMs,
+            capturedAt: new Date(capturedAtMs).toISOString(),
+            elapsedMs: Math.max(
+              0,
+              capturedAtMs - recordingStartedAt,
+            ),
             error: error instanceof Error ? error.message : "Engine telemetry failed",
             gameId,
             runId,

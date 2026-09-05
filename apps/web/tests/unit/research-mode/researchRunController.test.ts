@@ -3,6 +3,7 @@ import test from "node:test";
 import { createDefaultResearchRunConfig } from "../../../src/features/research-mode/researchRunConfig.ts";
 import {
   createResearchRunControllerState,
+  getResearchCompletionInvalidReason,
   getResearchRecordingDurationMs,
   getResearchRunRemainingMs,
   researchRunControllerReducer,
@@ -54,7 +55,7 @@ test("research run controller accepts only ordered transitions", () => {
   assert.equal(getResearchRecordingDurationMs(state), 60);
 });
 
-test("research run controller rejects capture without telemetry", () => {
+test("research run controller rejects capture without an observation span", () => {
     let state = createResearchRunControllerState(0);
     state = researchRunControllerReducer(state, { nowMs: 1, type: "connect" });
     state = researchRunControllerReducer(state, {
@@ -72,12 +73,51 @@ test("research run controller rejects capture without telemetry", () => {
     state = researchRunControllerReducer(state, {
       completionKind: "manual",
       nowMs: 5,
-      sampleCount: 0,
+      sampleCount: 1,
       type: "finish_recording",
     });
 
   assert.equal(state.stage, "invalid");
-  assert.match(state.invalidReason || "", /without telemetry samples/);
+  assert.match(state.invalidReason || "", /without enough browser telemetry samples/);
+});
+
+test("research run completion rejects missing and partial compute telemetry", () => {
+  assert.match(
+    getResearchCompletionInvalidReason({
+      hasUnavailableComputeSamples: false,
+      requiresComputeTelemetry: true,
+      sampleCount: 2,
+      validComputeSampleCount: 0,
+    }) || "",
+    /without required engine and encoder telemetry/,
+  );
+  assert.match(
+    getResearchCompletionInvalidReason({
+      hasUnavailableComputeSamples: true,
+      requiresComputeTelemetry: true,
+      sampleCount: 2,
+      validComputeSampleCount: 1,
+    }) || "",
+    /contains unavailable engine or encoder telemetry samples/,
+  );
+  assert.equal(
+    getResearchCompletionInvalidReason({
+      hasUnavailableComputeSamples: false,
+      requiresComputeTelemetry: true,
+      sampleCount: 2,
+      validComputeSampleCount: 1,
+    }),
+    null,
+  );
+  assert.match(
+    getResearchCompletionInvalidReason({
+      hasUnavailableComputeSamples: false,
+      requiresComputeTelemetry: false,
+      sampleCount: Number.NaN,
+      validComputeSampleCount: 0,
+    }) || "",
+    /without enough browser telemetry samples/,
+  );
 });
 
 test("research run controller countdown and terminal state", () => {

@@ -4,6 +4,7 @@ import type { ResearchRunEventName } from "../player/research/researchRunEvents"
 import type { ResearchRunConfig } from "./researchRunConfig";
 import {
   createResearchRunControllerState,
+  getResearchCompletionInvalidReason,
   getResearchRunRemainingMs,
   researchRunControllerReducer,
 } from "./researchRunController";
@@ -16,6 +17,7 @@ type RecordResearchEvent = (
 export function useResearchRunController({
   config,
   computeSampleCount,
+  hasUnavailableComputeSamples,
   currentProfileId,
   enabled,
   firstFrameObserved,
@@ -31,6 +33,7 @@ export function useResearchRunController({
 }: {
   config: ResearchRunConfig;
   computeSampleCount: number;
+  hasUnavailableComputeSamples: boolean;
   currentProfileId: StreamProfileId;
   enabled: boolean;
   firstFrameObserved: boolean;
@@ -54,6 +57,7 @@ export function useResearchRunController({
   const recordingObservedRef = useRef(false);
   const sampleCountRef = useRef(sampleCount);
   const computeSampleCountRef = useRef(computeSampleCount);
+  const hasUnavailableComputeSamplesRef = useRef(hasUnavailableComputeSamples);
 
   useEffect(() => {
     sampleCountRef.current = sampleCount;
@@ -63,17 +67,21 @@ export function useResearchRunController({
     computeSampleCountRef.current = computeSampleCount;
   }, [computeSampleCount]);
 
+  useEffect(() => {
+    hasUnavailableComputeSamplesRef.current = hasUnavailableComputeSamples;
+  }, [hasUnavailableComputeSamples]);
+
   const finishRecording = useCallback(
     (completionKind: "automatic" | "manual") => {
       const completedAt = performance.now();
       onStopRecording();
       const completedSampleCount = sampleCountRef.current;
-      const invalidReason =
-        completedSampleCount <= 0
-          ? "Recording completed without browser telemetry samples."
-          : requiresComputeTelemetry && computeSampleCountRef.current <= 0
-            ? "Recording completed without required engine and encoder telemetry."
-            : null;
+      const invalidReason = getResearchCompletionInvalidReason({
+        hasUnavailableComputeSamples: hasUnavailableComputeSamplesRef.current,
+        requiresComputeTelemetry,
+        sampleCount: completedSampleCount,
+        validComputeSampleCount: computeSampleCountRef.current,
+      });
       if (invalidReason) {
         recordEvent("research_run_invalidated", { reason: invalidReason });
         dispatch({
