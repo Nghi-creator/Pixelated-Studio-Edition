@@ -149,9 +149,9 @@ test("engine telemetry buffer updates summaries incrementally and stays bounded"
 
   assert.equal(buffer.append(firstPoll), true);
   assert.equal(buffer.snapshot.validComputeSampleCount, 1);
-  assert.equal(buffer.append(secondPoll), true);
-  assert.equal(buffer.snapshot.recordedEngineSamples.length, 3);
-  assert.equal(buffer.snapshot.latestEngineSample?.elapsedMs, 2_000);
+  assert.equal(buffer.append(secondPoll), false);
+  assert.equal(buffer.snapshot.recordedEngineSamples.length, 2);
+  assert.equal(buffer.snapshot.latestEngineSample?.elapsedMs, 1_000);
   assert.equal(buffer.snapshot.latestEncoderSample?.elapsedMs, 1_000);
   assert.equal(buffer.snapshot.validComputeSampleCount, 1);
   assert.equal(buffer.append(secondPoll), false);
@@ -185,4 +185,18 @@ test("engine telemetry buffer counts only valid pairs from the same poll", () =>
 
   assert.equal(buffer.snapshot.validComputeSampleCount, 0);
   assert.equal(buffer.snapshot.hasUnavailableComputeSamples, true);
+});
+
+test("engine telemetry buffer rejects unpaired and duplicate poll rows", () => {
+  const buffer = new EngineResearchTelemetryBuffer();
+  const poll = createEngineResearchTelemetrySamples({
+    elapsedMs: 1_000,
+    gameId: "game-1",
+    response,
+    runId: "run-1",
+  });
+
+  assert.equal(buffer.append([poll[0]]), false);
+  assert.equal(buffer.append([poll[0], poll[0], poll[1]]), false);
+  assert.equal(buffer.snapshot.recordedEngineSamples.length, 0);
 });

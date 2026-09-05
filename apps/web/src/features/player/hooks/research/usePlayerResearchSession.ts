@@ -53,7 +53,7 @@ export function usePlayerResearchSession({
     status,
     telemetry,
   });
-  const { clearTelemetryCsv } = recording;
+  const { clearTelemetryCsv, getRecordedCsvSamples } = recording;
   const { clearEvents } = researchState;
   const resetCapture = useCallback(() => {
     clearTelemetryCsv();
@@ -69,14 +69,22 @@ export function usePlayerResearchSession({
     runId: researchState.runId,
     sessionId,
   });
+  const { getSnapshot: getEngineTelemetrySnapshot } = engineTelemetry;
+  const getCompletionSnapshot = useCallback(() => {
+    const computeSnapshot = getEngineTelemetrySnapshot();
+    return {
+      hasUnavailableComputeSamples:
+        computeSnapshot.hasUnavailableComputeSamples,
+      sampleCount: getRecordedCsvSamples().length,
+      validComputeSampleCount: computeSnapshot.validComputeSampleCount,
+    };
+  }, [getEngineTelemetrySnapshot, getRecordedCsvSamples]);
   const controller = useResearchRunController({
     config,
-    computeSampleCount: engineTelemetry.validComputeSampleCount,
-    hasUnavailableComputeSamples:
-      engineTelemetry.hasUnavailableComputeSamples,
     currentProfileId: streamProfileId,
     enabled: experience === "research",
     firstFrameObserved,
+    getCompletionSnapshot,
     isConnectionReady:
       status === "playing" &&
       telemetry.connectionState === "connected" &&
@@ -88,7 +96,6 @@ export function usePlayerResearchSession({
     recordEvent: researchState.recordEvent,
     requiresComputeTelemetry:
       experience === "research" && config.scenario !== "browser_only_baseline",
-    sampleCount: recording.recordedCsvSamples.length,
     sessionId,
   });
   const exports = useResearchRunExports({

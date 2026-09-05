@@ -144,6 +144,10 @@ export function useStreamTelemetryRecording({
     setRecordedCsvRevision((revision) => revision + 1);
     setRecordingStartedAt(null);
   }, [recordingBuffer]);
+  const getRecordedCsvSamples = useCallback(
+    () => recordingBuffer.samples,
+    [recordingBuffer],
+  );
 
   const recordedCsvSamples = recordingBuffer.samples;
   const recordedCsvRowLabel = `${recordedCsvSamples.length} row${
@@ -169,6 +173,7 @@ export function useStreamTelemetryRecording({
     csvStatusText,
     csvStatusTitle,
     isRecordingCsv,
+    getRecordedCsvSamples,
     recordedCsvSamples,
     recordedCsvRevision,
     startCsvRecording,

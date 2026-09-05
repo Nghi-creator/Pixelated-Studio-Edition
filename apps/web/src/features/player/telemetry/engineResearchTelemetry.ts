@@ -63,41 +63,27 @@ export class EngineResearchTelemetryBuffer {
 
   append(samples: EngineResearchTelemetrySample[]) {
     let appended = false;
-    const acceptedSamples: EngineResearchTelemetrySample[] = [];
-    for (const sample of samples) {
-      if (this.values.length >= this.maxRows) break;
-      this.values.push(sample);
-      acceptedSamples.push(sample);
+    const pollPairs = completePollPairs(samples);
+    if (pollPairs.length * 2 !== samples.length) return false;
+    for (const [engineSample, encoderSample] of pollPairs) {
+      if (this.values.length + 2 > this.maxRows) break;
+      this.values.push(engineSample, encoderSample);
       appended = true;
-      if (!sample.available) this.hasUnavailableComputeSamples = true;
-      if (sample.source === "engine_runtime") {
-        this.latestEngineSample = sample;
-      } else {
-        this.latestEncoderSample = sample;
+      this.latestEngineSample = engineSample;
+      this.latestEncoderSample = encoderSample;
+      if (!engineSample.available || !encoderSample.available) {
+        this.hasUnavailableComputeSamples = true;
+      }
+      if (
+        engineSample.available &&
+        engineSample.nodeCpuPercent !== null &&
+        engineSample.emulatorCpuPercent !== null &&
+        engineSample.cameraCpuPercent !== null &&
+        encoderSample.available
+      ) {
+        this.validComputeSampleCount += 1;
       }
     }
-    const validEnginePolls = new Set(
-      acceptedSamples
-        .filter(
-          (sample) =>
-            sample.source === "engine_runtime" &&
-            sample.available &&
-            sample.nodeCpuPercent !== null &&
-            sample.emulatorCpuPercent !== null &&
-            sample.cameraCpuPercent !== null,
-        )
-        .map(samplePollIdentity),
-    );
-    const validEncoderPolls = new Set(
-      acceptedSamples
-        .filter(
-          (sample) => sample.source === "encoder_pipeline" && sample.available,
-        )
-        .map(samplePollIdentity),
-    );
-    this.validComputeSampleCount += [...validEnginePolls].filter((poll) =>
-      validEncoderPolls.has(poll),
-    ).length;
     return appended;
   }
 
@@ -121,12 +107,55 @@ export class EngineResearchTelemetryBuffer {
 }
 
 function samplePollIdentity(sample: EngineResearchTelemetrySample) {
-  return [
+  return JSON.stringify([
     sample.runId,
     sample.sessionId,
+    sample.gameId,
     sample.capturedAt,
     sample.elapsedMs,
-  ].join("\u0000");
+  ]);
+}
+
+function completePollPairs(samples: EngineResearchTelemetrySample[]) {
+  const polls = new Map<
+    string,
+    {
+      encoder: EngineResearchTelemetrySample | null;
+      engine: EngineResearchTelemetrySample | null;
+      invalid: boolean;
+    }
+  >();
+  for (const sample of samples) {
+    const identity = samplePollIdentity(sample);
+    const poll = polls.get(identity) ?? {
+      encoder: null,
+      engine: null,
+      invalid: false,
+    };
+    if (sample.source === "engine_runtime") {
+      if (poll.engine) poll.invalid = true;
+      poll.engine = sample;
+    } else {
+      if (poll.encoder) poll.invalid = true;
+      poll.encoder = sample;
+    }
+    polls.set(identity, poll);
+  }
+  return [...polls.values()]
+    .filter(
+      (poll): poll is {
+        encoder: EngineResearchTelemetrySample;
+        engine: EngineResearchTelemetrySample;
+        invalid: false;
+      } => !poll.invalid && poll.engine !== null && poll.encoder !== null,
+    )
+    .map((poll) => [poll.engine, poll.encoder] as const);
+}
+
+export function hasExactlyPairedEngineTelemetrySamples(
+  samples: EngineResearchTelemetrySample[],
+) {
+  return completePollPairs(samples).length * 2 === samples.length;
 }
 
 export function elapsedMsFromCapturedAt(

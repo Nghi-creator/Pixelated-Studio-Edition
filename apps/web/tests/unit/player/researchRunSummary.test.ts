@@ -254,6 +254,40 @@ test("research run summary rejects partial compute gaps and excludes them from s
   assert.equal(summary.compute.encoderFramesDroppedLatest, 2);
 });
 
+test("research run summary rejects engine and encoder rows from different polls", () => {
+  const pair = createUnavailableEngineTelemetrySamples({
+    capturedAt: "2026-08-10T01:02:03.000Z",
+    elapsedMs: 1_000,
+    error: "unavailable",
+    gameId: "game-1",
+    runId: "edge-run-1",
+    sessionId: "session-1",
+  });
+  const engineSamples = [
+    { ...pair[0], available: true, error: null },
+    {
+      ...pair[1],
+      available: true,
+      capturedAt: "2026-08-10T01:02:03.500Z",
+      elapsedMs: 1_500,
+      error: null,
+    },
+  ];
+  const summary = createResearchRunSummary({
+    engineSamples,
+    events: [],
+    requiresComputeTelemetry: true,
+    runId: "edge-run-1",
+    samples: [baseSample, { ...baseSample, elapsedMs: 1_000 }],
+    sessionId: "session-1",
+  });
+
+  assert.equal(summary.validity.isValid, false);
+  assert.deepEqual(summary.validity.reasons, [
+    "Engine and encoder telemetry samples are not paired by poll.",
+  ]);
+});
+
 test("research run summary JSON is pretty printed with trailing newline", () => {
   const json = researchRunSummaryToJson(
     createResearchRunSummary({
