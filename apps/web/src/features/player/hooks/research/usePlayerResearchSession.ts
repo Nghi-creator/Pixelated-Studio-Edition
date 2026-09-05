@@ -72,6 +72,8 @@ export function usePlayerResearchSession({
   const controller = useResearchRunController({
     config,
     computeSampleCount: engineTelemetry.validComputeSampleCount,
+    hasUnavailableComputeSamples:
+      engineTelemetry.hasUnavailableComputeSamples,
     currentProfileId: streamProfileId,
     enabled: experience === "research",
     firstFrameObserved,

@@ -80,7 +80,10 @@ function measurementSupport(
     ...ENGINE_RESEARCH_METRIC_KEYS.map((metric) => [
       `engine_runtime.${metric}`,
       engineSamples.some(
-        (sample) => sample.source === "engine_runtime" && sample[metric] !== null,
+        (sample) =>
+          sample.source === "engine_runtime" &&
+          sample.available &&
+          sample[metric] !== null,
       )
         ? "supported"
         : "unavailable",
@@ -91,7 +94,9 @@ function measurementSupport(
         ? "unsupported"
         : engineSamples.some(
               (sample) =>
-                sample.source === "encoder_pipeline" && sample[metric] !== null,
+                sample.source === "encoder_pipeline" &&
+                sample.available &&
+                sample[metric] !== null,
             )
           ? "supported"
           : "unavailable",
@@ -130,7 +135,7 @@ export function createResearchRunExportArtifacts({
   }));
   const sanitizedEngineSamples = engineSamples.map((sample) => ({
     ...sample,
-    error: null,
+    error: sample.available ? null : "telemetry unavailable",
   }));
   const contentFiles: ResearchRunBundleFile[] = [
     { data: metadataJson, name: "run-metadata.json" },

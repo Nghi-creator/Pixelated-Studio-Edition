@@ -10,6 +10,10 @@ import {
   type ResearchRunEvent,
 } from "../../../src/features/player/research/researchRunEvents.ts";
 import type { StreamTelemetryCsvSample } from "../../../src/features/player/telemetry/streamTelemetryExport.ts";
+import {
+  createEngineResearchTelemetrySamples,
+  createUnavailableEngineTelemetrySamples,
+} from "../../../src/features/player/telemetry/engineResearchTelemetry.ts";
 
 const baseSample: StreamTelemetryCsvSample = {
   availableIncomingBitrateKbps: null,
@@ -149,6 +153,105 @@ test("research run summary treats the first packet-loss total as its baseline", 
     totalDelta: 0,
     totalLatest: 180,
   });
+});
+
+test("research run duration is the observed sample span", () => {
+  const summary = createResearchRunSummary({
+    events: [],
+    runId: "edge-run-1",
+    samples: [
+      { ...baseSample, elapsedMs: 5_000 },
+      { ...baseSample, elapsedMs: 65_000 },
+    ],
+    sessionId: "session-1",
+  });
+
+  assert.equal(summary.recording.durationMs, 60_000);
+});
+
+test("research run summary rejects a single browser sample", () => {
+  const summary = createResearchRunSummary({
+    events: [],
+    runId: "edge-run-1",
+    samples: [baseSample],
+    sessionId: "session-1",
+  });
+
+  assert.equal(summary.validity.isValid, false);
+  assert.deepEqual(summary.validity.reasons, [
+    "Browser WebRTC telemetry requires at least two samples.",
+  ]);
+});
+
+test("research run summary rejects partial compute gaps and excludes them from stats", () => {
+  const engineResponse = {
+    capturedAt: "2026-08-10T01:02:03.000Z",
+    encoder: {
+      available: true,
+      cpuUsed: 6,
+      error: null,
+      framesDroppedTotal: 2,
+      framesInTotal: 101,
+      framesOutTotal: 99,
+      maxQuantizer: 48,
+      pipelineDelayProxyMs: null,
+      queueLevelBuffers: 3,
+      targetBitrateKbps: 1_500,
+      targetFps: 60,
+      updatedAt: "2026-08-10T01:02:02.900Z",
+    },
+    engine: {
+      cameraCpuPercent: 30,
+      cameraRssMb: 210,
+      cameraRunning: true,
+      cpuCapacityCores: 4,
+      emulatorCpuPercent: 70,
+      emulatorRssMb: 350,
+      emulatorRunning: true,
+      logicalCpuCount: 8,
+      nodeCpuPercent: 5,
+      nodeRssMb: 120,
+      nodeRunning: true,
+      peerCount: 1,
+      runtimeKind: "libretro" as const,
+    },
+    schemaVersion: 1 as const,
+    sessionId: "session-1",
+  };
+  const available = createEngineResearchTelemetrySamples({
+    elapsedMs: 1_000,
+    gameId: "game-1",
+    response: engineResponse,
+    runId: "edge-run-1",
+  });
+  const unavailable = createUnavailableEngineTelemetrySamples({
+    capturedAt: "2026-08-10T01:02:04.000Z",
+    elapsedMs: 2_000,
+    error: "private diagnostic",
+    gameId: "game-1",
+    runId: "edge-run-1",
+    sessionId: "session-1",
+  }).map((sample) => ({
+    ...sample,
+    framesDroppedTotal: sample.source === "encoder_pipeline" ? 999 : null,
+    nodeCpuPercent: sample.source === "engine_runtime" ? 999 : null,
+  }));
+  const summary = createResearchRunSummary({
+    engineSamples: [...available, ...unavailable],
+    events: [],
+    requiresComputeTelemetry: true,
+    runId: "edge-run-1",
+    samples: [baseSample, { ...baseSample, elapsedMs: 1_000 }],
+    sessionId: "session-1",
+  });
+
+  assert.equal(summary.validity.isValid, false);
+  assert.deepEqual(summary.validity.reasons, [
+    "Engine runtime telemetry has unavailable samples.",
+    "Encoder pipeline telemetry has unavailable samples.",
+  ]);
+  assert.equal(summary.compute.nodeCpuPercent.mean, 5);
+  assert.equal(summary.compute.encoderFramesDroppedLatest, 2);
 });
 
 test("research run summary JSON is pretty printed with trailing newline", () => {

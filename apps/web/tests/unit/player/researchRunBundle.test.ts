@@ -250,6 +250,46 @@ test("formal research artifacts omit diagnostic error text", () => {
   assert.equal(exportedText.includes("/Users/alice"), false);
   assert.equal(exportedText.includes("C:\\Users\\alice"), false);
   assert.match(exportedText, /engine-error/);
+  assert.match(exportedText, /telemetry unavailable/);
+});
+
+test("research manifest does not advertise metrics from unavailable samples", () => {
+  const engineSamples = createUnavailableEngineTelemetrySamples({
+    capturedAt: "2026-08-10T00:00:01.000Z",
+    elapsedMs: 1_000,
+    error: "engine unavailable",
+    gameId: "game-1",
+    runId: "run-1",
+    sessionId: "session-1",
+  }).map((sample) => ({
+    ...sample,
+    nodeCpuPercent: sample.source === "engine_runtime" ? 99 : null,
+    queueLevelBuffers: sample.source === "encoder_pipeline" ? 9 : null,
+  }));
+  const files = createResearchRunExportArtifacts({
+    comparisonCaseId: "case-1",
+    engineSamples,
+    events: [],
+    graphPng: null,
+    metadataJson: "{}\n",
+    phase: "healthy",
+    recordedAt: new Date("2026-08-10T00:00:02.000Z"),
+    runId: "run-1",
+    samples: [],
+    summaryJson: "{}\n",
+  });
+  const manifest = JSON.parse(String(files[0].data)) as {
+    measurementSupport: Record<string, string>;
+  };
+
+  assert.equal(
+    manifest.measurementSupport["engine_runtime.nodeCpuPercent"],
+    "unavailable",
+  );
+  assert.equal(
+    manifest.measurementSupport["encoder_pipeline.queueLevelBuffers"],
+    "unavailable",
+  );
 });
 
 test("research run bundle entries cannot escape through tar paths", () => {

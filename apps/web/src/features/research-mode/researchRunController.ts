@@ -10,6 +10,8 @@ export type ResearchRunStage =
   | "invalid"
   | "cancelled";
 
+export const MIN_RESEARCH_BROWSER_SAMPLES = 2;
+
 export type ResearchRunControllerState = {
   completionKind: "automatic" | "manual" | null;
   endedAtMs: number | null;
@@ -50,6 +52,35 @@ export function createResearchRunControllerState(
 
 function isTerminal(stage: ResearchRunStage) {
   return stage === "completed" || stage === "invalid" || stage === "cancelled";
+}
+
+export function getResearchCompletionInvalidReason({
+  hasUnavailableComputeSamples,
+  requiresComputeTelemetry,
+  sampleCount,
+  validComputeSampleCount,
+}: {
+  hasUnavailableComputeSamples: boolean;
+  requiresComputeTelemetry: boolean;
+  sampleCount: number;
+  validComputeSampleCount: number;
+}) {
+  if (
+    !Number.isInteger(sampleCount) ||
+    sampleCount < MIN_RESEARCH_BROWSER_SAMPLES
+  ) {
+    return "Recording completed without enough browser telemetry samples.";
+  }
+  if (requiresComputeTelemetry && hasUnavailableComputeSamples) {
+    return "Recording contains unavailable engine or encoder telemetry samples.";
+  }
+  if (
+    requiresComputeTelemetry &&
+    (!Number.isInteger(validComputeSampleCount) || validComputeSampleCount <= 0)
+  ) {
+    return "Recording completed without required engine and encoder telemetry.";
+  }
+  return null;
 }
 
 export function researchRunControllerReducer(
@@ -95,11 +126,17 @@ export function researchRunControllerReducer(
     };
   }
   if (event.type === "finish_recording" && state.stage === "recording") {
-    if (event.sampleCount <= 0) {
+    const invalidReason = getResearchCompletionInvalidReason({
+      hasUnavailableComputeSamples: false,
+      requiresComputeTelemetry: false,
+      sampleCount: event.sampleCount,
+      validComputeSampleCount: 0,
+    });
+    if (invalidReason) {
       return {
         ...state,
         endedAtMs: event.nowMs,
-        invalidReason: "Recording completed without telemetry samples.",
+        invalidReason,
         sampleCount: event.sampleCount,
         stage: "invalid",
         stageStartedAtMs: event.nowMs,

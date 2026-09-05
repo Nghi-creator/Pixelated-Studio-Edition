@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   createEngineResearchTelemetrySamples,
   createUnavailableEngineTelemetrySamples,
+  elapsedMsFromCapturedAt,
   EngineResearchTelemetryBuffer,
   engineResearchTelemetrySamplesToCsv,
   parseEngineResearchTelemetryResponse,
@@ -82,6 +83,20 @@ test("one poll becomes separate engine and encoder source samples", () => {
   assert.equal(samples[1].available, true);
 });
 
+test("engine telemetry elapsed time uses the exported wall-clock timestamp", () => {
+  const startedAt = Date.parse("2026-08-10T01:02:00.250Z");
+
+  assert.equal(
+    elapsedMsFromCapturedAt("2026-08-10T01:02:03.000Z", startedAt),
+    2_750,
+  );
+  assert.equal(
+    elapsedMsFromCapturedAt("2026-08-10T01:01:59.999Z", startedAt),
+    null,
+  );
+  assert.equal(elapsedMsFromCapturedAt("not-a-date", startedAt), null);
+});
+
 test("unavailable polls preserve missing metrics as empty CSV cells", () => {
   const samples = createUnavailableEngineTelemetrySamples({
     capturedAt: "2026-08-10T01:02:03.000Z",
@@ -146,5 +161,28 @@ test("engine telemetry buffer updates summaries incrementally and stays bounded"
   assert.equal(buffer.snapshot.recordedEngineSamples, stableSamples);
   assert.equal(buffer.snapshot.recordedEngineSamples.length, 0);
   assert.equal(buffer.snapshot.validComputeSampleCount, 0);
+  assert.equal(buffer.snapshot.hasUnavailableComputeSamples, false);
   assert.equal(buffer.snapshot.latestEngineSample, null);
+});
+
+test("engine telemetry buffer counts only valid pairs from the same poll", () => {
+  const buffer = new EngineResearchTelemetryBuffer();
+  const firstPoll = createEngineResearchTelemetrySamples({
+    elapsedMs: 1_000,
+    gameId: "game-1",
+    response,
+    runId: "run-1",
+  });
+  const secondPoll = createEngineResearchTelemetrySamples({
+    elapsedMs: 2_000,
+    gameId: "game-1",
+    response: { ...response, capturedAt: "2026-08-10T01:02:04.000Z" },
+    runId: "run-1",
+  });
+
+  buffer.append([{ ...firstPoll[0] }, { ...firstPoll[1], available: false }]);
+  buffer.append([{ ...secondPoll[0], available: false }, { ...secondPoll[1] }]);
+
+  assert.equal(buffer.snapshot.validComputeSampleCount, 0);
+  assert.equal(buffer.snapshot.hasUnavailableComputeSamples, true);
 });

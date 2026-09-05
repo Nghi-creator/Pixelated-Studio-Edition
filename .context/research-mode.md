@@ -2,7 +2,7 @@
 
 **Status:** Implemented and verified for the P0 controlled-run workflow  
 **Consumer:** `latency_fingerprinting` Pixelated bundle adapter
-**Last verified:** 2026-08-13
+**Last verified:** 2026-09-05
 
 ## Purpose and scope
 
@@ -64,6 +64,9 @@ Warm-up begins only after playback, connected ICE and the first visible frame.
 Recording clears previous capture data, starts and stops automatically, and
 uses monotonic time for duration. Connection, session or profile instability
 invalidates the run instead of silently producing accepted evidence.
+Completion requires at least two browser samples so the exported observation
+has a positive first-to-last span. A compute-required run is also invalidated
+when any engine or encoder poll is unavailable.
 
 The HUD shows the phase, profile, readiness, countdown and sample counts. The
 terminal result shows validity, duration, browser metrics, engine/encoder
@@ -96,6 +99,11 @@ Unavailable measurements remain null/empty. They must never be represented as
 zero. Direct encoder processing time is not claimed; the unsupported
 pipeline-delay proxy remains explicitly identified as unavailable.
 
+Each exported engine row derives `captured_at` and `elapsed_ms` from the same
+capture instant. Compute readiness counts a poll only when its engine-runtime
+and encoder-pipeline rows are both usable; samples from different polls cannot
+be combined into a synthetic valid pair.
+
 ## Bundle v2 contract
 
 The complete TAR contains:
@@ -114,6 +122,15 @@ performance-network.png  # optional preview
 distinguished by the `source` column. The convenience CSV action downloads
 `stream-telemetry.csv`, `stream-events.csv` and `engine-telemetry.csv` as
 individual files using phase/run-aware filenames.
+
+Available rows have an empty `error` cell. Unavailable rows retain the generic
+categorical reason `telemetry unavailable`; raw diagnostic text is removed so
+the consumer can distinguish missing evidence without receiving local paths or
+other private details. Measurement support is inferred only from available
+rows. A partial engine/encoder gap invalidates a compute-required run, and
+summary compute statistics exclude unavailable rows. Summary duration is the
+observed span from the first browser sample to the last, matching the adapter's
+wall-clock and elapsed-clock reconciliation.
 
 Bundle v1 remains readable downstream. Bundle v2 binds its phase, comparison
 case, run ID, file inventory, source availability and measurement support in

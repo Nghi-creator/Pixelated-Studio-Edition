@@ -139,8 +139,12 @@ export function createResearchRunSummary({
   sessionId: string;
 }): ResearchRunSummary {
   const samplesWithDeltas = addPacketLossDeltas(samples);
+  const firstSample = samplesWithDeltas.at(0);
   const latestSample = samplesWithDeltas.at(-1);
-  const durationMs = Math.max(0, latestSample?.elapsedMs ?? 0);
+  const durationMs =
+    firstSample && latestSample
+      ? Math.max(0, latestSample.elapsedMs - firstSample.elapsedMs)
+      : 0;
   const totalPacketLossDelta = samplesWithDeltas.reduce(
     (total, sample) => total + sample.packetsLostDelta,
     0,
@@ -159,29 +163,43 @@ export function createResearchRunSummary({
     (sample) => sample.available,
   );
   const validityReasons: string[] = [];
-  if (samples.length === 0) validityReasons.push("Browser WebRTC telemetry is unavailable.");
+  if (samples.length === 0) {
+    validityReasons.push("Browser WebRTC telemetry is unavailable.");
+  } else if (samples.length < 2) {
+    validityReasons.push("Browser WebRTC telemetry requires at least two samples.");
+  }
   if (requiresComputeTelemetry && availableEngineSamples.length === 0) {
     validityReasons.push("Engine runtime telemetry is unavailable.");
+  } else if (
+    requiresComputeTelemetry &&
+    availableEngineSamples.length !== engineRuntimeSamples.length
+  ) {
+    validityReasons.push("Engine runtime telemetry has unavailable samples.");
   }
   if (requiresComputeTelemetry && availableEncoderSamples.length === 0) {
     validityReasons.push("Encoder pipeline telemetry is unavailable.");
+  } else if (
+    requiresComputeTelemetry &&
+    availableEncoderSamples.length !== encoderPipelineSamples.length
+  ) {
+    validityReasons.push("Encoder pipeline telemetry has unavailable samples.");
   }
 
   return {
     compute: {
       cameraCpuPercent: metricSummary(
-        engineRuntimeSamples.map((sample) => sample.cameraCpuPercent),
+        availableEngineSamples.map((sample) => sample.cameraCpuPercent),
       ),
       emulatorCpuPercent: metricSummary(
-        engineRuntimeSamples.map((sample) => sample.emulatorCpuPercent),
+        availableEngineSamples.map((sample) => sample.emulatorCpuPercent),
       ),
       encoderFramesDroppedLatest:
-        encoderPipelineSamples.at(-1)?.framesDroppedTotal ?? null,
+        availableEncoderSamples.at(-1)?.framesDroppedTotal ?? null,
       encoderQueueLevelBuffers: metricSummary(
-        encoderPipelineSamples.map((sample) => sample.queueLevelBuffers),
+        availableEncoderSamples.map((sample) => sample.queueLevelBuffers),
       ),
       nodeCpuPercent: metricSummary(
-        engineRuntimeSamples.map((sample) => sample.nodeCpuPercent),
+        availableEngineSamples.map((sample) => sample.nodeCpuPercent),
       ),
     },
     eventCount: events.length,
