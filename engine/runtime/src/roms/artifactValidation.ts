@@ -142,9 +142,9 @@ function hasValidSnesHeader(filePath: string) {
     const printableTitleBytes = title.filter(
       (value) => value === 0x00 || (value >= 0x20 && value <= 0x7e),
     ).length;
-    const mapMode = header[0x15];
-    const romType = header[0x16];
-    const romSize = header[0x17];
+    const mapMode = header.readUInt8(0x15);
+    const romType = header.readUInt8(0x16);
+    const romSize = header.readUInt8(0x17);
     const complement = header.readUInt16LE(0x1c);
     const checksum = header.readUInt16LE(0x1e);
 

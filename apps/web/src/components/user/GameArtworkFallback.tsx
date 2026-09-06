@@ -15,8 +15,9 @@ function initialsFor(title: string) {
     .filter(Boolean);
 
   if (words.length === 0) return "PX";
-  if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
-  return `${words[0][0]}${words[1][0]}`.toUpperCase();
+  const [first = "", second = ""] = words;
+  if (words.length === 1) return first.slice(0, 2).toUpperCase();
+  return `${first.charAt(0)}${second.charAt(0)}`.toUpperCase();
 }
 
 export function GameArtworkFallback({

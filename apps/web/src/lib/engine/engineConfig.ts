@@ -1,3 +1,8 @@
+import {
+  isLocalEngineHostname,
+  isLocalOrLanEngineHostname,
+} from "../network/privateHost.ts";
+
 export const ENGINE_URL_STORAGE_KEY = "pixelated_engine_url";
 export const ENGINE_CONTROL_URL_STORAGE_KEY = "pixelated_engine_control_url";
 
@@ -13,38 +18,11 @@ function normalizeEngineUrl(url: string) {
   return url.trim().replace(/\/+$/, "");
 }
 
-function isLocalEngineHostname(hostname: string) {
-  return (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "::1" ||
-    hostname === "[::1]"
-  );
-}
-
-function isPrivateIpv4(hostname: string) {
-  const parts = hostname.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part))) {
-    return false;
-  }
-
-  const [first, second] = parts;
-  return (
-    first === 10 ||
-    (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && second === 168) ||
-    (first === 169 && second === 254)
-  );
-}
-
 export function isAllowedEngineUrl(value: string) {
   try {
     const url = new URL(normalizeEngineUrl(value));
     const hostname = url.hostname.toLowerCase();
-    const isAllowedHost =
-      isLocalEngineHostname(hostname) ||
-      isPrivateIpv4(hostname) ||
-      hostname.endsWith(".local");
+    const isAllowedHost = isLocalOrLanEngineHostname(hostname);
 
     return (
       ["http:", "https:"].includes(url.protocol) &&
@@ -78,11 +56,7 @@ export const getLocalCompanionControlUrl = (engineUrl = getEngineUrl()) => {
   try {
     const url = new URL(engineUrl);
     const hostname = url.hostname.toLowerCase();
-    const isLocalhost =
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1" ||
-      hostname === "[::1]";
+    const isLocalhost = isLocalEngineHostname(hostname);
 
     if (!isLocalhost || url.port !== "8080") return null;
 

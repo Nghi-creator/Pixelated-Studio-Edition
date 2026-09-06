@@ -54,10 +54,12 @@ test("connection health registers a lightweight authenticated probe", () => {
   const handlers = routes.get("/health/connection");
   assert.ok(handlers);
   assert.equal(handlers[0], requireEngineToken);
+  const bodyHandler = handlers[1];
+  assert.ok(bodyHandler);
 
   const headers = new Map<string, string>();
   let payload: unknown;
-  handlers[1](
+  bodyHandler(
     {} as Parameters<RequestHandler>[0],
     {
       json(value: unknown) {

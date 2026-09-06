@@ -127,7 +127,7 @@ export function parseWebRTCStats(
   videoInbound.forEach((record) => {
     const current = nextInboundById[record.id];
     const previous = previousState.inboundById[record.id];
-    if (!previous) return;
+    if (!current || !previous) return;
 
     const decodeTimeDelta = counterDelta(
       current.totalDecodeTime,

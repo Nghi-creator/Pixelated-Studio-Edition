@@ -18,7 +18,7 @@ class FakeSocket extends EventEmitter {
     this.rooms = new Set([id]);
   }
 
-  emit(event: string, payload?: unknown) {
+  override emit(event: string, payload?: unknown) {
     if (event === "engine-error") {
       this.outbound.push({ event, payload });
       return true;
@@ -185,8 +185,10 @@ test("spectator input is rejected", () => {
   });
 
   assert.deepEqual(inputs, []);
+  const rejection = spectator.outbound[0];
+  assert.ok(rejection);
   assert.equal(
-    (spectator.outbound[0].payload as { message: string }).message,
+    (rejection.payload as { message: string }).message,
     "Input is not allowed for this player slot.",
   );
 });
@@ -218,8 +220,10 @@ test("assigned player cannot send input for another slot", () => {
   });
 
   assert.deepEqual(inputs, []);
+  const rejection = guest.outbound[0];
+  assert.ok(rejection);
   assert.equal(
-    (guest.outbound[0].payload as { message: string }).message,
+    (rejection.payload as { message: string }).message,
     "Input is not allowed for this player slot.",
   );
 });
@@ -246,8 +250,10 @@ test("player slot 3 receives a clear error when virtual gamepads are unavailable
     sessionId: "session-1",
   });
 
+  const rejection = guest.outbound[0];
+  assert.ok(rejection);
   assert.equal(
-    (guest.outbound[0].payload as { message: string }).message,
+    (rejection.payload as { message: string }).message,
     "Player slots 3 and 4 need virtual gamepad support. Start the engine with /dev/uinput available.",
   );
 });

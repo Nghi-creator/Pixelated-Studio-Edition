@@ -48,7 +48,11 @@ export function buildResearchRunGraphPng({
           packetsLostDelta:
             index === 0
               ? sample.packetsLost
-              : Math.max(0, sample.packetsLost - history[index - 1].packetsLost),
+              : Math.max(
+                  0,
+                  sample.packetsLost -
+                    (history[index - 1]?.packetsLost ?? sample.packetsLost),
+                ),
           packetsLostTotal: sample.packetsLost,
         }));
   return createStreamTelemetryGraphPngBytes(graphSamples, {

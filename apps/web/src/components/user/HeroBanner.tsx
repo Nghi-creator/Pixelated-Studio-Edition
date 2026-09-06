@@ -89,7 +89,7 @@ export default function HeroBanner({
     currentIndex,
     Math.max(0, featuredGames.length - 1),
   );
-  const currentGame = featuredGames[safeCurrentIndex];
+  const currentGame = featuredGames[safeCurrentIndex] ?? featuredGames[0];
 
   // Automatically rotate the banner every 5 seconds
   useEffect(() => {
@@ -119,7 +119,7 @@ export default function HeroBanner({
     });
   };
 
-  if (!featuredGames || featuredGames.length === 0) {
+  if (!currentGame) {
     return (
       <div className="w-full h-[360px] md:h-[440px] bg-synth-bg animate-pulse" />
     );

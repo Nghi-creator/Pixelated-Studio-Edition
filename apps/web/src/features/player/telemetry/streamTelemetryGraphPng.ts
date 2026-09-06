@@ -151,7 +151,8 @@ function drawGraphPanel({
     ctx.lineWidth = 3;
     ctx.beginPath();
     values.forEach((value, index) => {
-      const pointX = plotX + (seconds[index] / maxSecond) * plotWidth;
+      const elapsedSeconds = seconds[index] ?? 0;
+      const pointX = plotX + (elapsedSeconds / maxSecond) * plotWidth;
       const pointY =
         plotY +
         plotHeight -

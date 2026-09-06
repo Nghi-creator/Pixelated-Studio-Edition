@@ -31,7 +31,8 @@ export function useProfileAvatar({
   const handleFileSelect = (e: ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
 
-    const file = e.target.files[0];
+    const file = e.target.files.item(0);
+    if (!file) return;
     const validationError = validateAvatarFile(file);
     if (validationError) {
       setProfileMessage({ type: "error", text: validationError });

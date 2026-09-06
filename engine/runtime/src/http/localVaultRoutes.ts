@@ -159,9 +159,16 @@ export function registerLocalVaultRoutes(
     async (req: Request, res: Response) => {
       try {
         const filenameParam = req.params.filename;
+        const filename = Array.isArray(filenameParam)
+          ? filenameParam[0]
+          : filenameParam;
+        if (typeof filename !== "string" || !filename) {
+          res.status(400).json({ error: "Invalid filename" });
+          return;
+        }
         const result = await deleteVaultGame(
           getVaultOwnerContext(req, getVaultOwnerId),
-          Array.isArray(filenameParam) ? filenameParam[0] : filenameParam,
+          filename,
         );
         if (result.status === "invalid") {
           res.status(400).json({ error: "Invalid filename" });

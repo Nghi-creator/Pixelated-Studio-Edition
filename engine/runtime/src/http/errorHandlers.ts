@@ -22,7 +22,7 @@ export function getHttpErrorResponse(err: unknown) {
 export function registerErrorHandlers(app: Express): void {
   const handler: ErrorRequestHandler = (
     err: unknown,
-    req: Request,
+    _req: Request,
     res: Response,
     next: NextFunction,
   ) => {

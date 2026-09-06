@@ -1,6 +1,6 @@
 # Verification, Deployment, and Smoke Operations
 
-Last reviewed: 2026-07-22
+Last reviewed: 2026-09-07
 
 Use this as the cross-package operational runbook. Package-specific setup and
 environment variables remain in each package README.
@@ -106,8 +106,9 @@ The two-device LAN procedure remains in `lan-manual-smoke-checklist.md`.
 - Native builds use an allowlisted launch manifest and no ROM target; libretro
   builds require immutable ROM evidence.
 - PRs do not run secret-backed staging predeploy or production browser smokes.
-- Desktop packaging includes the web build, so web changes can break Electron
-  release validation.
+- Desktop packaging includes the engine runtime resources and its own renderer,
+  but not the separately deployed Vite web build. Cross-surface contract changes
+  can still require both hosted and desktop release validation.
 - CI uses the Node 24 version pinned in `.nvmrc` and `npm ci`;
   package/lock drift is a hard failure.
 - A passing proof-mode deploy is not evidence that production auth and pairing

@@ -43,7 +43,11 @@ test("research telemetry route bounds and binds session requests", () => {
     rateLimit: (_req, _res, next) => next(),
     requireEngineToken: (_req, _res, next) => next(),
   });
-  const bodyHandler = handlers[2];
+  const bodyHandler: RequestHandler =
+    handlers[2] ??
+    (() => {
+      throw new Error("Missing route body handler");
+    });
 
   function invoke(sessionId: string) {
     const result: { body?: unknown; status?: number } = {};

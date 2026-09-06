@@ -131,7 +131,7 @@ test("research bundle v2 composer adds a matching manifest", () => {
       engine_runtime: "supported",
     },
   });
-  const manifest = JSON.parse(String(files[0].data)) as {
+  const manifest = JSON.parse(String(files[0]?.data)) as {
     files: Array<{ name: string }>;
     measurementSupport: Record<string, string>;
     phase: string;
@@ -164,7 +164,7 @@ test("research export artifacts preserve browser-only missing evidence", () => {
     samples: [],
     summaryJson: "{}\n",
   });
-  const manifest = JSON.parse(String(files[0].data)) as {
+  const manifest = JSON.parse(String(files[0]?.data)) as {
     measurementSupport: Record<string, string>;
     telemetrySources: Record<string, string>;
   };
@@ -278,7 +278,7 @@ test("research manifest does not advertise metrics from unavailable samples", ()
     samples: [],
     summaryJson: "{}\n",
   });
-  const manifest = JSON.parse(String(files[0].data)) as {
+  const manifest = JSON.parse(String(files[0]?.data)) as {
     measurementSupport: Record<string, string>;
   };
 

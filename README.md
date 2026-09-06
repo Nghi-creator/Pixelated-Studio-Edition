@@ -93,8 +93,8 @@ Install workspace dependencies from the repository root:
 npm install
 ```
 
-CI and hosted builds use Node.js 22. Docker Desktop is required only for local
-engine startup and desktop/engine integration work.
+CI and hosted builds use Node.js 24, pinned in `.nvmrc`. Docker Desktop is
+required only for local engine startup and desktop/engine integration work.
 
 Common root commands:
 
