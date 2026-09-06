@@ -89,7 +89,10 @@ export function useStreamPlayback({
           ).data;
           let total = 0;
           for (let index = 0; index < pixels.length; index += 4) {
-            total += pixels[index] + pixels[index + 1] + pixels[index + 2];
+            total +=
+              (pixels[index] ?? 0) +
+              (pixels[index + 1] ?? 0) +
+              (pixels[index + 2] ?? 0);
           }
           const average = total / (pixels.length / 4) / 3;
           recordSample(average < BLACK_VIDEO_SAMPLE_THRESHOLD);
@@ -106,4 +109,3 @@ export function useStreamPlayback({
 
   return status === "playing" && sampledFallbackActive;
 }
-

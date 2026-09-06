@@ -56,7 +56,7 @@ class FakeSocket extends EventEmitter {
   outbound: Array<{ event: string; payload: unknown }> = [];
   rooms: string[] = [];
 
-  emit(event: string, ...args: unknown[]) {
+  override emit(event: string, ...args: unknown[]) {
     if (event === "engine-error") {
       this.outbound.push({ event, payload: args[0] });
       return true;

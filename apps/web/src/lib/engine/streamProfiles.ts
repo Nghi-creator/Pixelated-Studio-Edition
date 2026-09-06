@@ -9,6 +9,13 @@ export type StreamProfile = {
 
 export const STREAM_PROFILE_STORAGE_KEY = "pixelated_stream_profile";
 
+export const DEFAULT_STREAM_PROFILE: StreamProfile = {
+  bitrateKbps: 1400,
+  fps: 60,
+  id: "balanced",
+  label: "Balanced",
+};
+
 export const STREAM_PROFILES: StreamProfile[] = [
   {
     bitrateKbps: 700,
@@ -16,12 +23,7 @@ export const STREAM_PROFILES: StreamProfile[] = [
     id: "performance",
     label: "Performance",
   },
-  {
-    bitrateKbps: 1400,
-    fps: 60,
-    id: "balanced",
-    label: "Balanced",
-  },
+  DEFAULT_STREAM_PROFILE,
   {
     bitrateKbps: 2500,
     fps: 60,
@@ -29,10 +31,6 @@ export const STREAM_PROFILES: StreamProfile[] = [
     label: "Quality",
   },
 ];
-
-export const DEFAULT_STREAM_PROFILE =
-  STREAM_PROFILES.find((profile) => profile.id === "balanced") ||
-  STREAM_PROFILES[0];
 
 export function getStreamProfile(profileId: string | null | undefined) {
   return (

@@ -2,7 +2,7 @@
 
 **Status:** Implemented and verified for the P0 controlled-run workflow  
 **Consumer:** `latency_fingerprinting` Pixelated bundle adapter
-**Last verified:** 2026-09-05
+**Last verified:** 2026-09-07
 
 ## Purpose and scope
 

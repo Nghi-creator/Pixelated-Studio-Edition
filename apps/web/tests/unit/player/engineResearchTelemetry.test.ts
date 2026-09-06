@@ -75,12 +75,15 @@ test("one poll becomes separate engine and encoder source samples", () => {
     samples.map((sample) => sample.source),
     ["engine_runtime", "encoder_pipeline"],
   );
-  assert.equal(samples[0].nodeCpuPercent, 4.5);
-  assert.equal(samples[0].framesInTotal, null);
-  assert.equal(samples[1].nodeCpuPercent, null);
-  assert.equal(samples[1].framesInTotal, 101);
-  assert.equal(samples[0].available, true);
-  assert.equal(samples[1].available, true);
+  const [engineSample, encoderSample] = samples;
+  assert.ok(engineSample);
+  assert.ok(encoderSample);
+  assert.equal(engineSample.nodeCpuPercent, 4.5);
+  assert.equal(engineSample.framesInTotal, null);
+  assert.equal(encoderSample.nodeCpuPercent, null);
+  assert.equal(encoderSample.framesInTotal, 101);
+  assert.equal(engineSample.available, true);
+  assert.equal(encoderSample.available, true);
 });
 
 test("engine telemetry elapsed time uses the exported wall-clock timestamp", () => {
@@ -108,8 +111,11 @@ test("unavailable polls preserve missing metrics as empty CSV cells", () => {
   });
   const csv = engineResearchTelemetrySamplesToCsv(samples);
 
-  assert.equal(samples[0].nodeCpuPercent, null);
-  assert.equal(samples[1].framesInTotal, null);
+  const [engineSample, encoderSample] = samples;
+  assert.ok(engineSample);
+  assert.ok(encoderSample);
+  assert.equal(engineSample.nodeCpuPercent, null);
+  assert.equal(encoderSample.framesInTotal, null);
   assert.match(csv, /,false,'\+engine unavailable,/);
   assert.doesNotMatch(csv, /,0,0,0,/);
 });
@@ -179,9 +185,15 @@ test("engine telemetry buffer counts only valid pairs from the same poll", () =>
     response: { ...response, capturedAt: "2026-08-10T01:02:04.000Z" },
     runId: "run-1",
   });
+  const [firstEngine, firstEncoder] = firstPoll;
+  const [secondEngine, secondEncoder] = secondPoll;
+  assert.ok(firstEngine);
+  assert.ok(firstEncoder);
+  assert.ok(secondEngine);
+  assert.ok(secondEncoder);
 
-  buffer.append([{ ...firstPoll[0] }, { ...firstPoll[1], available: false }]);
-  buffer.append([{ ...secondPoll[0], available: false }, { ...secondPoll[1] }]);
+  buffer.append([{ ...firstEngine }, { ...firstEncoder, available: false }]);
+  buffer.append([{ ...secondEngine, available: false }, { ...secondEncoder }]);
 
   assert.equal(buffer.snapshot.validComputeSampleCount, 0);
   assert.equal(buffer.snapshot.hasUnavailableComputeSamples, true);
@@ -195,8 +207,14 @@ test("engine telemetry buffer rejects unpaired and duplicate poll rows", () => {
     response,
     runId: "run-1",
   });
+  const [engineSample, encoderSample] = poll;
+  assert.ok(engineSample);
+  assert.ok(encoderSample);
 
-  assert.equal(buffer.append([poll[0]]), false);
-  assert.equal(buffer.append([poll[0], poll[0], poll[1]]), false);
+  assert.equal(buffer.append([engineSample]), false);
+  assert.equal(
+    buffer.append([engineSample, engineSample, encoderSample]),
+    false,
+  );
   assert.equal(buffer.snapshot.recordedEngineSamples.length, 0);
 });

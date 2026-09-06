@@ -1,6 +1,6 @@
 # Architecture and Runtime Flows
 
-Last reviewed: 2026-07-22
+Last reviewed: 2026-09-07
 
 This is the durable architecture reference for Studio Edition. Historical
 implementation plans and audit notes belong in Git history.
@@ -66,8 +66,10 @@ remain feature-owned under `apps/web/src/lib/engine/`, `src/lib/webrtc/`, and
 
 The desktop app performs Docker diagnostics, builds or pulls the selected
 runtime image, creates a per-run token, starts/stops the engine, polls health,
-and packages the web app. LAN mode also starts the HTTPS companion, invite
-state, launch tickets, QR flow, scoped credential proxy, and client revocation.
+and packages its Electron shell plus the engine runtime resources. It launches
+the separately deployed hosted web app rather than embedding the Vite web
+build. LAN mode also starts the HTTPS companion, invite state, launch tickets,
+QR flow, scoped credential proxy, and client revocation.
 
 Local mode publishes the engine on loopback. LAN exposure is explicit and
 publishes through the desktop-controlled companion boundary.

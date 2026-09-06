@@ -49,7 +49,7 @@ test("profile save removes a newly uploaded avatar when the API update fails", a
   );
 
   assert.equal(removed.length, 1);
-  assert.match(removed[0], /^user-1\/avatar-\d+\.jpg$/);
+  assert.match(removed[0] ?? "", /^user-1\/avatar-\d+\.jpg$/);
 });
 
 test("profile save cleans the versioned path after an uncertain upload failure", async () => {
@@ -74,7 +74,7 @@ test("profile save cleans the versioned path after an uncertain upload failure",
   );
 
   assert.equal(removed.length, 1);
-  assert.match(removed[0], /^user-1\/avatar-\d+\.jpg$/);
+  assert.match(removed[0] ?? "", /^user-1\/avatar-\d+\.jpg$/);
 });
 
 test("profile save reports partial cleanup and metadata failures clearly", async () => {

@@ -91,22 +91,29 @@ function metricSummary(values: Array<number | null>): ResearchRunMetricSummary {
     };
   }
 
+  const first = numericValues[0];
+  const last = numericValues.at(-1);
+  if (first === undefined || last === undefined) {
+    throw new Error("Metric summary unexpectedly received an empty sample set.");
+  }
   const middleIndex = Math.floor(numericValues.length / 2);
   const median =
     numericValues.length % 2 === 0
-      ? (numericValues[middleIndex - 1] + numericValues[middleIndex]) / 2
-      : numericValues[middleIndex];
+      ? ((numericValues[middleIndex - 1] ?? first) +
+          (numericValues[middleIndex] ?? last)) /
+        2
+      : (numericValues[middleIndex] ?? first);
   const p95Index = Math.ceil(numericValues.length * 0.95) - 1;
   const mean =
     numericValues.reduce((total, value) => total + value, 0) /
     numericValues.length;
 
   return {
-    max: roundStat(numericValues[numericValues.length - 1]),
+    max: roundStat(last),
     mean: roundStat(mean),
     median: roundStat(median),
-    min: roundStat(numericValues[0]),
-    p95: roundStat(numericValues[Math.max(0, p95Index)]),
+    min: roundStat(first),
+    p95: roundStat(numericValues[Math.max(0, p95Index)] ?? last),
   };
 }
 

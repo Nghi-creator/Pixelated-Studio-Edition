@@ -34,7 +34,7 @@ class FakeSocket extends EventEmitter {
     return this;
   }
 
-  emit(event: string, payload?: unknown) {
+  override emit(event: string, payload?: unknown) {
     this.outbound.push({ event, payload });
     return true;
   }

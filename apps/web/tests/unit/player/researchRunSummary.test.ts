@@ -263,10 +263,13 @@ test("research run summary rejects engine and encoder rows from different polls"
     runId: "edge-run-1",
     sessionId: "session-1",
   });
+  const [engineSample, encoderSample] = pair;
+  assert.ok(engineSample);
+  assert.ok(encoderSample);
   const engineSamples = [
-    { ...pair[0], available: true, error: null },
+    { ...engineSample, available: true, error: null },
     {
-      ...pair[1],
+      ...encoderSample,
       available: true,
       capturedAt: "2026-08-10T01:02:03.500Z",
       elapsedMs: 1_500,

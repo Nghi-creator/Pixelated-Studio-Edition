@@ -32,12 +32,10 @@ export async function mapWithConcurrency<T, Result>(
   }
 
   const results = new Array<Result>(items.length);
-  let nextIndex = 0;
+  const entries = items.entries();
   const worker = async () => {
-    while (nextIndex < items.length) {
-      const index = nextIndex;
-      nextIndex += 1;
-      results[index] = await mapper(items[index], index);
+    for (const [index, item] of entries) {
+      results[index] = await mapper(item, index);
     }
   };
   const workers = Array.from(

@@ -74,8 +74,10 @@ export function isPublicNetworkAddress(address: string): boolean {
   const family = net.isIP(address);
   if (family === 4) return !blockedAddresses.check(address, "ipv4");
   if (family === 6) {
-    const mappedIpv4 = address.toLowerCase().match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
-    if (mappedIpv4) return isPublicNetworkAddress(mappedIpv4[1]);
+    const mappedIpv4 = address
+      .toLowerCase()
+      .match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/)?.[1];
+    if (mappedIpv4) return isPublicNetworkAddress(mappedIpv4);
     return !blockedAddresses.check(address, "ipv6");
   }
   return false;
@@ -164,6 +166,9 @@ export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
     // Pin the request to the address we validated so DNS cannot be rebound between
     // validation and connection establishment. TLS still verifies the URL hostname.
     const pinnedAddress = publicAddresses[0];
+    if (!pinnedAddress) {
+      throw new Error("Cloud ROM host did not resolve to a usable address");
+    }
 
     return new Promise((resolve, reject) => {
       const file = createExclusiveArtifactWriteStream(destinationPath);

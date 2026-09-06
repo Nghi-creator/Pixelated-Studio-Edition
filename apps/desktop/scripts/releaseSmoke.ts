@@ -67,7 +67,8 @@ function readArchiveText(
 }
 
 function normalizeAssetPath(value: string) {
-  return value.split(/[?#]/, 1)[0].replace(/^\.?\//, "");
+  const [assetPath = ""] = value.split(/[?#]/, 1);
+  return assetPath.replace(/^\.?\//, "");
 }
 
 export function normalizeArchiveEntry(value: string) {
@@ -99,7 +100,10 @@ function findFiles(root: string, fileName: string): string[] {
 
 export function getHtmlScriptSources(html: string) {
   return Array.from(html.matchAll(/<script\b[^>]*\bsrc=["']([^"']+)["']/gi))
-    .map((match) => normalizeAssetPath(match[1]))
+    .flatMap((match) => {
+      const source = match[1];
+      return source ? [normalizeAssetPath(source)] : [];
+    })
     .filter((scriptPath) => scriptPath.startsWith("dist/"));
 }
 

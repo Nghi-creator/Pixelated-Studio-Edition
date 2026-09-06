@@ -7,6 +7,10 @@ import type {
   EngineUrlScope,
   LanPreflightPayload,
 } from "./pairingTypes";
+import {
+  isLocalEngineHostname,
+  isPrivateIpv4,
+} from "../../lib/network/privateHost.ts";
 
 type PairingFailureContext = {
   error: unknown;
@@ -52,32 +56,12 @@ export const parseEngineUrl = (url: string) => {
   }
 };
 
-const isPrivateIpv4 = (hostname: string) => {
-  const parts = hostname.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) {
-    return false;
-  }
-
-  const [first, second] = parts;
-  return (
-    first === 10 ||
-    (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && second === 168) ||
-    (first === 169 && second === 254)
-  );
-};
-
 export const getEngineUrlScope = (url: string): EngineUrlScope => {
   const parsed = parseEngineUrl(url);
   if (!parsed) return "custom";
 
   const hostname = parsed.hostname.toLowerCase();
-  if (
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "::1" ||
-    hostname === "[::1]"
-  ) {
+  if (isLocalEngineHostname(hostname)) {
     return "local";
   }
 

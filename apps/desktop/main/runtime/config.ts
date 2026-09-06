@@ -9,8 +9,10 @@ function hasEngineRuntime(dir: string) {
   return fs.existsSync(path.join(dir, "Dockerfile"));
 }
 
-function firstAvailableEngineRuntimePath(paths: string[]) {
-  return paths.find(hasEngineRuntime) || paths[0];
+function firstAvailableEngineRuntimePath(
+  paths: readonly [string, ...string[]],
+) {
+  return paths.find(hasEngineRuntime) ?? paths[0];
 }
 
 export const engineRuntimeDir =

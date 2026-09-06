@@ -1,3 +1,5 @@
+import { isLocalOrLanEngineHostname } from "../../lib/network/privateHost.ts";
+
 const getInvitePath = (invite: string) => {
   const trimmedInvite = invite.trim().split(/\s+/)[0];
   if (!trimmedInvite) return null;
@@ -11,31 +13,10 @@ const getInvitePath = (invite: string) => {
   }
 };
 
-const isPrivateIpv4 = (hostname: string) => {
-  const parts = hostname.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part))) {
-    return false;
-  }
-
-  const [first, second] = parts;
-  return (
-    first === 10 ||
-    (first === 172 && second >= 16 && second <= 31) ||
-    (first === 192 && second === 168) ||
-    (first === 169 && second === 254)
-  );
-};
-
 const isDesktopCompanionInvite = (inviteUrl: URL) => {
-  const hostname = inviteUrl.hostname.toLowerCase();
   return (
     inviteUrl.protocol === "https:" &&
-    (isPrivateIpv4(hostname) ||
-      hostname === "localhost" ||
-      hostname === "127.0.0.1" ||
-      hostname === "::1" ||
-      hostname === "[::1]" ||
-      hostname.endsWith(".local"))
+    isLocalOrLanEngineHostname(inviteUrl.hostname)
   );
 };
 
@@ -54,4 +35,3 @@ export const getSessionFromInvite = (invite: string) => {
   const inviteUrl = getInvitePath(invite);
   return inviteUrl?.searchParams.get("session") || "";
 };
-

@@ -104,6 +104,9 @@ export function validateRomFile(file: Pick<File, "name" | "size"> | null) {
     return `ROM uploads must use one of these extensions: ${SUPPORTED_SUBMISSION_ROM_LABEL}.`;
   }
   const maxBytes = SUBMISSION_ROM_LIMITS_BY_EXTENSION[extension];
+  if (maxBytes === undefined) {
+    return `ROM uploads must use one of these extensions: ${SUPPORTED_SUBMISSION_ROM_LABEL}.`;
+  }
   if (file.size > maxBytes) {
     return `${extension.toUpperCase()} ROM files must be ${formatBytes(maxBytes)} or smaller.`;
   }
