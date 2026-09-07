@@ -38,6 +38,7 @@
     "verify:api": "npm run typecheck:api && npm run lint:api && npm run test:api && npm run build:api"
   },
   "devDependencies": {
-    "playwright": "^1.55.0"
+    "playwright": "^1.55.0",
+    "socket.io-client": "^4.8.3"
   }
 }
