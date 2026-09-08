@@ -56,6 +56,57 @@ function event(
   });
 }
 
+test("research summary preserves finite extreme statistics in JSON", () => {
+  const summary = createResearchRunSummary({
+    events: [],
+    runId: "edge-run-1",
+    sessionId: "session-1",
+    samples: [
+      { ...baseSample, bitrateKbps: Number.MAX_VALUE },
+      { ...baseSample, elapsedMs: 1_000, bitrateKbps: Number.MAX_VALUE },
+    ],
+  });
+  const exported = JSON.parse(researchRunSummaryToJson(summary));
+  assert.equal(exported.metrics.bitrateKbps.mean, Number.MAX_VALUE);
+  assert.equal(exported.metrics.bitrateKbps.median, Number.MAX_VALUE);
+});
+
+test("research summary excludes non-finite metrics without losing valid values", () => {
+  const summary = createResearchRunSummary({
+    events: [],
+    runId: "edge-run-1",
+    sessionId: "session-1",
+    samples: [NaN, Infinity, -Infinity, 10, 20].map((bitrateKbps, index) => ({
+      ...baseSample,
+      elapsedMs: index * 1_000,
+      bitrateKbps,
+    })),
+  });
+  assert.deepEqual(summary.metrics.bitrateKbps, {
+    min: 10,
+    max: 20,
+    mean: 15,
+    median: 15,
+    p95: 20,
+  });
+});
+
+test("research summary keeps long extreme series finite", () => {
+  const summary = createResearchRunSummary({
+    events: [],
+    runId: "edge-run-1",
+    sessionId: "session-1",
+    samples: Array.from({ length: 100 }, (_, index) => ({
+      ...baseSample,
+      elapsedMs: index * 1_000,
+      bitrateKbps: Number.MAX_VALUE,
+    })),
+  });
+  const mean = summary.metrics.bitrateKbps.mean;
+  assert.ok(mean !== null && Number.isFinite(mean));
+  assert.ok(Math.abs(mean / Number.MAX_VALUE - 1) < 1e-14);
+});
+
 test("research run summary computes numeric and event-derived stats", () => {
   const samples = [
     baseSample,

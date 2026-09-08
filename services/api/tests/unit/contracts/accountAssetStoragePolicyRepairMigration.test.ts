@@ -8,6 +8,13 @@ const migrationUrl = new URL(
 );
 
 const migration = fs.readFileSync(migrationUrl, "utf8");
+const writePolicyRepairMigration = fs.readFileSync(
+  new URL(
+    "../../../../../supabase/migrations/20260908090000_repair_submission_storage_write_policies.sql",
+    import.meta.url,
+  ),
+  "utf8",
+);
 
 test("account asset quota accepts Supabase pre-upload metadata", () => {
   assert.match(
@@ -30,4 +37,22 @@ test("submission uploads can return only the authenticated owner's row", () => {
     /\(storage\.foldername\(name\)\)\[2\] IN \('roms', 'covers', 'banners'\)/,
   );
   assert.doesNotMatch(migration, /USING \(true\)/);
+});
+
+test("submission write-policy repair restores scoped uploads and cleanup", () => {
+  assert.match(
+    writePolicyRepairMigration,
+    /CREATE POLICY "Authenticated users can upload own submissions"[\s\S]*FOR INSERT TO authenticated/,
+  );
+  assert.match(writePolicyRepairMigration, /auth\.uid\(\) = owner/);
+  assert.match(
+    writePolicyRepairMigration,
+    /\(storage\.foldername\(name\)\)\[2\] IN \('roms', 'covers', 'banners'\)/,
+  );
+  assert.match(writePolicyRepairMigration, /account_asset_upload_within_quota/);
+  assert.match(
+    writePolicyRepairMigration,
+    /CREATE POLICY "Authenticated users can delete own submissions"[\s\S]*FOR DELETE TO authenticated/,
+  );
+  assert.doesNotMatch(writePolicyRepairMigration, /USING \(true\)/);
 });

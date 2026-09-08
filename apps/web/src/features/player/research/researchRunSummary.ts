@@ -78,7 +78,10 @@ function roundStat(value: number) {
 
 function metricSummary(values: Array<number | null>): ResearchRunMetricSummary {
   const numericValues = values
-    .filter((value): value is number => typeof value === "number")
+    .filter(
+      (value): value is number =>
+        typeof value === "number" && Number.isFinite(value),
+    )
     .sort((left, right) => left - right);
 
   if (numericValues.length === 0) {
@@ -99,14 +102,16 @@ function metricSummary(values: Array<number | null>): ResearchRunMetricSummary {
   const middleIndex = Math.floor(numericValues.length / 2);
   const median =
     numericValues.length % 2 === 0
-      ? ((numericValues[middleIndex - 1] ?? first) +
-          (numericValues[middleIndex] ?? last)) /
-        2
+      ? (numericValues[middleIndex - 1] ?? first) / 2 +
+        (numericValues[middleIndex] ?? last) / 2
       : (numericValues[middleIndex] ?? first);
   const p95Index = Math.ceil(numericValues.length * 0.95) - 1;
-  const mean =
-    numericValues.reduce((total, value) => total + value, 0) /
-    numericValues.length;
+  // A running convex combination avoids overflowing the sum of finite samples.
+  const mean = numericValues.reduce(
+    (average, value, index) =>
+      average * (index / (index + 1)) + value / (index + 1),
+    0,
+  );
 
   return {
     max: roundStat(last),
