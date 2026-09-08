@@ -132,6 +132,10 @@ summary compute statistics exclude unavailable rows. Summary duration is the
 observed span from the first browser sample to the last, matching the adapter's
 wall-clock and elapsed-clock reconciliation.
 
+Metric summaries omit non-finite numeric inputs and use overflow-resistant mean
+and even-median calculations. Finite extreme measurements must remain finite
+when serialized to JSON rather than silently turning into `null` statistics.
+
 Bundle v1 remains readable downstream. Bundle v2 binds its phase, comparison
 case, run ID, file inventory, source availability and measurement support in
 the manifest. The `latency_fingerprinting` adapter validates these declarations
