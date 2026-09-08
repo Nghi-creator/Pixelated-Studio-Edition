@@ -51,6 +51,6 @@ test("hosted predeploy fails fast on hosted Supabase schema drift", () => {
   assert.doesNotMatch(stagingSmoke, /\$\{userId\}\/staging-smoke\//);
   assert.match(
     stagingSmoke,
-    /20260828170000_repair_account_asset_storage_policies\.sql/,
+    /20260908090000_repair_submission_storage_write_policies\.sql/,
   );
 });
