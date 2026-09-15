@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createDefaultResearchRunConfig } from "../../../src/features/research-mode/researchRunConfig.ts";
 import {
   createResearchRunMetadata,
   createResearchRunMetadataFilename,
@@ -149,4 +150,24 @@ test("research run metadata filenames are filesystem-safe", () => {
     }),
     "pixelated-research-run-Beat-Beast-edge-study-edge-run-1-2026-07-04T02-03-04-000Z.json",
   );
+});
+
+test("formal metadata preserves experiment configuration while excluding private notes", () => {
+  const researchConfig = { ...createDefaultResearchRunConfig("game-1"),
+    nodeLabel: "anonymous-node-a", runtimeLabel: "docker-libretro-v2",
+    interventionLabel: "bounded_cpu_pressure", audioMuted: true, audioVolume: 0.25,
+    notes: "/Users/private/research secret", recordingDurationMs: 120000 };
+  const metadata = sanitizeResearchRunMetadata(createResearchRunMetadata({
+    researchConfig, form, gameId: "game-1", gameTitle: "Test", playerMode: "host",
+    runId: researchConfig.runId, sessionId: "session-1", shareUrl: "", status: "playing",
+    streamProfile: { id: "balanced" }, userAgent: "test",
+  }));
+  const roundTrip = JSON.parse(sanitizedResearchRunMetadataToJson(metadata));
+  assert.deepEqual(roundTrip.runConfiguration, {
+    schemaVersion: 1, nodeLabel: "anonymous-node-a", runtimeLabel: "docker-libretro-v2",
+    interventionLabel: "bounded_cpu_pressure", audioMuted: true, audioVolume: 0.25,
+    warmupDurationMs: 10000, recordingDurationMs: 120000, streamProfileId: "balanced",
+    coldStart: false, phase: "healthy",
+  });
+  assert.doesNotMatch(JSON.stringify(roundTrip), /private|secret|notes|shareUrl/);
 });

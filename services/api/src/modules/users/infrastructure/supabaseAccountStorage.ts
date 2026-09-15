@@ -36,12 +36,31 @@ export async function findOwnedAccountStorage(
   service: SupabaseService,
   userId: string,
 ): Promise<OwnedAccountStorage[]> {
-  return Promise.all(
+  const ownedStorage = await Promise.all(
     ["avatars", "submissions"].map(async (bucket) => ({
       bucket,
       paths: await listStorageObjects(service, bucket, userId),
     })),
   );
+  // Legacy buckets can use arbitrary paths. Include ownership metadata as well
+  // as the current user-prefix convention (including service-uploaded files).
+  const buckets = new Map(ownedStorage.map(({ bucket, paths }) => [bucket, new Set(paths)]));
+  for (let offset = 0; ; offset += STORAGE_LIST_PAGE_SIZE) {
+    const { data, error } = await service.rpc("list_account_deletion_objects", {
+      p_user_id: userId,
+      p_offset: offset,
+      p_limit: STORAGE_LIST_PAGE_SIZE,
+    });
+    if (error) throw error;
+    const objects = (data || []) as { bucket_id: string; name: string }[];
+    for (const object of objects) {
+      const paths = buckets.get(object.bucket_id) || new Set<string>();
+      paths.add(object.name);
+      buckets.set(object.bucket_id, paths);
+    }
+    if (objects.length < STORAGE_LIST_PAGE_SIZE) break;
+  }
+  return [...buckets].map(([bucket, paths]) => ({ bucket, paths: [...paths] }));
 }
 
 export async function removeOwnedAccountStorage(

@@ -229,7 +229,7 @@ test("account deletion aborts without mutating storage when preflight fails", as
   await app.close();
 });
 
-test("account deletion leaves storage intact when identity deletion fails", async () => {
+test("account deletion can retry identity failure after removing owned storage", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
   db.storageObjects.avatars.push(`${USER_ID}/avatar.png`);
@@ -245,13 +245,17 @@ test("account deletion leaves storage intact when identity deletion fails", asyn
 
   assert.equal(response.statusCode, 500);
   assert.deepEqual(db.deletedUsers, []);
-  assert.deepEqual(db.storageObjects.avatars, [`${USER_ID}/avatar.png`]);
-  assert.deepEqual(db.storageObjects.submissions, [`${USER_ID}/roms/tiny.nes`]);
-  assert.deepEqual(db.removedStorageObjects, []);
+  assert.deepEqual(db.storageObjects.avatars, []);
+  assert.deepEqual(db.storageObjects.submissions, []);
+  assert.equal(db.deletionRequests.has(USER_ID), true);
+  db.authDeleteError = null;
+  const retry = await app.inject({ method: "DELETE", payload: { confirmation: "DELETE" }, url: "/me/account" });
+  assert.equal(retry.statusCode, 204);
+  assert.deepEqual(db.deletedUsers, [USER_ID]);
   await app.close();
 });
 
-test("account deletion reports incomplete cleanup only after identity deletion succeeds", async () => {
+test("account deletion retains identity and resumes after partial storage cleanup", async () => {
   const db = new FakeSupabase();
   seedProfiles(db);
   db.storageObjects.avatars.push(`${USER_ID}/avatar.png`);
@@ -265,15 +269,40 @@ test("account deletion reports incomplete cleanup only after identity deletion s
     url: "/me/account",
   });
 
-  assert.equal(response.statusCode, 200);
+  assert.equal(response.statusCode, 503);
   assert.deepEqual(response.json(), {
-    accountDeleted: true,
+    error: "Some account files could not be removed. Retry account deletion to finish. Uploads are paused until deletion completes.",
+    accountDeleted: false,
     cleanupIncomplete: true,
     code: "account_storage_cleanup_incomplete",
   });
-  assert.deepEqual(db.deletedUsers, [USER_ID]);
+  assert.deepEqual(db.deletedUsers, []);
   assert.deepEqual(db.storageObjects.avatars, []);
   assert.deepEqual(db.storageObjects.submissions, [`${USER_ID}/roms/tiny.nes`]);
+  assert.equal(db.deletionRequests.has(USER_ID), true);
+  db.storageRemoveErrors.clear();
+  const retry = await app.inject({ method: "DELETE", payload: { confirmation: "DELETE" }, url: "/me/account" });
+  assert.equal(retry.statusCode, 204);
+  assert.deepEqual(db.deletedUsers, [USER_ID]);
+  assert.equal(db.deletionRequests.has(USER_ID), false);
+  await app.close();
+});
+
+test("account deletion removes paginated legacy owned objects without deleting another user's files", async () => {
+  const db = new FakeSupabase();
+  seedProfiles(db);
+  const ownedPaths = Array.from({ length: 101 }, (_, i) => `legacy-${i}.nes`);
+  db.storageObjects.web_roms = [...ownedPaths, "other.nes"];
+  for (const path of ownedPaths) db.storageOwners.set(`web_roms/${path}`, USER_ID);
+  db.storageOwners.set("web_roms/other.nes", OTHER_USER_ID);
+  const app = await createDataBoundaryApp(db, USER_ID);
+  const response = await app.inject({
+    method: "DELETE", payload: { confirmation: "DELETE" }, url: "/me/account",
+  });
+  assert.equal(response.statusCode, 204);
+  assert.deepEqual(db.storageObjects.web_roms, ["other.nes"]);
+  assert.deepEqual(db.deletedUsers, [USER_ID]);
+  assert.equal(db.rpcCalls.filter(call => call.fn === "list_account_deletion_objects").length, 2);
   await app.close();
 });
 

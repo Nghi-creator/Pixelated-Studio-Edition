@@ -10,6 +10,8 @@ import {
 } from "../../../src/features/player/telemetry/engineResearchTelemetry.ts";
 
 const response = {
+  sampleSequence: 1,
+  sampleIntervalMs: 1000,
   capturedAt: "2026-08-10T01:02:03.000Z",
   encoder: {
     available: true,
@@ -131,9 +133,9 @@ test("engine telemetry CSV keeps contract metric order", () => {
   assert.equal(
     engineResearchTelemetrySamplesToCsv(samples),
     [
-      "captured_at,elapsed_ms,schema_version,run_id,session_id,game_id,source,available,error,node_cpu_percent,node_rss_mb,emulator_cpu_percent,emulator_rss_mb,camera_cpu_percent,camera_rss_mb,logical_cpu_count,cpu_capacity_cores,runtime_kind,node_running,emulator_running,camera_running,peer_count,frames_in_total,frames_out_total,frames_dropped_total,queue_level_buffers,pipeline_delay_proxy_ms,target_bitrate_kbps,target_fps,cpu_used,max_quantizer",
-      "2026-08-10T01:02:03.000Z,1000,1,run-1,session-1,game-1,engine_runtime,true,,4.5,120,72.25,350,33.5,210,8,4,libretro,true,true,true,1,,,,,,,,,",
-      "2026-08-10T01:02:03.000Z,1000,1,run-1,session-1,game-1,encoder_pipeline,true,,,,,,,,,,,,,,,101,99,2,3,,1500,60,6,48",
+      "captured_at,elapsed_ms,schema_version,run_id,session_id,game_id,source,available,error,node_cpu_percent,node_rss_mb,emulator_cpu_percent,emulator_rss_mb,camera_cpu_percent,camera_rss_mb,logical_cpu_count,cpu_capacity_cores,runtime_kind,node_running,emulator_running,camera_running,peer_count,frames_in_total,frames_out_total,frames_dropped_total,queue_level_buffers,pipeline_delay_proxy_ms,target_bitrate_kbps,target_fps,cpu_used,max_quantizer,sample_sequence,sample_interval_ms",
+      "2026-08-10T01:02:03.000Z,1000,1,run-1,session-1,game-1,engine_runtime,true,,4.5,120,72.25,350,33.5,210,8,4,libretro,true,true,true,1,,,,,,,,,,1,1000",
+      "2026-08-10T01:02:03.000Z,1000,1,run-1,session-1,game-1,encoder_pipeline,true,,,,,,,,,,,,,,,101,99,2,3,,1500,60,6,48,1,1000",
     ].join("\n"),
   );
 });

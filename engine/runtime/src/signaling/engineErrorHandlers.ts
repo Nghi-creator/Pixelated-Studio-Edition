@@ -1,3 +1,4 @@
+import { isSocketPayload } from "./socketPayload";
 import type { Socket } from "socket.io";
 import { getSessionRoom, normalizeSessionId } from "./sessionRooms";
 
@@ -9,6 +10,7 @@ type EngineErrorPayload = {
 
 export function registerEngineErrorHandlers(socket: Socket) {
   socket.on("engine-error", (payload: EngineErrorPayload = {}) => {
+    if (!isSocketPayload(payload)) return;
     const sessionId =
       normalizeSessionId(payload.sessionId) || socket.data.sessionId;
     const message =

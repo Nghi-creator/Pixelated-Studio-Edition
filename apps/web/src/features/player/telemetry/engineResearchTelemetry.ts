@@ -9,6 +9,8 @@ import {
 
 export type EngineResearchTelemetrySample = EngineResearchMetrics &
   EncoderResearchMetrics & {
+    sampleSequence?: number;
+    sampleIntervalMs?: number | null;
     available: boolean;
     cameraRunning: boolean | null;
     capturedAt: string;
@@ -28,6 +30,8 @@ export type EngineResearchTelemetrySample = EngineResearchMetrics &
   };
 
 export type EngineResearchTelemetryResponse = {
+  sampleSequence?: number;
+  sampleIntervalMs?: number | null;
   capturedAt: string;
   encoder: EncoderResearchMetrics & {
     available: boolean;
@@ -237,6 +241,8 @@ export function parseEngineResearchTelemetryResponse(
         : null,
   };
   return {
+    sampleSequence: nullableNumber(value.sampleSequence) ?? undefined,
+    sampleIntervalMs: nullableNumber(value.sampleIntervalMs),
     capturedAt: value.capturedAt,
     encoder,
     engine,
@@ -302,13 +308,14 @@ export function createEngineResearchTelemetrySamples({
   response: EngineResearchTelemetryResponse;
   runId: string;
 }): EngineResearchTelemetrySample[] {
-  const sampleIdentity = identity({
+  const sampleIdentity = { sampleSequence: response.sampleSequence,
+    sampleIntervalMs: response.sampleIntervalMs, ...identity({
     capturedAt: response.capturedAt,
     elapsedMs,
     gameId,
     runId,
     sessionId: response.sessionId,
-  });
+  }) };
   return [
     {
       ...EMPTY_ENCODER_METRICS,
@@ -402,6 +409,8 @@ export const ENGINE_TELEMETRY_CSV_HEADERS = [
   "target_fps",
   "cpu_used",
   "max_quantizer",
+  "sample_sequence",
+  "sample_interval_ms",
 ] as const;
 
 function csvCell(value: boolean | number | string | null) {
@@ -433,6 +442,8 @@ export function engineResearchTelemetrySamplesToCsv(
       sample.cameraRunning,
       sample.peerCount,
       ...ENCODER_RESEARCH_METRIC_KEYS.map((field) => sample[field]),
+      sample.sampleSequence ?? null,
+      sample.sampleIntervalMs ?? null,
     ]
       .map(csvCell)
       .join(","),

@@ -263,3 +263,12 @@ describe("desktop companion status page", () => {
     assert.doesNotMatch(page, /All Games|pixelated_engine_url/);
   });
 });
+
+it("research telemetry is proxied for hosts but never guests or adjacent paths", () => {
+  const url = "/research/telemetry?sessionId=run-1";
+  assert.equal(shouldProxy(url), true);
+  assert.equal(canProxyCompanionRequest(url, "host"), true);
+  assert.equal(canProxyCompanionRequest(url, "guest"), false);
+  assert.equal(shouldProxy("/research/telemetry-private"), false);
+  assert.equal(shouldProxy("/research/telemetry/extra"), false);
+});

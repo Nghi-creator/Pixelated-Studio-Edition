@@ -1,3 +1,4 @@
+import { isSocketPayload } from "../socketPayload";
 import crypto from "crypto";
 import type { Socket } from "socket.io";
 import {
@@ -78,6 +79,7 @@ export function registerStartGameHandler(
   } = options;
 
   socket.on("start-game", async (payload: StartGamePayload = {}) => {
+    if (!isSocketPayload(payload)) return;
     const sessionId =
       normalizeSessionId(payload.sessionId) ||
       socket.data.sessionId ||
@@ -233,6 +235,7 @@ export function registerStartGameHandler(
   });
 
   socket.on("restart-stream", (payload: StartGamePayload = {}) => {
+    if (!isSocketPayload(payload)) return;
     const sessionId =
       normalizeSessionId(payload.sessionId) || socket.data.sessionId || null;
     if (!sessionId) {

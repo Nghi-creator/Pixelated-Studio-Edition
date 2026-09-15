@@ -1,8 +1,10 @@
+import { isSocketPayload } from "./socketPayload";
 import type { Socket } from "socket.io";
 import {
   getSessionRoom,
   joinSession,
   normalizeSessionId,
+  onSessionChange,
   relayToSession,
 } from "./sessionRooms";
 import {
@@ -60,7 +62,7 @@ export function createSignalingPeerRegistry(
     acquire(sessionId: string, peerId: string, socketId: string) {
       const key = peerKey(sessionId, peerId);
       const existing = peers.get(key);
-      if (existing?.socketId === socketId) return true;
+      if (existing) return existing.socketId === socketId;
 
       releaseSocket(socketId);
       if (peers.size >= maxActivePeers) return false;
@@ -70,6 +72,9 @@ export function createSignalingPeerRegistry(
     release(sessionId: string, peerId: string, socketId: string) {
       const key = peerKey(sessionId, peerId);
       if (peers.get(key)?.socketId === socketId) peers.delete(key);
+    },
+    owns(sessionId: string, peerId: string, socketId: string) {
+      return peers.get(peerKey(sessionId, peerId))?.socketId === socketId;
     },
     releaseSocket,
     size: () => peers.size,
@@ -197,6 +202,7 @@ export function registerSignalingRelayHandlers(
   };
 
   socket.on("python-ready", (payload: SessionPayload = {}) => {
+    if (!isSocketPayload(payload)) return;
     if (!consumeSignalingBudget()) return;
     if (socket.data.trustedCamera !== true) {
       console.warn("[Node.js] Dropping python-ready from an untrusted socket");
@@ -219,6 +225,7 @@ export function registerSignalingRelayHandlers(
   });
 
   socket.on("webrtc-offer", (offer: SessionPayload = {}) => {
+    if (!isSocketPayload(offer)) return;
     if (!consumeSignalingBudget()) return;
     if (!payloadMatchesActiveSession(socket, offer)) return;
     if (!isValidWebRtcOffer(offer)) return;
@@ -244,10 +251,13 @@ export function registerSignalingRelayHandlers(
   });
 
   socket.on("webrtc-peer-disconnect", (payload: SessionPayload = {}) => {
+    if (!isSocketPayload(payload)) return;
     if (!consumeSignalingBudget()) return;
     const peerId = getPeerId(payload);
     if (peerId) {
       const sessionId = normalizeSessionId(socket.data.sessionId);
+      if (!sessionId || !payloadMatchesActiveSession(socket, payload) ||
+          !peerRegistry.owns(sessionId, peerId, socket.id)) return;
       emitPeerDisconnect(socket, peerId);
       forgetPeer(socket, peerId);
       if (sessionId) peerRegistry.release(sessionId, peerId, socket.id);
@@ -255,6 +265,7 @@ export function registerSignalingRelayHandlers(
   });
 
   socket.on("webrtc-answer", (answer: SessionPayload = {}) => {
+    if (!isSocketPayload(answer)) return;
     if (!consumeSignalingBudget()) return;
     if (socket.data.trustedCamera !== true) return;
     if (!payloadMatchesActiveSession(socket, answer)) return;
@@ -263,6 +274,7 @@ export function registerSignalingRelayHandlers(
   });
 
   socket.on("webrtc-ice-candidate", (payload: CandidateEnvelope = {}) => {
+    if (!isSocketPayload(payload)) return;
     if (!consumeSignalingBudget()) return;
     if (!payloadMatchesActiveSession(socket, payload)) return;
     const candidate = normalizeIceCandidate(payload);
@@ -276,6 +288,7 @@ export function registerSignalingRelayHandlers(
   socket.on(
     "webrtc-ice-candidate-backend",
     (payload: CandidateEnvelope = {}) => {
+      if (!isSocketPayload(payload)) return;
       if (!consumeSignalingBudget()) return;
       if (socket.data.trustedCamera !== true) return;
       if (!payloadMatchesActiveSession(socket, payload)) return;
@@ -289,7 +302,7 @@ export function registerSignalingRelayHandlers(
     },
   );
 
-  socket.on("disconnect", () => {
+  const releasePeers = () => {
     const peerIds = Array.isArray(socket.data.webrtcPeerIds)
       ? socket.data.webrtcPeerIds
       : [];
@@ -298,5 +311,7 @@ export function registerSignalingRelayHandlers(
       if (typeof peerId === "string") emitPeerDisconnect(socket, peerId);
     }
     peerRegistry.releaseSocket(socket.id);
-  });
+  };
+  onSessionChange(socket, releasePeers);
+  socket.on("disconnect", releasePeers);
 }

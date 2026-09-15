@@ -1,3 +1,4 @@
+import { isSocketPayload, socketNumber } from "../socketPayload";
 import type { Socket } from "socket.io";
 import {
   createLobbyStateStore,
@@ -42,7 +43,7 @@ function normalizeRole(value: unknown): LobbyRole {
 }
 
 function normalizePlayerIndex(value: unknown, maxPlayers: number) {
-  const playerIndex = Number(value);
+  const playerIndex = socketNumber(value);
   return Number.isInteger(playerIndex) &&
     playerIndex >= 1 &&
     playerIndex <= maxPlayers
@@ -207,18 +208,22 @@ export function createLobbyManager(maxPlayers = 4) {
 
   function registerLobbyHandlers(socket: Socket) {
     socket.on("join-lobby", (payload: JoinLobbyPayload = {}) => {
+    if (!isSocketPayload(payload)) return;
       joinLobby(socket, payload);
     });
 
     socket.on("request-player-slot", (payload: SlotPayload = {}) => {
+    if (!isSocketPayload(payload)) return;
       requestPlayerSlot(socket, payload);
     });
 
     socket.on("release-player-slot", (payload: SlotPayload = {}) => {
+    if (!isSocketPayload(payload)) return;
       releasePlayerSlot(socket, payload);
     });
 
     socket.on("lobby-kick", (payload: KickPayload = {}) => {
+    if (!isSocketPayload(payload)) return;
       kickParticipant(socket, payload);
     });
 

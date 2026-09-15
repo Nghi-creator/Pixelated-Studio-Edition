@@ -1,5 +1,11 @@
 import type { Socket } from "socket.io";
 
+const sessionCleanups = new WeakMap<Socket, () => void>();
+
+export function onSessionChange(socket: Socket, cleanup: () => void) {
+  sessionCleanups.set(socket, cleanup);
+}
+
 export function normalizeSessionId(sessionId: unknown) {
   return typeof sessionId === "string" &&
     sessionId.length > 0 &&
@@ -27,6 +33,7 @@ export function joinSession(
 
   const previousSessionId = normalizeSessionId(socket.data.sessionId);
   if (previousSessionId && previousSessionId !== safeSessionId) {
+    sessionCleanups.get(socket)?.();
     const previousRoom = getSessionRoom(previousSessionId);
     for (const room of socket.rooms) {
       if (room === previousRoom || room.startsWith(`${previousRoom}:`)) {

@@ -24,6 +24,7 @@ const GUEST_PROXY_PREFIXES = ["/health", "/socket.io"];
 type CompanionTokenScope = "guest" | "host" | null;
 
 export function shouldProxy(url = "") {
+  if (url === "/research/telemetry" || url.startsWith("/research/telemetry?")) return true;
   return PROXY_PREFIXES.some((prefix) => {
     return url === prefix || url.startsWith(`${prefix}/`) || url.startsWith(`${prefix}?`);
   });

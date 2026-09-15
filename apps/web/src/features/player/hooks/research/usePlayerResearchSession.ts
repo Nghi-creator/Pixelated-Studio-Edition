@@ -99,6 +99,7 @@ export function usePlayerResearchSession({
     sessionId,
   });
   const exports = useResearchRunExports({
+    researchConfig: experience === "research" ? config : undefined,
     baselineForm: researchState.baselineForm,
     comparisonCaseId: config.comparisonCaseId,
     events: researchState.events,

@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from "react";
 import type { StreamProfile } from "../../../../lib/engine/streamProfiles";
-import type { ResearchRunPhase } from "../../../research-mode/researchRunConfig";
+import type { ResearchRunConfig, ResearchRunPhase } from "../../../research-mode/researchRunConfig";
 import { downloadBlob, downloadText } from "../../downloadFile";
 import {
   createResearchBaseline,
@@ -47,6 +47,7 @@ import type { StreamTelemetryHistorySample } from "../telemetry/useStreamTelemet
 import type { EngineResearchTelemetrySample } from "../../telemetry/engineResearchTelemetry";
 
 export function useResearchRunExports({
+  researchConfig,
   baselineForm,
   comparisonCaseId,
   events,
@@ -64,6 +65,7 @@ export function useResearchRunExports({
   status,
   streamProfile,
 }: {
+  researchConfig?: ResearchRunConfig;
   baselineForm: ResearchBaselineForm;
   comparisonCaseId?: string;
   events: ResearchRunEvent[];
@@ -96,6 +98,7 @@ export function useResearchRunExports({
 
   const createMetadata = useCallback((capturedAt: Date) =>
     createResearchRunMetadata({
+      researchConfig,
       capturedAt,
       form,
       gameId,
@@ -108,6 +111,7 @@ export function useResearchRunExports({
       streamProfile,
       userAgent: navigator.userAgent,
     }), [
+      researchConfig,
       form,
       gameId,
       gameTitle,

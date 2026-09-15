@@ -15,6 +15,8 @@ type ResearchTelemetrySnapshotOptions = {
   cameraTelemetryStatePath: string;
   getRuntimeState: () => ResearchRuntimeState;
   now?: () => number;
+  monotonicNow?: () => number;
+  autoStart?: boolean;
   resourceSampler?: ReturnType<typeof createIntervalResourceSampler>;
   runtimeKind: "libretro" | "native_linux";
 };
@@ -27,7 +29,7 @@ export function createResearchTelemetrySnapshot(
   const now = options.now || Date.now;
   const resources = options.resourceSampler || createIntervalResourceSampler();
 
-  return function getResearchTelemetrySnapshot(sessionId: string) {
+  function capture(sessionId: string) {
     const runtime = options.getRuntimeState();
     if (!runtime.activeSessionId || runtime.activeSessionId !== sessionId) {
       return null;
@@ -66,5 +68,37 @@ export function createResearchTelemetrySnapshot(
       schemaVersion: RESEARCH_TELEMETRY_SCHEMA_VERSION,
       sessionId,
     };
+  }
+
+  type Snapshot = NonNullable<ReturnType<typeof capture>> & {
+    sampleSequence: number;
+    sampleIntervalMs: number | null;
   };
+  const monotonicNow = options.monotonicNow || (() => performance.now());
+  let snapshot: Snapshot | null = null;
+  let sampledAt: number | null = null;
+  let sequence = 0;
+  const sample = () => {
+    const sessionId = options.getRuntimeState().activeSessionId;
+    if (!sessionId) { snapshot = null; sampledAt = null; return; }
+    const captured = capture(sessionId);
+    if (!captured) return;
+    const current = monotonicNow();
+    const interval = sampledAt === null || snapshot?.sessionId !== sessionId
+      ? null : Math.max(0, current - sampledAt);
+    sampledAt = current;
+    snapshot = Object.freeze({ ...captured,
+      engine: Object.freeze(captured.engine), encoder: Object.freeze(captured.encoder),
+      sampleSequence: ++sequence, sampleIntervalMs: interval });
+  };
+  // Readers never advance process counters. Sampling belongs to the engine.
+  const timer = options.autoStart === false ? null : setInterval(sample, 1_000);
+  timer?.unref();
+  const getSnapshot = (sessionId: string) => {
+    if (!snapshot || options.getRuntimeState().activeSessionId !== sessionId ||
+        snapshot.sessionId !== sessionId || sampledAt === null ||
+        monotonicNow() - sampledAt > 3_000) return null;
+    return snapshot;
+  };
+  return Object.assign(getSnapshot, { sample, stop: () => { if (timer) clearInterval(timer); } });
 }
