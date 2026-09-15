@@ -32,6 +32,6 @@
     "globals": "^16.5.0",
     "socket.io-client": "^4.8.3",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.62.1"
+    "typescript-eslint": "^8.70.0"
   }
 }
