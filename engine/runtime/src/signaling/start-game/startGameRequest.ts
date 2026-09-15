@@ -1,3 +1,4 @@
+import { socketNumber } from "../socketPayload";
 import { sanitizeUserId } from "../../roms/localRomStore";
 import { getRuntimeDefinition } from "../../runtime/runtimeRegistry";
 
@@ -89,8 +90,8 @@ export function normalizeIceServers(value: unknown): IceServer[] {
 export function normalizeStreamProfile(value: unknown): StreamProfile {
   const profile = value && typeof value === "object" ? value : {};
   const rawProfile = profile as Record<string, unknown>;
-  const fps = Number(rawProfile.fps);
-  const bitrateKbps = Number(rawProfile.bitrateKbps);
+  const fps = socketNumber(rawProfile.fps);
+  const bitrateKbps = socketNumber(rawProfile.bitrateKbps);
   const id = typeof rawProfile.id === "string" ? rawProfile.id : "balanced";
 
   return {

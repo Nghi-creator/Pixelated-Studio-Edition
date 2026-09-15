@@ -1,3 +1,4 @@
+import type { ResearchRunConfig } from "../../research-mode/researchRunConfig.ts";
 export const RESEARCH_RUN_SCHEMA_VERSION = 1;
 
 export type ResearchRunScenario =
@@ -14,6 +15,7 @@ export type ResearchRunMetadataForm = {
 };
 
 export type ResearchRunMetadata = {
+  runConfiguration?: ReturnType<typeof exportResearchRunConfiguration>;
   capturedAt: string;
   client: {
     userAgent: string;
@@ -71,7 +73,28 @@ export function createResearchRunId(recordedAt = new Date()) {
   return `edge-run-${timestamp}-${randomPart}`;
 }
 
+// Only explicit experiment fields cross the privacy boundary. Never spread the
+// browser-stored config: it contains freeform notes and may contain extra keys.
+export function exportResearchRunConfiguration(config: ResearchRunConfig) {
+  const label = (value: string) => /^[A-Za-z][A-Za-z0-9 _-]{0,79}$/.test(value.trim())
+    ? value.trim() : null;
+  return {
+    schemaVersion: 1,
+    nodeLabel: label(config.nodeLabel),
+    runtimeLabel: label(config.runtimeLabel),
+    interventionLabel: label(config.interventionLabel),
+    audioMuted: config.audioMuted,
+    audioVolume: config.audioVolume,
+    warmupDurationMs: config.warmupDurationMs,
+    recordingDurationMs: config.recordingDurationMs,
+    streamProfileId: config.streamProfileId,
+    coldStart: config.coldStart,
+    phase: config.phase,
+  };
+}
+
 export function createResearchRunMetadata({
+  researchConfig,
   form,
   gameId,
   gameTitle,
@@ -85,6 +108,7 @@ export function createResearchRunMetadata({
   capturedAt = new Date(),
 }: {
   capturedAt?: Date;
+  researchConfig?: ResearchRunConfig;
   form: ResearchRunMetadataForm;
   gameId: string | undefined;
   gameTitle: string;
@@ -104,6 +128,7 @@ export function createResearchRunMetadata({
   const notes = form.notes.trim();
 
   return {
+    ...(researchConfig ? { runConfiguration: exportResearchRunConfiguration(researchConfig) } : {}),
     capturedAt: capturedAt.toISOString(),
     client: {
       userAgent,

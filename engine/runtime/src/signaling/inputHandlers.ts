@@ -1,3 +1,4 @@
+import { isSocketPayload, socketNumber } from "./socketPayload";
 import type { Socket } from "socket.io";
 
 type InputPayload = {
@@ -34,7 +35,7 @@ type InputHandlerOptions = {
 const DEFAULT_INPUT_LIMIT_PER_SECOND = 60;
 
 function normalizePlayerIndex(payload: InputPayload, socket: Socket) {
-  const playerIndex = Number(payload.playerIndex);
+  const playerIndex = socketNumber(payload.playerIndex);
   if (Number.isInteger(playerIndex) && playerIndex >= 1 && playerIndex <= 4) {
     return playerIndex;
   }
@@ -127,11 +128,13 @@ export function registerInputHandlers(
   };
 
   socket.on("keydown", (data: InputPayload = {}) => {
+    if (!isSocketPayload(data)) return;
     if (!consumeInputBudget()) return;
     handleKeyAction("keydown", data, runtime, socket, options);
   });
 
   socket.on("keyup", (data: InputPayload = {}) => {
+    if (!isSocketPayload(data)) return;
     if (!consumeInputBudget()) return;
     handleKeyAction("keyup", data, runtime, socket, options);
   });

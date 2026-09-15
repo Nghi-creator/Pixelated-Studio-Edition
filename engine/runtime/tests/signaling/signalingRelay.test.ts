@@ -239,6 +239,9 @@ test("browser peer disconnect relays only a peer cleanup event to the session", 
   socket.data.sessionId = "session-1";
   registerSignalingRelayHandlers(socket as never);
 
+  socket.emit("webrtc-offer", { peerId: "peer-1", sdp: "offer" });
+  socket.relays.length = 0;
+
   socket.emit("webrtc-peer-disconnect", {
     peerId: "peer-1",
     sessionId: "session-1",
@@ -404,4 +407,38 @@ test("browser companions cannot impersonate the camera bridge", () => {
 
   assert.deepEqual(socket.joins, []);
   assert.deepEqual(socket.relays, []);
+});
+
+test("peer ownership rejects cross-socket acquisition and teardown", () => {
+  const registry = createSignalingPeerRegistry();
+  const owner = new FakeSocket("owner");
+  const guest = new FakeSocket("guest");
+  owner.data.sessionId = guest.data.sessionId = "session-1";
+  registerSignalingRelayHandlers(owner as never, { peerRegistry: registry });
+  registerSignalingRelayHandlers(guest as never, { peerRegistry: registry });
+  owner.emit("webrtc-offer", { peerId: "peer-1", sdp: "offer" });
+  guest.emit("webrtc-offer", { peerId: "peer-1", sdp: "offer" });
+  guest.emit("webrtc-peer-disconnect", { peerId: "peer-1" });
+  assert.deepEqual(guest.relays, []);
+  assert.equal(registry.owns("session-1", "peer-1", "owner"), true);
+  assert.equal(guest.rooms.has("session:session-1:peer:peer-1"), false);
+  owner.emit("webrtc-peer-disconnect", { peerId: "peer-1", sessionId: "wrong-session" });
+  assert.equal(registry.size(), 1);
+  owner.emit("webrtc-peer-disconnect", { peerId: "peer-1" });
+  assert.equal(registry.size(), 0);
+  assert.equal(owner.relays.at(-1)?.event, "webrtc-peer-disconnect");
+});
+
+test("session switching tears down old camera peers and releases capacity", () => {
+  const registry = createSignalingPeerRegistry(1);
+  const socket = new FakeSocket("browser-1");
+  socket.data.sessionId = "old-session";
+  registerSignalingRelayHandlers(socket as never, { peerRegistry: registry });
+  socket.emit("webrtc-offer", { peerId: "peer-1", sdp: "offer" });
+  joinSession(socket as never, "new-session");
+  assert.equal(registry.size(), 0);
+  assert.deepEqual(socket.relays.at(-1), { event: "webrtc-peer-disconnect",
+    payload: { peerId: "peer-1", sessionId: "old-session" }, room: "session:old-session" });
+  socket.emit("webrtc-offer", { peerId: "peer-2", sdp: "offer" });
+  assert.equal(registry.owns("new-session", "peer-2", socket.id), true);
 });

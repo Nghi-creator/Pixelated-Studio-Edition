@@ -19,7 +19,7 @@ import {
   findOwnedAccountStorage,
   removeOwnedAccountStorage,
 } from "../infrastructure/supabaseAccountStorage.js";
-import { deleteSupabaseIdentity } from "../infrastructure/supabaseIdentityAdmin.js";
+import { beginSupabaseAccountDeletion, deleteSupabaseIdentity } from "../infrastructure/supabaseIdentityAdmin.js";
 import {
   findAccountRole,
   findProfile,
@@ -72,6 +72,7 @@ export async function registerProfileRoutes(
     });
   const deleteAccount = service
     ? createDeleteAccount({
+        beginDeletion: (userId) => beginSupabaseAccountDeletion(service, userId),
         deleteIdentity: (userId) => deleteSupabaseIdentity(service, userId),
         findOwnedStorage: (userId) => findOwnedAccountStorage(service, userId),
         findRole: (userId) => findAccountRole(service, userId),
@@ -197,13 +198,14 @@ export async function registerProfileRoutes(
             code: "recent_sign_in_required",
           });
         }
-        if (result.status === "deleted_with_incomplete_cleanup") {
+        if (result.status === "cleanup_incomplete") {
           request.log.error(
             { cleanupFailures: result.cleanupFailures },
-            "Account deleted but storage cleanup is incomplete",
+            "Account deletion paused while storage cleanup is incomplete",
           );
-          return reply.status(200).send({
-            accountDeleted: true,
+          return reply.status(503).send({
+            error: "Some account files could not be removed. Retry account deletion to finish. Uploads are paused until deletion completes.",
+            accountDeleted: false,
             cleanupIncomplete: true,
             code: "account_storage_cleanup_incomplete",
           });
@@ -223,7 +225,7 @@ export async function registerProfileRoutes(
             });
           }
         }
-        return reply.status(500).send({ error: "Failed to delete account" });
+        return reply.status(500).send({ error: "Account deletion did not finish. Some files may already have been removed. Retry to complete deletion." });
       }
     },
   );

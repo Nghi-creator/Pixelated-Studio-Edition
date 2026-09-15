@@ -100,7 +100,7 @@ export function createIntervalResourceSampler(
     1,
     Math.floor(options.logicalCpuCount || os.cpus().length || 1),
   );
-  const now = options.now || Date.now;
+  const now = options.now || (() => performance.now());
   const readCounters = options.readProcessCounters || readLinuxProcessCounters;
   const cpuCapacityCores =
     options.cpuCapacityCores || readCpuCapacityCores(logicalCpuCount);

@@ -70,6 +70,8 @@ export function buildDockerRunArgs({
     "256",
     "--read-only",
     "--tmpfs",
+    "/run/pixelated:rw,nosuid,nodev,noexec,size=8m,uid=10001,gid=10001,mode=0700",
+    "--tmpfs",
     "/tmp:rw,nosuid,nodev,noexec,size=256m,mode=1777",
     "--tmpfs",
     "/home/pixelated:rw,nosuid,nodev,size=64m,uid=10001,gid=10001,mode=0700",

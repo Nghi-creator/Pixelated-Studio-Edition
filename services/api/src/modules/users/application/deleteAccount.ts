@@ -7,6 +7,7 @@ export type OwnedAccountStorage = { bucket: string; paths: string[] };
 
 export type DeleteAccountDependencies = {
   deleteIdentity(userId: string): Promise<void>;
+  beginDeletion(userId: string): Promise<void>;
   findOwnedStorage(userId: string): Promise<OwnedAccountStorage[]>;
   findRole(userId: string): Promise<string | null>;
   removeOwnedStorage(
@@ -16,7 +17,7 @@ export type DeleteAccountDependencies = {
 
 export class DeleteAccountError extends Error {
   constructor(
-    readonly stage: "authorize" | "delete_identity" | "inspect_storage",
+    readonly stage: "authorize" | "delete_identity" | "inspect_storage" | "begin_deletion",
     override readonly cause: unknown,
   ) {
     super(`Account deletion failed during ${stage}`);
@@ -40,6 +41,13 @@ export function createDeleteAccount(dependencies: DeleteAccountDependencies) {
       return { status: "recent_sign_in_required" } as const;
     }
 
+    // Persist intent before inventory: Storage policies stop new uploads while
+    // failures remain retryable through this authenticated endpoint.
+    try {
+      await dependencies.beginDeletion(input.userId);
+    } catch (error) {
+      throw new DeleteAccountError("begin_deletion", error);
+    }
     let ownedStorage: OwnedAccountStorage[];
     try {
       ownedStorage = await dependencies.findOwnedStorage(input.userId);
@@ -47,15 +55,16 @@ export function createDeleteAccount(dependencies: DeleteAccountDependencies) {
       throw new DeleteAccountError("inspect_storage", error);
     }
 
+    const cleanupFailures = await dependencies.removeOwnedStorage(ownedStorage);
+    if (cleanupFailures.length > 0) {
+      return { cleanupFailures, status: "cleanup_incomplete" } as const;
+    }
     try {
       await dependencies.deleteIdentity(input.userId);
     } catch (error) {
       throw new DeleteAccountError("delete_identity", error);
     }
 
-    const cleanupFailures = await dependencies.removeOwnedStorage(ownedStorage);
-    return cleanupFailures.length > 0
-      ? { cleanupFailures, status: "deleted_with_incomplete_cleanup" } as const
-      : { status: "deleted" } as const;
+    return { status: "deleted" } as const;
   };
 }

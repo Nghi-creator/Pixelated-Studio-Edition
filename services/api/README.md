@@ -20,6 +20,21 @@ The API owns:
 
 The local engine still runs separately on `localhost:8080` and verifies cloud sessions through this API before booting catalog games.
 
+## Account deletion deployment
+
+Apply `supabase/migrations/20260915090000_resumable_account_deletion.sql` before
+deploying the API. Deletion persists intent, pauses authenticated Storage writes,
+and removes files through the Storage API before deleting the Auth identity.
+Inventory includes current user-prefix paths and ownership metadata across
+buckets, including legacy `web_roms` objects. Service-role uploads bypass RLS;
+any service that uploads on behalf of users must respect deletion intent too.
+
+On partial cleanup, the API returns 503 with `accountDeleted: false`; the user
+can retry the same account deletion request. Successfully removed files stay
+deleted, and uploads remain paused until deletion completes. Validate the
+migration and retry flow against a disposable Supabase user with owned files
+before production rollout; the API integration suite uses a database double.
+
 ## Code map
 
 ```text

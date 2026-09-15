@@ -47,6 +47,7 @@ export function useEngineResearchTelemetryRecording({
     if (!enabled || !isRecording || !sessionId) return;
     let active = true;
     let pollInFlight = false;
+    let lastCapturedAt: string | null = null;
 
     const append = (samples: EngineResearchTelemetrySample[]) => {
       if (!active) return;
@@ -70,6 +71,10 @@ export function useEngineResearchTelemetryRecording({
           sessionId,
         );
         if (!parsed) throw new Error("Engine telemetry response was invalid");
+        // Fixed-cadence snapshots can predate capture or repeat across polls.
+        if (Date.parse(parsed.capturedAt) < recordingStartedAt ||
+            parsed.capturedAt === lastCapturedAt) return;
+        lastCapturedAt = parsed.capturedAt;
         const elapsedMs = elapsedMsFromCapturedAt(
           parsed.capturedAt,
           recordingStartedAt,

@@ -262,6 +262,7 @@ export function installEngineShutdownHandlers() {
   const shutdown = (signal: NodeJS.Signals) => {
     if (shutdownPromise) return shutdownPromise;
     console.log(`[Engine] ${signal} received; shutting down`);
+    getResearchTelemetrySnapshot.stop();
     runtime.shutdown();
 
     shutdownPromise = new Promise<void>((resolve) => {

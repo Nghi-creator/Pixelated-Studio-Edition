@@ -11,6 +11,14 @@ local telemetry bundles from the existing cloud player. It is an evidence
 capture surface for the latency-fingerprinting project, not the diagnosis
 engine itself.
 
+Engine CPU telemetry is sampled on a fixed one-second monotonic interval.
+HTTP reads return the cached sample without advancing CPU counters; samples
+older than three seconds or from another session are unavailable. CSV exports
+include the sample sequence and interval, and browser recording deduplicates
+samples. Run metadata includes an allowlisted configuration snapshot (labels,
+audio, timing, stream profile, cold-start state, and phase); free-form notes
+are excluded.
+
 ```text
 Normal mode
 Game card -> /play/:id

@@ -31,6 +31,8 @@ export class FakeSupabase {
   authUsers: User[] = [];
   browserSmokeArtifactClaims = new Set<string>();
   deletedUsers: string[] = [];
+  deletionRequests = new Set<string>();
+  storageOwners = new Map<string, string>();
   storageErrors = new Set<string>();
   storageRemoveErrors = new Set<string>();
   signedStorageUrls: { bucket: string; expiresIn: number; path: string }[] = [];
@@ -69,6 +71,10 @@ export class FakeSupabase {
         if (this.authDeleteError) {
           return { error: this.authDeleteError };
         }
+        if (Object.entries(this.storageObjects).some(([bucket, paths]) => paths.some(path => path.startsWith(`${userId}/`) || this.storageOwners.get(`${bucket}/${path}`) === userId))) {
+          return { error: new Error("User owns Storage objects") };
+        }
+        this.deletionRequests.delete(userId);
         this.deletedUsers.push(userId);
         return { error: null };
       },
@@ -178,6 +184,18 @@ export class FakeSupabase {
     const rpcError = this.rpcErrors.get(fn);
     if (rpcError) return { data: null, error: rpcError };
 
+    if (fn === "begin_account_deletion") {
+      this.deletionRequests.add(String(params.p_user_id));
+      return { data: null, error: null };
+    }
+    if (fn === "list_account_deletion_objects") {
+      const objects = Object.entries(this.storageObjects).flatMap(([bucket, paths]) =>
+        paths.filter(path => this.storageOwners.get(`${bucket}/${path}`) === params.p_user_id)
+          .map(name => ({ bucket_id: bucket, name })),
+      ).sort((a, b) => `${a.bucket_id}/${a.name}`.localeCompare(`${b.bucket_id}/${b.name}`));
+      const offset = Number(params.p_offset);
+      return { data: objects.slice(offset, offset + Number(params.p_limit)), error: null };
+    }
     if (fn === "reject_game_submission") {
       const submission = this.rows.game_submissions.find(
         (row) => row.id === params.p_submission_id,

@@ -23,6 +23,8 @@ test("Docker run arguments preserve environment values without shell quoting", (
 
   assert.ok(args.includes("10001:10001"));
   assert.ok(args.includes("--read-only"));
+  const mounts = args.flatMap((arg, i) => arg === "--tmpfs" ? [args[i + 1]] : []);
+  assert.ok(mounts.includes("/run/pixelated:rw,nosuid,nodev,noexec,size=8m,uid=10001,gid=10001,mode=0700"));
   assert.ok(args.includes("--cap-drop"));
   assert.ok(args.includes("no-new-privileges:true"));
   assert.ok(args.includes("/dev/uinput"));
