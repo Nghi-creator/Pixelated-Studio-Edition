@@ -95,6 +95,18 @@ auto-deploys must not bypass the GitHub gates.
 Generated proof and smoke output is disposable. Keep it in `.artifacts/` or a
 CI artifact upload; do not commit it under `.context/`.
 
+Hosted and LAN JSON smoke requests have a 20-second timeout that includes body
+reads. Deploy readiness also has an overall deadline. Mutating requests are
+not automatically retried. Hosted cleanup failures fail the run and appear in
+the report; pairing restoration runs only after the original pairing was read.
+The local browser interaction harness selects a free port unless
+`PIXELATED_WEB_INTERACTION_PORT` is explicitly set.
+
+For browser `Failed to fetch` errors, inspect `browser-request-failures.json`
+and `browser-console.json` in the hosted pairing artifact. A passing local
+CORS test does not establish that the deployed API, proxy, and runner network
+were healthy when the failure occurred.
+
 The two-device LAN procedure remains in `lan-manual-smoke-checklist.md`.
 
 ## Known Tripwires

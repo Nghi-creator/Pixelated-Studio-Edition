@@ -14,8 +14,8 @@ const repoRoot = path.resolve(
   "..",
 );
 const webRoot = path.join(repoRoot, "apps", "web");
-const port = Number(process.env.PIXELATED_WEB_INTERACTION_PORT || 5174);
-const baseUrl = `http://127.0.0.1:${port}`;
+const port = Number(process.env.PIXELATED_WEB_INTERACTION_PORT || 0);
+let baseUrl = `http://127.0.0.1:${port}`;
 const harnessSourcePath = path.join(
   webRoot,
   "tests",
@@ -141,6 +141,7 @@ async function startWebServer(rootDir) {
     });
   });
 
+  baseUrl = `http://127.0.0.1:${server.address().port}`;
   return server;
 }
 
@@ -174,11 +175,12 @@ function formatDiagnostics({
 
 async function run() {
   const outDir = await buildHarness();
-  const builtHarnessSource = await readBuiltHarnessContract(outDir);
-  assertBuiltHarnessContract(builtHarnessSource);
-  const server = await startWebServer(outDir);
+  let server;
   let browser;
   try {
+    const builtHarnessSource = await readBuiltHarnessContract(outDir);
+    assertBuiltHarnessContract(builtHarnessSource);
+    server = await startWebServer(outDir);
     browser = await chromium.launch({ headless: true });
     const page = await browser.newPage();
     const errors = [];
@@ -466,10 +468,20 @@ async function run() {
       .waitFor();
 
     assert.deepEqual(errors, []);
+    assert.deepEqual(pageErrors, [], "Uncaught browser exceptions");
   } finally {
-    if (browser) await browser.close();
-    await new Promise((resolve) => server.close(resolve));
-    await fs.rm(outDir, { force: true, recursive: true });
+    try {
+      if (browser) await browser.close();
+    } finally {
+      try {
+        if (server) {
+          server.closeAllConnections();
+          await new Promise((resolve) => server.close(resolve));
+        }
+      } finally {
+        await fs.rm(outDir, { force: true, recursive: true });
+      }
+    }
   }
 }
 

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+import { requestSmoke } from "../shared/smokeHttp.mjs";
 
 export async function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -26,12 +27,9 @@ export async function getHostedWebBuild({
   hostedPairingBuildMarker,
   hostedRuntimeSwitchBuildMarker,
   webUrl,
+  signal,
 }) {
-  const response = await fetch(`${webUrl}/engine`, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`GET /engine returned ${response.status}`);
-  }
-  const html = await response.text();
+  const { body: html } = await requestSmoke(`${webUrl}/engine`, { cache: "no-store", signal }, { format: "text" });
   const htmlSha256 = crypto.createHash("sha256").update(html).digest("hex");
   const scripts = Array.from(html.matchAll(/<script[^>]+src="([^"]+)"/g)).map(
     ([, source]) => new URL(source, webUrl).toString(),
@@ -50,9 +48,9 @@ export async function getHostedWebBuild({
     const script = pendingScripts.shift();
     if (!script || visitedScripts.has(script)) continue;
     visitedScripts.add(script);
-    const asset = await fetch(script, { cache: "no-store" });
+    const { response: asset, body: source } = await requestSmoke(script,
+      { cache: "no-store", signal }, { format: "text", expected: null });
     if (!asset.ok) continue;
-    const source = await asset.text();
     if (source.includes(hostedPairingBuildMarker)) {
       hasLaunchPairing = true;
     }
@@ -82,17 +80,19 @@ export async function waitForRenderApiDeploy({
   renderBaselineStartedAtSeconds,
   timeoutMs,
 }) {
-  const deadline = Date.now() + timeoutMs;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("Readiness timeout must be positive.");
+  const signal = AbortSignal.timeout(Math.ceil(timeoutMs));
+  const deadline = performance.now() + timeoutMs;
   let lastError = "";
 
-  while (Date.now() < deadline) {
+  while (performance.now() < deadline) {
     try {
       const [healthResponse, readyResponse] = await Promise.all([
-        fetch(`${apiUrl}/health`, { cache: "no-store" }),
-        fetch(`${apiUrl}/ready`, { cache: "no-store" }),
+        requestSmoke(`${apiUrl}/health`, { cache: "no-store", signal }),
+        requestSmoke(`${apiUrl}/ready`, { cache: "no-store", signal }),
       ]);
-      const health = await healthResponse.json();
-      const ready = await readyResponse.json();
+      const health = healthResponse.body;
+      const ready = readyResponse.body;
       const startedAtSeconds =
         Math.floor(Date.now() / 1000) - Number(health?.uptimeSeconds);
       const isNewProcess =
@@ -100,19 +100,19 @@ export async function waitForRenderApiDeploy({
         startedAtSeconds > renderBaselineStartedAtSeconds;
 
       if (
-        healthResponse.ok &&
+        healthResponse.response.ok &&
         health?.ok === true &&
-        readyResponse.ok &&
+        readyResponse.response.ok &&
         ready?.ok === true &&
         isNewProcess
       ) {
         return;
       }
-      lastError = `health=${healthResponse.status}/${JSON.stringify(health)} ready=${readyResponse.status}/${JSON.stringify(ready)} startedAtSeconds=${startedAtSeconds} baseline=${renderBaselineStartedAtSeconds || "none"}`;
+      lastError = `health=${healthResponse.response.status}/${JSON.stringify(health)} ready=${readyResponse.response.status}/${JSON.stringify(ready)} startedAtSeconds=${startedAtSeconds} baseline=${renderBaselineStartedAtSeconds || "none"}`;
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
     }
-    await delay(15_000);
+    await delay(Math.max(0, Math.min(15_000, deadline - performance.now())));
   }
 
   throw new Error(
@@ -127,15 +127,18 @@ export async function waitForHostedWebPairingBundle({
   vercelBaselineHtmlSha256,
   webUrl,
 }) {
-  const deadline = Date.now() + timeoutMs;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error("Readiness timeout must be positive.");
+  const signal = AbortSignal.timeout(Math.ceil(timeoutMs));
+  const deadline = performance.now() + timeoutMs;
   let lastError = "";
 
-  while (Date.now() < deadline) {
+  while (performance.now() < deadline) {
     try {
       const build = await getHostedWebBuild({
         hostedPairingBuildMarker,
         hostedRuntimeSwitchBuildMarker,
         webUrl,
+        signal,
       });
       const isNewBuild =
         !vercelBaselineHtmlSha256 ||
@@ -145,7 +148,7 @@ export async function waitForHostedWebPairingBundle({
     } catch (error) {
       lastError = error instanceof Error ? error.message : String(error);
     }
-    await delay(15_000);
+    await delay(Math.max(0, Math.min(15_000, deadline - performance.now())));
   }
 
   throw new Error(

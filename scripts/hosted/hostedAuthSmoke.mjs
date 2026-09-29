@@ -1,3 +1,5 @@
+import { requestSmoke } from "../shared/smokeHttp.mjs";
+import { runSmokeCleanup } from "../shared/smokeCleanup.mjs";
 import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -83,7 +85,7 @@ function smokePassword(label) {
 }
 
 async function adminRequest(pathname, options = {}) {
-  const response = await fetch(`${supabaseUrl}/auth/v1/admin${pathname}`, {
+  const { body } = await requestSmoke(`${supabaseUrl}/auth/v1/admin${pathname}`, {
     ...options,
     body: options.body ? JSON.stringify(options.body) : undefined,
     headers: {
@@ -92,14 +94,7 @@ async function adminRequest(pathname, options = {}) {
       ...(options.body ? { "content-type": "application/json" } : {}),
     },
   });
-  const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
-  if (!response.ok) {
-    throw new Error(
-      `${options.method || "GET"} admin${pathname} returned ${response.status}: ${text}`,
-    );
-  }
-  return payload;
+  return body;
 }
 
 async function generateLink({ email, password, redirectTo, type }) {
@@ -139,14 +134,13 @@ async function findUserId(email) {
 }
 
 async function deleteSmokeUsers() {
-  for (const [email, knownId] of users) {
-    const userId = knownId || (await findUserId(email).catch(() => ""));
-    if (userId) {
-      await adminRequest(`/users/${userId}`, { method: "DELETE" }).catch(
-        () => undefined,
-      );
-    }
-  }
+  return runSmokeCleanup([...users].map(([email, knownId]) => [
+    "delete smoke user",
+    async () => {
+      const userId = knownId || await findUserId(email);
+      if (userId) await adminRequest(`/users/${userId}`, { method: "DELETE" });
+    },
+  ]));
 }
 
 async function newPage() {
@@ -487,8 +481,15 @@ try {
   }
   process.exitCode = 1;
 } finally {
-  await browser?.close().catch(() => undefined);
-  await deleteSmokeUsers().catch(() => undefined);
+  const cleanupFailures = [
+    ...await runSmokeCleanup([["close browser", () => browser?.close()]]),
+    ...await deleteSmokeUsers(),
+  ];
+  for (const entry of cleanupFailures) record(`cleanup: ${entry.name}`, "fail", entry.error);
+  if (cleanupFailures.length) {
+    failure ||= new Error("Hosted auth cleanup failed; see report checks.");
+    process.exitCode = 1;
+  }
   fs.mkdirSync(runDir, { recursive: true });
   writeJson(reportPath, {
     failure: failure?.message || null,
