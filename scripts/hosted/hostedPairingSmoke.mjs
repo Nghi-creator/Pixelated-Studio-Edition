@@ -9,6 +9,7 @@ import { createRequire } from "node:module";
 import { chromium } from "playwright";
 import { assertHostedPairingContract } from "./hostedPairingContract.mjs";
 import { probeHostedNativePairing } from "./hostedNativePairingProbe.mjs";
+import { redeemHostedDesktopLaunch } from "./hostedDesktopLaunch.mjs";
 import { createHostedEngineProbe } from "./hostedPairingEngineProbe.mjs";
 import {
   delay,
@@ -414,20 +415,11 @@ async function main() {
   pairingSnapshotTaken = true;
 
   await step("redeem and register desktop launch on hosted /engine", async () => {
-    const launchTicket = companion.createCompanionLaunchTicket();
-    const launchUrl = new URL("/engine", webUrl);
-    launchUrl.searchParams.set("companionUrl", companionUrl);
-    launchUrl.searchParams.set("launchTicket", launchTicket);
-    await page.goto(launchUrl.toString(), { waitUntil: "domcontentloaded" });
     try {
-      await page.waitForFunction(
-        () =>
-          window.localStorage
-            .getItem("pixelated_engine_token")
-            ?.startsWith("companion:"),
-        null,
-        { timeout: 20_000 },
-      );
+      await redeemHostedDesktopLaunch({
+        page, webUrl, companionUrl,
+        createLaunchTicket: () => companion.createCompanionLaunchTicket(),
+      });
     } catch {
       const launchRequests = browserNetwork.filter((entry) =>
         entry.url.includes("/launch/redeem"),
@@ -517,6 +509,13 @@ async function main() {
   });
 
   await step("switch hosted pairing to native Linux and resolve Debian-native boot", async () => {
+    // The metadata-restoration check deliberately removed the saved credentials.
+    // Its populated form does not restore an authenticated local connection.
+    await redeemHostedDesktopLaunch({
+      page, webUrl, companionUrl,
+      createLaunchTicket: () => companion.createCompanionLaunchTicket(),
+    });
+    await waitForRenderPairingRegistration();
     const { build, game } = await findDebianNativeGame();
     const nativeSessionId = `hosted-native-smoke-${Date.now()}`;
     createdSessionIds.push(nativeSessionId);

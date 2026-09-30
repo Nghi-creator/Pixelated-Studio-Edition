@@ -20,7 +20,9 @@ export async function probeHostedNativePairing({ apiUrl: apiBaseUrl, gameId, ses
     if (!selected) throw new Error("Unapproved native probe engine destination.");
     return selected;
   };
-  const engineUrl = selectLocalOrigin(window.localStorage.getItem("pixelated_engine_url"));
+  const storedEngineUrl = window.localStorage.getItem("pixelated_engine_url");
+  if (!storedEngineUrl) throw new Error("Native probe requires an active desktop pairing; redeem a fresh launch ticket after restoring metadata.");
+  const engineUrl = selectLocalOrigin(storedEngineUrl);
   const storedControlUrl = window.localStorage.getItem("pixelated_engine_control_url");
   const engineControlUrl = storedControlUrl ? selectLocalOrigin(storedControlUrl) : engineUrl;
   const request = async (stage, url, options = {}) => {
