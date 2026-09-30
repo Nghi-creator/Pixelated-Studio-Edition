@@ -1,11 +1,38 @@
 // Self-contained: Playwright serializes this function into the hosted page.
 export async function probeHostedNativePairing({ apiUrl: apiBaseUrl, gameId, sessionId }) {
+  // CI configuration comes from the Node runner, never browser storage.
+  const api = new URL(apiBaseUrl);
+  if (api.protocol !== "https:" || api.username || api.password ||
+      api.search || api.hash || api.pathname !== "/") {
+    throw new Error("Native probe requires a configured HTTPS API origin.");
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(sessionId)) throw new Error("Invalid smoke session ID.");
+  const apiOrigin = api.origin;
+  const localOrigins = [
+    "https://localhost:8090", "https://127.0.0.1:8090", "https://[::1]:8090",
+    "http://localhost:8080", "http://127.0.0.1:8080", "http://[::1]:8080",
+    "http://localhost:8091", "http://127.0.0.1:8091", "http://[::1]:8091",
+  ];
+  const selectLocalOrigin = (value) => {
+    // Return the trusted constant, not the storage value. Reject paths, userinfo,
+    // queries, alternate ports, lookalike hosts, and protocol-relative URLs.
+    const selected = localOrigins.find(origin => value === origin || value === `${origin}/`);
+    if (!selected) throw new Error("Unapproved native probe engine destination.");
+    return selected;
+  };
+  const engineUrl = selectLocalOrigin(window.localStorage.getItem("pixelated_engine_url"));
+  const storedControlUrl = window.localStorage.getItem("pixelated_engine_control_url");
+  const engineControlUrl = storedControlUrl ? selectLocalOrigin(storedControlUrl) : engineUrl;
   const request = async (stage, url, options = {}) => {
     const endpoint = new URL(url);
+    const expectedOrigins = stage.startsWith("native session") ? [apiOrigin] : localOrigins;
+    if (!expectedOrigins.includes(endpoint.origin) || endpoint.username || endpoint.password || endpoint.search || endpoint.hash) {
+      throw new Error("Unapproved native probe request destination.");
+    }
     // Never include auth headers, request bodies, or URL credentials in errors.
     const label = `${options.method || "GET"} ${endpoint.origin}${endpoint.pathname}`;
     try {
-      return await fetch(url, { ...options, signal: AbortSignal.timeout(20_000) });
+      return await fetch(url, { ...options, redirect: "error", credentials: "omit", signal: AbortSignal.timeout(20_000) });
     } catch (error) {
       throw new Error(
         `${stage}: ${label} failed before an HTTP response (${error instanceof Error ? error.name : "network error"}). ` +
@@ -28,9 +55,6 @@ export async function probeHostedNativePairing({ apiUrl: apiBaseUrl, gameId, ses
     return "";
   })();
   if (!authToken) throw new Error("Native pairing probe requires a signed-in hosted browser session.");
-  const engineUrl = window.localStorage.getItem("pixelated_engine_url");
-  const engineControlUrl =
-    window.localStorage.getItem("pixelated_engine_control_url") || engineUrl;
   const engineTokenValue =
     window.localStorage.getItem("pixelated_engine_control_token") ||
     window.localStorage.getItem("pixelated_engine_token") ||
@@ -43,21 +67,10 @@ export async function probeHostedNativePairing({ apiUrl: apiBaseUrl, gameId, ses
     "X-Pixelated-Client-Id": "hosted-native-smoke",
   };
   const getLocalCompanionControlUrl = (target) => {
-    try {
-      const url = new URL(target);
-      const hostname = url.hostname.toLowerCase();
-      const isLocalhost =
-        hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        hostname === "::1" ||
-        hostname === "[::1]";
-      if (!isLocalhost || url.port !== "8080") return null;
-      url.protocol = "http:";
-      url.port = "8091";
-      return url.toString().replace(/\/$/, "");
-    } catch {
-      return null;
-    }
+    if (target === "http://localhost:8080") return "http://localhost:8091";
+    if (target === "http://127.0.0.1:8080") return "http://127.0.0.1:8091";
+    if (target === "http://[::1]:8080") return "http://[::1]:8091";
+    return null;
   };
   const fallbackControlUrl =
     engineControlUrl === engineUrl
@@ -125,7 +138,7 @@ export async function probeHostedNativePairing({ apiUrl: apiBaseUrl, gameId, ses
     return response;
   };
 
-  const createResponse = await request("native session creation", `${apiBaseUrl}/sessions`, {
+  const createResponse = await request("native session creation", `${apiOrigin}/sessions`, {
     body: JSON.stringify({
       clientSessionId: sessionId,
       gameId,
@@ -149,7 +162,7 @@ export async function probeHostedNativePairing({ apiUrl: apiBaseUrl, gameId, ses
   }
   const verifyResponse = await request(
     "native session verification",
-    `${apiBaseUrl}/sessions/${sessionId}/verify`,
+    `${apiOrigin}/sessions/${sessionId}/verify`,
     {
       body: JSON.stringify({ sessionToken: created.sessionToken }),
       headers: { "content-type": "application/json" },
