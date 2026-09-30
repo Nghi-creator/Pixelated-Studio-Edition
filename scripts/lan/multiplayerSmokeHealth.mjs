@@ -1,3 +1,5 @@
+import { requestSmoke } from "../shared/smokeHttp.mjs";
+
 export function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -99,28 +101,14 @@ export function summarizeHealth(health) {
 }
 
 export async function fetchHealth(engineUrl) {
-  const response = await fetch(getHealthUrl(engineUrl));
-  const body = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const message = body ? JSON.stringify(body) : response.statusText;
-    throw new Error(`GET /health returned ${response.status}: ${message}`);
-  }
-
-  return body;
+  return requestJson(engineUrl, "/health");
 }
 
 export async function requestJson(engineUrl, route, options = {}) {
-  const response = await fetch(`${engineUrl}${route}`, options);
-  const body = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const message = body ? JSON.stringify(body) : response.statusText;
-    throw new Error(
-      `${options.method || "GET"} ${route} returned ${response.status}: ${message}`,
-    );
+  const { body } = await requestSmoke(`${engineUrl}${route}`, options);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    throw new Error(`${options.method || "GET"} ${route} returned no JSON object.`);
   }
-
   return body;
 }
 

@@ -1,3 +1,6 @@
+import { requestSmoke } from "../shared/smokeHttp.mjs";
+import { runSmokeCleanup } from "../shared/smokeCleanup.mjs";
+import { restorePairingSnapshot } from "./hostedPairingCleanup.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -5,6 +8,7 @@ import path from "node:path";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
 import { assertHostedPairingContract } from "./hostedPairingContract.mjs";
+import { probeHostedNativePairing } from "./hostedNativePairingProbe.mjs";
 import { createHostedEngineProbe } from "./hostedPairingEngineProbe.mjs";
 import {
   delay,
@@ -76,6 +80,7 @@ let page;
 let companion;
 let bearerToken = "";
 let previousPairing = null;
+let pairingSnapshotTaken = false;
 let createdSessionId = "";
 const createdSessionIds = [];
 const engineProbe = createHostedEngineProbe({ engineToken, webUrl });
@@ -131,26 +136,16 @@ async function apiRequest(pathname, options = {}) {
   const headers = new Headers(options.headers);
   if (options.auth !== false) headers.set("authorization", `Bearer ${bearerToken}`);
   if (options.body) headers.set("content-type", "application/json");
-  const response = await fetch(`${apiUrl}${pathname}`, {
+  const { body } = await requestSmoke(`${apiUrl}${pathname}`, {
     ...options,
     body: options.body ? JSON.stringify(options.body) : undefined,
     headers,
-  });
-  const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
-  const expected = Array.isArray(options.expected)
-    ? options.expected
-    : [options.expected ?? 200];
-  if (!expected.includes(response.status)) {
-    throw new Error(
-      `${options.method || "GET"} ${pathname} returned ${response.status}: ${text}`,
-    );
-  }
-  return payload;
+  }, { expected: Array.isArray(options.expected) ? options.expected : [options.expected ?? 200] });
+  return body;
 }
 
 async function adminRequest(pathname, options = {}) {
-  const response = await fetch(`${supabaseUrl}/auth/v1/admin${pathname}`, {
+  const { body } = await requestSmoke(`${supabaseUrl}/auth/v1/admin${pathname}`, {
     ...options,
     body: options.body ? JSON.stringify(options.body) : undefined,
     headers: {
@@ -159,14 +154,7 @@ async function adminRequest(pathname, options = {}) {
       ...(options.body ? { "content-type": "application/json" } : {}),
     },
   });
-  const text = await response.text();
-  const payload = text ? JSON.parse(text) : null;
-  if (!response.ok) {
-    throw new Error(
-      `${options.method || "GET"} admin${pathname} returned ${response.status}: ${text}`,
-    );
-  }
-  return payload;
+  return body;
 }
 
 async function generateMagicLink() {
@@ -251,17 +239,7 @@ async function findDebianNativeGame() {
 
 async function restorePreviousPairing() {
   if (!bearerToken) return;
-  if (previousPairing?.engineUrl) {
-    await apiRequest("/local-pairings", {
-      body: { engineUrl: previousPairing.engineUrl },
-      method: "POST",
-    });
-    return;
-  }
-  await apiRequest("/local-pairings/current", {
-    expected: 204,
-    method: "DELETE",
-  });
+  await restorePairingSnapshot({ captured: pairingSnapshotTaken, pairing: previousPairing }, apiRequest);
 }
 
 async function waitForRenderPairingRegistration() {
@@ -288,19 +266,17 @@ async function waitForRenderPairingRegistration() {
 }
 
 async function cleanup() {
-  if (bearerToken) {
-    for (const sessionId of createdSessionIds) {
-      await apiRequest(`/sessions/${sessionId}`, {
-        expected: 204,
-        method: "DELETE",
-      }).catch(() => undefined);
-    }
-  }
-  await browser?.close().catch(() => undefined);
-  await restorePreviousPairing().catch(() => undefined);
-  companion?.stopCompanionServer();
-  await engineProbe.stop();
-  fs.rmSync(certDir, { force: true, recursive: true });
+  return runSmokeCleanup([
+    ["close browser", () => browser?.close()],
+    ...createdSessionIds.map(sessionId => [
+      `delete session ${sessionId}`,
+      () => apiRequest(`/sessions/${sessionId}`, { expected: [204, 404], method: "DELETE" }),
+    ]),
+    ["restore saved pairing", restorePreviousPairing],
+    ["stop companion", () => companion?.stopCompanionServer()],
+    ["stop engine probe", () => engineProbe.stop()],
+    ["remove temporary certificates", () => fs.rmSync(certDir, { force: true, recursive: true })],
+  ]);
 }
 
 async function main() {
@@ -435,6 +411,7 @@ async function main() {
   previousPairing = await apiRequest("/local-pairings/current", {
     expected: [200, 404],
   }).then((payload) => payload?.pairing || null);
+  pairingSnapshotTaken = true;
 
   await step("redeem and register desktop launch on hosted /engine", async () => {
     const launchTicket = companion.createCompanionLaunchTicket();
@@ -544,194 +521,7 @@ async function main() {
     const nativeSessionId = `hosted-native-smoke-${Date.now()}`;
     createdSessionIds.push(nativeSessionId);
     const result = await page.evaluate(
-      async ({ apiUrl: apiBaseUrl, gameId, sessionId }) => {
-        const authToken = (() => {
-          for (const [key, value] of Object.entries(window.localStorage)) {
-            if (!key.startsWith("sb-") || !key.endsWith("-auth-token")) continue;
-            try {
-              const parsed = JSON.parse(value);
-              if (typeof parsed?.access_token === "string") {
-                return parsed.access_token;
-              }
-            } catch {
-              // Ignore unrelated local storage entries.
-            }
-          }
-          return "";
-        })();
-        const engineUrl = window.localStorage.getItem("pixelated_engine_url");
-        const engineControlUrl =
-          window.localStorage.getItem("pixelated_engine_control_url") || engineUrl;
-        const engineTokenValue =
-          window.localStorage.getItem("pixelated_engine_control_token") ||
-          window.localStorage.getItem("pixelated_engine_token") ||
-          "";
-        const companionToken = engineTokenValue.startsWith("companion:")
-          ? engineTokenValue.slice("companion:".length)
-          : engineTokenValue;
-        const engineHeaders = {
-          "X-Engine-Token": companionToken,
-          "X-Pixelated-Client-Id": "hosted-native-smoke",
-        };
-        const getLocalCompanionControlUrl = (target) => {
-          try {
-            const url = new URL(target);
-            const hostname = url.hostname.toLowerCase();
-            const isLocalhost =
-              hostname === "localhost" ||
-              hostname === "127.0.0.1" ||
-              hostname === "::1" ||
-              hostname === "[::1]";
-            if (!isLocalhost || url.port !== "8080") return null;
-            url.protocol = "http:";
-            url.port = "8091";
-            return url.toString().replace(/\/$/, "");
-          } catch {
-            return null;
-          }
-        };
-        const fallbackControlUrl =
-          engineControlUrl === engineUrl
-            ? getLocalCompanionControlUrl(engineControlUrl)
-            : null;
-        const healthUrls = [
-          engineControlUrl,
-          engineUrl,
-          fallbackControlUrl,
-        ].filter((entry, index, entries) => entry && entries.indexOf(entry) === index);
-        const healthAttempts = [];
-        const getEngineHealth = async () => {
-          for (const healthUrl of healthUrls) {
-            const response = await fetch(`${healthUrl}/health`, {
-              cache: "no-store",
-              headers: engineHeaders,
-            }).catch((error) => {
-              healthAttempts.push({
-                error: error instanceof Error ? error.message : String(error),
-                url: healthUrl,
-              });
-              return null;
-            });
-            if (!response) continue;
-            const health = await response.json().catch((error) => {
-              healthAttempts.push({
-                error: error instanceof Error ? error.message : String(error),
-                status: response.status,
-                url: healthUrl,
-              });
-              return null;
-            });
-            healthAttempts.push({
-              ok: response.ok,
-              runtimeKind: health?.runtimeKind || "",
-              status: response.status,
-              url: healthUrl,
-            });
-            if (response.ok && health) return health;
-          }
-          return null;
-        };
-        const postEngineControl = async (path, body) => {
-          const request = (controlUrl) =>
-            fetch(`${controlUrl}${path}`, {
-              body: body ? JSON.stringify(body) : undefined,
-              cache: "no-store",
-              headers: {
-                ...engineHeaders,
-                ...(body ? { "content-type": "application/json" } : {}),
-              },
-              method: "POST",
-            });
-          let response = await request(engineControlUrl).catch((error) => {
-            if (!fallbackControlUrl) throw error;
-            return request(fallbackControlUrl);
-          });
-          if (
-            fallbackControlUrl &&
-            engineControlUrl !== fallbackControlUrl &&
-            [404, 405].includes(response.status)
-          ) {
-            response = await request(fallbackControlUrl);
-          }
-          return response;
-        };
-
-        const createResponse = await fetch(`${apiBaseUrl}/sessions`, {
-          body: JSON.stringify({
-            clientSessionId: sessionId,
-            gameId,
-            mode: "cloud",
-          }),
-          headers: {
-            authorization: `Bearer ${authToken}`,
-            "content-type": "application/json",
-          },
-          method: "POST",
-        });
-        const created = await createResponse.json().catch(() => null);
-        if (!createResponse.ok) {
-          return {
-            created,
-            error: `session create returned ${createResponse.status}`,
-          };
-        }
-        const verifyResponse = await fetch(
-          `${apiBaseUrl}/sessions/${sessionId}/verify`,
-          {
-            body: JSON.stringify({ sessionToken: created.sessionToken }),
-            headers: { "content-type": "application/json" },
-            method: "POST",
-          },
-        );
-        const verified = await verifyResponse.json().catch(() => null);
-        if (!verifyResponse.ok) {
-          return {
-            created,
-            error: `session verify returned ${verifyResponse.status}`,
-            verified,
-          };
-        }
-
-        const beforeHealth = await getEngineHealth();
-        if (created.boot?.runtimeKind !== beforeHealth?.runtimeKind) {
-          await postEngineControl("/session/stop-active");
-          const switchResponse = await postEngineControl("/runtime/switch", {
-            runtimeKind: created.boot?.runtimeKind,
-          });
-          const switchPayload = await switchResponse.json().catch(() => null);
-          if (![200, 202].includes(switchResponse.status)) {
-            return {
-              beforeHealth,
-              created,
-              error: `runtime switch returned ${switchResponse.status}`,
-              switchPayload,
-            };
-          }
-        }
-
-        let activeHealth = null;
-        let activeRuntimeKind = "";
-        for (let attempt = 0; attempt < 40; attempt += 1) {
-          const health = await getEngineHealth();
-          activeHealth = health;
-          activeRuntimeKind = health?.runtimeKind || "";
-          if (activeRuntimeKind === created.boot?.runtimeKind) break;
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        }
-
-        return {
-          activeHealth,
-          activeRuntimeKind,
-          healthAttempts: healthAttempts.slice(-20),
-          bootTarget:
-            created.boot?.launchManifestId ||
-            created.boot?.romUrl ||
-            created.boot?.romFilename ||
-            null,
-          created,
-          verified,
-        };
-      },
+      probeHostedNativePairing,
       { apiUrl, gameId: game.id, sessionId: nativeSessionId },
     );
 
@@ -774,7 +564,12 @@ try {
   }
   process.exitCode = 1;
 } finally {
-  await cleanup();
+  const cleanupFailures = await cleanup();
+  for (const entry of cleanupFailures) record(`cleanup: ${entry.name}`, "fail", entry.error);
+  if (cleanupFailures.length) {
+    failure ||= new Error("Hosted pairing cleanup failed; see report checks.");
+    process.exitCode = 1;
+  }
   writeJson(path.join(runDir, "browser-console.json"), browserConsole);
   writeJson(path.join(runDir, "browser-network.json"), browserNetwork);
   writeJson(

@@ -117,6 +117,7 @@ async function resolveBearerToken() {
         "Content-Type": "application/json",
       },
       method: "POST",
+      signal: AbortSignal.timeout(20_000),
     },
   );
   const text = await response.text();
@@ -193,6 +194,7 @@ async function request<T = JsonRecord>(
         : {}),
     },
     method,
+    signal: AbortSignal.timeout(20_000),
   });
   const text = await response.text();
   const payload = text ? parseJson(text, path) : null;

@@ -166,6 +166,7 @@ async function fetchTelemetryCapture(engineUrl, captureToken) {
 
 async function deactivateTelemetryCapture(engineUrl, captureToken) {
   const response = await fetch(`${engineUrl}/smoke/telemetry/active`, {
+    signal: AbortSignal.timeout(20_000),
     headers: { "X-Smoke-Capture-Token": captureToken },
     method: "DELETE",
   });

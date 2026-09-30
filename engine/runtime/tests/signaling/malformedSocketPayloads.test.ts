@@ -10,9 +10,10 @@ import { createLobbyManager } from "../../src/signaling/lobby/lobby";
 import { registerEngineErrorHandlers } from "../../src/signaling/engineErrorHandlers";
 import { registerStartGameHandler } from "../../src/signaling/start-game/startGameHandlers";
 
-test("malformed wire messages cannot terminate a paired engine connection", async () => {
+test("malformed wire messages cannot terminate a paired engine connection", { timeout: 10_000 }, async (t) => {
   const server = http.createServer();
   const io = new Server(server);
+  t.after(() => new Promise<void>((resolve) => io.close(() => resolve())));
   io.use(createEngineTokenAuth("test-token").useSocketEngineToken);
   io.on("connection", (socket) => {
     socket.data.sessionId = "test-session";
@@ -28,10 +29,14 @@ test("malformed wire messages cannot terminate a paired engine connection", asyn
     });
     socket.on("audit-ping", (ack: () => void) => ack());
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => { server.off("error", reject); resolve(); });
+  });
   const address = server.address();
   assert(address && typeof address !== "string");
-  const client = connect(`http://127.0.0.1:${address.port}`, { auth: { token: "test-token" }, transports: ["websocket"], reconnection: false });
+  const client = connect(`http://127.0.0.1:${address.port}`, { auth: { token: "test-token" }, transports: ["websocket"], reconnection: false, timeout: 5_000 });
+  t.after(() => client.disconnect());
   try {
     await new Promise<void>((resolve, reject) => { client.once("connect", resolve); client.once("connect_error", reject); });
     for (const event of ["webrtc-offer", "webrtc-answer", "webrtc-ice-candidate", "webrtc-ice-candidate-backend", "python-ready", "webrtc-peer-disconnect", "keydown", "keyup", "join-lobby", "request-player-slot", "release-player-slot", "lobby-kick", "engine-error", "start-game", "restart-stream"]) {
@@ -41,6 +46,5 @@ test("malformed wire messages cannot terminate a paired engine connection", asyn
     assert.equal(client.connected, true);
   } finally {
     client.disconnect();
-    await new Promise<void>((resolve) => io.close(() => resolve()));
   }
 });
