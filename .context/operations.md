@@ -41,6 +41,10 @@ npm --prefix apps/desktop run dist:ci
   packaged desktop runtime/build chain. It also rebuilds both final engine
   images, emits SPDX SBOMs, and blocks fixable high/critical image
   vulnerabilities on every change and on a weekly schedule.
+- `dependabot-automerge.yml` can merge narrowly allowlisted type-package patch
+  updates after a seven-day release cooldown and passing enforced CI. It is
+  disabled until explicitly enabled; see [activation and dry-run instructions](../docs/dependabot-automerge.md).
+  Its token-based merges do not trigger push-based deployments.
 
 Local contract-only smoke does not prove production propagation timing, real
 Supabase auth, browser/device behavior, or desktop runtime switching.
