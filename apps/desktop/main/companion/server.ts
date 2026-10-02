@@ -87,7 +87,7 @@ export function hardenCompanionServer(server: http.Server | https.Server) {
   });
 }
 
-export function startCompanionServer({
+export async function startCompanionServer({
   certDir,
   engineToken,
   exposureMode,
@@ -106,7 +106,7 @@ export function startCompanionServer({
     revokeCompanionInvite();
   }
 
-  const { certPath, keyPath } = createCompanionCertificate(certDir, lanAddresses);
+  const { certPath, keyPath } = await createCompanionCertificate(certDir, lanAddresses);
   const requestOptions: CompanionRequestOptions = {
     engineToken,
     launchAllowedOrigins,

@@ -6,13 +6,13 @@ import path from "node:path";
 import test from "node:test";
 import { createCompanionCertificate } from "../../../main/companion/certificate";
 
-test("companion certificate helper generates and reuses a valid certificate pair", (t) => {
+test("companion certificate helper generates and reuses a valid certificate pair", async (t) => {
   const certDir = fs.mkdtempSync(path.join(os.tmpdir(), "pixelated-cert-"));
   t.after(() => fs.rmSync(certDir, { force: true, recursive: true }));
   const certPath = path.join(certDir, "pixelated-companion.crt");
   const keyPath = path.join(certDir, "pixelated-companion.key");
 
-  assert.deepEqual(createCompanionCertificate(certDir, ["192.0.2.10"]), {
+  assert.deepEqual(await createCompanionCertificate(certDir, ["192.0.2.10"]), {
     certPath,
     keyPath,
   });
@@ -29,21 +29,21 @@ test("companion certificate helper generates and reuses a valid certificate pair
     "pixelated-companion.key",
   ]);
 
-  assert.deepEqual(createCompanionCertificate(certDir, ["192.0.2.10"]), {
+  assert.deepEqual(await createCompanionCertificate(certDir, ["192.0.2.10"]), {
     certPath,
     keyPath,
   });
   assert.equal(fs.readFileSync(certPath, "utf8"), originalCertificate);
 });
 
-test("companion certificate helper renews stale or mismatched certificates", (t) => {
+test("companion certificate helper renews stale or mismatched certificates", async (t) => {
   const certDir = fs.mkdtempSync(path.join(os.tmpdir(), "pixelated-cert-"));
   t.after(() => fs.rmSync(certDir, { force: true, recursive: true }));
   const certPath = path.join(certDir, "pixelated-companion.crt");
 
-  createCompanionCertificate(certDir, ["192.0.2.10"]);
+  await createCompanionCertificate(certDir, ["192.0.2.10"]);
   const originalCertificate = fs.readFileSync(certPath, "utf8");
-  createCompanionCertificate(certDir, ["192.0.2.11"]);
+  await createCompanionCertificate(certDir, ["192.0.2.11"]);
 
   const renewedCertificate = fs.readFileSync(certPath, "utf8");
   assert.notEqual(renewedCertificate, originalCertificate);
@@ -53,7 +53,7 @@ test("companion certificate helper renews stale or mismatched certificates", (t)
   );
 });
 
-test("companion certificate renewal replaces symlinks without following them", (t) => {
+test("companion certificate renewal replaces symlinks without following them", async (t) => {
   if (process.platform === "win32") {
     t.skip("Creating symlinks requires elevated privileges on some Windows hosts.");
     return;
@@ -73,7 +73,7 @@ test("companion certificate renewal replaces symlinks without following them", (
   );
   fs.symlinkSync(outsideKey, path.join(certDir, "pixelated-companion.key"));
 
-  const result = createCompanionCertificate(certDir, ["192.0.2.10"]);
+  const result = await createCompanionCertificate(certDir, ["192.0.2.10"]);
 
   assert.equal(fs.readFileSync(outsideCertificate, "utf8"), "do-not-overwrite-certificate");
   assert.equal(fs.readFileSync(outsideKey, "utf8"), "do-not-overwrite-key");

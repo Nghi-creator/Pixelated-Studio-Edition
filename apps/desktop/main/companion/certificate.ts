@@ -63,10 +63,10 @@ function readMatchingCertificate(
   }
 }
 
-export function createCompanionCertificate(
+export async function createCompanionCertificate(
   certDir: string,
   lanAddresses: string[] = [],
-): CertificatePaths {
+): Promise<CertificatePaths> {
   fs.mkdirSync(certDir, { mode: 0o700, recursive: true });
   fs.chmodSync(certDir, 0o700);
   const certPath = path.join(certDir, "pixelated-companion.crt");
@@ -83,11 +83,11 @@ export function createCompanionCertificate(
     return { certPath, keyPath };
   }
 
-  const pems = generate(
+  const pems = await generate(
     [{ name: "commonName", value: "pixelated.local" }],
     {
       algorithm: "sha256",
-      days: CERTIFICATE_VALIDITY_DAYS,
+      notAfterDate: new Date(Date.now() + CERTIFICATE_VALIDITY_DAYS * 24 * 60 * 60 * 1000),
       extensions: [
         {
           name: "basicConstraints",
@@ -108,7 +108,7 @@ export function createCompanionCertificate(
             { type: 2, value: "localhost" },
             { type: 2, value: "pixelated.local" },
             { type: 7, ip: "127.0.0.1" },
-            ...lanAddresses.map((address) => ({ type: 7, ip: address })),
+            ...lanAddresses.map((address) => ({ type: 7 as const, ip: address })),
           ],
         },
       ],
