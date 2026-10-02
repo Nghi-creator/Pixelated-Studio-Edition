@@ -13,6 +13,9 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Asia/Ho_Chi_Minh"
+    # Routine releases must be at least seven days old; security updates are exempt.
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 10
     rebase-strategy: "auto"
     versioning-strategy: "increase-if-necessary"
@@ -24,6 +27,21 @@ updates:
         applies-to: "security-updates"
         patterns:
           - "*"
+      # First matching version-update group wins. Keep this allowlist in sync
+      # with scripts/security/dependabotMergePolicy.mjs.
+      npm-types-patches:
+        applies-to: "version-updates"
+        dependency-type: "development"
+        patterns:
+          - "@types/node"
+          - "@types/react"
+          - "@types/react-dom"
+          - "@types/qrcode"
+          - "@types/cors"
+          - "@types/express"
+          - "@types/multer"
+        update-types:
+          - "patch"
       npm-production-minor-patch:
         applies-to: "version-updates"
         dependency-type: "production"

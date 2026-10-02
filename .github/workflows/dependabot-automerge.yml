@@ -1,0 +1,57 @@
+name: Dependabot Safe Merge
+
+on:
+  workflow_run:
+    workflows:
+      - Hosted API Deploy Gate
+      - Security Scan
+      - Desktop Cross-Platform Release Validation
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: PR number to evaluate (dry run only; never merges)
+        required: true
+        type: string
+
+permissions: {}
+
+concurrency:
+  group: dependabot-safe-merge
+  cancel-in-progress: false
+
+jobs:
+  merge:
+    if: >-
+      github.repository == 'Nghi-creator/Pixelated-Studio-Edition' &&
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (vars.DEPENDABOT_AUTOMERGE_ENABLED == 'true' &&
+        github.event.workflow_run.event == 'pull_request' &&
+        github.event.workflow_run.conclusion == 'success' &&
+        github.event.workflow_run.head_repository.full_name == github.repository))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+      checks: read
+    steps:
+      # workflow_run's SHA is on the default branch, never the triggering PR.
+      # No PR checkout, artifact download, npm install, cache, or PR code execution.
+      - name: Check out trusted policy
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          sparse-checkout: scripts/security
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version-file: .nvmrc
+      - name: Evaluate policy and merge eligible patch PRs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AUTOMERGE_ENABLED: ${{ vars.DEPENDABOT_AUTOMERGE_ENABLED }}
+          PR_NUMBER: ${{ inputs.pr_number }}
+        run: node scripts/security/dependabotAutomerge.mjs
