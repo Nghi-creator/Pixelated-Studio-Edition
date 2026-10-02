@@ -31,7 +31,7 @@
   },
   "dependencies": {
     "qrcode": "^1.5.4",
-    "selfsigned": "^3.0.1"
+    "selfsigned": "5.5.0"
   },
   "build": {
     "appId": "com.pixelated.studio",
