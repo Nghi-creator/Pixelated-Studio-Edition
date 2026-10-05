@@ -17,19 +17,19 @@
     "dist:ci:signed": "npm run build && electron-builder --publish never --config.forceCodeSigning=true && npm run smoke:release"
   },
   "devDependencies": {
-    "@electron/asar": "^4.2.1",
+    "@electron/asar": "^4.3.1",
     "@eslint/js": "^9.39.4",
+    "@tailwindcss/postcss": "4.3.3",
     "@types/node": "^20.19.39",
     "@types/qrcode": "^1.5.6",
     "electron": "43.7.7",
     "electron-builder": "^26.15.3",
     "eslint": "^9.39.4",
     "globals": "^16.5.0",
+    "postcss": "8.5.28",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
-    "typescript-eslint": "^8.62.1",
-    "@tailwindcss/postcss": "4.3.3",
-    "postcss": "8.5.25"
+    "typescript-eslint": "^8.70.1"
   },
   "dependencies": {
     "qrcode": "^1.5.4",
