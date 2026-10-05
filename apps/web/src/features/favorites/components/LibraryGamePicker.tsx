@@ -57,7 +57,7 @@ export function LibraryGamePicker({
   return (
     <div
       aria-modal="true"
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/85 p-4"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-black/85 p-4"
       role="dialog"
     >
       <div className="flex max-h-[86vh] w-full max-w-3xl flex-col overflow-hidden rounded-lg border border-synth-border bg-[#12070D] shadow-card">

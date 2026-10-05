@@ -70,7 +70,7 @@ export function CommentsPanel({
       />
 
       {reportMessage && (
-        <div className="mb-6 rounded-lg border border-[#C02066]/40 bg-[#9B0048]/15 px-4 py-3 text-sm text-[#F38BB4]">
+        <div className="mb-6 rounded-lg border border-[#C02066]/40 bg-synth-action/15 px-4 py-3 text-sm text-[#F38BB4]">
           {reportMessage}
         </div>
       )}

@@ -7,9 +7,9 @@ import {
 import type { ApiGameSubmission } from "../../lib/api/apiTypes";
 
 const inputClassName =
-  "h-11 w-full rounded-lg border border-synth-secondary/40 bg-synth-bg px-3 text-sm font-semibold text-white outline-none placeholder:text-gray-400 focus:border-synth-secondary";
+  "h-11 w-full rounded-lg border border-synth-secondary/40 bg-synth-bg px-3 text-sm font-semibold text-white outline-hidden placeholder:text-gray-400 focus:border-synth-secondary";
 const textareaClassName =
-  "h-full min-h-0 w-full resize-none rounded-lg border border-synth-secondary/40 bg-synth-bg px-3 py-2 text-sm font-semibold text-white outline-none placeholder:text-gray-400 focus:border-synth-secondary";
+  "h-full min-h-0 w-full resize-none rounded-lg border border-synth-secondary/40 bg-synth-bg px-3 py-2 text-sm font-semibold text-white outline-hidden placeholder:text-gray-400 focus:border-synth-secondary";
 const disabledTooltipClassName =
   "pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 hidden w-max max-w-xs -translate-x-1/2 rounded-md border border-synth-secondary/60 bg-synth-bg px-3 py-2 text-xs font-bold text-white shadow-xl group-hover:block group-focus-within:block";
 
@@ -43,7 +43,7 @@ export function SubmissionReviewCard({
             <h2 className="text-xl font-bold text-white">
               {submission.game_title}
             </h2>
-            <span className="rounded-full border border-[#ff5ca8]/90 bg-[#9B0048]/45 px-3 py-1 text-xs font-extrabold text-white">
+            <span className="rounded-full border border-[#ff5ca8]/90 bg-synth-action/45 px-3 py-1 text-xs font-extrabold text-white">
               {submission.status}
             </span>
           </div>
@@ -55,7 +55,7 @@ export function SubmissionReviewCard({
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
             {submission.ownership_status && (
-              <span className="rounded-full border border-[#ff5ca8]/80 bg-[#9B0048]/35 px-3 py-1 text-xs font-extrabold text-white">
+              <span className="rounded-full border border-[#ff5ca8]/80 bg-synth-action/35 px-3 py-1 text-xs font-extrabold text-white">
                 {submission.ownership_status}
               </span>
             )}

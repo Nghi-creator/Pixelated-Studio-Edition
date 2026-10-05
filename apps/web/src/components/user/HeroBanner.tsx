@@ -153,7 +153,7 @@ export default function HeroBanner({
         );
       })}
       <div className="absolute inset-0 bg-black/52" />
-      <div className="absolute inset-y-0 left-0 w-full bg-gradient-to-r from-synth-bg via-synth-bg/80 to-transparent md:w-3/4" />
+      <div className="absolute inset-y-0 left-0 w-full bg-linear-to-r from-synth-bg via-synth-bg/80 to-transparent md:w-3/4" />
 
       {featuredGames.length > 1 && (
         <>

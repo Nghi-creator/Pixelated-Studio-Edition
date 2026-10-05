@@ -45,7 +45,7 @@ export function Avatar({
   return (
     <span
       aria-label={alt || name || "User avatar"}
-      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-synth-border bg-gradient-to-br from-synth-primary to-synth-secondary font-extrabold text-black ${sizeClasses[size]} ${className}`}
+      className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-synth-border bg-linear-to-br from-synth-primary to-synth-secondary font-extrabold text-black ${sizeClasses[size]} ${className}`}
     >
       <span aria-hidden={showImage} className="select-none">
         {initials}

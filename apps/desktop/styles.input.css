@@ -1,6 +1,52 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss" source(none);
+@source "./index.html";
+@source "./renderer.ts";
+@source "./renderer";
+
+@theme {
+  --color-brand-champagne: #ffc2d1;
+  --color-brand-light-pink: #ff8fab;
+  --color-brand-blush: #ffe5ec;
+  --color-brand-rose-ink: #3a1824;
+
+  --color-neutral-paper: #0b090a;
+  --color-neutral-canvas: #100b0e;
+  --color-neutral-surface: #2b1720;
+  --color-neutral-elevated: #351b27;
+  --color-neutral-border: #5d263a;
+  --color-neutral-text: #fff7fa;
+  --color-neutral-muted: #cfa4b2;
+
+  --color-status-success: #2f7d5b;
+  --color-status-warning: #91516a;
+  --color-status-danger: #b64242;
+
+  --color-console-black: #080708;
+
+  --color-synth-bg: #050505;
+  --color-synth-surface: #2b1720;
+  --color-synth-elevated: #351b27;
+  --color-synth-primary: #91516a;
+  --color-synth-primary-hover: #a15e78;
+  --color-synth-action: #9b0048;
+  --color-synth-action-hover: #b00052;
+  --color-synth-secondary: #f38bb4;
+  --color-synth-border: #5d263a;
+  --color-synth-ink: #ffffff;
+
+  --shadow-panel: 0 18px 48px rgba(0, 0, 0, 0.42);
+  --shadow-card: 0 12px 30px rgba(0, 0, 0, 0.34);
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+}
 
 ::-webkit-scrollbar {
   width: 8px;

@@ -32,8 +32,8 @@ export function ModeButton({
     <button
       className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg border px-4 text-sm font-bold transition-colors ${
         active
-          ? "border-[#C02066] bg-[#9B0048] text-white shadow-card"
-          : "border-[#C02066]/50 bg-[#9B0048]/15 text-gray-300 hover:border-[#C02066] hover:bg-[#9B0048]/30 hover:text-white"
+          ? "border-[#C02066] bg-synth-action text-white shadow-card"
+          : "border-[#C02066]/50 bg-synth-action/15 text-gray-300 hover:border-[#C02066] hover:bg-synth-action/30 hover:text-white"
       }`}
       onClick={onClick}
       type="button"
@@ -60,7 +60,7 @@ export function StatusPill({ status }: { status: EngineConnectionStatus }) {
     <div
       className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${
         paired
-          ? "border-[#C02066]/40 bg-[#9B0048]/15 text-[#F38BB4]"
+          ? "border-[#C02066]/40 bg-synth-action/15 text-[#F38BB4]"
           : "border-amber-400/30 bg-amber-400/10 text-amber-200"
       }`}
     >
@@ -110,7 +110,7 @@ export function JoinLobbyPanel({
           Host invite link
         </span>
         <input
-          className="h-12 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-primary"
+          className="h-12 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm text-white outline-hidden transition-colors placeholder:text-gray-600 focus:border-synth-primary"
           onChange={(event) => setInviteUrl(event.target.value)}
           placeholder="https://192.168.1.20:8090/play/game-id?session=..."
           value={inviteUrl}
@@ -121,7 +121,7 @@ export function JoinLobbyPanel({
         <div
           className={`mt-3 rounded-lg border px-3 py-2 text-sm ${
             joinInvite
-              ? "border-[#C02066]/40 bg-[#9B0048]/15 text-[#F38BB4]"
+              ? "border-[#C02066]/40 bg-synth-action/15 text-[#F38BB4]"
               : "danger-panel font-bold"
           }`}
         >
@@ -135,7 +135,7 @@ export function JoinLobbyPanel({
 
       <div className="mt-5 flex flex-col gap-3">
         <button
-          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#ff5ca8]/80 bg-[#9B0048]/55 px-5 text-sm font-bold text-white transition-colors hover:bg-[#B00052] disabled:cursor-not-allowed disabled:border-[#ff5ca8]/60 disabled:bg-[#9B0048]/35 disabled:text-red-100"
+          className="inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-[#ff5ca8]/80 bg-synth-action/55 px-5 text-sm font-bold text-white transition-colors hover:bg-synth-action-hover disabled:cursor-not-allowed disabled:border-[#ff5ca8]/60 disabled:bg-synth-action/35 disabled:text-red-100"
           disabled={!joinInvite}
           onClick={() => {
             if (!joinInvite) return;
@@ -210,7 +210,7 @@ export function HostCatalogPanel({
           <label className="relative block">
             <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 text-gray-500" />
             <input
-              className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg pl-10 pr-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-synth-primary"
+              className="h-11 w-full rounded-lg border border-synth-border bg-synth-bg pl-10 pr-3 text-sm text-white outline-hidden transition-colors placeholder:text-gray-600 focus:border-synth-primary"
               onChange={(event) => updateSearchQuery(event.target.value)}
               placeholder="Search games..."
               value={searchQuery}

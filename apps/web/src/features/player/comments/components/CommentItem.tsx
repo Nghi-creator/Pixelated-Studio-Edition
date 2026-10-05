@@ -41,7 +41,7 @@ export function CommentItem({
         name={displayName}
         src={comment.profiles?.avatar_url}
       />
-      <div className="flex-grow">
+      <div className="grow">
         <div className="flex justify-between items-start mb-1">
           <div className="flex items-center gap-2">
             <span className="font-bold text-white text-sm">{displayName}</span>

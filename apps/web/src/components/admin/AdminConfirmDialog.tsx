@@ -25,7 +25,7 @@ export function AdminConfirmDialog({
     <div
       aria-labelledby="admin-confirm-title"
       aria-modal="true"
-      className="fixed inset-0 z-[120] flex items-center justify-center bg-black/75 p-4"
+      className="fixed inset-0 z-120 flex items-center justify-center bg-black/75 p-4"
       role="dialog"
     >
       <div className="w-full max-w-md rounded-lg border border-synth-border bg-synth-surface shadow-card">

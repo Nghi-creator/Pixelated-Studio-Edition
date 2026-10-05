@@ -34,7 +34,7 @@ export default function Auth() {
 
   return (
     <div className="pixel-animated-backdrop min-h-[85vh] flex items-center justify-center p-4">
-      <div className="relative z-10 w-full max-w-[26rem] bg-synth-surface border border-synth-border rounded-lg shadow-card p-6 sm:p-7">
+      <div className="relative z-10 w-full max-w-104 bg-synth-surface border border-synth-border rounded-lg shadow-card p-6 sm:p-7">
         <div className="text-center mb-7">
           <PixelIcon
             className="mx-auto mb-4 h-12 w-12 text-synth-secondary"

@@ -24,7 +24,7 @@ export function HeroSkeleton() {
     <div className="relative h-[360px] w-full overflow-hidden bg-synth-bg md:h-[440px]">
       <Skeleton className="absolute inset-0 rounded-none opacity-55" />
       <div className="absolute inset-0 bg-black/55" />
-      <div className="absolute inset-y-0 left-0 w-3/4 bg-gradient-to-r from-synth-bg via-synth-bg/80 to-transparent" />
+      <div className="absolute inset-y-0 left-0 w-3/4 bg-linear-to-r from-synth-bg via-synth-bg/80 to-transparent" />
 
       <Skeleton className="absolute left-4 top-1/2 h-14 w-14 -translate-y-1/2 rounded-full opacity-40" />
       <Skeleton className="absolute right-4 top-1/2 h-14 w-14 -translate-y-1/2 rounded-full opacity-40" />
@@ -33,7 +33,7 @@ export function HeroSkeleton() {
         <div className="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
             <Skeleton className="mb-4 h-7 w-36 rounded-md" />
-            <Skeleton className="mb-5 h-14 w-[min(34rem,75vw)] md:h-[4.5rem]" />
+            <Skeleton className="mb-5 h-14 w-[min(34rem,75vw)] md:h-18" />
             <div className="flex flex-wrap gap-4">
               <Skeleton className="h-12 w-36 rounded-lg" />
               <Skeleton className="h-12 w-40 rounded-lg" />

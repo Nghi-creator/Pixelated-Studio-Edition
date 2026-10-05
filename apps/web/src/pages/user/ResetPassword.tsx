@@ -180,7 +180,7 @@ export default function ResetPassword() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               minLength={PASSWORD_MIN_LENGTH}
-              className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-secondary transition-all"
+              className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-hidden focus:border-synth-secondary transition-all"
               required
             />
           </div>
@@ -197,7 +197,7 @@ export default function ResetPassword() {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               minLength={PASSWORD_MIN_LENGTH}
-              className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-secondary transition-all"
+              className="w-full bg-synth-bg border border-synth-border text-white rounded-lg pl-10 pr-4 py-3 focus:outline-hidden focus:border-synth-secondary transition-all"
               required
             />
           </div>

@@ -161,7 +161,7 @@ export default function Dashboard() {
 
         <div className="flex items-center gap-3">
           {/* Filter Dropdown */}
-          <div className="relative flex items-center bg-synth-surface border border-synth-border rounded-lg px-3 py-2 shadow-inner">
+          <div className="relative flex items-center bg-synth-surface border border-synth-border rounded-lg px-3 py-2 inset-shadow-sm">
             <Filter className="w-4 h-4 text-gray-400 mr-2" />
             <select
               value={filter}
@@ -169,7 +169,7 @@ export default function Dashboard() {
                 setFilter(e.target.value as FilterType);
                 setPage(1);
               }}
-              className="bg-transparent text-sm text-gray-300 font-medium focus:outline-none cursor-pointer appearance-none pr-4"
+              className="bg-transparent text-sm text-gray-300 font-medium focus:outline-hidden cursor-pointer appearance-none pr-4"
             >
               <option value="all">All Reports</option>
               <option value="users">User Reports</option>

@@ -31,7 +31,7 @@ export default function Navbar() {
             : "Connect Engine";
   const engineStatusColor =
     engineConnectionStatus === "online"
-      ? "text-[#9B0048]"
+      ? "text-synth-action"
       : engineConnectionStatus === "checking"
         ? "text-amber-300"
         : engineConnectionStatus === "offline"
@@ -39,7 +39,7 @@ export default function Navbar() {
           : "text-gray-400";
   const engineStatusDot =
     engineConnectionStatus === "online"
-      ? "bg-[#9B0048]"
+      ? "bg-synth-action"
       : engineConnectionStatus === "checking"
         ? "bg-amber-300 animate-pulse"
         : engineConnectionStatus === "offline"

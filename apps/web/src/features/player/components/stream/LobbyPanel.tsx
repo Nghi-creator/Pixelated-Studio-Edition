@@ -69,10 +69,10 @@ export function LobbyPanel({
   if (!isOpen) return null;
 
   return (
-        <div className="fixed inset-0 z-[70]">
+        <div className="fixed inset-0 z-70">
           <button
             aria-label="Close lobby"
-            className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/55 backdrop-blur-xs"
             onClick={onClose}
             type="button"
           />

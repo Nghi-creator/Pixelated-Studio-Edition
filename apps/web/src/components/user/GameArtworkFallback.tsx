@@ -35,7 +35,7 @@ export function GameArtworkFallback({
       role="img"
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_22%_18%,rgba(216,164,181,0.36),transparent_28%),radial-gradient(circle_at_80%_12%,rgba(155,0,72,0.42),transparent_30%),linear-gradient(145deg,#351522_0%,#10070D_48%,#050505_100%)]" />
-      <div className="absolute inset-0 opacity-[0.18] [background-image:linear-gradient(rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] [background-size:18px_18px]" />
+      <div className="absolute inset-0 opacity-[0.18] bg-[linear-gradient(rgba(255,255,255,0.12)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.12)_1px,transparent_1px)] bg-size-[18px_18px]" />
 
       <div
         className={`relative z-10 flex h-full w-full flex-col ${
@@ -43,7 +43,7 @@ export function GameArtworkFallback({
         }`}
       >
         <div
-          className={`mb-4 inline-flex items-center justify-center rounded-2xl border border-synth-border/80 bg-synth-surface/70 shadow-card backdrop-blur-sm ${
+          className={`mb-4 inline-flex items-center justify-center rounded-2xl border border-synth-border/80 bg-synth-surface/70 shadow-card backdrop-blur-xs ${
             compact ? "h-20 w-20" : "h-24 w-24"
           }`}
         >

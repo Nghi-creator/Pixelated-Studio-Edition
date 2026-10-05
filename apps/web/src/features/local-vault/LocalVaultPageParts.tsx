@@ -33,7 +33,7 @@ export function LocalVaultMessageBanner({
       className={`mb-6 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${
         message.tone === "error"
           ? "danger-panel font-bold"
-          : "border-[#C02066]/40 bg-[#9B0048]/15 text-[#F38BB4]"
+          : "border-[#C02066]/40 bg-synth-action/15 text-[#F38BB4]"
       }`}
     >
       {message.tone === "error" ? (
@@ -207,7 +207,7 @@ export function LocalVaultGameList({
           <button
             disabled={pendingDeleteFilename === filename}
             onClick={(event) => onDeleteRequest(event, filename)}
-            className="absolute top-2 right-2 bg-synth-bg border border-synth-border p-2 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-colors hover:border-red-500 hover:bg-red-500/20 focus:outline-none z-10"
+            className="absolute top-2 right-2 bg-synth-bg border border-synth-border p-2 rounded-md opacity-0 group-hover:opacity-100 focus:opacity-100 transition-colors hover:border-red-500 hover:bg-red-500/20 focus:outline-hidden z-10"
             title="Delete from Local Vault"
             type="button"
           >

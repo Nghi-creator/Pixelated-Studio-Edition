@@ -28,7 +28,7 @@ export function AvatarCropModal({
     <div
       aria-labelledby="avatar-crop-title"
       aria-modal="true"
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-4"
+      className="fixed inset-0 z-100 flex items-center justify-center bg-black/90 p-4"
       role="dialog"
     >
       <div className="bg-synth-surface border border-synth-border rounded-lg w-full max-w-lg overflow-hidden shadow-card flex flex-col">
@@ -130,7 +130,7 @@ export function DeleteAccountModal({
     <div
       aria-labelledby="delete-account-title"
       aria-modal="true"
-      className="fixed inset-0 z-[110] flex items-center justify-center bg-black/80 p-4"
+      className="fixed inset-0 z-110 flex items-center justify-center bg-black/80 p-4"
       role="dialog"
     >
       <div className="bg-synth-surface border border-red-500/30 rounded-lg w-full max-w-md overflow-hidden shadow-card flex flex-col">
@@ -183,7 +183,7 @@ export function DeleteAccountModal({
                 placeholder={hasPassword ? "Your password" : "DELETE"}
                 required
                 disabled={isDeleting}
-                className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-500 transition-all"
+                className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-hidden focus:border-red-500 transition-all"
               />
             </div>
 

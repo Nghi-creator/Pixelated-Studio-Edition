@@ -16,11 +16,11 @@ export function AuthSocialActions({
   return (
     <>
       <div className="my-6 flex items-center">
-        <div className="flex-grow border-t border-synth-border" />
+        <div className="grow border-t border-synth-border" />
         <span className="px-3 text-sm uppercase tracking-wider text-white">
           Or continue with
         </span>
-        <div className="flex-grow border-t border-synth-border" />
+        <div className="grow border-t border-synth-border" />
       </div>
 
       <div className="grid grid-cols-2 gap-3 mb-6">

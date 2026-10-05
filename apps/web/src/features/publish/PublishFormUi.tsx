@@ -72,7 +72,7 @@ export function PublishProgress({ step }: { step: number }) {
                   : undefined
               }
             >
-              {index < step && <CheckCircle className="h-4 w-4 flex-shrink-0" />}
+              {index < step && <CheckCircle className="h-4 w-4 shrink-0" />}
               {name}
             </div>
           );
@@ -124,7 +124,7 @@ export function ChoiceGroup({
           const selected = option.value === value;
           return (
             <button
-              className={`rounded-lg border p-4 text-left outline-none transition-colors focus:ring-2 focus:ring-[#E0A3BB] ${
+              className={`rounded-lg border p-4 text-left outline-hidden transition-colors focus:ring-2 focus:ring-[#E0A3BB] ${
                 selected
                   ? "text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]"
                   : "border-synth-border bg-synth-bg/70 text-gray-200 hover:border-synth-secondary/70"

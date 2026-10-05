@@ -115,6 +115,17 @@ The two-device LAN procedure remains in `lan-manual-smoke-checklist.md`.
 
 ## Known Tripwires
 
+- Web and desktop use Tailwind 4 with themes in their CSS entrypoints. Desktop
+  styles use a one-shot PostCSS build to avoid the CLI's unused watcher tree.
+  Check both surfaces visually after styling changes; the web browser baseline
+  is Safari 16.4+, Chrome 111+, and Firefox 128+.
+- Root and desktop manifests pin `@electron/get` to 5.1.0 to remove the
+  vulnerable `got` / `http-cache-semantics` download chain from electron-builder.
+  Keep those overrides aligned and use the pinned Node 24 runtime. Version 5
+  uses Fetch: legacy Got proxy/timeout options are not equivalent. Proxy builds
+  need Fetch-compatible proxy configuration (for example `NODE_USE_ENV_PROXY=1`
+  on Node 24). Revalidate a fresh download and desktop packaging when changing
+  or removing this override.
 - Hosted pairing is deployment-timing sensitive. Poll runtime switching and
   retain the latest health payload in failures.
 - Session boot must preserve runtime kind/id, launch manifest, ROM URL, and ROM

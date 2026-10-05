@@ -72,7 +72,7 @@ export default function UserManagement() {
               placeholder="Search username..."
               value={searchQuery}
               onChange={(event) => handleSearchChange(event.target.value)}
-              className="block w-full rounded-lg border border-synth-border bg-synth-surface py-2 pl-10 pr-3 text-sm text-gray-300 placeholder-gray-500 shadow-inner transition-colors focus:border-synth-secondary focus:outline-none"
+              className="block w-full rounded-lg border border-synth-border bg-synth-surface py-2 pl-10 pr-3 text-sm text-gray-300 placeholder-gray-500 inset-shadow-sm transition-colors focus:border-synth-secondary focus:outline-hidden"
             />
           </div>
 
@@ -150,7 +150,7 @@ export default function UserManagement() {
                           <div className="text-white font-bold flex items-center gap-2">
                             @{user.username || "Unknown"}
                             {isSelf && (
-                              <span className="text-xs bg-[#9B0048] text-white px-2 py-0.5 rounded-full border border-[#C02066]">
+                              <span className="text-xs bg-synth-action text-white px-2 py-0.5 rounded-full border border-[#C02066]">
                                 You
                               </span>
                             )}
@@ -204,7 +204,7 @@ export default function UserManagement() {
                                 handleToggleRole(user.id, user.role)
                               }
                               disabled={isPending || Boolean(pendingUserId)}
-                              className="px-3 py-1.5 rounded-lg text-sm font-bold transition-all border border-[#C02066] bg-[#9B0048] text-white hover:bg-[#B00052]"
+                              className="px-3 py-1.5 rounded-lg text-sm font-bold transition-all border border-[#C02066] bg-synth-action text-white hover:bg-synth-action-hover"
                             >
                               {isPending ? (
                                 <Loader2 className="h-4 w-4 animate-spin" />

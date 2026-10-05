@@ -34,7 +34,7 @@ export function CloudGameCard({ game }: { game: ApiGame }) {
       state={multiplayerBackState}
       to={`/play/${game.id}`}
     >
-      <div className="aspect-[4/5] overflow-hidden bg-synth-bg">
+      <div className="aspect-4/5 overflow-hidden bg-synth-bg">
         {showCover ? (
           <img
             alt={game.title}
@@ -92,7 +92,7 @@ export function MultiplayerGameGridSkeleton({ source }: { source: GameSource }) 
             className="overflow-hidden rounded-lg border border-synth-border bg-synth-bg"
             key={index}
           >
-            <Skeleton className="aspect-[4/5] w-full rounded-none" />
+            <Skeleton className="aspect-4/5 w-full rounded-none" />
             <div className="flex min-h-20 flex-col justify-between gap-3 p-3">
               <Skeleton className="h-4 w-4/5" />
               <Skeleton className="h-3 w-20" />

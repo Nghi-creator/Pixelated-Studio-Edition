@@ -87,7 +87,7 @@
       for (const client of visibleClients) {
         const card = document.createElement("article");
         card.className =
-          "rounded-lg border border-synth-border bg-[#050810] p-3 text-xs shadow-inner";
+          "rounded-lg border border-synth-border bg-[#050810] p-3 text-xs inset-shadow-sm";
 
         const header = document.createElement("div");
         header.className = "flex items-start justify-between gap-3";
