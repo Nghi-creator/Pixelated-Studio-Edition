@@ -50,7 +50,7 @@ export function NavbarAccount({
         to="/login"
         className="group flex items-center gap-3 rounded-md border border-synth-border bg-synth-surface py-1.5 pl-1.5 pr-1.5 transition-colors hover:bg-synth-elevated sm:pr-4"
       >
-        <div className="w-8 h-8 rounded bg-synth-elevated flex items-center justify-center">
+        <div className="w-8 h-8 rounded-sm bg-synth-elevated flex items-center justify-center">
           <PixelIcon className="w-4 h-4 text-white" name="profile" />
         </div>
         <span className="hidden text-sm font-medium text-white sm:inline">Sign In</span>
@@ -71,7 +71,7 @@ export function NavbarAccount({
       <div className="relative" ref={dropdownRef}>
         <button
           onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-          className="flex items-center gap-2 focus:outline-none"
+          className="flex items-center gap-2 focus:outline-hidden"
           type="button"
         >
           <Avatar

@@ -64,7 +64,7 @@ const StandardLayout = () => {
   return (
     <div className="min-h-screen bg-synth-bg text-white font-sans antialiased flex flex-col relative">
       <Navbar />
-      <main className="flex-grow pt-16">
+      <main className="grow pt-16">
         <Outlet />
       </main>
       <Footer />

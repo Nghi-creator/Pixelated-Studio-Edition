@@ -187,7 +187,7 @@ export default function Home() {
                       setSearchQuery(e.target.value);
                       setCurrentPage(1);
                     }}
-                    className="block w-full rounded-lg border border-synth-border bg-synth-bg py-2 pl-10 pr-3 leading-5 text-white placeholder:text-gray-500 transition-colors focus:border-synth-secondary focus:outline-none"
+                    className="block w-full rounded-lg border border-synth-border bg-synth-bg py-2 pl-10 pr-3 leading-5 text-white placeholder:text-gray-500 transition-colors focus:border-synth-secondary focus:outline-hidden"
                   />
                 </div>
               </div>

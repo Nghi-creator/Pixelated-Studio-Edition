@@ -18,7 +18,7 @@ export function ReportModal({
   setReportReason,
 }: ReportModalProps) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-xs p-4">
       <div className="bg-synth-surface border border-synth-border rounded-2xl w-full max-w-md overflow-hidden shadow-card">
         <div className="flex justify-between items-center p-6 border-b border-synth-border">
           <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -50,7 +50,7 @@ export function ReportModal({
             value={reportReason}
             onChange={(event) => setReportReason(event.target.value)}
             placeholder="E.g., Spam, harassment, toxic behavior..."
-            className="w-full bg-synth-bg border border-synth-border rounded-xl p-3 text-white focus:outline-none focus:border-synth-secondary focus:ring-1 focus:ring-synth-secondary/40 min-h-[100px] mb-6 resize-none"
+            className="w-full bg-synth-bg border border-synth-border rounded-xl p-3 text-white focus:outline-hidden focus:border-synth-secondary focus:ring-1 focus:ring-synth-secondary/40 min-h-[100px] mb-6 resize-none"
             required
           />
 

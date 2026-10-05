@@ -124,8 +124,8 @@ export function PlayerControls({
   };
 
   const controlButtonClass =
-    "inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#5D263A] bg-[#351B27] text-white transition-colors hover:bg-[#2B1720] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary";
-  const pixelButtonClass = `inline-flex h-10 w-10 items-center justify-center rounded-lg border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary ${
+    "inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[#5D263A] bg-[#351B27] text-white transition-colors hover:bg-[#2B1720] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-synth-secondary";
+  const pixelButtonClass = `inline-flex h-10 w-10 items-center justify-center rounded-lg border transition-all focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-synth-secondary ${
     pixelPerfect
       ? "border-synth-action-hover bg-synth-action text-white shadow-[0_0_0_2px_rgba(255,153,193,0.35)] hover:brightness-110"
       : "border-[#5D263A] bg-[#351B27] text-gray-400 hover:bg-[#2B1720] hover:text-white"
@@ -144,7 +144,7 @@ export function PlayerControls({
           type="button"
           onClick={handleMuteToggle}
           disabled={audioControlsDisabled}
-          className="inline-flex h-full w-10 shrink-0 items-center justify-center rounded-l-lg text-white transition-colors hover:bg-[#2B1720] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-full w-10 shrink-0 items-center justify-center rounded-l-lg text-white transition-colors hover:bg-[#2B1720] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-synth-secondary disabled:cursor-not-allowed disabled:opacity-50"
           aria-label={isMuted ? "Unmute game audio" : "Mute game audio"}
           title={isMuted ? "Unmute game audio" : "Mute game audio"}
         >

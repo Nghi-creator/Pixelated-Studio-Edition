@@ -36,13 +36,13 @@ export function CommentForm({
 
   return (
     <form onSubmit={onPostComment} className="mb-10 flex gap-4">
-      <div className="flex-grow relative">
+      <div className="grow relative">
         <input
           type="text"
           value={newComment}
           onChange={(event) => setNewComment(event.target.value)}
           placeholder="Add a comment..."
-          className="w-full bg-synth-surface border border-synth-border text-white rounded-xl pl-4 pr-12 py-4 focus:outline-none focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
+          className="w-full bg-synth-surface border border-synth-border text-white rounded-xl pl-4 pr-12 py-4 focus:outline-hidden focus:border-synth-primary focus:ring-1 focus:ring-synth-primary transition-all"
           maxLength={500}
         />
         <button

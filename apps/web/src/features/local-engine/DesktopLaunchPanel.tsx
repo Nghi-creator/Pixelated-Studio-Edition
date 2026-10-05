@@ -45,7 +45,7 @@ export function DesktopLaunchPanel({
 
         {!isEngineConnected && (
           <a
-            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#C02066] bg-[#9B0048] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#B00052] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F38BB4] focus-visible:ring-offset-2 focus-visible:ring-offset-[#2B1720]"
+            className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#C02066] bg-synth-action px-4 text-sm font-semibold text-white transition-colors hover:bg-synth-action-hover focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-[#F38BB4] focus-visible:ring-offset-2 focus-visible:ring-offset-[#2B1720]"
             href={DESKTOP_OPEN_URL}
           >
             <ExternalLink className="h-4 w-4" />
@@ -71,7 +71,7 @@ export function DesktopLaunchPanel({
           </button>
 
           {showTroubleshooting && (
-            <div className="mt-3 rounded-lg border border-[#C02066]/50 bg-[#9B0048]/15 px-3 py-2 text-xs leading-5 text-[#F7B1CD]">
+            <div className="mt-3 rounded-lg border border-[#C02066]/50 bg-synth-action/15 px-3 py-2 text-xs leading-5 text-[#F7B1CD]">
               <p>
                 If you chose Open and nothing happened, try again or download
                 the latest version.

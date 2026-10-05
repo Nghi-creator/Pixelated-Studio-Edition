@@ -69,7 +69,7 @@ export function EnginePairingPanel({
               <input
                 value={engineUrl}
                 onChange={(event) => updateEngineUrl(event.target.value)}
-                className="h-11 w-full rounded-lg border border-[#7E3250] bg-synth-bg px-3 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-[#C01662]"
+                className="h-11 w-full rounded-lg border border-[#7E3250] bg-synth-bg px-3 text-sm text-white outline-hidden transition-colors placeholder:text-gray-600 focus:border-[#C01662]"
                 placeholder="http://localhost:8080 or http://192.168.1.20:8080"
               />
             </label>
@@ -82,7 +82,7 @@ export function EnginePairingPanel({
                 <input
                   value={inviteCode}
                   onChange={(event) => updateInviteCode(event.target.value)}
-                  className="h-11 w-full rounded-lg border border-[#7E3250] bg-synth-bg px-3 font-mono text-sm tracking-widest text-white outline-none transition-colors placeholder:text-gray-600 focus:border-[#C01662]"
+                  className="h-11 w-full rounded-lg border border-[#7E3250] bg-synth-bg px-3 font-mono text-sm tracking-widest text-white outline-hidden transition-colors placeholder:text-gray-600 focus:border-[#C01662]"
                   maxLength={8}
                   placeholder="A1B2C3D4"
                 />
@@ -98,7 +98,7 @@ export function EnginePairingPanel({
                 onKeyDown={(event) => {
                   if (event.key === "Enter") void pairEngine();
                 }}
-                className="h-11 w-full rounded-lg border border-[#7E3250] bg-synth-bg px-3 pr-11 text-sm text-white outline-none transition-colors placeholder:text-gray-600 focus:border-[#C01662]"
+                className="h-11 w-full rounded-lg border border-[#7E3250] bg-synth-bg px-3 pr-11 text-sm text-white outline-hidden transition-colors placeholder:text-gray-600 focus:border-[#C01662]"
                 placeholder="Desktop app token"
                 type={showToken ? "text" : "password"}
               />
@@ -169,7 +169,7 @@ export function EnginePairingPanel({
               pairingState === "checking" ||
               (isCompanionJoin && pairingState !== "paired" && !preflightReady)
             }
-            className="inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-lg border border-[#C02066] bg-[#9B0048] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#B00052] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex h-11 items-center gap-2 whitespace-nowrap rounded-lg border border-[#C02066] bg-synth-action px-4 text-sm font-semibold text-white transition-colors hover:bg-synth-action-hover disabled:cursor-not-allowed disabled:opacity-60"
             type="button"
           >
             {pairingState === "checking" ? (

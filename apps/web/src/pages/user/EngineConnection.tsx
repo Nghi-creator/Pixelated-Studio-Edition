@@ -137,14 +137,14 @@ export default function EngineConnection() {
       </div>
 
       {isPaired && (
-        <div className="mb-6 flex flex-col gap-3 rounded-lg border border-[#C02066]/40 bg-[#9B0048]/15 px-4 py-3 text-sm text-[#F38BB4] sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-6 flex flex-col gap-3 rounded-lg border border-[#C02066]/40 bg-synth-action/15 px-4 py-3 text-sm text-[#F38BB4] sm:flex-row sm:items-center sm:justify-between">
           <span className="inline-flex items-center gap-2 font-semibold">
             <CheckCircle2 className="h-4 w-4" />
             The desktop engine is connected.
           </span>
           {isReturning && (
             <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#C02066]/50 bg-[#9B0048]/20 px-4 font-bold text-white transition-colors hover:bg-[#9B0048]/30"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#C02066]/50 bg-synth-action/20 px-4 font-bold text-white transition-colors hover:bg-synth-action/30"
               onClick={continueToDestination}
               type="button"
             >
@@ -187,7 +187,7 @@ export default function EngineConnection() {
                   to={action.to}
                 >
                   <span className="flex items-center gap-3 text-sm font-bold text-white">
-                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#C02066]/50 bg-[#9B0048]/20 text-[#F38BB4] transition-colors group-hover:bg-[#9B0048]/35">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-[#C02066]/50 bg-synth-action/20 text-[#F38BB4] transition-colors group-hover:bg-synth-action/35">
                       <Icon className="h-4 w-4" />
                     </span>
                     {action.label}

@@ -130,7 +130,7 @@ export default function Favorites() {
             ))}
             <button
               aria-label="Add games to library"
-              className="group flex min-h-[21.25rem] flex-col items-center justify-center rounded-lg border border-dashed border-synth-border bg-synth-surface text-gray-400 transition-colors hover:border-synth-primary hover:bg-synth-elevated hover:text-white"
+              className="group flex min-h-85 flex-col items-center justify-center rounded-lg border border-dashed border-synth-border bg-synth-surface text-gray-400 transition-colors hover:border-synth-primary hover:bg-synth-elevated hover:text-white"
               onClick={() => setIsPickerOpen(true)}
               type="button"
             >

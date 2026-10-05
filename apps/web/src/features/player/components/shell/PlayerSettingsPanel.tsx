@@ -142,7 +142,7 @@ export function PlayerSettingsPanel({
               type="button"
               onClick={() => onStreamProfileChange(profile.id)}
               disabled={streamProfileLocked}
-              className={`min-h-14 rounded-lg border px-2 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary disabled:cursor-not-allowed disabled:opacity-60 ${
+              className={`min-h-14 rounded-lg border px-2 py-2 text-left transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-synth-secondary disabled:cursor-not-allowed disabled:opacity-60 ${
                 isSelected
                   ? "border-synth-action-hover bg-synth-action text-white"
                   : "border-synth-border bg-synth-bg text-gray-400 hover:text-white"

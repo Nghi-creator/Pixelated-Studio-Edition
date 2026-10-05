@@ -68,7 +68,7 @@ export function PublicProfileSection({ profile }: { profile: ProfileSettingsStat
         <div
           className={`p-4 rounded-lg mb-6 border ${
             profileMessage.type === "success"
-              ? "bg-[#9B0048]/15 border-[#C02066]/50 text-[#F38BB4]"
+              ? "bg-synth-action/15 border-[#C02066]/50 text-[#F38BB4]"
               : profileMessage.type === "warning"
                 ? "bg-synth-primary/10 border-synth-primary/50 text-synth-secondary"
                 : "danger-panel font-bold"
@@ -136,7 +136,7 @@ export function PublicProfileSection({ profile }: { profile: ProfileSettingsStat
             disabled={savingProfile}
             maxLength={80}
             required
-            className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-synth-secondary transition-all"
+            className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-hidden focus:border-synth-secondary transition-all"
           />
         </div>
 
@@ -178,7 +178,7 @@ export function SecuritySection({ profile }: { profile: ProfileSettingsState }) 
 
       {passwordMessage && (
         <div
-          className={`p-4 rounded-lg mb-6 border ${passwordMessage.type === "success" ? "bg-[#9B0048]/15 border-[#C02066]/50 text-[#F38BB4]" : "danger-panel font-bold"}`}
+          className={`p-4 rounded-lg mb-6 border ${passwordMessage.type === "success" ? "bg-synth-action/15 border-[#C02066]/50 text-[#F38BB4]" : "danger-panel font-bold"}`}
         >
           {passwordMessage.text}
         </div>
@@ -276,7 +276,7 @@ function PasswordField({
         required
         minLength={minLength}
         disabled={disabled}
-        className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-none focus:border-red-400 transition-all"
+        className="w-full bg-synth-bg border border-synth-border text-white rounded-lg px-4 py-3 focus:outline-hidden focus:border-red-400 transition-all"
       />
     </div>
   );

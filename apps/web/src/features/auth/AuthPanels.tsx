@@ -42,11 +42,11 @@ export function AuthMessagePanel({
       )}
 
       {message && (
-        <div className="mb-6 rounded-lg border border-[#C02066]/50 bg-[#9B0048]/15 px-4 py-3 text-center text-sm text-[#F38BB4]">
+        <div className="mb-6 rounded-lg border border-[#C02066]/50 bg-synth-action/15 px-4 py-3 text-center text-sm text-[#F38BB4]">
           <p>{message}</p>
           {verificationPendingEmail && (
             <button
-              className="mt-3 inline-flex items-center justify-center gap-2 rounded-md border border-[#C02066]/50 bg-[#9B0048]/20 px-3 py-2 font-semibold text-[#F38BB4] transition-colors hover:bg-[#9B0048]/30 disabled:cursor-not-allowed disabled:opacity-50"
+              className="mt-3 inline-flex items-center justify-center gap-2 rounded-md border border-[#C02066]/50 bg-synth-action/20 px-3 py-2 font-semibold text-[#F38BB4] transition-colors hover:bg-synth-action/30 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={
                 resendLoading ||
                 resendCooldown > 0 ||
@@ -97,7 +97,7 @@ export function ForgotPasswordForm({
           placeholder="Email address"
           value={email}
           onChange={(event) => onEmailChange(event.target.value)}
-          className="w-full bg-synth-bg border border-synth-border text-white placeholder:text-white/70 rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-secondary transition-all"
+          className="w-full bg-synth-bg border border-synth-border text-white placeholder:text-white/70 rounded-lg pl-10 pr-4 py-3 focus:outline-hidden focus:border-synth-secondary transition-all"
           required
         />
       </div>
@@ -184,7 +184,7 @@ export function EmailAuthForm({
             placeholder="Email address"
             value={email}
             onChange={(event) => onEmailChange(event.target.value)}
-            className="w-full bg-synth-bg border border-synth-border text-white placeholder:text-white/70 rounded-lg pl-10 pr-4 py-3 focus:outline-none focus:border-synth-secondary transition-all"
+            className="w-full bg-synth-bg border border-synth-border text-white placeholder:text-white/70 rounded-lg pl-10 pr-4 py-3 focus:outline-hidden focus:border-synth-secondary transition-all"
             required
           />
         </div>
@@ -197,7 +197,7 @@ export function EmailAuthForm({
             value={password}
             onChange={(event) => onPasswordChange(event.target.value)}
             minLength={isLogin ? undefined : PASSWORD_MIN_LENGTH}
-            className="w-full bg-synth-bg border border-synth-border text-white placeholder:text-white/70 rounded-lg pl-10 pr-11 py-3 focus:outline-none focus:border-synth-secondary transition-all"
+            className="w-full bg-synth-bg border border-synth-border text-white placeholder:text-white/70 rounded-lg pl-10 pr-11 py-3 focus:outline-hidden focus:border-synth-secondary transition-all"
             required
           />
           <PasswordVisibilityButton
@@ -231,7 +231,7 @@ export function EmailAuthForm({
               onCopy={(event) => event.preventDefault()}
               onCut={(event) => event.preventDefault()}
               onPaste={(event) => event.preventDefault()}
-              className="w-full bg-synth-bg border border-synth-border text-white placeholder:text-white/70 rounded-lg pl-10 pr-11 py-3 focus:outline-none focus:border-synth-secondary transition-all"
+              className="w-full bg-synth-bg border border-synth-border text-white placeholder:text-white/70 rounded-lg pl-10 pr-11 py-3 focus:outline-hidden focus:border-synth-secondary transition-all"
               required
             />
             <PasswordVisibilityButton

@@ -16,7 +16,7 @@ const SCENARIO_OPTIONS: Array<{
 
 const NETWORK_OPTIONS = ["", "Ethernet", "Wi-Fi", "Mobile hotspot", "Custom"];
 const RESEARCH_SELECT_BUTTON_CLASS =
-  "flex h-9 w-full items-center justify-between gap-4 rounded-md border border-synth-border bg-synth-bg pl-2 pr-5 text-left text-sm font-semibold normal-case text-white outline-none transition hover:border-synth-primary focus:border-synth-primary";
+  "flex h-9 w-full items-center justify-between gap-4 rounded-md border border-synth-border bg-synth-bg pl-2 pr-5 text-left text-sm font-semibold normal-case text-white outline-hidden transition hover:border-synth-primary focus:border-synth-primary";
 const RESEARCH_SELECT_MENU_CLASS =
   "absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-md border border-synth-border bg-synth-bg py-1 shadow-card";
 
@@ -78,7 +78,7 @@ export function ResearchMetadataFields({
       <label className="block text-xs font-semibold uppercase text-white sm:col-span-2">
         Notes
         <textarea
-          className="mt-1 min-h-24 w-full resize-y rounded-md border border-synth-border bg-synth-bg px-3 py-2 text-sm font-medium normal-case text-white outline-none transition placeholder:text-white focus:border-synth-primary"
+          className="mt-1 min-h-24 w-full resize-y rounded-md border border-synth-border bg-synth-bg px-3 py-2 text-sm font-medium normal-case text-white outline-hidden transition placeholder:text-white focus:border-synth-primary"
           onChange={(event) => setField("notes", event.target.value)}
           placeholder="Device, room, network, or test condition notes"
           value={form.notes}

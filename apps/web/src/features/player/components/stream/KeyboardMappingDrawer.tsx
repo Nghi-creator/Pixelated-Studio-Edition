@@ -16,7 +16,7 @@ type KeyboardMappingDrawerProps = {
 };
 
 const bindingButtonClass =
-  "mt-1 min-w-24 w-full rounded-md border border-synth-border bg-synth-bg px-3 py-2 text-sm font-bold text-white transition-colors hover:border-synth-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-synth-secondary";
+  "mt-1 min-w-24 w-full rounded-md border border-synth-border bg-synth-bg px-3 py-2 text-sm font-bold text-white transition-colors hover:border-synth-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-synth-secondary";
 
 export function KeyboardMappingDrawer({
   onClose,
@@ -66,10 +66,10 @@ export function KeyboardMappingDrawer({
   };
 
   return (
-    <div className="fixed inset-0 z-[70]" data-ignore-game-input>
+    <div className="fixed inset-0 z-70" data-ignore-game-input>
       <button
         aria-label="Close keyboard mapping"
-        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/55 backdrop-blur-xs"
         onClick={onClose}
         type="button"
       />

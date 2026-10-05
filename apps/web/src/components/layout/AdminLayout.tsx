@@ -104,7 +104,7 @@ export default function AdminLayout() {
       )}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-72 flex-shrink-0 transform flex-col border-r border-synth-border bg-[#2B1720] shadow-panel transition-transform lg:static lg:z-auto lg:w-64 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-72 shrink-0 transform flex-col border-r border-synth-border bg-[#2B1720] shadow-panel transition-transform lg:static lg:z-auto lg:w-64 lg:translate-x-0 ${
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         }`}
         id="admin-navigation"
@@ -136,7 +136,7 @@ export default function AdminLayout() {
                 onClick={() => setIsSidebarOpen(false)}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
                   isActive
-                    ? "border border-[#C02066] bg-[#9B0048] text-white font-bold"
+                    ? "border border-[#C02066] bg-synth-action text-white font-bold"
                     : "text-white hover:bg-synth-elevated/70 font-medium border border-transparent"
                 }`}
               >
@@ -169,7 +169,7 @@ export default function AdminLayout() {
       </aside>
 
       <main className="min-w-0 flex-1 overflow-y-auto bg-synth-bg">
-        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-synth-border bg-synth-bg/95 px-4 backdrop-blur lg:hidden">
+        <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-synth-border bg-synth-bg/95 px-4 backdrop-blur-sm lg:hidden">
           <button
             aria-controls="admin-navigation"
             aria-expanded={isSidebarOpen}

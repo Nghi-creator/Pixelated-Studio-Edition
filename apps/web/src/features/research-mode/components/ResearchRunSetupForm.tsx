@@ -10,9 +10,9 @@ import {
 } from "../researchRunConfig";
 
 const FIELD_CLASS =
-  "mt-1 h-10 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm font-medium normal-case text-white outline-none transition placeholder:text-gray-500 focus:border-synth-primary";
+  "mt-1 h-10 w-full rounded-lg border border-synth-border bg-synth-bg px-3 text-sm font-medium normal-case text-white outline-hidden transition placeholder:text-gray-500 focus:border-synth-primary";
 const SELECT_BUTTON_CLASS =
-  "flex h-10 w-full items-center justify-between gap-4 rounded-lg border border-synth-border bg-synth-bg pl-3 pr-6 text-left text-sm font-semibold normal-case text-white outline-none transition hover:border-synth-primary focus:border-synth-primary";
+  "flex h-10 w-full items-center justify-between gap-4 rounded-lg border border-synth-border bg-synth-bg pl-3 pr-6 text-left text-sm font-semibold normal-case text-white outline-hidden transition hover:border-synth-primary focus:border-synth-primary";
 const SELECT_MENU_CLASS =
   "absolute left-0 top-full z-50 mt-2 w-full overflow-hidden rounded-lg border border-synth-border bg-synth-bg py-1 shadow-card";
 

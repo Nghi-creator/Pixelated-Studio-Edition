@@ -1,118 +1,96 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss' source(none);
+@source "../index.html";
+@source "./";
 
+@theme {
+  --font-sans: Outfit, system-ui, sans-serif;
+
+  --color-brand-champagne: #ffc2d1;
+  --color-brand-light-pink: #ff8fab;
+  --color-brand-blush: #ffe5ec;
+  --color-brand-rose-ink: #3a1824;
+
+  --color-neutral-paper: #0b090a;
+  --color-neutral-canvas: #100b0e;
+  --color-neutral-surface: #4a2835;
+  --color-neutral-elevated: #5a3140;
+  --color-neutral-border: #7e465b;
+  --color-neutral-text: #fff7fa;
+  --color-neutral-muted: #cfa4b2;
+
+  --color-status-success: #2f7d5b;
+  --color-status-warning: #b86f88;
+  --color-status-danger: #b64242;
+
+  --color-console-black: #080708;
+
+  --color-synth-bg: #050505;
+  --color-synth-surface: #4a2835;
+  --color-synth-elevated: #5a3140;
+  --color-synth-border: #7e465b;
+  --color-synth-primary: #b86f88;
+  --color-synth-primary-hover: #c97893;
+  --color-synth-action: #9b0048;
+  --color-synth-action-hover: #b00052;
+  --color-synth-secondary: #d8a4b5;
+  --color-synth-secondary-hover: #e8b8c6;
+  --color-synth-ink: #ffffff;
+
+  --shadow-panel: 0 18px 48px rgba(0, 0, 0, 0.42);
+  --shadow-card: 0 12px 30px rgba(0, 0, 0, 0.34);
+  --shadow-pressed: inset 0 1px 2px rgba(0, 0, 0, 0.34);
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
 @layer base {
-  html {
-    @apply antialiased;
-  }
-
-  body {
-    @apply bg-synth-bg text-white;
-  }
-
-  ::selection {
-    @apply bg-synth-primary text-synth-ink;
-  }
-
-  :focus-visible {
-    @apply outline-none ring-2 ring-synth-primary/50 ring-offset-2 ring-offset-synth-bg;
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
   }
 }
 
-@layer components {
-  .danger-panel {
-    border-color: rgba(239, 68, 68, 0.55);
-    background-color: rgba(127, 29, 29, 0.38);
-    color: rgb(254, 202, 202);
-    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
-  }
+@utility danger-panel {
+  border-color: rgba(239, 68, 68, 0.55);
+  background-color: rgba(127, 29, 29, 0.38);
+  color: rgb(254, 202, 202);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+}
 
-  .danger-action {
-    border-color: rgba(239, 68, 68, 0.72);
-    background-color: rgba(127, 29, 29, 0.46);
-    color: rgb(254, 202, 202);
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
-  }
+@utility danger-action {
+  border-color: rgba(239, 68, 68, 0.72);
+  background-color: rgba(127, 29, 29, 0.46);
+  color: rgb(254, 202, 202);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.2);
 
-  .danger-action:hover {
+  &:hover {
     background-color: rgba(153, 27, 27, 0.58);
     color: white;
   }
+}
 
-  .feature-pop-card {
-    position: relative;
-    z-index: 0;
-    transform: translateZ(0);
-    transform-origin: center;
-    transition:
-      transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
-      box-shadow 220ms ease,
-      border-color 220ms ease,
-      background-color 220ms ease;
-  }
-
-  .pixel-animated-backdrop,
-  .auth-backdrop {
-    position: relative;
-    isolation: isolate;
-    overflow: hidden;
-    background:
-      radial-gradient(
-        ellipse at 50% 20%,
-        rgba(226, 139, 160, 0.26),
-        rgba(130, 55, 76, 0.16) 30%,
-        transparent 56%
-      ),
-      radial-gradient(
-        circle at 78% 78%,
-        rgba(255, 168, 177, 0.12),
-        transparent 24%
-      ),
-      linear-gradient(180deg, rgba(255, 158, 181, 0.08), transparent 48%);
-  }
-
-  .pixel-animated-backdrop::before,
-  .pixel-animated-backdrop::after,
-  .auth-backdrop::before,
-  .auth-backdrop::after {
-    content: "";
-    position: absolute;
-    inset: -16%;
-    z-index: -1;
-    pointer-events: none;
-  }
-
-  .pixel-animated-backdrop::before,
-  .auth-backdrop::before {
-    opacity: 0.34;
-    background-image:
-      linear-gradient(rgba(255, 177, 190, 0.15) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 177, 190, 0.15) 1px, transparent 1px);
-    background-size: 42px 42px;
-    mask-image: radial-gradient(ellipse at center, black 0%, transparent 72%);
-    animation: auth-grid-drift 18s linear infinite;
-  }
-
-  .pixel-animated-backdrop::after,
-  .auth-backdrop::after {
-    opacity: 0.78;
-    background:
-      radial-gradient(circle at 22% 32%, rgba(255, 174, 188, 0.2), transparent 14%),
-      radial-gradient(circle at 78% 68%, rgba(218, 104, 130, 0.2), transparent 18%),
-      linear-gradient(
-        100deg,
-        transparent 28%,
-        rgba(255, 166, 186, 0.11) 48%,
-        transparent 68%
-      );
-    filter: blur(16px);
-    transform: translate3d(-3%, 0, 0);
-    animation: auth-ambient-sweep 14s ease-in-out infinite alternate;
-  }
+@utility feature-pop-card {
+  position: relative;
+  z-index: 0;
+  transform: translateZ(0);
+  transform-origin: center;
+  transition:
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    background-color 220ms ease;
 
   @media (hover: hover) and (pointer: fine) {
-    .feature-pop-card:hover {
+    &:hover {
       z-index: 20;
       transform: translateY(-14px) scale(1.07);
       border-color: rgba(216, 164, 181, 0.92);
@@ -124,19 +102,185 @@
     }
   }
 
-  .pixel-title-glow {
-    position: relative;
-    display: inline-block;
-    text-shadow:
-      0 0 8px rgba(255, 194, 209, 0.48),
-      0 0 22px rgba(216, 164, 181, 0.44),
-      0 0 42px rgba(155, 0, 72, 0.34),
-      0 0 68px rgba(184, 111, 136, 0.24);
-    animation: pixel-title-flicker 4.8s steps(1, end) infinite;
+  @media (prefers-reduced-motion: reduce) {
+    transition: none;
+
+    &:hover {
+      transform: none;
+    }
+  }
+}
+
+@utility pixel-animated-backdrop {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse at 50% 20%,
+      rgba(226, 139, 160, 0.26),
+      rgba(130, 55, 76, 0.16) 30%,
+      transparent 56%
+    ),
+    radial-gradient(
+      circle at 78% 78%,
+      rgba(255, 168, 177, 0.12),
+      transparent 24%
+    ),
+    linear-gradient(180deg, rgba(255, 158, 181, 0.08), transparent 48%);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -16%;
+    z-index: -1;
+    pointer-events: none;
   }
 
-  .pixel-title-glow::after {
-    content: "";
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -16%;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  &::before {
+    opacity: 0.34;
+    background-image:
+      linear-gradient(rgba(255, 177, 190, 0.15) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 177, 190, 0.15) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(ellipse at center, black 0%, transparent 72%);
+    animation: auth-grid-drift 18s linear infinite;
+  }
+
+  &::after {
+    opacity: 0.78;
+    background:
+      radial-gradient(
+        circle at 22% 32%,
+        rgba(255, 174, 188, 0.2),
+        transparent 14%
+      ),
+      radial-gradient(
+        circle at 78% 68%,
+        rgba(218, 104, 130, 0.2),
+        transparent 18%
+      ),
+      linear-gradient(
+        100deg,
+        transparent 28%,
+        rgba(255, 166, 186, 0.11) 48%,
+        transparent 68%
+      );
+    filter: blur(16px);
+    transform: translate3d(-3%, 0, 0);
+    animation: auth-ambient-sweep 14s ease-in-out infinite alternate;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      animation: none;
+    }
+
+    &::after {
+      animation: none;
+    }
+  }
+}
+
+@utility auth-backdrop {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background:
+    radial-gradient(
+      ellipse at 50% 20%,
+      rgba(226, 139, 160, 0.26),
+      rgba(130, 55, 76, 0.16) 30%,
+      transparent 56%
+    ),
+    radial-gradient(
+      circle at 78% 78%,
+      rgba(255, 168, 177, 0.12),
+      transparent 24%
+    ),
+    linear-gradient(180deg, rgba(255, 158, 181, 0.08), transparent 48%);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -16%;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: -16%;
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  &::before {
+    opacity: 0.34;
+    background-image:
+      linear-gradient(rgba(255, 177, 190, 0.15) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 177, 190, 0.15) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: radial-gradient(ellipse at center, black 0%, transparent 72%);
+    animation: auth-grid-drift 18s linear infinite;
+  }
+
+  &::after {
+    opacity: 0.78;
+    background:
+      radial-gradient(
+        circle at 22% 32%,
+        rgba(255, 174, 188, 0.2),
+        transparent 14%
+      ),
+      radial-gradient(
+        circle at 78% 68%,
+        rgba(218, 104, 130, 0.2),
+        transparent 18%
+      ),
+      linear-gradient(
+        100deg,
+        transparent 28%,
+        rgba(255, 166, 186, 0.11) 48%,
+        transparent 68%
+      );
+    filter: blur(16px);
+    transform: translate3d(-3%, 0, 0);
+    animation: auth-ambient-sweep 14s ease-in-out infinite alternate;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &::before {
+      animation: none;
+    }
+
+    &::after {
+      animation: none;
+    }
+  }
+}
+
+@utility pixel-title-glow {
+  position: relative;
+  display: inline-block;
+  text-shadow:
+    0 0 8px rgba(255, 194, 209, 0.48),
+    0 0 22px rgba(216, 164, 181, 0.44),
+    0 0 42px rgba(155, 0, 72, 0.34),
+    0 0 68px rgba(184, 111, 136, 0.24);
+  animation: pixel-title-flicker 4.8s steps(1, end) infinite;
+
+  &::after {
+    content: '';
     position: absolute;
     inset: 0;
     pointer-events: none;
@@ -154,6 +298,34 @@
     animation: pixel-title-sweep 5.6s ease-in-out infinite;
   }
 
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+
+    &::after {
+      animation: none;
+    }
+  }
+}
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-synth-bg text-white;
+  }
+
+  ::selection {
+    @apply bg-synth-primary text-synth-ink;
+  }
+
+  :focus-visible {
+    @apply outline-hidden ring-2 ring-synth-primary/50 ring-offset-2 ring-offset-synth-bg;
+  }
+}
+
+@layer components {
   @keyframes pixel-title-flicker {
     0%,
     7%,
@@ -214,25 +386,6 @@
 
     to {
       transform: translate3d(3%, 1%, 0) scale(1.04);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .feature-pop-card {
-      transition: none;
-    }
-
-    .feature-pop-card:hover {
-      transform: none;
-    }
-
-    .pixel-title-glow,
-    .pixel-title-glow::after,
-    .pixel-animated-backdrop::before,
-    .pixel-animated-backdrop::after,
-    .auth-backdrop::before,
-    .auth-backdrop::after {
-      animation: none;
     }
   }
 }

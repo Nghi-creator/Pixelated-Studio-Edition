@@ -168,11 +168,11 @@ export default function Submissions() {
           className="fixed right-6 top-6 z-50 flex max-w-md items-start gap-3 rounded-lg border border-red-300/70 bg-[#2B0F16] px-4 py-3 text-sm font-semibold text-red-50 shadow-2xl"
           role="alert"
         >
-          <AlertCircle className="mt-0.5 h-5 w-5 flex-shrink-0 text-red-200" />
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-red-200" />
           <p className="min-w-0 flex-1 leading-6">{toastMessage}</p>
           <button
             aria-label="Dismiss notification"
-            className="rounded p-1 text-red-100 hover:bg-red-500/20 hover:text-white"
+            className="rounded-sm p-1 text-red-100 hover:bg-red-500/20 hover:text-white"
             onClick={() => setToastMessage("")}
             type="button"
           >
@@ -204,7 +204,7 @@ export default function Submissions() {
           value={status}
         />
         <input
-          className="h-10 min-w-0 flex-1 rounded-lg border border-synth-secondary/40 bg-synth-bg px-3 text-sm font-semibold text-white outline-none placeholder:text-gray-400 focus:border-synth-secondary"
+          className="h-10 min-w-0 flex-1 rounded-lg border border-synth-secondary/40 bg-synth-bg px-3 text-sm font-semibold text-white outline-hidden placeholder:text-gray-400 focus:border-synth-secondary"
           onChange={(event) => {
             setSearch(event.target.value);
             setPage(1);

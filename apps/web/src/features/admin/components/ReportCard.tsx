@@ -147,7 +147,7 @@ export default function ReportCard({
           <button
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             disabled={pending}
-            className="flex items-center gap-2 px-4 py-2 bg-synth-elevated hover:bg-synth-border border border-synth-border text-white text-sm font-bold rounded-lg transition-colors focus:outline-none disabled:cursor-wait disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 bg-synth-elevated hover:bg-synth-border border border-synth-border text-white text-sm font-bold rounded-lg transition-colors focus:outline-hidden disabled:cursor-wait disabled:opacity-50"
           >
             Action{" "}
             <ChevronDown

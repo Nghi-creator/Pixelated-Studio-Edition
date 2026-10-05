@@ -40,7 +40,7 @@ export function StreamStage({
       <div
         ref={stageRef}
         className={`relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-b-lg border border-synth-border bg-black shadow-card fullscreen:h-screen fullscreen:w-screen fullscreen:aspect-auto fullscreen:rounded-none fullscreen:border-0 ${
-          showStreamTelemetry ? "xl:aspect-[16/9.5]" : ""
+          showStreamTelemetry ? "xl:aspect-16/9.5" : ""
         }`}
       >
         {status === "connecting" && (
@@ -52,7 +52,7 @@ export function StreamStage({
           </div>
         )}
         {(status === "error" || isBlocked) && (
-          <div className="absolute inset-px z-10 flex flex-col items-center justify-center rounded-b-[0.45rem] bg-synth-bg/90 px-6 text-center backdrop-blur-sm">
+          <div className="absolute inset-px z-10 flex flex-col items-center justify-center rounded-b-[0.45rem] bg-synth-bg/90 px-6 text-center backdrop-blur-xs">
             <AlertTriangle className="mb-4 h-12 w-12 text-red-400" />
             <p className="text-lg font-semibold text-gray-200">
               Stream could not start

@@ -49,7 +49,7 @@ function FavoriteAction({
       aria-label={isFavorited ? `Remove ${title} from favorites` : `Add ${title} to favorites`}
       disabled={isPending}
       title={favoriteError || undefined}
-      className="absolute right-2 top-2 z-10 rounded-md border border-synth-border bg-synth-surface p-2 text-white transition-colors hover:bg-synth-elevated focus:outline-none disabled:cursor-wait disabled:opacity-70"
+      className="absolute right-2 top-2 z-10 rounded-md border border-synth-border bg-synth-surface p-2 text-white transition-colors hover:bg-synth-elevated focus:outline-hidden disabled:cursor-wait disabled:opacity-70"
     >
       {isPending ? (
         <Loader2 className="h-5 w-5 animate-spin text-white" />

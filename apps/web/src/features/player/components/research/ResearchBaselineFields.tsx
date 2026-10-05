@@ -1,7 +1,7 @@
 import type { ResearchBaselineForm } from "../../research/researchBaseline";
 
 const FIELD_CLASS =
-  "mt-1 h-9 w-full rounded-md border border-synth-border bg-synth-bg px-2 text-sm font-semibold normal-case text-white outline-none transition placeholder:text-gray-500 focus:border-synth-primary";
+  "mt-1 h-9 w-full rounded-md border border-synth-border bg-synth-bg px-2 text-sm font-semibold normal-case text-white outline-hidden transition placeholder:text-gray-500 focus:border-synth-primary";
 
 export function ResearchBaselineFields({
   form,

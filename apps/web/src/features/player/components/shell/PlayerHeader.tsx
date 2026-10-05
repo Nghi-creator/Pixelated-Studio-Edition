@@ -32,7 +32,7 @@ export function PlayerHeader({
           : "Idle";
   const statusDotClass =
     status === "playing"
-      ? "bg-[#9B0048]"
+      ? "bg-synth-action"
       : status === "error"
         ? "bg-red-500"
         : "bg-amber-400 animate-pulse";
