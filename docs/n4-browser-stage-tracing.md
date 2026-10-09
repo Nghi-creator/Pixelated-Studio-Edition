@@ -30,3 +30,15 @@ and absolute clock origins remain private. Effective clock resolution is unknown
 38 new software cases and 220 total web tests pass, plus web lint and production
 build. The strict sibling Python contract accepts 23 synthetic snapshots. No live
 browser timing or measured instrumentation overhead is claimed.
+
+## Step 7 software integration
+
+The core now pins independent synthetic host/browser/unsupported-API fixtures and
+expected summaries. `scripts/n4/exportSyntheticTraces.py` and
+`scripts/n4/exportSyntheticTraces.mts` feed fixed synthetic inputs through these
+production collectors/exporters into an existing disposable directory. Run them
+with Python and Node type stripping, then run the core command
+`python -m tests.observability.check_reproduction --producer-bundles DIRECTORY`.
+It compares canonical records and inspection/CLI outputs to independent pins.
+Synthetic provenance and the placeholder commit are explicit. This passes locally;
+real Linux capture, live browser callbacks and paired overhead trials remain pending.

@@ -33,3 +33,15 @@ browser clock resolution, real capture, picker interaction and measured overhead
 have not been validated. The sibling core now implements inspect-trace (Step 6) for offline same-clock
 queue/encode/age/callback reconstruction with loss/exclusion and budget evidence.
 Pinned integration and real capture/overhead acceptance remain Step 7.
+
+## Step 7 software integration
+
+The core now pins independent synthetic host/browser/unsupported-API fixtures and
+expected summaries. `scripts/n4/exportSyntheticTraces.py` and
+`scripts/n4/exportSyntheticTraces.mts` feed fixed synthetic inputs through these
+production collectors/exporters into an existing disposable directory. Run them
+with Python and Node type stripping, then run the core command
+`python -m tests.observability.check_reproduction --producer-bundles DIRECTORY`.
+It compares canonical records and inspection/CLI outputs to independent pins.
+Synthetic provenance and the placeholder commit are explicit. This passes locally;
+real Linux capture, live browser callbacks and paired overhead trials remain pending.
