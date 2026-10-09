@@ -30,4 +30,6 @@ before atomic output. Actual no-follow paths are required; JSON is bounded to
 
 Synthetic export API tests and both producer-to-core CLI handoffs pass. Effective
 browser clock resolution, real capture, picker interaction and measured overhead
-have not been validated. Offline reconstruction is next (N4 Step 6).
+have not been validated. The sibling core now implements inspect-trace (Step 6) for offline same-clock
+queue/encode/age/callback reconstruction with loss/exclusion and budget evidence.
+Pinned integration and real capture/overhead acceptance remain Step 7.

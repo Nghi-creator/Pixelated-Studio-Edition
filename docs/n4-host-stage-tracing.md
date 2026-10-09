@@ -52,7 +52,7 @@ preserve Gst media flow. Short mutexes serialize state; actual overhead is unmea
 
 After `HostTraceRecording.finish()`, its `snapshot()` returns detached sanitized
 in-memory trace data with a caller-supplied producer commit. [Step 5 export](n4-stage-trace-export.md)
-now publishes this as a standalone gzip TAR after shutdown; inspection remains Step 6. Real Linux/X11/VP8 correlation and five paired
+now publishes this as a standalone gzip TAR after shutdown; inspection is delivered in the sibling core as Step 6. Real Linux/X11/VP8 correlation and five paired
 CPU/FPS overhead trials remain required before full N4 completion. Factory lookup,
 synthetic clocks and fake pads do not satisfy that gate.
 
@@ -80,4 +80,4 @@ artifact skip, zero failures. Twenty-five test snapshots also validate against
 the core's strict N4 models. Container builds, hosted execution and real-capture/
 overhead measurements remain pending.
 
-[Step 5 standalone export](n4-stage-trace-export.md) now supplies configured shutdown persistence; offline reconstruction remains Step 6.
+[Step 5 standalone export](n4-stage-trace-export.md) now supplies configured shutdown persistence; offline reconstruction is delivered in the sibling core as Step 6.
