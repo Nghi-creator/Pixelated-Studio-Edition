@@ -10,6 +10,9 @@ from camera_config import (
 )
 from camera_protocol import normalize_ice_candidate, normalize_peer_id, validate_offer
 from camera_state import write_encoder_telemetry, write_peer_state
+from camera_trace import HostTraceRecording
+from camera_trace_config import parse_trace_config
+from camera_trace_hooks import install_host_trace, install_trace_shutdown
 
 gi.require_version("Gst", "1.0")
 gi.require_version("GstWebRTC", "1.0")
@@ -32,6 +35,12 @@ TELEMETRY_STATE_PATH = os.environ.get(
     '/run/pixelated/camera-telemetry.json',
 )
 peers = {}
+try:
+    trace_config = parse_trace_config(os.environ)
+    STAGE_TRACE = HostTraceRecording(trace_config) if trace_config is not None else None
+except ValueError:
+    print("[Python] N4 stage tracing disabled: invalid configuration.")
+    STAGE_TRACE = None
 MAX_ACTIVE_PEERS = parse_max_active_peers(
     os.environ.get("PIXELATED_MAX_STREAM_PEERS", "8")
 )
@@ -51,11 +60,14 @@ def emit_engine_error(message):
     except Exception as exc:
         print(f"[Python] Failed to emit engine-error: {exc}")
 
-def cleanup_peer(peer_id):
+def cleanup_peer(peer_id, reason="shutdown"):
     peer = peers.pop(peer_id, None)
     if not peer:
         return
 
+    stage_trace = peer.get('stage_trace')
+    if stage_trace is not None:
+        stage_trace.close(reason)
     pipeline = peer.get('pipeline')
     if pipeline:
         pipeline.set_state(Gst.State.NULL)
@@ -99,7 +111,7 @@ def handle_offer(offer):
     pipeline_str = f"""
         webrtcbin name=sendrecv
         
-        ximagesrc display-name=:99 use-damage=false show-pointer=false ! 
+        ximagesrc name=video_capture display-name=:99 use-damage=false show-pointer=false !
         video/x-raw,framerate={stream_profile['fps']}/1 ! 
         videoconvert ! video/x-raw,format=I420 ! 
         queue name=pre_encoder_queue max-size-buffers=1 leaky=downstream !
@@ -119,6 +131,11 @@ def handle_offer(offer):
     video_encoder = pipeline.get_by_name('video_encoder')
     post_encoder_queue = pipeline.get_by_name('post_encoder_queue')
     configure_ice_servers(webrtcbin, ICE_SERVERS)
+    try:
+        stage_trace = install_host_trace(pipeline, STAGE_TRACE, Gst)
+    except Exception:
+        print("[Python] N4 stage tracing unavailable: host hooks could not be installed.")
+        stage_trace = None
     peers[peer_id] = {
         'frames_dropped_total': 0,
         'frames_in_total': 0,
@@ -126,6 +143,7 @@ def handle_offer(offer):
         'pipeline': pipeline,
         'post_encoder_queue': post_encoder_queue,
         'pre_encoder_queue': pre_encoder_queue,
+        'stage_trace': stage_trace,
         'stream_profile': stream_profile,
         'video_encoder': video_encoder,
         'webrtcbin': webrtcbin,
@@ -170,7 +188,7 @@ def handle_offer(offer):
             emit_engine_error(f"GStreamer error for peer {peer_id}: {err.message}")
             if debug:
                 print(f"[Python] GStreamer debug: {debug}")
-            cleanup_peer(peer_id)
+            cleanup_peer(peer_id, "source_error")
         elif message.type == Gst.MessageType.WARNING:
             warn, debug = message.parse_warning()
             print(f"[Python] GStreamer warning for peer {peer_id}: {warn.message}")
@@ -252,4 +270,16 @@ def on_peer_disconnect(payload):
 sio.connect('http://localhost:8080', auth={'token': ENGINE_TOKEN})
 GLib.timeout_add_seconds(1, publish_encoder_telemetry)
 loop = GLib.MainLoop()
-loop.run()
+install_trace_shutdown(STAGE_TRACE, GLib, loop)
+try:
+    loop.run()
+finally:
+    try:
+        for peer_id in list(peers):
+            try:
+                cleanup_peer(peer_id)
+            except Exception:
+                print("[Python] Camera peer cleanup failed during shutdown.")
+    finally:
+        if STAGE_TRACE is not None:
+            STAGE_TRACE.finish("shutdown")

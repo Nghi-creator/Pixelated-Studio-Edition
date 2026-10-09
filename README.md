@@ -39,6 +39,10 @@ The browser is the front door: users browse games, play through a protected anon
 | Research telemetry | The gameplay screen records stream/playback samples, exports research bundles, and sends authenticated metrics to the API. |
 | Admin tools | Admin routes cover submissions, catalog candidates, users, access logs, reports, and moderation workflows. |
 
+The engine also has [opt-in N4 host stage tracing](docs/n4-host-stage-tracing.md).
+Collection is bounded and disabled by default; real-capture/overhead acceptance
+and trace export remain pending.
+
 ## Architecture
 
 ```text
@@ -187,3 +191,5 @@ GitHub production environment variable. See
 MIT - see [LICENSE](LICENSE).
 
 Built by [Nicholas Nguyen](https://www.linkedin.com/in/nicholas-nguyen-3bb17a335/).
+
+Browser stage tracing is also opt-in; see [N4 browser tracing](docs/n4-browser-stage-tracing.md) for build-time settings and capability limits.

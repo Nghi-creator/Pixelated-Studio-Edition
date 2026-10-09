@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { RefObject } from "react";
 import type { WebRTCStatus } from "../../../../lib/webrtc/session/webrtcSession";
+import { useBrowserStageTrace } from "./useBrowserStageTrace";
 import {
   BLACK_VIDEO_SAMPLE_THRESHOLD,
   createStreamPlaybackSampleTracker,
@@ -24,6 +25,7 @@ export function useStreamPlayback({
   videoRef: RefObject<HTMLVideoElement | null>;
 }) {
   const [sampledFallbackActive, setSampledFallbackActive] = useState(false);
+  useBrowserStageTrace(videoRef, stream, status);
 
   useEffect(() => {
     const video = videoRef.current;
