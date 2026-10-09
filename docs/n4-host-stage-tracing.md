@@ -1,7 +1,7 @@
 # N4 opt-in host stage tracing
 
 **Status:** Host collector/hooks implemented, 2026-10-09; real capture and overhead
-acceptance pending. Browser collection and trace export/adoption are later steps.
+acceptance pending. Browser collection and standalone export/adoption are now delivered in Steps 4–5.
 
 The camera now has optional bounded probes at capture output, pre-encoder queue
 entry/exit and VP8 encoder input/output. Their timestamp source is local Python
@@ -14,8 +14,8 @@ and `N4_PRODUCER_CAPABILITIES.md` define the versioned contract and real accepta
 ## Configuration
 
 Set camera/engine process environment before pipeline creation. Existing engine
-launcher environment inheritance passes these settings through; there is no UI
-recording control yet.
+launcher environment inheritance passes these settings through; host tracing uses launch configuration; the separate browser finish/export
+control is documented in [standalone export](n4-stage-trace-export.md).
 
 | Variable | Meaning |
 | --- | --- |
@@ -51,8 +51,8 @@ Callbacks do no I/O, logging, export or Python research-core calls, and always
 preserve Gst media flow. Short mutexes serialize state; actual overhead is unmeasured.
 
 After `HostTraceRecording.finish()`, its `snapshot()` returns detached sanitized
-in-memory trace data with a caller-supplied producer commit. It is not a saved
-trace bundle or inspection result. Real Linux/X11/VP8 correlation and five paired
+in-memory trace data with a caller-supplied producer commit. [Step 5 export](n4-stage-trace-export.md)
+now publishes this as a standalone gzip TAR after shutdown; inspection remains Step 6. Real Linux/X11/VP8 correlation and five paired
 CPU/FPS overhead trials remain required before full N4 completion. Factory lookup,
 synthetic clocks and fake pads do not satisfy that gate.
 
@@ -73,9 +73,11 @@ python3 -m unittest discover -s tests/python -p 'test_camera_trace*.py' -v
 ```
 
 The engine test runner executes them automatically; Python 3.10+ is required
-alongside Node. Thirty-one Python cases cover sampling, overflow, duplicate/
+alongside Node. Forty-one Python cases include ten export cases alongside sampling, overflow, duplicate/
 missing PTS, segment/clock resets, concurrency, partial registration, teardown,
 shutdown and disabled mode. Local engine result: 133 pass, one existing external
 artifact skip, zero failures. Twenty-five test snapshots also validate against
 the core's strict N4 models. Container builds, hosted execution and real-capture/
 overhead measurements remain pending.
+
+[Step 5 standalone export](n4-stage-trace-export.md) now supplies configured shutdown persistence; offline reconstruction remains Step 6.

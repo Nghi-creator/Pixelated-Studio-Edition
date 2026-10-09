@@ -115,6 +115,10 @@ export class BrowserStageTraceRecording {
     this.cleanups.clear(); this.finished = true;
   }
 
+  hasLifetimes() {
+    return this.streams.length > 0;
+  }
+
   snapshot(producerVersion: string, provenance: "synthetic" | "producer_capture") {
     if (!this.finished || !this.streams.length || !/^[0-9a-f]{40}$/.test(producerVersion)
       || !["synthetic", "producer_capture"].includes(provenance)) {

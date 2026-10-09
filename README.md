@@ -193,3 +193,5 @@ MIT - see [LICENSE](LICENSE).
 Built by [Nicholas Nguyen](https://www.linkedin.com/in/nicholas-nguyen-3bb17a335/).
 
 Browser stage tracing is also opt-in; see [N4 browser tracing](docs/n4-browser-stage-tracing.md) for build-time settings and capability limits.
+
+[Standalone N4 trace export](docs/n4-stage-trace-export.md) supports configured camera shutdown persistence and explicit browser download, independently of research bundle v2.

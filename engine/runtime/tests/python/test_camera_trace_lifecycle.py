@@ -42,6 +42,10 @@ class LifecycleTests(unittest.TestCase):
 
         namespace = {
             "peers": peers,
+            "os": types.SimpleNamespace(environ={}),
+            "export_camera_trace": lambda recording, environment: calls.append(
+                ("export", "after_finish")
+            ),
             "Gst": types.SimpleNamespace(State=types.SimpleNamespace(NULL="NULL")),
             "SESSION_ID": "private-not-exported",
             "PEER_STATE_PATH": "unused",
@@ -67,6 +71,7 @@ class LifecycleTests(unittest.TestCase):
                 ("second", "shutdown"),
                 ("second", "NULL"),
                 ("recording", "shutdown"),
+                ("export", "after_finish"),
             ],
         )
 

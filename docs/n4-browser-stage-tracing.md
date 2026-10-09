@@ -25,7 +25,7 @@ idempotent, and late callbacks are ignored. No per-frame React state update occu
 `BrowserStageTraceRecording.finish()` cancels bindings; `snapshot(commit, provenance)`
 returns detached in-memory evidence requiring a forty-hex commit. Runtime metadata
 and absolute clock origins remain private. Effective clock resolution is unknown
-(null). No persistent export/control is supplied yet: artifact/adoption is Step 5.
+(null). [Step 5 export/control](n4-stage-trace-export.md) now provides an explicit finish/download button; reconstruction remains Step 6.
 
 38 new software cases and 220 total web tests pass, plus web lint and production
 build. The strict sibling Python contract accepts 23 synthetic snapshots. No live

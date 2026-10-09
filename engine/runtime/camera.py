@@ -11,6 +11,7 @@ from camera_config import (
 from camera_protocol import normalize_ice_candidate, normalize_peer_id, validate_offer
 from camera_state import write_encoder_telemetry, write_peer_state
 from camera_trace import HostTraceRecording
+from camera_trace_export import export_camera_trace
 from camera_trace_config import parse_trace_config
 from camera_trace_hooks import install_host_trace, install_trace_shutdown
 
@@ -283,3 +284,4 @@ finally:
     finally:
         if STAGE_TRACE is not None:
             STAGE_TRACE.finish("shutdown")
+            export_camera_trace(STAGE_TRACE, os.environ)
