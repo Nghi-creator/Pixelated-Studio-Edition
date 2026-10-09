@@ -28,7 +28,7 @@ export function parseBrowserStageTraceConfig(environment: Record<string, unknown
   function number(name: string, fallback: number) {
     const raw = environment[name];
     if (raw === undefined) return fallback;
-    if (typeof raw !== "string" || !/^[0-9]{1,16}$/.test(raw)) {
+    if (typeof raw !== "string" || raw.length < 1 || raw.length > 16 || /[^0-9]/.test(raw)) {
       throw new Error("N4 browser trace configuration requires decimal integers");
     }
     return Number(raw);

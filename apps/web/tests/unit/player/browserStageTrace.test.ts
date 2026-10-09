@@ -45,7 +45,7 @@ test("disabled ignores knobs and enabled configuration is bounded/copied", () =>
 for (const value of ["true", true, 1, "", null]) test(`invalid enabled value ${JSON.stringify(value)}`, () => {
   assert.throws(() => parseBrowserStageTraceConfig({ VITE_N4_STAGE_TRACE: value }));
 });
-for (const value of ["0", "2001", "1.5", "-1", "1e3", " 1", true, 2, "99999999999999999"]) test(`invalid frame limit ${JSON.stringify(value)}`, () => {
+for (const value of ["0", "2001", "1.5", "-1", "1e3", " 1", true, 2, "99999999999999999", "1\n", "1\r\n", "1\u2028", "1\u2029"]) test(`invalid frame limit ${JSON.stringify(value)}`, () => {
   assert.throws(() => parseBrowserStageTraceConfig({ VITE_N4_STAGE_TRACE: "1", VITE_N4_STAGE_TRACE_MAX_FRAMES: value }));
 });
 
@@ -220,4 +220,11 @@ test("nonfinite clock and throwing clock install no callbacks", () => {
 
 after(() => {
   if (process.env.N4_BROWSER_SNAPSHOT_OUTPUT) writeFileSync(process.env.N4_BROWSER_SNAPSHOT_OUTPUT, JSON.stringify(snapshots));
+});
+
+for (const suffix of ["\n", "\r\n", "\u2028", "\u2029"]) test(`snapshot rejects commit trailing whitespace ${JSON.stringify(suffix)}`, () => {
+  const recording = new BrowserStageTraceRecording(config);
+  recording.begin(0, true)!.observe(14, 10, 1);
+  recording.finish();
+  assert.throws(() => recording.snapshot("a".repeat(40) + suffix, "synthetic"));
 });

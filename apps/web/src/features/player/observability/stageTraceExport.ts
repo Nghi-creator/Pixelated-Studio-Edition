@@ -23,7 +23,8 @@ export function canonicalStageTraceJson(value: unknown) {
 }
 
 export async function createStageTraceFiles(recording: BrowserStageTraceRecording, producerVersion: string, provenance: "synthetic" | "producer_capture") {
-  if (typeof producerVersion !== "string" || !/^[0-9a-f]{40}$/.test(producerVersion)) throw new Error("N4 export requires a producer commit");
+  if (typeof producerVersion !== "string" || producerVersion.length !== 40 || !/^[0-9a-f]{40}$/.test(producerVersion)) throw new Error("N4 export requires a producer commit");
+  if (provenance !== "synthetic" && provenance !== "producer_capture") throw new Error("N4 export requires approved provenance");
   if (!recording.hasLifetimes()) throw new Error("N4 export requires a trace lifetime");
   recording.finish();
   const payload = canonicalStageTraceJson(recording.snapshot(producerVersion, provenance));

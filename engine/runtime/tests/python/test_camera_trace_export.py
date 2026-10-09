@@ -2,6 +2,7 @@ import gzip
 import hashlib
 import io
 import json
+import os
 import sys
 import tarfile
 import tempfile
@@ -21,6 +22,40 @@ class ExportTests(unittest.TestCase):
         recording.begin()
         recording.finish()
         return recording
+
+    def test_failed_stream_or_cleanup_closes_descriptors(self):
+        for failure in ("fdopen", "cleanup"):
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory(
+                dir="/private/tmp" if Path("/private/tmp").exists() else None
+            ) as directory:
+                target = Path(directory) / "trace.tar.gz"
+                target.write_bytes(b"old")
+                descriptors = []
+                original_open = os.open
+
+                def tracked_open(*args, **kwargs):
+                    descriptor = original_open(*args, **kwargs)
+                    descriptors.append(descriptor)
+                    return descriptor
+
+                with patch("camera_trace_export.os.open", side_effect=tracked_open):
+                    if failure == "fdopen":
+                        with patch("camera_trace_export.os.fdopen", side_effect=OSError("failure")):
+                            with self.assertRaises(OSError):
+                                write_trace_bundle(target, b"new")
+                    else:
+                        with (
+                            patch("camera_trace_export.os.replace", side_effect=OSError("failure")),
+                            patch("camera_trace_export.os.unlink", side_effect=OSError("failure")),
+                        ):
+                            with self.assertRaises(OSError):
+                                write_trace_bundle(target, b"new")
+                for descriptor in descriptors:
+                    with self.assertRaises(OSError):
+                        os.fstat(descriptor)
+                self.assertEqual(target.read_bytes(), b"old")
+                for temporary in Path(directory).glob(".n4-*.tmp"):
+                    temporary.unlink()
 
     def test_two_regular_members_and_canonical_hash(self):
         recording = self.recording()

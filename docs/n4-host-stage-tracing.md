@@ -82,14 +82,8 @@ overhead measurements remain pending.
 
 [Step 5 standalone export](n4-stage-trace-export.md) now supplies configured shutdown persistence; offline reconstruction is delivered in the sibling core as Step 6.
 
-## Step 7 software integration
+## Integration and next acceptance step
 
-The core now pins independent synthetic host/browser/unsupported-API fixtures and
-expected summaries. `scripts/n4/exportSyntheticTraces.py` and
-`scripts/n4/exportSyntheticTraces.mts` feed fixed synthetic inputs through these
-production collectors/exporters into an existing disposable directory. Run them
-with Python and Node type stripping, then run the core command
-`python -m tests.observability.check_reproduction --producer-bundles DIRECTORY`.
-It compares canonical records and inspection/CLI outputs to independent pins.
-Synthetic provenance and the placeholder commit are explicit. This passes locally;
-real Linux capture, live browser callbacks and paired overhead trials remain pending.
+See [standalone export and integration](n4-stage-trace-export.md) for producer-to-core
+reproduction commands and remaining real capture/overhead gates. Both collectors
+and exporters reproduce pinned synthetic records; this is software evidence.

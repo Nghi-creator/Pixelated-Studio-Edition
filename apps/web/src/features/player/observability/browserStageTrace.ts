@@ -120,7 +120,7 @@ export class BrowserStageTraceRecording {
   }
 
   snapshot(producerVersion: string, provenance: "synthetic" | "producer_capture") {
-    if (!this.finished || !this.streams.length || !/^[0-9a-f]{40}$/.test(producerVersion)
+    if (!this.finished || !this.streams.length || typeof producerVersion !== "string" || producerVersion.length !== 40 || !/^[0-9a-f]{40}$/.test(producerVersion)
       || !["synthetic", "producer_capture"].includes(provenance)) {
       throw new Error("N4 browser snapshot requires closed evidence and a producer commit");
     }

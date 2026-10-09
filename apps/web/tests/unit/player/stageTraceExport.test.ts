@@ -70,3 +70,15 @@ test("gzip TAR contains only two fixed regular names, zero mtime, no v2 members"
   assert.deepEqual(names, ["trace-manifest.json", "trace-record.json"]);
   assert.ok(bytes.subarray(offset).every(byte => byte === 0));
 });
+
+for (const suffix of ["\n", "\r\n", "\u2028", "\u2029"]) test(`export rejects commit trailing whitespace before stopping ${JSON.stringify(suffix)}`, async () => {
+  const value = recording();
+  await assert.rejects(createStageTraceFiles(value, "a".repeat(40) + suffix, "synthetic"));
+  assert.ok(value.begin(200, true));
+});
+
+test("invalid provenance fails before stopping collection", async () => {
+  const value = recording();
+  await assert.rejects(createStageTraceFiles(value, "a".repeat(40), "unknown" as never));
+  assert.ok(value.begin(200, true));
+});

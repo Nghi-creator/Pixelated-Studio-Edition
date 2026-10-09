@@ -71,16 +71,21 @@ def write_trace_bundle(path, payload):
             temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=parent
         )
         created = True
-        with os.fdopen(fd, "wb") as target:
-            target.write(payload)
-            target.flush()
-            os.fsync(target.fileno())
+        try:
+            with os.fdopen(fd, "wb", closefd=False) as target:
+                target.write(payload)
+                target.flush()
+                os.fsync(target.fileno())
+        finally:
+            os.close(fd)
         os.replace(temporary, path.name, src_dir_fd=parent, dst_dir_fd=parent)
         created = False
     finally:
-        if created:
-            os.unlink(temporary, dir_fd=parent)
-        os.close(parent)
+        try:
+            if created:
+                os.unlink(temporary, dir_fd=parent)
+        finally:
+            os.close(parent)
 
 
 def export_camera_trace(recording, environment):

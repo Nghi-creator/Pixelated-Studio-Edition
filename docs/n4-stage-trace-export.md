@@ -32,16 +32,39 @@ Synthetic export API tests and both producer-to-core CLI handoffs pass. Effectiv
 browser clock resolution, real capture, picker interaction and measured overhead
 have not been validated. The sibling core now implements inspect-trace (Step 6) for offline same-clock
 queue/encode/age/callback reconstruction with loss/exclusion and budget evidence.
-Pinned integration and real capture/overhead acceptance remain Step 7.
+Pinned synthetic integration is delivered; real capture/overhead acceptance remains pending.
 
-## Step 7 software integration
+## Synthetic integration and next acceptance step
 
-The core now pins independent synthetic host/browser/unsupported-API fixtures and
-expected summaries. `scripts/n4/exportSyntheticTraces.py` and
-`scripts/n4/exportSyntheticTraces.mts` feed fixed synthetic inputs through these
-production collectors/exporters into an existing disposable directory. Run them
-with Python and Node type stripping, then run the core command
-`python -m tests.observability.check_reproduction --producer-bundles DIRECTORY`.
-It compares canonical records and inspection/CLI outputs to independent pins.
-Synthetic provenance and the placeholder commit are explicit. This passes locally;
-real Linux capture, live browser callbacks and paired overhead trials remain pending.
+From this trusted checkout, export fixed inputs through the actual bounded
+collectors and production exporters into an existing disposable directory:
+
+```sh
+mkdir -p /private/tmp/n4-step7-bundles
+python3 scripts/n4/exportSyntheticTraces.py /private/tmp/n4-step7-bundles
+node --experimental-strip-types scripts/n4/exportSyntheticTraces.mts /private/tmp/n4-step7-bundles
+```
+
+From the sibling core checkout, run:
+
+```sh
+.venv/bin/python -m tests.observability.check_reproduction \
+  --producer-bundles /private/tmp/n4-step7-bundles
+```
+
+The core pins three independent host/browser/unsupported-API records, manifests
+and expected summaries. It compares adoption, reconstruction and both CLI output
+files byte for byte. These scripts do not read the goldens. Synthetic provenance
+and the placeholder commit are explicit; no real timing is claimed.
+
+Next run the core's frozen `N4_PRODUCER_CAPABILITIES.md` procedure in an actual
+Linux/Xvfb/PulseAudio runtime with a draining WebRTC receiver. Record unique PTS
+correlation, nominal/tiny-capacity/interrupted/two-peer and browser evidence, all
+five paired overhead trials and the separate callback diagnostic. Docker is
+unavailable on the current host; real capture, live callbacks, picker interaction
+and measured overhead remain pending. Full N4 acceptance is open.
+
+The health audit tightens browser decimal/commit validation to reject trailing
+line terminators and validates export provenance before ending collection. Host
+atomic writes close file/directory descriptors even when stream creation or
+cleanup fails. These changes preserve all trace schemas and pinned payloads.
