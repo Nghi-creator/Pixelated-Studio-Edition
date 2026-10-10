@@ -42,7 +42,8 @@ The browser is the front door: users browse games, play through a protected anon
 Opt-in [host](docs/n4-host-stage-tracing.md) and [browser](docs/n4-browser-stage-tracing.md)
 stage tracing is bounded and disabled by default. [Standalone export and pinned
 integration](docs/n4-stage-trace-export.md) are delivered; real capture and measured
-overhead acceptance remain pending.
+overhead acceptance remain pending. [N5 scenario-harness work](docs/n5-scenario-harness.md)
+now starts from a reproduced baseline; its contract step is next.
 
 ## Architecture
 

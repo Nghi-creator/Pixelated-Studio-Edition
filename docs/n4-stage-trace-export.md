@@ -68,3 +68,6 @@ The health audit tightens browser decimal/commit validation to reject trailing
 line terminators and validates export provenance before ending collection. Host
 atomic writes close file/directory descriptors even when stream creation or
 cleanup fails. These changes preserve all trace schemas and pinned payloads.
+
+N5 now starts the [scenario-harness contract work](n5-scenario-harness.md). It
+carries these real acceptance gates forward; no trace contract or fixture changed.
