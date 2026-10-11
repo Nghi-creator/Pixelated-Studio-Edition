@@ -1,6 +1,6 @@
 # N5 scenario-harness handoff
 
-**Updated:** 2026-10-11. Steps 1–6 software gates are complete locally. The
+**Updated:** 2026-10-12. Steps 1–7 software gates are complete locally. The
 sibling core's active `docs/plans/NEXT_IMPLEMENTATION_PLAN.md` specifies N5
 (Phase 1.3). Its frozen experiment contract, capability matrix, independent
 examples and three strict models/schemas preserve prior research-v2/N4 meanings.
@@ -21,8 +21,8 @@ campaign-owner declarations, not inferred screen content. Foreign generations an
 unknown restoration remain visible. The runner uses trusted cooperative hooks;
 it cannot preempt arbitrary blocking Python/GI code. No real fault trial is claimed.
 [Bundle export and detached inspection](n5-experiment-export.md) are delivered in
-Step 6. Independent fixtures/pins/reproduction are next (Step 7), followed by real
-campaign/closeout (Step 8). Two planned steps remain.
+Step 6. [Independent fixtures/pins/reproduction](n5-experiment-reproduction.md) are delivered
+in Step 7. One planned step remains: real campaign/closeout (Step 8).
 
 V1 approves healthy and host contention for implementation. Other fault classes
 and mixed/changing scenarios remain unsupported. Startup is separate from effect
@@ -31,16 +31,17 @@ trial. Existing pressure helpers/smoke scripts do not already meet this contract
 The producer owns runtime hooks, actions and capture; detached validation and
 offline inspection remain in the sibling core with no callback dependency.
 
-Step 6 full producer checks: 185 API, 135 engine, 245 web, 90 desktop and 61
+Step 7 full producer checks: 185 API, 135 engine, 245 web, 90 desktop and 61
 smoke/security tests pass, **716 total**, with one existing external-artifact engine
-skip. Final engine verification includes **106 passing nested Python cases**:
-50 trace/control plus 56 scenario cases, with one additional Linux-only idle-child
-integration skip (57 scenario cases discovered). These use fake native/Gst
+skip. Final engine verification includes **109 passing nested Python cases**:
+50 trace/control plus 59 scenario cases, with one additional Linux-only idle-child
+integration skip (60 scenario cases discovered). These use fake native/Gst
 boundaries; the idle integration test never sends GO. Workspace lint/lockfiles,
 engine build, focused Ruff/syntax checks and actual synthetic N4 producer→core
-API/CLI pinned reproduction pass. Six actual synthetic N5 producer bundle cases
-also pass core API/CLI inspection, including unavailable and failed effects. Step 1 API typecheck/production web build remain
-historical, not separately rerun. No dependency or fixture release was introduced.
+API/CLI pinned reproduction pass. Eight pinned synthetic N5 producer bundle cases
+also pass core API/CLI inspection, including unavailable and failed effects. API
+typecheck and production web build were rerun successfully in Step 7. N5 fixture
+release 1.0.0 is additive; earlier releases and dependencies are unchanged.
 
 [Existing N4 tracing/export](n4-stage-trace-export.md) remains delivered. Fresh
 recording control is now available in software, but actual Linux/Xvfb/PulseAudio

@@ -69,5 +69,5 @@ Six producer export regressions exercise actual synthetic frozen collectors,
 determinism, checksums, missing traces, unsupported adapters, unknown cleanup,
 private metadata/plan drift and atomic output. Cross-repo API/CLI handoffs pass for
 healthy, host contention, failed pressure, unsupported runtime, missing traces and unknown cleanup timing.
-No worker pressure or real capture was run. Independent released fixtures and
-reproduction pins remain Step 7; live campaigns/acceptance remain Step 8.
+No worker pressure or real capture was run. [Independent released fixtures and
+reproduction pins](n5-experiment-reproduction.md) are delivered in Step 7; live campaigns/acceptance remain Step 8.

@@ -119,6 +119,5 @@ That integration test is skipped on this Mac. No live pressure, Linux capture,
 container build, paired overhead or hosted/minimum-version run was performed.
 
 Healthy plus one CPU fault class cannot pass Phase 1.3's two real bottleneck-class
-gate. N4's capture/coverage/overhead gates remain separately pending. The next step
-is independent fixture pinning and cross-repository reproduction, followed by real
-campaign and closeout work.
+gate. N4's capture/coverage/overhead gates remain separately pending. [Independent fixture pinning and reproduction](n5-experiment-reproduction.md) are
+delivered in Step 7. The next step is real campaign and closeout work.

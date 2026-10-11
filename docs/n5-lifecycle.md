@@ -112,4 +112,4 @@ paired overhead trial was run in Step 4. [N4 tracing acceptance](n4-stage-trace-
 and actual Node 24/hosted results remain pending. Healthy plus one approved CPU
 class does not meet Phase 1.3's two real bottleneck-class gate. Concrete supported
 adapters and fixed effect predicates are delivered in [Step 5](n5-adapters.md); [offline bundle verification](n5-experiment-export.md) is delivered in
-Step 6; independent release pins remain Step 7.
+Step 6; [independent release pins](n5-experiment-reproduction.md) are delivered in Step 7.
