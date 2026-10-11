@@ -87,12 +87,12 @@ class RuntimeLease:
         finally:
             os.close(fd)
 
-    def _write(self, value):
+    def _write(self, value, name="journal.json"):
         if self.fd is None:
             raise ValueError("active lease required")
         # Recheck existing target; a symlink/special file is never read or followed.
         try:
-            existing = self._open("journal.json", os.O_RDONLY)
+            existing = self._open(name, os.O_RDONLY)
         except FileNotFoundError:
             existing = None
         if existing is not None:
@@ -100,24 +100,49 @@ class RuntimeLease:
         temporary = "journal-" + uuid.uuid4().hex
         fd = self._open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL)
         try:
-            data = (
-                json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n"
-            ).encode()
+            data = (json.dumps(value, sort_keys=True, separators=(",", ":")) + "\n").encode()
             with os.fdopen(fd, "wb") as file:
                 file.write(data)
                 file.flush()
                 os.fsync(file.fileno())
             os.replace(
                 temporary,
-                "journal.json",
+                name,
                 src_dir_fd=self.directory_fd,
                 dst_dir_fd=self.directory_fd,
             )
             os.fsync(self.directory_fd)
-            self.journal = value
+            if name == "journal.json":
+                self.journal = value
         finally:
             with suppress(FileNotFoundError):
                 os.unlink(temporary, dir_fd=self.directory_fd)
+
+    def worker_record(self, resource, value=None):
+        """Private durable child identity, reachable only under matching active intent."""
+        if (
+            self.fd is None
+            or self.journal is None
+            or self.journal["state"] == "clean"
+            or asdict(resource) not in self.journal["resources"]
+            or resource.kind != "pressure"
+        ):
+            raise ValueError("exact active pressure ownership required")
+        name = "worker-" + resource.token + ".json"
+        if value is not None:
+            self._write(value, name)
+            return value
+        try:
+            fd = self._open(name, os.O_RDONLY)
+        except FileNotFoundError:
+            return None
+        try:
+            data = os.read(fd, 4097)
+            if len(data) > 4096:
+                raise ValueError("worker identity exceeds bound")
+            return json.loads(data, object_pairs_hook=_unique)
+        finally:
+            os.close(fd)
 
     def begin(self, plan, resources):
         if self.journal is not None and self.journal["state"] != "clean":
@@ -131,6 +156,19 @@ class RuntimeLease:
         resources = tuple(Resource(**asdict(resource)) for resource in resources)
         if len({r.token for r in resources}) != len(resources):
             raise ValueError("duplicate ownership token")
+        if self.journal is not None:
+            # Retain at most one run's bounded native identities. Never scan/delete
+            # other files or discard dirty ownership intent.
+            for prior in self.journal["resources"]:
+                if prior["kind"] != "pressure":
+                    continue
+                name = "worker-" + prior["token"] + ".json"
+                try:
+                    fd = self._open(name, os.O_RDONLY)
+                except FileNotFoundError:
+                    continue
+                os.close(fd)
+                os.unlink(name, dir_fd=self.directory_fd)
         self._write(
             {
                 "version": "n5-private-lease-v1",

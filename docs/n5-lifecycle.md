@@ -1,7 +1,8 @@
 # N5 bounded lifecycle and fresh recording control
 
 **Delivered:** Step 4 software, 2026-10-11. [Handoff](n5-scenario-harness.md).
-Live adapters/effect verification are Step 5; export/adoption is Step 6.
+[Concrete camera/CPU adapters and fixed effect checks](n5-adapters.md) are delivered
+in Step 5 software; export/adoption is Step 6. Live execution remains pending.
 
 `engine/runtime/scenario_harness/` supplies a stdlib-only, opt-in synchronous
 runner with an immutable local `RunPlan`, exact workload/recording/worker ownership
@@ -22,7 +23,7 @@ are coalesced within the frozen 0.5–5 s evidence bounds.
 
 ## Runtime hook contract
 
-Step 5 must supply the concrete runtime/workload/CPU adapter. Hooks are trusted
+[Step 5 supplies the concrete camera/CPU adapter](n5-adapters.md). Hooks are trusted
 local implementation code, not serialized callbacks, shell commands or plug-ins.
 The runner cannot preempt an arbitrary blocking Python/GI hook: every hook must use
 its `Budget`, bounded system APIs and cooperative cancellation. `wait_until` must
@@ -61,8 +62,8 @@ A later owner must explicitly call `RuntimeLease.recover(runtime, budget)` and v
 every exact resource generation. Unknown/foreign ownership is retained as dirty and
 never restored by guess. A clean lease can begin a new run; active/dirty intent cannot
 be overwritten. This implements journal/ownership decision logic, not actual native
-child reconstruction. Step 5 must supply durable child identity/handshake records,
-TERM/KILL/reap and measured restoration; SIGKILL cannot promise cleanup.
+child reconstruction by itself. [Step 5 native worker ownership](n5-adapters.md)
+now supplies durable parked-child identities, pidfd recovery and bounded TERM/KILL/reap; SIGKILL cannot promise cleanup.
 
 ## Actual camera recording control
 
@@ -94,7 +95,7 @@ mistaking a warm-up shutdown artifact for a post-warm-up measurement.
 ## Local verification and remaining gates
 
 ```sh
-python3 -m unittest discover -s engine/runtime/tests/python -p 'test_scenario_harness.py' -v
+python3 -m unittest discover -s engine/runtime/tests/python -p 'test_scenario_*.py' -v
 python3 -m unittest discover -s engine/runtime/tests/python -p 'test_camera_trace*.py' -v
 npm run test:engine
 ```
@@ -110,5 +111,5 @@ No real pressure worker, Linux/GI playback, container build, measured effect or
 paired overhead trial was run in Step 4. [N4 tracing acceptance](n4-stage-trace-export.md)
 and actual Node 24/hosted results remain pending. Healthy plus one approved CPU
 class does not meet Phase 1.3's two real bottleneck-class gate. Concrete supported
-adapters and fixed effect predicates are next; offline bundle verification remains
+adapters and fixed effect predicates are delivered in [Step 5](n5-adapters.md); offline bundle verification remains
 Step 6 and independent release pins remain Step 7.

@@ -1,6 +1,8 @@
-"""Opt-in producer lifecycle; adapters/export remain separate implementation steps."""
+"""Opt-in producer lifecycle and adapters; detached export/inspection is separate."""
 
+from .camera_runtime import LinuxCameraRuntime, WorkloadDeclaration
 from .contracts import Budget, Counters, Resource, RunPlan, Timeline
+from .effects import MeasuredEffect, evaluate_effect
 from .lease import RuntimeLease
 from .runner import ScenarioRunner
 
@@ -12,4 +14,8 @@ __all__ = [
     "RuntimeLease",
     "ScenarioRunner",
     "Timeline",
+    "LinuxCameraRuntime",
+    "WorkloadDeclaration",
+    "MeasuredEffect",
+    "evaluate_effect",
 ]

@@ -6,7 +6,7 @@ import fs from "node:fs";
 test("N5 bounded lifecycle, ownership journal and recovery regressions pass", () => {
   const result = spawnSync(
     "python3",
-    ["-m", "unittest", "discover", "-s", "tests/python", "-p", "test_scenario_harness.py", "-v"],
+    ["-m", "unittest", "discover", "-s", "tests/python", "-p", "test_scenario_*.py", "-v"],
     { cwd: process.cwd(), encoding: "utf8", timeout: 30000 },
   );
   assert.equal(result.error, undefined, String(result.error));

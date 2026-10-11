@@ -162,22 +162,23 @@ def handle_offer(offer):
         'video_encoder': video_encoder,
         'webrtcbin': webrtcbin,
     }
+    owned_peer = peers[peer_id]
 
     def count_frame_in(_pad, _info):
         peer = peers.get(peer_id)
-        if peer is not None:
+        if peer is owned_peer:
             peer['frames_in_total'] += 1
         return Gst.PadProbeReturn.OK
 
     def count_frame_out(_pad, _info):
         peer = peers.get(peer_id)
-        if peer is not None:
+        if peer is owned_peer:
             peer['frames_out_total'] += 1
         return Gst.PadProbeReturn.OK
 
     def count_queue_drop(_queue):
         peer = peers.get(peer_id)
-        if peer is not None:
+        if peer is owned_peer:
             peer['frames_dropped_total'] += 1
 
     pre_encoder_queue.get_static_pad('sink').add_probe(
