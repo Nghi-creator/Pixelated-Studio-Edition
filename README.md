@@ -43,7 +43,7 @@ Opt-in [host](docs/n4-host-stage-tracing.md) and [browser](docs/n4-browser-stage
 stage tracing is bounded and disabled by default. [Standalone export and pinned
 integration](docs/n4-stage-trace-export.md) are delivered; real capture and measured
 overhead acceptance remain pending. [N5 scenario-harness work](docs/n5-scenario-harness.md)
-now starts from a reproduced baseline; its contract step is next.
+has delivered Steps 1–4, including [bounded lifecycle/fresh recording control](docs/n5-lifecycle.md); concrete adapters and effect verification are next.
 
 ## Architecture
 

@@ -23,6 +23,8 @@ class HostTraceBinding:
         self.used_segments = set()
         self.ready = False
         self.closed = False
+        self.last_capture_pts = None
+        self.pts_floor = None
 
     def _suspend(self, reason):
         self.recording.stop(self.stream, reason)
@@ -45,6 +47,8 @@ class HostTraceBinding:
                 return
             self.used_segments.add(key)
             self.segment_key = key
+            self.pts_floor = None
+            self.last_capture_pts = None
         self.pad_segments[boundary] = key
 
     def callback(self, boundary):
@@ -68,6 +72,12 @@ class HostTraceBinding:
                     if self.pad_segments.get(boundary) != self.segment_key:
                         return self.gst.PadProbeReturn.OK
                     if boundary == "capture_output":
+                        if self.pts_floor is not None and (
+                            type(buffer.pts) is not int or buffer.pts <= self.pts_floor
+                        ):
+                            return self.gst.PadProbeReturn.OK
+                        if type(buffer.pts) is int and 0 <= buffer.pts < 2**64 - 1:
+                            self.last_capture_pts = max(self.last_capture_pts or 0, buffer.pts)
                         if (
                             buffer.has_flags(self.gst.BufferFlags.DISCONT)
                             and self.stream.loss["offered_frames"]
@@ -84,6 +94,19 @@ class HostTraceBinding:
             return self.gst.PadProbeReturn.OK
 
         return probe
+
+    def retire(self):
+        """Freeze source admission boundary before closing; private PTS never exports."""
+        with self.lock:
+            if self.closed or self.segment_key is None or self.last_capture_pts is None:
+                raise ValueError("active source admission boundary unavailable")
+            handoff = (self.segment_key, dict(self.pad_segments),
+                       set(self.used_segments), self.last_capture_pts)
+            self.closed = True
+        self.close("completed")
+        if self.probes:
+            raise ValueError("old probes could not be retired")
+        return handoff
 
     def close(self, reason="shutdown"):
         with self.lock:
@@ -105,7 +128,7 @@ class HostTraceBinding:
                 self.probes.extend(failed)  # A later close can retry; flow stays untouched.
 
 
-def install_host_trace(pipeline, recording, gst):
+def install_host_trace(pipeline, recording, gst, handoff=None):
     if recording is None:
         return None
     # Resolve the complete hook set before registration. Called before PLAYING.
@@ -132,10 +155,15 @@ def install_host_trace(pipeline, recording, gst):
         if binding.stream is None:
             binding.close("capacity")
             return None
+        if handoff is not None:
+            binding.segment_key, binding.pad_segments, binding.used_segments, binding.pts_floor = handoff
+            binding.last_capture_pts = binding.pts_floor
         binding.ready = True
         return binding
-    except Exception:
+    except Exception as exc:
         binding.close("source_error")
+        if binding.probes:
+            exc.trace_binding = binding  # Retain exact handles for control cleanup retry.
         raise
 
 

@@ -14,6 +14,7 @@ from camera_trace import HostTraceRecording
 from camera_trace_export import export_camera_trace
 from camera_trace_config import parse_trace_config
 from camera_trace_hooks import install_host_trace, install_trace_shutdown
+from camera_trace_control import PeerRecordingControl
 
 gi.require_version("Gst", "1.0")
 gi.require_version("GstWebRTC", "1.0")
@@ -74,6 +75,18 @@ def cleanup_peer(peer_id, reason="shutdown"):
         pipeline.set_state(Gst.State.NULL)
     write_peer_state(PEER_STATE_PATH, SESSION_ID, peers)
     write_encoder_telemetry(TELEMETRY_STATE_PATH, SESSION_ID, peers)
+
+def create_peer_recording_control(peer_id, config):
+    """Explicit experiment-owner API; no socket exposure or work in media callbacks."""
+    if len(peers) != 1 or peer_id not in peers:
+        raise ValueError("experiment recording requires one exact draining peer")
+    peer = peers[peer_id]
+    binding = peer.get('stage_trace')
+    if isinstance(binding, PeerRecordingControl):
+        raise ValueError("peer recording already has an experiment owner")
+    control = PeerRecordingControl(peer['pipeline'], binding, Gst, config)
+    peer['stage_trace'] = control
+    return control
 
 def handle_offer(offer):
     validation_error = validate_offer(offer)
