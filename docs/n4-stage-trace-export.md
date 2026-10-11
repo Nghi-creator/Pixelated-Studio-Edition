@@ -77,6 +77,6 @@ carries these real acceptance gates forward; no trace contract or fixture change
 [Step 4 producer controls](n5-lifecycle.md) now retire old single-peer probes and
 create separate measured-phase collectors behind a bounded source barrier. The
 legacy shutdown export still belongs to its initial collector; a warm-up artifact
-cannot stand in for the fresh measured phase. Phase export/adoption remains N5
-Step 6. Actual Linux transition/overhead verification and full N4 acceptance remain
+cannot stand in for the fresh measured phase. [Phase export/adoption](n5-experiment-export.md) is delivered in N5
+Step 6 software. Actual Linux transition/overhead verification and full N4 acceptance remain
 pending; the synthetic pinned exports above still reproduce unchanged.

@@ -1,7 +1,7 @@
 # N5 supported adapters and measured effects
 
 **Delivered:** Step 5 software, 2026-10-11. [Lifecycle](n5-lifecycle.md),
-[current handoff](n5-scenario-harness.md). Export/offline inspection is Step 6.
+[current handoff](n5-scenario-harness.md). [Export/offline inspection](n5-experiment-export.md) is delivered in Step 6.
 
 `engine/runtime/scenario_harness/camera_runtime.py` implements opt-in trusted
 control-thread hooks for an existing Linux camera peer. It does not start the
@@ -16,7 +16,7 @@ camera module, private `RuntimeLease` and immutable `WorkloadDeclaration` contai
 a sanitized workload alias, seed and actual Node version from the campaign owner.
 Call `preflight(plan, budget)` before `ScenarioRunner.run(plan)`. It returns explicit
 availability/reason and an immutable tuple of runtime metadata, without children,
-recording changes or pressure. Unavailability must later export as unsupported,
+recording changes or pressure. Unavailability exports as unsupported through Step 6,
 with no phase/effect numbers; it is never retried by silently switching runtimes.
 
 Checks include actual Linux, monotonic clock/resolution, affinity and every visible
@@ -105,8 +105,8 @@ Multiple workers may legitimately yield CPU above 100% of one core. Unavailable
 effects retain null rates. Startup alone cannot verify pressure or degradation.
 
 These private results do not prove artifact hashes, detached cross-root associations,
-scientific causality, confidence or held-out separation. Step 6 must export and
-verify those associations before accepting a public experiment bundle.
+scientific causality, confidence or held-out separation. [Step 6](n5-experiment-export.md) exports and
+verifies those associations before accepting a public experiment bundle.
 
 ## Verification and pending execution
 
@@ -120,5 +120,5 @@ container build, paired overhead or hosted/minimum-version run was performed.
 
 Healthy plus one CPU fault class cannot pass Phase 1.3's two real bottleneck-class
 gate. N4's capture/coverage/overhead gates remain separately pending. The next step
-is producer export and bounded detached adoption/inspection, followed by independent
-fixtures/pins and real campaign work.
+is independent fixture pinning and cross-repository reproduction, followed by real
+campaign and closeout work.

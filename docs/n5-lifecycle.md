@@ -2,14 +2,14 @@
 
 **Delivered:** Step 4 software, 2026-10-11. [Handoff](n5-scenario-harness.md).
 [Concrete camera/CPU adapters and fixed effect checks](n5-adapters.md) are delivered
-in Step 5 software; export/adoption is Step 6. Live execution remains pending.
+in Step 5 software; [export/adoption](n5-experiment-export.md) is delivered in Step 6. Live execution remains pending.
 
 `engine/runtime/scenario_harness/` supplies a stdlib-only, opt-in synchronous
 runner with an immutable local `RunPlan`, exact workload/recording/worker ownership
 inventory and a private lease/journal. It never imports the sibling core or starts
 processes itself. All six phases, actual runner offsets, contiguous covered counter
 prefixes, action attempts and cleanup outcomes remain visible in internal execution
-records. These records are not exported `ExperimentResult` roots and contain no
+records. These private records are inputs to [Step 6 export](n5-experiment-export.md), rather than public `ExperimentResult` roots, and contain no
 verified effect claim.
 
 `RunPlan` bounds seeds, worker counts, phase order/durations, total watchdog,
@@ -88,8 +88,8 @@ Barrier callbacks only acknowledge idleness; filesystem/core/export work stays o
 the control thread after recordings freeze. Rotation introduces a deliberate
 short source pause whose live cost must be measured. The original warm-up collector
 is separate from the four measured phase collectors and is never relabelled.
-The legacy shutdown exporter still belongs to its initial N4 recording; Step 6 must
-explicitly export the frozen phase collectors returned by `finish_phase`, rather than
+The legacy shutdown exporter still belongs to its initial N4 recording; [Step 6](n5-experiment-export.md)
+explicitly exports the frozen phase collectors returned by `finish_phase`, rather than
 mistaking a warm-up shutdown artifact for a post-warm-up measurement.
 
 ## Local verification and remaining gates
@@ -111,5 +111,5 @@ No real pressure worker, Linux/GI playback, container build, measured effect or
 paired overhead trial was run in Step 4. [N4 tracing acceptance](n4-stage-trace-export.md)
 and actual Node 24/hosted results remain pending. Healthy plus one approved CPU
 class does not meet Phase 1.3's two real bottleneck-class gate. Concrete supported
-adapters and fixed effect predicates are delivered in [Step 5](n5-adapters.md); offline bundle verification remains
-Step 6 and independent release pins remain Step 7.
+adapters and fixed effect predicates are delivered in [Step 5](n5-adapters.md); [offline bundle verification](n5-experiment-export.md) is delivered in
+Step 6; independent release pins remain Step 7.
