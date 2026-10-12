@@ -42,8 +42,10 @@ class Pad:
     def deliver(self, info):
         return [callback(self, info) for callback in list(self.callbacks.values())]
 
-    def segment(self, number):
+    def segment(self, number, description=None):
         event = types.SimpleNamespace(type="SEGMENT", get_seqnum=lambda: number)
+        if description is not None:
+            event.parse_segment = lambda: types.SimpleNamespace(**description)
         return self.deliver(types.SimpleNamespace(type=2, get_event=lambda: event))
 
     def flush(self):
@@ -83,6 +85,70 @@ def binding():
 
 
 class HookTests(unittest.TestCase):
+    def test_actual_event_callbacks_route_replacement_without_changing_frame_pts(self):
+        gst = types.SimpleNamespace(**vars(GST), Format=types.SimpleNamespace(TIME=3), State=types.SimpleNamespace(NULL="null", VOID_PENDING="void"))
+        description = dict(format=3, rate=1.0, applied_rate=1.0, flags=0, base=0, offset=0, start=0, stop=2**64-1, time=0, position=0, duration=2**64-1)
+        manager = HostTraceRecording(TraceConfig(), clock=Clock(), resolution_ns=1)
+        pipeline = Pipeline()
+        pipeline.get_state = lambda timeout: ("success", "null", "void")
+        bound = install_host_trace(pipeline, manager, gst)
+        for _, _, boundary in LOCATIONS:
+            pipeline.pad(boundary).segment(99 if boundary == "encode_output" else 10, description)
+        pipeline.frame(50)
+        bound.close(); manager.finish()
+        events = snapshot(manager)["streams"][0]["events"]
+        self.assertEqual(len(events), 5)
+        self.assertEqual({e["frame_id"] for e in events}, {"frame-1"})
+
+    def test_fresh_encoder_event_id_requires_identical_initial_segment(self):
+        description = (0, 0, 0, 0, 2**64-1, 0, 0, 2**64-1)
+        for fresh, matching, input_seen in ((True, True, True), (False, True, True), (True, False, True), (True, True, False)):
+            with self.subTest(fresh=fresh, matching=matching, input_seen=input_seen):
+                manager, pipeline, bound = binding()
+                bound.allow_initial_encoder_segment = fresh
+                bound._segment("capture_output", 10, description)
+                if input_seen:
+                    bound._segment("encode_input", 10, description)
+                output_description = description if matching else (*description[:-1], 0)
+                bound._segment("encode_output", 99, output_description)
+                pipeline.pad("capture_output").buffer(50)
+                pipeline.pad("encode_input").buffer(50)
+                pipeline.pad("encode_output").buffer(50)
+                bound.close(); manager.finish()
+                events = snapshot(manager)["streams"][0]["events"]
+                self.assertEqual(any(e["boundary"] == "encode_output" for e in events), fresh and matching and input_seen)
+
+    def test_encoder_rewrite_cannot_bridge_reset_or_replace_an_output_segment(self):
+        description = (0, 0, 0, 0, 2**64-1, 0, 0, 2**64-1)
+        for reset in (False, True):
+            with self.subTest(reset=reset):
+                manager, pipeline, bound = binding()
+                bound.allow_initial_encoder_segment = True
+                bound._segment("capture_output", 10, description)
+                bound._segment("encode_input", 10, description)
+                bound._segment("encode_output", 99, description)
+                if reset:
+                    bound._segment("capture_output", 20, description)
+                    bound._segment("encode_input", 20, description)
+                bound._segment("encode_output", 100, description)
+                pipeline.pad("capture_output").buffer(50)
+                pipeline.pad("encode_input").buffer(50)
+                pipeline.pad("encode_output").buffer(50)
+                bound.close(); manager.finish()
+                events = [e for s in snapshot(manager)["streams"] for e in s["events"]]
+                self.assertFalse(any(e["boundary"] == "encode_output" for e in events))
+
+    def test_only_null_pipeline_installation_enables_initial_event_mapping(self):
+        gst = types.SimpleNamespace(**vars(GST), State=types.SimpleNamespace(NULL="null", VOID_PENDING="void"))
+        for state in ("null", "playing"):
+            with self.subTest(state=state):
+                manager, pipeline, old = binding()
+                old.close()
+                pipeline.get_state = lambda timeout, state=state: ("success", state, "void")
+                bound = install_host_trace(pipeline, manager, gst)
+                self.assertEqual(bound.allow_initial_encoder_segment, state == "null")
+                bound.close(); manager.finish()
+
     def test_explicit_diagnostic_samples_buffer_probes_and_bounds_storage(self):
         recording = HostTraceRecording(TraceConfig(),clock=Clock(),resolution_ns=1)
         pipeline = Pipeline()

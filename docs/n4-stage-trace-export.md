@@ -1,5 +1,14 @@
 # N4 standalone stage trace export
 
+Live Gst 1.26.2 testing on 2026-10-12 found preserved VP8 frame PTS with a
+replacement initial SEGMENT event ID. Host routing now recognizes one unchanged
+initial unit-rate TIME segment only from a pipeline observed NULL before probe
+installation, after the matching source and encoder-input events. Later output
+replacement events and seek/reset epochs keep the strict guard; PTS is never
+transformed. Recording handoffs retain the already established private routing.
+The short native diagnostic yielded 110 queue/encode pairs without collector loss;
+this does not replace the full 30-second/500-pair and overhead acceptance gates.
+
 Tracing remains opt-in. Export is independent of research bundle v2 and contains
 only trace-manifest.json and canonical trace-record.json in a gzip TAR. No summary,
 pixels, raw PTS, addresses, credentials, titles or game/session filename are added.

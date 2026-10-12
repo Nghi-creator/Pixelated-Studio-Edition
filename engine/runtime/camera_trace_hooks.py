@@ -25,13 +25,33 @@ class HostTraceBinding:
         self.closed = False
         self.last_capture_pts = None
         self.pts_floor = None
+        self.allow_initial_encoder_segment = False
+        self.source_segment_description = None
+        self.encoder_input_segment = None
+        self.encoder_output_segment_seen = False
 
     def _suspend(self, reason):
         self.recording.stop(self.stream, reason)
         self.stream = None
         self.segment_key = None
+        self.source_segment_description = None
+        self.encoder_input_segment = None
 
-    def _segment(self, boundary, key):
+    def _segment_description(self, event):
+        parse = getattr(event, "parse_segment", None)
+        if parse is None:
+            return None
+        segment = parse()
+        if segment.format != self.gst.Format.TIME or segment.rate != 1 or segment.applied_rate != 1:
+            return None
+        values = tuple(getattr(segment, name) for name in (
+            "base", "offset", "start", "stop", "time", "position", "duration"
+        ))
+        if any(type(value) is not int or not 0 <= value < 2**64 for value in values):
+            return None
+        return (int(segment.flags), *values)
+
+    def _segment(self, boundary, key, description=None):
         if type(key) is not int or not 0 <= key <= 2**32 - 1:
             self._suspend("source_error")
             return
@@ -49,6 +69,26 @@ class HostTraceBinding:
             self.segment_key = key
             self.pts_floor = None
             self.last_capture_pts = None
+            self.source_segment_description = description
+            self.encoder_input_segment = None
+        if boundary == "encode_input" and key == self.segment_key:
+            self.encoder_input_segment = (key, description)
+        if (
+            boundary == "encode_output"
+            and key != self.segment_key
+            and self.allow_initial_encoder_segment
+            and not self.encoder_output_segment_seen
+            and len(self.used_segments) == 1
+            and description is not None
+            and description == self.source_segment_description
+            and self.encoder_input_segment == (self.segment_key, description)
+        ):
+            # A freshly NULL pipeline has no older encoded generation. GstVideoEncoder
+            # may issue its own event ID for an unchanged initial TIME segment.
+            # Normalize only that proven initial segment, never a seek/reset or PTS.
+            key = self.segment_key
+        if boundary == "encode_output":
+            self.encoder_output_segment_seen = True
         self.pad_segments[boundary] = key
 
     def callback(self, boundary):
@@ -60,7 +100,7 @@ class HostTraceBinding:
                     if info.type & self.gst.PadProbeType.EVENT_DOWNSTREAM:
                         event = info.get_event()
                         if event.type == self.gst.EventType.SEGMENT:
-                            self._segment(boundary, event.get_seqnum())
+                            self._segment(boundary, event.get_seqnum(), self._segment_description(event))
                         elif event.type == self.gst.EventType.FLUSH_START:
                             self.pad_segments.pop(boundary, None)
                             if boundary == "capture_output":
@@ -128,6 +168,8 @@ class HostTraceBinding:
             probes, self.probes = self.probes, []
             self.pad_segments.clear()
             self.used_segments.clear()
+            self.source_segment_description = None
+            self.encoder_input_segment = None
         # Do not hold the binding mutex while asking Gst to remove callbacks.
         failed = []
         for pad, probe_id in probes:
@@ -153,6 +195,12 @@ def install_host_trace(pipeline, recording, gst, handoff=None, probe_costs=None)
         pads.append((pad, boundary))
     binding = HostTraceBinding(recording, gst)
     binding.probe_costs = probe_costs
+    if handoff is None:
+        try:
+            _, state, pending = pipeline.get_state(0)
+            binding.allow_initial_encoder_segment = state == gst.State.NULL and pending == gst.State.VOID_PENDING
+        except (AttributeError, TypeError, ValueError):
+            pass  # Unknown/playing pipelines retain the original strict sequence guard.
     try:
         for pad, boundary in pads:
             probe_id = pad.add_probe(
