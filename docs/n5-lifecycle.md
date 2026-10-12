@@ -21,6 +21,15 @@ restoration before recovery. Degraded→probe counters retain one continuous bou
 N4 recording clocks still restart independently. Fractional-second final intervals
 are coalesced within the frozen 0.5–5 s evidence bounds.
 
+Live acceptance found that stamping interval end before reading owned CPU could
+falsely exceed the strict capacity bound on a saturated first sample. The runner
+now stamps the receipt after reading counters; it does not clamp CPU or relax
+the bound. Final abort cleanup also records action-stop/cleanup offsets when the
+original measurement clock is still valid and every owned restoration succeeds.
+A failed/regressed measurement clock remains unknown even when the independent
+watchdog releases resources. This closes the missing abort receipt without
+fabricating recovery measurements or accepting an incomplete run.
+
 ## Runtime hook contract
 
 [Step 5 supplies the concrete camera/CPU adapter](n5-adapters.md). Hooks are trusted

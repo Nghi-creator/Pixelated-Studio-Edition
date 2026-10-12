@@ -168,6 +168,30 @@ class HarnessTests(unittest.TestCase):
         self.assertTrue(all(i[4] == 1 for p in result.phases[2:4] for i in p.intervals))
         self.assertTrue(all(i[4:] == (0, 0) for i in result.phases[4].intervals))
 
+    def test_saturated_cpu_read_latency_is_inside_wall_receipt(self):
+        class Saturated(Runtime):
+            def start_action(inner, value, budget):
+                result = super().start_action(value, budget)
+                inner.origin = inner.clock.value
+                inner.reads = 0
+                return result
+
+            def counters(inner):
+                if inner.workers:
+                    # Initial read is immediate; subsequent reads take 1 ms while
+                    # the single worker continues consuming an entire CPU core.
+                    if inner.reads:
+                        inner.clock.value += SECOND // 1000
+                    inner.reads += 1
+                    inner.cpu = inner.clock.value - inner.origin
+                return super().counters()
+
+        self.runtime = Saturated(self.clock)
+        result = self.run_plan(True)
+        self.assertEqual(result.status, "completed")
+        intervals = [row for phase in result.phases[2:4] for row in phase.intervals]
+        self.assertTrue(all(row[5] == row[1] - row[0] for row in intervals))
+
     def test_fractional_second_duration_has_no_short_fabricated_interval(self):
         value = RunPlan("run-1", "healthy", 0, (1_100_000_000,) * 6)
         result = self.run_plan(value=value)
@@ -178,6 +202,9 @@ class HarnessTests(unittest.TestCase):
     def test_cancellation_keeps_prefix_and_attempts_every_owned_cleanup(self):
         result = self.run_plan(True, cancelled=lambda: self.clock.value >= 65 * SECOND)
         self.assertEqual((result.status, result.reason), ("aborted", "cancelled"))
+        self.assertEqual(result.action_stopped_ns, 65 * SECOND)
+        self.assertEqual(result.action_cleanup_started_ns, 65 * SECOND)
+        self.assertEqual(result.action_cleanup_ended_ns, 65 * SECOND)
         self.assertEqual([p.phase for p in result.phases], list(PHASES[:3]))
         self.assertEqual(result.phases[-1].state, "partial")
         self.assertEqual(result.phases[-1].end_ns, 65 * SECOND)

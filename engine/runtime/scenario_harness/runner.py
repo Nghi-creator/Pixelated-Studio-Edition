@@ -147,10 +147,13 @@ class ScenarioRunner:
                     )
                     self.runtime.wait_until(t.origin + deadline, phase_budget)
                     phase_budget.check()
+                    # The receipt time must include the counter read itself. Reading
+                    # worker CPU after the wall timestamp can report >100% in a fully
+                    # saturated first interval even when the raw clocks are valid.
+                    counters = self._counters(plan, phase)
                     observed = t.offset()
                     if observed < deadline:
                         raise RunFailure("source_error")
-                    counters = self._counters(plan, phase)
                     wall = observed - cursor
                     if not SECOND // 2 <= wall <= 5 * SECOND:
                         raise RunFailure("source_error")
@@ -218,12 +221,20 @@ class ScenarioRunner:
             cleanup_timeline = Timeline(self.runtime.cleanup_clock)
             cleanup_start = cleanup_timeline.now()
             cleanup_budget = Budget(cleanup_timeline, cleanup_start + 10 * SECOND)
+            # Aborts also stop owned actions. Preserve their cleanup receipt when
+            # the original measurement clock is still trustworthy; never repair it.
+            if started is not None and stopped is None:
+                with suppress(RunFailure):
+                    action_cleanup_start = t.offset()
             restored, cleanup_reason = restore_owned(
                 resources, self.runtime, cleanup_budget
             )
             cleanup_end = cleanup_timeline.now()
             if cleanup_end - cleanup_start > 10 * SECOND:
                 restored, cleanup_reason = False, "restore_failed"
+            if restored and started is not None and stopped is None:
+                with suppress(RunFailure):
+                    action_cleanup_end = stopped = t.offset()
         except BaseException:
             cleanup_start = cleanup_end = 0
             restored, cleanup_reason = False, "missing_evidence"
