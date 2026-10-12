@@ -547,12 +547,44 @@ class CameraAdapterTests(unittest.TestCase):
 
     def test_actual_hook_adapter_healthy_runner_and_fixed_effect(self):
         self.assertEqual(self.preflight().state, "available")
+        self.assertEqual(dict(self.runtime.availability.runtime)["gst_version"], "1.24.2")
         self.assertEqual(self.calls, [])  # Read-only: no recording, children or setting mutation.
         result = ScenarioRunner(self.lease, self.runtime, self.clock).run(plan(0))
         self.assertEqual(result.status, "completed")
         self.assertEqual(evaluate_effect(plan(0), result).state, "verified")
         self.assertEqual(self.runtime.frozen_recordings, [(phase, phase) for phase in PHASES[1:5]])
         self.assertEqual(self.lease.journal["state"], "clean")
+
+    def test_context_managed_caps_borrow_is_released_on_success_and_rejection(self):
+        for width in (1280, 640):
+            with self.subTest(width=width):
+                calls = []
+
+                class Borrow:
+                    def __enter__(inner):
+                        calls.append("enter")
+
+                        def field(name, width=width):
+                            self.assertEqual(calls, ["enter"])
+                            return {"width": width, "height": 720}[name]
+
+                        return SimpleNamespace(
+                            get_fraction=lambda name: (True, 30, 1), get_value=field
+                        )
+
+                    def __exit__(inner, *exc):
+                        calls.append("exit")
+
+                caps = SimpleNamespace(get_structure=lambda index: Borrow())
+                self.encoder.get_static_pad = lambda name, caps=caps: SimpleNamespace(
+                    get_current_caps=lambda: caps
+                )
+                if width == 1280:
+                    self.runtime._snapshot()
+                else:
+                    with self.assertRaises(ValueError):
+                        self.runtime._snapshot()
+                self.assertEqual(calls, ["enter", "exit"])
 
     def test_peer_generation_and_configuration_drift_fail_closed(self):
         self.assertEqual(self.preflight().state, "available")

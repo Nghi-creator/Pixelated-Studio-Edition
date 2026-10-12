@@ -6,6 +6,7 @@ import re
 import sys
 import time
 import uuid
+from contextlib import nullcontext
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -124,14 +125,21 @@ class LinuxCameraRuntime:
             raise ValueError("peer not draining")
         caps = encoder.get_static_pad("sink").get_current_caps()
         structure = caps.get_structure(0)
-        ok, numerator, denominator = structure.get_fraction("framerate")
-        if not ok or (
-            structure.get_value("width"),
-            structure.get_value("height"),
-            numerator,
-            denominator,
-        ) != (1280, 720, 30, 1):
-            raise ValueError("fixed 1280x720/30 workload required")
+        # Recent Gst Python overrides borrow structures through a context manager.
+        # Keep the caps alive and read every field before releasing that borrow.
+        with (
+            structure
+            if hasattr(structure, "__enter__")
+            else nullcontext(structure) as fields
+        ):
+            ok, numerator, denominator = fields.get_fraction("framerate")
+            if not ok or (
+                fields.get_value("width"),
+                fields.get_value("height"),
+                numerator,
+                denominator,
+            ) != (1280, 720, 30, 1):
+                raise ValueError("fixed 1280x720/30 workload required")
         # Verify actual audio source too, without process-name scans or new probes.
         iterator = pipeline.iterate_elements()
         pulse = False
@@ -217,7 +225,7 @@ class LinuxCameraRuntime:
                     kind="linux_x11",
                     python_version=".".join(map(str, sys.version_info[:3])),
                     node_version=self.workload.node_version,
-                    gst_version=".".join(map(str, versions)),
+                    gst_version=".".join(map(str, versions[:3])),
                     cpu_allocation=allocation,
                     width=1280,
                     height=720,
