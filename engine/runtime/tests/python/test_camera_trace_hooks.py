@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from camera_trace import HostTraceRecording
 from camera_trace_config import TraceConfig
-from camera_trace_hooks import LOCATIONS, install_host_trace, install_trace_shutdown
+from camera_trace_hooks import ProbeCosts, LOCATIONS, install_host_trace, install_trace_shutdown
 from test_camera_trace import Clock, create, snapshot
 
 GST = types.SimpleNamespace(
@@ -83,6 +83,24 @@ def binding():
 
 
 class HookTests(unittest.TestCase):
+    def test_explicit_diagnostic_samples_buffer_probes_and_bounds_storage(self):
+        recording = HostTraceRecording(TraceConfig(),clock=Clock(),resolution_ns=1)
+        pipeline = Pipeline()
+        costs = ProbeCosts()
+        bound = install_host_trace(pipeline,recording,GST,probe_costs=costs)
+        pipeline.segments(10)
+        self.assertEqual(costs.count,0)
+        pipeline.frame(50)
+        samples,count = costs.snapshot()
+        self.assertEqual(count,5)
+        self.assertEqual(len(samples),5)
+        self.assertTrue(all(n>=0 for n in samples))
+        for _ in range(10001):costs.observe(100)
+        self.assertEqual(len(costs.snapshot()[0]),10000)
+        self.assertEqual(costs.count,10006)
+        bound.close()
+        recording.finish()
+
     def test_signal_shutdown_is_opt_in_and_quits_the_loop(self):
         self.assertIsNone(install_trace_shutdown(None, None, None))
         registered, quit_calls = [], []

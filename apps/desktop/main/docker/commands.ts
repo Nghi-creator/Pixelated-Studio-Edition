@@ -10,6 +10,9 @@ type DockerRunArgsOptions = {
   includeUinputDevice: boolean;
   publishHost: string;
   uinputGroupId?: number;
+  researchCampaign?: boolean;
+  researchWorkloadId?: string;
+  researchWorkloadSeed?: number;
 };
 
 const ENGINE_CONTAINER_USER = "10001:10001";
@@ -54,7 +57,13 @@ export function buildDockerRunArgs({
   includeUinputDevice,
   publishHost,
   uinputGroupId,
+  researchCampaign = false,
+  researchWorkloadId,
+  researchWorkloadSeed,
 }: DockerRunArgsOptions) {
+  if (researchCampaign && (!/^workload-[1-9][0-9]{0,8}$/.test(researchWorkloadId || "") || !Number.isSafeInteger(researchWorkloadSeed) || researchWorkloadSeed! < 0 || researchWorkloadSeed! > 4294967295)) {
+    throw new Error("N5 research requires an explicit workload and seed declaration.");
+  }
   return [
     "run",
     "-d",
@@ -106,6 +115,14 @@ export function buildDockerRunArgs({
     `PIXELATED_ADVERTISED_URLS=${advertisedUrls.join(",")}`,
     "-e",
     `PIXELATED_COMPANION_URLS=${companionUrls.join(",")}`,
+    ...(researchCampaign ? [
+      "-v", "pixelated-n5:/n5",
+      "-e", "PIXELATED_STAGE_TRACE=1",
+      "-e", "PIXELATED_STAGE_TRACE_BUDGET_NS=50000000",
+      "-e", "PIXELATED_N5_CAMPAIGN_DIRECTORY=/n5/control",
+      "-e", `PIXELATED_N5_WORKLOAD_ID=${researchWorkloadId}`,
+      "-e", `PIXELATED_N5_WORKLOAD_SEED=${researchWorkloadSeed}`,
+    ] : []),
     engineImage,
   ];
 }

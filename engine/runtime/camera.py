@@ -1,4 +1,5 @@
 import os
+import sys
 
 import gi
 import socketio
@@ -27,6 +28,17 @@ Gst.init(None)
 SESSION_ID = os.environ.get('PIXELATED_SESSION_ID', 'default-session')
 ENGINE_TOKEN = os.environ.get('PIXELATED_ENGINE_TOKEN', '')
 ICE_SERVERS = os.environ.get('PIXELATED_ICE_SERVERS', '[]')
+N5_CAMPAIGN_DIRECTORY = os.environ.get("PIXELATED_N5_CAMPAIGN_DIRECTORY")
+N5_WORKLOAD_DECLARATION = None
+if N5_CAMPAIGN_DIRECTORY:
+    from scenario_harness.camera_runtime import WorkloadDeclaration
+    declared_seed = os.environ.get("PIXELATED_N5_WORKLOAD_SEED", "")
+    if declared_seed.isascii() and declared_seed.isdecimal() and len(declared_seed) <= 10:
+        N5_WORKLOAD_DECLARATION = WorkloadDeclaration(
+            os.environ.get("PIXELATED_N5_WORKLOAD_ID", ""), int(declared_seed),
+            os.environ.get("PIXELATED_N5_NODE_VERSION", ""),
+        )
+
 STREAM_PROFILE = os.environ.get('PIXELATED_STREAM_PROFILE', '{}')
 PEER_STATE_PATH = os.environ.get(
     'PIXELATED_CAMERA_PEER_STATE_PATH',
@@ -122,11 +134,13 @@ def handle_offer(offer):
         f"cpu-used={stream_profile['cpu_used']}, max-quantizer={stream_profile['max_quantizer']})"
     )
     
+    pacing_element = "identity name=n5_capture_pacer sleep-time=0 signal-handoffs=false silent=true !" if N5_CAMPAIGN_DIRECTORY else ""
     pipeline_str = f"""
         webrtcbin name=sendrecv
         
         ximagesrc name=video_capture display-name=:99 use-damage=false show-pointer=false !
         video/x-raw,framerate={stream_profile['fps']}/1 ! 
+        {pacing_element}
         videoconvert ! video/x-raw,format=I420 ! 
         queue name=pre_encoder_queue max-size-buffers=1 leaky=downstream !
         vp8enc name=video_encoder deadline=1 cpu-used={stream_profile['cpu_used']} threads=4 end-usage=cbr target-bitrate={stream_profile['bitrate']} max-quantizer={stream_profile['max_quantizer']} min-quantizer=4 keyframe-max-dist=120 error-resilient=1 !
@@ -285,17 +299,28 @@ def on_peer_disconnect(payload):
 sio.connect('http://localhost:8080', auth={'token': ENGINE_TOKEN})
 GLib.timeout_add_seconds(1, publish_encoder_telemetry)
 loop = GLib.MainLoop()
+campaign_service = None
+if N5_CAMPAIGN_DIRECTORY:
+    from scenario_harness.campaign import CampaignService
+    if STAGE_TRACE is None:
+        raise ValueError("N5 campaign requires explicitly enabled tracing")
+    campaign_service = CampaignService(sys.modules[__name__], N5_CAMPAIGN_DIRECTORY)
+    campaign_service.start()
 install_trace_shutdown(STAGE_TRACE, GLib, loop)
 try:
     loop.run()
 finally:
     try:
-        for peer_id in list(peers):
-            try:
-                cleanup_peer(peer_id)
-            except Exception:
-                print("[Python] Camera peer cleanup failed during shutdown.")
+        if campaign_service is not None:
+            campaign_service.close()
     finally:
-        if STAGE_TRACE is not None:
-            STAGE_TRACE.finish("shutdown")
-            export_camera_trace(STAGE_TRACE, os.environ)
+        try:
+            for peer_id in list(peers):
+                try:
+                    cleanup_peer(peer_id)
+                except Exception:
+                    print("[Python] Camera peer cleanup failed during shutdown.")
+        finally:
+            if STAGE_TRACE is not None:
+                STAGE_TRACE.finish("shutdown")
+                export_camera_trace(STAGE_TRACE, os.environ)

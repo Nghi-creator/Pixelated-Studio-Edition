@@ -93,7 +93,19 @@ class HostTraceBinding:
                     self.ready = False
             return self.gst.PadProbeReturn.OK
 
-        return probe
+        costs = getattr(self, "probe_costs", None)
+        if costs is None:
+            return probe
+        def timed(pad, info):
+            if not info.type & self.gst.PadProbeType.BUFFER:
+                return probe(pad, info)
+            import time
+            start = time.perf_counter_ns()
+            try:
+                return probe(pad, info)
+            finally:
+                costs.observe(time.perf_counter_ns() - start)
+        return timed
 
     def retire(self):
         """Freeze source admission boundary before closing; private PTS never exports."""
@@ -128,7 +140,7 @@ class HostTraceBinding:
                 self.probes.extend(failed)  # A later close can retry; flow stays untouched.
 
 
-def install_host_trace(pipeline, recording, gst, handoff=None):
+def install_host_trace(pipeline, recording, gst, handoff=None, probe_costs=None):
     if recording is None:
         return None
     # Resolve the complete hook set before registration. Called before PLAYING.
@@ -140,6 +152,7 @@ def install_host_trace(pipeline, recording, gst, handoff=None):
             raise ValueError("N4 host boundary is unavailable")
         pads.append((pad, boundary))
     binding = HostTraceBinding(recording, gst)
+    binding.probe_costs = probe_costs
     try:
         for pad, boundary in pads:
             probe_id = pad.add_probe(
@@ -178,3 +191,21 @@ def install_trace_shutdown(recording, glib, loop):
         return False
 
     return glib.unix_signal_add(glib.PRIORITY_DEFAULT, signal.SIGTERM, shutdown)
+
+
+class ProbeCosts:
+    """Bounded explicit diagnostic only; samples contain durations, never raw buffers."""
+    def __init__(self):
+        self.samples = []
+        self.count = 0
+        self.lock = threading.Lock()
+
+    def observe(self, duration):
+        with self.lock:
+            self.count += 1
+            if len(self.samples) < 10000:
+                self.samples.append(duration)
+
+    def snapshot(self):
+        with self.lock:
+            return list(self.samples), self.count

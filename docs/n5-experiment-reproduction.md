@@ -43,6 +43,6 @@ configuration, not observed hosted or actual minimum-version execution.
 Trace sampling 1/1000 with bounds 2 frames/10 events keeps fixtures compact. This
 single retained sample does not meet real tracing coverage/overhead gates. Raw
 phase counters retain every second interval, while N4 event clocks stay separate.
-All eight local actual-producer/core API/CLI handoffs pass. Step 8 remains open for
+All eight local actual-producer/core API/CLI handoffs pass. [Step 8 software closeout](n5-software-closeout.md) is recorded; acceptance remains open for
 real repetitions, held-out source separation, inherited N4 acceptance and the
 second real bottleneck class; healthy plus one CPU class cannot satisfy Phase 1.3.

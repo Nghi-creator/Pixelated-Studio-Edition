@@ -7,7 +7,10 @@ from pathlib import Path
 
 
 class LifecycleTests(unittest.TestCase):
-    def execute_shutdown(self, fail_state_write=False):
+    def test_campaign_close_failure_never_skips_camera_teardown(self):
+        self.execute_shutdown(fail_campaign_close=True)
+
+    def execute_shutdown(self, fail_state_write=False, fail_campaign_close=False):
         tree = ast.parse((Path(__file__).resolve().parents[2] / "camera.py").read_text())
         cleanup = next(
             node
@@ -41,6 +44,7 @@ class LifecycleTests(unittest.TestCase):
             raise KeyboardInterrupt()
 
         namespace = {
+            "campaign_service": None,
             "peers": peers,
             "os": types.SimpleNamespace(environ={}),
             "export_camera_trace": lambda recording, environment: calls.append(
@@ -58,8 +62,12 @@ class LifecycleTests(unittest.TestCase):
             ),
             "print": lambda *_args: None,
         }
+        if fail_campaign_close:
+            def failed_close():
+                raise RuntimeError("private diagnostic")
+            namespace["campaign_service"] = types.SimpleNamespace(close=failed_close)
         module = ast.Module(body=[cleanup, loop_try], type_ignores=[])
-        with self.assertRaises(KeyboardInterrupt):
+        with self.assertRaises(RuntimeError if fail_campaign_close else KeyboardInterrupt):
             # Execute only the trusted local teardown AST, never supplied trace data.
             exec(compile(module, "camera-teardown", "exec"), namespace)  # noqa: S102
         self.assertEqual(peers, {})

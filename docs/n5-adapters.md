@@ -118,6 +118,14 @@ test spawns an actual parked child and sends EOF without GO; it never runs press
 That integration test is skipped on this Mac. No live pressure, Linux capture,
 container build, paired overhead or hosted/minimum-version run was performed.
 
-Healthy plus one CPU fault class cannot pass Phase 1.3's two real bottleneck-class
+The original v1 healthy/CPU support alone cannot pass Phase 1.3's two real bottleneck-class
 gate. N4's capture/coverage/overhead gates remain separately pending. [Independent fixture pinning and reproduction](n5-experiment-reproduction.md) are
 delivered in Step 7. The next step is real campaign and closeout work.
+
+## Additive capture pacing
+
+The [live test workflow](n5-live-test-procedure.md) adds an opt-in identity element
+with fixed 50 ms pacing in degraded/probe, restored before recovery and guarded
+by an exact-element watchdog. Its additive experiment-v2 method independently
+checks observed stage delay and throughput/restoration; the setter is not ground
+truth. V1 roots/pins are unchanged. Real execution remains pending.

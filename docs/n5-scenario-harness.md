@@ -22,7 +22,8 @@ unknown restoration remain visible. The runner uses trusted cooperative hooks;
 it cannot preempt arbitrary blocking Python/GI code. No real fault trial is claimed.
 [Bundle export and detached inspection](n5-experiment-export.md) are delivered in
 Step 6. [Independent fixtures/pins/reproduction](n5-experiment-reproduction.md) are delivered
-in Step 7. One planned step remains: real campaign/closeout (Step 8).
+in Step 7. [Step 8 software closeout](n5-software-closeout.md) is recorded; real campaign
+acceptance remains open.
 
 V1 approves healthy and host contention for implementation. Other fault classes
 and mixed/changing scenarios remain unsupported. Startup is separate from effect
@@ -49,3 +50,19 @@ capture, draining receiver, real callbacks/picker and every paired overhead tria
 remain pending. No live pressure, host networking change, deployment, container
 build, actual Node 24 or hosted verification was run. Healthy plus one approved CPU
 class cannot satisfy Phase 1.3's two real bottleneck-class gate or complete Phase 1.
+
+## End-to-end coding extension
+
+[Live test procedure](n5-live-test-procedure.md) documents the implemented opt-in
+desktop/container/camera entry, private frozen schedules, capture-pacing second
+adapter, repeated source assignments, cancellation and overhead collection. The
+core adds v2 pacing and linked campaign/overhead inspectors with independent raw
+threshold checks. Original v1 release pins and normal startup remain unchanged.
+The Step 7 counts above are historical; live trials have not run.
+
+Final coding-extension checks: 718 Node passed (existing artifact skip), 129 nested
+Python passed (one Linux-only idle-child skip), workspace lint and desktop/engine
+builds pass. The sibling core passes 1,978 tests at 93.48% coverage, checks 23
+schemas and retains original release bytes. Actual synthetic pacing exports pass
+core API/CLI for verified/unobserved/unknown-cleanup outcomes. The final CLI test
+was verified through a subsequent engine-wrapper run. Live trials remain pending.

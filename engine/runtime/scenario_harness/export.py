@@ -69,7 +69,7 @@ def unsupported_bundle_bytes(manifest):
     )
 
 
-def experiment_bundle_bytes(manifest, plan, execution, *, recordings=(), observation_windows=()):
+def experiment_files(manifest, plan, execution, *, recordings=(), observation_windows=()):
     """No live runtime access. Missing frozen traces retain an aborted source result.
 
     Native IDs, private cleanup watchdog timestamps and diagnostics are never copied.
@@ -255,7 +255,7 @@ def experiment_bundle_bytes(manifest, plan, execution, *, recordings=(), observa
         cleanup=cleanup,
     )
     files["experiment-result.json"] = json_bytes(result)
-    return _archive(files)
+    return files
 
 
 def write_experiment_bundle(path, payload):
@@ -265,3 +265,15 @@ def write_experiment_bundle(path, payload):
     from .output import write_atomic
 
     write_atomic(path, payload)
+
+
+def experiment_bundle_bytes(manifest, plan, execution, *, recordings=(), observation_windows=()):
+    return _archive(
+        experiment_files(
+            manifest,
+            plan,
+            execution,
+            recordings=recordings,
+            observation_windows=observation_windows,
+        )
+    )

@@ -170,6 +170,8 @@ COPY --from=python-builder /out /usr/local/lib/python3.10/dist-packages
 COPY scenario_harness /app/scenario_harness
 COPY camera.py camera_config.py camera_protocol.py camera_state.py camera_trace.py camera_trace_config.py camera_trace_hooks.py camera_trace_export.py camera_trace_control.py input_gamepad.py input_keyboard.py /app/
 
+RUN install -d -o 10001 -g 10001 -m 0700 /n5 /n5/control
+
 WORKDIR /app
 ENV HOME=/home/pixelated
 USER 10001:10001

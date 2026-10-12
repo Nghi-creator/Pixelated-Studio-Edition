@@ -102,6 +102,10 @@ export function getDockerRunArgs({
     engineImage: resolvedRuntimeConfig.engineImage,
     engineRuntimeKind: resolvedRuntimeConfig.engineRuntimeKind,
     engineToken,
+    researchCampaign: process.env.PIXELATED_N5_RESEARCH === "1",
+    researchWorkloadId: process.env.PIXELATED_N5_WORKLOAD_ID,
+    researchWorkloadSeed: /^(0|[1-9][0-9]{0,9})$/.test(process.env.PIXELATED_N5_WORKLOAD_SEED || "")
+      ? Number(process.env.PIXELATED_N5_WORKLOAD_SEED) : undefined,
     exposureMode,
     includeUinputDevice,
     publishHost,

@@ -127,3 +127,21 @@ class PeerRecordingControl:
             except Exception:
                 success = False
             return success and self.barrier is None
+
+    def rearm(self):
+        """Fresh warm-up binding after a fully restored run; never reuse measured frames."""
+        with self.lock:
+            if not self.closed or self.index != 4 or self.handoff is None or self.failed_bindings or self.binding.probes:
+                raise ValueError("only a complete restored recorder can rearm")
+            self._block_source()
+            recording = self.factory(self.config)
+            try:
+                binding = install_host_trace(self.pipeline, recording, self.gst, self.handoff)
+                if binding is None:
+                    raise ValueError("fresh warm-up binding unavailable")
+                return binding
+            except BaseException:
+                recording.finish("source_error")
+                raise
+            finally:
+                self._unblock_source()

@@ -73,6 +73,32 @@ def control():
 
 
 class ControlTests(unittest.TestCase):
+    def test_rearm_creates_new_warmup_binding_without_reusing_old_frames(self):
+        pipeline, _, owner = control()
+        for i, phase in enumerate(("healthy", "degraded", "probe", "recovery")):
+            owner.start_phase(phase)
+            pipeline.frame(60+i*10)
+            owner.finish_phase(phase)
+        old = owner.finished[-1][1]
+        before = old.snapshot("a"*40,"synthetic")
+        self.assertTrue(owner.close())
+        binding = owner.rearm()
+        pipeline.frame(100)
+        self.assertEqual(before,old.snapshot("a"*40,"synthetic"))
+        self.assertIsNot(binding.recording,old)
+        self.assertFalse(binding.recording.finished)
+        self.assertEqual(len(binding.stream.frames),1)
+        binding.close()
+        binding.recording.finish()
+        self.assertTrue(all(not p.callbacks for p in pipeline.pads.values()))
+
+    def test_partial_or_active_recorders_cannot_rearm(self):
+        _, _, owner = control()
+        with self.assertRaises(ValueError): owner.rearm()
+        owner.start_phase("healthy")
+        owner.close()
+        with self.assertRaises(ValueError): owner.rearm()
+
     def test_four_fresh_collectors_and_new_clocks_preserve_n4_roots(self):
         pipeline, initial, owner = control()
         for index, phase in enumerate(("healthy", "degraded", "probe", "recovery")):
