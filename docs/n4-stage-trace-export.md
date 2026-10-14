@@ -7,7 +7,12 @@ installation, after the matching source and encoder-input events. Later output
 replacement events and seek/reset epochs keep the strict guard; PTS is never
 transformed. Recording handoffs retain the already established private routing.
 The short native diagnostic yielded 110 queue/encode pairs without collector loss;
-this does not replace the full 30-second/500-pair and overhead acceptance gates.
+subsequent full nominal camera recordings yielded 900 pairs per 30-second phase,
+100% joint coverage and zero drops. The sibling core's
+`docs/observability/N4_RUNTIME_ACCEPTANCE.md` records passing nominal/overhead and host lifecycle cases, including the selected
+workload confirmation. Browser execution method checks also pass locally. Normal desktop interaction
+and hosted checks for final browser changes in both repos remain open; previous
+core minimum-version/hosted baseline results are retained.
 
 Tracing remains opt-in. Export is independent of research bundle v2 and contains
 only trace-manifest.json and canonical trace-record.json in a gzip TAR. No summary,
@@ -38,10 +43,12 @@ before atomic output. Actual no-follow paths are required; JSON is bounded to
 10 MiB/depth 32, compressed/expanded archive to 32 MiB. Legacy exports are unchanged.
 
 Synthetic export API tests and both producer-to-core CLI handoffs pass. Effective
-browser clock resolution, real capture, picker interaction and measured overhead
-have not been validated. The sibling core now implements inspect-trace (Step 6) for offline same-clock
+browser clock resolution and picker interaction remain unverified. Actual real
+nominal capture and measured overhead now pass; see the [live procedure](n5-live-test-procedure.md)
+for the supported-browser timing limitation and remaining gates. The sibling core now implements inspect-trace (Step 6) for offline same-clock
 queue/encode/age/callback reconstruction with loss/exclusion and budget evidence.
-Pinned synthetic integration is delivered; real capture/overhead acceptance remains pending.
+Pinned synthetic integration and actual nominal capture/overhead checks pass;
+full acceptance remains open as recorded in the live ledger.
 
 ## Synthetic integration and next acceptance step
 
@@ -69,9 +76,11 @@ and the placeholder commit are explicit; no real timing is claimed.
 Next run the core's frozen `N4_PRODUCER_CAPABILITIES.md` procedure in an actual
 Linux/Xvfb/PulseAudio runtime with a draining WebRTC receiver. Record unique PTS
 correlation, nominal/tiny-capacity/interrupted/two-peer and browser evidence, all
-five paired overhead trials and the separate callback diagnostic. Docker is
-unavailable on the current host; real capture, live callbacks, picker interaction
-and measured overhead remain pending. Full N4 acceptance is open.
+five paired overhead trials and the separate callback diagnostic. The initial
+software checks lacked a usable Docker CLI on PATH; subsequent Docker Desktop
+Linux execution now verifies the nominal 900-pair case. Remaining lifecycle,
+browser, picker and overhead gates are tracked in the linked live ledger. Full N4
+acceptance remains open.
 
 The health audit tightens browser decimal/commit validation to reject trailing
 line terminators and validates export provenance before ending collection. Host
@@ -87,5 +96,15 @@ carries these real acceptance gates forward; no trace contract or fixture change
 create separate measured-phase collectors behind a bounded source barrier. The
 legacy shutdown export still belongs to its initial collector; a warm-up artifact
 cannot stand in for the fresh measured phase. [Phase export/adoption](n5-experiment-export.md) is delivered in N5
-Step 6 software. Actual Linux transition/overhead verification and full N4 acceptance remain
-pending; the synthetic pinned exports above still reproduce unchanged.
+Step 6 software. Actual nominal Linux transition, paired overhead and host lifecycle/isolation
+cases now pass; the additive browser execution method also passes local
+validation. Final desktop/picker and hosted acceptance remain open; the synthetic pinned exports above still reproduce unchanged.
+
+## Browser execution v2 export
+
+Build with `VITE_N4_STAGE_TRACE_METHOD=execution-v2` in addition to tracing and
+producer-version settings. The same finish/export control emits manifest version
+2 and `stage-trace-record-v2`, method release `n4-browser-execution-v1`. Core
+`ingest-trace`/`inspect-trace` select that explicit version and produce the fifth,
+separate callback-entry timing result. Default `api-v1` preserves its previous
+bytes. See [browser tracing](n4-browser-stage-tracing.md) for loss/reset behavior.

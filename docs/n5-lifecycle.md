@@ -2,7 +2,8 @@
 
 **Delivered:** Step 4 software, 2026-10-11. [Handoff](n5-scenario-harness.md).
 [Concrete camera/CPU adapters and fixed effect checks](n5-adapters.md) are delivered
-in Step 5 software; [export/adoption](n5-experiment-export.md) is delivered in Step 6. Live execution remains pending.
+in Step 5 software; [export/adoption](n5-experiment-export.md) is delivered in Step 6. Real execution is recorded in the [live procedure](n5-live-test-procedure.md);
+full acceptance remains open.
 
 `engine/runtime/scenario_harness/` supplies a stdlib-only, opt-in synchronous
 runner with an immutable local `RunPlan`, exact workload/recording/worker ownership
@@ -118,7 +119,8 @@ The Node engine suite runs these Python cases and checks both image COPY lists.
 
 No real pressure worker, Linux/GI playback, container build, measured effect or
 paired overhead trial was run in Step 4. [N4 tracing acceptance](n4-stage-trace-export.md)
-and actual Node 24/hosted results remain pending. Healthy plus one approved CPU
+records the current nominal/overhead/lifecycle results. Actual Node 24 execution
+now passes; hosted CI remains unverified. Healthy plus one approved CPU
 class does not meet Phase 1.3's two real bottleneck-class gate. Concrete supported
 adapters and fixed effect predicates are delivered in [Step 5](n5-adapters.md); [offline bundle verification](n5-experiment-export.md) is delivered in
 Step 6; [independent release pins](n5-experiment-reproduction.md) are delivered in Step 7.

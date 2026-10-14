@@ -1,7 +1,7 @@
 # N4 opt-in host stage tracing
 
-**Status:** Host collector/hooks implemented, 2026-10-09; real capture and overhead
-acceptance pending. Browser collection and standalone export/adoption are now delivered in Steps 4–5.
+**Status:** Host collector/hooks implemented, 2026-10-09; subsequent real capture,
+selected-workload overhead and host lifecycle checks pass. Browser collection and standalone export/adoption are now delivered in Steps 4–5.
 
 The camera now has optional bounded probes at capture output, pre-encoder queue
 entry/exit and VP8 encoder input/output. Their timestamp source is local Python
@@ -77,13 +77,16 @@ alongside Node. Forty-one Python cases include ten export cases alongside sampli
 missing PTS, segment/clock resets, concurrency, partial registration, teardown,
 shutdown and disabled mode. Local engine result: 133 pass, one existing external
 artifact skip, zero failures. Twenty-five test snapshots also validate against
-the core's strict N4 models. Container builds, hosted execution and real-capture/
-overhead measurements remain pending.
+the core's strict N4 models. Those are historical software-checkpoint counts.
+Subsequent actual Linux execution passes 58 trace/control cases, native image
+build/package smoke, nominal capture, paired overhead and host lifecycle checks.
+Core hosted CI is verified. Pixelated hosted execution, desktop interaction and
+full browser acceptance remain open; see the [live procedure](n5-live-test-procedure.md).
 
 [Step 5 standalone export](n4-stage-trace-export.md) now supplies configured shutdown persistence; offline reconstruction is delivered in the sibling core as Step 6.
 
 ## Integration and next acceptance step
 
 See [standalone export and integration](n4-stage-trace-export.md) for producer-to-core
-reproduction commands and remaining real capture/overhead gates. Both collectors
+reproduction commands and remaining browser/desktop/Pixelated hosted gates. Both collectors
 and exporters reproduce pinned synthetic records; this is software evidence.

@@ -16,7 +16,10 @@ Eight synthetic production exports match independently authored core fixture byt
 and API/CLI results. Earlier release bytes and dependencies are unchanged. These
 are the recorded Step 7 runs, not newly repeated suite claims for documentation.
 
-At closeout the actual Linux camera adapter preflight on this Darwin host returned
+This document records the initial closeout snapshot; the [live procedure](n5-live-test-procedure.md)
+and linked core ledger now record subsequent Docker Desktop Linux execution.
+
+At the initial closeout the actual Linux camera adapter preflight on this Darwin host returned
 `unavailable / runtime_unavailable`, with no runtime fields, acquired resources or
 prepared plan. No live camera, workload or CPU worker was started. Docker is absent
 from PATH and no Linux connection or N5 real campaign evidence was supplied. A
@@ -32,11 +35,11 @@ is not a remote provisioner or standalone workload launcher. Retain all raw,
 failed/unavailable and cleanup outcomes, export after frozen recording and cleanup,
 and verify each bundle in the detached core.
 
-V1 approves only healthy and host contention. Phase 1.3 needs two real fault classes;
+At the original closeout, v1 approved only healthy and host contention. Phase 1.3 needs two real fault classes;
 healthy is not a fault class. A second adapter and its observable effect/restoration
-criteria require additive approval/implementation before trials. All inherited N4
+criteria required additive approval/implementation before trials. At that snapshot, all inherited N4
 capture/correlation/coverage cases, five paired overhead trials, browser and actual
-minimum-version/container/hosted execution remain unverified. Synthetic sparse
+minimum-version/container/hosted execution remained unverified. Synthetic sparse
 fixture traces and hashes do not close these gates or prove held-out independence.
 
 Software closeout is recorded. Step 8 real acceptance and Phase 1 remain open.
@@ -46,4 +49,8 @@ no automatic N6 transition or runtime success is claimed.
 The initial closeout covered Step 1–7 library delivery. The subsequent
 [live workflow extension](n5-live-test-procedure.md) implements campaign entry,
 second-adapter pacing, assignments and automated overhead tools; its tests are
-recorded in the current handoff. Both fault classes still need real validation.
+recorded in the current handoff. Fresh campaign-8 now validates both fault classes in all 18 reference/query
+trials, and selected-scene overhead passes. Core hosted quality/minimum-Python
+jobs pass; browser execution method checks also pass locally. Normal desktop interaction
+and hosted checks for final browser changes in both repos remain open. These current outcomes supersede the initial runtime
+availability snapshot above.

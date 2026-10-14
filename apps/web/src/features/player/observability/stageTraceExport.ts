@@ -27,11 +27,12 @@ export async function createStageTraceFiles(recording: BrowserStageTraceRecordin
   if (provenance !== "synthetic" && provenance !== "producer_capture") throw new Error("N4 export requires approved provenance");
   if (!recording.hasLifetimes()) throw new Error("N4 export requires a trace lifetime");
   recording.finish();
-  const payload = canonicalStageTraceJson(recording.snapshot(producerVersion, provenance));
+  const snapshot = recording.snapshot(producerVersion, provenance);
+  const payload = canonicalStageTraceJson(snapshot);
   const digest = await crypto.subtle.digest("SHA-256", payload as Uint8Array<ArrayBuffer>);
   const trace_sha256 = [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, "0")).join("");
   return [
-    { name: "trace-manifest.json", data: canonicalStageTraceJson({ schema_version: 1, bundle_type: "pixelated_stage_trace", trace_schema_version: "stage-trace-record-v1", trace_sha256, trace_bytes: payload.length }) },
+    { name: "trace-manifest.json", data: canonicalStageTraceJson({ schema_version: recording.executionTiming ? 2 : 1, bundle_type: "pixelated_stage_trace", trace_schema_version: snapshot.schema_version, trace_sha256, trace_bytes: payload.length }) },
     { name: "trace-record.json", data: payload },
   ] satisfies ResearchRunBundleFile[];
 }

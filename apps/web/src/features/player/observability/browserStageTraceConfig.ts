@@ -1,4 +1,5 @@
 export type BrowserStageTraceConfig = Readonly<{
+  timing_method?: "api-v1" | "execution-v2";
   every_nth_frame: number;
   max_frames: number;
   max_events: number;
@@ -14,7 +15,11 @@ export function validateBrowserStageTraceConfig(config: BrowserStageTraceConfig)
       throw new Error("N4 browser trace configuration is outside approved limits");
     }
   }
+  if (config.timing_method !== undefined && !["api-v1", "execution-v2"].includes(config.timing_method)) {
+    throw new Error("N4 browser trace method is not supported");
+  }
   return Object.freeze({
+    ...(config.timing_method === undefined ? {} : { timing_method: config.timing_method }),
     every_nth_frame: config.every_nth_frame,
     max_frames: config.max_frames,
     max_events: config.max_events,
@@ -33,7 +38,12 @@ export function parseBrowserStageTraceConfig(environment: Record<string, unknown
     }
     return Number(raw);
   }
+  const method = environment.VITE_N4_STAGE_TRACE_METHOD;
+  if (method !== undefined && method !== "api-v1" && method !== "execution-v2") {
+    throw new Error("VITE_N4_STAGE_TRACE_METHOD must be api-v1 or execution-v2");
+  }
   return validateBrowserStageTraceConfig({
+    ...(method === undefined ? {} : { timing_method: method }),
     every_nth_frame: number("VITE_N4_STAGE_TRACE_EVERY_NTH_FRAME", 1),
     max_frames: number("VITE_N4_STAGE_TRACE_MAX_FRAMES", 2000),
     max_events: number("VITE_N4_STAGE_TRACE_MAX_EVENTS", 10000),

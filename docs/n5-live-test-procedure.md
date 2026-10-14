@@ -1,9 +1,50 @@
 # N5 live test procedure
 
-**Coding:** campaign and overhead workflows implemented. **Execution:** not run here.
-[Export](n5-experiment-export.md), [original reproduction](n5-experiment-reproduction.md).
-The sibling core's `docs/scenarios/N5_CAMPAIGN_WORKFLOW.md` specifies the additive
-pacing contract and linked report criteria. This procedure runs after coding checks.
+**Coding:** campaign and overhead workflows implemented. **Execution:** real
+checks recorded, full N5 acceptance pending. [Export](n5-experiment-export.md),
+[original reproduction](n5-experiment-reproduction.md).
+
+The core's `docs/scenarios/N5_RUNTIME_ACCEPTANCE.md` is the current live ledger;
+`experiments/n5-runtime-20261013/README.md` records sanitized receipts and replay
+commands. Actual Gst/counter compatibility fixes are in producer commits
+`eac8e58`, `08a4732` and `ae00593`. Corrected nominal recordings have 900 queue/encode
+pairs per phase and zero drops. All five overhead pairs pass, with median CPU
+increase 0.37238 percentage points on selected `workload-4` and essentially
+unchanged 30 FPS throughput. The earlier lighter-scene result is retained separately.
+Tiny-capacity, toggle, interruption/restart and two-peer checks also pass.
+
+Earlier lightweight-scene fault cohorts did not pass. Corrected quota-only cohorts did not consistently
+slow the lightweight scene; pinning the whole container to one CPU made its nominal
+baseline inadequate. Failed/canceled acquisitions are retained, not combined with
+previous successes. The supported browser trace also excludes 681 negative API
+lags out of 900 callbacks; the remaining 219 pairs are zero. API absence is tested
+by deliberate removal on an actual HTMLVideoElement, not by a natively unsupported
+Chromium build. A different callback timestamp needs additive method review.
+
+All 78 scenario and 58 trace/control Python tests pass on actual Linux, with no
+Linux-only skip. Core Python 3.13 passes 2,003 tests at 93.52% coverage. Python 3.11.17 also passes
+all 2,003 core tests at 93.60%, 25 schemas and frozen pins; core hosted quality/minimum-Python jobs pass for exact `bc6f42b`; Pixelated
+hosted CI and normal desktop/picker interaction remain unverified. The standard
+native image builds and passes Gst import plus bounded Frozen Bubble/Neverball
+package smoke; actual Node 24.18.1 engine verification passes 135 tests with one
+existing external-artifact skip. The research capture image is recorded separately. Full N5 and Phase 1 remain open.
+
+## Choose the execution path
+
+The commands below describe the normal Pixelated desktop route and use container
+`pixelated-node`. The observed acceptance run uses an isolated research capture
+container, loopback socket relay, deterministic animated X11 scene and a headless
+Chromium receiver. Its retained, now stopped container is `n5-acceptance-ae00593-r7`, image
+`pixelated-n5-acceptance:ae00593`, and overhead request is `campaign-7`. Use
+`docker cp` to inspect retained public evidence; do not restart old inboxes. Start a fresh camera lifetime and
+use new campaign/output/volume IDs for a new acquisition. Do not overwrite or
+resume the retained failed campaign as if it were a successful cohort.
+
+On this macOS host the working CLI is
+`/Applications/Docker.app/Contents/Resources/bin/docker`; the `/usr/local/bin/docker`
+symlink points to an absent OrbStack installation. Start Docker Desktop first.
+For builds, also put the bundled CLI directory on PATH so its credential helper is
+available. A Docker Desktop Linux VM is sufficient for these capture tests.
 
 ## Prepare the runtime
 
@@ -18,9 +59,10 @@ pacing contract and linked report criteria. This procedure runs after coding che
    npm run build:native -w @pixelated/engine-runtime
    ```
 
-   This invokes Docker only when you run it; no image was built during local coding
-   verification. Native Linux supports the existing locked runtime/architecture
-   settings. Preserve the image identity and build metadata with the test record.
+   This invokes Docker only when you run it. The acceptance research image was
+   built separately. The standard native image now also builds and passes its
+   native-package smoke; a new checkout still needs its own build/identity record.
+   Native Linux supports the existing locked runtime/architecture settings. Preserve the image identity and build metadata with the test record.
 3. Start the development desktop with an explicit research/workload declaration:
 
    ```sh
@@ -64,7 +106,12 @@ docker exec pixelated-node python3 -m scenario_harness.campaign_cli submit \
 ```
 
 Default schedule: 18 acquisitions, three reference and three held-out runs for
-healthy, host contention and capture pacing. It takes roughly 42 minutes plus
+healthy, host contention and capture pacing. The default order groups three
+references per class, then three held-out queries per class (healthy, contention,
+pacing in each group); retained `campaign-4` used that order. Retained `campaign-5/6` used prospectively declared interleaving and allocation
+changes. The former failed to slow capture and the latter failed baseline adequacy;
+both were canceled and retained. The current execution record explains each
+configuration. Preserve nominal adequacy when selecting a future workload/allocation. Never infer ordering from run filenames. It takes roughly 42 minutes plus
 transition/preflight/export time if all trials execute. The explicit order is saved
 in the plan; `--repeats` accepts 1–4, `--workers` 1–8. If you change order or settings,
 do it before submission, never after examining effects. Source IDs are assigned
@@ -175,3 +222,63 @@ required. Do not adjust thresholds after seeing results.
 - Minimum-version/container/hosted execution and externally verified source
   separation remain real acceptance evidence. Docker Desktop VM measurements
   describe that allocation/environment; they are not bare-metal performance claims.
+
+## Selected workload after engineering calibration
+
+The subsequent six short trials screen 24/192/512-rectangle deterministic scenes
+without claiming acceptance: all short exports remain insufficient_evidence in
+the detached inspector. The 512 rectangles of size 32 pixels (`workload-4`, seed 7)
+give repeatable 24.6–24.7 degraded FPS with near-30 healthy/recovery and adequate
+owned worker CPU. Core `experiments/n5-runtime-20261013/calibration-screen.json`
+retains the frozen screen and every result.
+
+Fresh full `campaign-8` uses this scene, the same unpinned one-CPU/one-second quota,
+producer `7e78d48`, and a separately labeled image `pixelated-n5-calibration:7e78d48`.
+Its eighteen new reference/query assignments and interleaved order are frozen
+before measurement. Runtime `n5-acceptance-7e78d48-c8` is separate from retained
+failed cohorts. Normal phase durations and acceptance predicates are unchanged;
+the full schedule now finishes with 18/18 independently verified acquisitions
+and repeated-effect criteria passed. Core publishes the plan/index/report under
+`experiments/n5-runtime-20261013/`. Selected-scene overhead (`campaign-9`) also passes all fixed thresholds: five
+enabled traces each with 900 joint pairs and zero drops, median CPU +0.37238
+percentage points and FPS −0.000517%. Core publishes the separate
+`workload-4-overhead-report.json`; earlier lighter-scene evidence is preserved.
+
+The bounded live browser diagnostic on 2026-10-14 records 180 callbacks: 170
+negative API deltas/ten zero, but all callback-entry deltas positive (median
+0.2 ms). This supported the core's subsequently implemented additive method; the short diagnostic does not
+change frozen v1 meanings or close browser acceptance. All owned acquisition and
+diagnostic runtimes are stopped. The additive browser execution method now passes local software/live checks
+(see core `experiments/n5-browser-execution-20261014/`). Final desktop interaction
+and hosted verification of the browser changes in both repos remain open.
+
+## Final manual desktop and hosted checks
+
+The browser execution method is implemented separately from the frozen v1 API
+method. Passing local live validation is recorded in the sibling core's
+`experiments/n5-browser-execution-20261014/` and N4/N5 runtime ledgers. The
+following checks remain separate from headless producer capture:
+
+1. Build the web player with `VITE_N4_STAGE_TRACE=1`,
+   `VITE_N4_STAGE_TRACE_METHOD=execution-v2`, and
+   `VITE_N4_STAGE_TRACE_PRODUCER_VERSION` set to the exact final producer commit.
+   Use the normal desktop game picker to launch a game, connect the player and
+   confirm normal playback/input. Exercise the normal stop/reconnect route.
+2. Use **Finish and export stage trace**. Verify picker/download behavior,
+   including cancellation and export retry. Adopt the downloaded archive with
+   core `ingest-trace`, then `inspect-trace`. Record the v2 schema/release,
+   usable execution pairs, all exclusions/loss, exact build commits and outcome.
+   Low evidence or visible failure stays pending; a successful download alone
+   does not establish timing acceptance.
+3. After committing/pushing both repos, retain the final SHA and Actions URL for
+   core **CI** (`quality` and `python-311-compatibility`). The earlier successful
+   `bc6f42b` run predates these browser changes and cannot verify the final patch.
+4. For Pixelated, use **Hosted API Deploy Gate** with `proof_mode=true`, or its
+   pull-request contract jobs, to verify the final hosted web/smoke and API
+   checks. For desktop packaging use **Desktop Cross-Platform Release Validation**
+   with `release_tag` explicitly blank to validate without creating a release.
+   Record actual job results; local tests and configured YAML are separate evidence.
+
+Retain manual outcomes in the core runtime ledger. N5/Phase 1 remain open until
+these remaining gates have actual evidence. Commit subjects use `[type] summary`
+in Pixelated and `type: summary` in latency_fingerprinting.

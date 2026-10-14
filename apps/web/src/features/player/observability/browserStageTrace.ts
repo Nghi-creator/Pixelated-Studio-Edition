@@ -17,13 +17,14 @@ type Event = { sequence: number; frame_id: string; boundary: string; timestamp_n
 type Frame = { frame_id: string; source_sequence: number; correlation: "exact" };
 
 function createStream(index: number, config: BrowserStageTraceConfig, supported: boolean) {
+  const execution = config.timing_method === "execution-v2";
   return {
     stream_id: `stream-${index}`, epoch_id: `epoch-${index}`, clock_id: `clock-${index}`,
     clock: { source: "browser_performance", unit: "ns", origin: "stream_start",
       resolution_ns: null, synchronization: "none" },
-    capabilities: boundaries.map(boundary => ({ boundary,
-      state: boundary === "presentation_proxy" && supported ? "supported" : "unavailable",
-      reason: boundary === "presentation_proxy" ? (supported ? null : "api_unavailable") : "unsupported_source",
+    capabilities: [...boundaries, ...(execution ? ["presentation_callback_execution"] : [])].map(boundary => ({ boundary,
+      state: ["presentation_proxy", "presentation_callback_execution"].includes(boundary) && supported ? "supported" : "unavailable",
+      reason: ["presentation_proxy", "presentation_callback_execution"].includes(boundary) ? (supported ? null : "api_unavailable") : "unsupported_source",
     })),
     sampling: { every_nth_frame: config.every_nth_frame }, limits: { max_frames: config.max_frames, max_events: config.max_events },
     deadline: null, frames: [] as Frame[], events: [] as Event[],
@@ -45,6 +46,10 @@ export class BrowserStageTraceRecording {
     this.config = validateBrowserStageTraceConfig(config);
   }
 
+  get executionTiming() {
+    return this.config.timing_method === "execution-v2";
+  }
+
   begin(origin: number, supported: boolean) {
     if (this.finished || this.streams.length === 16 || !Number.isFinite(origin) || origin < 0) return null;
     const stream = createStream(this.streams.length + 1, this.config, supported);
@@ -52,10 +57,11 @@ export class BrowserStageTraceRecording {
     let closed = !supported;
     let lastPresented: number | null = null;
     let lastNow: number | null = null;
+    let lastExecution: number | null = null;
     const stop = (reason: StopReason = "completed") => {
       if (!closed) { closed = true; stream.stop_reason = reason; }
     };
-    const observe = (now: number, presentation: number, presented: number) => {
+    const observe = (now: number, presentation: number, presented: number, execution = NaN) => {
       if (closed || this.finished) return false;
       // A reset closes this scope; a new attachment must establish a fresh origin.
       if (!Number.isFinite(now) || now < origin || (lastNow !== null && now < lastNow)
@@ -64,6 +70,12 @@ export class BrowserStageTraceRecording {
         || stream.loss.offered_frames === 0x7fffffff
         || (lastPresented !== null && !Number.isSafeInteger(stream.loss.browser_missed_presentations + presented - lastPresented - 1))) {
         stop("source_error"); return false;
+      }
+      if (this.executionTiming && Number.isFinite(execution)) {
+        if (execution < origin || (lastExecution !== null && execution < lastExecution)) {
+          stop("source_error"); return false;
+        }
+        lastExecution = execution;
       }
       if (lastPresented !== null) stream.loss.browser_missed_presentations += presented - lastPresented - 1;
       lastPresented = presented; lastNow = now;
@@ -77,7 +89,9 @@ export class BrowserStageTraceRecording {
       this.frameSlots++; stream.loss.sampled_frames++;
       const frame_id = `frame-${sequence}`;
       stream.frames.push({ frame_id, source_sequence: sequence, correlation: "exact" });
-      for (const [boundary, timestamp] of [["presentation_proxy", presentation], ["presentation_callback", now]] as const) {
+      const endpoints: [string, number][] = [["presentation_proxy", presentation], ["presentation_callback", now]];
+      if (this.executionTiming) endpoints.push(["presentation_callback_execution", execution]);
+      for (const [boundary, timestamp] of endpoints) {
         const eventSequence = ++stream.loss.attempted_events;
         const relative = (timestamp - origin) * 1e6;
         const timestamp_ns = Math.round(relative);
@@ -95,8 +109,11 @@ export class BrowserStageTraceRecording {
     };
     const apiUnavailable = () => {
       if (stream.loss.offered_frames === 0) {
-        const capability = stream.capabilities.at(-1)!;
-        capability.state = "unavailable"; capability.reason = "api_unavailable";
+        for (const capability of stream.capabilities) {
+          if (["presentation_proxy", "presentation_callback_execution"].includes(capability.boundary)) {
+            capability.state = "unavailable"; capability.reason = "api_unavailable";
+          }
+        }
       }
       stop("source_error");
     };
@@ -124,7 +141,8 @@ export class BrowserStageTraceRecording {
       || !["synthetic", "producer_capture"].includes(provenance)) {
       throw new Error("N4 browser snapshot requires closed evidence and a producer commit");
     }
-    return structuredClone({ schema_version: "stage-trace-record-v1", method_release: "n4-stage-local-v1",
+    return structuredClone({ schema_version: this.executionTiming ? "stage-trace-record-v2" : "stage-trace-record-v1",
+      method_release: this.executionTiming ? "n4-browser-execution-v1" : "n4-stage-local-v1",
       trace_id: "trace-1", session_id: "session-1", run_id: "run-1", producer: "pixelated_browser",
       producer_version: producerVersion, provenance, streams: this.streams });
   }
@@ -152,10 +170,13 @@ export function attachBrowserStageTrace(video: FrameVideo, recording: BrowserSta
   };
   const schedule = () => {
     try { handle = video.requestVideoFrameCallback!((now, metadata) => {
-      handle = null;
       if (stopped) return;
+      // The opt-in endpoint is read before metadata or collector work; v1 never reads it.
+      let execution = NaN;
+      if (recording.executionTiming) { try { execution = clock(); } catch { /* Count a missing endpoint. */ } }
+      handle = null;
       try {
-        if (!scope.observe(now, metadata.presentationTime, metadata.presentedFrames)) { stop(); return; }
+        if (!scope.observe(now, metadata.presentationTime, metadata.presentedFrames, execution)) { stop(); return; }
         schedule();
       } catch { stop("source_error"); }
     }); } catch { scope.apiUnavailable(); stop("source_error"); }

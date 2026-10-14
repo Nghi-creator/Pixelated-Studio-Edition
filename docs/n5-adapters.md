@@ -115,12 +115,19 @@ arithmetic, one-unit boundary failures, unavailable precedence, fake native
 activation/durability, partial startup, TERM/KILL/reap, restart, missing/reused PID,
 deadline and actual camera hooks with fake Gst dependencies. A Linux-only integration
 test spawns an actual parked child and sends EOF without GO; it never runs pressure.
-That integration test is skipped on this Mac. No live pressure, Linux capture,
-container build, paired overhead or hosted/minimum-version run was performed.
+That integration test was skipped in the original macOS checks. The subsequent
+Linux run passes all 78 scenario tests, including actual parked-child cleanup.
+Real pressure/capture outcomes, retained failures and remaining overhead/version/hosted
+gates are recorded in the [live procedure](n5-live-test-procedure.md) and linked
+core runtime ledger.
 
 The original v1 healthy/CPU support alone cannot pass Phase 1.3's two real bottleneck-class
-gate. N4's capture/coverage/overhead gates remain separately pending. [Independent fixture pinning and reproduction](n5-experiment-reproduction.md) are
-delivered in Step 7. The next step is real campaign and closeout work.
+gate. N4's nominal capture/coverage/overhead and host lifecycle gates now pass;
+the browser execution method also passes local validation; final desktop/hosted
+acceptance remains open. [Independent fixture pinning and reproduction](n5-experiment-reproduction.md) are
+delivered in Step 7. Fresh campaign-8 now passes all 18 healthy/CPU/pacing reference/query trials;
+selected-scene overhead also passes. Browser execution method checks also pass locally. Normal desktop interaction
+and hosted checks for final browser changes in both repos remain open.
 
 ## Additive capture pacing
 
@@ -128,4 +135,5 @@ The [live test workflow](n5-live-test-procedure.md) adds an opt-in identity elem
 with fixed 50 ms pacing in degraded/probe, restored before recovery and guarded
 by an exact-element watchdog. Its additive experiment-v2 method independently
 checks observed stage delay and throughput/restoration; the setter is not ground
-truth. V1 roots/pins are unchanged. Real execution remains pending.
+truth. V1 roots/pins are unchanged. Real pacing effects have been observed; the complete
+corrected cohort and remaining acceptance gates are tracked in the live ledger.
