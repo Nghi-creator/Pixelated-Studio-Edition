@@ -69,7 +69,8 @@ def write_encoder_telemetry(file_path, session_id, peers):
                 int(peer.get("frames_out_total", 0)) for peer in active_peers
             ),
             "maxQuantizer": profile.get("max_quantizer") if profile else None,
-            # A direct encoder processing duration is not exposed by this pipeline.
+            # Legacy snapshots do not carry N4 per-frame boundary elapsed timings.
+            # Keep this old proxy unavailable; traces use their own versioned contract.
             "pipelineDelayProxyMs": None,
             "queueLevelBuffers": max(queue_levels) if queue_levels else 0,
             "schemaVersion": 1,

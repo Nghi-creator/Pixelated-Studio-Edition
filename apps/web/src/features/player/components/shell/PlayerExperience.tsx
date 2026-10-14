@@ -19,6 +19,8 @@ import { usePlayerNavigation } from "../../hooks/navigation/usePlayerNavigation"
 import { usePlayerShareInvite } from "../../hooks/navigation/usePlayerShareInvite";
 import { usePlayerStreamSettings } from "../../hooks/playback/usePlayerStreamSettings";
 import { usePreventGameInputScroll } from "../../hooks/playback/usePreventGameInputScroll";
+import { StageTraceExportButton } from "../research/StageTraceExportButton";
+import { useBrowserStageTrace } from "../../hooks/playback/useBrowserStageTrace";
 import { useStreamPlayback } from "../../hooks/playback/useStreamPlayback";
 import { usePlayerResearchSession } from "../../hooks/research/usePlayerResearchSession";
 import { useResearchRunState } from "../../hooks/research/useResearchRunState";
@@ -154,6 +156,7 @@ export function PlayerExperience({
     stream,
     videoRef,
   });
+  const stageTraceRecording = useBrowserStageTrace(videoRef, stream, status);
 
   useEffect(() => {
     setResearchSessionId(sessionId);
@@ -293,6 +296,7 @@ export function PlayerExperience({
         />
       </PlayerStreamGrid>
 
+      <StageTraceExportButton recording={stageTraceRecording} />
       {experience === "research" && (
         <ResearchPlayerOutput
           layoutClassName={playerLayoutClassName}

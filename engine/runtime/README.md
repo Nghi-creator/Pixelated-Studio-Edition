@@ -28,6 +28,7 @@ src/signaling/            Socket.IO auth, relay, lobby, input, and start-game ha
 src/telemetry/            Health and resource snapshots
 tests/                    Unit coverage by runtime area
 camera.py                 GStreamer WebRTC sender
+camera_trace*.py           Opt-in bounded stage tracing and standalone export
 input_keyboard.py         Persistent X11/XTest keyboard injection bridge
 server.ts                 Runtime process entry point
 ```
@@ -136,3 +137,10 @@ Native runtime override:
 PIXELATED_ENGINE_RUNTIME_KIND=native_linux
 PIXELATED_ENGINE_NATIVE_IMAGE=pixelated-engine-native:debian-native-v1-...
 ```
+
+## Optional stage tracing
+
+[Host configuration and limitations](../../docs/n4-host-stage-tracing.md) and
+[standalone export/integration](../../docs/n4-stage-trace-export.md) document N4.
+Disabled mode installs no probes. Synthetic software integration passes; real
+Linux capture and paired CPU/FPS overhead acceptance remain pending.

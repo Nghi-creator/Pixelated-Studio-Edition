@@ -1,4 +1,5 @@
 import os
+import sys
 
 import gi
 import socketio
@@ -10,6 +11,11 @@ from camera_config import (
 )
 from camera_protocol import normalize_ice_candidate, normalize_peer_id, validate_offer
 from camera_state import write_encoder_telemetry, write_peer_state
+from camera_trace import HostTraceRecording
+from camera_trace_export import export_camera_trace
+from camera_trace_config import parse_trace_config
+from camera_trace_hooks import install_host_trace, install_trace_shutdown
+from camera_trace_control import PeerRecordingControl
 
 gi.require_version("Gst", "1.0")
 gi.require_version("GstWebRTC", "1.0")
@@ -22,6 +28,17 @@ Gst.init(None)
 SESSION_ID = os.environ.get('PIXELATED_SESSION_ID', 'default-session')
 ENGINE_TOKEN = os.environ.get('PIXELATED_ENGINE_TOKEN', '')
 ICE_SERVERS = os.environ.get('PIXELATED_ICE_SERVERS', '[]')
+N5_CAMPAIGN_DIRECTORY = os.environ.get("PIXELATED_N5_CAMPAIGN_DIRECTORY")
+N5_WORKLOAD_DECLARATION = None
+if N5_CAMPAIGN_DIRECTORY:
+    from scenario_harness.camera_runtime import WorkloadDeclaration
+    declared_seed = os.environ.get("PIXELATED_N5_WORKLOAD_SEED", "")
+    if declared_seed.isascii() and declared_seed.isdecimal() and len(declared_seed) <= 10:
+        N5_WORKLOAD_DECLARATION = WorkloadDeclaration(
+            os.environ.get("PIXELATED_N5_WORKLOAD_ID", ""), int(declared_seed),
+            os.environ.get("PIXELATED_N5_NODE_VERSION", ""),
+        )
+
 STREAM_PROFILE = os.environ.get('PIXELATED_STREAM_PROFILE', '{}')
 PEER_STATE_PATH = os.environ.get(
     'PIXELATED_CAMERA_PEER_STATE_PATH',
@@ -32,6 +49,12 @@ TELEMETRY_STATE_PATH = os.environ.get(
     '/run/pixelated/camera-telemetry.json',
 )
 peers = {}
+try:
+    trace_config = parse_trace_config(os.environ)
+    STAGE_TRACE = HostTraceRecording(trace_config) if trace_config is not None else None
+except ValueError:
+    print("[Python] N4 stage tracing disabled: invalid configuration.")
+    STAGE_TRACE = None
 MAX_ACTIVE_PEERS = parse_max_active_peers(
     os.environ.get("PIXELATED_MAX_STREAM_PEERS", "8")
 )
@@ -51,16 +74,31 @@ def emit_engine_error(message):
     except Exception as exc:
         print(f"[Python] Failed to emit engine-error: {exc}")
 
-def cleanup_peer(peer_id):
+def cleanup_peer(peer_id, reason="shutdown"):
     peer = peers.pop(peer_id, None)
     if not peer:
         return
 
+    stage_trace = peer.get('stage_trace')
+    if stage_trace is not None:
+        stage_trace.close(reason)
     pipeline = peer.get('pipeline')
     if pipeline:
         pipeline.set_state(Gst.State.NULL)
     write_peer_state(PEER_STATE_PATH, SESSION_ID, peers)
     write_encoder_telemetry(TELEMETRY_STATE_PATH, SESSION_ID, peers)
+
+def create_peer_recording_control(peer_id, config):
+    """Explicit experiment-owner API; no socket exposure or work in media callbacks."""
+    if len(peers) != 1 or peer_id not in peers:
+        raise ValueError("experiment recording requires one exact draining peer")
+    peer = peers[peer_id]
+    binding = peer.get('stage_trace')
+    if isinstance(binding, PeerRecordingControl):
+        raise ValueError("peer recording already has an experiment owner")
+    control = PeerRecordingControl(peer['pipeline'], binding, Gst, config)
+    peer['stage_trace'] = control
+    return control
 
 def handle_offer(offer):
     validation_error = validate_offer(offer)
@@ -96,11 +134,13 @@ def handle_offer(offer):
         f"cpu-used={stream_profile['cpu_used']}, max-quantizer={stream_profile['max_quantizer']})"
     )
     
+    pacing_element = "identity name=n5_capture_pacer sleep-time=0 signal-handoffs=false silent=true !" if N5_CAMPAIGN_DIRECTORY else ""
     pipeline_str = f"""
         webrtcbin name=sendrecv
         
-        ximagesrc display-name=:99 use-damage=false show-pointer=false ! 
+        ximagesrc name=video_capture display-name=:99 use-damage=false show-pointer=false !
         video/x-raw,framerate={stream_profile['fps']}/1 ! 
+        {pacing_element}
         videoconvert ! video/x-raw,format=I420 ! 
         queue name=pre_encoder_queue max-size-buffers=1 leaky=downstream !
         vp8enc name=video_encoder deadline=1 cpu-used={stream_profile['cpu_used']} threads=4 end-usage=cbr target-bitrate={stream_profile['bitrate']} max-quantizer={stream_profile['max_quantizer']} min-quantizer=4 keyframe-max-dist=120 error-resilient=1 !
@@ -119,6 +159,11 @@ def handle_offer(offer):
     video_encoder = pipeline.get_by_name('video_encoder')
     post_encoder_queue = pipeline.get_by_name('post_encoder_queue')
     configure_ice_servers(webrtcbin, ICE_SERVERS)
+    try:
+        stage_trace = install_host_trace(pipeline, STAGE_TRACE, Gst)
+    except Exception:
+        print("[Python] N4 stage tracing unavailable: host hooks could not be installed.")
+        stage_trace = None
     peers[peer_id] = {
         'frames_dropped_total': 0,
         'frames_in_total': 0,
@@ -126,26 +171,28 @@ def handle_offer(offer):
         'pipeline': pipeline,
         'post_encoder_queue': post_encoder_queue,
         'pre_encoder_queue': pre_encoder_queue,
+        'stage_trace': stage_trace,
         'stream_profile': stream_profile,
         'video_encoder': video_encoder,
         'webrtcbin': webrtcbin,
     }
+    owned_peer = peers[peer_id]
 
     def count_frame_in(_pad, _info):
         peer = peers.get(peer_id)
-        if peer is not None:
+        if peer is owned_peer:
             peer['frames_in_total'] += 1
         return Gst.PadProbeReturn.OK
 
     def count_frame_out(_pad, _info):
         peer = peers.get(peer_id)
-        if peer is not None:
+        if peer is owned_peer:
             peer['frames_out_total'] += 1
         return Gst.PadProbeReturn.OK
 
     def count_queue_drop(_queue):
         peer = peers.get(peer_id)
-        if peer is not None:
+        if peer is owned_peer:
             peer['frames_dropped_total'] += 1
 
     pre_encoder_queue.get_static_pad('sink').add_probe(
@@ -170,7 +217,7 @@ def handle_offer(offer):
             emit_engine_error(f"GStreamer error for peer {peer_id}: {err.message}")
             if debug:
                 print(f"[Python] GStreamer debug: {debug}")
-            cleanup_peer(peer_id)
+            cleanup_peer(peer_id, "source_error")
         elif message.type == Gst.MessageType.WARNING:
             warn, debug = message.parse_warning()
             print(f"[Python] GStreamer warning for peer {peer_id}: {warn.message}")
@@ -252,4 +299,28 @@ def on_peer_disconnect(payload):
 sio.connect('http://localhost:8080', auth={'token': ENGINE_TOKEN})
 GLib.timeout_add_seconds(1, publish_encoder_telemetry)
 loop = GLib.MainLoop()
-loop.run()
+campaign_service = None
+if N5_CAMPAIGN_DIRECTORY:
+    from scenario_harness.campaign import CampaignService
+    if STAGE_TRACE is None:
+        raise ValueError("N5 campaign requires explicitly enabled tracing")
+    campaign_service = CampaignService(sys.modules[__name__], N5_CAMPAIGN_DIRECTORY)
+    campaign_service.start()
+install_trace_shutdown(STAGE_TRACE, GLib, loop)
+try:
+    loop.run()
+finally:
+    try:
+        if campaign_service is not None:
+            campaign_service.close()
+    finally:
+        try:
+            for peer_id in list(peers):
+                try:
+                    cleanup_peer(peer_id)
+                except Exception:
+                    print("[Python] Camera peer cleanup failed during shutdown.")
+        finally:
+            if STAGE_TRACE is not None:
+                STAGE_TRACE.finish("shutdown")
+                export_camera_trace(STAGE_TRACE, os.environ)

@@ -34,6 +34,9 @@ export function launchCameraBridge(options: LaunchCameraBridgeOptions) {
   return spawnProcess("python3", ["-u", cameraPath], {
     env: {
       ...process.env,
+      ...(process.env.PIXELATED_N5_CAMPAIGN_DIRECTORY
+        ? { PIXELATED_N5_NODE_VERSION: process.versions.node }
+        : {}),
       PULSE_SERVER: "127.0.0.1",
       PIXELATED_SESSION_ID: sessionId,
       PIXELATED_ENGINE_TOKEN: engineToken,

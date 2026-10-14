@@ -26,6 +26,7 @@ src/pages/                       Route-level user and admin screens
 src/components/                  Shared admin, layout, skeleton, UI, and user components
 src/features/player/components/  Player shell, stream, community, research, and telemetry UI
 src/features/player/hooks/       Player data, navigation, playback, research, and telemetry state
+src/features/player/observability/ Opt-in stage trace collector and standalone exporter
 src/lib/api/                     Hosted API client, queries, mutations, and types
 src/lib/auth/                    Supabase auth/session and Turnstile helpers
 src/lib/engine/                  Engine credentials, launch-ticket pairing, and connection monitoring
@@ -116,3 +117,11 @@ Routes that boot or manage local gameplay require an engine connection:
 - `/multiplayer`
 
 The connection may be a raw local engine token for localhost use or a `companion:<credential>` token from the desktop HTTPS companion. Companion credentials are scoped and revocable. The app probes saved pairings at startup, on browser visibility/network changes, and every five seconds; transient reachability failures mark the engine offline, while authentication rejection clears the stale credential.
+
+## Optional stage tracing
+
+The defaults in `.env.example` leave N4 disabled.
+[Browser tracing](../../docs/n4-browser-stage-tracing.md) documents the approved
+presentation/callback evidence; [export/integration](../../docs/n4-stage-trace-export.md)
+documents the finish/download flow and synthetic verification. Real callbacks,
+picker interaction and measured overhead remain pending.
