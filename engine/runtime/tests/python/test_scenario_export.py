@@ -20,7 +20,7 @@ from scenario_harness import (
     unsupported_bundle_bytes,
     write_experiment_bundle,
 )
-from test_scenario_adapters import execution, plan
+from scenario_adapter_support import execution, plan
 
 
 def declaration(value):

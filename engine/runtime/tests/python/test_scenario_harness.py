@@ -2,6 +2,7 @@
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -318,6 +319,38 @@ class HarnessTests(unittest.TestCase):
             os.chmod(journal, 0o600)
             with self.assertRaises(ValueError), RuntimeLease(self.temp.name):
                 pass
+
+    def test_fifo_journal_and_worker_identity_fail_without_waiting_for_a_writer(self):
+        runtime = str(Path(__file__).resolve().parents[2])
+        script = """
+import os
+import sys
+from scenario_harness import RuntimeLease
+try:
+    with RuntimeLease(sys.argv[1]) as lease:
+        if sys.argv[2] != 'journal.json':
+            fd = lease._open(sys.argv[2], os.O_RDONLY)
+            os.close(fd)
+except ValueError:
+    sys.exit(0)
+sys.exit(1)
+"""
+        for name in ("journal.json", "worker-" + "a" * 32 + ".json"):
+            with self.subTest(name=name):
+                path = Path(self.temp.name, name)
+                os.mkfifo(path, 0o600)
+                try:
+                    result = subprocess.run(  # noqa: S603 - fixed interpreter and test-owned FIFO.
+                        [sys.executable, "-c", script, self.temp.name, name],
+                        env={**os.environ, "PYTHONPATH": runtime},
+                        capture_output=True,
+                        text=True,
+                        timeout=3,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                finally:
+                    path.unlink()
 
     def test_cleanup_deadline_does_not_wait_indefinitely_or_clear_dirty_intent(self):
         def restore(resource, budget):

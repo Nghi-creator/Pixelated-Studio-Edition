@@ -1,11 +1,9 @@
-"""Independent arithmetic and fake native/Gst ownership boundaries; no pressure run."""
+"""Camera hook availability, generation ownership and restoration with fake Gst."""
 
 import ast
-import signal
 import sys
 import tempfile
 import unittest
-from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -13,11 +11,10 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from camera_trace_hooks import HostTraceBinding
+from scenario_adapter_support import Clock, Element, Processes, plan
 from scenario_harness import (
     Budget,
     LinuxCameraRuntime,
-    Resource,
-    RunPlan,
     RuntimeLease,
     ScenarioRunner,
     Timeline,
@@ -25,368 +22,10 @@ from scenario_harness import (
     evaluate_effect,
 )
 from scenario_harness.camera_runtime import cpu_allocation
-from scenario_harness.contracts import PHASES, SECOND, Execution, PhaseExecution, RunFailure
-from scenario_harness.pressure import LinuxProcesses, PressureWorkers
-
-
-def plan(workers=1):
-    return RunPlan(
-        "run-1", "host_contention" if workers else "healthy", 7, (30 * SECOND,) * 6, workers
-    )
-
-
-def execution(healthy=900, degraded=720, recovery=900, cpu=18 * SECOND, workers=1):
-    # Independently specified Step 2 totals, apportioned without rounded FPS inputs.
-    phases = []
-    cursor = 0
-    frames = 0
-    for phase in PHASES:
-        count = {"healthy": healthy, "degraded": degraded, "recovery": recovery}.get(phase, 900)
-        active = workers if phase in ("degraded", "probe") else 0
-        owned = cpu if active else 0
-        rows = tuple(
-            (
-                cursor + i * SECOND,
-                cursor + (i + 1) * SECOND,
-                frames + count * i // 30,
-                frames + count * (i + 1) // 30,
-                active,
-                owned * (i + 1) // 30 - owned * i // 30,
-            )
-            for i in range(30)
-        )
-        phases.append(PhaseExecution(phase, cursor, cursor + 30 * SECOND, "complete", None, rows))
-        cursor += 30 * SECOND
-        frames += count
-    return Execution(
-        "completed",
-        None,
-        tuple(phases),
-        60 * SECOND if workers else None,
-        120 * SECOND if workers else None,
-        120 * SECOND if workers else None,
-        120 * SECOND if workers else None,
-        "restored",
-        None,
-        180 * SECOND,
-        180 * SECOND,
-        (),
-    )
-
-
-class EffectTests(unittest.TestCase):
-    def test_independent_nominal_and_inclusive_boundary(self):
-        effect = evaluate_effect(plan(), execution())
-        self.assertEqual(
-            (
-                effect.state,
-                effect.reason,
-                effect.healthy_fps,
-                effect.degraded_fps,
-                effect.recovery_fps,
-                effect.pressure_cpu_percent,
-            ),
-            ("verified", None, 30.0, 24.0, 30.0, 60.0),
-        )
-        effect = evaluate_effect(plan(), execution(degraded=855, recovery=855, cpu=15 * SECOND))
-        self.assertEqual(effect.state, "verified")
-        self.assertEqual(
-            (effect.degraded_fps, effect.recovery_fps, effect.pressure_cpu_percent),
-            (28.5, 28.5, 50.0),
-        )
-
-    def test_all_fixed_failure_predicates_and_priority(self):
-        for values, expected in [
-            ({"healthy": 780, "cpu": 0, "degraded": 900, "recovery": 0}, "baseline_inadequate"),
-            ({"cpu": 12 * SECOND, "degraded": 900, "recovery": 0}, "pressure_not_observed"),
-            ({"degraded": 900, "recovery": 0}, "degradation_not_observed"),
-            ({"recovery": 810}, "recovery_not_observed"),
-        ]:
-            with self.subTest(expected=expected):
-                result = evaluate_effect(plan(), execution(**values))
-                self.assertEqual((result.state, result.reason), ("failed", expected))
-
-    def test_one_integer_unit_outside_boundary_fails(self):
-        for values, expected in [
-            ({"cpu": 15 * SECOND - 1}, "pressure_not_observed"),
-            ({"degraded": 856}, "degradation_not_observed"),
-            ({"recovery": 854}, "recovery_not_observed"),
-        ]:
-            self.assertEqual(evaluate_effect(plan(), execution(**values)).reason, expected)
-
-    def test_healthy_needs_all_three_throughputs_and_zero_workers(self):
-        self.assertEqual(
-            evaluate_effect(plan(0), execution(degraded=810, recovery=810, workers=0)).state,
-            "verified",
-        )
-        self.assertEqual(
-            evaluate_effect(plan(0), execution(degraded=809, workers=0)).reason,
-            "degradation_not_observed",
-        )
-        self.assertEqual(
-            evaluate_effect(plan(0), execution(degraded=900, recovery=809, workers=0)).reason,
-            "recovery_not_observed",
-        )
-        self.assertEqual(evaluate_effect(plan(0), execution()).reason, "insufficient_evidence")
-
-    def test_unavailable_precedence_and_no_fabricated_values(self):
-        run = replace(execution(), status="aborted", cleanup_state="unverified")
-        for available, expected in [(False, "adapter_unavailable"), (True, "incomplete_run")]:
-            result = evaluate_effect(plan(), run, adapter_available=available)
-            self.assertEqual(result.reason, expected)
-            self.assertIsNone(result.healthy_fps)
-        self.assertEqual(
-            evaluate_effect(plan(), replace(execution(), cleanup_state="unverified")).reason,
-            "cleanup_unverified",
-        )
-
-    def test_bad_prefix_gap_counter_capacity_and_worker_evidence(self):
-        run = execution()
-        degraded = run.phases[2]
-        row = degraded.intervals[0]
-        for rows in [
-            ((), *degraded.intervals[1:]),
-            degraded.intervals[:29],
-            ((row[0] + 1, *row[1:]), *degraded.intervals[1:]),
-            ((row[0], row[1], row[2], row[2] - 1, *row[4:]), *degraded.intervals[1:]),
-            ((*row[:4], 0, row[5]), *degraded.intervals[1:]),
-            ((*row[:5], SECOND + 1), *degraded.intervals[1:]),
-        ]:
-            altered = replace(degraded, intervals=rows)
-            self.assertEqual(
-                evaluate_effect(
-                    plan(), replace(run, phases=(*run.phases[:2], altered, *run.phases[3:]))
-                ).reason,
-                "insufficient_evidence",
-            )
-
-    def test_multiple_workers_cpu_percent_can_exceed_one_core(self):
-        effect = evaluate_effect(plan(2), execution(cpu=45 * SECOND, workers=2))
-        self.assertEqual((effect.state, effect.pressure_cpu_percent), ("verified", 150.0))
-
-
-class Clock:
-    value = 0
-
-    def __call__(self):
-        return self.value
-
-
-class Processes:
-    def __init__(self):
-        self.next = 100
-        self.live = {}
-        self.signals = []
-        self.reaped = []
-        self.closed = []
-        self.fail_handshake = None
-        self.ignore_term = False
-        self.ignore_kill = False
-        self.activation_check = lambda: None
-
-    def spawn(self, duration):
-        self.next += 1
-        self.live[self.next] = dict(
-            boot="0" * 8 + "-" + "0" * 4 + "-" + "0" * 4 + "-" + "0" * 4 + "-" + "0" * 12,
-            start=self.next,
-            cpu=0,
-            exited=False,
-        )
-        return SimpleNamespace(pid=self.next)
-
-    def pin(self, pid):
-        if pid not in self.live:
-            raise ProcessLookupError()
-        return pid
-
-    def identity(self, pid):
-        value = self.live[pid]
-        return value["boot"], value["start"], value["cpu"]
-
-    def exited(self, fd):
-        return self.live[fd]["exited"]
-
-    def handshake(self, child, expected, budget):
-        budget.check()
-        if child.pid == self.fail_handshake:
-            raise RunFailure("action_failed")
-
-    def activate(self, child):
-        self.activation_check()
-
-    def send(self, fd, sig):
-        self.signals.append((fd, sig))
-        if (sig == signal.SIGTERM and not self.ignore_term) or (
-            sig == signal.SIGKILL and not self.ignore_kill
-        ):
-            self.live[fd]["exited"] = True
-
-    def pause(self, budget):
-        budget.check()
-        budget.timeline.clock.value += SECOND // 10
-
-    def reap(self, child, budget):
-        budget.check()
-        if child is not None:
-            self.reaped.append(child.pid)
-
-    def close(self, fd):
-        self.closed.append(fd)
-
-
-class WorkerTests(unittest.TestCase):
-    def setUp(self):
-        self.directory = tempfile.TemporaryDirectory()
-        self.lease = RuntimeLease(self.directory.name).__enter__()
-        self.resources = tuple(Resource("pressure", f"{i:032x}", "a" * 32) for i in (1, 2))
-        self.lease.begin(plan(2), self.resources)
-        self.processes = Processes()
-        self.manager = PressureWorkers(self.lease, self.resources, self.processes)
-        self.clock = Clock()
-        self.budget = Budget(Timeline(self.clock), 10 * SECOND)
-
-    def tearDown(self):
-        self.lease.__exit__()
-        self.directory.cleanup()
-
-    def start(self):
-        self.manager.start(70 * SECOND, self.budget)
-
-    def test_all_durable_parked_identities_precede_first_activation(self):
-        def check():
-            for resource in self.resources:
-                self.assertIn(self.lease.worker_record(resource)["state"], ("parked", "active"))
-                path = Path(self.directory.name, "worker-" + resource.token + ".json")
-                self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-
-        self.processes.activation_check = check
-        self.start()
-        self.processes.live[101]["cpu"] = 3 * SECOND
-        self.processes.live[102]["cpu"] = 4 * SECOND
-        self.assertEqual(self.manager.counters(), (2, 7 * SECOND))
-        self.assertTrue(self.manager.stop(self.budget))
-        self.assertEqual(self.manager.counters(), (0, 7 * SECOND))
-        signals = list(self.processes.signals)
-        self.assertTrue(self.manager.stop(self.budget))
-        self.assertEqual(self.processes.signals, signals)
-        self.assertEqual(self.processes.reaped, [102, 101])
-
-    def test_term_escalates_to_kill_with_bounded_reap(self):
-        self.start()
-        self.processes.ignore_term = True
-        self.assertTrue(self.manager.stop(self.budget))
-        self.assertEqual(
-            self.processes.signals,
-            [
-                (102, signal.SIGTERM),
-                (102, signal.SIGKILL),
-                (101, signal.SIGTERM),
-                (101, signal.SIGKILL),
-            ],
-        )
-        self.assertLessEqual(self.clock.value, 3 * SECOND)
-
-    def test_stuck_child_retains_record_and_fails_by_deadline(self):
-        self.start()
-        self.processes.ignore_term = self.processes.ignore_kill = True
-        self.assertFalse(self.manager.stop(self.budget))
-        self.assertLessEqual(self.clock.value, 10 * SECOND + SECOND // 10)
-        self.assertEqual(self.lease.worker_record(self.resources[1])["state"], "active")
-
-    def test_partial_startup_keeps_exact_child_for_cleanup(self):
-        self.processes.fail_handshake = 102
-        with self.assertRaises(RunFailure):
-            self.start()
-        self.assertTrue(self.manager.stop(self.budget))
-        self.assertEqual(set(self.processes.reaped), {101, 102})
-
-    def test_persist_failure_never_activates_and_still_reaps_child(self):
-        with (
-            patch.object(self.lease, "worker_record", side_effect=OSError("disk full")),
-            self.assertRaises(OSError),
-        ):
-            self.start()
-        self.assertEqual(self.processes.live, {})  # failure reading intent before spawn
-        original = self.lease.worker_record
-
-        def fail_write(resource, value=None):
-            if value is not None:
-                raise OSError("disk full")
-            return original(resource)
-
-        with (
-            patch.object(self.lease, "worker_record", side_effect=fail_write),
-            self.assertRaises(OSError),
-        ):
-            self.start()
-        self.assertTrue(self.manager.stop(self.budget))
-        self.assertEqual(self.processes.reaped, [101])
-
-    def test_restarted_manager_recovers_durable_exact_workers(self):
-        self.start()
-        recovered = PressureWorkers(self.lease, self.resources, self.processes)
-        self.assertTrue(recovered.stop(self.budget))
-        self.assertEqual({pid for pid, _ in self.processes.signals}, {101, 102})
-
-    def test_foreign_pid_generation_never_signalled_attempts_other_child(self):
-        self.start()
-        self.processes.live[102]["start"] += 1
-        recovered = PressureWorkers(self.lease, self.resources, self.processes)
-        self.assertFalse(recovered.stop(self.budget))
-        self.assertEqual(self.processes.signals, [(101, signal.SIGTERM)])
-        self.assertIn(102, self.processes.closed)
-
-    def test_unexpected_exit_aborts_counters_but_exact_child_can_be_reaped(self):
-        self.start()
-        self.processes.live[101]["exited"] = True
-        self.assertTrue(self.manager.owns(self.resources[0]))
-        with self.assertRaises(RunFailure):
-            self.manager.counters()
-        self.assertTrue(self.manager.stop(self.budget))
-        self.assertIn(101, self.processes.reaped)
-
-    def test_missing_native_pid_is_restored_without_signal(self):
-        self.start()
-        del self.processes.live[102]
-        recovered = PressureWorkers(self.lease, self.resources, self.processes)
-        self.assertTrue(recovered.restore(self.resources[1], self.budget))
-        self.assertEqual(self.processes.signals, [])
-
-    def test_duplicate_invalid_private_record_and_clean_lease_fail_closed(self):
-        resource = self.resources[0]
-        path = Path(self.directory.name, "worker-" + resource.token + ".json")
-        path.write_text('{"pid":1,"pid":2}')
-        path.chmod(0o600)
-        with self.assertRaises(ValueError):
-            self.manager.owns(resource)
-        path.unlink()
-        self.start()
-        with self.assertRaises(ValueError):
-            self.start()
-        self.assertTrue(self.manager.stop(self.budget))
-        self.lease.finish(True)
-        with self.assertRaises(ValueError):
-            self.manager.owns(resource)
-
-    def test_declared_stop_is_not_native_restoration_proof_after_restart(self):
-        self.start()
-        resource = self.resources[0]
-        self.lease.worker_record(
-            resource, dict(self.lease.worker_record(resource), state="stopped")
-        )
-        recovered = PressureWorkers(self.lease, self.resources, self.processes)
-        with self.assertRaises(RunFailure):
-            recovered.counters()
-        self.assertTrue(recovered.restore(resource, self.budget))
-        self.assertEqual(self.processes.signals, [(101, signal.SIGTERM)])
-
-    def test_clean_next_run_prunes_only_prior_bounded_native_inventory(self):
-        self.start()
-        self.assertTrue(self.manager.stop(self.budget))
-        self.lease.finish(True)
-        next_resources = (Resource("pressure", "f" * 32, "e" * 32),)
-        self.lease.begin(plan(), next_resources)
-        self.assertEqual(list(Path(self.directory.name).glob("worker-*.json")), [])
+from scenario_harness.contracts import (
+    PHASES,
+    SECOND,
+)
 
 
 class AdapterTests(unittest.TestCase):
@@ -428,28 +67,6 @@ class AdapterTests(unittest.TestCase):
         ]:
             with self.assertRaises(ValueError):
                 WorkloadDeclaration(*args)
-
-
-class Element:
-    def __init__(self, name, properties=None):
-        self.name = name
-        self.properties = properties or {}
-
-    def get_factory(self):
-        return SimpleNamespace(get_name=lambda: self.name)
-
-    def get_property(self, name):
-        return self.properties.get(name, 1)
-
-    def get_static_pad(self, name):
-        return SimpleNamespace(
-            get_current_caps=lambda: SimpleNamespace(
-                get_structure=lambda index: SimpleNamespace(
-                    get_fraction=lambda field: (True, 30, 1),
-                    get_value=lambda field: {"width": 1280, "height": 720}[field],
-                )
-            )
-        )
 
 
 class CameraAdapterTests(unittest.TestCase):
@@ -707,31 +324,6 @@ class CameraAdapterTests(unittest.TestCase):
         namespace["count_frame_out"](None, None)
         namespace["count_queue_drop"](None)
         self.assertEqual(tuple(peers["same-private-peer"].values()), (0, 0, 0))
-
-
-class NativeIdleIntegrationTests(unittest.TestCase):
-    @unittest.skipUnless(sys.platform == "linux", "Linux pidfd integration only")
-    def test_actual_parked_child_eof_and_reap_without_pressure_activation(self):
-        processes = LinuxProcesses()
-        child = processes.spawn(40 * SECOND)
-        timeline = Timeline(__import__("time").monotonic_ns)
-        budget = Budget(timeline, timeline.now() + 2 * SECOND)
-        fd = processes.pin(child.pid)
-        try:
-            processes.handshake(child, b"READY\n", budget)
-            boot, start, cpu = processes.identity(child.pid)
-            self.assertTrue(boot)
-            self.assertGreater(start, 0)
-            self.assertGreaterEqual(cpu, 0)
-            child.stdin.close()  # No GO is ever sent.
-            child.wait(timeout=1)
-            self.assertTrue(processes.exited(fd))
-        finally:
-            if child.poll() is None:
-                processes.send(fd, signal.SIGKILL)
-                child.wait(timeout=1)
-            child.stdout.close()
-            processes.close(fd)
 
 
 if __name__ == "__main__":

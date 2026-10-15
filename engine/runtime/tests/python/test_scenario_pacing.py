@@ -15,7 +15,7 @@ from camera_trace_config import ENGINE_EVENTS, TraceConfig
 from scenario_harness.contracts import SECOND, PhaseExecution, RunPlan
 from scenario_harness.pacing_export import pacing_bundle_bytes
 from scenario_harness.pacing_runtime import CapturePacer
-from test_scenario_adapters import execution
+from scenario_adapter_support import execution
 from test_scenario_export import declaration
 
 

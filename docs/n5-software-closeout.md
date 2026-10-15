@@ -51,6 +51,6 @@ The initial closeout covered Step 1–7 library delivery. The subsequent
 second-adapter pacing, assignments and automated overhead tools; its tests are
 recorded in the current handoff. Fresh campaign-8 now validates both fault classes in all 18 reference/query
 trials, and selected-scene overhead passes. Core hosted quality/minimum-Python
-jobs pass; browser execution method checks also pass locally. Normal desktop interaction
-and hosted checks for final browser changes in both repos remain open. These current outcomes supersede the initial runtime
+jobs pass; browser execution method checks also pass locally. Both merged baselines now pass hosted gates; normal desktop/picker sign-off
+and normal CI for subsequent audit fixes remain open. These current outcomes supersede the initial runtime
 availability snapshot above.

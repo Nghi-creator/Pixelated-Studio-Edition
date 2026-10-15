@@ -120,7 +120,8 @@ The Node engine suite runs these Python cases and checks both image COPY lists.
 No real pressure worker, Linux/GI playback, container build, measured effect or
 paired overhead trial was run in Step 4. [N4 tracing acceptance](n4-stage-trace-export.md)
 records the current nominal/overhead/lifecycle results. Actual Node 24 execution
-now passes; hosted CI remains unverified. Healthy plus one approved CPU
+now passes; both merged baselines pass hosted gates. User desktop/picker
+sign-off and normal CI for subsequent audit fixes remain pending. Healthy plus one approved CPU
 class does not meet Phase 1.3's two real bottleneck-class gate. Concrete supported
 adapters and fixed effect predicates are delivered in [Step 5](n5-adapters.md); [offline bundle verification](n5-experiment-export.md) is delivered in
 Step 6; [independent release pins](n5-experiment-reproduction.md) are delivered in Step 7.
