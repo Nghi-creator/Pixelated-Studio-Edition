@@ -3,8 +3,13 @@
 The [current live procedure](n5-live-test-procedure.md) records actual Linux
 79-scenario/58-trace test passes, Node 24.18.1 engine 135 passed/one artifact skip,
 standard native build/two-package smoke and real nominal/overhead/lifecycle checks.
-Core Python 3.11/3.13 each pass 2,015 tests, each at 93.61% coverage,
-and frozen pins. Actual Node 24 also passes all 259 web tests.
+Earlier core Python 3.11/3.13 verification passed 2,015 tests/93.61% and frozen
+pins; the actual Node 24 baseline passed all 259 web tests. The follow-up
+[readiness audit](../../latency_fingerprinting/experiments/phase-1-readiness-20261015/README.md)
+passes 2,032 current Python 3.13 tests/93.55% and 740 Node tests, with one
+existing external-artifact skip. It separates scenario tests, telemetry parsing/CSV
+and API fake behavior, and hardens failed browser saves. These new patches still
+need normal minimum-version/native hosted checks.
 Fresh selected-workload campaign-8 passes all 18 trials and repeated effects;
 selected-scene overhead also passes. Core hosted quality/minimum-Python jobs are
 verified. Browser execution method checks also pass locally. Both merged baselines now pass hosted gates; normal desktop/picker sign-off

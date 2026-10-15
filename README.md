@@ -79,6 +79,7 @@ PIXELATED Studio is intended to be used through the packaged desktop app plus th
 ### Download
 
 Install the latest packaged release from [GitHub Releases](https://github.com/Nghi-creator/Pixelated-Studio-Edition/releases/latest).
+Repository release notes: [v1.0.1](docs/releases/v1.0.1.md).
 
 - **Windows:** download the `.exe` installer.
 - **macOS:** download the `.dmg` and drag the app into Applications. If Gatekeeper blocks it, right-click and choose **Open**.

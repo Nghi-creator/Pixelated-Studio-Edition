@@ -21,9 +21,11 @@ lags out of 900 callbacks; the remaining 219 pairs are zero. API absence is test
 by deliberate removal on an actual HTMLVideoElement, not by a natively unsupported
 Chromium build. A different callback timestamp needs additive method review.
 
-All 79 scenario and 58 trace/control Python tests pass on actual Linux, with no
-Linux-only skip. Core Python 3.13 passes 2,015 tests at 93.61% coverage. Python 3.11.17 also passes
-all 2,015 core tests at 93.61%, 25 schemas and frozen pins; core and Pixelated merged-baseline hosted gates now pass at `3313139` and
+Prior actual Linux verification passed 79 scenario and 58 trace/control Python
+tests with no Linux-only skip. Current macOS readiness checks pass 2,032 core
+Python 3.13 tests at 93.55% coverage and 740 Node tests with one existing
+external-artifact skip. The prior Python 3.11.17 baseline passed 2,015 tests at
+93.61%, 25 schemas and frozen pins; core and Pixelated merged-baseline hosted gates now pass at `3313139` and
 `31d675a` respectively. Normal desktop/picker sign-off remains unverified, and
 subsequent audit fixes need their normal CI run. The standard
 native image builds and passes Gst import plus bounded Frozen Bubble/Neverball
@@ -301,3 +303,15 @@ stop/reconnect, trace export, cancellation/retry and detached v2 inspection
 outcomes. A failed or untested step stays pending. These manual outcomes are the
 remaining user sign-off before N5/Phase 1 can be closed; a new long fault campaign
 is not needed merely to exercise these UI paths.
+
+## Follow-up readiness audit, 2026-10-15
+
+The [follow-up review](../../latency_fingerprinting/experiments/phase-1-readiness-20261015/README.md)
+adds cleanup of browser writable streams when saving fails. Successful saves and
+picker cancellation keep their existing behavior; failed writes attempt abort
+before cancellation/download fallback. Telemetry parsing/CSV serialization and
+API database-test helpers are separated by responsibility. Scenario effect,
+worker and camera-hook tests are independently discoverable, with their original
+test methods retained. These changes do not replace the manual checks above.
+Current full-suite counts and verification limits are in the linked record;
+earlier native Linux/minimum-version results retain their original versions.

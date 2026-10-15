@@ -1,4 +1,5 @@
 type FileSystemWritable = {
+  abort: () => Promise<void>;
   close: () => Promise<void>;
   write: (data: Blob) => Promise<void>;
 };
@@ -43,8 +44,14 @@ async function saveBlobWithPicker(filename: string, blob: Blob) {
     ],
   });
   const writable = await fileHandle.createWritable();
-  await writable.write(blob);
-  await writable.close();
+  try {
+    await writable.write(blob);
+    await writable.close();
+  } catch (error) {
+    // Discard the temporary write and release its lock before cancellation/fallback.
+    try { await writable.abort(); } catch { /* The original save failure takes precedence. */ }
+    throw error;
+  }
   return "saved" as const;
 }
 
