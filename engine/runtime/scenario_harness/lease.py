@@ -36,7 +36,7 @@ class RuntimeLease:
             raise
 
     def _open(self, name, flags):
-        fd = os.open(name, flags | os.O_NOFOLLOW, 0o600, dir_fd=self.directory_fd)
+        fd = os.open(name, flags | os.O_NOFOLLOW | os.O_NONBLOCK, 0o600, dir_fd=self.directory_fd)
         info = os.fstat(fd)
         if (
             not stat.S_ISREG(info.st_mode)

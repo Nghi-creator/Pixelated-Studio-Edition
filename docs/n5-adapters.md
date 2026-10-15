@@ -116,7 +116,7 @@ activation/durability, partial startup, TERM/KILL/reap, restart, missing/reused 
 deadline and actual camera hooks with fake Gst dependencies. A Linux-only integration
 test spawns an actual parked child and sends EOF without GO; it never runs pressure.
 That integration test was skipped in the original macOS checks. The subsequent
-Linux run passes all 78 scenario tests, including actual parked-child cleanup.
+current Linux audit passes all 79 scenario tests, including actual parked-child cleanup.
 Real pressure/capture outcomes, retained failures and remaining overhead/version/hosted
 gates are recorded in the [live procedure](n5-live-test-procedure.md) and linked
 core runtime ledger.
@@ -126,8 +126,8 @@ gate. N4's nominal capture/coverage/overhead and host lifecycle gates now pass;
 the browser execution method also passes local validation; final desktop/hosted
 acceptance remains open. [Independent fixture pinning and reproduction](n5-experiment-reproduction.md) are
 delivered in Step 7. Fresh campaign-8 now passes all 18 healthy/CPU/pacing reference/query trials;
-selected-scene overhead also passes. Browser execution method checks also pass locally. Normal desktop interaction
-and hosted checks for final browser changes in both repos remain open.
+selected-scene overhead also passes. Browser execution method checks also pass locally. Both merged baselines now pass hosted gates; normal desktop/picker sign-off
+and normal CI for subsequent audit fixes remain open.
 
 ## Additive capture pacing
 

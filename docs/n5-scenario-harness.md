@@ -1,14 +1,14 @@
 # N5 scenario-harness handoff
 
 The [current live procedure](n5-live-test-procedure.md) records actual Linux
-78-scenario/58-trace test passes, Node 24.18.1 engine 135 passed/one artifact skip,
+79-scenario/58-trace test passes, Node 24.18.1 engine 135 passed/one artifact skip,
 standard native build/two-package smoke and real nominal/overhead/lifecycle checks.
-Core Python 3.11/3.13 each pass 2,003 tests, 93.60%/93.52% coverage respectively,
+Core Python 3.11/3.13 each pass 2,015 tests, each at 93.61% coverage,
 and frozen pins. Actual Node 24 also passes all 259 web tests.
 Fresh selected-workload campaign-8 passes all 18 trials and repeated effects;
 selected-scene overhead also passes. Core hosted quality/minimum-Python jobs are
-verified. Browser execution method checks also pass locally. Normal desktop interaction
-and hosted checks for final browser changes in both repos remain open. Earlier step counts and unavailable gates below are historical.
+verified. Browser execution method checks also pass locally. Both merged baselines now pass hosted gates; normal desktop/picker sign-off
+and normal CI for subsequent audit fixes remain open. Earlier step counts and unavailable gates below are historical.
 
 
 **Updated:** 2026-10-12. Steps 1–7 software gates are complete locally. The

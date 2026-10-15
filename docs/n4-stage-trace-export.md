@@ -10,9 +10,8 @@ The short native diagnostic yielded 110 queue/encode pairs without collector los
 subsequent full nominal camera recordings yielded 900 pairs per 30-second phase,
 100% joint coverage and zero drops. The sibling core's
 `docs/observability/N4_RUNTIME_ACCEPTANCE.md` records passing nominal/overhead and host lifecycle cases, including the selected
-workload confirmation. Browser execution method checks also pass locally. Normal desktop interaction
-and hosted checks for final browser changes in both repos remain open; previous
-core minimum-version/hosted baseline results are retained.
+workload confirmation. Browser execution method checks also pass locally. Both merged baselines now pass hosted gates; normal desktop/picker sign-off
+and normal CI for subsequent audit fixes remain open.
 
 Tracing remains opt-in. Export is independent of research bundle v2 and contains
 only trace-manifest.json and canonical trace-record.json in a gzip TAR. No summary,
@@ -98,7 +97,7 @@ legacy shutdown export still belongs to its initial collector; a warm-up artifac
 cannot stand in for the fresh measured phase. [Phase export/adoption](n5-experiment-export.md) is delivered in N5
 Step 6 software. Actual nominal Linux transition, paired overhead and host lifecycle/isolation
 cases now pass; the additive browser execution method also passes local
-validation. Final desktop/picker and hosted acceptance remain open; the synthetic pinned exports above still reproduce unchanged.
+validation. User desktop/picker sign-off and normal CI for subsequent audit fixes remain open; the synthetic pinned exports above still reproduce unchanged.
 
 ## Browser execution v2 export
 

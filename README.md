@@ -44,7 +44,7 @@ stage tracing is bounded and disabled by default. [Standalone export and pinned
 integration](docs/n4-stage-trace-export.md) are delivered; actual nominal capture,
 paired overhead and host lifecycle checks pass. The opt-in browser execution
 method also passes local software/live validation. [N5 scenario-harness work](docs/n5-scenario-harness.md)
-has delivered Steps 1–7, including [bounded lifecycle/fresh recording control](docs/n5-lifecycle.md) and [camera/CPU adapters with fixed effect checks](docs/n5-adapters.md); [experiment export/inspection](docs/n5-experiment-export.md) is delivered; [Step 7 fixture reproduction](docs/n5-experiment-reproduction.md) is delivered; [Step 8 software closeout](docs/n5-software-closeout.md) is recorded; normal desktop/picker interaction and hosted checks of final changes remain open.
+has delivered Steps 1–7, including [bounded lifecycle/fresh recording control](docs/n5-lifecycle.md) and [camera/CPU adapters with fixed effect checks](docs/n5-adapters.md); [experiment export/inspection](docs/n5-experiment-export.md) is delivered; [Step 7 fixture reproduction](docs/n5-experiment-reproduction.md) is delivered; [Step 8 software closeout](docs/n5-software-closeout.md) is recorded; merged-baseline hosted checks pass. User desktop/picker sign-off and normal CI for subsequent audit fixes remain open.
 
 ## Architecture
 
@@ -198,4 +198,4 @@ Built by [Nicholas Nguyen](https://www.linkedin.com/in/nicholas-nguyen-3bb17a335
 Opt-in N5 research campaigns and the separate real overhead procedure are described
 in the [live test guide](docs/n5-live-test-procedure.md). Normal startup remains
 disabled for these controls. The full 18-trial campaign and selected-scene
-overhead pass; final desktop/picker and hosted verification remain pending.
+overhead pass; user desktop/picker sign-off and normal CI for subsequent audit fixes remain pending.

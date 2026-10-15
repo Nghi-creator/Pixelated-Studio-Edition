@@ -80,8 +80,8 @@ artifact skip, zero failures. Twenty-five test snapshots also validate against
 the core's strict N4 models. Those are historical software-checkpoint counts.
 Subsequent actual Linux execution passes 58 trace/control cases, native image
 build/package smoke, nominal capture, paired overhead and host lifecycle checks.
-Core hosted CI is verified. Pixelated hosted execution, desktop interaction and
-full browser acceptance remain open; see the [live procedure](n5-live-test-procedure.md).
+Both merged baselines pass hosted CI, including image security and desktop
+packaging. User desktop/picker sign-off and normal CI for subsequent audit fixes remain open; see the [live procedure](n5-live-test-procedure.md).
 
 [Step 5 standalone export](n4-stage-trace-export.md) now supplies configured shutdown persistence; offline reconstruction is delivered in the sibling core as Step 6.
 

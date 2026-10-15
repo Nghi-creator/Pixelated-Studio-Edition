@@ -21,10 +21,11 @@ lags out of 900 callbacks; the remaining 219 pairs are zero. API absence is test
 by deliberate removal on an actual HTMLVideoElement, not by a natively unsupported
 Chromium build. A different callback timestamp needs additive method review.
 
-All 78 scenario and 58 trace/control Python tests pass on actual Linux, with no
-Linux-only skip. Core Python 3.13 passes 2,003 tests at 93.52% coverage. Python 3.11.17 also passes
-all 2,003 core tests at 93.60%, 25 schemas and frozen pins; core hosted quality/minimum-Python jobs pass for exact `bc6f42b`; Pixelated
-hosted CI and normal desktop/picker interaction remain unverified. The standard
+All 79 scenario and 58 trace/control Python tests pass on actual Linux, with no
+Linux-only skip. Core Python 3.13 passes 2,015 tests at 93.61% coverage. Python 3.11.17 also passes
+all 2,015 core tests at 93.61%, 25 schemas and frozen pins; core and Pixelated merged-baseline hosted gates now pass at `3313139` and
+`31d675a` respectively. Normal desktop/picker sign-off remains unverified, and
+subsequent audit fixes need their normal CI run. The standard
 native image builds and passes Gst import plus bounded Frozen Bubble/Neverball
 package smoke; actual Node 24.18.1 engine verification passes 135 tests with one
 existing external-artifact skip. The research capture image is recorded separately. Full N5 and Phase 1 remain open.
@@ -250,14 +251,16 @@ negative API deltas/ten zero, but all callback-entry deltas positive (median
 change frozen v1 meanings or close browser acceptance. All owned acquisition and
 diagnostic runtimes are stopped. The additive browser execution method now passes local software/live checks
 (see core `experiments/n5-browser-execution-20261014/`). Final desktop interaction
-and hosted verification of the browser changes in both repos remain open.
+and normal CI for subsequent audit fixes remain open; merged-baseline hosted
+verification now passes in both repos.
 
 ## Final manual desktop and hosted checks
 
 The browser execution method is implemented separately from the frozen v1 API
 method. Passing local live validation is recorded in the sibling core's
-`experiments/n5-browser-execution-20261014/` and N4/N5 runtime ledgers. The
-following checks remain separate from headless producer capture:
+`experiments/n5-browser-execution-20261014/` and N4/N5 runtime ledgers. Merged-baseline hosted gates now pass; the CI steps below are the procedure
+for verifying subsequent audit fixes after merge. The manual steps remain
+separate from headless producer capture:
 
 1. Build the web player with `VITE_N4_STAGE_TRACE=1`,
    `VITE_N4_STAGE_TRACE_METHOD=execution-v2`, and
@@ -282,3 +285,19 @@ following checks remain separate from headless producer capture:
 Retain manual outcomes in the core runtime ledger. N5/Phase 1 remain open until
 these remaining gates have actual evidence. Commit subjects use `[type] summary`
 in Pixelated and `type: summary` in latency_fingerprinting.
+
+## Pre-manual audit, 2026-10-15
+
+The sibling core's [audit record](../../latency_fingerprinting/experiments/phase-1-audit-20261015/README.md)
+records successful hosted runs for both exact merged baselines. Local input
+hardening now rejects FIFO/special private journals without waiting for a writer;
+actual Linux regressions and existing cleanup/ownership tests pass. The remaining
+moderate `fast-copy` advisory is fixed within the compatible major version and
+all five scopes' full/production npm audits report zero vulnerabilities.
+Current audit source changes require their normal hosted run after merge.
+
+Retain a small manual result record with exact build commits, game launch/input,
+stop/reconnect, trace export, cancellation/retry and detached v2 inspection
+outcomes. A failed or untested step stays pending. These manual outcomes are the
+remaining user sign-off before N5/Phase 1 can be closed; a new long fault campaign
+is not needed merely to exercise these UI paths.
