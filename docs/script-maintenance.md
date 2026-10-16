@@ -29,7 +29,9 @@ remains untouched.
 LAN smoke retains each connected guest immediately and attempts all owned cleanup
 steps even when another fails. Host telemetry shutdown must succeed before a pass
 report is written. HTTP bodies and diagnostic logs have explicit limits; hosted
-pairing log reports include drop counts and redact credentials/URL parameters.
+pairing log reports include drop counts and redact credentials/URL parameters,
+including URLs embedded in navigation errors and console text. Native catalog
+selection returns the same supported build that satisfied its manifest checks.
 
 The reusable Repository Quality workflow tests all workspaces on the pinned
 production Node version and Node 26 compatibility, with Linux producer Python 3.13.
@@ -39,5 +41,5 @@ production dependency audit also blocks deployment. Security audits and
 three-platform desktop validation retain their existing workflows. These workflow
 edits require actual CI runs; local tests do not establish remote success.
 
-See the sibling core's [verification record](../../latency_fingerprinting/experiments/phase-1-script-ci-20261016/README.md)
+See the sibling core's [verification record](../../latency_fingerprinting/experiments/phase-1-final-check-20261016/README.md)
 and the [manual/live acceptance procedure](n5-live-test-procedure.md).

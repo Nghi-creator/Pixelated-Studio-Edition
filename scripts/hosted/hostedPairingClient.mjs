@@ -53,13 +53,14 @@ export function createHostedPairingClient({ apiUrl, supabaseUrl, serviceRoleKey,
         auth: false,
       });
       lastPayload = payload;
-      const game = payload.games?.find((candidate) => candidate.game_builds?.some((build) => build.runtime_kind === "native_linux" &&
+      const isSupportedBuild = (build) => build.runtime_kind === "native_linux" &&
         build.runtime_id === "debian-native-v1" &&
         typeof build.launch_manifest_id === "string" &&
-        build.launch_manifest_id.length > 0));
+        build.launch_manifest_id.length > 0;
+      const game = payload.games?.find((candidate) => candidate.game_builds?.some(isSupportedBuild));
       if (game) {
         return {
-          build: game.game_builds.find((candidate) => candidate.runtime_kind === "native_linux"),
+          build: game.game_builds.find(isSupportedBuild),
           game,
         };
       }

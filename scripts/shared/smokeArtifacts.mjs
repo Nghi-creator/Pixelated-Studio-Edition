@@ -8,7 +8,8 @@ export function safeSmokeUrl(value) {
   }
 }
 export function redactSmokeText(value, secrets = []) {
-  let text = String(value);
+  // Navigation failures and console messages can embed signed URLs as plain text.
+  let text = String(value).replace(/https?:\/\/[^\s"'<>]+/gi, safeSmokeUrl);
   for (const secret of secrets)
     if (typeof secret === "string" && secret.length >= 8)
       text = text.replaceAll(secret, "[redacted]");

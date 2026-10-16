@@ -23,7 +23,7 @@ Chromium build. A different callback timestamp needs additive method review.
 
 Prior actual Linux verification passed 79 scenario and 58 trace/control Python
 tests with no Linux-only skip. Current macOS readiness checks pass 2,032 core
-Python 3.13 tests at 93.55% coverage and 780 Node tests with one existing
+Python 3.13 tests at 93.55% coverage and 783 Node tests with one existing
 external-artifact skip. The prior Python 3.11.17 baseline passed 2,015 tests at
 93.61%, 25 schemas and frozen pins; core and Pixelated merged-baseline hosted gates now pass at `3313139` and
 `31d675a` respectively. Normal desktop/picker sign-off remains unverified, and
@@ -43,9 +43,11 @@ Chromium receiver. Its retained, now stopped container is `n5-acceptance-ae00593
 use new campaign/output/volume IDs for a new acquisition. Do not overwrite or
 resume the retained failed campaign as if it were a successful cohort.
 
-On this macOS host the working CLI is
+The recorded macOS captures used
 `/Applications/Docker.app/Contents/Resources/bin/docker`; the `/usr/local/bin/docker`
-symlink points to an absent OrbStack installation. Start Docker Desktop first.
+symlink pointed to an absent OrbStack installation. The final 2026-10-16 check
+finds the bundled client present but its configured daemon socket unavailable.
+Start Docker Desktop and confirm `docker version` reports a server before preflight.
 For builds, also put the bundled CLI directory on PATH so its credential helper is
 available. A Docker Desktop Linux VM is sufficient for these capture tests.
 
@@ -319,5 +321,6 @@ earlier native Linux/minimum-version results retain their original versions.
 
 The [script/CI maintenance pass](script-maintenance.md) adds full workspace
 regression gating before hosted deployment and hardens utility cleanup/diagnostics.
-It passes 780 local Node tests with one existing artifact skip. Actual new CI lanes
+The [final review](../../latency_fingerprinting/experiments/phase-1-final-check-20261016/README.md)
+passes 783 local Node tests with one existing artifact skip. Actual new CI lanes
 and the manual outcomes above remain separate acceptance tasks.

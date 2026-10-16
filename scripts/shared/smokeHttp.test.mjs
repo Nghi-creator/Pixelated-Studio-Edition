@@ -25,3 +25,9 @@ for (const declared of [false, true])
     await assert.rejects(requestSmoke("https://api.test/user?token=private-value", {}, { maxBodyBytes: 4 }), { message: "GET https://api.test/user failed while reading HTTP 200 body." });
     assert.equal(cancelled, true);
   });
+
+test("console and failure text remove embedded magic-link credentials", () => {
+  const text = redactSmokeText('page.goto: navigation to "https://user:password@auth.test/verify?token_hash=private-link&type=magiclink#access_token=private-token" timed out');
+  assert.equal(text, 'page.goto: navigation to "https://auth.test/verify" timed out');
+  assert.equal(redactSmokeText('Failed GET https://api.test/route?code=private-code'), 'Failed GET https://api.test/route');
+});
