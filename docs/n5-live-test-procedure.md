@@ -23,7 +23,7 @@ Chromium build. A different callback timestamp needs additive method review.
 
 Prior actual Linux verification passed 79 scenario and 58 trace/control Python
 tests with no Linux-only skip. Current macOS readiness checks pass 2,032 core
-Python 3.13 tests at 93.55% coverage and 740 Node tests with one existing
+Python 3.13 tests at 93.55% coverage and 780 Node tests with one existing
 external-artifact skip. The prior Python 3.11.17 baseline passed 2,015 tests at
 93.61%, 25 schemas and frozen pins; core and Pixelated merged-baseline hosted gates now pass at `3313139` and
 `31d675a` respectively. Normal desktop/picker sign-off remains unverified, and
@@ -315,3 +315,9 @@ worker and camera-hook tests are independently discoverable, with their original
 test methods retained. These changes do not replace the manual checks above.
 Current full-suite counts and verification limits are in the linked record;
 earlier native Linux/minimum-version results retain their original versions.
+
+
+The [script/CI maintenance pass](script-maintenance.md) adds full workspace
+regression gating before hosted deployment and hardens utility cleanup/diagnostics.
+It passes 780 local Node tests with one existing artifact skip. Actual new CI lanes
+and the manual outcomes above remain separate acceptance tasks.

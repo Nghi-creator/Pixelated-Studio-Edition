@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true
+  },
+  "include": [
+    "scripts/stagingSmoke.ts",
+    "scripts/staging/**/*.ts",
+    "scripts/captureCatalogArtwork.ts",
+    "scripts/artwork/**/*.ts",
+    "tests/unit/tooling/**/*.ts"
+  ]
+}

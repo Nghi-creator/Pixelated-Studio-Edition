@@ -6,7 +6,7 @@ standard native build/two-package smoke and real nominal/overhead/lifecycle chec
 Earlier core Python 3.11/3.13 verification passed 2,015 tests/93.61% and frozen
 pins; the actual Node 24 baseline passed all 259 web tests. The follow-up
 [readiness audit](../../latency_fingerprinting/experiments/phase-1-readiness-20261015/README.md)
-passes 2,032 current Python 3.13 tests/93.55% and 740 Node tests, with one
+passes 2,032 current Python 3.13 tests/93.55% and 780 Node tests, with one
 existing external-artifact skip. It separates scenario tests, telemetry parsing/CSV
 and API fake behavior, and hardens failed browser saves. These new patches still
 need normal minimum-version/native hosted checks.

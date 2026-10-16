@@ -17,4 +17,9 @@ export default defineConfig([
       },
     },
   },
+  {
+    files: ["scripts/stagingSmoke.ts", "scripts/staging/**/*.ts", "scripts/captureCatalogArtwork.ts", "scripts/artwork/**/*.ts", "tests/unit/tooling/**/*.ts"],
+    extends: [js.configs.recommended, ...tseslint.configs.recommended],
+    languageOptions: { ecmaVersion: 2022, globals: globals.node },
+  },
 ]);

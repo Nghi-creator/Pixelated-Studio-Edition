@@ -25,7 +25,8 @@
     "smoke:staging": "tsx scripts/stagingSmoke.ts",
     "test": "node --import tsx --test \"tests/**/*.test.ts\"",
     "upload:catalog-artwork-overrides": "tsx scripts/uploadCatalogArtworkOverrides.ts",
-    "typecheck": "tsc -p tsconfig.json --noEmit"
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:tooling": "tsc -p tsconfig.tooling.json"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",

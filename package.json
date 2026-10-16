@@ -16,7 +16,7 @@
     "check:access-log-schema": "npm run check:access-log-schema -w @pixelated/api",
     "check:submission-cleanup-policy": "npm run check:submission-cleanup-policy -w @pixelated/api",
     "check:lockfiles": "node scripts/security/checkWorkspaceLockConsistency.mjs",
-    "lint": "npm run check:lockfiles && npm run lint:api && npm run lint:web && npm run lint:engine && npm run lint:desktop",
+    "lint": "npm run check:lockfiles && npm run typecheck:tooling && npm run lint:api && npm run lint:web && npm run lint:engine && npm run lint:desktop",
     "lint:api": "npm run lint -w @pixelated/api",
     "lint:desktop": "npm run lint -w pixelated-desktop",
     "lint:engine": "npm run lint -w @pixelated/engine-runtime",
@@ -32,10 +32,11 @@
     "test:engine": "npm test -w @pixelated/engine-runtime",
     "test:web-interactions": "node scripts/web/interactionHarnessSmoke.mjs",
     "test:web": "npm test -w @pixelated/web",
-    "test:smoke": "node --test scripts/hosted/*.test.mjs scripts/lan/*.test.mjs scripts/security/*.test.mjs",
+    "test:smoke": "node --test scripts/shared/*.test.mjs scripts/hosted/*.test.mjs scripts/lan/*.test.mjs scripts/security/*.test.mjs",
     "typecheck:api": "npm run typecheck -w @pixelated/api",
     "verify:hosted-contract": "node --check scripts/hosted/hostedAuthSmoke.mjs && node --check scripts/hosted/hostedPairingSmoke.mjs && node --check scripts/web/interactionHarnessSmoke.mjs && node scripts/hosted/hostedAuthSmoke.mjs --contract-only && node scripts/hosted/hostedPairingSmoke.mjs --contract-only && npm run test:smoke && npm run lint:web && npm run test:web && npm run build:web && npm run test:web-interactions && npm run test:desktop",
-    "verify:api": "npm run typecheck:api && npm run lint:api && npm run test:api && npm run build:api"
+    "verify:api": "npm run typecheck:api && npm run typecheck:tooling && npm run lint:api && npm run test:api && npm run build:api",
+    "typecheck:tooling": "npm run typecheck:tooling -w @pixelated/api"
   },
   "devDependencies": {
     "playwright": "^1.55.0",

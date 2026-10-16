@@ -200,3 +200,5 @@ Opt-in N5 research campaigns and the separate real overhead procedure are descri
 in the [live test guide](docs/n5-live-test-procedure.md). Normal startup remains
 disabled for these controls. The full 18-trial campaign and selected-scene
 overhead pass; user desktop/picker sign-off and normal CI for subsequent audit fixes remain pending.
+
+[Script boundaries and CI maintenance](docs/script-maintenance.md) describes utility ownership, bounds and the full repository regression gate.
