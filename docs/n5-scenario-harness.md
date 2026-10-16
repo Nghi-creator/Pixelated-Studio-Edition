@@ -6,7 +6,7 @@ standard native build/two-package smoke and real nominal/overhead/lifecycle chec
 Earlier core Python 3.11/3.13 verification passed 2,015 tests/93.61% and frozen
 pins; the actual Node 24 baseline passed all 259 web tests. The follow-up
 [final check](../../latency_fingerprinting/experiments/phase-1-final-check-20261016/README.md)
-passes 2,032 current Python 3.13 tests/93.55% and 783 Node tests, with one
+passes 2,032 current Python 3.13 tests/93.55% and 785 Node tests, with one
 existing external-artifact skip. It verifies the earlier scenario-test, telemetry
 and API-fake splits and failed-save hardening, and fixes hosted smoke build selection
 and embedded-URL redaction. These new patches still

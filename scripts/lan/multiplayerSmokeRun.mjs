@@ -8,9 +8,6 @@ import { activateTelemetryCapture, deactivateTelemetryCapture, captureBrowserTel
 import { pollUntil, assertSessionSurvived } from "./multiplayerSmokeSession.mjs";
 import { connectOwnedGuests, disconnectOwnedGuests } from "./multiplayerSmokeCleanup.mjs";
 export async function run(options, runState) {
-  if (options.allowSelfSigned) {
-    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-  }
   const safeLabel = options.label.replace(/[^a-zA-Z0-9_-]+/g, "-");
   const runId = `${safeLabel}-${new Date().toISOString().replace(/[:.]/g, "-")}`;
   const log = makeLogger(options.outDir, runId);
@@ -53,7 +50,6 @@ export async function run(options, runState) {
   log.write("run-start", {
     engineUrl: options.engineUrl,
     expectedGuests: options.expectedGuests,
-    allowSelfSigned: options.allowSelfSigned,
     skipDisconnect: options.skipDisconnect,
   });
   let companionRedemption = null;

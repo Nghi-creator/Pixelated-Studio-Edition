@@ -32,3 +32,10 @@ test("a later join failure retains ownership of each earlier acquired guest", as
   assert.deepEqual(await cleanupRun(run), []);
   assert.equal(closed, 1);
 });
+
+test("legacy TLS bypass is rejected without changing process certificate validation", () => {
+  const previous = process.env.NODE_TLS_REJECT_UNAUTHORIZED;
+  assert.throws(() => parseArgs(["--allow-self-signed"], {}), /NODE_EXTRA_CA_CERTS/);
+  assert.equal(process.env.NODE_TLS_REJECT_UNAUTHORIZED, previous);
+  assert.equal(Object.hasOwn(parseArgs([], {}), "allowSelfSigned"), false);
+});

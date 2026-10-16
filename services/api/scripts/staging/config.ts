@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 export type SmokeMode = "access-log-schema" | "catalog-rpc" | "full" | "submission-cleanup-policy";
 export function parseArgs(args: string[]): SmokeMode {
   if (args.length === 0)
@@ -41,5 +42,5 @@ export function createStagingConfig(environment: NodeJS.ProcessEnv = process.env
 export type StagingConfig = ReturnType<typeof createStagingConfig>;
 export function logStep(message: string) { console.log(`smoke: ${message}`); }
 export function uniqueId(prefix: string) {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}-${Date.now()}-${randomBytes(16).toString("hex")}`;
 }

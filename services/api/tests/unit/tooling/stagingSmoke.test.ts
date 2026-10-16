@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createStagingConfig, parseArgs } from "../../../scripts/staging/config.js";
+import { createStagingConfig, parseArgs, uniqueId } from "../../../scripts/staging/config.js";
 import { createStagingClient } from "../../../scripts/staging/client.js";
 import { createCatalogChecks } from "../../../scripts/staging/catalog.js";
 import { createStorageChecks } from "../../../scripts/staging/storage.js";
@@ -83,16 +83,39 @@ test("admin/submission writes send the approved Studio origin while public reads
 });
 
 
-test("ambiguous storage upload failure still attempts cleanup of its exact owned probe",async t=>{
- const config=configuration();const deleted:string[]=[];let objectPath="";
- t.mock.method(globalThis,"fetch",async(input:Parameters<typeof fetch>[0],options?:RequestInit)=>{
-  const url=String(input);
-  if(url.endsWith("/me"))return Response.json({user:{id:"smoke-user"}});
-  if(options?.method==="DELETE"){deleted.push(...JSON.parse(String(options.body)).prefixes);return Response.json([{name:objectPath}]);}
-  objectPath=url.split("/object/submissions/")[1]||"";
-  return Response.json({message:"private-response"},{status:503});
- });
- const client=createStagingClient(config);client.setBearerToken("smoke-bearer");
- await assert.rejects(createStorageChecks({...config,...client}).predeploySubmissionCleanupPolicyCheck(),error=>error instanceof Error&&/cleanup was attempted/.test(error.message)&&!error.message.includes("private-response"));
- assert.deepEqual(deleted,[objectPath]);assert.match(objectPath,/smoke-user\/roms\/cleanup-policy/);
+test("ambiguous storage upload failure still attempts cleanup of its exact owned probe", async (t) => {
+  const config = configuration();
+  const deleted: string[] = [];
+  let objectPath = "";
+  t.mock.method(globalThis, "fetch", async (input: Parameters<typeof fetch>[0], options?: RequestInit) => {
+    const url = String(input);
+    if (url.endsWith("/me"))
+      return Response.json({ user: { id: "smoke-user" } });
+    if (options?.method === "DELETE") {
+      deleted.push(...JSON.parse(String(options.body)).prefixes);
+      return Response.json([{ name: objectPath }]);
+    }
+    objectPath = url.split("/object/submissions/")[1] || "";
+    return Response.json({ message: "private-response" }, { status: 503 });
+  });
+  const client = createStagingClient(config);
+  client.setBearerToken("smoke-bearer");
+  await assert.rejects(
+    createStorageChecks({ ...config, ...client }).predeploySubmissionCleanupPolicyCheck(),
+    error => error instanceof Error &&
+      /cleanup was attempted/.test(error.message) &&
+      !error.message.includes("private-response"),
+  );
+  assert.deepEqual(deleted, [objectPath]);
+  assert.match(objectPath, /smoke-user\/roms\/cleanup-policy/);
+});
+
+test("staging IDs use independent cryptographic suffixes even at the same timestamp", (t) => {
+  t.mock.method(Date, "now", () => 1234567890);
+  t.mock.method(Math, "random", () => { throw new Error("insecure randomness used"); });
+  const first = uniqueId("staging-smoke");
+  const second = uniqueId("staging-smoke");
+  assert.match(first, /^staging-smoke-1234567890-[a-f0-9]{32}$/);
+  assert.match(second, /^staging-smoke-1234567890-[a-f0-9]{32}$/);
+  assert.notEqual(first, second);
 });

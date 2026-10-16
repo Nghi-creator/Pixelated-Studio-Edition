@@ -43,3 +43,27 @@ edits require actual CI runs; local tests do not establish remote success.
 
 See the sibling core's [verification record](../../latency_fingerprinting/experiments/phase-1-final-check-20261016/README.md)
 and the [manual/live acceptance procedure](n5-live-test-procedure.md).
+
+## Security review follow-up
+
+LAN smoke no longer disables Node TLS certificate verification. The legacy
+`--allow-self-signed` flag is rejected. For an HTTPS companion, configure the
+trusted certificate/CA file before Node starts, then use the normal invite flow:
+
+```sh
+NODE_EXTRA_CA_CERTS=/absolute/path/to/companion-cert.pem \
+  node scripts/lan/multiplayerSmoke.mjs \
+  --engine-url https://companion-host:8090 --invite-code INVITE_CODE
+```
+
+The certificate must also match the requested host; browser trust is separate.
+Staging smoke IDs now use a fresh 128-bit cryptographic suffix instead of
+`Math.random()`. The storage cleanup regression's Boolean expression is formatted
+to make its existing grouping clear.
+
+The reported network-to-file flows save response/error data as smoke evidence.
+Hosted report destinations come from local configuration with fixed basenames;
+the LAN failure destination is created from the local output directory, sanitized
+label and timestamp before network requests. Remote payloads do not select these
+paths. These are expected report-content flows, not arbitrary remote file writes.
+No CodeQL alert suppression or hosted dismissal was added.

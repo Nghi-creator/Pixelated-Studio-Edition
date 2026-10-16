@@ -16,16 +16,17 @@ Options:
   --out-dir <path>          Artifact directory. Default: ${DEFAULT_OUT_DIR}
   --label <name>            Artifact label. Default: lan-multiplayer-smoke
   --notes <path>            Copy completed manual notes into the bundle.
-  --allow-self-signed       Allow Node to use a self-signed companion certificate.
   --skip-disconnect         Do not wait for guest peer cleanup after join validation.
   --help                    Show this help.
 
 Environment:
   PIXELATED_ENGINE_TOKEN    Host engine token required to control telemetry capture.
+  NODE_EXTRA_CA_CERTS        PEM certificate/CA file trusted by Node at startup.
 
 Flow:
   1. Start the host game and wait for the host stream to play.
-  2. For HTTPS companion smoke, accept the certificate once, then pass --invite-code.
+  2. For HTTPS companion smoke, trust its certificate in Node via NODE_EXTRA_CA_CERTS
+     and in the browser, then pass --invite-code.
   3. The harness preflights/redeems the invite and joins a synthetic spectator peer.
   4. Host and real guest browser telemetry is captured through Stream Stats.
 
@@ -44,7 +45,6 @@ export function parseArgs(argv, environment = process.env) {
     notesPath: null,
     outDir: DEFAULT_OUT_DIR,
     pollMs: DEFAULT_POLL_MS,
-    allowSelfSigned: false,
     sessionId: null,
     skipDisconnect: false,
     timeoutMs: DEFAULT_TIMEOUT_MS,
@@ -89,7 +89,7 @@ export function parseArgs(argv, environment = process.env) {
       options.notesPath = next();
     }
     else if (arg === "--allow-self-signed") {
-      options.allowSelfSigned = true;
+      throw new Error("--allow-self-signed is no longer supported. Trust the companion certificate with NODE_EXTRA_CA_CERTS=/path/to/certificate.pem before starting Node.");
     }
     else if (arg === "--skip-disconnect") {
       options.skipDisconnect = true;
