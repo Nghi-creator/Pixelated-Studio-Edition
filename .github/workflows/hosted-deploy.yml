@@ -20,8 +20,14 @@ permissions:
   contents: read
 
 jobs:
+  repository-quality:
+    name: Full repository regression gate
+    if: github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/quality.yml
+
   deploy-gate:
     name: Hosted API deploy gate
+    needs: repository-quality
     if: github.ref == 'refs/heads/main'
     uses: ./.github/workflows/hosted-api-deploy-gate.yml
     with:

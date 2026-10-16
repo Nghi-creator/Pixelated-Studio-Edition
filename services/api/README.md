@@ -81,6 +81,7 @@ If Supabase env vars are missing, authenticated routes return `503`. Production 
 
 ```sh
 npm run typecheck
+npm run typecheck:tooling
 npm run lint
 npm test
 npm run build
@@ -98,7 +99,7 @@ Hosted predeploy gate:
 npm run predeploy:hosted
 ```
 
-`predeploy:hosted` checks hosted access-log schema, submission cleanup policy, catalog RPC shape, catalog candidate import validation, typecheck, lint, and build. It runs every check and reports all failures together instead of stopping at the first failed check.
+`predeploy:hosted` checks hosted access-log schema, submission cleanup policy, catalog RPC shape, catalog candidate import validation, production/tooling typechecks, lint, and build. It runs every check and reports all failures together instead of stopping at the first failed check.
 
 ## Maintenance scripts
 
@@ -315,3 +316,10 @@ Recognized Supabase access-log schema failures return API code `access_log_schem
 lockfile location, applies the packaged-desktop build-chain policy, scans for
 committed secret patterns, and runs CodeQL. Dependabot update policy is defined
 centrally in `.github/dependabot.yml`.
+
+
+Smoke/artwork commands keep their existing entry points and now use focused helper
+modules with strict tooling typechecks, bounded input and owned process cleanup.
+See the [maintenance guide](../../docs/script-maintenance.md) for resource limits,
+temporary capture behavior and regression/CI commands. No live smoke is started
+merely by importing a helper.
