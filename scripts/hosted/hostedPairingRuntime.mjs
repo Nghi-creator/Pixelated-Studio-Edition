@@ -4,8 +4,10 @@ import { restorePairingSnapshot } from "./hostedPairingCleanup.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { createRequire } from "node:module";
 import { chromium } from "playwright";
+import { createHostedPairingBrowser } from "./hostedPairingBrowser.mjs";
 import { assertHostedPairingContract } from "./hostedPairingContract.mjs";
 import { probeHostedNativePairing } from "./hostedNativePairingProbe.mjs";
 import { redeemHostedDesktopLaunch } from "./hostedDesktopLaunch.mjs";
@@ -14,7 +16,7 @@ import { createHostedPairingClient } from "./hostedPairingClient.mjs";
 import { delay, waitForHostedWebPairingBundle as waitForHostedWebPairingBundleBase, waitForRenderApiDeploy as waitForRenderApiDeployBase } from "./hostedPairingReadiness.mjs";
 const require = createRequire(import.meta.url);
 export function createHostedPairingRun(config) {
-  const { rootDir, webUrl, apiUrl, companionUrl, engineToken, hostedPairingBuildMarker, hostedRuntimeSwitchBuildMarker, hostedPublishTimeoutMs, renderBaselineStartedAtSeconds, vercelBaselineHtmlSha256, runDir, email, supabaseUrl, serviceRoleKey, certDir } = config;
+  const { rootDir, webUrl, apiUrl, companionUrl, engineToken, hostedPairingBuildMarker, hostedRuntimeSwitchBuildMarker, hostedPublishTimeoutMs, renderBaselineStartedAtSeconds, vercelBaselineHtmlSha256, runDir, email, supabaseUrl, serviceRoleKey } = config;
   const steps = [];
   const browserConsole = createSmokeLog({ secrets: () => [serviceRoleKey, bearerToken, engineToken] });
   const browserNetwork = createSmokeLog();
@@ -23,6 +25,7 @@ export function createHostedPairingRun(config) {
   let context;
   let page;
   let companion;
+  let certDir = null;
   let bearerToken = "";
   let previousPairing = null;
   let pairingSnapshotTaken = false;
@@ -114,7 +117,7 @@ export function createHostedPairingRun(config) {
       ["restore saved pairing", restorePreviousPairing],
       ["stop companion", () => companion?.stopCompanionServer()],
       ["stop engine probe", () => engineProbe.stop()],
-      ["remove temporary certificates", () => fs.rmSync(certDir, { force: true, recursive: true })],
+      ["remove temporary certificates", () => { if (certDir) fs.rmSync(certDir, { force: true, recursive: true }); }],
     ]);
   }
   async function main() {
@@ -139,7 +142,8 @@ export function createHostedPairingRun(config) {
       companion = require(modulePath);
     });
     await step("start deterministic local engine probe", engineProbe.start);
-    await step("start real desktop HTTPS companion", () => companion.startCompanionServer({
+    certDir = fs.mkdtempSync(path.join(os.tmpdir(), "pixelated-hosted-companion-"));
+    const { certPath } = await step("start real desktop HTTPS companion", () => companion.startCompanionServer({
       certDir,
       engineToken,
       lanAddresses: [],
@@ -147,11 +151,7 @@ export function createHostedPairingRun(config) {
       onRuntimeSwitch: engineProbe.requestRuntimeSwitch,
       port: 8090,
     }));
-    browser = await chromium.launch({ headless: true });
-    context = await browser.newContext({
-      ignoreHTTPSErrors: true,
-      viewport: { height: 900, width: 1440 },
-    });
+    ({ browser, context } = await createHostedPairingBrowser(chromium, fs.readFileSync(certPath)));
     await context.grantPermissions(["local-network-access"], {
       origin: new URL(webUrl).origin,
     });

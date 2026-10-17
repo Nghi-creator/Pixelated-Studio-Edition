@@ -24,7 +24,10 @@ The privileged job checks out only trusted default-branch policy code. It
 does not execute PR code, install PR dependencies, or download PR artifacts.
 It verifies the PR author, signed commits, same-repository origin, file scope,
 JSON changes, npm release age/integrity, branch rules, and current CI results.
-Missing data or failed API calls leave the PR unmerged.
+Missing data or failed API calls leave the PR unmerged. Repository Quality
+completion also triggers evaluation. If an existing activation lacks the two
+quality checks below in its strict ruleset, the policy leaves PRs unmerged until
+the ruleset is updated; the local patch does not modify GitHub settings.
 
 ## Activation
 
@@ -38,6 +41,8 @@ Missing data or failed API calls leave the PR unmerged.
 
    - `API contract`
    - `Hosted web and smoke contract`
+   - `Node 24.18.0 / Linux regression suite`
+   - `Node 26 / Linux regression suite`
    - `npm audit production dependencies (root, .)`
    - `npm audit production dependencies (web, apps/web)`
    - `npm audit production dependencies (desktop, apps/desktop)`

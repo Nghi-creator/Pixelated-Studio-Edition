@@ -34,9 +34,10 @@
     "test:web": "npm test -w @pixelated/web",
     "test:smoke": "node --test scripts/shared/*.test.mjs scripts/hosted/*.test.mjs scripts/lan/*.test.mjs scripts/security/*.test.mjs",
     "typecheck:api": "npm run typecheck -w @pixelated/api",
-    "verify:hosted-contract": "node --check scripts/hosted/hostedAuthSmoke.mjs && node --check scripts/hosted/hostedPairingSmoke.mjs && node --check scripts/web/interactionHarnessSmoke.mjs && node scripts/hosted/hostedAuthSmoke.mjs --contract-only && node scripts/hosted/hostedPairingSmoke.mjs --contract-only && npm run test:smoke && npm run lint:web && npm run test:web && npm run build:web && npm run test:web-interactions && npm run test:desktop",
+    "verify:hosted-contract": "node --check scripts/hosted/hostedAuthSmoke.mjs && node --check scripts/hosted/hostedPairingSmoke.mjs && node --check scripts/web/interactionHarnessSmoke.mjs && node scripts/hosted/hostedAuthSmoke.mjs --contract-only && node scripts/hosted/hostedPairingSmoke.mjs --contract-only && npm run test:smoke && npm run lint:web && npm run test:web && npm run build:web && npm run test:web-interactions && npm run test:desktop && npm run test:hosted-tls",
     "verify:api": "npm run typecheck:api && npm run typecheck:tooling && npm run lint:api && npm run test:api && npm run build:api",
-    "typecheck:tooling": "npm run typecheck:tooling -w @pixelated/api"
+    "typecheck:tooling": "npm run typecheck:tooling -w @pixelated/api",
+    "test:hosted-tls": "node scripts/hosted/verifyPairingTls.mjs"
   },
   "devDependencies": {
     "playwright": "^1.55.0",
