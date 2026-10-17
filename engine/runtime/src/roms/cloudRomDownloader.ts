@@ -1,6 +1,7 @@
 import fs from "fs";
 import https from "https";
 import net from "net";
+import { once } from "node:events";
 import { promises as dns } from "dns";
 import { validateGameArtifactAsync } from "./artifactValidation";
 
@@ -152,10 +153,16 @@ export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
       );
     }
 
-    const addresses = await resolveHost(parsedUrl.hostname, {
-      all: true,
-      verbatim: true,
-    });
+    const deadlineAt = performance.now() + timeoutMs;
+    let resolutionTimer: ReturnType<typeof setTimeout> | undefined;
+    const addresses = await Promise.race([
+      resolveHost(parsedUrl.hostname, { all: true, verbatim: true }),
+      new Promise<ResolvedAddress[]>((_resolve, reject) => {
+        resolutionTimer = setTimeout(() => {
+          reject(new Error("Cloud ROM DNS resolution deadline exceeded"));
+        }, timeoutMs);
+      }),
+    ]).finally(() => clearTimeout(resolutionTimer));
     const publicAddresses = addresses.filter(({ address }) =>
       isPublicNetworkAddress(address),
     );
@@ -170,94 +177,96 @@ export function createCloudRomDownloader(options: CloudRomDownloaderOptions) {
       throw new Error("Cloud ROM host did not resolve to a usable address");
     }
 
+    const file = createExclusiveArtifactWriteStream(destinationPath);
+    // Establish ownership before starting the transport. Failed exclusive opens
+    // must reject without deleting a destination owned by somebody else.
+    await once(file, "open");
     return new Promise((resolve, reject) => {
-      const file = createExclusiveArtifactWriteStream(destinationPath);
       let downloadedBytes = 0;
       let settled = false;
+      let request: ReturnType<typeof https.get> | undefined;
       const deadline = setTimeout(() => {
-        request.destroy(new Error("Cloud ROM download deadline exceeded"));
-      }, timeoutMs);
+        fail(new Error("Cloud ROM download deadline exceeded"));
+      }, Math.max(1, deadlineAt - performance.now()));
 
       const fail = (err: Error) => {
         if (settled) return;
         settled = true;
         clearTimeout(deadline);
+        request?.destroy();
         file.destroy();
-        removeFileIfExists(destinationPath);
-        reject(err);
+        // Wait for the file descriptor to close before removing the partial file,
+        // including when running on Windows.
+        file.once("close", () => {
+          removeFileIfExists(destinationPath);
+          reject(err);
+        });
       };
 
-      const request = get(
-        parsedUrl,
-        {
-          lookup: createPinnedAddressLookup(pinnedAddress),
-        },
-        (response) => {
-        if (response.statusCode !== 200) {
-          response.resume();
-          fail(
-            new Error(
-              `Failed to download cloud ROM: status ${response.statusCode}`,
-            ),
-          );
-          return;
-        }
-
-        const contentLength = Number(response.headers["content-length"] || 0);
-        if (contentLength > maxCloudRomSizeBytes) {
-          response.resume();
-          fail(
-            new Error(
-              `Cloud ROM is too large. Max size is ${maxCloudRomSizeBytes} bytes.`,
-            ),
-          );
-          return;
-        }
-
-        response.on("data", (chunk: Buffer) => {
-          downloadedBytes += chunk.length;
-          if (downloadedBytes > maxCloudRomSizeBytes) {
-            response.destroy(
-              new Error(
-                `Cloud ROM exceeded max size of ${maxCloudRomSizeBytes} bytes.`,
-              ),
-            );
+      file.on("error", fail);
+      file.on("finish", () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(deadline);
+        file.close(async (closeError) => {
+          if (closeError) {
+            removeFileIfExists(destinationPath);
+            reject(closeError);
+            return;
+          }
+          try {
+            await validateGameArtifactAsync(destinationPath, {
+              ...validation,
+              fileLabel: "Cloud ROM",
+            });
+            resolve();
+          } catch (err) {
+            removeFileIfExists(destinationPath);
+            reject(err);
           }
         });
+      });
 
-        response.on("error", fail);
-        file.on("error", fail);
-        file.on("finish", () => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(deadline);
-          file.close(async (closeError) => {
-            if (closeError) {
-              removeFileIfExists(destinationPath);
-              reject(closeError);
+      try {
+        request = get(
+          parsedUrl,
+          { lookup: createPinnedAddressLookup(pinnedAddress) },
+          (response) => {
+            if (settled) {
+              response.destroy();
               return;
             }
-            try {
-              await validateGameArtifactAsync(destinationPath, {
-                ...validation,
-                fileLabel: "Cloud ROM",
-              });
-              resolve();
-            } catch (err) {
-              removeFileIfExists(destinationPath);
-              reject(err);
+            if (response.statusCode !== 200) {
+              response.resume();
+              fail(new Error(`Failed to download cloud ROM: status ${response.statusCode}`));
+              return;
             }
-          });
+
+            const contentLength = Number(response.headers["content-length"] || 0);
+            if (contentLength > maxCloudRomSizeBytes) {
+              response.resume();
+              fail(new Error(`Cloud ROM is too large. Max size is ${maxCloudRomSizeBytes} bytes.`));
+              return;
+            }
+
+            response.on("data", (chunk: Buffer) => {
+              downloadedBytes += chunk.length;
+              if (downloadedBytes > maxCloudRomSizeBytes) {
+                response.destroy(new Error(`Cloud ROM exceeded max size of ${maxCloudRomSizeBytes} bytes.`));
+              }
+            });
+            response.on("error", fail);
+            response.pipe(file);
+          },
+        );
+
+        request.setTimeout(timeoutMs, () => {
+          fail(new Error("Cloud ROM download stalled"));
         });
-
-        response.pipe(file);
-        },
-      );
-
-      request.setTimeout(timeoutMs, () => {
-        request.destroy(new Error("Cloud ROM download stalled"));
-      });
-      request.on("error", fail);
+        request.on("error", fail);
+      } catch (error) {
+        fail(error instanceof Error ? error : new Error("Cloud ROM request failed"));
+      }
     });
   }
 
