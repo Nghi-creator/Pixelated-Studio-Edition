@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
+import { requiredChecks } from "./dependabotMergePolicy.mjs";
 const repositoryRoot = path.resolve(import.meta.dirname, "../..");
 const nodeVersion = fs
   .readFileSync(path.join(repositoryRoot, ".nvmrc"), "utf8")
@@ -35,4 +36,9 @@ test("CI and production packages share the Node 24 runtime contract", () => {
     assert.match(workflow, /node-version-file: \.nvmrc/);
     assert.doesNotMatch(workflow, /\bnode-version:\s/);
   }
+});
+
+test("safe merge quality checks track the production Node pin", () => {
+  assert.ok(requiredChecks.includes(`Node ${nodeVersion} / Linux regression suite`));
+  assert.ok(requiredChecks.includes("Node 26 / Linux regression suite"));
 });

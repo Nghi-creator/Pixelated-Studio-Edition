@@ -41,7 +41,7 @@ production dependency audit also blocks deployment. Security audits and
 three-platform desktop validation retain their existing workflows. These workflow
 edits require actual CI runs; local tests do not establish remote success.
 
-See the sibling core's [verification record](../../latency_fingerprinting/experiments/phase-1-final-check-20261016/README.md)
+See the sibling core's [verification record](../../latency_fingerprinting/experiments/phase-1-security-20261017/README.md)
 and the [manual/live acceptance procedure](n5-live-test-procedure.md).
 
 ## Security review follow-up
@@ -67,3 +67,12 @@ the LAN failure destination is created from the local output directory, sanitize
 label and timestamp before network requests. Remote payloads do not select these
 paths. These are expected report-content flows, not arbitrary remote file writes.
 No CodeQL alert suppression or hosted dismissal was added.
+
+Hosted pairing uses normal browser certificate verification for hosted services,
+with a Chromium SPKI exception limited to the temporary companion's generated
+key. Its probe credential is cryptographically random, and certificates are kept
+in an atomically allocated private temporary directory. `npm run test:hosted-tls`
+checks actual Chromium acceptance/rejection against two different generated keys;
+run a desktop build first. The existing hosted contract chain runs this test after
+its desktop build. The [safe merge policy](dependabot-automerge.md) now requires
+both Repository Quality lanes as well as the existing security/contract checks.

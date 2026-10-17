@@ -1,7 +1,6 @@
 import fs from "fs";
 
-const CLOCK_TICKS_PER_SECOND = 100;
-const PAGE_SIZE_BYTES = 4096;
+import { CLOCK_TICKS_PER_SECOND, readLinuxProcessCounters } from "./linuxProcessCounters";
 
 type ProcessRef = {
   pid?: number | null;
@@ -25,17 +24,10 @@ export type CameraPeerState = {
   sessionId: string | null;
 };
 
-export function readNumberFile(filePath: string): number | null {
-  try {
-    return Number(fs.readFileSync(filePath, "utf8").trim());
-  } catch {
-    return null;
-  }
-}
-
 function readSystemUptimeSeconds(): number | null {
   try {
-    return Number(fs.readFileSync("/proc/uptime", "utf8").split(" ")[0]);
+    const value = Number(fs.readFileSync("/proc/uptime", "utf8").trim().split(/\s+/)[0]);
+    return Number.isFinite(value) && value >= 0 ? value : null;
   } catch {
     return null;
   }
@@ -44,40 +36,27 @@ function readSystemUptimeSeconds(): number | null {
 export function readProcessSnapshot(
   pid?: number | null,
 ): ProcessResourceSnapshot | null {
-  if (!pid || !fs.existsSync(`/proc/${pid}`)) return null;
+  if (pid == null) return null;
+  const counters = readLinuxProcessCounters(pid);
+  if (!counters) return null;
 
-  try {
-    const stat = fs.readFileSync(`/proc/${pid}/stat`, "utf8");
-    const statm = fs.readFileSync(`/proc/${pid}/statm`, "utf8");
-    const endCommandIndex = stat.lastIndexOf(")");
-    const statFields = stat.slice(endCommandIndex + 2).split(" ");
-    const statmFields = statm.trim().split(" ");
-    const utimeTicks = Number(statFields[11]);
-    const stimeTicks = Number(statFields[12]);
-    const startTimeTicks = Number(statFields[19]);
-    const residentPages = Number(statmFields[1]);
-    const systemUptimeSeconds = readSystemUptimeSeconds();
-    const processUptimeSeconds =
-      systemUptimeSeconds === null
-        ? null
-        : systemUptimeSeconds - startTimeTicks / CLOCK_TICKS_PER_SECOND;
-    const cpuSeconds = (utimeTicks + stimeTicks) / CLOCK_TICKS_PER_SECOND;
-    const averageCpuPercent =
-      processUptimeSeconds && processUptimeSeconds > 0
-        ? (cpuSeconds / processUptimeSeconds) * 100
-        : null;
+  const systemUptimeSeconds = readSystemUptimeSeconds();
+  const processUptimeSeconds =
+    systemUptimeSeconds === null
+      ? null
+      : systemUptimeSeconds - counters.startTimeTicks / CLOCK_TICKS_PER_SECOND;
+  const cpuSeconds = counters.cpuTicks / CLOCK_TICKS_PER_SECOND;
+  const averageCpuPercent =
+    processUptimeSeconds && processUptimeSeconds > 0
+      ? (cpuSeconds / processUptimeSeconds) * 100
+      : null;
 
-    return {
-      averageCpuPercent:
-        averageCpuPercent === null ? null : Number(averageCpuPercent.toFixed(2)),
-      pid,
-      rssMb: Number(
-        ((residentPages * PAGE_SIZE_BYTES) / 1024 / 1024).toFixed(2),
-      ),
-    };
-  } catch {
-    return null;
-  }
+  return {
+    averageCpuPercent:
+      averageCpuPercent === null ? null : Number(averageCpuPercent.toFixed(2)),
+    pid,
+    rssMb: counters.rssMb,
+  };
 }
 
 export function readCameraPeerState(

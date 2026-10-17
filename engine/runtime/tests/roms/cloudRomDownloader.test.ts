@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import fs from "node:fs";
 import https from "node:https";
+import type { IncomingMessage } from "node:http";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { PassThrough } from "node:stream";
 import {
   createCloudRomDownloader,
   createPinnedAddressLookup,
@@ -125,4 +127,84 @@ test("enforces a total deadline even when the transport never responds", async (
     ),
     /deadline exceeded/,
   );
+});
+
+test("a stalled DNS lookup rejects before creating an artifact or transport", async () => {
+  const destination = path.join(downloadTestRoot, "dns-deadline.nes");
+  const downloader = createCloudRomDownloader({
+    allowedRomHosts: ["roms.example"],
+    maxCloudRomSizeBytes: 1024,
+    timeoutMs: 25,
+    resolveHost: () => new Promise(() => {}),
+  });
+  await assert.rejects(
+    downloader.downloadCloudRom("https://roms.example/game.nes", destination, validation),
+    /DNS resolution deadline exceeded/,
+  );
+  assert.equal(fs.existsSync(destination), false);
+});
+
+function downloaderWithRequest(request: typeof https.get) {
+  return createCloudRomDownloader({
+    allowedRomHosts: ["roms.example"],
+    maxCloudRomSizeBytes: 1024,
+    timeoutMs: 100,
+    resolveHost: async () => [{ address: "1.1.1.1", family: 4 }],
+    request,
+  });
+}
+
+test("a failed exclusive open preserves the existing destination and never starts a request", async () => {
+  const destination = path.join(downloadTestRoot, "existing.nes");
+  fs.writeFileSync(destination, "existing artifact");
+  let requested = false;
+  const downloader = downloaderWithRequest((() => {
+    requested = true;
+    throw new Error("request must not start");
+  }) as unknown as typeof https.get);
+  await assert.rejects(
+    downloader.downloadCloudRom("https://roms.example/game.nes", destination, validation),
+    { code: "EEXIST" },
+  );
+  assert.equal(requested, false);
+  assert.equal(fs.readFileSync(destination, "utf8"), "existing artifact");
+});
+
+test("synchronous transport failures close and remove the owned partial file", async () => {
+  const destination = path.join(downloadTestRoot, "transport-error.nes");
+  const downloader = downloaderWithRequest((() => {
+    throw new Error("transport failed synchronously");
+  }) as unknown as typeof https.get);
+  await assert.rejects(
+    downloader.downloadCloudRom("https://roms.example/game.nes", destination, validation),
+    /transport failed synchronously/,
+  );
+  assert.equal(fs.existsSync(destination), false);
+});
+
+test("successful cloud downloads finish and validate the artifact", async () => {
+  const destination = path.join(downloadTestRoot, "complete.nes");
+  const request = ((_url: unknown, _options: unknown, callback: (response: IncomingMessage) => void) => {
+    const transport = new EventEmitter() as EventEmitter & {
+      setTimeout: () => void;
+      destroy: () => void;
+    };
+    transport.setTimeout = () => {};
+    transport.destroy = () => {};
+    setImmediate(() => {
+      const response = new PassThrough() as PassThrough & {
+        statusCode: number;
+        headers: Record<string, string>;
+      };
+      response.statusCode = 200;
+      response.headers = { "content-length": "4" };
+      callback(response as unknown as IncomingMessage);
+      response.end(Buffer.from([0x4e, 0x45, 0x53, 0x1a]));
+    });
+    return transport;
+  }) as unknown as typeof https.get;
+  await downloaderWithRequest(request).downloadCloudRom(
+    "https://roms.example/game.nes", destination, validation,
+  );
+  assert.deepEqual(fs.readFileSync(destination), Buffer.from([0x4e, 0x45, 0x53, 0x1a]));
 });

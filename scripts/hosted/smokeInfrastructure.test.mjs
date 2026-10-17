@@ -87,3 +87,12 @@ test("cleanup distinguishes an absent pairing from an existing saved pairing", a
     ["/local-pairings", { body: { engineUrl: "https://localhost:8090" }, method: "POST" }],
   ]);
 });
+
+test("hosted probe credentials use fresh random bytes rather than the run timestamp", async () => {
+  const { createHostedPairingConfig } = await import("./hostedPairingConfig.mjs");
+  const first = createHostedPairingConfig({}, ["--contract-only"]);
+  const second = createHostedPairingConfig({}, ["--contract-only"]);
+  assert.match(first.engineToken, /^hosted-smoke-engine-[0-9a-f]{48}$/);
+  assert.notEqual(first.engineToken, second.engineToken);
+  assert.equal(Object.hasOwn(first, "certDir"), false);
+});

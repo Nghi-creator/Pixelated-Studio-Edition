@@ -3,6 +3,7 @@ name: Dependabot Safe Merge
 on:
   workflow_run:
     workflows:
+      - Repository Quality
       - Hosted API Deploy Gate
       - Security Scan
       - Desktop Cross-Platform Release Validation
