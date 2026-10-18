@@ -202,3 +202,7 @@ disabled for these controls. The full 18-trial campaign and selected-scene
 overhead pass; user desktop/picker sign-off and normal CI for subsequent audit fixes remain pending.
 
 [Script boundaries and CI maintenance](docs/script-maintenance.md) describes utility ownership, bounds and the full repository regression gate.
+
+The [deep audit](docs/deep-audit-20261018.md) records companion disconnect/probe
+fixes, 814 passing Node tests across local Node 24/26 verification, and the
+remaining hosted/platform and manual acceptance checks.

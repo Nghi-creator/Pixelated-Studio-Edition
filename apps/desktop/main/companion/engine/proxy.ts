@@ -6,6 +6,11 @@ import http, {
 import crypto from "crypto";
 import net, { type Socket } from "net";
 import { getCompanionAccessTokenScope } from "../invite/inviteState";
+import {
+  getCompanionTokenFromRequest,
+  matchesCompanionRequestPath as matchesPath,
+  serializeHeaderValue,
+} from "../httpUtils";
 
 const ENGINE_HOST = "127.0.0.1";
 const ENGINE_PORT = 8080;
@@ -34,14 +39,6 @@ function matchesPrefix(url: string, prefix: string) {
   return url === prefix || url.startsWith(`${prefix}/`) || url.startsWith(`${prefix}?`);
 }
 
-function matchesPath(url: string, path: string) {
-  try {
-    return new URL(url, "https://pixelated.local").pathname === path;
-  } catch {
-    return false;
-  }
-}
-
 export function canProxyCompanionRequest(
   url = "",
   companionScope: CompanionTokenScope,
@@ -53,23 +50,6 @@ export function canProxyCompanionRequest(
     return true;
   }
   return GUEST_PROXY_PREFIXES.some((prefix) => matchesPrefix(url, prefix));
-}
-
-function serializeHeaderValue(value: number | string | string[] | undefined) {
-  if (Array.isArray(value)) return value.join(", ");
-  return value === undefined ? "" : String(value);
-}
-
-function getCompanionTokenFromRequest(req: IncomingMessage) {
-  const headerToken = serializeHeaderValue(req.headers["x-engine-token"]);
-  if (headerToken) return headerToken;
-
-  try {
-    const url = new URL(req.url || "/", "https://pixelated.local");
-    return url.searchParams.get("companionToken") || "";
-  } catch {
-    return "";
-  }
 }
 
 function getCompanionScopeFromRequest(req: IncomingMessage): CompanionTokenScope {
@@ -139,6 +119,7 @@ export function proxyHttpRequest(
     return;
   }
 
+  let response: IncomingMessage | undefined;
   const upstream = http.request(
     {
       headers: getProxiedHeaders(req, engineToken),
@@ -148,15 +129,39 @@ export function proxyHttpRequest(
       port: ENGINE_PORT,
     },
     (upstreamResponse) => {
+      response = upstreamResponse;
+      upstreamResponse.on("error", fail);
+      upstreamResponse.on("aborted", fail);
+      if (res.destroyed) {
+        upstreamResponse.destroy();
+        return;
+      }
       res.writeHead(upstreamResponse.statusCode || 502, upstreamResponse.headers);
       upstreamResponse.pipe(res);
     },
   );
 
-  upstream.on("error", () => {
+  function cancel() {
+    upstream.destroy();
+    response?.destroy();
+  }
+
+  function fail() {
+    cancel();
+    if (res.destroyed || res.writableEnded) return;
+    if (res.headersSent) {
+      res.destroy();
+      return;
+    }
     res.writeHead(502, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: "Local engine is not reachable" }));
-  });
+  }
+
+  upstream.on("error", fail);
+  req.on("aborted", cancel);
+  req.on("error", cancel);
+  res.on("close", cancel);
+  res.on("error", cancel);
 
   req.pipe(upstream);
 }
@@ -185,5 +190,16 @@ export function proxyWebSocket(
     socket.pipe(upstream).pipe(socket);
   });
 
-  upstream.on("error", () => socket.destroy());
+  const close = () => {
+    upstream.destroy();
+    socket.destroy();
+  };
+  upstream.on("error", close);
+  upstream.on("close", () => {
+    // A clean FIN must flush any buffered browser writes before closing.
+    if (upstream.readableEnded) socket.end();
+    else socket.destroy();
+  });
+  socket.on("error", close);
+  socket.on("close", close);
 }

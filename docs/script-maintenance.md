@@ -74,5 +74,5 @@ key. Its probe credential is cryptographically random, and certificates are kept
 in an atomically allocated private temporary directory. `npm run test:hosted-tls`
 checks actual Chromium acceptance/rejection against two different generated keys;
 run a desktop build first. The existing hosted contract chain runs this test after
-its desktop build. The [safe merge policy](dependabot-automerge.md) now requires
+its desktop build. The [safe merge policy](../scripts/security/dependabotMergePolicy.mjs) now requires
 both Repository Quality lanes as well as the existing security/contract checks.
