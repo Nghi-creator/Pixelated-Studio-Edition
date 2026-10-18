@@ -39,12 +39,10 @@ The browser is the front door: users browse games, play through a protected anon
 | Research telemetry | The gameplay screen records stream/playback samples, exports research bundles, and sends authenticated metrics to the API. |
 | Admin tools | Admin routes cover submissions, catalog candidates, users, access logs, reports, and moderation workflows. |
 
-Opt-in [host](docs/n4-host-stage-tracing.md) and [browser](docs/n4-browser-stage-tracing.md)
-stage tracing is bounded and disabled by default. [Standalone export and pinned
-integration](docs/n4-stage-trace-export.md) are delivered; actual nominal capture,
-paired overhead and host lifecycle checks pass. The opt-in browser execution
-method also passes local software/live validation. [N5 scenario-harness work](docs/n5-scenario-harness.md)
-has delivered Steps 1–7, including [bounded lifecycle/fresh recording control](docs/n5-lifecycle.md) and [camera/CPU adapters with fixed effect checks](docs/n5-adapters.md); [experiment export/inspection](docs/n5-experiment-export.md) is delivered; [Step 7 fixture reproduction](docs/n5-experiment-reproduction.md) is delivered; [Step 8 software closeout](docs/n5-software-closeout.md) is recorded; merged-baseline hosted checks pass. User desktop/picker sign-off and normal CI for subsequent audit fixes remain open.
+Optional [stage tracing](docs/n4-stage-trace-export.md) captures bounded host and
+browser timing. The [scenario harness](docs/n5-scenario-harness.md) provides
+predeclared experiments, [lifecycle control](docs/n5-lifecycle.md),
+[supported adapters](docs/n5-adapters.md) and [offline export](docs/n5-experiment-export.md).
 
 ## Architecture
 
@@ -196,13 +194,7 @@ MIT - see [LICENSE](LICENSE).
 
 Built by [Nicholas Nguyen](https://www.linkedin.com/in/nicholas-nguyen-3bb17a335/).
 
-Opt-in N5 research campaigns and the separate real overhead procedure are described
-in the [live test guide](docs/n5-live-test-procedure.md). Normal startup remains
-disabled for these controls. The full 18-trial campaign and selected-scene
-overhead pass; user desktop/picker sign-off and normal CI for subsequent audit fixes remain pending.
+Use the [live test guide](docs/n5-live-test-procedure.md) for opt-in research
+campaigns and paired overhead measurements. Normal startup leaves these controls disabled.
 
 [Script boundaries and CI maintenance](docs/script-maintenance.md) describes utility ownership, bounds and the full repository regression gate.
-
-The [deep audit](docs/deep-audit-20261018.md) records companion disconnect/probe
-fixes, 814 passing Node tests across local Node 24/26 verification, and the
-remaining hosted/platform and manual acceptance checks.

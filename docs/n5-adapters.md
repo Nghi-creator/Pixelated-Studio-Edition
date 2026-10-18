@@ -1,7 +1,6 @@
 # N5 supported adapters and measured effects
 
-**Delivered:** Step 5 software, 2026-10-11. [Lifecycle](n5-lifecycle.md),
-[current handoff](n5-scenario-harness.md). [Export/offline inspection](n5-experiment-export.md) is delivered in Step 6.
+[current handoff](n5-scenario-harness.md). [Export/offline inspection](n5-experiment-export.md) is available.
 
 `engine/runtime/scenario_harness/camera_runtime.py` implements opt-in trusted
 control-thread hooks for an existing Linux camera peer. It does not start the
@@ -16,7 +15,7 @@ camera module, private `RuntimeLease` and immutable `WorkloadDeclaration` contai
 a sanitized workload alias, seed and actual Node version from the campaign owner.
 Call `preflight(plan, budget)` before `ScenarioRunner.run(plan)`. It returns explicit
 availability/reason and an immutable tuple of runtime metadata, without children,
-recording changes or pressure. Unavailability exports as unsupported through Step 6,
+recording changes or pressure. Unavailability exports as unsupported,
 with no phase/effect numbers; it is never retried by silently switching runtimes.
 
 Checks include actual Linux, monotonic clock/resolution, affinity and every visible
@@ -105,29 +104,8 @@ Multiple workers may legitimately yield CPU above 100% of one core. Unavailable
 effects retain null rates. Startup alone cannot verify pressure or degradation.
 
 These private results do not prove artifact hashes, detached cross-root associations,
-scientific causality, confidence or held-out separation. [Step 6](n5-experiment-export.md) exports and
+scientific causality, confidence or held-out separation. [implementation guide](n5-experiment-export.md) exports and
 verifies those associations before accepting a public experiment bundle.
-
-## Verification and pending execution
-
-The Node engine suite discovers `test_scenario_*.py`, including independent Step 2
-arithmetic, one-unit boundary failures, unavailable precedence, fake native
-activation/durability, partial startup, TERM/KILL/reap, restart, missing/reused PID,
-deadline and actual camera hooks with fake Gst dependencies. A Linux-only integration
-test spawns an actual parked child and sends EOF without GO; it never runs pressure.
-That integration test was skipped in the original macOS checks. The subsequent
-current Linux audit passes all 79 scenario tests, including actual parked-child cleanup.
-Real pressure/capture outcomes, retained failures and remaining overhead/version/hosted
-gates are recorded in the [live procedure](n5-live-test-procedure.md) and linked
-core runtime ledger.
-
-The original v1 healthy/CPU support alone cannot pass Phase 1.3's two real bottleneck-class
-gate. N4's nominal capture/coverage/overhead and host lifecycle gates now pass;
-the browser execution method also passes local validation; final desktop/hosted
-acceptance remains open. [Independent fixture pinning and reproduction](n5-experiment-reproduction.md) are
-delivered in Step 7. Fresh campaign-8 now passes all 18 healthy/CPU/pacing reference/query trials;
-selected-scene overhead also passes. Browser execution method checks also pass locally. Both merged baselines now pass hosted gates; normal desktop/picker sign-off
-and normal CI for subsequent audit fixes remain open.
 
 ## Additive capture pacing
 
@@ -135,5 +113,5 @@ The [live test workflow](n5-live-test-procedure.md) adds an opt-in identity elem
 with fixed 50 ms pacing in degraded/probe, restored before recovery and guarded
 by an exact-element watchdog. Its additive experiment-v2 method independently
 checks observed stage delay and throughput/restoration; the setter is not ground
-truth. V1 roots/pins are unchanged. Real pacing effects have been observed; the complete
-corrected cohort and remaining acceptance gates are tracked in the live ledger.
+truth. V1 roots/pins are unchanged. Use the [live test procedure](n5-live-test-procedure.md) to measure effects and
+restoration on the target environment.

@@ -1,6 +1,5 @@
 # N5 synthetic release reproduction
 
-**Delivered:** Step 7 software, 2026-10-12. **Release:** 1.0.0.
 [Export](n5-experiment-export.md), [handoff](n5-scenario-harness.md).
 
 From this trusted producer checkout, create an existing disposable directory:
@@ -40,9 +39,7 @@ The existing Node scenario wrapper discovers these tests in configured engine CI
 core CI adds read-only reproduction on its 3.13 and minimum 3.11 jobs. This records
 configuration, not observed hosted or actual minimum-version execution.
 
-Trace sampling 1/1000 with bounds 2 frames/10 events keeps fixtures compact. This
-single retained sample does not meet real tracing coverage/overhead gates. Raw
-phase counters retain every second interval, while N4 event clocks stay separate.
-All eight local actual-producer/core API/CLI handoffs pass. [Step 8 software closeout](n5-software-closeout.md) is recorded; acceptance remains open for
-real repetitions, held-out source separation, inherited N4 acceptance and the
-second real bottleneck class; healthy plus one CPU class cannot satisfy Phase 1.3.
+Trace sampling 1/1000 with bounds of 2 frames/10 events keeps fixtures compact.
+This sample does not meet real tracing coverage/overhead criteria. Raw phase
+counters retain every second interval, while N4 event clocks stay separate.
+Use the [live procedure](n5-live-test-procedure.md) for actual measurements.

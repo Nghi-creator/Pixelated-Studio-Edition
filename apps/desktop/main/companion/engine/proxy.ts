@@ -95,6 +95,9 @@ function getProxiedHeaders(
     headers["x-pixelated-access-scope"] = `companion-${companionScope}`;
   }
   if (clientId) {
+    // Query parameters are decoded text, not validated incoming HTTP headers.
+    // The raw WebSocket handshake needs the same check as http.request.
+    http.validateHeaderValue("x-pixelated-client-id", clientId);
     headers["x-pixelated-client-id"] = clientId;
   }
 
@@ -119,10 +122,19 @@ export function proxyHttpRequest(
     return;
   }
 
+  let headers: OutgoingHttpHeaders;
+  try {
+    headers = getProxiedHeaders(req, engineToken);
+  } catch {
+    res.writeHead(400, { "content-type": "application/json", "cache-control": "no-store" });
+    res.end(JSON.stringify({ error: "Invalid companion request metadata" }));
+    return;
+  }
+
   let response: IncomingMessage | undefined;
   const upstream = http.request(
     {
-      headers: getProxiedHeaders(req, engineToken),
+      headers,
       hostname: ENGINE_HOST,
       method: req.method,
       path: req.url,
@@ -178,8 +190,15 @@ export function proxyWebSocket(
     return;
   }
 
+  let headers: OutgoingHttpHeaders;
+  try {
+    headers = getProxiedHeaders(req, engineToken);
+  } catch {
+    socket.destroy();
+    return;
+  }
+
   const upstream = net.connect(ENGINE_PORT, ENGINE_HOST, () => {
-    const headers = getProxiedHeaders(req, engineToken);
     const headerLines = Object.entries(headers)
       .map(([name, value]) => `${name}: ${serializeHeaderValue(value)}`)
       .join("\r\n");

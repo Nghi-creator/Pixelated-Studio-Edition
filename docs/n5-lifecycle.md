@@ -1,16 +1,11 @@
 # N5 bounded lifecycle and fresh recording control
 
-**Delivered:** Step 4 software, 2026-10-11. [Handoff](n5-scenario-harness.md).
-[Concrete camera/CPU adapters and fixed effect checks](n5-adapters.md) are delivered
-in Step 5 software; [export/adoption](n5-experiment-export.md) is delivered in Step 6. Real execution is recorded in the [live procedure](n5-live-test-procedure.md);
-full acceptance remains open.
-
 `engine/runtime/scenario_harness/` supplies a stdlib-only, opt-in synchronous
 runner with an immutable local `RunPlan`, exact workload/recording/worker ownership
 inventory and a private lease/journal. It never imports the sibling core or starts
 processes itself. All six phases, actual runner offsets, contiguous covered counter
 prefixes, action attempts and cleanup outcomes remain visible in internal execution
-records. These private records are inputs to [Step 6 export](n5-experiment-export.md), rather than public `ExperimentResult` roots, and contain no
+records. These private records are inputs to [export](n5-experiment-export.md), rather than public `ExperimentResult` roots, and contain no
 verified effect claim.
 
 `RunPlan` bounds seeds, worker counts, phase order/durations, total watchdog,
@@ -33,7 +28,7 @@ fabricating recovery measurements or accepting an incomplete run.
 
 ## Runtime hook contract
 
-[Step 5 supplies the concrete camera/CPU adapter](n5-adapters.md). Hooks are trusted
+[supplies the concrete camera/CPU adapter](n5-adapters.md). Hooks are trusted
 local implementation code, not serialized callbacks, shell commands or plug-ins.
 The runner cannot preempt an arbitrary blocking Python/GI hook: every hook must use
 its `Budget`, bounded system APIs and cooperative cancellation. `wait_until` must
@@ -72,7 +67,7 @@ A later owner must explicitly call `RuntimeLease.recover(runtime, budget)` and v
 every exact resource generation. Unknown/foreign ownership is retained as dirty and
 never restored by guess. A clean lease can begin a new run; active/dirty intent cannot
 be overwritten. This implements journal/ownership decision logic, not actual native
-child reconstruction by itself. [Step 5 native worker ownership](n5-adapters.md)
+child reconstruction by itself. [native worker ownership](n5-adapters.md)
 now supplies durable parked-child identities, pidfd recovery and bounded TERM/KILL/reap; SIGKILL cannot promise cleanup.
 
 ## Actual camera recording control
@@ -98,11 +93,11 @@ Barrier callbacks only acknowledge idleness; filesystem/core/export work stays o
 the control thread after recordings freeze. Rotation introduces a deliberate
 short source pause whose live cost must be measured. The original warm-up collector
 is separate from the four measured phase collectors and is never relabelled.
-The legacy shutdown exporter still belongs to its initial N4 recording; [Step 6](n5-experiment-export.md)
+The legacy shutdown exporter still belongs to its initial N4 recording; [implementation guide](n5-experiment-export.md)
 explicitly exports the frozen phase collectors returned by `finish_phase`, rather than
 mistaking a warm-up shutdown artifact for a post-warm-up measurement.
 
-## Local verification and remaining gates
+## Testing
 
 ```sh
 python3 -m unittest discover -s engine/runtime/tests/python -p 'test_scenario_*.py' -v
@@ -116,12 +111,3 @@ duplicate leases, restart recovery and cleanup deadlines. Fake Gst pads exercise
 actual collectors/control, old queued buffers/callbacks, source barriers, registration/
 removal failure, duplicate owners and actual camera control/teardown functions.
 The Node engine suite runs these Python cases and checks both image COPY lists.
-
-No real pressure worker, Linux/GI playback, container build, measured effect or
-paired overhead trial was run in Step 4. [N4 tracing acceptance](n4-stage-trace-export.md)
-records the current nominal/overhead/lifecycle results. Actual Node 24 execution
-now passes; both merged baselines pass hosted gates. User desktop/picker
-sign-off and normal CI for subsequent audit fixes remain pending. Healthy plus one approved CPU
-class does not meet Phase 1.3's two real bottleneck-class gate. Concrete supported
-adapters and fixed effect predicates are delivered in [Step 5](n5-adapters.md); [offline bundle verification](n5-experiment-export.md) is delivered in
-Step 6; [independent release pins](n5-experiment-reproduction.md) are delivered in Step 7.
