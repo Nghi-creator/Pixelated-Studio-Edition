@@ -1,6 +1,5 @@
 # N5 experiment bundle export
 
-**Delivered:** Step 6 software, 2026-10-11. [Lifecycle](n5-lifecycle.md),
 [adapters](n5-adapters.md), [current handoff](n5-scenario-harness.md).
 
 The stdlib-only `scenario_harness` package exports these functions:
@@ -64,10 +63,3 @@ policy, independently recomputes integer effect thresholds, and writes canonical
 `ExperimentResult` silently. Fixed errors do not echo supplied paths or data.
 Generic model validation alone does not verify linked evidence. Inspecting hashes
 cannot establish fresh source runs, held-out independence or scientific causality.
-
-Six producer export regressions exercise actual synthetic frozen collectors,
-determinism, checksums, missing traces, unsupported adapters, unknown cleanup,
-private metadata/plan drift and atomic output. Cross-repo API/CLI handoffs pass for
-healthy, host contention, failed pressure, unsupported runtime, missing traces and unknown cleanup timing.
-No worker pressure or real capture was run. [Independent released fixtures and
-reproduction pins](n5-experiment-reproduction.md) are delivered in Step 7; live campaigns/acceptance remain Step 8.

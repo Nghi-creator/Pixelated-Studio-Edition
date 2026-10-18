@@ -15,4 +15,5 @@ supabase/.temp/
 .artifacts/
 user-edition/
 research-papers-latency-fingerprinting/
-latency_fingerprinting/ 
+latency_fingerprinting/
+local/

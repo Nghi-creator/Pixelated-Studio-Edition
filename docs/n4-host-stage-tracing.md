@@ -1,8 +1,5 @@
 # N4 opt-in host stage tracing
 
-**Status:** Host collector/hooks implemented, 2026-10-09; subsequent real capture,
-selected-workload overhead and host lifecycle checks pass. Browser collection and standalone export/adoption are now delivered in Steps 4–5.
-
 The camera now has optional bounded probes at capture output, pre-encoder queue
 entry/exit and VP8 encoder input/output. Their timestamp source is local Python
 monotonic time; queue residence and encoder boundary elapsed are distinct from
@@ -29,7 +26,7 @@ Invalid enabled configuration reports a fixed diagnostic and disables tracing,
 preserving playback. Frame/event capacity is shared across the recording's peer
 pipelines and closed epochs, with at most sixteen lifetimes. It never grows or
 rolls over when peers reconnect. Exceeding capacity retains original prefixes
-and exact loss counts; playback continues. No artifact is saved in this step.
+and exact loss counts; playback continues. Persistence is configured separately.
 
 ## Implementation and limitations
 
@@ -48,11 +45,11 @@ current source before a buffer can be associated. Noninitial DISCONT pauses
 collection until a new segment. Clock regression/failure closes its timing scope.
 No PTS, peer/session identifier, frame pixels, SDP or private metadata is exported.
 Callbacks do no I/O, logging, export or Python research-core calls, and always
-preserve Gst media flow. Short mutexes serialize state; actual overhead is unmeasured.
+preserve Gst media flow. Short mutexes serialize state; measure overhead on the target runtime.
 
 After `HostTraceRecording.finish()`, its `snapshot()` returns detached sanitized
-in-memory trace data with a caller-supplied producer commit. [Step 5 export](n4-stage-trace-export.md)
-now publishes this as a standalone gzip TAR after shutdown; inspection is delivered in the sibling core as Step 6. Real Linux/X11/VP8 correlation and five paired
+in-memory trace data with a caller-supplied producer commit. [export](n4-stage-trace-export.md)
+now publishes this as a standalone gzip TAR after shutdown; inspection is available in the sibling core. Real Linux/X11/VP8 correlation and five paired
 CPU/FPS overhead trials remain required before full N4 completion. Factory lookup,
 synthetic clocks and fake pads do not satisfy that gate.
 
@@ -72,21 +69,10 @@ From `engine/runtime`, the GI-free Python tests can also run directly:
 python3 -m unittest discover -s tests/python -p 'test_camera_trace*.py' -v
 ```
 
-The engine test runner executes them automatically; Python 3.10+ is required
-alongside Node. Forty-one Python cases include ten export cases alongside sampling, overflow, duplicate/
-missing PTS, segment/clock resets, concurrency, partial registration, teardown,
-shutdown and disabled mode. Local engine result: 133 pass, one existing external
-artifact skip, zero failures. Twenty-five test snapshots also validate against
-the core's strict N4 models. Those are historical software-checkpoint counts.
-Subsequent actual Linux execution passes 58 trace/control cases, native image
-build/package smoke, nominal capture, paired overhead and host lifecycle checks.
-Both merged baselines pass hosted CI, including image security and desktop
-packaging. User desktop/picker sign-off and normal CI for subsequent audit fixes remain open; see the [live procedure](n5-live-test-procedure.md).
+[standalone export](n4-stage-trace-export.md) now supplies configured shutdown persistence; offline reconstruction is available in the sibling core.
 
-[Step 5 standalone export](n4-stage-trace-export.md) now supplies configured shutdown persistence; offline reconstruction is delivered in the sibling core as Step 6.
-
-## Integration and next acceptance step
+## Integration testing
 
 See [standalone export and integration](n4-stage-trace-export.md) for producer-to-core
-reproduction commands and remaining browser/desktop/Pixelated hosted gates. Both collectors
+reproduction commands and browser/desktop integration and runtime criteria. Both collectors
 and exporters reproduce pinned synthetic records; this is software evidence.

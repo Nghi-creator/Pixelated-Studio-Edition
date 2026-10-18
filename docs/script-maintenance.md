@@ -38,13 +38,11 @@ production Node version and Node 26 compatibility, with Linux producer Python 3.
 Hosted deployment waits for it, then the existing hosted/schema gates. Standalone
 and reused quality/API-gate runs use different concurrency groups. The API
 production dependency audit also blocks deployment. Security audits and
-three-platform desktop validation retain their existing workflows. These workflow
-edits require actual CI runs; local tests do not establish remote success.
+three-platform desktop validation retain their existing workflows.
 
-See the sibling core's [verification record](../../latency_fingerprinting/experiments/phase-1-security-20261017/README.md)
-and the [manual/live acceptance procedure](n5-live-test-procedure.md).
+See the [live test procedure](n5-live-test-procedure.md) for runtime integration checks.
 
-## Security review follow-up
+## TLS and diagnostics
 
 LAN smoke no longer disables Node TLS certificate verification. The legacy
 `--allow-self-signed` flag is rejected. For an HTTPS companion, configure the
@@ -58,15 +56,12 @@ NODE_EXTRA_CA_CERTS=/absolute/path/to/companion-cert.pem \
 
 The certificate must also match the requested host; browser trust is separate.
 Staging smoke IDs now use a fresh 128-bit cryptographic suffix instead of
-`Math.random()`. The storage cleanup regression's Boolean expression is formatted
-to make its existing grouping clear.
-
+`Math.random()`.
 The reported network-to-file flows save response/error data as smoke evidence.
 Hosted report destinations come from local configuration with fixed basenames;
 the LAN failure destination is created from the local output directory, sanitized
 label and timestamp before network requests. Remote payloads do not select these
 paths. These are expected report-content flows, not arbitrary remote file writes.
-No CodeQL alert suppression or hosted dismissal was added.
 
 Hosted pairing uses normal browser certificate verification for hosted services,
 with a Chromium SPKI exception limited to the temporary companion's generated
@@ -74,5 +69,5 @@ key. Its probe credential is cryptographically random, and certificates are kept
 in an atomically allocated private temporary directory. `npm run test:hosted-tls`
 checks actual Chromium acceptance/rejection against two different generated keys;
 run a desktop build first. The existing hosted contract chain runs this test after
-its desktop build. The [safe merge policy](dependabot-automerge.md) now requires
+its desktop build. The [safe merge policy](../scripts/security/dependabotMergePolicy.mjs) now requires
 both Repository Quality lanes as well as the existing security/contract checks.

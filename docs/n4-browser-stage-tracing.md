@@ -1,6 +1,6 @@
 # N4 browser stage tracing
 
-Step 4 software is implemented in the web player; tracing defaults off.
+Browser tracing defaults off.
 Set these Vite build-time variables and rebuild:
 
 ```text
@@ -26,16 +26,9 @@ idempotent, and late callbacks are ignored. No per-frame React state update occu
 `BrowserStageTraceRecording.finish()` cancels bindings; `snapshot(commit, provenance)`
 returns detached in-memory evidence requiring a forty-hex commit. Runtime metadata
 and absolute clock origins remain private. Effective clock resolution is unknown
-(null). [Step 5 export/control](n4-stage-trace-export.md) now provides an explicit finish/download button; offline reconstruction is delivered in the sibling core as Step 6.
+(null). [export/control](n4-stage-trace-export.md) now provides an explicit finish/download button; offline reconstruction is available in the sibling core.
 
-The original Step 4 checkpoint passed 38 new software cases and 220 total web
-tests, plus web lint/build; the strict sibling core accepted 23 synthetic snapshots.
-Those were historical software results. Current Node 24/26 web verification
-passes all 259 tests, plus lint and default/opt-in production builds. Local live
-execution-method results are recorded in the core’s
-`experiments/n5-browser-execution-20261014/`.
-
-## Integration and next acceptance step
+## Integration testing
 
 See [standalone export and integration](n4-stage-trace-export.md) for producer-to-core
 reproduction commands and remaining real capture/overhead gates. Both collectors
