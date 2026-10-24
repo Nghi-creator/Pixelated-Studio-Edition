@@ -67,11 +67,16 @@ class Pipeline:
 
 
 class TrialTests(unittest.TestCase):
-    def execute(self, pipeline):
+    def execute(self, pipeline, protocol="short"):
         gst = types.SimpleNamespace(
             init=lambda _args: None,
             version=lambda: (1, 26, 2, 0),
-            parse_launch=lambda text: pipeline if text == trial.PIPELINE else None,
+            parse_launch=lambda text: (
+                pipeline
+                if text
+                in (trial.PIPELINE, trial.PIPELINE.replace("num-buffers=600", "num-buffers=2400"))
+                else None
+            ),
             StateChangeReturn=types.SimpleNamespace(FAILURE=0),
             State=types.SimpleNamespace(
                 PLAYING="playing", NULL="null", VOID_PENDING="void-pending"
@@ -83,7 +88,61 @@ class TrialTests(unittest.TestCase):
             pipeline.frames += 30
 
         with patch.object(trial, "wait", side_effect=advance):
-            return trial.run(gst, now=itertools.count(0, 1000000000).__next__)
+            return trial.run(gst, now=itertools.count(0, 1000000000).__next__, protocol=protocol)
+
+    def test_longer_protocols_keep_live_authority_unavailable(self):
+        for protocol in ("settled", "sham"):
+            with self.subTest(protocol=protocol):
+                pipeline = Pipeline()
+                result = self.execute(pipeline, protocol)
+                self.assertEqual(result["status"], "observed")
+                self.assertEqual(result["protocol"]["settling_seconds"], 8)
+                self.assertEqual(result["protocol"]["measurement_seconds"], 6)
+                self.assertEqual(result["protocol_id"], protocol)
+                self.assertFalse(result["live_authority"])
+                self.assertIsNone(result["selected_family"])
+                self.assertEqual(result["live_relief"], "unavailable_unverified")
+                self.assertEqual(
+                    result["assessment"]["status"], "met" if protocol == "sham" else "not_met"
+                )
+                if protocol == "sham":
+                    self.assertEqual(set(pipeline.mutations), {1000000})
+
+    def test_predeclared_effect_thresholds_and_exact_boundaries(self):
+        def windows(a, b, c):
+            return {
+                phase: dict(
+                    encoded_bytes=value, start=dict(read_start_ns=0), end=dict(read_start_ns=10)
+                )
+                for phase, value in zip(
+                    ("baseline", "during", "restoration"), (a, b, c), strict=True
+                )
+            }
+
+        for values, protocol, expected in (
+            ((100, 50, 100), "settled", "met"),
+            ((100, 75, 100), "settled", "met"),
+            ((100, 60, 75), "settled", "met"),
+            ((100, 76, 100), "settled", "not_met"),
+            ((100, 50, 62), "settled", "not_met"),
+            ((100, 50, 126), "settled", "not_met"),
+            ((100, 75, 125), "sham", "met"),
+            ((100, 74, 100), "sham", "not_met"),
+            ((100, 100, 126), "sham", "not_met"),
+            ((100, 0, 100), "settled", "unavailable"),
+        ):
+            with self.subTest(values=values, protocol=protocol):
+                self.assertEqual(trial.assess(windows(*values), protocol)["status"], expected)
+        unequal = windows(100, 50, 100)
+        unequal["during"]["end"]["read_start_ns"] = 5
+        self.assertFalse(trial.assess(unequal, "settled")["checks"]["reduction"])
+        self.assertEqual(trial.assess({}, "short")["status"], "not_evaluated_short_protocol")
+
+    def test_unknown_protocol_cannot_create_a_pipeline(self):
+        with self.assertRaisesRegex(ValueError, "unsupported_protocol"):
+            trial.run(None, protocol="arbitrary")
+        with self.assertRaisesRegex(ValueError, "unsupported_protocol"):
+            trial.assess({}, "arbitrary")
 
     def test_success_retains_independent_local_observations_without_qualification(self):
         pipeline = Pipeline()

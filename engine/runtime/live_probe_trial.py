@@ -22,7 +22,57 @@ UNRELATED = (
     "max-quantizer",
     "deadline",
     "keyframe-max-dist",
+    "buffer-size",
+    "buffer-initial-size",
+    "buffer-optimal-size",
+    "lag-in-frames",
+    "dropframe-threshold",
+    "resize-allowed",
 )
+PROTOCOLS = {
+    "short": dict(
+        startup_seconds=2, settling_seconds=1, measurement_seconds=2, deadline_seconds=18
+    ),
+    "settled": dict(
+        startup_seconds=2, settling_seconds=8, measurement_seconds=6, deadline_seconds=55
+    ),
+    "sham": dict(startup_seconds=2, settling_seconds=8, measurement_seconds=6, deadline_seconds=55),
+}
+
+
+def assess(windows, protocol):
+    """Predeclared synthetic effect screens, never a production qualification."""
+    if protocol not in PROTOCOLS:
+        raise ValueError("unsupported_protocol")
+    if protocol == "short":
+        return dict(status="not_evaluated_short_protocol", checks={})
+    rates = {}
+    for phase in ("baseline", "during", "restoration"):
+        row = windows[phase]
+        duration = row["end"]["read_start_ns"] - row["start"]["read_start_ns"]
+        if duration <= 0 or row["encoded_bytes"] <= 0:
+            return dict(status="unavailable", checks={})
+        rates[phase] = (row["encoded_bytes"], duration)
+
+    def ratio_between(left, right, low_n, low_d, high_n, high_d):
+        a, b = rates[left], rates[right]
+        numerator, denominator = a[0] * b[1], b[0] * a[1]
+        return low_d * numerator >= low_n * denominator and (
+            high_n is None or high_d * numerator <= high_n * denominator
+        )
+
+    if protocol == "sham":
+        checks = dict(
+            during_stable=ratio_between("during", "baseline", 3, 4, 5, 4),
+            restoration_stable=ratio_between("restoration", "baseline", 3, 4, 5, 4),
+        )
+    else:
+        checks = dict(
+            reduction=ratio_between("during", "baseline", 0, 1, 3, 4),
+            recovery=ratio_between("restoration", "during", 5, 4, None, 1),
+            returned_near_baseline=ratio_between("restoration", "baseline", 3, 4, 5, 4),
+        )
+    return dict(status="met" if all(checks.values()) else "not_met", checks=checks)
 
 
 def counter(value):
@@ -85,14 +135,18 @@ def wait(bus, gst, seconds, deadline, now=time.monotonic):
             raise ValueError("pipeline_error_or_eos")
 
 
-def run(gst, now=time.monotonic_ns):
+def run(gst, now=time.monotonic_ns, protocol="short"):
+    if protocol not in PROTOCOLS:
+        raise ValueError("unsupported_protocol")
+    bounds = PROTOCOLS[protocol].copy()
     origin = now()
 
     def elapsed():
         return counter(now() - origin)
 
     report = dict(
-        trial_version="n10-isolated-vp8-trial-v1",
+        trial_version="n10-isolated-vp8-trial-v2",
+        protocol_id=protocol,
         python_version=platform.python_version(),
         architecture=platform.machine(),
         platform=sys.platform,
@@ -103,9 +157,8 @@ def run(gst, now=time.monotonic_ns):
         receiver_continuity="not_tested_no_webrtc_receiver",
         output_effect="not_qualified_by_this_trial",
         clock="process_monotonic_ns_relative_to_trial_origin",
-        protocol=dict(
-            startup_seconds=2, settling_seconds=1, measurement_seconds=2, deadline_seconds=18
-        ),
+        protocol=bounds,
+        assessment=dict(status="unavailable", checks={}),
         status="unavailable",
         reason="pipeline_setup_failed",
         restoration="not_attempted",
@@ -119,19 +172,29 @@ def run(gst, now=time.monotonic_ns):
     try:
         gst.init(None)
         report["gst_version"] = ".".join(map(str, gst.version()[:3]))
-        pipeline = gst.parse_launch(PIPELINE)
+        text = (
+            PIPELINE
+            if protocol == "short"
+            else PIPELINE.replace("num-buffers=600", "num-buffers=2400")
+        )
+        pipeline = gst.parse_launch(text)
         report["teardown"] = "unknown"
         encoder = pipeline.get_by_name("encoder")
         baseline = counter(encoder.get_property("target-bitrate"))
         if baseline != 1000000:
             raise ValueError("unexpected_initial_setting")
-        deadline = time.monotonic() + 18
+        deadline = time.monotonic() + bounds["deadline_seconds"]
         bus = pipeline.get_bus()
         report["reason"] = "pipeline_start_failed"
         if pipeline.set_state(gst.State.PLAYING) == gst.StateChangeReturn.FAILURE:
             raise ValueError("pipeline_start_failed")
-        wait(bus, gst, 2, deadline)
-        for phase, value in (("baseline", baseline), ("during", 500000), ("restoration", baseline)):
+        wait(bus, gst, bounds["startup_seconds"], deadline)
+        changed = baseline if protocol == "sham" else 500000
+        for phase, value in (
+            ("baseline", baseline),
+            ("during", changed),
+            ("restoration", baseline),
+        ):
             if phase != "baseline":
                 report["reason"] = "setting_application_failed"
                 # Record intent before invoking a setter that may partly apply then raise.
@@ -140,10 +203,10 @@ def run(gst, now=time.monotonic_ns):
                 mutation_attempted = True
                 encoder.set_property("target-bitrate", value)
                 receipt["after_ns"] = elapsed()
-            wait(bus, gst, 1, deadline)  # Predeclared settling exclusion.
+            wait(bus, gst, bounds["settling_seconds"], deadline)
             report["reason"] = "observation_failed"
             start = snapshot(pipeline, gst, elapsed)
-            wait(bus, gst, 2, deadline)
+            wait(bus, gst, bounds["measurement_seconds"], deadline)
             end = snapshot(pipeline, gst, elapsed)
             report["windows"][phase] = window(start, end)
             if start["setting"] != value or end["setting"] != value:
@@ -160,6 +223,7 @@ def run(gst, now=time.monotonic_ns):
         report.update(
             status="observed", reason=None, restoration="setting_and_local_decode_observed"
         )
+        report["assessment"] = assess(report["windows"], protocol)
     except (Exception, KeyboardInterrupt):
         # Keep partial receipts/windows. No successful setter is inferred from an exception.
         report["status"] = "unavailable"
@@ -196,8 +260,13 @@ def run(gst, now=time.monotonic_ns):
 
 
 def main():
-    if sys.argv[1:] != ["--isolated-bitrate-trial"]:
-        print("error: requires --isolated-bitrate-trial", file=sys.stderr)
+    protocols = {
+        "--isolated-bitrate-trial": "short",
+        "--settled-bitrate-trial": "settled",
+        "--settled-bitrate-sham": "sham",
+    }
+    if len(sys.argv) != 2 or sys.argv[1] not in protocols:
+        print("error: requires one explicit isolated bitrate protocol", file=sys.stderr)
         return 2
 
     # Termination takes the same cleanup path as Ctrl-C. SIGKILL destroys only the
@@ -218,7 +287,7 @@ def main():
             )
         )
         return 1
-    report = run(Gst)
+    report = run(Gst, protocol=protocols[sys.argv[1]])
     print(json.dumps(report, indent=2, sort_keys=True, allow_nan=False))
     return 0 if report["status"] == "observed" else 1
 
