@@ -14,8 +14,8 @@ test("N10 read-only inventory boundaries pass without Gst or a running camera", 
   assert.match(result.stderr, /Ran \d+ tests/);
 });
 
-test("both runtime images ship the standalone inspector", () => {
+test("both runtime images ship the explicit inventory and isolated trial", () => {
   for (const name of ["Dockerfile", "Dockerfile.native"]) {
-    assert.match(fs.readFileSync(name, "utf8"), /COPY live_probe_inventory\.py \/app\//);
+    assert.match(fs.readFileSync(name, "utf8"), /COPY live_probe_inventory\.py live_probe_trial\.py \/app\//);
   }
 });

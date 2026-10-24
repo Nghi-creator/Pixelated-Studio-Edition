@@ -67,3 +67,7 @@ unavailable until a controlled target-runtime trial qualifies one family.
 
 The fake-boundary tests prove read-only behavior and retained failure semantics.
 They do not establish physical timing, actual live Gst mutability or safe playback.
+
+For explicit synthetic setter/output investigation, use the separately contained
+[isolated bitrate trial](n10-bitrate-feasibility.md). It changes only a disposable
+encoder and does not qualify a running camera or WebRTC receiver.
