@@ -3,7 +3,7 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import test from "node:test";
 
-test("N10 read-only inventory boundaries pass without Gst or a running camera", () => {
+test("N10 inventory and isolated experiment boundaries pass without Gst or a camera", () => {
   const result = spawnSync(
     "python3",
     ["-m", "unittest", "discover", "-s", "tests/python", "-p", "test_live_probe_*.py", "-v"],
@@ -14,8 +14,8 @@ test("N10 read-only inventory boundaries pass without Gst or a running camera", 
   assert.match(result.stderr, /Ran \d+ tests/);
 });
 
-test("both runtime images ship the explicit inventory and isolated trial", () => {
+test("both runtime images ship the explicit N10 tools", () => {
   for (const name of ["Dockerfile", "Dockerfile.native"]) {
-    assert.match(fs.readFileSync(name, "utf8"), /COPY live_probe_inventory\.py live_probe_trial\.py \/app\//);
+    assert.match(fs.readFileSync(name, "utf8"), /COPY live_probe_inventory\.py live_probe_trial\.py live_probe_cadence_trial\.py \/app\//);
   }
 });

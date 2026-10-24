@@ -46,7 +46,9 @@ predeclared experiments, [lifecycle control](docs/n5-lifecycle.md),
 The opt-in [property inventory](docs/n10-capability-inventory.md) inspects installed
 GStreamer metadata before live-relief capability qualification. The explicit
 [isolated bitrate trial](docs/n10-bitrate-feasibility.md) tests a disposable
-synthetic encoder/decoder; live relief remains unavailable.
+synthetic encoder/decoder. The [capture-cadence experiment](docs/n10-cadence-feasibility.md)
+tests source framerate renegotiation in disposable synthetic/private-Xvfb pipelines;
+live relief remains unavailable.
 
 ## Architecture
 

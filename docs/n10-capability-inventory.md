@@ -71,3 +71,8 @@ They do not establish physical timing, actual live Gst mutability or safe playba
 For explicit synthetic setter/output investigation, use the separately contained
 [isolated bitrate trial](n10-bitrate-feasibility.md). It changes only a disposable
 encoder and does not qualify a running camera or WebRTC receiver.
+
+The conditional [capture-cadence experiment](n10-cadence-feasibility.md) tests
+actual source framerate renegotiation through a named caps filter, including
+private-Xvfb capture. It does not add that control to the camera or change
+production capability availability.

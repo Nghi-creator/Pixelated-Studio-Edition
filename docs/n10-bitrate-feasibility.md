@@ -123,3 +123,7 @@ Run fake failure-boundary tests with:
 cd engine/runtime
 python3 -m unittest discover -s tests/python -p 'test_live_probe_*.py' -v
 ```
+
+A separately contained [capture-cadence experiment](n10-cadence-feasibility.md)
+evaluates the conditional fallback when bitrate output/recovery is unproven.
+Its source-framerate control and evidence are distinct from the bitrate family.
