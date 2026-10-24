@@ -43,6 +43,8 @@ Optional [stage tracing](docs/n4-stage-trace-export.md) captures bounded host an
 browser timing. The [scenario harness](docs/n5-scenario-harness.md) provides
 predeclared experiments, [lifecycle control](docs/n5-lifecycle.md),
 [supported adapters](docs/n5-adapters.md) and [offline export](docs/n5-experiment-export.md).
+The opt-in [property inventory](docs/n10-capability-inventory.md) inspects installed
+GStreamer metadata before live-relief capability qualification.
 
 ## Architecture
 
