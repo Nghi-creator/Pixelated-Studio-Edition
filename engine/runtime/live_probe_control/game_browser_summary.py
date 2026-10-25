@@ -19,6 +19,14 @@ def difference(first, last, key):
     return b - a
 
 
+def sequence_difference(samples, key):
+    if len(samples) < 2 or any(
+        difference(a, b, key) is None for a, b in itertools.pairwise(samples)
+    ):
+        return None
+    return difference(samples[0], samples[-1], key)
+
+
 def summarize(acquisition):
     if acquisition.get("version") != "n10-game-browser-acquisition-v1":
         raise ValueError("unsupported game/browser acquisition")
@@ -101,7 +109,19 @@ def summarize(acquisition):
             first, last = resources[0], resources[-1]
             duration = last["read_start_ns"] - first["read_start_ns"]
             cpu = difference(first, last, "worker_cpu_ns")
+            if (
+                sequence_difference(raw.get("resource_samples", []), "worker_cpu_ns")
+                is None
+            ):
+                cpu = None
             game = difference(first["game"], last["game"], "cpu_ticks")
+            if (
+                sequence_difference(
+                    [s["game"] for s in raw.get("resource_samples", [])], "cpu_ticks"
+                )
+                is None
+            ):
+                game = None
             ticks = raw.get("resource_clock_ticks_per_second")
             if duration > 0 and cpu is not None:
                 item["worker_cpu_percent"] = 100 * cpu / duration
@@ -115,9 +135,10 @@ def summarize(acquisition):
         ]
         if len(stats) >= 2:
             values = {
-                key: difference(stats[0]["values"], stats[-1]["values"], key)
+                key: sequence_difference([s["values"] for s in stats], key)
                 for key in stats[0]["values"]
             }
+            values["frameWidth"] = values["frameHeight"] = None
             item["browser_counter_deltas"] = values
             # These samples cover their own retained subinterval, not an invented window endpoint.
             item["browser_counter_interval"] = [
@@ -126,8 +147,19 @@ def summarize(acquisition):
             ]
             valid = (
                 valid
+                and values.get("framesReceived") is not None
+                and values["framesReceived"] > 0
+                and values.get("framesDecoded") is not None
+                and values["framesDecoded"] > 0
                 and values.get("framesDropped") == 0
                 and values.get("freezeCount") == 0
+                and all(
+                    sample["values"].get("framesDropped") == 0
+                    and sample["values"].get("freezeCount") == 0
+                    and sample["values"].get("frameWidth") == 640
+                    and sample["values"].get("frameHeight") == 480
+                    for sample in stats
+                )
             )
         else:
             valid = False
@@ -152,6 +184,15 @@ def summarize(acquisition):
     result["received_image_varies_nonblank"] = len(
         {s["hash"] for s in visuals}
     ) >= 3 and all(s["color_bins"] >= 4 for s in visuals)
+    result["received_image_varies_nonblank"] = result[
+        "received_image_varies_nonblank"
+    ] and all(
+        any(
+            window["start"]["at_ns"] <= sample["worker_at_ns"] <= window["end"]["at_ns"]
+            for sample in visuals
+        )
+        for window in windows.values()
+    )
     result["presentation_continuity"] = continuity
     result["transport_screen"] = (
         "met"
@@ -169,10 +210,17 @@ def summarize(acquisition):
     browser = acquisition.get("browser_resources", [])
     result["browser_cpu_percent"] = None
     result["browser_cpu_reason"] = "missing_or_changed_inventory"
-    if len(browser) >= 2 and len({s["inventory_hash"] for s in browser}) == 1:
-        delta = difference(browser[0], browser[-1], "cpu_seconds")
+    if (
+        len(browser) >= 2
+        and not acquisition.get("browser_resource_error")
+        and len({(s["inventory_hash"], s.get("process_count")) for s in browser}) == 1
+    ):
+        delta = sequence_difference(browser, "cpu_seconds")
         duration = browser[-1]["host_at_ns"] - browser[0]["host_at_ns"]
-        if delta is not None and duration > 0:
+        clock_ok = all(
+            a["host_at_ns"] < b["host_at_ns"] for a, b in itertools.pairwise(browser)
+        )
+        if delta is not None and duration > 0 and clock_ok:
             result["browser_cpu_percent"] = 100 * delta * SECOND / duration
             result["browser_cpu_reason"] = None
     before, during = (

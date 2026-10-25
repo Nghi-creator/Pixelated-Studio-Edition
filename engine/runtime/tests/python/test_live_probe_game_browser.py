@@ -1,5 +1,6 @@
 """Strict local browser messages and independent descriptive resource arithmetic."""
 
+import copy
 import json
 import sys
 import types
@@ -220,6 +221,37 @@ class GameBrowserTests(unittest.TestCase):
             else:
                 self.assertIsNone(result["phases"]["during"]["worker_cpu_percent"])
         self.assertIsNone(difference({"x": True}, {"x": 1}, "x"))
+
+    def test_summary_requires_a_visual_sample_in_each_measured_phase(self):
+        data = acquisition()
+        end = data["report"]["windows"]["during"]["end"]["at_ns"]
+        data["report"]["visual_samples"] = [
+            s for s in data["report"]["visual_samples"] if s["worker_at_ns"] <= end
+        ]
+        self.assertEqual(summarize(data)["transport_screen"], "not_met")
+
+    def test_summary_does_not_hide_interior_cpu_or_rtp_counter_resets(self):
+        data = acquisition()
+        middle = copy.deepcopy(data["browser_resources"][0])
+        middle.update(host_at_ns=S, cpu_seconds=0)
+        data["browser_resources"].insert(1, middle)
+        self.assertIsNone(summarize(data)["browser_cpu_percent"])
+        data = acquisition()
+        start = data["report"]["resource_samples"][2]
+        middle = copy.deepcopy(start)
+        middle.update(
+            at_ns=start["at_ns"] + 100000000,
+            read_start_ns=start["read_start_ns"] + 100000000,
+            worker_cpu_ns=0,
+        )
+        data["report"]["resource_samples"].insert(3, middle)
+        self.assertIsNone(summarize(data)["phases"]["during"]["worker_cpu_percent"])
+        data = acquisition()
+        middle = copy.deepcopy(data["report"]["browser_stats"][2])
+        middle["worker_at_ns"] += 100000000
+        middle["values"]["framesDecoded"] = 0
+        data["report"]["browser_stats"].insert(3, middle)
+        self.assertEqual(summarize(data)["transport_screen"], "not_met")
 
     def test_owned_scene_cleanup_reaps_children_even_when_key_release_fails(self):
         scene = GameScene()

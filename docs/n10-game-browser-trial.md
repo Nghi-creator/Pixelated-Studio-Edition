@@ -112,6 +112,8 @@ are limited to 250 ms and presentation/worker receipt gaps to 500 ms. Browser
 explicit instrumentation. The game-to-browser path is distinct from the earlier
 synthetic Gst-to-Gst experiment. It must not be imported or relabeled as that
 frozen `cadence-probe-evidence-v1` report scope or the bitrate-only evidence root.
+Core provides a separate [game/browser engineering evidence contract](../../latency_fingerprinting/docs/live_probes/N10_GAME_BROWSER_EVIDENCE.md)
+with protected import and independent inspection for these acquisitions.
 
 For offline descriptive summaries:
 
