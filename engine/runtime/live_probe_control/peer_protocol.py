@@ -6,10 +6,31 @@ from dataclasses import asdict
 
 from .contracts import Generation, digest, integer
 
-VERSION = "n10-peer-ipc-v1"
+VERSION = "n10-peer-ipc-v2"
 MAX_LINE = 262144
 MAX_BUFFER = 524288
 MAX_COMMANDS = 256
+SNAPSHOT_STATES = {
+    "connection_state": (
+        "new",
+        "connecting",
+        "connected",
+        "disconnected",
+        "failed",
+        "closed",
+        "unknown",
+    ),
+    "ice_connection_state": (
+        "new",
+        "checking",
+        "connected",
+        "completed",
+        "disconnected",
+        "failed",
+        "closed",
+        "unknown",
+    ),
+}
 PROFILE_ENCODERS = {"performance": (8, 56), "balanced": (6, 48), "quality": (4, 42)}
 SNAPSHOT_COUNTERS = (
     "capture_buffers",
@@ -110,11 +131,23 @@ def event_body(kind, body):
         if body["state"] not in ("queued", "forwarded"):
             raise ValueError("invalid ICE acknowledgement")
     elif kind == "snapshot":
-        closed(body, ("read_start_ns", "read_end_ns", "state", *SNAPSHOT_COUNTERS))
+        closed(
+            body,
+            (
+                "read_start_ns",
+                "read_end_ns",
+                "state",
+                *SNAPSHOT_COUNTERS,
+                *SNAPSHOT_STATES,
+            ),
+        )
         integer(body["read_start_ns"], 0, 2**53 - 1)
         integer(body["read_end_ns"], body["read_start_ns"], 2**53 - 1)
         if body["state"] not in ("ready", "playing", "unavailable"):
             raise ValueError("invalid peer media state")
+        for key, allowed in SNAPSHOT_STATES.items():
+            if body[key] not in allowed:
+                raise ValueError("invalid native peer connection state")
         for key in SNAPSHOT_COUNTERS:
             if body[key] is not None:
                 integer(body[key], 0, 2**53 - 1)

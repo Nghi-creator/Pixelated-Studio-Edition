@@ -12,6 +12,7 @@ from .peer_protocol import (
     MAX_BUFFER,
     PROFILE_ENCODERS,
     SNAPSHOT_COUNTERS,
+    SNAPSHOT_STATES,
     Lines,
     encode,
     event,
@@ -195,6 +196,12 @@ class PeerMedia:
             elif current == self.gst.State.READY:
                 state = "ready"
         values = {key: None for key in SNAPSHOT_COUNTERS}
+        for key, allowed in SNAPSHOT_STATES.items():
+            try:
+                native = self.webrtc.get_property(key.replace("_", "-")).value_nick
+                values[key] = native if native in allowed else "unknown"
+            except (ValueError, TypeError, AttributeError, RuntimeError):
+                values[key] = "unknown"
         for name, key in (
             ("captured", "capture_buffers"),
             ("encoded", "encoded_buffers"),

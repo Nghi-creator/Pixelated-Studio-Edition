@@ -143,7 +143,13 @@ class NativeWebRTCWorkerTests(unittest.TestCase):
         result, report, journal = self.run_worker("--isolated-webrtc-trial")
         self.assertEqual(result.returncode, 0, result.stderr + result.stdout)
         self.assertEqual(report["result"]["outcome"], "completed")
-        self.assertEqual(report["assessment"]["status"], "met")
+        self.assertEqual(
+            report["assessment"]["status"],
+            "met",
+            json.dumps(
+                {"assessment": report["assessment"], "windows": report["windows"]}
+            ),
+        )
         self.assertEqual(report["teardown"], "null_observed")
         self.assertEqual(journal["state"], "clean")
         self.assertFalse(report["live_authority"])

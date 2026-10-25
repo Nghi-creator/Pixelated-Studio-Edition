@@ -236,3 +236,8 @@ it does not widen the synthetic Gst cadence evidence root or qualify activation.
 [Dedicated peer-worker transport](n10-peer-workers.md) describes the opt-in
 one-pipeline process boundary and its contained isolation tests. Production
 camera routing and live mutation remain disabled.
+
+The isolated WebRTC worker uses a fixed 200 ms startup warmup before its
+750 ms baseline window. This keeps initial decoder/jitter-buffer catch-up out
+of the baseline rate count. It measures one baseline window and retains the
+existing 10% rate tolerance; it does not retry until a favorable window appears.

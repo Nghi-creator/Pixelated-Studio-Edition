@@ -15,6 +15,7 @@ from .controller import CadenceController
 
 # Fixed experimental context, not a production safety/quality policy.
 POLICY = Policy(24, 30, 3 * SECOND, 1, 5 * SECOND, SECOND, 20, 500000000)
+BASELINE_WARMUP_NS = 200000000
 CAPS = "video/x-raw,width=640,height=360,framerate={}/1"
 SETTINGS = (
     "target-bitrate",
@@ -424,6 +425,9 @@ def main():
         port = _DedicatedWorkerPort(Gst, GLib)
         report["teardown"] = "unknown"
         port.start()
+        # Connection/first output can precede decoder/jitter-buffer catch-up.
+        # One fixed premeasurement warmup, never an adaptive acceptance retry.
+        port.sleep(BASELINE_WARMUP_NS / SECOND)
         port.measure("baseline", 750000000)
         prior = port.snapshot()
         start = time.monotonic_ns()

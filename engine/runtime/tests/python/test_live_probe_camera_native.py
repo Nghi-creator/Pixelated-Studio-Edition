@@ -15,7 +15,9 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import test_live_probe_camera_workers as camera_helpers
 from live_probe_control.camera_workers import CameraWorkers
+from live_probe_control.contracts import Policy
 from live_probe_control.game_scene import GameScene
+from live_probe_control.local_owner import LocalProbeOwner, ReceiverSample
 from test_live_probe_peer_native import NATIVE, Receiver
 
 
@@ -173,6 +175,56 @@ class CameraNativeTests(unittest.TestCase):
                     for r in receivers.values()
                 )
             )
+            directory = cleanup.enter_context(tempfile.TemporaryDirectory())
+            local = cleanup.enter_context(
+                LocalProbeOwner(
+                    service,
+                    directory,
+                    Policy(24, 60, 2 * 10**9, 3, 12 * 10**9, 10**9, 20, 100000000),
+                    enabled=True,
+                )
+            )
+            capability = local.claim()
+            receiver_scope = local.bind(
+                capability, "first", service.active["first"].token
+            )
+            # These test observations come from a Gst receiver, not an actual
+            # browser. The admission API must retain its declared-only label.
+            sequence, origin, next_sample = 0, time.monotonic_ns(), 0
+            deadline = time.monotonic() + 4
+            while time.monotonic() < deadline:
+                pump()
+                now = time.monotonic_ns()
+                if now >= next_sample:
+                    frames = receivers["first"].frames()
+                    local.report(
+                        receiver_scope,
+                        ReceiverSample(
+                            sequence, "gst-test-declared", now - origin, frames, frames
+                        ),
+                    )
+                    sequence += 1
+                    next_sample = now + 200000000
+                    if local.inspect(receiver_scope)["status"] == "ready_for_dry_run":
+                        break
+            self.assertEqual(
+                local.inspect(receiver_scope)["status"], "ready_for_dry_run"
+            )
+            draft = local.prepare(
+                capability, receiver_scope, "native-dry-run", 24, 10**9
+            )
+            self.assertFalse(draft.dispatch_available)
+            self.assertFalse(draft.budget_reserved)
+            self.assertFalse(draft.live_authority)
+            self.assertFalse((Path(directory) / "journal.json").exists())
+            self.assertEqual(
+                service.active["first"].owner.last_snapshot["connection_state"],
+                "connected",
+            )
+            self.assertIn(
+                service.active["first"].owner.last_snapshot["ice_connection_state"],
+                ("connected", "completed"),
+            )
             old_slot = service.active["first"]
             old_token = camera["peers"]["first"]["worker_token"]
             before = second.frames()
@@ -180,6 +232,8 @@ class CameraNativeTests(unittest.TestCase):
             harness.pending.pop(0)()
             until(lambda: old_slot.done.is_set(), seconds=3)
             self.assertGreater(second.frames(), before)
+            with self.assertRaisesRegex(ValueError, "stale"):
+                local.recheck(capability, draft)
             replacement = receive("first")
             self.assertNotEqual(camera["peers"]["first"]["worker_token"], old_token)
             old_slot.events.put_nowait(
@@ -188,6 +242,11 @@ class CameraNativeTests(unittest.TestCase):
             until(
                 lambda: replacement.frames() >= 15 and replacement.frames("audio") >= 15
             )
+            fresh_scope = local.bind(
+                capability, "first", camera["peers"]["first"]["worker_token"]
+            )
+            self.assertIsNot(fresh_scope, receiver_scope)
+            self.assertEqual(local.directory, directory)
             snapshot = camera["peers"]["first"]["worker_snapshot"]
             self.assertEqual(snapshot["negotiated_fps"], 30)
             self.assertGreater(snapshot["capture_buffers"], 0)

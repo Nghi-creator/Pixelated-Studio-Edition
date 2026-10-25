@@ -46,6 +46,8 @@ def snapshot(stamp=1):
         read_start_ns=0,
         read_end_ns=stamp,
         state="ready",
+        connection_state="unknown",
+        ice_connection_state="unknown",
         **dict.fromkeys(SNAPSHOT_COUNTERS),
     )
 
@@ -141,6 +143,21 @@ class ProtocolTests(unittest.TestCase):
             body["ice_servers"] = servers
             with self.assertRaises(ValueError):
                 command(GENERATION, 0, "bootstrap", body)
+
+    def test_previous_protocol_and_missing_native_states_are_rejected(self):
+        message = event(bootstrap(), "snapshot", snapshot())
+        message["version"] = "n10-peer-ipc-v1"
+        with self.assertRaises(ValueError):
+            decode(encode(message))
+        message = event(bootstrap(), "snapshot", snapshot())
+        del message["body"]["connection_state"]
+        with self.assertRaises(ValueError):
+            decode(encode(message))
+        for key in ("connection_state", "ice_connection_state"):
+            body = snapshot()
+            body[key] = "healthy"
+            with self.assertRaises(ValueError):
+                event(bootstrap(), "snapshot", body)
 
     def test_nullable_snapshot_and_timing(self):
         self.assertEqual(

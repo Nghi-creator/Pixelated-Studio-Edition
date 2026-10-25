@@ -74,6 +74,8 @@ class PeerSupervisor:
         self.stderr_bytes = 0
         self.last_heartbeat = 0
         self.last_snapshot = None
+        self.last_observation = None
+        self.observation_sequence = 0
         self.last_snapshot_received = None
         self.offer_hash = self.offer_sequence = None
         self.ice_count = 0
@@ -239,6 +241,8 @@ class PeerSupervisor:
                 raise ValueError("peer snapshot clock regressed")
             self.last_snapshot = message["body"]
             self.last_snapshot_received = now
+            self.observation_sequence += 1
+            self.last_observation = (message["body"], now, self.observation_sequence)
         elif kind == "ice":
             if seq != self.offer_sequence:
                 raise ValueError("peer ICE belongs to a stale negotiation")

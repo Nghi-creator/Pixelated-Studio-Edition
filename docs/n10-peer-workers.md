@@ -147,3 +147,8 @@ processes. It verifies two receiving peers, disconnect/replacement, stale result
 isolation, worker-crash isolation, signaling disconnect, observed NULL/zero exit
 and continued game lifetime. It uses an in-process signaling harness, so it does not replace a full
 Socket.IO/browser/desktop gameplay acceptance run.
+
+[Read-only local probe admission](n10-local-owner.md) binds process-local owner
+requests and declared receiver progress to native worker observations. It uses
+private IPC v2 connection-state snapshots and atomic parent observation sequences;
+it does not add controller dispatch or live mutation authority.
