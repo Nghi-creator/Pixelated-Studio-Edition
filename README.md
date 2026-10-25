@@ -50,7 +50,9 @@ synthetic encoder/decoder. The [capture-cadence experiment](docs/n10-cadence-fea
 tests source framerate renegotiation in disposable synthetic/private-Xvfb pipelines;
 live relief remains unavailable. The [default-disabled lifecycle kernel](docs/n10-cadence-controller.md)
 adds dedicated-worker ownership and watchdog handling; it has no normal camera
-or qualified receiver binding.
+or qualified receiver binding. The [contained game/browser experiment](docs/n10-game-browser-trial.md)
+adds a fixed real-game source, headless Chromium presentation and descriptive
+resource/temporal-quality observations without enabling gameplay control.
 
 ## Architecture
 

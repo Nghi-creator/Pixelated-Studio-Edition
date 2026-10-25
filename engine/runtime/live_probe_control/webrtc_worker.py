@@ -37,7 +37,7 @@ MAX_SILENCE_NS = 500000000
 MAX_TIMELINE = 1200
 
 
-def exact_fps(caps):
+def exact_fps(caps, dimensions=(640, 360)):
     if caps is None or caps.get_size() != 1:
         raise ValueError("caps unavailable")
     structure = caps.get_structure(0)
@@ -51,8 +51,8 @@ def exact_fps(caps):
             not ok
             or denominator != 1
             or numerator not in (24, 30)
-            or fields.get_value("width") != 640
-            or fields.get_value("height") != 360
+            or fields.get_value("width") != dimensions[0]
+            or fields.get_value("height") != dimensions[1]
         ):
             raise ValueError("unexpected caps")
         return numerator
@@ -101,6 +101,7 @@ class WebRTCPort:
     """
 
     dedicated_process = False
+    dimensions = (640, 360)
 
     def __init__(self, gst, glib):
         self.gst, self.glib = gst, glib
@@ -262,11 +263,18 @@ class WebRTCPort:
             for pipeline in self.pipelines
         )
         # Exact dimensions/cadence are validated from configured and source caps.
-        settings.update(width=640, height=360, format="I420", transport="webrtc-vp8")
+        settings.update(
+            width=self.dimensions[0],
+            height=self.dimensions[1],
+            format="I420",
+            transport="webrtc-vp8",
+        )
         result = Snapshot(
             self.generation,
-            exact_fps(self.control.get_property("caps")),
-            exact_fps(self.capture.get_static_pad("src").get_current_caps()),
+            exact_fps(self.control.get_property("caps"), self.dimensions),
+            exact_fps(
+                self.capture.get_static_pad("src").get_current_caps(), self.dimensions
+            ),
             digest(settings),
             states_healthy and self.connected() and self.progress.healthy(self.now()),
         )
@@ -307,7 +315,12 @@ class WebRTCPort:
             "after_ns": None,
         }
         self.receipts.append(receipt)
-        self.control.set_property("caps", self.gst.Caps.from_string(CAPS.format(fps)))
+        self.control.set_property(
+            "caps",
+            self.gst.Caps.from_string(
+                f"video/x-raw,width={self.dimensions[0]},height={self.dimensions[1]},framerate={fps}/1"
+            ),
+        )
         receipt["after_ns"] = self.now() - self.origin
 
     def sleep(self, seconds):

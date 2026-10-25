@@ -226,3 +226,9 @@ These trials establish a synthetic Gst-to-Gst transport/controller path. Browser
 playback, moving-game capture, perceptual quality, resource/disturbance costs,
 production activation and representative evidence remain open. Offline cadence
 export/inspection does not qualify these capabilities.
+
+
+The separate [contained game/browser experiment](n10-game-browser-trial.md) uses
+an actual fixed Frozen-Bubble level and headless Chromium to measure presentation
+and resource observations. Its operator report has a distinct scope/version;
+it does not widen the synthetic Gst cadence evidence root or qualify activation.

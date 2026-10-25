@@ -22,3 +22,12 @@ test("both runtime images ship the explicit N10 tools", () => {
     assert.match(recipe, /COPY live_probe_inventory\.py live_probe_trial\.py live_probe_cadence_trial\.py \/app\//);
   }
 });
+
+
+test("N10 isolated browser driver arguments and resource counters fail closed", () => {
+  const result = spawnSync(process.execPath, ["--test", "scripts/n10/gameBrowserTrial.test.mjs"], {
+    cwd: process.cwd(), encoding: "utf8", timeout: 10000,
+  });
+  assert.equal(result.error, undefined, String(result.error));
+  assert.equal(result.status, 0, result.stdout + result.stderr);
+});
