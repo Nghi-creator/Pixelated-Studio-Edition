@@ -443,6 +443,7 @@ def main():
         report["status"] = "unavailable"
     finally:
         if port is not None:
+            report["generation"] = asdict(port.generation)
             report["receipts"] = port.receipts
             report["observations"] = port.observations
             rows = [

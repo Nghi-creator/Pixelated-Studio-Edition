@@ -193,8 +193,9 @@ windows and pull times on a process-relative monotonic clock. Received PTS use
 the receiver pipeline clock and are not aligned to source/browser time. Window
 screens use exact integer arithmetic and ±10% rate tolerance. `status=observed`
 means the trial returned evidence; inspect `assessment` separately. This is a
-producer operator report, **not** a core accepted evidence artifact or the frozen
-bitrate-only `live-probe-evidence-v1` root. Quality is explicitly `not_evaluated`
+producer operator report. Core can import it into the separate
+[cadence evidence format](../../latency_fingerprinting/docs/live_probes/N10_CADENCE_EVIDENCE.md);
+it is never relabeled as the frozen bitrate-only `live-probe-evidence-v1` root. Quality is explicitly `not_evaluated`
 and live authority remains false.
 
 `--isolated-webrtc-cancel` cancels after one second and requires owned restoration.
@@ -223,4 +224,5 @@ N10_NATIVE_WEBRTC_TESTS=1 python3 -m unittest discover \
 
 These trials establish a synthetic Gst-to-Gst transport/controller path. Browser
 playback, moving-game capture, perceptual quality, resource/disturbance costs,
-additive accepted cadence evidence and production activation remain open.
+production activation and representative evidence remain open. Offline cadence
+export/inspection does not qualify these capabilities.
