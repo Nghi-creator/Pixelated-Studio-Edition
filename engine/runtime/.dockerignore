@@ -1,4 +1,5 @@
-__pycache__/
 dist/
 node_modules/
 npm-debug.log*
+**/__pycache__/
+**/*.pyc

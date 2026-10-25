@@ -16,6 +16,9 @@ test("N10 inventory and isolated experiment boundaries pass without Gst or a cam
 
 test("both runtime images ship the explicit N10 tools", () => {
   for (const name of ["Dockerfile", "Dockerfile.native"]) {
-    assert.match(fs.readFileSync(name, "utf8"), /COPY live_probe_inventory\.py live_probe_trial\.py live_probe_cadence_trial\.py \/app\//);
+    const recipe = fs.readFileSync(name, "utf8");
+    assert.match(recipe, /COPY private_journal\.py \/app\//);
+    assert.match(recipe, /COPY live_probe_control \/app\/live_probe_control/);
+    assert.match(recipe, /COPY live_probe_inventory\.py live_probe_trial\.py live_probe_cadence_trial\.py \/app\//);
   }
 });

@@ -48,7 +48,9 @@ GStreamer metadata before live-relief capability qualification. The explicit
 [isolated bitrate trial](docs/n10-bitrate-feasibility.md) tests a disposable
 synthetic encoder/decoder. The [capture-cadence experiment](docs/n10-cadence-feasibility.md)
 tests source framerate renegotiation in disposable synthetic/private-Xvfb pipelines;
-live relief remains unavailable.
+live relief remains unavailable. The [default-disabled lifecycle kernel](docs/n10-cadence-controller.md)
+adds dedicated-worker ownership and watchdog handling; it has no normal camera
+or qualified receiver binding.
 
 ## Architecture
 

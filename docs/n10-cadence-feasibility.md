@@ -88,3 +88,8 @@ Run boundary tests without Gst:
 cd engine/runtime
 python3 -m unittest discover -s tests/python -p 'test_live_probe_*.py' -v
 ```
+
+The [default-disabled lifecycle kernel](n10-cadence-controller.md) supplies local
+request/ownership/journal/watchdog behavior for the next implementation stage.
+It requires a dedicated worker and independent receiver port; it does not enable
+the camera or promote this experiment to a qualified capability.
