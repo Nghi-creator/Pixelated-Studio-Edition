@@ -9,6 +9,8 @@ from camera_config import (
     parse_max_active_peers,
     parse_stream_profile,
 )
+from live_probe_control.camera_workers import CameraWorkers, workers_enabled
+
 from camera_protocol import normalize_ice_candidate, normalize_peer_id, validate_offer
 from camera_state import write_encoder_telemetry, write_peer_state
 from camera_trace import HostTraceRecording
@@ -49,6 +51,8 @@ TELEMETRY_STATE_PATH = os.environ.get(
     '/run/pixelated/camera-telemetry.json',
 )
 peers = {}
+SIGNALING_EPOCH = object()
+SIGNALING_CONNECTED = False
 try:
     trace_config = parse_trace_config(os.environ)
     STAGE_TRACE = HostTraceRecording(trace_config) if trace_config is not None else None
@@ -58,6 +62,47 @@ except ValueError:
 MAX_ACTIVE_PEERS = parse_max_active_peers(
     os.environ.get("PIXELATED_MAX_STREAM_PEERS", "8")
 )
+
+WORKERS = (
+    CameraWorkers(parse_stream_profile(STREAM_PROFILE), ICE_SERVERS, MAX_ACTIVE_PEERS)
+    if workers_enabled(os.environ) else None
+)
+
+
+def poll_camera_workers():
+    updated = False
+    for peer_id, token, kind, body, received_ns in WORKERS.poll():
+        peer = peers.get(peer_id)
+        if peer is None or peer.get('worker_token') != token:
+            continue  # A retired generation can never update its replacement.
+        if not SIGNALING_CONNECTED or peer.get('signaling_epoch') is not SIGNALING_EPOCH:
+            cleanup_peer(peer_id, "disconnect")
+            continue
+        try:
+            if kind == 'failed':
+                emit_engine_error(f"Dedicated WebRTC worker failed for peer {peer_id}.")
+                cleanup_peer(peer_id, "source_error")
+            elif kind == 'answer':
+                sio.emit('webrtc-answer', {
+                    'sessionId': SESSION_ID, 'peerId': peer_id,
+                    'type': 'answer', 'sdp': body['sdp'],
+                })
+            elif kind == 'ice':
+                sio.emit('webrtc-ice-candidate-backend', {
+                    'sessionId': SESSION_ID, 'peerId': peer_id,
+                    'candidate': {'sdpMLineIndex': body['index'], 'candidate': body['candidate']},
+                })
+            elif kind == 'snapshot':
+                peer['worker_snapshot'] = body
+                peer['worker_snapshot_received_ns'] = received_ns
+                updated = True
+        except Exception:
+            emit_engine_error(f"Dedicated WebRTC signaling failed for peer {peer_id}.")
+            cleanup_peer(peer_id, "source_error")
+    if updated:
+        publish_encoder_telemetry()
+    return True
+
 
 def publish_encoder_telemetry():
     write_encoder_telemetry(TELEMETRY_STATE_PATH, SESSION_ID, peers)
@@ -79,6 +124,8 @@ def cleanup_peer(peer_id, reason="shutdown"):
     if not peer:
         return
 
+    if peer.get('worker_token') is not None:
+        WORKERS.retire(peer_id)  # Never wait for process teardown on GLib.
     stage_trace = peer.get('stage_trace')
     if stage_trace is not None:
         stage_trace.close(reason)
@@ -93,6 +140,8 @@ def create_peer_recording_control(peer_id, config):
     if len(peers) != 1 or peer_id not in peers:
         raise ValueError("experiment recording requires one exact draining peer")
     peer = peers[peer_id]
+    if peer.get('worker_token') is not None:
+        raise ValueError("dedicated peer tracing is not supported")
     binding = peer.get('stage_trace')
     if isinstance(binding, PeerRecordingControl):
         raise ValueError("peer recording already has an experiment owner")
@@ -107,6 +156,20 @@ def handle_offer(offer):
         return
 
     peer_id = normalize_peer_id(offer)
+    if WORKERS is not None:
+        try:
+            token = WORKERS.start(peer_id, offer['sdp'])
+        except ValueError:
+            emit_engine_error("Dedicated WebRTC offer rejected: invalid, changed or at capacity.")
+            return
+        if peer_id not in peers:
+            peers[peer_id] = {
+                'worker_token': token, 'worker_snapshot': None,
+                'signaling_epoch': SIGNALING_EPOCH,
+            }
+            write_peer_state(PEER_STATE_PATH, SESSION_ID, peers)
+            publish_encoder_telemetry()
+        return
     try:
         result, sdp_msg = GstSdp.SDPMessage.new_from_text(offer['sdp'])
     except Exception as exc:
@@ -257,6 +320,10 @@ def handle_offer(offer):
 
 @sio.event
 def connect():
+    global SIGNALING_EPOCH, SIGNALING_CONNECTED
+    if WORKERS is not None:
+        SIGNALING_EPOCH = object()
+        SIGNALING_CONNECTED = True
     print("[Python] Connected to Node.js Switchboard!")
     write_peer_state(PEER_STATE_PATH, SESSION_ID, peers)
     write_encoder_telemetry(TELEMETRY_STATE_PATH, SESSION_ID, peers)
@@ -265,7 +332,14 @@ def connect():
 
 @sio.on('webrtc-offer')
 def on_offer(offer):
-    GLib.idle_add(handle_offer, offer)
+    if WORKERS is None:
+        GLib.idle_add(handle_offer, offer)
+        return
+    epoch = SIGNALING_EPOCH
+    def dispatch_offer():
+        if SIGNALING_CONNECTED and epoch is SIGNALING_EPOCH:
+            handle_offer(offer)
+    GLib.idle_add(dispatch_offer)
 
 @sio.on('webrtc-ice-candidate')
 def on_ice(payload):
@@ -274,8 +348,18 @@ def on_ice(payload):
         emit_engine_error("Invalid WebRTC ICE candidate.")
         return
     peer_id = normalize_peer_id(candidate)
+    expected_peer = peers.get(peer_id)
     def handle_ice():
         peer = peers.get(peer_id)
+        if expected_peer is not None and peer is not expected_peer:
+            return
+        if peer and peer.get('worker_token') is not None:
+            try:
+                WORKERS.ice(peer_id, candidate['sdpMLineIndex'], candidate['candidate'])
+            except ValueError:
+                emit_engine_error("Dedicated WebRTC ICE rejected.")
+                cleanup_peer(peer_id, "source_error")
+            return
         webrtcbin = peer.get('webrtcbin') if peer else None
         if webrtcbin:
             try:
@@ -291,14 +375,39 @@ def on_ice(payload):
 @sio.on('webrtc-peer-disconnect')
 def on_peer_disconnect(payload):
     peer_id = normalize_peer_id(payload)
+    expected_peer = peers.get(peer_id)
     def handle_disconnect():
+        if expected_peer is not None and peers.get(peer_id) is not expected_peer:
+            return
         print(f"[Python] Cleaning up WebRTC pipeline for peer {peer_id}.")
         cleanup_peer(peer_id)
     GLib.idle_add(handle_disconnect)
 
+@sio.event
+def disconnect(*_reason):
+    global SIGNALING_EPOCH, SIGNALING_CONNECTED
+    if WORKERS is None:
+        return
+    SIGNALING_CONNECTED = False
+    SIGNALING_EPOCH = object()
+    # Socket.IO callbacks enqueue exact current lifetimes; a delayed callback
+    # cannot close a replacement created after reconnection.
+    owned = list(peers.items())
+    def close_disconnected_peers():
+        for peer_id, peer in owned:
+            if peers.get(peer_id) is peer:
+                cleanup_peer(peer_id, "disconnect")
+    GLib.idle_add(close_disconnected_peers)
+
+
 sio.connect('http://localhost:8080', auth={'token': ENGINE_TOKEN})
 GLib.timeout_add_seconds(1, publish_encoder_telemetry)
 loop = GLib.MainLoop()
+if WORKERS is not None:
+    import signal
+    GLib.timeout_add(20, poll_camera_workers)
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: loop.quit())
+    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, lambda: loop.quit())
 campaign_service = None
 if N5_CAMPAIGN_DIRECTORY:
     from scenario_harness.campaign import CampaignService
@@ -321,6 +430,10 @@ finally:
                 except Exception:
                     print("[Python] Camera peer cleanup failed during shutdown.")
         finally:
-            if STAGE_TRACE is not None:
-                STAGE_TRACE.finish("shutdown")
-                export_camera_trace(STAGE_TRACE, os.environ)
+            try:
+                if WORKERS is not None and not WORKERS.close():
+                    print("[Python] Dedicated camera worker cleanup incomplete.")
+            finally:
+                if STAGE_TRACE is not None:
+                    STAGE_TRACE.finish("shutdown")
+                    export_camera_trace(STAGE_TRACE, os.environ)

@@ -2,8 +2,8 @@
 
 `engine/runtime/live_probe_control/peer_supervisor.py` provides an opt-in Linux
 boundary for one WebRTC answerer pipeline per child. It is import-safe and is
-currently independent of the production `camera.py` routing. Normal engine
-startup does not activate it. Both `live_authority` and `mutation_available`
+connected to `camera.py` behind `PIXELATED_DEDICATED_PEER_WORKERS=1`. Normal
+engine startup does not activate it. Both `live_authority` and `mutation_available`
 remain false; the private protocol contains no cadence setter or live-probe
 request.
 
@@ -61,9 +61,10 @@ clocks, and these snapshots do not establish receiver health or probe qualificat
 
 The worker builds fixed VP8 video and Opus audio branches. `production` selects
 `:99` X capture and `auto_null.monitor`; `isolated_synthetic` selects a ball test
-source and silent audio. Only the contained synthetic path is covered by the
-peer-isolation test. Production capture/audio, browser lifecycle, camera routing,
-trace integration and trusted local probe binding remain separate integration work.
+source and silent audio. The peer-isolation test uses synthetic media; the
+camera adapter test uses private x99 capture and a PulseAudio null-sink monitor.
+Browser signaling/lifecycle, child trace integration and trusted local probe
+binding remain separate integration work.
 
 Run protocol/supervisor tests without Gst from the repository root:
 
@@ -86,3 +87,63 @@ The test owns a private display/game and two receiving peers, requires decoded
 video/audio progress, kills one exact worker, and requires continued decoding by
 the other peer and continued game CPU progress. It also checks graceful NULL/exit
 cleanup and lease loss/stall targeting. It never attaches to a user's game/display.
+
+## Opt-in camera routing
+
+Set `PIXELATED_DEDICATED_PEER_WORKERS=1` in the host engine environment before
+launching the camera. The existing camera launcher inherits this host setting;
+WebRTC messages and guests cannot select the backend. The flag accepts only
+`0` and `1`, defaults to `0`, and currently routes all camera peers through the
+worker backend when enabled. Native runtime dependencies and Linux pidfds are
+required. Invalid worker configuration fails rather than falling back silently.
+This enables media transport only; it does not authorize live cadence changes.
+
+N4 stage tracing and N5 campaign configuration are explicitly incompatible with
+this option. Startup rejects those combinations before signaling connects.
+Experiment recording control also rejects dedicated peers. Child trace export
+is not implemented, and child snapshot brackets are never merged into the parent
+trace or written to its export path. Leave the worker option disabled for N4/N5.
+
+`camera_workers.py` owns one control thread per admitted peer. GLib/signaling
+callbacks only enqueue work, consume bounded results, or retire a slot. Child
+startup, negotiation and teardown waits run on the slot's control thread. The
+existing peer limit includes retired workers until cleanup completes, preventing
+rapid reconnects from accumulating unbounded threads/processes. An identical
+offer is ignored; a changed offer requires disconnect/replacement. Replacement
+uses a fresh worker generation and parent token; stale results and callbacks
+captured for the old peer cannot update or close its replacement. ICE queued
+while a worker starts is bounded and forwarded after bootstrap. Network ICE
+still relies on the negotiated SDP credentials; no probe authority is derived
+from signaling messages.
+
+Each GLib poll renews a three-second adapter lease. A stalled main loop cannot
+keep workers alive merely because their background threads continue polling.
+Candidate/result queue overflow or worker failure closes that slot. A worker
+failure reports an engine error and removes only its peer; it does not terminate
+the camera process or the separately owned game. Signaling disconnect retires
+the captured worker peers and invalidates queued offers using a connection epoch.
+Peer disconnect queued before offer startup is also honored. Camera SIGTERM/SIGINT and process-manager stream
+restart use bounded worker cleanup; abrupt parent death also closes private
+lease pipes. The adapter adds no mutation endpoint or browser-side control.
+
+Encoder telemetry retains schema version 1. Worker values come from native
+snapshots, with parent receipt-time freshness. Missing, future-dated, stale or
+unavailable snapshots yield null metrics. An aggregate requires known values
+from every active peer; mixed encoder settings remain null. Native queue getter
+failures also remain null on the legacy path. Empty-peer counters remain zero.
+No missing queue or worker counter is represented as healthy zero occupancy.
+
+Software adapter/callback/telemetry tests run with:
+
+```sh
+python3 -m unittest discover -s engine/runtime/tests/python \
+  -p 'test_live_probe_camera*.py' -v
+```
+
+Inside the contained native runtime, run the same pattern from `engine/runtime`
+with `N10_NATIVE_PEER_TESTS=1` and `-s tests/python`. The native test executes the
+actual camera callback bodies, production x99/Pulse branches and dedicated worker
+processes. It verifies two receiving peers, disconnect/replacement, stale result
+isolation, worker-crash isolation, signaling disconnect, observed NULL/zero exit
+and continued game lifetime. It uses an in-process signaling harness, so it does not replace a full
+Socket.IO/browser/desktop gameplay acceptance run.

@@ -45,6 +45,7 @@ class LifecycleTests(unittest.TestCase):
 
         namespace = {
             "campaign_service": None,
+            "WORKERS": None,
             "peers": peers,
             "os": types.SimpleNamespace(environ={}),
             "export_camera_trace": lambda recording, environment: calls.append(
