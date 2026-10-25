@@ -8,8 +8,9 @@ pipeline. This is not a qualified live capability.
 The earlier [isolated experiment](n10-cadence-feasibility.md) establishes a limited
 source-control feasibility surface. The lifecycle kernel adds ownership, durable
 intent, conservative budgets, cancellation, independent process teardown and
-recovery. A real Gst/receiver port is still required; no port that verifies actual
-receiver/quality recovery is shipped here. Fake-port tests establish software
+recovery. The explicit isolated worker below binds a disposable Gst WebRTC
+receiver and verifies received-frame recovery. A production camera/browser port
+and quality qualification remain required. Fake-port tests establish software
 behavior only. The frozen core bitrate-evidence format is unchanged.
 
 ## Local request/result boundary
@@ -62,9 +63,10 @@ An explicitly enabled controller requires `port.dedicated_process is True` and:
   A default `True`, a setting getter or a local-decoder-only observation is not a
   production implementation of this port.
 
-No actual Gst/receiver implementation is provided by these interfaces. Bind one
-only in an owned dedicated pipeline worker and qualify it against representative
-workloads, real receiver continuity and quality/cost bounds. The existing
+The isolated worker implements these interfaces for its own fixed Gst pair only.
+A production binding must use an owned dedicated pipeline worker and qualify
+representative workloads, browser receiver continuity and quality/cost bounds.
+The existing
 multi-peer `camera.py` process is not such a worker: killing it would affect other
 peers. Never attach this watchdog to that process as a shortcut.
 
@@ -137,3 +139,88 @@ The three pidfd tests run only on Linux and use dedicated child test workers.
 Build/Node tests run the Python boundary suite and verify both image recipes ship
 the package and shared journal helper. No normal gameplay or public activation
 path is added by these checks.
+
+## Explicit isolated WebRTC worker
+
+`live_probe_control.webrtc_worker` creates its own synthetic moving-ball sender
+and Gst `webrtcbin` receiver, negotiates SDP/ICE locally, and receives VP8 through
+WebRTC before decoding into a bounded appsink. It accepts no caller pipeline,
+display, device, peer, SDP or ICE-server configuration. Importing it does not load
+GI or start media. The importable port is not marked as a dedicated process;
+only the explicit module worker binds the controller watchdog.
+
+Run it as a **standalone disposable Linux process**, never from the camera/server
+process or an existing Python worker with other responsibilities. The state
+directory must already exist, be owned by the current user, and have mode 0700.
+Keep that directory after failure for journal inspection/recovery; never delete
+it to reset a dirty request or budget.
+
+```sh
+cd engine/runtime
+mkdir -m 700 /tmp/n10-webrtc-state
+python3 -m live_probe_control.webrtc_worker --isolated-webrtc-trial \
+  --state-directory /tmp/n10-webrtc-state
+```
+
+Use a new explicit directory for each independent disposable experiment. Reusing
+a retained request ID with a new pipeline generation fails rather than replaying
+control into a replacement worker. There is no network request or normal-camera
+activation route. The packaged module is copied with `live_probe_control` in both
+runtime images.
+
+The fixed provisional context is 640×360 VP8, 1 Mbps, 30→24→30 integer capture
+FPS, a three-second request, 500 ms application settling and a five-second total
+watchdog reservation. Encoder controls and dimensions stay fixed. These are
+experiment parameters, not a production quality floor or qualified policy.
+Source caps are read back exactly. Unrelated encoder settings are hashed on each
+snapshot. New pipelines/peers get fresh opaque generations and the port closes
+its generation at teardown; it exposes no competing control route.
+
+Health requires both peers connected, both pipelines in stable PLAYING, fresh
+received frames, strictly increasing receiver PTS with gaps at most 250 ms and
+nonregressing pull times with gaps at most 500 ms. Missing/reversed/stale output,
+queue overflow and native ERROR/EOS fail closed. Signaling waits, callback
+signaling queues, sample pulls, snapshots, timeline size and total trial lifetime
+are bounded. Media callbacks only forward bounded ICE or link the one expected
+receiver pad; cadence control and proof run outside media callbacks. Session
+descriptions are copied before their Gst promises are released.
+
+Restore proof excludes 200 ms settling, then measures 750 ms of fresh source and
+received-frame progress at the prior cadence (inclusive ±10%), alongside exact
+prior snapshot/connection health and the controller deadline. JSON retains
+setter brackets, source/receiver counter observations, baseline/during/restoration
+windows and pull times on a process-relative monotonic clock. Received PTS use
+the receiver pipeline clock and are not aligned to source/browser time. Window
+screens use exact integer arithmetic and ±10% rate tolerance. `status=observed`
+means the trial returned evidence; inspect `assessment` separately. This is a
+producer operator report, **not** a core accepted evidence artifact or the frozen
+bitrate-only `live-probe-evidence-v1` root. Quality is explicitly `not_evaluated`
+and live authority remains false.
+
+`--isolated-webrtc-cancel` cancels after one second and requires owned restoration.
+`--isolated-webrtc-disconnect` deliberately stops the owned receiver after one
+second. Failed proof retains dirty intent and the full budget; the worker emits
+partial evidence, then waits for its independent watchdog to terminate it. A
+SIGKILL/137 exit is expected for this fault drill. The native test then proves
+the old worker lifetime is gone and exercises teardown recovery while preserving
+its action count and reservation; recovery is labeled `not_verified_teardown`.
+Neither NULL teardown nor
+process death is reported as verified live restoration.
+
+The loopback-only `--network none` Docker context may provide no usable libnice
+candidate. Use a disposable **internal-only** Docker network with no STUN/TURN
+servers for this local pair, retain state on a private mount, and enforce an
+outer process/container deadline. Remove only the owned container/network after
+the run. No external signaling service or internet access is needed.
+
+Software boundary tests run with the command above. To opt into the three actual
+native WebRTC success/cancel/receiver-loss tests in a contained Linux runtime:
+
+```sh
+N10_NATIVE_WEBRTC_TESTS=1 python3 -m unittest discover \
+  -s tests/python -p test_live_probe_webrtc.py -v
+```
+
+These trials establish a synthetic Gst-to-Gst transport/controller path. Browser
+playback, moving-game capture, perceptual quality, resource/disturbance costs,
+additive accepted cadence evidence and production activation remain open.
