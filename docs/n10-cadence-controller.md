@@ -234,10 +234,14 @@ and resource observations. Its operator report has a distinct scope/version;
 it does not widen the synthetic Gst cadence evidence root or qualify activation.
 
 [Dedicated peer-worker transport](n10-peer-workers.md) describes the opt-in
-one-pipeline process boundary and its contained isolation tests. Production
-camera routing and live mutation remain disabled.
+one-pipeline process boundary and its contained isolation tests. Dedicated camera routing is opt-in. Production probe mutation remains disabled.
 
 The isolated WebRTC worker uses a fixed 200 ms startup warmup before its
 750 ms baseline window. This keeps initial decoder/jitter-buffer catch-up out
 of the baseline rate count. It measures one baseline window and retains the
 existing 10% rate tolerance; it does not retry until a favorable window appears.
+
+The [synthetic engineering dispatch path](n10-engineering-dispatch.md) runs this
+controller through a dedicated camera worker with local owner/receiver binding.
+It retains one owner/session ledger across replacements and remains unavailable
+for production capture and qualified live activation.

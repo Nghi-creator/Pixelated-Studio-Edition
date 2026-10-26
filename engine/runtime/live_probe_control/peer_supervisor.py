@@ -12,6 +12,7 @@ from pathlib import Path
 from .contracts import Generation
 from .peer_lifetime import ParentLease
 from .peer_protocol import MAX_BUFFER, MAX_COMMANDS, Lines, command, decode, encode
+from .probe_transport import EngineeringControl
 
 SECOND = 1000000000
 ENVIRONMENT = frozenset(
@@ -82,6 +83,9 @@ class PeerSupervisor:
         self.closed_reply = None
         self.exit_code = None
         self.close_deadline = None
+        self.control = None
+        self.probe_sequence = self.probe_id = None
+        self.probe_unresolved = False
 
     def __enter__(self):
         if self.entered or self.state != "new":
@@ -123,7 +127,7 @@ class PeerSupervisor:
         self.sequence += 1
         return request
 
-    def start(self, profile, *, ice_servers=None, source="production"):
+    def start(self, profile, *, ice_servers=None, source="production", control=None):
         if not self.enabled or not self.entered or self.state != "new":
             raise ValueError("dedicated peer disabled or not exclusively owned")
         if (
@@ -138,7 +142,12 @@ class PeerSupervisor:
             "ice_servers": [] if ice_servers is None else ice_servers,
             "source": source,
         }
+        if control is not None:
+            if type(control) is not EngineeringControl:
+                raise ValueError("typed engineering configuration required")
+            body["control"] = control.wire()
         command(self.generation, 0, "bootstrap", body)
+        self.control = control
         environment = child_environment(os.environ)
         try:
             self.child = subprocess.Popen(
@@ -200,12 +209,50 @@ class PeerSupervisor:
         self.ice_count += 1
         return result["sequence"]
 
+    def probe(self, body):
+        if (
+            self.control is None
+            or self.state != "playing"
+            or self.probe_sequence is not None
+            or MAX_COMMANDS - self.sequence < 64
+        ):
+            raise ValueError("engineering probe transport unavailable")
+        if body["request"]["generation"] != asdict(self.generation):
+            raise ValueError("stale engineering probe generation")
+        request = self._queue("probe", body, "probe_result", 10 * SECOND)
+        self.probe_sequence, self.probe_id = (
+            request["sequence"],
+            body["request"]["request_id"],
+        )
+        return request["sequence"]
+
+    def probe_heartbeat(self, request_id, receiver):
+        if (
+            self.control is None
+            or self.probe_sequence is None
+            or request_id != self.probe_id
+        ):
+            raise ValueError("stale engineering receiver lease")
+        self._queue(
+            "probe_heartbeat", {"request_id": request_id, "receiver": receiver}, "ack"
+        )
+
+    def probe_cancel(self, request_id):
+        if (
+            self.control is None
+            or self.probe_sequence is None
+            or request_id != self.probe_id
+        ):
+            raise ValueError("stale engineering cancellation")
+        self._queue("probe_cancel", {"request_id": request_id}, "ack")
+
     def shutdown(self):
         if self.state not in ("starting", "ready", "answering", "playing"):
             raise ValueError("peer shutdown unavailable")
-        self._queue("shutdown", {}, "closed", 2 * SECOND)
+        grace = 4 * SECOND if self.control is not None else 2 * SECOND
+        self._queue("shutdown", {}, "closed", grace)
         self.state = "closing"
-        self.close_deadline = self._now() + 2 * SECOND
+        self.close_deadline = self._now() + grace
 
     def _event(self, message, now):
         if message["generation"] != asdict(self.generation):
@@ -213,10 +260,20 @@ class PeerSupervisor:
         seq, kind = message["sequence"], message["kind"]
         if self.anchors.get(seq) != message["request_hash"]:
             raise ValueError("unbound private peer reply")
-        if kind in ("ready", "answer", "ack", "closed"):
+        if kind in ("ready", "answer", "ack", "closed", "probe_result"):
             pending = self.pending.get(seq)
             if pending is None or pending[1] != kind:
                 raise ValueError("duplicate or unexpected peer reply")
+            if kind == "probe_result":
+                if (
+                    seq != self.probe_sequence
+                    or message["body"]["request_id"] != self.probe_id
+                ):
+                    raise ValueError("unbound engineering probe result")
+                self.probe_sequence = self.probe_id = None
+                result = message["body"]["result"]
+                if result is not None and result["restoration"] == "unknown":
+                    self.probe_unresolved = True
             del self.pending[seq]
             if kind == "ready":
                 if self.state == "starting":
@@ -297,6 +354,14 @@ class PeerSupervisor:
                 raise ValueError("private peer snapshot stalled")
             if self.state == "closing" and now > self.close_deadline:
                 raise ValueError("private peer exit deadline")
+            if self.probe_unresolved:
+                # Unknown restoration/journal completion cannot leave a reusable
+                # pipeline, including failure after watchdog disarm.
+                try:
+                    signal.pidfd_send_signal(self.pidfd, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                self.probe_unresolved = False
             code = self.child.poll()
             if eof and code is None and self.state == "closing":
                 return events

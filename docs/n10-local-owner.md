@@ -1,10 +1,11 @@
-# Read-only local probe admission
+# Local probe admission
 
 `engine/runtime/live_probe_control/local_owner.py` binds local request drafts to
 one current dedicated camera worker and a scoped receiver observation stream.
 It is default-disabled and import-safe. Normal camera startup does not construct
 this API, and no Socket.IO, hosted, LAN, HTTP or file-watching command endpoint
-calls it. It contains no cadence setter or controller dispatch.
+calls it. Admission contains no cadence setter; a separate explicit synthetic
+engineering configuration is required for its local `dispatch`/`cancel` methods.
 
 This is a request-preparation contract. Every readiness receipt and draft keeps
 `dispatch_available`, `budget_reserved` and `live_authority` false. A
@@ -58,8 +59,9 @@ observations, explicitly labeled `declared_counters_not_authenticated_playback`.
 
 The local API also reads the supervisor's atomic native observation tuple:
 validated snapshot, parent receipt time and observation sequence. Private peer
-IPC version `n10-peer-ipc-v2` adds explicit native WebRTC connection and ICE states;
-unknown reads stay `unknown`, and the previous closed message shape is rejected.
+IPC version `n10-peer-ipc-v3` carries explicit native WebRTC connection and ICE
+states; unknown reads stay `unknown`, and previous closed message shapes are
+rejected.
 A pipeline being PLAYING is insufficient: native connection must be connected
 and ICE connected/completed. Capture and encode counters must advance between
 two native observations. Missing values, stale receipts, repeated snapshots and
@@ -75,6 +77,10 @@ counters retained to detect resets across missing values. The current timing
 bounds are 1.5 seconds for native freshness, 750 ms for receiver report/progress
 freshness, and at least 200 ms of receiver-local and parent-observed warmup.
 These are conservative admission bounds, not a perceptual quality floor.
+
+Outside an issued engineering operation, arbitrary cadence changes invalidate
+the binding. An issued operation admits only its explicit baseline/target
+transitions and must return to baseline observations before new drafts.
 
 Peer retirement, worker failure, stopped main-loop lease, generation or offer
 replacement, and scope closure invalidate old receiver handles and drafts. A
@@ -96,9 +102,11 @@ are not issued drafts. Draft flags cannot be constructed as true.
 
 `recheck(owner, draft)` verifies the issued object, current slot/generation,
 fresh proof, hashes, expiry and existing ledger again. It remains read-only.
-There is deliberately no `execute()` method. Controller transport, action-time
-receiver refresh/cancellation, explicit controlled-setting transitions, watchdog
-failure drills and browser/desktop acceptance are subsequent integration work.
+There is no direct `execute()` method on a draft. Explicit synthetic engineering
+dispatch, action-time receiver refresh/cancellation, controlled-setting transitions
+and failure drills are described in [engineering dispatch](n10-engineering-dispatch.md).
+Authenticated browser binding, browser/desktop acceptance and production
+qualification remain open.
 
 Run the software checks from the repository root:
 

@@ -1,12 +1,18 @@
-"""Closed private single-peer IPC. No executable pipelines or mutation commands."""
+"""Closed private single-peer IPC. No executable pipelines or unrestricted setters."""
 
 import json
 import re
 from dataclasses import asdict
 
-from .contracts import Generation, digest, integer
+from .contracts import Generation, Result, alias, digest, integer
+from .probe_transport import (
+    EngineeringControl,
+    hash_value,
+    receiver_value,
+    request_value,
+)
 
-VERSION = "n10-peer-ipc-v2"
+VERSION = "n10-peer-ipc-v3"
 MAX_LINE = 262144
 MAX_BUFFER = 524288
 MAX_COMMANDS = 256
@@ -94,7 +100,19 @@ def ice_servers(value):
 
 def command_body(kind, body):
     if kind == "bootstrap":
-        closed(body, ("profile", "ice_servers", "source"))
+        closed(
+            body,
+            (
+                "profile",
+                "ice_servers",
+                "source",
+                *(("control",) if "control" in body else ()),
+            ),
+        )
+        if "control" in body:
+            EngineeringControl.from_wire(body["control"])
+            if body["source"] != "isolated_synthetic":
+                raise ValueError("probe transport is synthetic engineering only")
         profile(body["profile"])
         ice_servers(body["ice_servers"])
         if body["source"] not in ("production", "isolated_synthetic"):
@@ -106,6 +124,30 @@ def command_body(kind, body):
         closed(body, ("index", "candidate"))
         integer(body["index"], 0, 65535)
         text(body["candidate"], 4096)
+    elif kind == "probe":
+        closed(
+            body,
+            (
+                "request",
+                "offer_hash",
+                "settings_hash",
+                "policy_hash",
+                "expires_ns",
+                "receiver",
+            ),
+        )
+        request_value(body["request"])
+        for key in ("offer_hash", "settings_hash", "policy_hash"):
+            hash_value(body[key])
+        integer(body["expires_ns"], 0, 2**63 - 1)
+        receiver_value(body["receiver"])
+    elif kind == "probe_heartbeat":
+        closed(body, ("request_id", "receiver"))
+        alias(body["request_id"])
+        receiver_value(body["receiver"])
+    elif kind == "probe_cancel":
+        closed(body, ("request_id",))
+        alias(body["request_id"])
     elif kind == "shutdown":
         closed(body, ())
     else:
@@ -155,6 +197,20 @@ def event_body(kind, body):
         closed(body, ("teardown",))
         if body["teardown"] not in ("null_observed", "unknown"):
             raise ValueError("invalid peer teardown")
+    elif kind == "probe_result":
+        closed(body, ("request_id", "result", "rejection"))
+        alias(body["request_id"])
+        if body["result"] is not None:
+            value = Result(**body["result"])
+            if value.request_id != body["request_id"] or body["rejection"] is not None:
+                raise ValueError("unbound probe result")
+        elif body["rejection"] not in (
+            "disabled",
+            "busy",
+            "preconditions",
+            "ledger_unavailable",
+        ):
+            raise ValueError("closed probe rejection required")
     elif kind == "error":
         closed(body, ("reason",))
         if body["reason"] not in (

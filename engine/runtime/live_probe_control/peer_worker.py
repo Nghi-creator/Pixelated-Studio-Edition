@@ -67,6 +67,7 @@ class PeerMedia:
         self.overruns = 0
         self.pending_ice = []
         self.origin = time.monotonic_ns()
+        self.latest_snapshot = None
         settings = bootstrap["body"]["profile"]
         cpu, quantizer = PROFILE_ENCODERS[settings["id"]]
         isolated = bootstrap["body"]["source"] == "isolated_synthetic"
@@ -245,12 +246,14 @@ class PeerMedia:
                 values[key] = counter(encoder.get_property(prop))
         except (ValueError, TypeError, AttributeError):
             pass
-        return dict(
+        snapshot = dict(
             read_start_ns=start,
             read_end_ns=time.monotonic_ns() - self.origin,
             state=state,
             **values,
         )
+        self.latest_snapshot = (snapshot, time.monotonic_ns())
+        return snapshot
 
     def poll(self):
         if self.failed or self.pipeline.get_bus().pop_filtered(
@@ -285,7 +288,7 @@ def main():
     os.set_blocking(sys.stdout.fileno(), False)
     lines = Lines()
     tx = b""
-    media = bootstrap = last_request = None
+    media = control = bootstrap = last_request = None
     next_sequence = 0
     last_snapshot = 0
     startup = time.monotonic() + 5
@@ -309,6 +312,7 @@ def main():
     try:
         closing = False
         closed_ok = False
+        pending_shutdown = None
         while True:
             if cancelled:
                 break
@@ -342,6 +346,9 @@ def main():
                             raise ValueError("bootstrap required")
                         bootstrap = request
                         media = PeerMedia(bootstrap, emit)
+                        from .peer_control import PeerControl
+
+                        control = PeerControl(media, emit)
                         emit(
                             bootstrap,
                             "ready",
@@ -351,7 +358,19 @@ def main():
                         media.answer(request)
                     elif kind == "ice":
                         media.ice(request)
+                    elif kind == "probe":
+                        control.start(request)
+                    elif kind == "probe_heartbeat":
+                        control.heartbeat(request["body"])
+                        emit(request, "ack", {"state": "forwarded"})
+                    elif kind == "probe_cancel":
+                        control.cancel(request["body"]["request_id"])
+                        emit(request, "ack", {"state": "forwarded"})
                     elif kind == "shutdown":
+                        if control.running():
+                            control.cancel()
+                            pending_shutdown = request
+                            break
                         ok = media.close()
                         closed_ok = ok
                         emit(
@@ -365,7 +384,16 @@ def main():
                         raise ValueError("duplicate peer bootstrap")
                 if media is not None and not closing:
                     media.poll()
-                    if time.monotonic() - last_snapshot >= 0.5:
+                    control.poll()
+                    if pending_shutdown is not None and not control.running():
+                        closed_ok = media.close()
+                        emit(
+                            pending_shutdown,
+                            "closed",
+                            {"teardown": "null_observed" if closed_ok else "unknown"},
+                        )
+                        closing = True
+                    if not closing and time.monotonic() - last_snapshot >= 0.5:
                         emit(bootstrap, "snapshot", media.snapshot())
                         last_snapshot = time.monotonic()
                 elif time.monotonic() > startup:
@@ -380,7 +408,9 @@ def main():
             except (OSError, ValueError):
                 pass
     finally:
-        if media is not None:
+        if control is not None:
+            control.cancel()
+        if media is not None and not (control is not None and control.running()):
             try:
                 media.close()
             except Exception:  # noqa: BLE001 -- hard owner lease remains authoritative

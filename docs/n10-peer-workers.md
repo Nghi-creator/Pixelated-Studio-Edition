@@ -4,8 +4,9 @@
 boundary for one WebRTC answerer pipeline per child. It is import-safe and is
 connected to `camera.py` behind `PIXELATED_DEDICATED_PEER_WORKERS=1`. Normal
 engine startup does not activate it. Both `live_authority` and `mutation_available`
-remain false; the private protocol contains no cadence setter or live-probe
-request.
+remain false. Default transport exposes no probe dispatch; the separate
+[synthetic engineering controller](n10-engineering-dispatch.md) requires explicit
+local configuration and cannot be enabled for production capture.
 
 ## Ownership and lifetime
 
@@ -36,7 +37,9 @@ UTF-8 byte bounds, duplicate-key rejection, generation aliases, ordered command
 sequences, and request hashes bind responses to their requests. These hashes
 provide correlation, not authentication of an external sender.
 
-Commands are limited to bootstrap, one SDP offer, ICE candidates and shutdown.
+Default commands are bootstrap, one SDP offer, ICE candidates and shutdown.
+Private IPC v3 additionally supports closed engineering probe/receiver/cancel
+commands only with explicit synthetic configuration; it has no generic setter.
 A repeated identical offer reuses its existing request; a changed offer requires
 a fresh worker generation. Bootstrap accepts only the three existing encoder
 profiles, bounded FPS/bitrate, validated ICE data, and a fixed source selector.
@@ -150,5 +153,6 @@ Socket.IO/browser/desktop gameplay acceptance run.
 
 [Read-only local probe admission](n10-local-owner.md) binds process-local owner
 requests and declared receiver progress to native worker observations. It uses
-private IPC v2 connection-state snapshots and atomic parent observation sequences;
-it does not add controller dispatch or live mutation authority.
+private IPC v3 connection-state snapshots and atomic parent observation sequences.
+Its drafts remain read-only; engineering dispatch is separately gated and does
+not grant live mutation authority.

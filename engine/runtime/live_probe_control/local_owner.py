@@ -1,4 +1,4 @@
-"""Process-local, read-only admission. No dispatch, setters, sockets or authority."""
+"""Process-local admission and explicit synthetic engineering dispatch; no live authority."""
 
 import copy
 import os
@@ -11,6 +11,7 @@ from pathlib import Path
 from .contracts import SECOND, Generation, Policy, Request, alias, digest, integer
 from .journal import CadenceJournal
 from .peer_protocol import PROFILE_ENCODERS, event_body
+from .probe_transport import EngineeringControl, ProbeOperation
 
 NATIVE_FRESH_NS = 1500000000
 BROWSER_FRESH_NS = 750000000
@@ -99,6 +100,7 @@ class Binding:
         self.browser = deque(maxlen=8)
         self.last_counters = {}
         self.settings = None
+        self.operation = None
         cpu, quantizer = PROFILE_ENCODERS[profile["id"]]
         self.expected = (
             profile["fps"],
@@ -139,11 +141,20 @@ class Binding:
                     self.last_counters[key] = value
             settings = tuple(body[k] for k in SETTINGS)
             if all(v is not None for v in settings):
-                if settings != self.expected:
+                allowed = {self.expected[0]}
+                if self.operation is not None:
+                    allowed.add(self.operation.request.target_fps)
+                if settings[2:] != self.expected[2:] or any(
+                    v not in allowed for v in settings[:2]
+                ):
                     raise ValueError("unsupported native profile/caps")
-                if self.settings is not None and self.settings != settings:
-                    raise ValueError("native settings changed")
-                self.settings = settings
+                self.settings = self.expected
+                if (
+                    self.operation is not None
+                    and self.operation.done.is_set()
+                    and settings == self.expected
+                ):
+                    self.operation = None
             self.native.append((copy.deepcopy(body), received))
             self.native_sequence = sequence
         except (ValueError, TypeError, KeyError):
@@ -191,7 +202,13 @@ class Binding:
                 or body["connection_state"] != "connected"
                 or body["ice_connection_state"] not in ("connected", "completed")
                 or any(body[k] is None for k in (*SETTINGS, *COUNTERS))
-                or body["configured_fps"] != body["negotiated_fps"]
+                or (
+                    self.operation is None
+                    and (
+                        body["configured_fps"] != self.expected[0]
+                        or body["negotiated_fps"] != self.expected[1]
+                    )
+                )
             ):
                 return False
         if any(last[k] <= first[k] for k in ("capture_buffers", "encoded_buffers")):
@@ -231,7 +248,7 @@ class LocalProbeOwner:
         self.policy_hash = digest(asdict(policy))
         self.service, self.enabled, self.clock = service, enabled, clock
         self.capability = OwnerCapability()
-        self.bindings, self.drafts = {}, {}
+        self.bindings, self.drafts, self.operations = {}, {}, {}
         self.active = self.closed = False
         self.last_clock = None
         self.directory_identity = None
@@ -287,6 +304,8 @@ class LocalProbeOwner:
     def close(self):
         self.active = False
         self.closed = True
+        for _draft, operation in self.operations.values():
+            operation.cancelled.set()
         self.bindings.clear()
         self.drafts.clear()
 
@@ -365,7 +384,15 @@ class LocalProbeOwner:
 
     def report(self, receiver, sample):
         now = self._now()
-        self._binding(receiver, now).observe_browser(sample, now)
+        binding = self._binding(receiver, now)
+        try:
+            binding.observe_browser(sample, now)
+        except ValueError:
+            if binding.operation is not None:
+                binding.operation.cancelled.set()
+            raise
+        if binding.operation is not None and not binding.operation.done.is_set():
+            binding.operation.publish(sample, binding.ready(now), now)
 
     def inspect(self, receiver):
         now = self._now()
@@ -387,7 +414,7 @@ class LocalProbeOwner:
             raise ValueError("local owner capability required")
         now = self._now()
         binding = self._binding(receiver, now)
-        if not binding.ready(now):
+        if binding.operation is not None or not binding.ready(now):
             raise ValueError("receiver/native preconditions unavailable")
         request = Request(request_id, binding.generation, target_fps, duration_ns)
         prior_fps = binding.native[-1][0]["configured_fps"]
@@ -449,3 +476,45 @@ class LocalProbeOwner:
             raise ValueError("local request draft expired or binding changed")
         self._request_ledger(draft.request)
         return draft
+
+    def dispatch(self, capability, draft):
+        """Explicit local engineering call; production sources cannot dispatch."""
+        self._check(capability)
+        if capability is not self.capability or type(draft) is not RequestDraft:
+            raise ValueError("issued local owner request required")
+        row = self.drafts.get(draft.request.request_id)
+        if row is None or row[1] is not draft:
+            raise ValueError("issued local owner draft required")
+        prior = self.operations.get(draft.request.request_id)
+        if prior is not None:
+            if prior[0] is not draft:
+                raise ValueError("engineering request identity conflict")
+            return prior[1]
+        self.recheck(capability, draft)
+        config = getattr(self.service, "control", None)
+        if (
+            type(config) is not EngineeringControl
+            or self.service.source != "isolated_synthetic"
+            or config.directory != self.directory
+            or config.policy != self.policy
+            or (config.device, config.inode) != self.directory_identity
+        ):
+            raise ValueError("explicit synthetic engineering configuration required")
+        if any(not op.done.is_set() for _draft, op in self.operations.values()):
+            raise ValueError("owner/session engineering action already active")
+        binding = self._binding(row[0], self._now())
+        sample, observed_ns = binding.browser[-1]
+        operation = ProbeOperation(draft, sample, observed_ns)
+        self.service.submit_probe(binding.peer_id, operation)
+        binding.operation = operation
+        self.operations[draft.request.request_id] = (draft, operation)
+        return operation
+
+    def cancel(self, capability, operation):
+        self._check(capability)
+        if capability is not self.capability or not any(
+            op is operation for _draft, op in self.operations.values()
+        ):
+            raise ValueError("issued engineering operation required")
+        if not operation.done.is_set():
+            operation.cancelled.set()

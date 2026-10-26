@@ -10,6 +10,7 @@ from dataclasses import dataclass, field
 from .contracts import SECOND, Generation
 from .peer_protocol import command
 from .peer_supervisor import PeerSupervisor
+from .probe_transport import EngineeringControl, ProbeOperation
 
 
 def workers_enabled(environment):
@@ -40,6 +41,7 @@ class Slot:
     failure: str | None = None
     reported: bool = False
     cleanup_ok: bool = False
+    operation: object = None
 
 
 class CameraWorkers:
@@ -50,7 +52,14 @@ class CameraWorkers:
     """
 
     def __init__(
-        self, profile, raw_ice, maximum, *, source="production", factory=PeerSupervisor
+        self,
+        profile,
+        raw_ice,
+        maximum,
+        *,
+        source="production",
+        factory=PeerSupervisor,
+        control=None,
     ):
         if type(maximum) is not int or not 1 <= maximum <= 16:
             raise ValueError("invalid dedicated peer capacity")
@@ -66,6 +75,13 @@ class CameraWorkers:
                 "source": source,
             },
         )
+        if control is not None and (
+            type(control) is not EngineeringControl or source != "isolated_synthetic"
+        ):
+            raise ValueError(
+                "controller dispatch requires explicit synthetic engineering workers"
+            )
+        self.control = control
         self.source, self.factory, self.maximum = source, factory, maximum
         self.active = {}
         self.retired = []
@@ -126,6 +142,22 @@ class CameraWorkers:
             slot.stop.set()
             raise ValueError("dedicated candidate queue full") from None
 
+    def submit_probe(self, peer_id, operation):
+        slot = self.active.get(peer_id)
+        if (
+            self.control is None
+            or self.closed
+            or type(operation) is not ProbeOperation
+            or slot is None
+            or slot.token != operation.token
+            or slot.stop.is_set()
+            or slot.done.is_set()
+            or slot.owner.generation != operation.request.generation
+            or (slot.operation is not None and not slot.operation.done.is_set())
+        ):
+            raise ValueError("exact engineering probe slot unavailable")
+        slot.operation = operation
+
     def retire(self, peer_id):
         slot = self.active.pop(peer_id, None)
         if slot is not None:
@@ -164,10 +196,17 @@ class CameraWorkers:
             owner = slot.owner = self.factory(enabled=True)
             with owner:
                 owner.start(
-                    self.profile, ice_servers=self.ice_servers, source=self.source
+                    self.profile,
+                    ice_servers=self.ice_servers,
+                    source=self.source,
+                    **({"control": self.control} if self.control is not None else {}),
                 )
                 offered = False
                 closing_at = None
+                operation = None
+                last_receiver_sequence = None
+                last_receiver_sent_ns = 0
+                cancel_sent = False
                 while True:
                     now = time.monotonic_ns()
                     if now < slot.seen_ns or now - slot.seen_ns > 3 * SECOND:
@@ -176,11 +215,45 @@ class CameraWorkers:
                     if slot.stop.is_set() and closing_at is None:
                         if owner.state in ("starting", "ready", "answering", "playing"):
                             owner.shutdown()
-                        closing_at = now + 2500000000
+                        closing_at = now + (
+                            4500000000 if self.control is not None else 2500000000
+                        )
                     if closing_at is None:
                         if owner.state == "ready" and not offered:
                             owner.offer(slot.sdp)
                             offered = True
+                        if (
+                            slot.operation is not None
+                            and slot.operation is not operation
+                        ):
+                            operation = slot.operation
+                            cancel_sent = False
+                            if (
+                                now > operation.expires_ns
+                                or operation.cancelled.is_set()
+                            ):
+                                operation.status = "rejected"
+                                operation.done.set()
+                            else:
+                                receiver = operation.lease()
+                                owner.probe(dict(operation.body, receiver=receiver))
+                                last_receiver_sequence = receiver["sequence"]
+                                last_receiver_sent_ns = now
+                                operation.status = "running"
+                        if operation is not None and not operation.done.is_set():
+                            if operation.cancelled.is_set() and not cancel_sent:
+                                owner.probe_cancel(operation.request.request_id)
+                                cancel_sent = True
+                            receiver = operation.lease()
+                            if (
+                                receiver["sequence"] != last_receiver_sequence
+                                and now - last_receiver_sent_ns >= 150000000
+                            ):
+                                owner.probe_heartbeat(
+                                    operation.request.request_id, receiver
+                                )
+                                last_receiver_sequence = receiver["sequence"]
+                                last_receiver_sent_ns = now
                         # Limit outstanding requests and return to supervisor polling.
                         for _ in range(8):
                             if len(owner.pending) >= 24:
@@ -191,6 +264,10 @@ class CameraWorkers:
                                 break
                             owner.ice(body["index"], body["candidate"])
                     for message in owner.poll():
+                        if message["kind"] == "probe_result":
+                            if operation is None:
+                                raise ValueError("unbound engineering result")
+                            operation.finish(message["body"])
                         if (
                             message["kind"] in ("answer", "ice", "snapshot")
                             and not slot.stop.is_set()
@@ -208,6 +285,8 @@ class CameraWorkers:
         except Exception:  # noqa: BLE001 -- fixed status only, cleanup is owned below
             slot.failure = "worker_failed"
         finally:
+            if slot.operation is not None:
+                slot.operation.lost()
             try:
                 slot.cleanup_ok = owner is None or owner.close()
             except Exception:  # noqa: BLE001 -- retain slot/capacity when cleanup fails
