@@ -3,6 +3,7 @@ export function nativeBrowserHtml(token) {
   return `<!doctype html><video id="video" autoplay muted playsinline></video>
 <script src="/socket.io/socket.io.js"></script><script type="module">
 import {startReceiverObservation,offerDigest} from '/collector.js';
+import {collectBrowserQuality} from '/quality.js';
 import {bindWebRTCEngineErrors} from '/engine-errors.js';
 const socket=io({auth:{token:${JSON.stringify(token)}},transports:['websocket'],reconnection:false});
 const initial=new URLSearchParams(location.search).get('peer');
@@ -33,6 +34,7 @@ socket.on('webrtc-receiver-bind',async challenge=>{try{const scope=active;if(!sc
 socket.on('webrtc-receiver-unbind',message=>{if(active&&message.peerId===active.peerId&&message.bindingId===active.bindingId){active.stop();window.unbound++;}});
 socket.on('disconnect',()=>{if(active)active.stop();});
 window.snapshot=()=>({problem:window.problem,failures:window.failures,counts:window.counts,bindings:window.bindings,unbound:window.unbound,state:active?.pc.connectionState});
+window.collectQuality=()=>collectBrowserQuality(active.pc,video);
 window.stopObservations=()=>{if(active)active.stop();return video.getVideoPlaybackQuality().totalVideoFrames;};
 window.videoFrames=()=>video.getVideoPlaybackQuality().totalVideoFrames;
 window.cleanup=()=>{stop();socket.disconnect();};

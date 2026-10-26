@@ -133,5 +133,7 @@ Playwright browser cache; it does not download a browser.
 The [browser/native acceptance runner](n10-browser-native-acceptance.md) joins
 the actual camera, relay, browser collector and local owner in one contained
 session, including synthetic action completion and receiver-loss teardown.
-Desktop acceptance, disturbance/quality bounds and production qualification
-remain separate requirements. N10 stays open.
+The [read-only observer disturbance screen](n10-observer-disturbance.md) provides
+fixed matched off/on temporal and resource checks. Desktop acceptance, control
+action disturbance, perceptual quality and production qualification remain
+separate requirements. N10 stays open.

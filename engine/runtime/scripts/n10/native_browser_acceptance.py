@@ -21,10 +21,12 @@ def main():
     if sys.argv[1:] != ["--isolated-browser-acceptance"] or os.environ.get("N10_BROWSER_ACCEPTANCE") != "1":
         raise ValueError("explicit disposable acceptance opt-in required")
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss"):
+    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on"):
         raise ValueError("closed acceptance mode required")
+    screen_mode = mode in ("observer-off", "observer-on")
     import gi
     import socketio
+    from observer_native_screen import NativeScreen
 
     gi.require_version("GLib", "2.0")
     from gi.repository import GLib
@@ -61,7 +63,7 @@ def main():
         cleanup.enter_context(patch.dict(os.environ, {
             "PULSE_SERVER": "127.0.0.1", "XDG_RUNTIME_DIR": directory,
             "XDG_CONFIG_HOME": directory + "/config", "PIXELATED_DEDICATED_PEER_WORKERS": "1",
-            "PIXELATED_RECEIVER_OBSERVATIONS": "1", "PIXELATED_MAX_STREAM_PEERS": "3",
+            "PIXELATED_RECEIVER_OBSERVATIONS": "0" if mode == "observer-off" else "1", "PIXELATED_MAX_STREAM_PEERS": "3",
             "PIXELATED_SESSION_ID": "native_acceptance", "PIXELATED_STREAM_PROFILE": '{"id":"balanced","fps":30,"bitrate_kbps":1500}',
             "PIXELATED_CAMERA_PEER_STATE_PATH": directory + "/peers.json",
             "PIXELATED_CAMERA_TELEMETRY_STATE_PATH": directory + "/telemetry.json",
@@ -86,7 +88,7 @@ def main():
         original_connect = socketio.Client.connect
 
         def workers_init(instance, *args, **kwargs):
-            if mode != "production-admission":
+            if mode.startswith("engineering-"):
                 kwargs.update(source="isolated_synthetic", control=EngineeringControl.open(ledger, policy))
             original_workers(instance, *args, **kwargs)
             captured["workers"] = instance
@@ -108,14 +110,47 @@ def main():
                 if time.monotonic() - origin > 26:
                     raise ValueError("integrated acceptance deadline: " + state["phase"])
                 service, bridge = captured.get("workers"), captured.get("bridge")
-                if service is None or bridge is None:
+                if service is None or (bridge is None and mode != "observer-off"):
                     return True
-                if "local" not in state:
-                    state["local"] = cleanup.enter_context(LocalProbeOwner(service, ledger, policy, enabled=True))
-                    state["capability"] = state["local"].claim()
-                    state["phase"] = "admission"
+                if state["phase"] == "startup":
+                    if mode != "observer-off":
+                        state["local"] = cleanup.enter_context(LocalProbeOwner(service, ledger, policy, enabled=True))
+                        state["capability"] = state["local"].claim()
+                    state["phase"] = "observer-warmup" if screen_mode else "admission"
                     emit("camera_ready", mode=mode, source=service.source)
-                local, capability = state["local"], state["capability"]
+                local, capability = state.get("local"), state.get("capability")
+                if state["phase"] == "observer-warmup":
+                    slots = [service.active.get(peer_id) for peer_id in ("first", "second")]
+                    if any(slot is None or slot.owner is None or slot.owner.last_snapshot is None for slot in slots):
+                        return True
+                    if any(slot.owner.last_snapshot["connection_state"] != "connected" or not slot.owner.last_snapshot["encoded_buffers"] for slot in slots):
+                        return True
+                    if mode == "observer-on":
+                        for peer_id, slot in zip(("first", "second"), slots, strict=True):
+                            record = bridge.records.get(peer_id)
+                            if record is None or not record.receiver_socket_id:
+                                return True
+                            if peer_id not in state["scopes"]:
+                                state["scopes"][peer_id] = bridge.attach(local, capability, peer_id, slot.token)
+                    state.setdefault("warmup_start", time.monotonic_ns())
+                    if time.monotonic_ns() - state["warmup_start"] < 3 * 10**9:
+                        return True
+                    if mode == "observer-on" and any(local.inspect(scope)["status"] != "ready_for_dry_run" for scope in state["scopes"].values()):
+                        raise ValueError("observer local admission unavailable after fixed warmup")
+                    state["screen"] = NativeScreen(service, scene)
+                    state["phase"] = "observer-measuring"
+                    emit("screen_started")
+                if state["phase"] == "observer-measuring":
+                    if not state["screen"].sample():
+                        return True
+                    if (Path(ledger) / "journal.json").exists():
+                        raise ValueError("read-only screen created action journal")
+                    emit("screen_native", **state["screen"].report())
+                    state["slots"] = list(service.active.values())
+                    state["phase"] = "disconnected"
+                    state["disconnect_thread"] = threading.Thread(target=captured["client"].disconnect, daemon=True)
+                    state["disconnect_thread"].start()
+                    return True
                 required = ("first", "second") if state["phase"] == "admission" else ("replacement", "second")
                 if state["phase"] in ("admission", "replacement"):
                     for peer_id in required:
@@ -222,7 +257,7 @@ def main():
                              "state": slot.owner.state, "reason": slot.owner.reason, "exit": slot.owner.exit_code,
                              "reply": slot.owner.closed_reply} for slot in state["slots"]
                         ]))
-                    if not state["old"].done.is_set() or not state["old"].cleanup_ok:
+                    if not screen_mode and (not state["old"].done.is_set() or not state["old"].cleanup_ok):
                         raise ValueError("failed worker not reaped")
                     state["phase"] = "complete"
                     emit("complete", live_authority=False, worker_cleanup=True, game_alive=scene.game.poll() is None)

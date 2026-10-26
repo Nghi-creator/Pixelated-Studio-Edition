@@ -87,6 +87,10 @@ not replace network signaling, native pipelines, browser counters or readiness
 checks. Engineering configuration is injected only inside this explicit test
 host; no controller or failure-injection endpoint is exposed to a browser.
 
+The separate [observer disturbance screen](n10-observer-disturbance.md) compares
+read-only observer/admission cost and temporal playback with a fixed off/on cohort.
+It retains separate CPU scopes and does not qualify a control action.
+
 This verifies integrated admission, action lifecycle, failure isolation,
 replacement, durable blocking and teardown. Browser counters remain declared
 observations, and `live_authority` stays false. It does not establish perceptual

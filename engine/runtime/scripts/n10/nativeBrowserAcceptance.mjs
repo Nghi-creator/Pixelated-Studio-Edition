@@ -1,7 +1,7 @@
 /** Opt-in real browser -> authenticated relay -> actual Python camera/native owner acceptance. */
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -9,6 +9,7 @@ import readline from "node:readline";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
+import { processCpuSample } from "./gameBrowserTrial.mjs";
 import { nativeBrowserHtml } from "./nativeBrowserPage.mjs";
 
 const require = createRequire(import.meta.url);
@@ -17,7 +18,8 @@ const runtime = fileURLToPath(new URL("../../", import.meta.url));
 
 export async function runNativeBrowserAcceptance(image, mode = "production-admission") {
   if (!/^sha256:[a-f0-9]{64}$/.test(image || "")) throw new Error("explicit cached image digest required");
-  if (!["production-admission", "engineering-complete", "engineering-receiver-loss"].includes(mode)) throw new Error("invalid acceptance mode");
+  if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on"].includes(mode)) throw new Error("invalid acceptance mode");
+  const screenMode = mode.startsWith("observer-");
   const docker = process.platform === "darwin" ? "/Applications/Docker.app/Contents/Resources/bin/docker" : "docker";
   const name = `n10-browser-native-${process.pid}-${Date.now()}`;
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "n10-browser-native-"));
@@ -37,6 +39,20 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     return result.stdout.trim();
   };
   try {
+    const hash = createHash("sha256");
+    for (const folder of [".", "live_probe_control", "scripts/n10"]) {
+      for (const file of (await fs.readdir(path.join(runtime, folder))).sort()) {
+        if (!/\.(py|mjs|cjs)$/.test(file)) continue;
+        hash.update(JSON.stringify([folder + "/" + file, createHash("sha256").update(await fs.readFile(path.join(runtime, folder, file))).digest("hex")]));
+      }
+    }
+    for (const relative of (await fs.readdir(path.join(runtime, "dist/src"), { recursive: true })).filter((name) => name.endsWith(".js")).sort()) {
+      hash.update(JSON.stringify(["dist/src/" + relative, createHash("sha256").update(await fs.readFile(path.join(runtime, "dist/src", relative))).digest("hex")]));
+    }
+    for (const relative of ["telemetry/receiverObservation.ts", "transport/webrtcEngineErrors.ts"]) {
+      hash.update(await fs.readFile(new URL(`../../../../apps/web/src/lib/webrtc/${relative}`, import.meta.url)));
+    }
+    const softwareHash = hash.digest("hex");
     await fs.writeFile(path.join(directory, "index.html"), nativeBrowserHtml(token));
     for (const [name, relative] of [["collector.js", "telemetry/receiverObservation.ts"], ["engine-errors.js", "transport/webrtcEngineErrors.ts"]]) {
       const source = await fs.readFile(new URL(`../../../../apps/web/src/lib/webrtc/${relative}`, import.meta.url), "utf8");
@@ -44,10 +60,11 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
         compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
       }).outputText);
     }
+    await fs.copyFile(new URL("./browserQualityScreen.mjs", import.meta.url), path.join(directory, "quality.js"));
     // Readable by the image's unprivileged UID on native Linux bind mounts too.
     // These assets contain only this disposable test's ephemeral pairing token.
     await fs.chmod(directory, 0o755);
-    for (const asset of ["index.html", "collector.js", "engine-errors.js"]) await fs.chmod(path.join(directory, asset), 0o644);
+    for (const asset of ["index.html", "collector.js", "engine-errors.js", "quality.js"]) await fs.chmod(path.join(directory, asset), 0o644);
     const args = ["run", "--rm", "--init", "--name", name, "--pull", "never", "--read-only", "--cap-drop", "ALL",
       "--security-opt", "no-new-privileges", "--cpus", "2", "--memory", "768m", "--pids-limit", "256",
       "--network", "bridge", "--publish", "127.0.0.1::8080", "--tmpfs", "/tmp:rw,nosuid,nodev,noexec,size=96m",
@@ -98,10 +115,21 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     const pageErrors = [];
     for (const page of [first, second]) page.on("pageerror", (error) => pageErrors.push(error.message));
     await Promise.all([first.goto(url + "/?peer=first"), second.goto(url + "/?peer=second")]);
+    let quality = null, browserResources = null;
     await Promise.race([
       (async () => {
         let stopped = false;
+        let measured = false;
         await deadline(async () => {
+          if (screenMode && !measured && events.some((event) => event.kind === "screen_started")) {
+            measured = true;
+            const session = await browser.newBrowserCDPSession();
+            const before = processCpuSample((await session.send("SystemInfo.getProcessInfo")).processInfo, Number(process.hrtime.bigint()));
+            quality = await Promise.all([first, second].map((page) => page.evaluate(() => globalThis.collectQuality())));
+            const after = processCpuSample((await session.send("SystemInfo.getProcessInfo")).processInfo, Number(process.hrtime.bigint()));
+            browserResources = { basis: "host_hrtime_browser_owned_process_cpu_separate_clock", before, after };
+            await session.detach();
+          }
           if (!stopped && events.some((event) => event.kind === "stop_first_observations")) {
             stopped = true;
             const before = await first.evaluate(() => globalThis.stopObservations());
@@ -114,11 +142,17 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       })(),
       new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("outer acceptance deadline")), 36000); }),
     ]);
-    await Promise.all([first, second].map((page) => page.waitForFunction(() => globalThis.unbound >= 1, undefined, { timeout: 2000 })));
+    if (mode !== "observer-off") await Promise.all([first, second].map((page) => page.waitForFunction(() => globalThis.unbound >= 1, undefined, { timeout: 2000 })));
     const snapshots = await Promise.all([first, second].map((page) => page.evaluate(() => globalThis.snapshot())));
     assert.deepEqual(pageErrors, []);
     assert.equal(snapshots[0].problem, null);
     assert.equal(snapshots[1].problem, null);
+    if (screenMode) {
+      assert.ok(quality && browserResources, "read-only screen was measured");
+      assert.ok(snapshots.every((snapshot) => snapshot.failures.length === 0));
+      if (mode === "observer-off") assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === 0 && Object.keys(snapshot.counts).length === 0 && snapshot.unbound === 0));
+      else assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === 1 && snapshot.unbound === 1));
+    } else {
     assert.equal(snapshots[0].failures.length, 1);
     assert.equal(snapshots[0].failures[0].peerId, "first");
     assert.deepEqual(snapshots[1].failures, []);
@@ -126,6 +160,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     assert.ok(snapshots[1].counts.second.framesDecoded > 0);
     assert.equal(new Set(snapshots[0].bindings).size, 2);
     assert.ok(snapshots.every((snapshot) => snapshot.unbound >= 1));
+    }
     const counters = snapshots.map((snapshot) => Object.values(snapshot.counts).map((item) => item.sequence));
     await first.waitForTimeout(450);
     const after = await Promise.all([first, second].map((page) => page.evaluate(() => globalThis.snapshot())));
@@ -134,7 +169,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     await reading;
     if (processFailure) throw processFailure;
     assert.equal(await exited, 0);
-    return { status: "passed", mode, live_authority: false, events, browser: browser.version(),
+    return { status: "passed", mode, live_authority: false, context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}), browser: browser.version(),
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound })) };
   } catch (error) {
     const diagnostics = await Promise.allSettled(pages.map((page) => page.evaluate(() => globalThis.snapshot?.())));
