@@ -66,8 +66,9 @@ The worker builds fixed VP8 video and Opus audio branches. `production` selects
 `:99` X capture and `auto_null.monitor`; `isolated_synthetic` selects a ball test
 source and silent audio. The peer-isolation test uses synthetic media; the
 camera adapter test uses private x99 capture and a PulseAudio null-sink monitor.
-Browser signaling/lifecycle, child trace integration and trusted local probe
-binding remain separate integration work.
+Scoped browser observations and local engineering dispatch are documented
+separately. Integrated browser/native lifecycle acceptance, child trace exports
+and production qualification remain open.
 
 Run protocol/supervisor tests without Gst from the repository root:
 
@@ -156,3 +157,7 @@ requests and declared receiver progress to native worker observations. It uses
 private IPC v3 connection-state snapshots and atomic parent observation sequences.
 Its drafts remain read-only; engineering dispatch is separately gated and does
 not grant live mutation authority.
+
+[Scoped browser receiver observations](n10-browser-observations.md) describes
+the default-off authenticated relay/collector and local owner attachment. It
+keeps browser data declared and does not enable production probe dispatch.

@@ -45,6 +45,7 @@ class LifecycleTests(unittest.TestCase):
 
         namespace = {
             "campaign_service": None,
+            "RECEIVERS": None,
             "WORKERS": None,
             "peers": peers,
             "os": types.SimpleNamespace(environ={}),

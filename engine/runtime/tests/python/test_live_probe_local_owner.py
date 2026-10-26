@@ -220,6 +220,24 @@ class LocalOwnerTests(unittest.TestCase):
             self.scope.inspect(self.receiver)["status"], "insufficient_or_stale"
         )
 
+    def test_worker_publication_during_api_call_is_fenced_after_atomic_read(self):
+        self.ready()
+        fixture = self
+
+        class ConcurrentOwner:
+            generation = GEN
+            state = "playing"
+
+            @property
+            def last_observation(self):
+                fixture.now += 1
+                return native(100, 30), fixture.now, 3
+
+        self.slot.owner = ConcurrentOwner()
+        self.assertEqual(
+            self.scope.inspect(self.receiver)["status"], "ready_for_dry_run"
+        )
+
     def test_future_receipt_and_reversed_native_time_invalidate(self):
         self.slot.owner.last_observation = (native(), self.now + 1, 1)
         with self.assertRaises(ValueError):

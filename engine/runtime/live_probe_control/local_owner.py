@@ -379,24 +379,35 @@ class LocalProbeOwner:
         observation = binding.slot.owner.last_observation
         if observation is not None:
             body, received, sequence = observation
-            binding.observe_native(body, received, sequence, now)
+            # The worker can publish between the API-entry clock read and this
+            # atomic tuple read. Fence it with a clock read AFTER capturing it.
+            binding.observe_native(body, received, sequence, self._now())
         return binding
 
     def report(self, receiver, sample):
+        self.report_at(receiver, sample, self._now())
+
+    def report_at(self, receiver, sample, received_ns):
+        """Trusted host adapter stamps receipt before main-loop queueing, never caller JSON."""
         now = self._now()
+        integer(received_ns, 0, now)
+        if now - received_ns > BROWSER_FRESH_NS:
+            raise ValueError("queued receiver observation stale")
         binding = self._binding(receiver, now)
+        now = self._now()
         try:
-            binding.observe_browser(sample, now)
+            binding.observe_browser(sample, received_ns)
         except ValueError:
             if binding.operation is not None:
                 binding.operation.cancelled.set()
             raise
         if binding.operation is not None and not binding.operation.done.is_set():
-            binding.operation.publish(sample, binding.ready(now), now)
+            binding.operation.publish(sample, binding.ready(now), received_ns)
 
     def inspect(self, receiver):
         now = self._now()
         binding = self._binding(receiver, now)
+        now = self._now()
         return {
             "status": "ready_for_dry_run"
             if binding.ready(now)
@@ -414,6 +425,7 @@ class LocalProbeOwner:
             raise ValueError("local owner capability required")
         now = self._now()
         binding = self._binding(receiver, now)
+        now = self._now()
         if binding.operation is not None or not binding.ready(now):
             raise ValueError("receiver/native preconditions unavailable")
         request = Request(request_id, binding.generation, target_fps, duration_ns)
@@ -464,6 +476,7 @@ class LocalProbeOwner:
             raise ValueError("foreign local request draft")
         now = self._now()
         binding = self._binding(row[0], now)
+        now = self._now()
         if (
             now > draft.expires_ns
             or not binding.ready(now)
@@ -518,3 +531,17 @@ class LocalProbeOwner:
             raise ValueError("issued engineering operation required")
         if not operation.done.is_set():
             operation.cancelled.set()
+
+    def unbind(self, capability, receiver):
+        self._check(capability)
+        if (
+            capability is not self.capability
+            or type(receiver) is not ReceiverCapability
+        ):
+            raise ValueError("issued owner/receiver capability required")
+        binding = self.bindings.pop(receiver, None)
+        if binding is None:
+            raise ValueError("receiver binding unavailable")
+        binding.invalid = True
+        if binding.operation is not None:
+            binding.operation.cancelled.set()

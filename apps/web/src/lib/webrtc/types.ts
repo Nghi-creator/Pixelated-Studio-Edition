@@ -46,6 +46,7 @@ export type WebRTCResearchEventName =
   | "stream_playing";
 
 export type UseWebRTCOptions = {
+  videoElementRef?: { current: HTMLVideoElement | null };
   displayName?: string;
   mode?: WebRTCMode;
   onResearchEvent?: (

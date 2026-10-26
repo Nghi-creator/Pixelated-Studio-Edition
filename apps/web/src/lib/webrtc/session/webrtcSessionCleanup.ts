@@ -8,6 +8,9 @@ import type {
 import { beginWebRTCSessionDisposal } from "./webrtcSessionDisposal";
 
 const SOCKET_EVENTS = [
+  "webrtc-receiver-bind",
+  "webrtc-receiver-unbind",
+  "disconnect",
   "webrtc-answer",
   "webrtc-ice-candidate-backend",
   "connect",
@@ -31,6 +34,8 @@ export function cleanupWebRTCSession({
   const preserveActiveSession =
     config.seamlessRestart || params.seamlessRestartRef.current;
   runtime.stopTelemetry();
+  runtime.stopReceiverObservation?.();
+  runtime.receiverObservationGeneration = (runtime.receiverObservationGeneration || 0) + 1;
   runtime.detachEngineInput();
   if (runtime.disconnectedTimeoutId !== null) {
     window.clearTimeout(runtime.disconnectedTimeoutId);

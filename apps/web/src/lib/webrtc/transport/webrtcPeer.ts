@@ -44,6 +44,7 @@ export const createAndSendOffer = async (
   socket: Socket,
   sessionId: string,
   peerId: string,
+  onOffer?: (sdp: string) => void,
 ) => {
   if (peerConnection.signalingState !== "stable") {
     throw new Error(
@@ -62,6 +63,7 @@ export const createAndSendOffer = async (
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
 
+  onOffer?.(offer.sdp || "");
   socket.emit("webrtc-offer", {
     sessionId,
     peerId,

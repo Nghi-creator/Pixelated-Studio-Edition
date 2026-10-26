@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from camera_protocol import normalize_ice_candidate, normalize_peer_id, validate_offer
 from camera_state import write_encoder_telemetry
 from live_probe_control.camera_workers import CameraWorkers, Slot, workers_enabled
+from live_probe_control.receiver_bridge import valid_bound, valid_report
 
 PROFILE = {"id": "balanced", "fps": 30, "bitrate_kbps": 1500}
 
@@ -196,6 +197,8 @@ class CameraCallbacks(unittest.TestCase):
             "publish_encoder_telemetry",
             "on_ice",
             "on_offer",
+            "on_receiver_bound",
+            "on_receiver_observation",
             "on_peer_disconnect",
             "disconnect",
         }
@@ -215,6 +218,10 @@ class CameraCallbacks(unittest.TestCase):
             poll=lambda: self.events,
         )
         ns = {
+            "RECEIVERS": None,
+            "valid_bound": valid_bound,
+            "valid_report": valid_report,
+            "time": SimpleNamespace(monotonic_ns=lambda: 123),
             "WORKERS": workers,
             "SIGNALING_EPOCH": object(),
             "SIGNALING_CONNECTED": True,
@@ -256,6 +263,49 @@ class CameraCallbacks(unittest.TestCase):
         self.assertEqual(len(self.sent), 1)
         self.assertEqual(self.sent[0][1]["sdp"], "answer")
         self.assertEqual(ns["peers"]["peer"]["worker_snapshot_received_ns"], 3)
+
+    def test_observation_callback_keeps_original_receipt_and_rejects_retired_peer(self):
+        ns = self.namespace()
+        reports = []
+        ns["RECEIVERS"] = SimpleNamespace(
+            accept=lambda payload, stamp: reports.append((payload, stamp))
+        )
+        ns["peers"]["peer"] = {"worker_token": "token"}
+        report = {
+            "peerId": "peer",
+            "bindingId": "a" * 64,
+            "offerHash": "b" * 64,
+            "receiverSocketId": "receiver",
+            "clockId": "clock",
+            "sequence": 0,
+            "elapsedNs": 0,
+            "framesDecoded": 1,
+            "presentedFrames": 1,
+        }
+        ns["on_receiver_observation"](report)
+        ns["time"].monotonic_ns = lambda: 999
+        self.pending.pop()()
+        self.assertEqual(reports, [(report, 123)])
+        ns["on_receiver_observation"](report)
+        ns["peers"]["peer"] = {"worker_token": "replacement"}
+        self.pending.pop()()
+        self.assertEqual(len(reports), 1)
+
+    def test_observation_ack_queued_before_signaling_replacement_is_discarded(self):
+        ns = self.namespace()
+        acknowledgements = []
+        ns["RECEIVERS"] = SimpleNamespace(bound=acknowledgements.append)
+        ns["on_receiver_bound"](
+            {
+                "peerId": "peer",
+                "bindingId": "a" * 64,
+                "offerHash": "b" * 64,
+                "receiverSocketId": "receiver",
+            }
+        )
+        ns["SIGNALING_EPOCH"] = object()
+        self.pending.pop()()
+        self.assertEqual(acknowledgements, [])
 
     def test_old_connection_cannot_emit_answer_after_reconnect(self):
         ns = self.namespace()

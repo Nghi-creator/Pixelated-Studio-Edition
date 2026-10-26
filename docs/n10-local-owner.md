@@ -26,9 +26,9 @@ Receiver capabilities permit declared observations and read-only inspection.
 They cannot prepare requests. Only the issuing scope's owner capability can call
 `prepare` or `recheck`. These object identities distinguish trusted local calls
 from observation input; they are not an operating-system sandbox against code
-already trusted inside the host process. The future browser collector must bind
-authenticated signaling/session identity to the issued receiver handle; remote
-messages must never obtain or select an owner capability.
+already trusted inside the host process. The optional browser observation bridge binds authenticated signaling/session
+identity to an issued receiver handle; remote messages never obtain or select an
+owner capability. Its data remains declared rather than authenticated playback.
 
 The host chooses the owner/session ledger directory once. Peer IDs, request IDs,
 receiver handles and worker replacements never derive a different path. Reads
@@ -105,8 +105,8 @@ fresh proof, hashes, expiry and existing ledger again. It remains read-only.
 There is no direct `execute()` method on a draft. Explicit synthetic engineering
 dispatch, action-time receiver refresh/cancellation, controlled-setting transitions
 and failure drills are described in [engineering dispatch](n10-engineering-dispatch.md).
-Authenticated browser binding, browser/desktop acceptance and production
-qualification remain open.
+Integrated browser-to-native/desktop acceptance and production qualification
+remain open.
 
 Run the software checks from the repository root:
 
@@ -121,3 +121,7 @@ receiver observations come from a Gst test receiver, not a browser. It verifies
 that disconnect invalidates the old draft and reconnect uses a new receiver
 handle with the same ledger directory. See the [peer-worker procedure](n10-peer-workers.md)
 for native prerequisites and isolation bounds.
+
+[Scoped browser receiver observations](n10-browser-observations.md) describes
+the default-off authenticated relay/collector and local owner attachment. It
+keeps browser data declared and does not enable production probe dispatch.

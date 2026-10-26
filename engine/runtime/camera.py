@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 
 import gi
 import socketio
@@ -10,6 +11,7 @@ from camera_config import (
     parse_stream_profile,
 )
 from live_probe_control.camera_workers import CameraWorkers, workers_enabled
+from live_probe_control.receiver_bridge import BrowserReceiverBridge, observation_enabled, valid_bound, valid_report
 
 from camera_protocol import normalize_ice_candidate, normalize_peer_id, validate_offer
 from camera_state import write_encoder_telemetry, write_peer_state
@@ -68,6 +70,8 @@ WORKERS = (
     if workers_enabled(os.environ) else None
 )
 
+RECEIVERS = BrowserReceiverBridge(WORKERS) if observation_enabled(os.environ, WORKERS) else None
+
 
 def poll_camera_workers():
     updated = False
@@ -87,6 +91,8 @@ def poll_camera_workers():
                     'sessionId': SESSION_ID, 'peerId': peer_id,
                     'type': 'answer', 'sdp': body['sdp'],
                 })
+                if RECEIVERS is not None:
+                    sio.emit('webrtc-receiver-bind', RECEIVERS.open(peer_id))
             elif kind == 'ice':
                 sio.emit('webrtc-ice-candidate-backend', {
                     'sessionId': SESSION_ID, 'peerId': peer_id,
@@ -124,6 +130,8 @@ def cleanup_peer(peer_id, reason="shutdown"):
     if not peer:
         return
 
+    if RECEIVERS is not None:
+        RECEIVERS.retire(peer_id)
     if peer.get('worker_token') is not None:
         WORKERS.retire(peer_id)  # Never wait for process teardown on GLib.
     stage_trace = peer.get('stage_trace')
@@ -317,6 +325,29 @@ def handle_offer(offer):
     offer_sdp = GstWebRTC.WebRTCSessionDescription.new(GstWebRTC.WebRTCSDPType.OFFER, sdp_msg)
     promise = Gst.Promise.new_with_change_func(on_offer_set, None, None)
     webrtcbin.emit('set-remote-description', offer_sdp, promise)
+
+@sio.on('webrtc-receiver-bound')
+def on_receiver_bound(payload):
+    if RECEIVERS is None or not valid_bound(payload):
+        return
+    epoch, peer = SIGNALING_EPOCH, peers.get(payload['peerId'])
+    def accept_bound():
+        if SIGNALING_CONNECTED and epoch is SIGNALING_EPOCH and peers.get(payload['peerId']) is peer:
+            RECEIVERS.bound(payload)
+    GLib.idle_add(accept_bound)
+
+
+@sio.on('webrtc-receiver-observation')
+def on_receiver_observation(payload):
+    received_ns = time.monotonic_ns()
+    if RECEIVERS is None or not valid_report(payload):
+        return
+    epoch, peer = SIGNALING_EPOCH, peers.get(payload['peerId'])
+    def accept_report():
+        if SIGNALING_CONNECTED and epoch is SIGNALING_EPOCH and peers.get(payload['peerId']) is peer:
+            RECEIVERS.accept(payload, received_ns)
+    GLib.idle_add(accept_report)
+
 
 @sio.event
 def connect():

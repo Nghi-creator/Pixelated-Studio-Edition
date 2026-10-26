@@ -140,7 +140,9 @@ Software fault tests also cover partial native setter changes, foreign cadence,
 unknown results after watchdog disarm, and intent persisted before its in-memory
 copy updates.
 
-Production activation still requires authenticated browser observation binding,
-action-time browser/desktop acceptance, supported quality/disturbance bounds and
-qualification through the actual production path. This engineering option does
+The [scoped browser observation relay](n10-browser-observations.md) now supplies
+authenticated connection identity while retaining declared-counter semantics.
+Production activation still requires integrated browser/native-worker and desktop
+acceptance, supported quality/disturbance bounds, and qualification through the
+actual production path. This engineering option does
 not satisfy those conditions or close N10.

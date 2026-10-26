@@ -171,6 +171,7 @@ export function useWebRTCSessionLifecycle(params: UseWebRTCSessionLifecycleParam
     metricsDisabledRef,
     onResearchEvent,
     options.displayName,
+    options.videoElementRef,
     options.mode,
     options.requestedRole,
     options.sessionId,
