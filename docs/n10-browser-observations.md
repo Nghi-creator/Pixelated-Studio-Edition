@@ -130,6 +130,8 @@ owned resources. No hosted service, engine game, real pairing token or probe
 mutation is used. It requires the workspace's development dependencies and
 Playwright browser cache; it does not download a browser.
 
-This browser/relay proof and native worker/controller tests cover separate
-layers. Integrated browser-to-native-worker/desktop acceptance, disturbance and
-quality bounds, and production qualification remain required. N10 stays open.
+The [browser/native acceptance runner](n10-browser-native-acceptance.md) joins
+the actual camera, relay, browser collector and local owner in one contained
+session, including synthetic action completion and receiver-loss teardown.
+Desktop acceptance, disturbance/quality bounds and production qualification
+remain separate requirements. N10 stays open.

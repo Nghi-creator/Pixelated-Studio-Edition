@@ -27,7 +27,10 @@ The context owns all cleanup even after protocol errors, media failure, worker
 exit, and startup failure. `shutdown()` requests a native NULL transition. A
 successful graceful result requires `null_observed`, complete protocol frames,
 and actual exit code zero; an acknowledgement alone is insufficient. Process
-termination is teardown, not verified live restoration.
+termination is teardown, not verified live restoration. The child startup timeout
+applies only before bootstrap. Shutdown after a long-running stream still flushes
+its close acknowledgement before exiting; it cannot reuse the startup deadline
+as an early exit.
 
 ## Private protocol
 
@@ -67,8 +70,9 @@ The worker builds fixed VP8 video and Opus audio branches. `production` selects
 source and silent audio. The peer-isolation test uses synthetic media; the
 camera adapter test uses private x99 capture and a PulseAudio null-sink monitor.
 Scoped browser observations and local engineering dispatch are documented
-separately. Integrated browser/native lifecycle acceptance, child trace exports
-and production qualification remain open.
+separately. The [browser/native acceptance runner](n10-browser-native-acceptance.md)
+checks the integrated lifecycle. Desktop acceptance, child trace exports and
+production qualification remain open.
 
 Run protocol/supervisor tests without Gst from the repository root:
 

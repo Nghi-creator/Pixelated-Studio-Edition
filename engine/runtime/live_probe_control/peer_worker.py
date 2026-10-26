@@ -396,7 +396,7 @@ def main():
                     if not closing and time.monotonic() - last_snapshot >= 0.5:
                         emit(bootstrap, "snapshot", media.snapshot())
                         last_snapshot = time.monotonic()
-                elif time.monotonic() > startup:
+                elif media is None and time.monotonic() > startup:
                     break
             time.sleep(0.005)
     except (Exception, KeyboardInterrupt):  # noqa: BLE001 -- fixed private error only, mandatory teardown below

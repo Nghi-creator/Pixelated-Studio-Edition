@@ -351,6 +351,57 @@ class SupervisorTests(unittest.TestCase):
                     self.assertEqual(owner.state, expected)
                     close.assert_called_once()
 
+    def test_worker_shutdown_after_startup_deadline_flushes_closed_ack(self):
+        from live_probe_control import peer_worker
+
+        clock, writes = [0.0], []
+        media = SimpleNamespace(close=lambda: True, poll=lambda: None)
+        control = SimpleNamespace(running=lambda: False, poll=lambda: None, cancel=lambda: None)
+        wire = iter((encode(bootstrap()), encode(command(GENERATION, 1, "shutdown", {}))))
+
+        def sleep(_seconds):
+            clock[0] += 6.0  # A healthy long-lived worker, beyond startup grace.
+
+        def write(_fd, data):
+            writes.append(data)
+            return len(data)
+
+        with (
+            patch.object(sys, "argv", ["worker", "--dedicated-peer-worker"]),
+            patch("live_probe_control.peer_worker.os.set_blocking"),
+            patch("live_probe_control.peer_worker.os.read", side_effect=lambda *_: next(wire)),
+            patch("live_probe_control.peer_worker.os.write", side_effect=write),
+            patch("live_probe_control.peer_worker.signal.signal"),
+            patch("live_probe_control.peer_worker.time.monotonic", side_effect=lambda: clock[0]),
+            patch("live_probe_control.peer_worker.time.sleep", side_effect=sleep),
+            patch("live_probe_control.peer_worker.PeerMedia", return_value=media),
+            patch("live_probe_control.peer_control.PeerControl", return_value=control),
+        ):
+            self.assertEqual(peer_worker.main(), 0)
+        messages = Lines().feed(b"".join(writes))
+        self.assertEqual([message["kind"] for message in messages], ["ready", "closed"])
+        self.assertEqual(messages[-1]["body"], {"teardown": "null_observed"})
+
+    def test_worker_without_bootstrap_still_expires_startup_deadline(self):
+        from live_probe_control import peer_worker
+
+        clock = [0.0]
+
+        def sleep(_seconds):
+            clock[0] += 6.0
+
+        with (
+            patch.object(sys, "argv", ["worker", "--dedicated-peer-worker"]),
+            patch("live_probe_control.peer_worker.os.set_blocking"),
+            patch("live_probe_control.peer_worker.os.read", side_effect=BlockingIOError),
+            patch("live_probe_control.peer_worker.signal.signal"),
+            patch("live_probe_control.peer_worker.time.monotonic", side_effect=lambda: clock[0]),
+            patch("live_probe_control.peer_worker.time.sleep", side_effect=sleep),
+            patch("live_probe_control.peer_worker.PeerMedia") as media,
+        ):
+            self.assertEqual(peer_worker.main(), 1)
+            media.assert_not_called()
+
     def test_native_end_of_ice_is_not_a_candidate(self):
         import queue
 

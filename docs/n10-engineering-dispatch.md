@@ -8,8 +8,9 @@ worker option does not enable it. There is no network or browser mutation endpoi
 
 This exercises ownership, bounded action execution and restoration; it does not
 qualify a live relief family. Results retain `live_authority=false`. Receiver
-observations in the contained tests come from native Gst sinks and remain declared
-engineering observations, not authenticated browser playback or perceptual proof.
+observations in contained tests come from native Gst sinks or the actual Chromium
+collector through the authenticated relay. Both retain declared engineering
+semantics; neither supplies perceptual quality proof.
 
 ## Explicit configuration and local calls
 
@@ -142,7 +143,9 @@ copy updates.
 
 The [scoped browser observation relay](n10-browser-observations.md) now supplies
 authenticated connection identity while retaining declared-counter semantics.
-Production activation still requires integrated browser/native-worker and desktop
-acceptance, supported quality/disturbance bounds, and qualification through the
-actual production path. This engineering option does
+The [browser/native acceptance runner](n10-browser-native-acceptance.md) verifies
+integrated completion/restoration and real browser observation loss, including
+replacement budget retention and dirty-intent blocking. Production activation
+still requires desktop acceptance, supported quality/disturbance bounds and
+qualification through the actual production path. This engineering option does
 not satisfy those conditions or close N10.
