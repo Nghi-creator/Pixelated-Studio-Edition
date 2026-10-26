@@ -150,7 +150,7 @@ function payloadMatchesActiveSession(socket: Socket, payload: SessionPayload) {
   );
 }
 
-function getPeerRoom(sessionId: string, peerId: string) {
+export function getPeerRoom(sessionId: string, peerId: string) {
   return `session:${sessionId}:peer:${peerId}`;
 }
 

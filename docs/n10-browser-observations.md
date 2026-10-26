@@ -122,7 +122,10 @@ node engine/runtime/scripts/n10/browserReceiverSmoke.mjs
 It uses the installed Playwright Chromium, disposable pairing credentials, an
 ephemeral loopback server and browser-to-browser canvas WebRTC media. It checks
 actual frame callbacks/stats through the authenticated relay, foreign-socket
-rejection, challenge replacement and stop-on-camera-disconnect, then closes all
+rejection, challenge replacement and stop-on-camera-disconnect. The actual
+browser error handler must preserve playback and advancing observation counters
+when a sibling fails or another browser forges a shared error. A matching peer
+failure must still reach the viewer's fatal-error callback. The test closes all
 owned resources. No hosted service, engine game, real pairing token or probe
 mutation is used. It requires the workspace's development dependencies and
 Playwright browser cache; it does not download a browser.

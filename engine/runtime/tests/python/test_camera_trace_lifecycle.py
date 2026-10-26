@@ -7,6 +7,41 @@ from pathlib import Path
 
 
 class LifecycleTests(unittest.TestCase):
+    def test_retired_pipeline_bus_error_cannot_fail_or_close_replacement(self):
+        tree = ast.parse((Path(__file__).resolve().parents[2] / "camera.py").read_text())
+        callback = next(node for node in ast.walk(tree)
+                        if isinstance(node, ast.FunctionDef) and node.name == "on_bus_message")
+        pipeline, replacement = object(), object()
+        errors, retired = [], []
+        namespace = {
+            "pipeline": pipeline, "peer_id": "peer", "peers": {"peer": {"pipeline": replacement}},
+            "Gst": types.SimpleNamespace(MessageType=types.SimpleNamespace(ERROR="error", WARNING="warning")),
+            "emit_engine_error": lambda message, peer_id: errors.append((message, peer_id)),
+            "cleanup_peer": lambda peer_id, reason: retired.append((peer_id, reason)),
+        }
+        exec(  # noqa: S102 -- actual local callback, no GI startup
+            compile(ast.Module(body=[callback], type_ignores=[]), "trusted-bus-callback", "exec"), namespace)
+        message = types.SimpleNamespace(type="error", parse_error=lambda: (types.SimpleNamespace(message="lost"), None))
+        namespace["on_bus_message"](None, message)
+        self.assertEqual((errors, retired), ([], []))
+        namespace["peers"]["peer"]["pipeline"] = pipeline
+        namespace["on_bus_message"](None, message)
+        self.assertEqual(errors, [("GStreamer error for peer peer: lost", "peer")])
+        self.assertEqual(retired, [("peer", "source_error")])
+
+    def test_camera_error_payload_contains_structured_peer_scope(self):
+        tree = ast.parse((Path(__file__).resolve().parents[2] / "camera.py").read_text())
+        emitter = next(node for node in tree.body
+                       if isinstance(node, ast.FunctionDef) and node.name == "emit_engine_error")
+        events = []
+        namespace = {"SESSION_ID": "session", "sio": types.SimpleNamespace(emit=lambda *args: events.append(args))}
+        exec(  # noqa: S102 -- actual local emitter, no socket client startup
+            compile(ast.Module(body=[emitter], type_ignores=[]), "trusted-error-emitter", "exec"), namespace)
+        namespace["emit_engine_error"]("worker lost", "failed")
+        self.assertEqual(events, [("engine-error", {
+            "sessionId": "session", "peerId": "failed", "source": "camera", "message": "worker lost",
+        })])
+
     def test_campaign_close_failure_never_skips_camera_teardown(self):
         self.execute_shutdown(fail_campaign_close=True)
 

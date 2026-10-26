@@ -15,19 +15,27 @@ const ts = require("typescript");
 const { createSignalingPeerRegistry, registerSignalingRelayHandlers } = require("../../dist/src/signaling/signalingRelay.js");
 const { createEngineTokenAuth } = require("../../dist/src/signaling/socketAuth.js");
 const { canClaimTrustedCamera } = require("../../dist/src/signaling/cameraAuthorization.js");
+const { registerEngineErrorHandlers } = require("../../dist/src/signaling/engineErrorHandlers.js");
 const { joinSession } = require("../../dist/src/signaling/sessionRooms.js");
 
 test("real Chromium observations follow authenticated peer/camera binding and stop on revocation", { timeout: 25000 }, async (t) => {
   const collector = ts.transpileModule(await readFile(new URL("../../../../apps/web/src/lib/webrtc/telemetry/receiverObservation.ts", import.meta.url), "utf8"), {
     compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
   }).outputText;
+  const errorHandler = ts.transpileModule(await readFile(new URL("../../../../apps/web/src/lib/webrtc/transport/webrtcEngineErrors.ts", import.meta.url), "utf8"), {
+    compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
   const token = randomBytes(24).toString("hex");
   const html = `<!doctype html><video id="video" autoplay muted playsinline></video><canvas id="canvas" width="320" height="240"></canvas>
 <script src="/socket.io/socket.io.js"></script><script type="module">
 import {startReceiverObservation, offerDigest} from '/collector.js';
+import {bindWebRTCEngineErrors} from '/engine-errors.js';
 const socket = io({auth:{token:${JSON.stringify(token)},role:'browser'},transports:['websocket']});
 window.sent = 0; window.stopped = false; window.error = null; window.starts = 0;
 let stop = () => {}; let nonce = null; let active = true; let originalOffer = null;
+window.failures=[];
+bindWebRTCEngineErrors({socket,peerId:'browser_peer',isDisposed:()=>!active,
+ failStream:message=>{window.failures.push(message);stop();},report:()=>{},clearRejectedToken:()=>{}});
 const rx = new RTCPeerConnection({iceServers:[]}); const tx = new RTCPeerConnection({iceServers:[]});
 const video = document.getElementById('video'); let incoming = null;
 rx.ontrack = ({track}) => { incoming = new MediaStream([track]); video.srcObject=incoming; video.play().catch(e=>window.error=String(e)); };
@@ -57,8 +65,9 @@ socket.on('connect',async()=>{try{
 }catch(error){window.error=String(error);}});
 </script>`;
   const http = createServer((req, res) => {
-    res.setHeader("Content-Type", req.url === "/collector.js" ? "text/javascript" : "text/html");
-    res.end(req.url === "/collector.js" ? collector : html);
+    const source = req.url === "/collector.js" ? collector : req.url === "/engine-errors.js" ? errorHandler : null;
+    res.setHeader("Content-Type", source === null ? "text/html" : "text/javascript");
+    res.end(source === null ? html : source);
   });
   const server = new Server(http, { maxHttpBufferSize: 128 * 1024 });
   server.use(createEngineTokenAuth(token).useSocketEngineToken);
@@ -67,6 +76,7 @@ socket.on('connect',async()=>{try{
     socket.data.trustedCamera = canClaimTrustedCamera("raw", String(socket.handshake.auth.role));
     joinSession(socket, "smoke");
     registerSignalingRelayHandlers(socket, { peerRegistry: peers });
+    registerEngineErrorHandlers(socket);
   });
   t.after(async () => { await new Promise((resolve) => server.close(resolve)); });
   await new Promise((resolve) => http.listen(0, "127.0.0.1", resolve));
@@ -91,6 +101,7 @@ socket.on('connect',async()=>{try{
   const bindingId = randomBytes(32).toString("hex");
   let offerHash;
   camera.on("webrtc-offer", (offer) => {
+    if (offer.peerId !== "browser_peer") return;
     offerHash = createHash("sha256").update(offer.sdp).digest("hex");
     camera.emit("webrtc-receiver-bind", { peerId: offer.peerId, bindingId, offerHash });
   });
@@ -109,6 +120,20 @@ socket.on('connect',async()=>{try{
   assert.equal(samples[0].receiverSocketId, bound[0].receiverSocketId);
   assert.ok(samples.at(-1).framesDecoded > samples[0].framesDecoded);
   assert.ok(samples.at(-1).presentedFrames > samples[0].presentedFrames);
+  // Exercise the actual browser fatal-error callback while real media advances.
+  // A failed sibling and a browser-forged global error must not stop this viewer.
+  foreign.emit("webrtc-offer", { peerId: "failed_peer", type: "offer", sdp: "sibling" });
+  const siblingFailure = new Promise((resolve) => foreign.once("engine-error", resolve));
+  const siblingOffer = new Promise((resolve) => camera.once("webrtc-offer", resolve));
+  await siblingOffer;
+  camera.emit("engine-error", { peerId: "failed_peer", message: "sibling worker lost" });
+  assert.equal((await siblingFailure).peerId, "failed_peer");
+  foreign.emit("engine-error", { message: "forged shared failure" });
+  const priorCount = samples.length;
+  const priorFrames = samples.at(-1).presentedFrames;
+  await until(() => samples.length >= priorCount + 3);
+  assert.ok(samples.at(-1).presentedFrames > priorFrames);
+  assert.deepEqual(await page.evaluate(() => window.failures), []);
   const old = samples[0];
   foreign.emit("webrtc-receiver-observation", { peerId: old.peerId, bindingId, clockId: old.clockId, sequence: 0, elapsedNs: 1, framesDecoded: 999, presentedFrames: 999 });
   const nextId = randomBytes(32).toString("hex");
@@ -125,4 +150,9 @@ socket.on('connect',async()=>{try{
   const sent = await page.evaluate(() => window.sent);
   await page.waitForTimeout(450);
   assert.equal(await page.evaluate(() => window.sent), sent);
+  const replacementCamera = connect("camera");
+  await connected(replacementCamera);
+  replacementCamera.emit("engine-error", { peerId: "browser_peer", message: "own worker lost" });
+  await page.waitForFunction(() => window.failures.length === 1, undefined, { timeout: 3000 });
+  assert.deepEqual(await page.evaluate(() => window.failures), ["own worker lost"]);
 });

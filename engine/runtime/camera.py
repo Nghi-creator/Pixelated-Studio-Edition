@@ -53,6 +53,7 @@ TELEMETRY_STATE_PATH = os.environ.get(
     '/run/pixelated/camera-telemetry.json',
 )
 peers = {}
+PENDING_OFFERS = {}
 SIGNALING_EPOCH = object()
 SIGNALING_CONNECTED = False
 try:
@@ -84,7 +85,7 @@ def poll_camera_workers():
             continue
         try:
             if kind == 'failed':
-                emit_engine_error(f"Dedicated WebRTC worker failed for peer {peer_id}.")
+                emit_engine_error(f"Dedicated WebRTC worker failed for peer {peer_id}.", peer_id)
                 cleanup_peer(peer_id, "source_error")
             elif kind == 'answer':
                 sio.emit('webrtc-answer', {
@@ -103,7 +104,7 @@ def poll_camera_workers():
                 peer['worker_snapshot_received_ns'] = received_ns
                 updated = True
         except Exception:
-            emit_engine_error(f"Dedicated WebRTC signaling failed for peer {peer_id}.")
+            emit_engine_error(f"Dedicated WebRTC signaling failed for peer {peer_id}.", peer_id)
             cleanup_peer(peer_id, "source_error")
     if updated:
         publish_encoder_telemetry()
@@ -114,13 +115,14 @@ def publish_encoder_telemetry():
     write_encoder_telemetry(TELEMETRY_STATE_PATH, SESSION_ID, peers)
     return True
 
-def emit_engine_error(message):
+def emit_engine_error(message, peer_id):
     print(f"[Python] Engine error: {message}")
     try:
         sio.emit('engine-error', {
             'sessionId': SESSION_ID,
             'message': message,
-            'source': 'camera'
+            'source': 'camera',
+            'peerId': peer_id
         })
     except Exception as exc:
         print(f"[Python] Failed to emit engine-error: {exc}")
@@ -160,7 +162,7 @@ def create_peer_recording_control(peer_id, config):
 def handle_offer(offer):
     validation_error = validate_offer(offer)
     if validation_error:
-        emit_engine_error(f"Invalid WebRTC offer: {validation_error}")
+        emit_engine_error(f"Invalid WebRTC offer: {validation_error}", normalize_peer_id(offer))
         return
 
     peer_id = normalize_peer_id(offer)
@@ -168,7 +170,7 @@ def handle_offer(offer):
         try:
             token = WORKERS.start(peer_id, offer['sdp'])
         except ValueError:
-            emit_engine_error("Dedicated WebRTC offer rejected: invalid, changed or at capacity.")
+            emit_engine_error("Dedicated WebRTC offer rejected: invalid, changed or at capacity.", peer_id)
             return
         if peer_id not in peers:
             peers[peer_id] = {
@@ -181,10 +183,10 @@ def handle_offer(offer):
     try:
         result, sdp_msg = GstSdp.SDPMessage.new_from_text(offer['sdp'])
     except Exception as exc:
-        emit_engine_error(f"Invalid WebRTC offer SDP: {exc}")
+        emit_engine_error(f"Invalid WebRTC offer SDP: {exc}", peer_id)
         return
     if result != GstSdp.SDPResult.OK or sdp_msg is None:
-        emit_engine_error("Invalid WebRTC offer SDP.")
+        emit_engine_error("Invalid WebRTC offer SDP.", peer_id)
         return
 
     print(f"[Python] Received React Offer for peer {peer_id}! Building WebRTC Pipeline...")
@@ -194,7 +196,7 @@ def handle_offer(offer):
         return
     if len(peers) >= MAX_ACTIVE_PEERS:
         emit_engine_error(
-            f"WebRTC stream capacity reached ({MAX_ACTIVE_PEERS} active peers)."
+            f"WebRTC stream capacity reached ({MAX_ACTIVE_PEERS} active peers).", peer_id
         )
         return
 
@@ -283,9 +285,11 @@ def handle_offer(offer):
     bus.add_signal_watch()
 
     def on_bus_message(_, message):
+        if peers.get(peer_id, {}).get('pipeline') is not pipeline:
+            return
         if message.type == Gst.MessageType.ERROR:
             err, debug = message.parse_error()
-            emit_engine_error(f"GStreamer error for peer {peer_id}: {err.message}")
+            emit_engine_error(f"GStreamer error for peer {peer_id}: {err.message}", peer_id)
             if debug:
                 print(f"[Python] GStreamer debug: {debug}")
             cleanup_peer(peer_id, "source_error")
@@ -367,28 +371,54 @@ def on_offer(offer):
         GLib.idle_add(handle_offer, offer)
         return
     epoch = SIGNALING_EPOCH
+    peer_id = normalize_peer_id(offer)
+    if not SIGNALING_CONNECTED or validate_offer(offer):
+        return
+    # Bound pending identities separately from live workers. ICE arriving before
+    # GLib starts this offer can bind to it, never to an unrelated later peer.
+    if peer_id not in PENDING_OFFERS and len(PENDING_OFFERS) >= MAX_ACTIVE_PEERS:
+        emit_engine_error("Dedicated WebRTC pending offer capacity reached.", peer_id)
+        return
+    pending = PENDING_OFFERS.setdefault(peer_id, object())
     def dispatch_offer():
-        if SIGNALING_CONNECTED and epoch is SIGNALING_EPOCH:
-            handle_offer(offer)
+        try:
+            if SIGNALING_CONNECTED and epoch is SIGNALING_EPOCH and PENDING_OFFERS.get(peer_id) is pending:
+                handle_offer(offer)
+                peer = peers.get(peer_id)
+                if peer is not None:
+                    peer['offer_callback_token'] = pending
+        finally:
+            if PENDING_OFFERS.get(peer_id) is pending:
+                PENDING_OFFERS.pop(peer_id, None)
     GLib.idle_add(dispatch_offer)
 
 @sio.on('webrtc-ice-candidate')
 def on_ice(payload):
     candidate = normalize_ice_candidate(payload)
     if not candidate:
-        emit_engine_error("Invalid WebRTC ICE candidate.")
+        emit_engine_error("Invalid WebRTC ICE candidate.", normalize_peer_id(payload))
         return
     peer_id = normalize_peer_id(candidate)
     expected_peer = peers.get(peer_id)
+    pending = PENDING_OFFERS.get(peer_id)
+    epoch = SIGNALING_EPOCH
     def handle_ice():
         peer = peers.get(peer_id)
-        if expected_peer is not None and peer is not expected_peer:
+        if WORKERS is not None:
+            if not SIGNALING_CONNECTED or epoch is not SIGNALING_EPOCH:
+                return
+            if expected_peer is None:
+                if pending is None or peer is None or peer.get('offer_callback_token') is not pending:
+                    return
+            elif peer is not expected_peer:
+                return
+        elif expected_peer is not None and peer is not expected_peer:
             return
         if peer and peer.get('worker_token') is not None:
             try:
                 WORKERS.ice(peer_id, candidate['sdpMLineIndex'], candidate['candidate'])
             except ValueError:
-                emit_engine_error("Dedicated WebRTC ICE rejected.")
+                emit_engine_error("Dedicated WebRTC ICE rejected.", peer_id)
                 cleanup_peer(peer_id, "source_error")
             return
         webrtcbin = peer.get('webrtcbin') if peer else None
@@ -400,15 +430,26 @@ def on_ice(payload):
                     candidate['candidate'],
                 )
             except Exception as exc:
-                emit_engine_error(f"Invalid WebRTC ICE candidate: {exc}")
+                emit_engine_error(f"Invalid WebRTC ICE candidate: {exc}", peer_id)
     GLib.idle_add(handle_ice)
 
 @sio.on('webrtc-peer-disconnect')
 def on_peer_disconnect(payload):
     peer_id = normalize_peer_id(payload)
     expected_peer = peers.get(peer_id)
+    pending = PENDING_OFFERS.get(peer_id)
+    epoch = SIGNALING_EPOCH
     def handle_disconnect():
-        if expected_peer is not None and peers.get(peer_id) is not expected_peer:
+        peer = peers.get(peer_id)
+        if WORKERS is not None:
+            if not SIGNALING_CONNECTED or epoch is not SIGNALING_EPOCH:
+                return
+            if expected_peer is None:
+                if pending is None or peer is None or peer.get('offer_callback_token') is not pending:
+                    return
+            elif peer is not expected_peer:
+                return
+        elif expected_peer is not None and peer is not expected_peer:
             return
         print(f"[Python] Cleaning up WebRTC pipeline for peer {peer_id}.")
         cleanup_peer(peer_id)
@@ -421,6 +462,7 @@ def disconnect(*_reason):
         return
     SIGNALING_CONNECTED = False
     SIGNALING_EPOCH = object()
+    PENDING_OFFERS.clear()
     # Socket.IO callbacks enqueue exact current lifetimes; a delayed callback
     # cannot close a replacement created after reconnection.
     owned = list(peers.items())

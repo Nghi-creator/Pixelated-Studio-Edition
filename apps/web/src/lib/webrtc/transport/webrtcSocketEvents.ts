@@ -1,3 +1,4 @@
+import { bindWebRTCEngineErrors } from "./webrtcEngineErrors";
 import { offerDigest, parseReceiverChallenge, startReceiverObservation } from "../telemetry/receiverObservation";
 import { clearEngineToken } from "../../engine/engineAuth";
 import { loadEngineSessionContext } from "../engine/engineContext";
@@ -117,17 +118,12 @@ export function bindWebRTCSocketEvents({
     );
   });
 
-  runtime.socket.on("engine-error", (payload: { code?: string; message?: string }) => {
-    console.error("[WebRTC] Engine error:", payload?.message);
-    params.onResearchEvent?.("engine_error", {
-      code: payload?.code || null,
-      message: payload?.message || null,
-      source: "engine-error",
-    });
-    if (payload?.code === "engine_access_revoked") {
-      clearEngineToken("rejected");
-    }
-    failStream(payload?.message || "Engine error");
+  bindWebRTCEngineErrors({
+    socket: runtime.socket, peerId: config.peerId,
+    isDisposed: () => runtime.disposed,
+    failStream,
+    report: (details) => params.onResearchEvent?.("engine_error", details),
+    clearRejectedToken: () => clearEngineToken("rejected"),
   });
 
   runtime.socket.on("connect", () => {

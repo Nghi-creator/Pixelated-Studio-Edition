@@ -219,6 +219,8 @@ class CameraCallbacks(unittest.TestCase):
         )
         ns = {
             "RECEIVERS": None,
+            "PENDING_OFFERS": {},
+            "MAX_ACTIVE_PEERS": 8,
             "valid_bound": valid_bound,
             "valid_report": valid_report,
             "time": SimpleNamespace(monotonic_ns=lambda: 123),
@@ -232,7 +234,7 @@ class CameraCallbacks(unittest.TestCase):
             "validate_offer": validate_offer,
             "normalize_peer_id": normalize_peer_id,
             "normalize_ice_candidate": normalize_ice_candidate,
-            "emit_engine_error": self.errors.append,
+            "emit_engine_error": lambda message, peer_id: self.errors.append((message, peer_id)),
             "write_peer_state": lambda *_: None,
             "write_encoder_telemetry": lambda *_: None,
             "sio": SimpleNamespace(emit=lambda *args: self.sent.append(args)),
@@ -316,6 +318,64 @@ class CameraCallbacks(unittest.TestCase):
         self.assertEqual(self.sent, [])
         self.assertEqual(self.retired, ["peer"])
         self.assertEqual(ns["peers"], {})
+
+    def test_failed_worker_diagnostic_is_scoped_and_preserves_sibling(self):
+        ns = self.namespace()
+        ns["peers"].update(
+            first={"worker_token": "first", "signaling_epoch": ns["SIGNALING_EPOCH"]},
+            second={"worker_token": "second", "signaling_epoch": ns["SIGNALING_EPOCH"]},
+        )
+        self.events.extend([
+            ("first", "stale", "failed", {}, 1),
+            ("first", "first", "failed", {}, 2),
+            ("second", "second", "snapshot", {"capture_buffers": 5}, 3),
+        ])
+        ns["poll_camera_workers"]()
+        self.assertEqual(len(self.errors), 1)
+        self.assertEqual(self.errors[0][1], "first")
+        self.assertEqual(self.retired, ["first"])
+        self.assertEqual(ns["peers"]["second"]["worker_snapshot"]["capture_buffers"], 5)
+
+    def test_early_ice_follows_exact_queued_offer(self):
+        ns = self.namespace()
+        ns["on_offer"]({"peerId": "peer", "type": "offer", "sdp": "offer"})
+        ns["on_ice"]({"peerId": "peer", "candidate": "candidate", "sdpMLineIndex": 0})
+        while self.pending:
+            self.pending.pop(0)()
+        self.assertEqual(self.sent, [("ice-forward", ("peer", 0, "candidate"))])
+        self.assertEqual(ns["PENDING_OFFERS"], {})
+
+    def test_early_ice_cannot_cross_reconnect_or_replace_pending_offer(self):
+        ns = self.namespace()
+        ns["on_offer"]({"peerId": "peer", "type": "offer", "sdp": "old"})
+        ns["on_ice"]({"peerId": "peer", "candidate": "old", "sdpMLineIndex": 0})
+        ns["disconnect"]()
+        ns["SIGNALING_CONNECTED"] = True
+        ns["on_offer"]({"peerId": "peer", "type": "offer", "sdp": "new"})
+        while self.pending:
+            self.pending.pop(0)()
+        self.assertEqual(self.sent, [])
+        self.assertEqual(ns["peers"]["peer"]["worker_token"], "token")
+        self.assertEqual(ns["PENDING_OFFERS"], {})
+
+    def test_pending_offer_identities_have_a_capacity_bound(self):
+        ns = self.namespace()
+        ns["MAX_ACTIVE_PEERS"] = 1
+        ns["on_offer"]({"peerId": "first", "type": "offer", "sdp": "offer"})
+        ns["on_offer"]({"peerId": "second", "type": "offer", "sdp": "offer"})
+        self.assertEqual(len(self.pending), 1)
+        self.assertEqual(set(ns["PENDING_OFFERS"]), {"first"})
+        self.assertEqual(self.errors[0][1], "second")
+
+    def test_ice_queued_without_peer_cannot_reach_later_peer(self):
+        ns = self.namespace()
+        ns["on_ice"]({"peerId": "peer", "candidate": "candidate", "sdpMLineIndex": 0})
+        ns["on_peer_disconnect"]({"peerId": "peer"})
+        ns["peers"]["peer"] = {"worker_token": "fresh"}
+        while self.pending:
+            self.pending.pop(0)()
+        self.assertEqual(self.sent, [])
+        self.assertEqual(self.retired, [])
 
     def test_delayed_disconnect_and_ice_cannot_touch_replacement(self):
         ns = self.namespace()

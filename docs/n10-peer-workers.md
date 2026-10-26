@@ -123,9 +123,18 @@ from signaling messages.
 Each GLib poll renews a three-second adapter lease. A stalled main loop cannot
 keep workers alive merely because their background threads continue polling.
 Candidate/result queue overflow or worker failure closes that slot. A worker
-failure reports an engine error and removes only its peer; it does not terminate
-the camera process or the separately owned game. Signaling disconnect retires
-the captured worker peers and invalidates queued offers using a connection epoch.
+failure reports a structured `engine-error` with its `peerId` and removes only
+that peer; it does not terminate the camera process or the separately owned game.
+Only the trusted camera in its active session may relay engine errors. A scoped
+error goes only to the peer's room; an invalid explicit peer/session scope is
+dropped. Session-wide camera failures and server-issued access revocation retain
+their shared scope. The browser ignores other-peer errors and disposed lifetimes.
+
+Signaling disconnect retires the captured worker peers and invalidates queued
+offers using a connection epoch. Early ICE/disconnect callbacks bind either the
+current peer object or an exact bounded pending-offer identity. Candidates for a
+queued offer remain usable after startup; callbacks received without an owning
+offer cannot affect a later peer. Retired legacy pipeline bus errors are ignored.
 Peer disconnect queued before offer startup is also honored. Camera SIGTERM/SIGINT and process-manager stream
 restart use bounded worker cleanup; abrupt parent death also closes private
 lease pipes. The adapter adds no mutation endpoint or browser-side control.
