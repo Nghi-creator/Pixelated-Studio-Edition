@@ -52,9 +52,11 @@ server.listen(8080, "0.0.0.0", () => {
     process.stdout.write(line + "\n");
     // Only the directly owned CLI host can inject this diagnostic event.
     // There is deliberately no socket handler accepting an injection request.
-    if (process.env.N10_BROWSER_ACCEPTANCE_MODE === "observer-static-diagnostic" && line.startsWith("N10_ACCEPTANCE ")) {
+    if (line.startsWith("N10_ACCEPTANCE ")) {
       try {
-        if (JSON.parse(line.slice(15)).kind === "diagnostic_observer_stop") io.to("session:native_acceptance").emit("acceptance-observer-stop");
+        const event = JSON.parse(line.slice(15));
+        if (process.env.N10_BROWSER_ACCEPTANCE_MODE === "observer-static-diagnostic" && event.kind === "diagnostic_observer_stop") io.to("session:native_acceptance").emit("acceptance-observer-stop");
+        if (["engineering-game-cancel", "engineering-game-reconnect"].includes(process.env.N10_BROWSER_ACCEPTANCE_MODE) && event.kind === "game_failure_reconnect") io.to("session:native_acceptance").emit("acceptance-peer-reconnect");
       } catch { camera.kill(); }
     }
   });

@@ -1,27 +1,12 @@
 /** Fixed-order paired acquisition. Every case retained; no retry or qualification promotion. */
-import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { runNativeBrowserAcceptance } from "./nativeBrowserAcceptance.mjs";
+import { acquireNativeCohort } from "./nativeCohort.mjs";
 
 export async function runObserverCohort(image, outputPath, protocol = "v1") {
-  if (!/^sha256:[a-f0-9]{64}$/.test(image || "") || typeof outputPath !== "string" || !path.isAbsolute(outputPath)) throw new Error("cached image and absolute exclusive output required");
   if (!["v1", "moving-v2"].includes(protocol)) throw new Error("closed observer protocol required");
   const order = ["off", "on", "on", "off", "off", "on"].map((condition) => `${protocol === "moving-v2" ? "observer-moving" : "observer"}-${condition}`);
-  const output = await fs.open(outputPath, "wx", 0o600);
-  const runs = [];
-  try {
-    for (const mode of order) {
-      try { runs.push(await runNativeBrowserAcceptance(image, mode)); }
-      catch (error) { runs.push({ status: "failed", mode, live_authority: false, failure: error.message, ...(error.acquisition ? { acquisition: error.acquisition } : {}) }); }
-      // Checkpoint every case, including failures, without changing its identity.
-      await output.truncate(0);
-      await output.write(JSON.stringify(runs, null, 2) + "\n", 0, "utf8");
-      await output.sync();
-      if (runs.at(-1).failure?.includes("cleanup unconfirmed")) break;
-    }
-    return runs;
-  } finally { await output.close(); }
+  return acquireNativeCohort(image, outputPath, order);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

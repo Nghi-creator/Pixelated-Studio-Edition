@@ -183,7 +183,7 @@ def assess(runs):
     return assess_cohort(runs, method=METHOD, order=ORDER, evaluate=evaluate_run)
 
 
-def cohort_main(assessor):
+def cohort_main(assessor, *, screen_key="observer_screen"):
     if len(sys.argv) != 2:
         return 2
     try:
@@ -195,7 +195,7 @@ def cohort_main(assessor):
     except (OSError, ValueError, TypeError):
         return 1
     print(json.dumps(result, allow_nan=False, indent=2))
-    return 0 if result["observer_screen"] == "met" else 1
+    return 0 if result[screen_key] == "met" else 1
 
 
 def main():

@@ -14,11 +14,16 @@ import { nativeBrowserHtml } from "./nativeBrowserPage.mjs";
 
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
+const gameFailures = new Map([
+  ["engineering-game-cancel", "cancel"], ["engineering-game-receiver-loss", "receiver-loss"],
+  ["engineering-game-source-loss", "source-loss"], ["engineering-game-reconnect", "reconnect"],
+]);
 const runtime = fileURLToPath(new URL("../../", import.meta.url));
 
 export async function runNativeBrowserAcceptance(image, mode = "production-admission") {
   if (!/^sha256:[a-f0-9]{64}$/.test(image || "")) throw new Error("explicit cached image digest required");
-  if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"].includes(mode)) throw new Error("invalid acceptance mode");
+  const gameFailure = gameFailures.get(mode);
+  if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"].includes(mode) && !gameFailure) throw new Error("invalid acceptance mode");
   const gameControl = mode === "engineering-game-disturbance";
   const controlMode = ["engineering-disturbance", "engineering-game-disturbance"].includes(mode);
   const movingMode = ["observer-moving-off", "observer-moving-on"].includes(mode);
@@ -30,6 +35,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "n10-browser-native-"));
   const token = randomBytes(32).toString("hex");
   let browser, child, timer, processFailure, softwareHash;
+  let siblingQuality = null, siblingTask = null, siblingError = null;
   const pages = [];
   const events = []; let logTail = "";
   let logBytes = 0, stdoutBytes = 0;
@@ -164,6 +170,9 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
             const pending = events.filter((event) => event.kind === "diagnostic_started")[diagnosticWindows.length];
             if (pending) diagnosticWindows.push({ phase: pending.phase, ...await measurePages() });
           }
+          if (gameFailure && !siblingTask && events.some((event) => event.kind === "game_failure_fault")) {
+            siblingTask = second.evaluate(() => globalThis.collectQuality(2000)).then((value) => { siblingQuality = value; }).catch((error) => { siblingError = error; });
+          }
           if (!stopped && events.some((event) => event.kind === "stop_first_observations")) {
             stopped = true;
             const before = await first.evaluate(() => globalThis.stopObservations());
@@ -172,10 +181,13 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
           }
           return events.some((event) => event.kind === "complete");
         }, 32);
-        if (mode === "engineering-receiver-loss") assert.ok(stopped, "receiver loss injection was required");
+        if (["engineering-receiver-loss", "engineering-game-receiver-loss"].includes(mode)) assert.ok(stopped, "receiver loss injection was required");
       })(),
       new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("outer acceptance deadline")), 36000); }),
     ]);
+    if (siblingTask) await siblingTask;
+    if (siblingError) throw siblingError;
+    if (gameFailure) assert.ok(siblingQuality, "fault sibling quality measured");
     if (!observerOff) await Promise.all([first, second].map((page) => page.waitForFunction(() => globalThis.unbound >= 1, undefined, { timeout: 2000 })));
     const continuity = controlMode ? await Promise.all(pages.map((page) => page.evaluate(() => globalThis.stopControlTrace()))) : null;
     if (controlMode) assert.deepEqual(controlWindows.map((window) => window.phase), ["baseline", "during", "restored"]);
@@ -188,6 +200,15 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       assert.ok(snapshots.every((snapshot) => snapshot.failures.length === 0));
       if (observerOff) assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === 0 && Object.keys(snapshot.counts).length === 0 && snapshot.unbound === 0));
       else assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === (diagnosticMode ? 2 : 1) && snapshot.unbound === 1));
+    } else if (gameFailure) {
+      const expectedFailures = ["source-loss", "receiver-loss"].includes(gameFailure) ? 1 : 0;
+      assert.equal(snapshots[0].failures.length, expectedFailures);
+      if (expectedFailures) assert.equal(snapshots[0].failures[0].peerId, "first");
+      assert.deepEqual(snapshots[1].failures, []);
+      assert.ok(snapshots[0].counts.first.framesDecoded > 0 && snapshots[0].counts.replacement.presentedFrames > 0);
+      assert.ok(snapshots[1].counts.second.framesDecoded > 0);
+      assert.equal(new Set(snapshots[0].bindings).size, 3);
+      assert.equal(new Set(snapshots[1].bindings).size, 2);
     } else {
     assert.equal(snapshots[0].failures.length, 1);
     assert.equal(snapshots[0].failures[0].peerId, "first");
@@ -208,14 +229,15 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     const exitCode = await exited;
     assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
     return { status: "passed", mode, live_authority: false, context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
+      ...(gameFailure ? {role: "contained_game_failure_not_qualification", method: "n10-contained-game-failure-v1", case: gameFailure, sibling_quality: siblingQuality} : {}),
       ...(controlMode ? {role: gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),
-      viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound })) };
+      viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound, bindings: snapshot.bindings.length })) };
   } catch (error) {
     const diagnostics = await Promise.allSettled(pages.map((page) => page.evaluate(() => globalThis.snapshot?.())));
     const failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logTail}`, { cause: error });
-    failure.acquisition = { status: "failed", mode, live_authority: false, events, diagnostics,
+    failure.acquisition = { status: "failed", mode, live_authority: false, events, diagnostics, ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
       context: { image, software_hash: softwareHash || null, host_platform: process.platform, host_arch: process.arch } };
     throw failure;
   } finally {

@@ -35,6 +35,7 @@ socket.on('webrtc-receiver-bind',async challenge=>{try{const scope=active;if(!sc
  scope.stop=startReceiverObservation({pc:scope.pc,challenge,getVideo:()=>video,getStream:()=>scope.stream,isCurrent:()=>active===scope&&scope.live&&socket.connected,
  emit:sample=>{mark(scope,'first_report',{decoded:sample.framesDecoded,presented:sample.presentedFrames});window.counts[scope.peerId]=sample;socket.emit('webrtc-receiver-observation',sample);}});}catch(e){window.problem=String(e);}});
 socket.on('webrtc-receiver-unbind',message=>{if(active&&message.peerId===active.peerId&&message.bindingId===active.bindingId){active.stop();window.unbound++;}});
+socket.on('acceptance-peer-reconnect',()=>{if(active?.peerId!=='first')return;socket.emit('webrtc-peer-disconnect',{peerId:'first',sessionId:'native_acceptance'});start('replacement').catch(e=>window.problem=String(e));});
 socket.on('acceptance-observer-stop',()=>{if(active)active.stop();});
 socket.on('disconnect',()=>{if(active)active.stop();});
 window.snapshot=()=>({problem:window.problem,failures:window.failures,counts:window.counts,bindings:window.bindings,unbound:window.unbound,state:active?.pc.connectionState,timelines:window.timelines,timeline_basis:'page_performance_ms_no_native_alignment'});

@@ -59,3 +59,9 @@ qualified live family. A met temporal screen does not establish perceptual or
 audio quality, desktop playability, general resource benefit or held-out
 diagnostic value. Those require separate predeclared acceptance. Live authority
 remains false, and no browser/network message grants controller permission.
+
+
+The separate [contained failure cohort](n10-contained-game-failures.md) covers
+cancellation, observation/source loss, active reconnect, replacement and local
+owner restart against the same budget ledger. Its expected dirty/unknown outcomes
+are distinct from this completed-action temporal screen.

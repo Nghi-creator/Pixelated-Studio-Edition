@@ -30,8 +30,8 @@ class ControlDisturbance:
         self.operation = self.sampler = None
         self.dispatched_at = None
 
-    def slots(self):
-        slots = {peer: self.service.active.get(peer) for peer in ("first", "second")}
+    def slots(self, peers=("first", "second")):
+        slots = {peer: self.service.active.get(peer) for peer in peers}
         now = time.monotonic_ns()
         for slot in slots.values():
             if slot is None or slot.owner is None or slot.stop.is_set() or slot.done.is_set() or slot.failure:
@@ -55,7 +55,7 @@ class ControlDisturbance:
                 return False
             if peer not in self.scopes:
                 self.scopes[peer] = self.bridge.attach(self.local, self.capability, peer, slot.token)
-        return all(self.local.inspect(scope)["status"] == "ready_for_dry_run" for scope in self.scopes.values())
+        return all(self.local.inspect(scope)["status"] == "ready_for_dry_run" for scope in (self.scopes[peer] for peer in slots))
 
     def begin(self, slots):
         identity = self.identity(slots)

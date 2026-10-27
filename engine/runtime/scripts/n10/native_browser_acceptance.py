@@ -23,10 +23,13 @@ sys.path.insert(0, str(RUNTIME))
 def main():
     if sys.argv[1:] != ["--isolated-browser-acceptance"] or os.environ.get("N10_BROWSER_ACCEPTANCE") != "1":
         raise ValueError("explicit disposable acceptance opt-in required")
+    from game_failure_acceptance import MODES as GAME_FAILURE_MODES
+
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"):
+    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", *GAME_FAILURE_MODES):
         raise ValueError("closed acceptance mode required")
-    game_control = mode == "engineering-game-disturbance"
+    game_failure = mode in GAME_FAILURE_MODES
+    game_control = mode == "engineering-game-disturbance" or game_failure
     control_mode = mode in ("engineering-disturbance", "engineering-game-disturbance")
     moving_mode = mode in ("observer-moving-off", "observer-moving-on")
     observer_off = mode in ("observer-off", "observer-moving-off")
@@ -131,9 +134,22 @@ def main():
                     if not observer_off:
                         state["local"] = cleanup.enter_context(LocalProbeOwner(service, ledger, policy, enabled=True))
                         state["capability"] = state["local"].claim()
-                    state["phase"] = "control-screen" if control_mode else ("observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission"))
+                    state["phase"] = "game-failure" if game_failure else ("control-screen" if control_mode else ("observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission")))
                     emit("camera_ready", mode=mode, source=service.source, profile=service.profile)
                 local, capability = state.get("local"), state.get("capability")
+                if state["phase"] == "game-failure":
+                    if "game_failure" not in state:
+                        from game_failure_acceptance import GameFailureAcceptance
+                        state["game_failure"] = GameFailureAcceptance(service, scene, bridge, local, capability, emit, captured["client"], mode)
+                        cleanup.callback(state["game_failure"].close)
+                    if not state["game_failure"].tick():
+                        return True
+                    state["old"] = state["game_failure"].old
+                    state["slots"] = list(service.active.values())
+                    state["phase"] = "disconnected"
+                    state["disconnect_thread"] = threading.Thread(target=captured["client"].disconnect, daemon=True)
+                    state["disconnect_thread"].start()
+                    return True
                 if state["phase"] == "control-screen":
                     if "control_screen" not in state:
                         from control_disturbance import (
