@@ -6,8 +6,9 @@ from pathlib import Path
 
 
 class NativeScreen:
-    def __init__(self, service, scene):
+    def __init__(self, service, scene, *, record_phase=False):
         self.service, self.scene = service, scene
+        self.record_phase = record_phase
         self.identities, self.samples = {}, []
         self.started = self.next_at = None
 
@@ -43,7 +44,7 @@ class NativeScreen:
                 raise ValueError("measurement profile/caps changed")
             workers[peer_id] = {**self.process(peer_id, slot.owner.child), "capture_buffers": body["capture_buffers"], "encoded_buffers": body["encoded_buffers"]}
         parent, relay, game = self.process("parent"), self.process("relay", parent=True), self.scene.resources()
-        self.samples.append({"read_start_ns": start, "read_end_ns": time.monotonic_ns(), "parent": parent, "relay": relay, "workers": workers, "game": game})
+        self.samples.append({"read_start_ns": start, "read_end_ns": time.monotonic_ns(), "parent": parent, "relay": relay, "workers": workers, "game": game, **({"game_phase": self.scene.phase()} if self.record_phase else {})})
         if len(self.samples) > 24:
             raise ValueError("native screen sample bound")
         self.next_at = now + 250000000

@@ -21,10 +21,12 @@ def main():
     if sys.argv[1:] != ["--isolated-browser-acceptance"] or os.environ.get("N10_BROWSER_ACCEPTANCE") != "1":
         raise ValueError("explicit disposable acceptance opt-in required")
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic"):
+    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on"):
         raise ValueError("closed acceptance mode required")
+    moving_mode = mode in ("observer-moving-off", "observer-moving-on")
+    observer_off = mode in ("observer-off", "observer-moving-off")
     diagnostic_mode = mode == "observer-static-diagnostic"
-    screen_mode = mode in ("observer-off", "observer-on") or diagnostic_mode
+    screen_mode = mode in ("observer-off", "observer-on") or diagnostic_mode or moving_mode
     import gi
     import socketio
     from observer_native_screen import NativeScreen
@@ -47,7 +49,7 @@ def main():
         print("N10_ACCEPTANCE " + json.dumps({"kind": kind, **values}), flush=True)
 
     with ExitStack() as cleanup:
-        scene = GameScene()
+        scene = GameScene(defer_script=moving_mode)
         cleanup.callback(scene.close)
         original_popen = subprocess.Popen
 
@@ -64,7 +66,7 @@ def main():
         cleanup.enter_context(patch.dict(os.environ, {
             "PULSE_SERVER": "127.0.0.1", "XDG_RUNTIME_DIR": directory,
             "XDG_CONFIG_HOME": directory + "/config", "PIXELATED_DEDICATED_PEER_WORKERS": "1",
-            "PIXELATED_RECEIVER_OBSERVATIONS": "0" if mode == "observer-off" else "1", "PIXELATED_MAX_STREAM_PEERS": "3",
+            "PIXELATED_RECEIVER_OBSERVATIONS": "0" if observer_off else "1", "PIXELATED_MAX_STREAM_PEERS": "3",
             "PIXELATED_SESSION_ID": "native_acceptance", "PIXELATED_STREAM_PROFILE": '{"id":"balanced","fps":30,"bitrate_kbps":1500}',
             "PIXELATED_CAMERA_PEER_STATE_PATH": directory + "/peers.json",
             "PIXELATED_CAMERA_TELEMETRY_STATE_PATH": directory + "/telemetry.json",
@@ -112,10 +114,10 @@ def main():
                 if time.monotonic() - origin > (30 if diagnostic_mode else 26):
                     raise ValueError("integrated acceptance deadline: " + state["phase"])
                 service, bridge = captured.get("workers"), captured.get("bridge")
-                if service is None or (bridge is None and mode != "observer-off"):
+                if service is None or (bridge is None and not observer_off):
                     return True
                 if state["phase"] == "startup":
-                    if mode != "observer-off":
+                    if not observer_off:
                         state["local"] = cleanup.enter_context(LocalProbeOwner(service, ledger, policy, enabled=True))
                         state["capability"] = state["local"].claim()
                     state["phase"] = "observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission")
@@ -135,6 +137,31 @@ def main():
                     state["disconnect_thread"] = threading.Thread(target=captured["client"].disconnect, daemon=True)
                     state["disconnect_thread"].start()
                     return True
+                if state["phase"] == "observer-warmup" and moving_mode:
+                    from observer_moving_gate import MovingObserverGate
+                    if "moving_gate" not in state:
+                        state["moving_gate"] = MovingObserverGate(scene, emit)
+                    slots = [service.active.get(peer) for peer in ("first", "second")]
+                    ready = all(slot is not None and slot.owner is not None and slot.owner.last_snapshot
+                                and slot.owner.last_snapshot["connection_state"] == "connected"
+                                and slot.owner.last_snapshot["encoded_buffers"] > 0
+                                and slot.owner.last_observation is not None
+                                and 0 <= time.monotonic_ns() - slot.owner.last_observation[1] <= 1500000000 for slot in slots)
+                    if ready and not observer_off:
+                        for peer, slot in zip(("first", "second"), slots, strict=True):
+                            record = bridge.records.get(peer)
+                            if record is None or not record.receiver_socket_id:
+                                ready = False
+                                continue
+                            if peer not in state["scopes"]:
+                                state["scopes"][peer] = bridge.attach(local, capability, peer, slot.token)
+                        ready = ready and len(state["scopes"]) == 2 and all(
+                            local.inspect(scope)["status"] == "ready_for_dry_run" for scope in state["scopes"].values())
+                    if not state["moving_gate"].tick(ready):
+                        return True
+                    state["screen"] = NativeScreen(service, scene, record_phase=True)
+                    state["phase"] = "observer-measuring"
+                    emit("screen_started")
                 if state["phase"] == "observer-warmup":
                     slots = [service.active.get(peer_id) for peer_id in ("first", "second")]
                     if any(slot is None or slot.owner is None or slot.owner.last_snapshot is None for slot in slots):
@@ -162,6 +189,8 @@ def main():
                     if (Path(ledger) / "journal.json").exists():
                         raise ValueError("read-only screen created action journal")
                     emit("screen_native", **state["screen"].report())
+                    if moving_mode:
+                        emit("moving_phase", **state["moving_gate"].report())
                     state["slots"] = list(service.active.values())
                     state["phase"] = "disconnected"
                     state["disconnect_thread"] = threading.Thread(target=captured["client"].disconnect, daemon=True)

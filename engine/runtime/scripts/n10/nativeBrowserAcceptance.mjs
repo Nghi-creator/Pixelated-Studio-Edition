@@ -18,7 +18,9 @@ const runtime = fileURLToPath(new URL("../../", import.meta.url));
 
 export async function runNativeBrowserAcceptance(image, mode = "production-admission") {
   if (!/^sha256:[a-f0-9]{64}$/.test(image || "")) throw new Error("explicit cached image digest required");
-  if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic"].includes(mode)) throw new Error("invalid acceptance mode");
+  if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on"].includes(mode)) throw new Error("invalid acceptance mode");
+  const movingMode = ["observer-moving-off", "observer-moving-on"].includes(mode);
+  const observerOff = ["observer-off", "observer-moving-off"].includes(mode);
   const diagnosticMode = mode === "observer-static-diagnostic";
   const screenMode = mode.startsWith("observer-");
   const docker = process.platform === "darwin" ? "/Applications/Docker.app/Contents/Resources/bin/docker" : "docker";
@@ -116,6 +118,17 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     const pageErrors = [];
     for (const page of [first, second]) page.on("pageerror", (error) => pageErrors.push(error.message));
     await Promise.all([first.goto(url + "/?peer=first"), second.goto(url + "/?peer=second")]);
+    if (movingMode) {
+      // An owned host-only marker, never a signaling/network control message.
+      await Promise.all(pages.map((page) => page.waitForFunction(() => {
+        const item = Object.values(globalThis.timelines || {})[0];
+        return globalThis.snapshot().state === "connected" && item?.first_presented?.presented > 0;
+      }, undefined, { timeout: 8000 })));
+      const marker = path.join(directory, "presented.pending");
+      await fs.writeFile(marker, JSON.stringify({ method: "n10-observer-moving-acquisition-v2", peers: ["first", "second"] }), { flag: "wx", mode: 0o644 });
+      await fs.chmod(marker, 0o644);
+      await fs.rename(marker, path.join(directory, "presented.json"));
+    }
     let quality = null, browserResources = null;
     const diagnosticWindows = [];
     async function measurePages() {
@@ -153,7 +166,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       })(),
       new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("outer acceptance deadline")), 36000); }),
     ]);
-    if (mode !== "observer-off") await Promise.all([first, second].map((page) => page.waitForFunction(() => globalThis.unbound >= 1, undefined, { timeout: 2000 })));
+    if (!observerOff) await Promise.all([first, second].map((page) => page.waitForFunction(() => globalThis.unbound >= 1, undefined, { timeout: 2000 })));
     const snapshots = await Promise.all([first, second].map((page) => page.evaluate(() => globalThis.snapshot())));
     assert.deepEqual(pageErrors, []);
     assert.equal(snapshots[0].problem, null);
@@ -161,7 +174,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if (screenMode) {
       assert.ok(quality && browserResources, "read-only screen was measured");
       assert.ok(snapshots.every((snapshot) => snapshot.failures.length === 0));
-      if (mode === "observer-off") assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === 0 && Object.keys(snapshot.counts).length === 0 && snapshot.unbound === 0));
+      if (observerOff) assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === 0 && Object.keys(snapshot.counts).length === 0 && snapshot.unbound === 0));
       else assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === (diagnosticMode ? 2 : 1) && snapshot.unbound === 1));
     } else {
     assert.equal(snapshots[0].failures.length, 1);
@@ -182,6 +195,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if (processFailure) throw processFailure;
     assert.equal(await exited, 0);
     return { status: "passed", mode, live_authority: false, context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
+      ...(movingMode ? {role: "moving_acquisition_rehearsal_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound })) };
   } catch (error) {

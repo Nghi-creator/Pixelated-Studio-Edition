@@ -10,7 +10,7 @@ from .contracts import SECOND
 
 
 class GameScene:
-    def __init__(self):
+    def __init__(self, *, defer_script=False):
         self.display = self.game = self.connection = None
         self.number = None
         self.started = None
@@ -18,6 +18,8 @@ class GameScene:
         self.held = None
         self.release_at = 0
         self.game_start_ticks = None
+        self.defer_script = defer_script
+        self.script_started = None
 
     def start(self):
         self.x11 = ctypes.CDLL("libX11.so.6")
@@ -91,7 +93,23 @@ class GameScene:
         if not self.connection:
             raise ValueError("owned display control unavailable")
         self.started = time.monotonic_ns()
+        if not self.defer_script:
+            self.script_started = self.started + 3 * SECOND
         self.resources()
+
+    def arm_script(self):
+        """One-shot local diagnostic boundary; never resets a running script."""
+        if not self.defer_script or self.script_started is not None or self.sent:
+            raise ValueError("game script already armed")
+        if self.started is None or time.monotonic_ns() - self.started < 3 * SECOND:
+            raise ValueError("game load interval incomplete")
+        self.script_started = time.monotonic_ns()
+
+    def phase(self):
+        now = time.monotonic_ns()
+        return {"game_age_ns": now - self.started,
+                "script_age_ns": None if self.script_started is None else now - self.script_started,
+                "script_actions": self.sent}
 
     def _key(self, name, down):
         code = self.x11.XKeysymToKeycode(
@@ -108,8 +126,10 @@ class GameScene:
         if self.held is not None and now >= self.release_at:
             self._key(self.held, 0)
             self.held = None
-        # Fixed script only, starts after three-second game load. No user input.
-        index = (now - self.started - 3 * SECOND) // 400000000
+        # Fixed script only. Diagnostics may defer its one-shot start boundary.
+        if self.script_started is None:
+            return
+        index = (now - self.script_started) // 400000000
         if index >= self.sent and index >= 0:
             if self.sent >= 64:
                 raise ValueError("game input budget exceeded")

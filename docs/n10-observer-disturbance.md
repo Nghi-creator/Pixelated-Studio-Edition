@@ -141,3 +141,40 @@ identify a general causal effect. Diagnostic state `observed` means the
 measurement was available; qualification and live authority remain unavailable.
 The ordinary screen rejects diagnostic cases and still requires game progress
 and visual variation. Never replace a failed cohort case with this diagnostic.
+
+## Presentation-gated moving-workload acquisition
+
+Two additional modes rehearse a separate acquisition protocol:
+
+```sh
+npm run smoke:n10-browser-native -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --mode observer-moving-off
+npm run smoke:n10-browser-native -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --mode observer-moving-on
+```
+
+The method is `n10-observer-moving-acquisition-v2`. Both viewers must first
+present a real video frame and remain connected. The owning host atomically
+publishes a closed presentation marker in its disposable assets directory, which
+the container mounts read-only. This is a local acquisition handshake; there is
+no signaling handler or media-control endpoint for it. Native eligibility also
+requires connected workers with fresh observations; on additionally requires
+both local-owner receiver scopes to be ready. Native eligibility has a fixed
+eight-second deadline. Missing or malformed markers fail acquisition.
+
+The existing fixed input script stays idle until eligibility and at least three
+seconds of game loading. It then starts once, followed by a fixed three-second
+warmup. Readiness loss fails that warmup instead of extending it. Native sampling
+records game age, script age and action count in every sample and at eligibility
+and window edges. Browser startup markers retain their separate page clock.
+The normal four-second browser and at least 4.5-second native sampling windows,
+resource limits, cleanup requirements and default-off production settings apply.
+
+These modes emit the role `moving_acquisition_rehearsal_not_qualification`. They
+are not accepted by the original six-case assessor. Matching script age does
+not prove identical game state, source pixels or host scheduling; the receipt
+explicitly records `source_content_matched: false`. A subsequent cost comparison
+must predeclare its own complete order, eligibility and phase-comparability
+rules before acquisition. Keep original failed cohorts and budgets intact;
+rehearsal success grants no observer-cost, control-action or perceptual/audio
+qualification and no live authority.
