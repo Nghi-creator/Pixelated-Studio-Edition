@@ -15,7 +15,7 @@
     "smoke:n10-observer-cost": "node scripts/n10/observerDisturbance.mjs",
     "smoke:n10-browser-native": "node scripts/n10/nativeBrowserAcceptance.mjs",
     "smoke:native": "node scripts/smokeNativeRuntime.mjs",
-    "test": "npm run build && node --test dist/tests/**/*.test.js",
+    "test": "npm run build && node --test dist/tests/**/*.test.js scripts/n10/*.test.mjs",
     "start": "node dist/server.js"
   },
   "dependencies": {

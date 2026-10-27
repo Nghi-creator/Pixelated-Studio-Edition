@@ -353,7 +353,6 @@ if __name__ == "__main__":
     # Disposable harness diagnosis only: leave stacks before the outer 42s kill.
     faulthandler.enable()
     faulthandler.dump_traceback_later(35)
-    try:
-        main()
-    finally:
-        faulthandler.cancel_dump_traceback_later()
+    # Keep the dump armed through interpreter shutdown too: main() can return
+    # while a non-daemon dependency thread still prevents process exit.
+    main()

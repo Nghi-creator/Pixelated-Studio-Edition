@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const readline = require("node:readline");
 const { spawn } = require("node:child_process");
 const { Server } = require("socket.io");
+const { ownRelayShutdown } = require("./nativeBrowserShutdown.cjs");
 const { createEngineTokenAuth } = require("../../dist/src/signaling/socketAuth.js");
 const { canClaimTrustedCamera } = require("../../dist/src/signaling/cameraAuthorization.js");
 const { createLobbyManager } = require("../../dist/src/signaling/lobby/lobby.js");
@@ -20,6 +21,7 @@ const server = http.createServer((req, res) => {
 });
 const io = new Server(server, { maxHttpBufferSize: 128 * 1024 });
 io.use(createEngineTokenAuth(process.env.PIXELATED_ENGINE_TOKEN).useSocketEngineToken);
+const closeRelay = ownRelayShutdown(server, io);
 const peers = createSignalingPeerRegistry(3);
 const lobby = createLobbyManager();
 io.on("connection", (socket) => {
@@ -38,6 +40,12 @@ io.on("connection", (socket) => {
 });
 server.listen(8080, "0.0.0.0", () => {
   const camera = spawn("python3", ["-u", "/opt/repo/engine/runtime/scripts/n10/native_browser_acceptance.py", "--isolated-browser-acceptance"], { stdio: ["ignore", "pipe", "inherit"] });
+  const diagnosticTimer = setTimeout(() => {
+    process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "relay_shutdown_diagnostic",
+      camera_exit: camera.exitCode, camera_signal: camera.signalCode,
+      active_resources: process.getActiveResourcesInfo().slice(0, 32) }) + "\n");
+  }, 35000);
+  diagnosticTimer.unref();
   const lines = readline.createInterface({ input: camera.stdout });
   lines.on("line", (line) => {
     if (line.length > 65536) { camera.kill(); return; }
@@ -52,7 +60,14 @@ server.listen(8080, "0.0.0.0", () => {
   });
   camera.on("exit", (code, signal) => {
     process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "camera_process_exit", code, signal }) + "\n");
-    io.close(() => { process.exitCode = code === 0 ? 0 : 1; });
+    process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "relay_shutdown", stage: "close_start" }) + "\n");
+    closeRelay().then(() => {
+      process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "relay_shutdown", stage: "closed" }) + "\n");
+      process.exitCode = code === 0 ? 0 : 1;
+    }).catch(() => {
+      process.stdout.write('N10_ACCEPTANCE {"kind":"failed","reason":"relay cleanup failed"}\n');
+      process.exitCode = 1;
+    });
   });
-  camera.on("error", () => { io.close(); process.exitCode = 1; });
+  camera.on("error", () => { void closeRelay().catch(() => {}); process.exitCode = 1; });
 });

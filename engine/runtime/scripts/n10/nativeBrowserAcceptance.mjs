@@ -29,11 +29,11 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const token = randomBytes(32).toString("hex");
   let browser, child, timer, processFailure, softwareHash;
   const pages = [];
-  const events = []; const logs = [];
+  const events = []; let logTail = "";
   let logBytes = 0, stdoutBytes = 0;
   const append = (data) => {
     logBytes += data.length;
-    if (logBytes <= 32768) logs.push(String(data));
+    logTail = (logTail + String(data)).slice(-32768);
     if (logBytes > 1024 * 1024) { processFailure = new Error("acceptance output budget"); child?.kill(); }
   };
   const command = (args) => {
@@ -201,7 +201,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound })) };
   } catch (error) {
     const diagnostics = await Promise.allSettled(pages.map((page) => page.evaluate(() => globalThis.snapshot?.())));
-    const failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logs.join("").slice(-16000)}`, { cause: error });
+    const failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logTail}`, { cause: error });
     failure.acquisition = { status: "failed", mode, live_authority: false, events, diagnostics,
       context: { image, software_hash: softwareHash || null, host_platform: process.platform, host_arch: process.arch } };
     throw failure;

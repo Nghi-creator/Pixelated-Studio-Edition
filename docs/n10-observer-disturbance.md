@@ -225,6 +225,19 @@ Preserve earlier cohorts and freeze any new protocol before collecting its resul
 The acquisition also requires the camera/container to exit successfully. A media
 `complete` event alone cannot establish process cleanup. Disposable CLI receipts
 include shutdown stages and the owned camera's exit code/signal. If a host stalls,
-a 35-second Python stack dump precedes the fixed 42-second container timeout.
+a 35-second Python stack dump, armed through interpreter exit, precedes the fixed
+42-second container timeout. The relay also records pending resource types and
+its own close stages. Failure logs retain a bounded tail so late shutdown
+diagnostics are preserved.
 These diagnostics do not extend deadlines or turn a timeout into a valid case.
 Separate shutdown failure drills cannot replace missing cohort cases.
+
+
+After the owned camera exits, the disposable relay explicitly destroys all
+connections accepted by its HTTP server, including upgraded connections. A
+connection accepted during that close transition is destroyed too. This prevents
+relay exit from depending on a browser transport finishing its own close handshake.
+Shutdown still awaits Socket.IO/server closure and preserves nonzero camera exit
+status; it does not force a successful exit or weaken the media/worker checks.
+These ownership rules apply to this acceptance fixture, not the production server.
+The normal engine test command includes HTTP and upgraded-socket close regressions.
