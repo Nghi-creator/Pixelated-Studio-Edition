@@ -1,8 +1,8 @@
-# Synthetic engineering controller dispatch
+# Contained engineering controller dispatch
 
 The dedicated peer worker can run the existing cadence controller through an
-explicit local engineering configuration. This path supports only
-`isolated_synthetic` media. Production x99/Pulse workers reject the configuration
+explicit local engineering configuration. It supports `isolated_synthetic` media and an explicitly pinned
+`isolated_game` experiment. Normal `production` x99/Pulse workers reject the configuration
 in the camera adapter, bootstrap protocol and child runner. The normal camera
 worker option does not enable it. There is no network or browser mutation endpoint.
 
@@ -156,3 +156,23 @@ baseline/active/restored measurements for both the controlled peer and its
 unchanged sibling, plus continuous presentation traces across the setters. It
 uses the same synthetic-only local dispatch boundary and does not enable real
 game capture control or establish perceptual/audio/desktop qualification.
+
+
+## Explicitly owned game capture
+
+The [contained game disturbance procedure](n10-contained-game-control.md) uses
+`EngineeringControl.open(private_directory, policy, scene=owned_scene)` only for
+an actual live `GameScene` with its private X99 display. That creates a closed
+capture descriptor for the owner, game, display and X11 socket. The matching
+source is `isolated_game`; it is not interchangeable with `production` or
+`isolated_synthetic`. Bootstrap rejects absent/mismatched capture descriptors.
+The existing synthetic wire format remains unchanged when no scene is supplied.
+
+The host checks scene identity before dispatch. The child pins owner/game/display
+lifetimes with read-only pidfds and verifies start times, parentage, UID and
+socket identity before connecting its capture pipeline. Periodic socket checks
+are limited to four per second on the control path; setters force a fresh check.
+Source loss invalidates the binding permanently. Loss during an action can leave
+restoration unknown and the journal dirty; the exact-worker watchdog remains the
+fallback. Game/display lifetime descriptors never become watchdog kill targets.
+There is still no network setter, production control flag or live qualification.

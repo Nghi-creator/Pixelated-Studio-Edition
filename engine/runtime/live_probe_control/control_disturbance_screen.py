@@ -36,20 +36,20 @@ def continuity_screen(data):
             "maximum_pts_gap_ms": max(b - a for a, b in itertools.pairwise(pts))}
 
 
-def summarize(run):
-    result = {"method": METHOD, "live_authority": False, "qualification": "unavailable_integrated_synthetic_only",
+def summarize_control(run, *, method, role, mode, source, qualification):
+    result = {"method": method, "live_authority": False, "qualification": qualification,
               "perceptual_quality": "not_evaluated", "real_game_quality": "not_evaluated", "control_screen": "unavailable"}
     try:
         if run.get("status") != "passed":
             raise ValueError("incomplete control acquisition")
-        if run["method"] != METHOD or run["role"] != "integrated_synthetic_control_disturbance_not_qualification" or run["mode"] != "engineering-disturbance" or run["status"] != "passed" or run["live_authority"] is not False:
-            raise ValueError("complete integrated synthetic acquisition required")
+        if run["method"] != method or run["role"] != role or run["mode"] != mode or run["status"] != "passed" or run["live_authority"] is not False:
+            raise ValueError("complete matching engineering acquisition required")
         acquisition_context(run)
         events = run["events"]
         ready = [e for e in events if e["kind"] == "camera_ready"]
         complete = [e for e in events if e["kind"] == "complete"]
-        if len(ready) != 1 or ready[0]["source"] != "isolated_synthetic" or ready[0]["mode"] != run["mode"] or len(complete) != 1 or complete[0]["worker_cleanup"] is not True or complete[0]["game_alive"] is not True:
-            raise ValueError("synthetic source/cleanup proof missing")
+        if len(ready) != 1 or ready[0]["source"] != source or ready[0]["mode"] != run["mode"] or len(complete) != 1 or complete[0]["worker_cleanup"] is not True or complete[0]["game_alive"] is not True:
+            raise ValueError("matching source/cleanup proof missing")
         if len(run["viewers"]) != 2 or any(v["failures"] != 0 or v["unbound"] != 1 for v in run["viewers"]):
             raise ValueError("viewer failure/lifecycle mismatch")
         windows = run["control_windows"]
@@ -61,7 +61,7 @@ def summarize(run):
         outcomes = [e for e in events if e["kind"] == "control_result"]
         if len(dispatched) != 1 or dispatched[0]["request"]["target_fps"] != 24 or dispatched[0]["request"]["duration_ns"] != 5000000000 or dispatched[0]["live_authority"] is not False or len(outcomes) != 1:
             raise ValueError("one bounded 24 FPS request required")
-        if any(e["method"] != METHOD for e in (*native, *started, *dispatched, *outcomes)):
+        if any(e["method"] != method for e in (*native, *started, *dispatched, *outcomes)):
             raise ValueError("control event method mismatch")
         outcome = outcomes[0]
         body = outcome["result"]
@@ -81,7 +81,7 @@ def summarize(run):
         rows, boundary = [], None
         cpu, quantizer = PROFILE_ENCODERS["balanced"]
         for window, report in zip(windows, native, strict=True):
-            if report["method"] != METHOD or report["worker_identities"] != identities or len(window["quality"]) != 2:
+            if report["method"] != method or report["worker_identities"] != identities or len(window["quality"]) != 2:
                 raise ValueError("worker/offer/measurement identity changed")
             samples = report["samples"]
             if boundary is not None and samples[0]["read_start_ns"] <= boundary:
@@ -117,7 +117,13 @@ def summarize(run):
     return result
 
 
-def main():
+def summarize(run):
+    return summarize_control(run, method=METHOD, role="integrated_synthetic_control_disturbance_not_qualification",
+                             mode="engineering-disturbance", source="isolated_synthetic",
+                             qualification="unavailable_integrated_synthetic_only")
+
+
+def screen_main(assessor):
     import json
     import sys
 
@@ -128,11 +134,15 @@ def main():
             body = source.read(16 * 1024**2 + 1)
         if len(body) > 16 * 1024**2:
             raise ValueError("control receipt size bound")
-        result = summarize(json.loads(body, object_pairs_hook=strict_object))
+        result = assessor(json.loads(body, object_pairs_hook=strict_object))
     except (OSError, ValueError, TypeError):
         return 1
     print(json.dumps(result, allow_nan=False, indent=2))
     return 0 if result["control_screen"] == "met" else 1
+
+
+def main():
+    return screen_main(summarize)
 
 
 if __name__ == "__main__":

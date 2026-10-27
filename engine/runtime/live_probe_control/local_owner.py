@@ -1,4 +1,4 @@
-"""Process-local admission and explicit synthetic engineering dispatch; no live authority."""
+"""Process-local admission and explicit contained engineering dispatch; no live authority."""
 
 import copy
 import os
@@ -507,12 +507,13 @@ class LocalProbeOwner:
         config = getattr(self.service, "control", None)
         if (
             type(config) is not EngineeringControl
-            or self.service.source != "isolated_synthetic"
+            or not config.matches_source(self.service.source)
             or config.directory != self.directory
             or config.policy != self.policy
             or (config.device, config.inode) != self.directory_identity
         ):
-            raise ValueError("explicit synthetic engineering configuration required")
+            raise ValueError("explicit contained engineering configuration required")
+        config.check_capture()
         if any(not op.done.is_set() for _draft, op in self.operations.values()):
             raise ValueError("owner/session engineering action already active")
         binding = self._binding(row[0], self._now())

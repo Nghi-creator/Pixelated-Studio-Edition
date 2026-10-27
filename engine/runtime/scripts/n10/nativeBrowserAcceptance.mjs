@@ -18,8 +18,9 @@ const runtime = fileURLToPath(new URL("../../", import.meta.url));
 
 export async function runNativeBrowserAcceptance(image, mode = "production-admission") {
   if (!/^sha256:[a-f0-9]{64}$/.test(image || "")) throw new Error("explicit cached image digest required");
-  if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance"].includes(mode)) throw new Error("invalid acceptance mode");
-  const controlMode = mode === "engineering-disturbance";
+  if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"].includes(mode)) throw new Error("invalid acceptance mode");
+  const gameControl = mode === "engineering-game-disturbance";
+  const controlMode = ["engineering-disturbance", "engineering-game-disturbance"].includes(mode);
   const movingMode = ["observer-moving-off", "observer-moving-on"].includes(mode);
   const observerOff = ["observer-off", "observer-moving-off"].includes(mode);
   const diagnosticMode = mode === "observer-static-diagnostic";
@@ -207,7 +208,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     const exitCode = await exited;
     assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
     return { status: "passed", mode, live_authority: false, context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
-      ...(controlMode ? {role: "integrated_synthetic_control_disturbance_not_qualification", method: "n10-integrated-control-disturbance-v1", control_windows: controlWindows, continuity} : {}),
+      ...(controlMode ? {role: gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound })) };

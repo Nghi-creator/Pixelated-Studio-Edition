@@ -117,7 +117,8 @@ class WorkerProbePort:
             and value["ice_connection_state"] in ("connected", "completed")
             and all(value[k] is not None and value[k] > 0 for k in keys)
             and 0 <= now - self.progress_at <= LEASE_NS
-            and self.lease.healthy(),
+            and self.lease.healthy()
+            and (getattr(self.media, "capture_lease", None) is None or self.media.capture_lease.healthy()),
         )
 
     def set_fps(self, fps):
@@ -125,6 +126,8 @@ class WorkerProbePort:
             raise ValueError("setter outside exact request/preimage")
         if fps != self.prior_fps and time.monotonic_ns() > self.deadline:
             raise ValueError("probe admission expired before setter")
+        if getattr(self.media, "capture_lease", None) is not None and not self.media.capture_lease.healthy(force=True):
+            raise ValueError("owned capture identity lost before setter")
         current = self.media.snapshot()["configured_fps"]
         if current not in (self.prior_fps, self.request.target_fps):
             raise ValueError("foreign cadence cannot be overwritten")
@@ -185,7 +188,7 @@ class PeerControl:
         if (
             self.config is None
             or sys.argv[1:] != ["--dedicated-peer-worker"]
-            or self.media.bootstrap["body"]["source"] != "isolated_synthetic"
+            or not self.config.matches_source(self.media.bootstrap["body"]["source"])
         ):
             rejection = "disabled"
         elif (
@@ -197,7 +200,9 @@ class PeerControl:
         else:
             native = self.media.snapshot()
             if (
-                request.generation != Generation(**envelope["generation"])
+                (self.config.capture is not None and (getattr(self.media, "capture_lease", None) is None
+                    or not self.media.capture_lease.healthy(force=True)))
+                or request.generation != Generation(**envelope["generation"])
                 or request.generation
                 != Generation(**self.media.bootstrap["generation"])
                 or self.media.offer is None

@@ -65,6 +65,12 @@ class CameraWorkers:
             raise ValueError("invalid dedicated peer capacity")
         self.profile = {key: profile[key] for key in ("id", "fps", "bitrate_kbps")}
         self.ice_servers = json.loads(raw_ice)
+        if control is not None and (
+            type(control) is not EngineeringControl or not control.matches_source(source)
+        ):
+            raise ValueError(
+                "controller dispatch requires explicit contained engineering workers"
+            )
         command(
             Generation("check", "check", "check"),
             0,
@@ -73,14 +79,11 @@ class CameraWorkers:
                 "profile": self.profile,
                 "ice_servers": self.ice_servers,
                 "source": source,
+                **({"control": control.wire()} if control is not None else {}),
             },
         )
-        if control is not None and (
-            type(control) is not EngineeringControl or source != "isolated_synthetic"
-        ):
-            raise ValueError(
-                "controller dispatch requires explicit synthetic engineering workers"
-            )
+        if control is not None:
+            control.check_capture()
         self.control = control
         self.source, self.factory, self.maximum = source, factory, maximum
         self.active = {}

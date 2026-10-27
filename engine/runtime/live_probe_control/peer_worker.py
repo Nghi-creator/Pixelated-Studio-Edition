@@ -43,7 +43,7 @@ def caps_values(caps):
 class PeerMedia:
     def __init__(self, bootstrap, emit):
         # Only after closed bootstrap validation and only inside the dedicated child.
-        if bootstrap["body"]["source"] == "production":
+        if bootstrap["body"]["source"] != "isolated_synthetic":
             import ctypes
 
             if not ctypes.CDLL("libX11.so.6").XInitThreads():
@@ -65,6 +65,7 @@ class PeerMedia:
         self.events = queue.Queue(maxsize=128)
         self.failed = False
         self.closed = False
+        self.capture_lease = None
         self.startup_keyframe_pending = self.startup_keyframe_attempted = False
         self.startup_keyframe_accepted = None
         self.overruns = 0
@@ -100,6 +101,12 @@ class PeerMedia:
         self.pipeline = Gst.parse_launch(text)
         self.webrtc = self.pipeline.get_by_name("sendrecv")
         try:
+            if bootstrap["body"]["source"] == "isolated_game":
+                from .contained_capture import PinnedGameCapture
+                from .probe_transport import EngineeringControl
+
+                config = EngineeringControl.from_wire(bootstrap["body"]["control"])
+                self.capture_lease = PinnedGameCapture(config.capture, expected_owner=os.getppid())
             configure_ice_servers(
                 self.webrtc,
                 json.dumps(bootstrap["body"]["ice_servers"]),
@@ -303,13 +310,17 @@ class PeerMedia:
 
     def close(self):
         self.closed = True
-        result = self.pipeline.set_state(self.gst.State.NULL)
-        _, state, pending = self.pipeline.get_state(self.gst.SECOND)
-        return (
-            result != self.gst.StateChangeReturn.FAILURE
-            and state == self.gst.State.NULL
-            and pending == self.gst.State.VOID_PENDING
-        )
+        try:
+            result = self.pipeline.set_state(self.gst.State.NULL)
+            _, state, pending = self.pipeline.get_state(self.gst.SECOND)
+            return (
+                result != self.gst.StateChangeReturn.FAILURE
+                and state == self.gst.State.NULL
+                and pending == self.gst.State.VOID_PENDING
+            )
+        finally:
+            if getattr(self, "capture_lease", None) is not None:
+                self.capture_lease.close()
 
 
 def main():

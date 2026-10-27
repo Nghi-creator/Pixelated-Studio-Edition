@@ -110,13 +110,15 @@ def command_body(kind, body):
             ),
         )
         if "control" in body:
-            EngineeringControl.from_wire(body["control"])
-            if body["source"] != "isolated_synthetic":
-                raise ValueError("probe transport is synthetic engineering only")
+            config = EngineeringControl.from_wire(body["control"])
+            if not config.matches_source(body["source"]):
+                raise ValueError("probe transport requires matching contained engineering source")
         profile(body["profile"])
         ice_servers(body["ice_servers"])
-        if body["source"] not in ("production", "isolated_synthetic"):
+        if body["source"] not in ("production", "isolated_synthetic", "isolated_game"):
             raise ValueError("unsupported peer source")
+        if body["source"] == "isolated_game" and "control" not in body:
+            raise ValueError("contained game capture configuration required")
     elif kind == "offer":
         closed(body, ("sdp",))
         text(body["sdp"], 65536)

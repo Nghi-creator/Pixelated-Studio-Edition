@@ -3,6 +3,7 @@
 import time
 from dataclasses import asdict
 
+from live_probe_control.contained_capture import GameCaptureContext
 from live_probe_control.contracts import digest
 from live_probe_control.controller import GRACE_NS
 from live_probe_control.journal import CadenceJournal
@@ -15,9 +16,12 @@ DURATION_NS = 5000000000
 
 
 class ControlDisturbance:
+    source = "isolated_synthetic"
+    method = METHOD
+
     def __init__(self, service, scene, bridge, local, capability, emit):
-        if service.source != "isolated_synthetic" or type(service.control) is not EngineeringControl:
-            raise ValueError("synthetic engineering control required")
+        if service.source != self.source or type(service.control) is not EngineeringControl or not service.control.matches_source(self.source):
+            raise ValueError(self.source + " engineering control required")
         self.service, self.scene, self.bridge = service, scene, bridge
         self.local, self.capability, self.emit = local, capability, emit
         self.origin = self.stage_start = time.monotonic_ns()
@@ -59,9 +63,9 @@ class ControlDisturbance:
             self.identities = identity
         if identity != self.identities:
             raise ValueError("control screen worker/offer changed")
-        self.sampler = NativeScreen(self.service, self.scene, control_phase=self.phase)
+        self.sampler = NativeScreen(self.service, self.scene, control_phase=self.phase, record_phase=self.source == "isolated_game")
         self.stage = "measure"
-        self.emit("control_window_started", phase=self.phase, method=METHOD)
+        self.emit("control_window_started", phase=self.phase, method=self.method)
 
     def target_ready(self, slots, target):
         return all(slot.owner.last_observation[0]["configured_fps"] == (target if peer == "first" else 30)
@@ -91,7 +95,7 @@ class ControlDisturbance:
             if self.phase == "during" and self.operation.done.is_set():
                 raise ValueError("action ended inside active measurement")
             if self.sampler.sample():
-                self.emit("control_native", phase=self.phase, method=METHOD,
+                self.emit("control_native", phase=self.phase, method=self.method,
                           worker_identities=self.identities, **self.sampler.report())
                 if self.phase == "baseline":
                     draft = self.local.prepare(self.capability, self.scopes["first"], "disturbance-request", 24, DURATION_NS)
@@ -99,7 +103,7 @@ class ControlDisturbance:
                     if self.local.dispatch(self.capability, draft) is not self.operation:
                         raise ValueError("control screen duplicate dispatch")
                     self.dispatched_at = now
-                    self.emit("control_dispatched", method=METHOD, request=asdict(draft.request), live_authority=False)
+                    self.emit("control_dispatched", method=self.method, request=asdict(draft.request), live_authority=False)
                     self.stage, self.stage_start = "await-during", now
                 elif self.phase == "during":
                     self.stage = "await-result"
@@ -129,7 +133,7 @@ class ControlDisturbance:
                     journal = store.journal
                 if journal["state"] != "clean" or journal["actions"] != 1 or journal["reserved_ns"] != DURATION_NS + GRACE_NS:
                     raise ValueError("control ledger/budget mismatch")
-                self.emit("control_result", method=METHOD, result=asdict(result), ledger_state=journal["state"],
+                self.emit("control_result", method=self.method, result=asdict(result), ledger_state=journal["state"],
                           actions=journal["actions"], reserved_ns=journal["reserved_ns"])
                 self.stage, self.stage_start = "settle-restored", now
         elif self.stage == "settle-restored":
@@ -141,3 +145,15 @@ class ControlDisturbance:
         elif self.stage == "done":
             raise ValueError("control screen already complete")
         return False
+
+
+class GameControlDisturbance(ControlDisturbance):
+    source = "isolated_game"
+    method = "n10-contained-game-control-disturbance-v1"
+
+    def __init__(self, service, scene, bridge, local, capability, emit):
+        super().__init__(service, scene, bridge, local, capability, emit)
+        if service.control.capture != GameCaptureContext.from_scene(scene):
+            raise ValueError("control capture does not match exact owned scene")
+        emit("control_capture_bound", method=self.method, scope="owned_x99_game_display",
+             binding_hash=digest(asdict(service.control.capture)), live_authority=False)

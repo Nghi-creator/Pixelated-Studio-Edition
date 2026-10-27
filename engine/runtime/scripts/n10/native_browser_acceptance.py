@@ -24,9 +24,10 @@ def main():
     if sys.argv[1:] != ["--isolated-browser-acceptance"] or os.environ.get("N10_BROWSER_ACCEPTANCE") != "1":
         raise ValueError("explicit disposable acceptance opt-in required")
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance"):
+    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"):
         raise ValueError("closed acceptance mode required")
-    control_mode = mode == "engineering-disturbance"
+    game_control = mode == "engineering-game-disturbance"
+    control_mode = mode in ("engineering-disturbance", "engineering-game-disturbance")
     moving_mode = mode in ("observer-moving-off", "observer-moving-on")
     observer_off = mode in ("observer-off", "observer-moving-off")
     diagnostic_mode = mode == "observer-static-diagnostic"
@@ -101,7 +102,8 @@ def main():
 
         def workers_init(instance, *args, **kwargs):
             if mode.startswith("engineering-"):
-                kwargs.update(source="isolated_synthetic", control=EngineeringControl.open(ledger, policy))
+                kwargs.update(source="isolated_game" if game_control else "isolated_synthetic",
+                              control=EngineeringControl.open(ledger, policy, scene=scene if game_control else None))
             original_workers(instance, *args, **kwargs)
             captured["workers"] = instance
 
@@ -134,8 +136,12 @@ def main():
                 local, capability = state.get("local"), state.get("capability")
                 if state["phase"] == "control-screen":
                     if "control_screen" not in state:
-                        from control_disturbance import ControlDisturbance
-                        state["control_screen"] = ControlDisturbance(service, scene, bridge, local, capability, emit)
+                        from control_disturbance import (
+                            ControlDisturbance,
+                            GameControlDisturbance,
+                        )
+                        screen_class = GameControlDisturbance if game_control else ControlDisturbance
+                        state["control_screen"] = screen_class(service, scene, bridge, local, capability, emit)
                     if not state["control_screen"].tick():
                         return True
                     state["slots"] = list(service.active.values())
@@ -240,7 +246,7 @@ def main():
                             try:
                                 local.dispatch(capability, draft)
                             except ValueError as exc:
-                                if "explicit synthetic engineering configuration required" not in str(exc):
+                                if "explicit contained engineering configuration required" not in str(exc):
                                     raise ValueError("production dispatch rejected for an unrelated reason") from exc
                             else:
                                 raise ValueError("production worker accepted controller dispatch")

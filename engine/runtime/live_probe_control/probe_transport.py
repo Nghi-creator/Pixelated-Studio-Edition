@@ -1,4 +1,4 @@
-"""Explicit synthetic engineering configuration and bounded local operation handles."""
+"""Explicit contained engineering configuration and bounded local operation handles."""
 
 import copy
 import os
@@ -7,6 +7,7 @@ import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from .contained_capture import GameCaptureContext, PinnedGameCapture
 from .contracts import Generation, Policy, Request, Result, digest, integer
 from .journal import CadenceJournal
 
@@ -36,6 +37,7 @@ class EngineeringControl:
     policy: Policy
     device: int
     inode: int
+    capture: GameCaptureContext | None = None
 
     def __post_init__(self):
         if (
@@ -46,14 +48,17 @@ class EngineeringControl:
             raise ValueError("absolute private owner/session directory required")
         if type(self.policy) is not Policy:
             raise ValueError("typed engineering policy required")
+        if self.capture is not None and type(self.capture) is not GameCaptureContext:
+            raise ValueError("typed contained capture context required")
         integer(self.device, 0, 2**63 - 1)
         integer(self.inode, 1, 2**63 - 1)
 
     @classmethod
-    def open(cls, directory, policy):
+    def open(cls, directory, policy, *, scene=None):
         with CadenceJournal(directory) as store:
             info = os.fstat(store.directory_fd)
-            value = cls(str(directory), policy, info.st_dev, info.st_ino)
+            value = cls(str(directory), policy, info.st_dev, info.st_ino,
+                        GameCaptureContext.from_scene(scene) if scene is not None else None)
             value.check(store)
             return value
 
@@ -64,6 +69,7 @@ class EngineeringControl:
             "policy",
             "device",
             "inode",
+            *(("capture",) if "capture" in value else ()),
         }:
             raise ValueError("closed engineering configuration required")
         return cls(
@@ -71,6 +77,7 @@ class EngineeringControl:
             Policy(**value["policy"]),
             value["device"],
             value["inode"],
+            GameCaptureContext.from_wire(value["capture"]) if "capture" in value else None,
         )
 
     def check(self, store):
@@ -82,8 +89,20 @@ class EngineeringControl:
         ):
             raise ValueError("owner/session policy mismatch")
 
+    def matches_source(self, source):
+        return (source == "isolated_synthetic" and self.capture is None) or (
+            source == "isolated_game" and type(self.capture) is GameCaptureContext)
+
+    def check_capture(self):
+        if self.capture is not None:
+            with PinnedGameCapture(self.capture, expected_owner=os.getpid()):
+                pass
+
     def wire(self):
-        return asdict(self)
+        body = asdict(self)
+        if self.capture is None:
+            del body["capture"]  # Preserve the existing synthetic bootstrap shape.
+        return body
 
 
 def receiver_value(value):
