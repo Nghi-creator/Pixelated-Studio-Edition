@@ -1,6 +1,7 @@
 /** Disposable acceptance server: production auth/lobby/relay handlers, no control endpoint. */
 const http = require("node:http");
 const fs = require("node:fs");
+const readline = require("node:readline");
 const { spawn } = require("node:child_process");
 const { Server } = require("socket.io");
 const { createEngineTokenAuth } = require("../../dist/src/signaling/socketAuth.js");
@@ -36,7 +37,19 @@ io.on("connection", (socket) => {
   registerEngineErrorHandlers(socket);
 });
 server.listen(8080, "0.0.0.0", () => {
-  const camera = spawn("python3", ["-u", "/opt/repo/engine/runtime/scripts/n10/native_browser_acceptance.py", "--isolated-browser-acceptance"], { stdio: "inherit" });
+  const camera = spawn("python3", ["-u", "/opt/repo/engine/runtime/scripts/n10/native_browser_acceptance.py", "--isolated-browser-acceptance"], { stdio: ["ignore", "pipe", "inherit"] });
+  const lines = readline.createInterface({ input: camera.stdout });
+  lines.on("line", (line) => {
+    if (line.length > 65536) { camera.kill(); return; }
+    process.stdout.write(line + "\n");
+    // Only the directly owned CLI host can inject this diagnostic event.
+    // There is deliberately no socket handler accepting an injection request.
+    if (process.env.N10_BROWSER_ACCEPTANCE_MODE === "observer-static-diagnostic" && line.startsWith("N10_ACCEPTANCE ")) {
+      try {
+        if (JSON.parse(line.slice(15)).kind === "diagnostic_observer_stop") io.to("session:native_acceptance").emit("acceptance-observer-stop");
+      } catch { camera.kill(); }
+    }
+  });
   camera.on("exit", (code) => io.close(() => { process.exitCode = code === 0 ? 0 : 1; }));
   camera.on("error", () => { io.close(); process.exitCode = 1; });
 });

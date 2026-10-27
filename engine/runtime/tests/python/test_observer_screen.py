@@ -102,6 +102,13 @@ class ObserverScreenTests(unittest.TestCase):
         self.assertIsNone(result["pairs"][0]["increases"])
         self.assertTrue(result["pairs"][1]["met"])
 
+    def test_exploratory_static_case_cannot_replace_a_failed_cohort_case(self):
+        runs = cohort()
+        runs[1]["mode"] = "observer-static-diagnostic"
+        result = assess(runs)
+        self.assertEqual(result["observer_screen"], "unavailable")
+        self.assertFalse(result["live_authority"])
+
     def test_cli_does_not_report_an_incomplete_cohort_as_a_successful_gate(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "missing.json"

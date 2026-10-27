@@ -9,6 +9,7 @@ import time
 import unittest
 from contextlib import ExitStack
 from pathlib import Path
+from types import SimpleNamespace
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from live_probe_control.game_scene import GameScene
@@ -130,6 +131,46 @@ class Receiver:
     NATIVE, "requires explicitly enabled disposable Linux native runtime"
 )
 class PeerNativeTests(unittest.TestCase):
+    def test_connected_startup_request_produces_a_fresh_native_vp8_keyframe(self):
+        import gi
+
+        gi.require_version("Gst", "1.0")
+        gi.require_version("GstVideo", "1.0")
+        from gi.repository import Gst, GstVideo
+        from live_probe_control.peer_worker import PeerMedia
+
+        Gst.init(None)
+        pipeline = Gst.parse_launch("videotestsrc is-live=true ! video/x-raw,width=160,height=120,framerate=30/1 ! vp8enc name=encoder deadline=1 cpu-used=8 keyframe-max-dist=120 ! fakesink sync=false")
+        encoder = pipeline.get_by_name("encoder")
+        packets = queue.Queue(maxsize=128)
+
+        def observe(_pad, info):
+            buffer = info.get_buffer()
+            packets.put_nowait((buffer.pts, not buffer.has_flags(Gst.BufferFlags.DELTA_UNIT)))
+            return Gst.PadProbeReturn.OK
+
+        encoder.get_static_pad("src").add_probe(Gst.PadProbeType.BUFFER, observe)
+        media = PeerMedia.__new__(PeerMedia)
+        media.closed, media.offer = False, object()
+        media.startup_keyframe_pending, media.startup_keyframe_attempted = True, False
+        media.gst, media.video = Gst, GstVideo
+        media.webrtc = SimpleNamespace(get_property=lambda _: SimpleNamespace(value_nick="connected"))
+        media.pipeline = SimpleNamespace(get_by_name=lambda _: encoder)
+        try:
+            pipeline.set_state(Gst.State.PLAYING)
+            before = [packets.get(timeout=3) for _ in range(6)]
+            self.assertTrue(before[0][1])
+            self.assertTrue(all(not key for _, key in before[1:]))
+            media._request_startup_keyframe()
+            self.assertTrue(media.startup_keyframe_accepted)
+            after = [packets.get(timeout=2) for _ in range(12)]
+            self.assertEqual(sum(key for _, key in after), 1)
+            self.assertGreater(next(pts for pts, key in after if key), before[-1][0])
+            media._request_startup_keyframe()
+            self.assertTrue(all(not key for _, key in [packets.get(timeout=2) for _ in range(4)]))
+        finally:
+            pipeline.set_state(Gst.State.NULL)
+
     def test_lifetime_guard_eof_and_poll_stall_kill_only_owned_child(self):
         for stalled in (False, True):
             with self.subTest(stalled=stalled), ExitStack() as cleanup:

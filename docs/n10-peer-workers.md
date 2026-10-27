@@ -65,7 +65,17 @@ clocks, and these snapshots do not establish receiver health or probe qualificat
 
 ## Media and verification
 
-The worker builds fixed VP8 video and Opus audio branches. `production` selects
+The worker builds fixed VP8 video and Opus audio branches. Its initial encoded
+keyframe can precede transport readiness, so the first connected notification
+queues one startup keyframe request. The worker loop sends the
+[GStreamer upstream key-unit event](https://gstreamer.freedesktop.org/documentation/video/video-event.html#gst_video_event_new_upstream_force_key_unit)
+outside the notification/media callback, after rechecking connected state. There
+is only one attempt per worker, including if the encoder rejects it; repeated
+state notifications cannot create a request loop. The regular keyframe interval,
+cadence, bitrate and relief-control gates are unchanged. A replacement worker has
+its own startup lifetime and one-shot request.
+
+ `production` selects
 `:99` X capture and `auto_null.monitor`; `isolated_synthetic` selects a ball test
 source and silent audio. The peer-isolation test uses synthetic media; the
 camera adapter test uses private x99 capture and a PulseAudio null-sink monitor.

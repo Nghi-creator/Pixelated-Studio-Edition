@@ -11,7 +11,7 @@ export async function runObserverCohort(image, outputPath) {
   try {
     for (const mode of ["observer-off", "observer-on", "observer-on", "observer-off", "observer-off", "observer-on"]) {
       try { runs.push(await runNativeBrowserAcceptance(image, mode)); }
-      catch (error) { runs.push({ status: "failed", mode, live_authority: false, failure: error.message }); }
+      catch (error) { runs.push({ status: "failed", mode, live_authority: false, failure: error.message, ...(error.acquisition ? { acquisition: error.acquisition } : {}) }); }
       // Checkpoint every case, including failures, without changing its identity.
       await output.truncate(0);
       await output.write(JSON.stringify(runs, null, 2) + "\n", 0, "utf8");

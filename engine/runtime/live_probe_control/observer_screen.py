@@ -35,7 +35,7 @@ def increasing(values, maximum_gap):
     return len(values) >= 2 and all(0 < b - a <= maximum_gap for a, b in itertools.pairwise(values))
 
 
-def browser_screen(data):
+def browser_screen(data, *, require_visual_variation=True):
     if data["basis"] != "browser_performance_relative_ms" or data["failure"] is not None:
         raise ValueError("browser measurement unavailable")
     duration = number(data["duration_ms"])
@@ -61,11 +61,11 @@ def browser_screen(data):
            and dropped == freezes == 0
            and all(s["width"] == 640 and s["height"] == 480 for s in (*frames, *stats))
            and all(s["color_bins"] >= 4 and 0 <= s["at_ms"] <= duration for s in visuals)
-           and len({s["hash"] for s in visuals}) >= 3)
+           and (not require_visual_variation or len({s["hash"] for s in visuals}) >= 3))
     return {"met": met, "presented_fps": fps, "decoded_fps": decode_fps, "new_dropped": dropped, "new_freezes": freezes}
 
 
-def resources(run):
+def resources(run, *, require_game_progress=True):
     native = [event for event in run["events"] if event["kind"] == "screen_native"]
     if len(native) != 1 or native[0]["basis"] != "linux_monotonic_brackets_exact_owned_process_ticks":
         raise ValueError("native screen missing")
@@ -85,7 +85,8 @@ def resources(run):
     parent = [s["parent"] for s in samples]
     relay = [s["relay"] for s in samples]
     workers = [[s["workers"][key] for s in samples] for key in ("first", "second")]
-    if delta([s["game"] for s in samples], "cpu_ticks") <= 0:
+    game_ticks = delta([s["game"] for s in samples], "cpu_ticks")
+    if require_game_progress and game_ticks <= 0:
         raise ValueError("game progress unavailable")
     for peer in workers:
         if delta(peer, "capture_buffers") <= 0 or delta(peer, "encoded_buffers") <= 0:
@@ -105,9 +106,7 @@ def resources(run):
             "workers_peak_rss": max(sum(number(peer[index]["rss_bytes"]) for peer in workers) for index in range(len(samples)))}
 
 
-def evaluate_run(run, identity):
-    if run["status"] != "passed" or run["live_authority"] is not False:
-        raise ValueError("incomplete acquisition or live authority")
+def acquisition_context(run):
     context = run["context"]
     if type(context) is not dict or set(context) != {"image", "software_hash", "host_platform", "host_arch"}:
         raise ValueError("closed acquisition context required")
@@ -115,7 +114,13 @@ def evaluate_run(run, identity):
         raise ValueError("pinned image/software hash required")
     if not all(type(v) is str and 0 < len(v) <= 128 for v in (context["host_platform"], context["host_arch"], run["browser"])):
         raise ValueError("host/browser context unavailable")
-    key = (json.dumps(context, sort_keys=True), run["browser"])
+    return (json.dumps(context, sort_keys=True), run["browser"])
+
+
+def evaluate_run(run, identity):
+    if run["status"] != "passed" or run["live_authority"] is not False:
+        raise ValueError("incomplete acquisition or live authority")
+    key = acquisition_context(run)
     if identity is not None and identity != key:
         raise ValueError("cohort software/image/browser/context changed")
     ready = [e for e in run["events"] if e["kind"] == "camera_ready"]

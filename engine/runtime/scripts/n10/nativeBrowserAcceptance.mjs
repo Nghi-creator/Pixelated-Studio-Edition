@@ -18,13 +18,14 @@ const runtime = fileURLToPath(new URL("../../", import.meta.url));
 
 export async function runNativeBrowserAcceptance(image, mode = "production-admission") {
   if (!/^sha256:[a-f0-9]{64}$/.test(image || "")) throw new Error("explicit cached image digest required");
-  if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on"].includes(mode)) throw new Error("invalid acceptance mode");
+  if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic"].includes(mode)) throw new Error("invalid acceptance mode");
+  const diagnosticMode = mode === "observer-static-diagnostic";
   const screenMode = mode.startsWith("observer-");
   const docker = process.platform === "darwin" ? "/Applications/Docker.app/Contents/Resources/bin/docker" : "docker";
   const name = `n10-browser-native-${process.pid}-${Date.now()}`;
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "n10-browser-native-"));
   const token = randomBytes(32).toString("hex");
-  let browser, child, timer, processFailure;
+  let browser, child, timer, processFailure, softwareHash;
   const pages = [];
   const events = []; const logs = [];
   let logBytes = 0, stdoutBytes = 0;
@@ -52,7 +53,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     for (const relative of ["telemetry/receiverObservation.ts", "transport/webrtcEngineErrors.ts"]) {
       hash.update(await fs.readFile(new URL(`../../../../apps/web/src/lib/webrtc/${relative}`, import.meta.url)));
     }
-    const softwareHash = hash.digest("hex");
+    softwareHash = hash.digest("hex");
     await fs.writeFile(path.join(directory, "index.html"), nativeBrowserHtml(token));
     for (const [name, relative] of [["collector.js", "telemetry/receiverObservation.ts"], ["engine-errors.js", "transport/webrtcEngineErrors.ts"]]) {
       const source = await fs.readFile(new URL(`../../../../apps/web/src/lib/webrtc/${relative}`, import.meta.url), "utf8");
@@ -116,6 +117,17 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     for (const page of [first, second]) page.on("pageerror", (error) => pageErrors.push(error.message));
     await Promise.all([first.goto(url + "/?peer=first"), second.goto(url + "/?peer=second")]);
     let quality = null, browserResources = null;
+    const diagnosticWindows = [];
+    async function measurePages() {
+      const session = await browser.newBrowserCDPSession();
+      try {
+        const before = processCpuSample((await session.send("SystemInfo.getProcessInfo")).processInfo, Number(process.hrtime.bigint()));
+        quality = await Promise.all([first, second].map((page) => page.evaluate(() => globalThis.collectQuality())));
+        const after = processCpuSample((await session.send("SystemInfo.getProcessInfo")).processInfo, Number(process.hrtime.bigint()));
+        browserResources = { basis: "host_hrtime_browser_owned_process_cpu_separate_clock", before, after };
+        return { quality, browser_resources: browserResources };
+      } finally { await session.detach(); }
+    }
     await Promise.race([
       (async () => {
         let stopped = false;
@@ -123,12 +135,11 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
         await deadline(async () => {
           if (screenMode && !measured && events.some((event) => event.kind === "screen_started")) {
             measured = true;
-            const session = await browser.newBrowserCDPSession();
-            const before = processCpuSample((await session.send("SystemInfo.getProcessInfo")).processInfo, Number(process.hrtime.bigint()));
-            quality = await Promise.all([first, second].map((page) => page.evaluate(() => globalThis.collectQuality())));
-            const after = processCpuSample((await session.send("SystemInfo.getProcessInfo")).processInfo, Number(process.hrtime.bigint()));
-            browserResources = { basis: "host_hrtime_browser_owned_process_cpu_separate_clock", before, after };
-            await session.detach();
+            await measurePages();
+          }
+          if (diagnosticMode) {
+            const pending = events.filter((event) => event.kind === "diagnostic_started")[diagnosticWindows.length];
+            if (pending) diagnosticWindows.push({ phase: pending.phase, ...await measurePages() });
           }
           if (!stopped && events.some((event) => event.kind === "stop_first_observations")) {
             stopped = true;
@@ -151,7 +162,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       assert.ok(quality && browserResources, "read-only screen was measured");
       assert.ok(snapshots.every((snapshot) => snapshot.failures.length === 0));
       if (mode === "observer-off") assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === 0 && Object.keys(snapshot.counts).length === 0 && snapshot.unbound === 0));
-      else assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === 1 && snapshot.unbound === 1));
+      else assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === (diagnosticMode ? 2 : 1) && snapshot.unbound === 1));
     } else {
     assert.equal(snapshots[0].failures.length, 1);
     assert.equal(snapshots[0].failures[0].peerId, "first");
@@ -161,6 +172,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     assert.equal(new Set(snapshots[0].bindings).size, 2);
     assert.ok(snapshots.every((snapshot) => snapshot.unbound >= 1));
     }
+    if (diagnosticMode) assert.deepEqual(diagnosticWindows.map((window) => window.phase), ["on-1", "off", "on-2"]);
     const counters = snapshots.map((snapshot) => Object.values(snapshot.counts).map((item) => item.sequence));
     await first.waitForTimeout(450);
     const after = await Promise.all([first, second].map((page) => page.evaluate(() => globalThis.snapshot())));
@@ -169,11 +181,15 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     await reading;
     if (processFailure) throw processFailure;
     assert.equal(await exited, 0);
-    return { status: "passed", mode, live_authority: false, context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}), browser: browser.version(),
+    return { status: "passed", mode, live_authority: false, context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
+      ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound })) };
   } catch (error) {
     const diagnostics = await Promise.allSettled(pages.map((page) => page.evaluate(() => globalThis.snapshot?.())));
-    throw new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logs.join("").slice(-16000)}`, { cause: error });
+    const failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logs.join("").slice(-16000)}`, { cause: error });
+    failure.acquisition = { status: "failed", mode, live_authority: false, events, diagnostics,
+      context: { image, software_hash: softwareHash || null, host_platform: process.platform, host_arch: process.arch } };
+    throw failure;
   } finally {
     clearTimeout(timer);
     const cleanup = spawnSync(docker, ["rm", "-f", name], { encoding: "utf8", timeout: 10000 });
@@ -189,7 +205,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     if (![4, 6].includes(process.argv.length) || process.argv[2] !== "--image" || (process.argv.length === 6 && process.argv[4] !== "--mode"))
-      throw new Error("use --image sha256:<cached-image-digest> [--mode all|production-admission|engineering-complete|engineering-receiver-loss]");
+      throw new Error("use --image sha256:<cached-image-digest> [--mode all|production-admission|engineering-complete|engineering-receiver-loss|observer-static-diagnostic]");
     const selected = process.argv[5] || "all";
     const modes = selected === "all" ? ["production-admission", "engineering-complete", "engineering-receiver-loss"] : [selected];
     for (const mode of modes) console.log(JSON.stringify(await runNativeBrowserAcceptance(process.argv[3], mode), null, 2));

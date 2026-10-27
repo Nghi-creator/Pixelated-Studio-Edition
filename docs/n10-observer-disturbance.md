@@ -91,3 +91,53 @@ passes. Its scope is the read-only observer/admission path in this contained
 context. It does not qualify a relief family, controller disturbance, audio
 quality, a desktop build, other profiles/devices or held-out diagnostic evidence.
 Those require their own production-path qualification and acceptance.
+
+## Same-worker exploratory diagnostic
+
+A separate diagnostic can help distinguish changing source content from observer
+activity. It is deliberately excluded from the six-case screen above:
+
+```sh
+npm run smoke:n10-browser-native -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --mode observer-static-diagnostic
+```
+
+It waits for actual local-owner readiness on both receivers (at most eight
+seconds), then applies a fixed three-second warmup. It stops only its own game
+through an exact pidfd and holds that framebuffer while two existing workers keep
+streaming. Three native 4.5-second/browser four-second windows run in on/off/on
+order, with fixed settling periods of 500 ms, 500 ms and 1 s. Eligibility loss,
+late rebind readiness or the 30-second scenario deadline fails the diagnostic;
+there is no adaptive warmup or retry.
+
+The off interval stops the actual browser collectors through a message emitted
+only from the directly owned camera CLI host's stdout into the disposable relay.
+No network handler accepts a request to inject that message. The second on
+interval obtains new camera challenges and local receiver handles for the same
+workers. Each measured window requires unchanged worker/offer identities and
+private command counts, advancing source counters, and zero game CPU progress
+while stopped. Cleanup resumes the game using that same pidfd before normal
+owned-process teardown, including on failed acquisition.
+
+Receipts contain browser startup markers for offer/answer, connection, video track,
+first presentation and first report. Native markers record when the host detects
+connection, binding, reports and readiness, plus the game age/script position at
+freeze. These are two separate clock domains; do not subtract a browser timestamp
+from a camera timestamp or treat a polling detection time as an exact capture time.
+Structured failure receipts retain collected events and page diagnostics.
+
+Save the emitted JSON under ignored `local/`. Its descriptive summary is:
+
+```sh
+PYTHONPATH=engine/runtime python3 -m live_probe_control.observer_diagnostic \
+  "$N10_DIAGNOSTIC_OUTPUT"
+```
+
+This reports scope-specific resource contrasts and temporal/nonblank continuity,
+without requiring visual variation from a deliberately frozen scene. It does not
+apply or modify the original cohort's budgets. A static framebuffer, the same
+processes and one on/off/on sequence do not qualify moving-gameplay overhead or
+identify a general causal effect. Diagnostic state `observed` means the
+measurement was available; qualification and live authority remain unavailable.
+The ordinary screen rejects diagnostic cases and still requires game progress
+and visual variation. Never replace a failed cohort case with this diagnostic.

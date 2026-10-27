@@ -53,10 +53,11 @@ class PeerMedia:
         gi.require_version("Gst", "1.0")
         gi.require_version("GstWebRTC", "1.0")
         gi.require_version("GstSdp", "1.0")
+        gi.require_version("GstVideo", "1.0")
         from camera_config import configure_ice_servers
-        from gi.repository import Gst, GstSdp, GstWebRTC
+        from gi.repository import Gst, GstSdp, GstVideo, GstWebRTC
 
-        self.gst, self.sdp, self.rtc = Gst, GstSdp, GstWebRTC
+        self.gst, self.sdp, self.rtc, self.video = Gst, GstSdp, GstWebRTC, GstVideo
         Gst.init(None)
         self.emit = emit
         self.bootstrap = bootstrap
@@ -64,6 +65,8 @@ class PeerMedia:
         self.events = queue.Queue(maxsize=128)
         self.failed = False
         self.closed = False
+        self.startup_keyframe_pending = self.startup_keyframe_attempted = False
+        self.startup_keyframe_accepted = None
         self.overruns = 0
         self.pending_ice = []
         self.origin = time.monotonic_ns()
@@ -103,6 +106,7 @@ class PeerMedia:
                 emit=lambda _: None,
             )
             self.webrtc.connect("on-ice-candidate", self._ice)
+            self.webrtc.connect("notify::connection-state", self._connection_changed)
             for name in ("pre_encoder_queue", "post_encoder_queue"):
                 self.pipeline.get_by_name(name).connect("overrun", self._overrun)
             if (
@@ -113,6 +117,33 @@ class PeerMedia:
         except BaseException:
             self.close()
             raise
+
+    def _connection_changed(self, *_):
+        # Gst may notify from a media thread: only enqueue the one-shot intent.
+        if self.closed or self.startup_keyframe_attempted:
+            return
+        try:
+            if self.webrtc.get_property("connection-state").value_nick == "connected":
+                self.startup_keyframe_pending = True
+        except (ValueError, TypeError, AttributeError, RuntimeError):
+            return
+
+    def _request_startup_keyframe(self):
+        if self.closed or self.offer is None or not self.startup_keyframe_pending or self.startup_keyframe_attempted:
+            return
+        try:
+            connected = self.webrtc.get_property("connection-state").value_nick == "connected"
+        except (ValueError, TypeError, AttributeError, RuntimeError):
+            return
+        if not connected:
+            return
+        # The initial encoded keyframe can precede ICE/DTLS readiness. Request
+        # one fresh keyframe off callbacks; retain normal periodic encoding if
+        # a downstream implementation does not accept the request.
+        self.startup_keyframe_attempted = True
+        self.startup_keyframe_pending = False
+        event = self.video.video_event_new_upstream_force_key_unit(self.gst.CLOCK_TIME_NONE, True, 1)
+        self.startup_keyframe_accepted = self.pipeline.get_by_name("video_encoder").get_static_pad("src").send_event(event)
 
     def _overrun(self, _):
         if not self.closed:
@@ -256,6 +287,7 @@ class PeerMedia:
         return snapshot
 
     def poll(self):
+        self._request_startup_keyframe()
         if self.failed or self.pipeline.get_bus().pop_filtered(
             self.gst.MessageType.ERROR | self.gst.MessageType.EOS
         ):

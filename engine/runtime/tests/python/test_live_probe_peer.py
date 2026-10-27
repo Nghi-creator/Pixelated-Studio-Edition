@@ -402,6 +402,62 @@ class SupervisorTests(unittest.TestCase):
             self.assertEqual(peer_worker.main(), 1)
             media.assert_not_called()
 
+    def test_startup_keyframe_is_deferred_and_bounded_to_one_connected_attempt(self):
+        from unittest.mock import Mock
+
+        media = PeerMedia.__new__(PeerMedia)
+        state = SimpleNamespace(value_nick="connecting")
+        media.closed = False
+        media.offer = object()
+        media.startup_keyframe_pending = media.startup_keyframe_attempted = False
+        media.startup_keyframe_accepted = None
+        media.webrtc = SimpleNamespace(get_property=lambda _: state)
+        event, pad = object(), Mock()
+        pad.send_event.return_value = True
+        media.gst = SimpleNamespace(CLOCK_TIME_NONE=2**64 - 1)
+        media.video = SimpleNamespace(video_event_new_upstream_force_key_unit=Mock(return_value=event))
+        media.pipeline = Mock()
+        media.pipeline.get_by_name.return_value.get_static_pad.return_value = pad
+        media._connection_changed()
+        media._request_startup_keyframe()
+        pad.send_event.assert_not_called()
+        state.value_nick = "connected"
+        media._connection_changed()
+        pad.send_event.assert_not_called()  # No native event from notify callback.
+        media._request_startup_keyframe()
+        media._connection_changed()
+        media._request_startup_keyframe()
+        pad.send_event.assert_called_once_with(event)
+        media.video.video_event_new_upstream_force_key_unit.assert_called_once_with(2**64 - 1, True, 1)
+        self.assertTrue(media.startup_keyframe_accepted)
+
+    def test_startup_keyframe_rechecks_disconnect_and_never_retries_rejection(self):
+        from unittest.mock import Mock
+
+        media = PeerMedia.__new__(PeerMedia)
+        state = SimpleNamespace(value_nick="disconnected")
+        media.closed = False
+        media.offer = object()
+        media.startup_keyframe_pending, media.startup_keyframe_attempted = True, False
+        media.webrtc = SimpleNamespace(get_property=lambda _: state)
+        pad = Mock(send_event=Mock(return_value=False))
+        media.gst = SimpleNamespace(CLOCK_TIME_NONE=0)
+        media.video = SimpleNamespace(video_event_new_upstream_force_key_unit=lambda *_: object())
+        media.pipeline = Mock()
+        media.pipeline.get_by_name.return_value.get_static_pad.return_value = pad
+        media._request_startup_keyframe()
+        pad.send_event.assert_not_called()
+        state.value_nick = "connected"
+        media._request_startup_keyframe()
+        media._connection_changed()
+        media._request_startup_keyframe()
+        pad.send_event.assert_called_once()
+        self.assertFalse(media.startup_keyframe_accepted)
+        media.closed = True
+        media._connection_changed()
+        media._request_startup_keyframe()
+        pad.send_event.assert_called_once()
+
     def test_native_end_of_ice_is_not_a_candidate(self):
         import queue
 

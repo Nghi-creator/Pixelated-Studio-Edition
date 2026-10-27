@@ -21,9 +21,10 @@ def main():
     if sys.argv[1:] != ["--isolated-browser-acceptance"] or os.environ.get("N10_BROWSER_ACCEPTANCE") != "1":
         raise ValueError("explicit disposable acceptance opt-in required")
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on"):
+    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic"):
         raise ValueError("closed acceptance mode required")
-    screen_mode = mode in ("observer-off", "observer-on")
+    diagnostic_mode = mode == "observer-static-diagnostic"
+    screen_mode = mode in ("observer-off", "observer-on") or diagnostic_mode
     import gi
     import socketio
     from observer_native_screen import NativeScreen
@@ -106,8 +107,9 @@ def main():
 
         def step():
             try:
-                scene.tick()
-                if time.monotonic() - origin > 26:
+                if not (state.get("diagnostic") and state["diagnostic"].frozen):
+                    scene.tick()
+                if time.monotonic() - origin > (30 if diagnostic_mode else 26):
                     raise ValueError("integrated acceptance deadline: " + state["phase"])
                 service, bridge = captured.get("workers"), captured.get("bridge")
                 if service is None or (bridge is None and mode != "observer-off"):
@@ -116,9 +118,23 @@ def main():
                     if mode != "observer-off":
                         state["local"] = cleanup.enter_context(LocalProbeOwner(service, ledger, policy, enabled=True))
                         state["capability"] = state["local"].claim()
-                    state["phase"] = "observer-warmup" if screen_mode else "admission"
+                    state["phase"] = "observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission")
                     emit("camera_ready", mode=mode, source=service.source)
                 local, capability = state.get("local"), state.get("capability")
+                if state["phase"] == "observer-diagnostic":
+                    if "diagnostic" not in state:
+                        from observer_static_diagnostic import ObserverStaticDiagnostic
+                        state["diagnostic"] = ObserverStaticDiagnostic(service, scene, bridge, local, capability, emit, captured["client"])
+                        cleanup.callback(state["diagnostic"].close)
+                    if not state["diagnostic"].tick():
+                        return True
+                    if (Path(ledger) / "journal.json").exists():
+                        raise ValueError("diagnostic created action journal")
+                    state["slots"] = list(service.active.values())
+                    state["phase"] = "disconnected"
+                    state["disconnect_thread"] = threading.Thread(target=captured["client"].disconnect, daemon=True)
+                    state["disconnect_thread"].start()
+                    return True
                 if state["phase"] == "observer-warmup":
                     slots = [service.active.get(peer_id) for peer_id in ("first", "second")]
                     if any(slot is None or slot.owner is None or slot.owner.last_snapshot is None for slot in slots):
@@ -267,6 +283,8 @@ def main():
                 return True
             except Exception as exc:  # noqa: BLE001 -- fail the owned acceptance run, never repair observations
                 state["failure"] = type(exc).__name__ + ": " + str(exc)
+                if state.get("diagnostic"):
+                    emit("diagnostic_trace", **state["diagnostic"].trace())
                 emit("failed", reason=state["failure"])
                 state["timer_finished"] = True
                 os.kill(os.getpid(), signal.SIGTERM)
