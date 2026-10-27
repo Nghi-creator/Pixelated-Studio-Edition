@@ -117,7 +117,7 @@ def acquisition_context(run):
     return (json.dumps(context, sort_keys=True), run["browser"])
 
 
-def evaluate_run(run, identity):
+def evaluate_run(run, identity, *, on_mode="observer-on"):
     if run["status"] != "passed" or run["live_authority"] is not False:
         raise ValueError("incomplete acquisition or live authority")
     key = acquisition_context(run)
@@ -129,22 +129,22 @@ def evaluate_run(run, identity):
         raise ValueError("production source/cleanup proof unavailable")
     if len(run["quality"]) != 2:
         raise ValueError("two real viewer windows required")
-    if len(run["viewers"]) != 2 or any(v["failures"] != 0 or v["unbound"] != (1 if run["mode"] == "observer-on" else 0) for v in run["viewers"]):
+    if len(run["viewers"]) != 2 or any(v["failures"] != 0 or v["unbound"] != (1 if run["mode"] == on_mode else 0) for v in run["viewers"]):
         raise ValueError("observer condition/lifecycle mismatch")
     return {"mode": run["mode"], "state": "measured", "viewers": [browser_screen(data) for data in run["quality"]],
             "resources": resources(run)}, key
 
 
-def assess(runs):
-    result = {"method": METHOD, "live_authority": False, "qualification": "unavailable_engineering_only",
+def assess_cohort(runs, *, method, order, evaluate, pair_check=None):
+    result = {"method": method, "live_authority": False, "qualification": "unavailable_engineering_only",
               "perceptual_quality": "not_evaluated", "observer_screen": "unavailable", "runs": [], "pairs": []}
     try:
-        if type(runs) is not list or len(runs) != 6 or tuple(r["mode"] for r in runs) != ORDER:
+        if type(runs) is not list or len(runs) != 6 or tuple(r["mode"] for r in runs) != order:
             raise ValueError("complete predeclared order required")
         identity, missing = None, []
         for index, run in enumerate(runs):
             try:
-                row, identity = evaluate_run(run, identity)
+                row, identity = evaluate(run, identity)
                 result["runs"].append(row)
             except (ValueError, KeyError, TypeError, IndexError, OverflowError) as exc:
                 missing.append(str(index) + ": " + str(exc))
@@ -154,6 +154,14 @@ def assess(runs):
             if a["state"] != "measured" or b["state"] != "measured":
                 result["pairs"].append({"off": off, "on": on, "increases": None, "met": None})
                 continue
+            if pair_check is not None:
+                try:
+                    pair_check(a, b)
+                except (ValueError, KeyError, TypeError, IndexError, OverflowError) as exc:
+                    reason = "pair " + str(off) + "/" + str(on) + ": " + str(exc)
+                    missing.append(reason)
+                    result["pairs"].append({"off": off, "on": on, "increases": None, "met": None, "reason": reason})
+                    continue
             increases = {key: b["resources"][key] - a["resources"][key] for key, _ in LIMITS}
             result["pairs"].append({"off": off, "on": on, "increases": increases,
                                     "met": all(increases[key] <= maximum for key, maximum in LIMITS)})
@@ -166,7 +174,11 @@ def assess(runs):
     return result
 
 
-def main():
+def assess(runs):
+    return assess_cohort(runs, method=METHOD, order=ORDER, evaluate=evaluate_run)
+
+
+def cohort_main(assessor):
     if len(sys.argv) != 2:
         return 2
     try:
@@ -174,11 +186,15 @@ def main():
             body = source.read(16 * 1024**2 + 1)
         if len(body) > 16 * 1024**2:
             raise ValueError("cohort size bound")
-        result = assess(json.loads(body, object_pairs_hook=strict_object))
+        result = assessor(json.loads(body, object_pairs_hook=strict_object))
     except (OSError, ValueError, TypeError):
         return 1
     print(json.dumps(result, allow_nan=False, indent=2))
     return 0 if result["observer_screen"] == "met" else 1
+
+
+def main():
+    return cohort_main(assess)
 
 
 if __name__ == "__main__":

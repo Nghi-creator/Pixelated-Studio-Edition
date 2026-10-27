@@ -193,9 +193,10 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     await Promise.all([first, second].map((page) => page.evaluate(() => globalThis.cleanup())));
     await reading;
     if (processFailure) throw processFailure;
-    assert.equal(await exited, 0);
+    const exitCode = await exited;
+    assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
     return { status: "passed", mode, live_authority: false, context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
-      ...(movingMode ? {role: "moving_acquisition_rehearsal_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
+      ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound })) };
   } catch (error) {

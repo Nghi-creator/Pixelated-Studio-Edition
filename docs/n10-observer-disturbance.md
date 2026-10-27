@@ -170,7 +170,7 @@ and window edges. Browser startup markers retain their separate page clock.
 The normal four-second browser and at least 4.5-second native sampling windows,
 resource limits, cleanup requirements and default-off production settings apply.
 
-These modes emit the role `moving_acquisition_rehearsal_not_qualification`. They
+These modes emit the role `moving_acquisition_not_qualification`. They
 are not accepted by the original six-case assessor. Matching script age does
 not prove identical game state, source pixels or host scheduling; the receipt
 explicitly records `source_content_matched: false`. A subsequent cost comparison
@@ -178,3 +178,53 @@ must predeclare its own complete order, eligibility and phase-comparability
 rules before acquisition. Keep original failed cohorts and budgets intact;
 rehearsal success grants no observer-cost, control-action or perceptual/audio
 qualification and no live authority.
+
+## Separate moving-workload cost cohort
+
+Use a new exclusive output path and select the moving protocol explicitly:
+
+```sh
+npm run smoke:n10-observer-cost -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --output "$N10_COHORT_OUTPUT" --protocol moving-v2
+PYTHONPATH=engine/runtime python3 -m live_probe_control.observer_moving_screen \
+  "$N10_COHORT_OUTPUT"
+```
+
+The offline method is `n10-observer-moving-disturbance-v2`. It uses the same six
+independent off/on, on/off, off/on sessions, matched pair indices, temporal/nonblank
+checks and resource budgets as v1. Its acquisition modes are the presentation-gated
+moving modes above. The default acquisition protocol remains `v1`. Neither
+assessor accepts the other protocol's cases; rehearsal cases with the earlier
+rehearsal-only role cannot substitute for this cohort.
+
+Each moving case additionally requires exactly one eligibility, window-start and
+window-end phase trace, agreeing with the acquisition events. Eligibility must
+occur within eight native seconds, after at least three seconds of game loading,
+with zero input actions and at most 50 ms of script age. Measurement must start
+at script age 3.00–3.15 s with eight actions and end at 7.50–8.15 s. Every native
+sample must retain advancing integral script ages, consistent game/script origins
+and the fixed 400 ms input schedule with at most 150 ms input lateness. Phase
+edges must cover the native samples within 50 ms, and relative phase/native clock
+increments must agree within 50 ms. Game/script clock origins and relative edge
+timing must agree within 1 ms. Both initial browser traces must show a first
+presentation within one second after connection in their own page clocks.
+
+For each off/on pair, the script ages **and game ages** at both window edges must
+differ by at most 150 ms. An unavailable or incomparable pair has null cost deltas
+and cannot pass; later pairs are still assessed. Every case, viewer and comparable
+pair must pass, without averages, retries or replacement. Acquisition failures
+remain in their original positions, and unknown cleanup stops acquisition.
+
+A met result is only this contained read-only observer/admission engineering cost
+screen. It does not establish identical source pixels or a causal observer effect,
+qualify an actual relief/control action, or evaluate perceptual/audio/desktop
+quality. Those claims remain unavailable, and live authority remains false.
+Preserve earlier cohorts and freeze any new protocol before collecting its results.
+
+
+The acquisition also requires the camera/container to exit successfully. A media
+`complete` event alone cannot establish process cleanup. Disposable CLI receipts
+include shutdown stages and the owned camera's exit code/signal. If a host stalls,
+a 35-second Python stack dump precedes the fixed 42-second container timeout.
+These diagnostics do not extend deadlines or turn a timeout into a valid case.
+Separate shutdown failure drills cannot replace missing cohort cases.

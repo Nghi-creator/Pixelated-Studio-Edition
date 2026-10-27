@@ -1,5 +1,6 @@
 """Opt-in contained test host. Real camera/socket/media; local hooks never exposed on the network."""
 
+import faulthandler
 import json
 import os
 import runpy
@@ -50,7 +51,12 @@ def main():
 
     with ExitStack() as cleanup:
         scene = GameScene(defer_script=moving_mode)
-        cleanup.callback(scene.close)
+        def close_scene():
+            emit("host_shutdown", stage="scene_close_start")
+            if not scene.close():
+                raise ValueError("owned game/display cleanup unconfirmed")
+            emit("host_shutdown", stage="scene_closed")
+        cleanup.callback(close_scene)
         original_popen = subprocess.Popen
 
         def private_x99(argv, *args, **kwargs):
@@ -323,13 +329,16 @@ def main():
         try:
             with patch.object(CameraWorkers, "__init__", workers_init), patch.object(BrowserReceiverBridge, "__init__", bridge_init), patch.object(socketio.Client, "connect", camera_connect):
                 runpy.run_path(str(RUNTIME / "camera.py"), run_name="__main__")
+                emit("host_shutdown", stage="camera_loop_returned")
         finally:
             if state.get("disconnect_thread"):
                 state["disconnect_thread"].join(timeout=3)
                 if state["disconnect_thread"].is_alive():
                     state["failure"] = "injected signaling disconnect did not finish"
+            emit("host_shutdown", stage="disconnect_thread_joined")
             if captured.get("client"):
                 captured["client"].disconnect()
+            emit("host_shutdown", stage="socket_closed")
             if state["phase"] not in ("complete",) and not state["failure"]:
                 state["failure"] = "camera exited before acceptance completion"
             if not state.get("timer_finished"):
@@ -337,6 +346,14 @@ def main():
         if state["failure"]:
             raise ValueError(state["failure"])
 
+    emit("host_shutdown", stage="scope_closed")
+
 
 if __name__ == "__main__":
-    main()
+    # Disposable harness diagnosis only: leave stacks before the outer 42s kill.
+    faulthandler.enable()
+    faulthandler.dump_traceback_later(35)
+    try:
+        main()
+    finally:
+        faulthandler.cancel_dump_traceback_later()

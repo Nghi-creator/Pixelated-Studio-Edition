@@ -50,6 +50,9 @@ server.listen(8080, "0.0.0.0", () => {
       } catch { camera.kill(); }
     }
   });
-  camera.on("exit", (code) => io.close(() => { process.exitCode = code === 0 ? 0 : 1; }));
+  camera.on("exit", (code, signal) => {
+    process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "camera_process_exit", code, signal }) + "\n");
+    io.close(() => { process.exitCode = code === 0 ? 0 : 1; });
+  });
   camera.on("error", () => { io.close(); process.exitCode = 1; });
 });
