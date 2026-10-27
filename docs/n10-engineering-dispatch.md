@@ -149,3 +149,10 @@ replacement budget retention and dirty-intent blocking. Production activation
 still requires desktop acceptance, supported quality/disturbance bounds and
 qualification through the actual production path. This engineering option does
 not satisfy those conditions or close N10.
+
+
+The [integrated synthetic disturbance screen](n10-control-disturbance.md) adds
+baseline/active/restored measurements for both the controlled peer and its
+unchanged sibling, plus continuous presentation traces across the setters. It
+uses the same synthetic-only local dispatch boundary and does not enable real
+game capture control or establish perceptual/audio/desktop qualification.

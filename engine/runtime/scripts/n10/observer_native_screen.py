@@ -6,8 +6,11 @@ from pathlib import Path
 
 
 class NativeScreen:
-    def __init__(self, service, scene, *, record_phase=False):
+    def __init__(self, service, scene, *, record_phase=False, control_phase=None):
         self.service, self.scene = service, scene
+        if control_phase not in (None, "baseline", "during", "restored"):
+            raise ValueError("closed control measurement phase required")
+        self.control_phase = control_phase
         self.record_phase = record_phase
         self.identities, self.samples = {}, []
         self.started = self.next_at = None
@@ -40,15 +43,18 @@ class NativeScreen:
             body = observation[0]
             if not body or body["connection_state"] != "connected" or body["ice_connection_state"] not in ("connected", "completed"):
                 raise ValueError("measurement connection unavailable")
-            if any(body[k] != v for k, v in {"configured_fps": 30, "negotiated_fps": 30, "width": 640, "height": 480}.items()):
+            fps = 24 if self.control_phase == "during" and peer_id == "first" else 30
+            if any(body[k] != v for k, v in {"configured_fps": fps, "negotiated_fps": fps, "width": 640, "height": 480, "target_bitrate": 1500000, "cpu_used": 6, "max_quantizer": 48}.items()):
                 raise ValueError("measurement profile/caps changed")
             workers[peer_id] = {**self.process(peer_id, slot.owner.child), "capture_buffers": body["capture_buffers"], "encoded_buffers": body["encoded_buffers"]}
+            workers[peer_id]["settings"] = {key: body[key] for key in (
+                "configured_fps", "negotiated_fps", "width", "height", "target_bitrate", "cpu_used", "max_quantizer")}
         parent, relay, game = self.process("parent"), self.process("relay", parent=True), self.scene.resources()
         self.samples.append({"read_start_ns": start, "read_end_ns": time.monotonic_ns(), "parent": parent, "relay": relay, "workers": workers, "game": game, **({"game_phase": self.scene.phase()} if self.record_phase else {})})
         if len(self.samples) > 24:
             raise ValueError("native screen sample bound")
         self.next_at = now + 250000000
-        return now - self.started >= 4500000000
+        return now - self.started >= (2500000000 if self.control_phase is not None else 4500000000)
 
     def report(self):
         return {"basis": "linux_monotonic_brackets_exact_owned_process_ticks", "ticks_per_second": os.sysconf("SC_CLK_TCK"), "samples": self.samples}

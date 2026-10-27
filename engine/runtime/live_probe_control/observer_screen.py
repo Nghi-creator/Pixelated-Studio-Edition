@@ -35,12 +35,14 @@ def increasing(values, maximum_gap):
     return len(values) >= 2 and all(0 < b - a <= maximum_gap for a, b in itertools.pairwise(values))
 
 
-def browser_screen(data, *, require_visual_variation=True):
+def browser_screen(data, *, require_visual_variation=True, measurement_ms=4000, expected_fps=30):
+    if measurement_ms not in (2000, 4000) or expected_fps not in (24, 30):
+        raise ValueError("closed measurement duration/rate required")
     if data["basis"] != "browser_performance_relative_ms" or data["failure"] is not None:
         raise ValueError("browser measurement unavailable")
     duration = number(data["duration_ms"])
     frames, stats, visuals = data["frames"], data["stats"], data["visuals"]
-    if not 4000 <= duration <= 4500 or not 2 <= len(frames) <= 300 or not 2 <= len(stats) <= 32 or not 2 <= len(visuals) <= 16:
+    if not measurement_ms <= duration <= measurement_ms + 500 or not 2 <= len(frames) <= 300 or not 2 <= len(stats) <= 32 or not 2 <= len(visuals) <= 16:
         raise ValueError("measurement window/sample bound")
     frame_times = [number(s["at_ms"]) for s in frames]
     pts = [number(s["pts_ms"]) for s in frames]
@@ -55,7 +57,7 @@ def browser_screen(data, *, require_visual_variation=True):
     fps, decode_fps = 1000 * presented / span, 1000 * decoded / stats_span
     for s in visuals:
         number(s["at_ms"]); number(s["hash"]); number(s["color_bins"])
-    met = (data["connection_state"] == "connected" and 27 <= fps <= 33 and 27 <= decode_fps <= 33
+    met = (data["connection_state"] == "connected" and 0.9 * expected_fps <= fps <= 1.1 * expected_fps and 0.9 * expected_fps <= decode_fps <= 1.1 * expected_fps
            and increasing(frame_times, 250) and increasing(pts, 250)
            and frame_times[0] <= 250 and duration - frame_times[-1] <= 250
            and dropped == freezes == 0
@@ -65,15 +67,18 @@ def browser_screen(data, *, require_visual_variation=True):
     return {"met": met, "presented_fps": fps, "decoded_fps": decode_fps, "new_dropped": dropped, "new_freezes": freezes}
 
 
-def resources(run, *, require_game_progress=True):
+def resources(run, *, require_game_progress=True, duration_ns=4500000000):
+    if duration_ns not in (2500000000, 4500000000):
+        raise ValueError("closed native measurement duration required")
     native = [event for event in run["events"] if event["kind"] == "screen_native"]
     if len(native) != 1 or native[0]["basis"] != "linux_monotonic_brackets_exact_owned_process_ticks":
         raise ValueError("native screen missing")
     samples = native[0]["samples"]
-    if not 16 <= len(samples) <= 24:
+    minimum, maximum = (10, 14) if duration_ns == 2500000000 else (16, 24)
+    if not minimum <= len(samples) <= maximum:
         raise ValueError("native sample bound")
     stamps = [number(s["read_start_ns"]) for s in samples]
-    if not increasing(stamps, 500000000) or not 4500000000 <= stamps[-1] - stamps[0] <= 5000000000:
+    if not increasing(stamps, 500000000) or not duration_ns <= stamps[-1] - stamps[0] <= duration_ns + 500000000:
         raise ValueError("native window/clock gap")
     if any(not 0 <= number(s["read_end_ns"]) - s["read_start_ns"] <= 50000000 for s in samples):
         raise ValueError("native read bracket unavailable")
@@ -96,7 +101,7 @@ def resources(run, *, require_game_progress=True):
     if browser["basis"] != "host_hrtime_browser_owned_process_cpu_separate_clock" or not a["inventory_hash"] or (a["inventory_hash"], a["process_count"]) != (b["inventory_hash"], b["process_count"]):
         raise ValueError("browser process inventory changed")
     duration = number(b["host_at_ns"]) - number(a["host_at_ns"])
-    if not 4 * 10**9 <= duration <= 5 * 10**9:
+    if not duration_ns - 500000000 <= duration <= duration_ns + 500000000:
         raise ValueError("browser resource window unavailable")
     return {"parent_cpu": scale * delta(parent, "cpu_ticks"), "relay_cpu": scale * delta(relay, "cpu_ticks"),
             "relay_peak_rss": max(number(s["rss_bytes"]) for s in relay),

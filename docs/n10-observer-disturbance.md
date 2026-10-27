@@ -3,7 +3,7 @@
 The optional browser observation relay and local-owner admission path have a
 separate, fixed engineering cost screen. It compares observer-off with observer-on
 using actual production x99/Pulse capture, a private scripted Frozen-Bubble level,
-two balanced 640×480/30 FPS VP8 peers, authenticated signaling and fresh Chromium.
+two balanced 640×480/30 FPS VP8 peers at 1500 kbps, authenticated signaling and fresh Chromium.
 There is no cadence action, remote control command or live probe authority.
 
 ## Acquisition
@@ -241,3 +241,11 @@ Shutdown still awaits Socket.IO/server closure and preserves nonzero camera exit
 status; it does not force a successful exit or weaken the media/worker checks.
 These ownership rules apply to this acceptance fixture, not the production server.
 The normal engine test command includes HTTP and upgraded-socket close regressions.
+
+
+The acceptance host serializes its camera profile using the public `bitrateKbps`
+wire key, then retains the parsed worker profile and per-sample encoder settings.
+Native sampling requires 1,500,000 bit/s, CPU setting 6 and quantizer limit 48,
+along with the expected cadence and dimensions. A configuration fallback or
+unrelated setting change fails acquisition. Historical receipts remain scoped to
+their own source/settings; do not infer this profile from a method name alone.

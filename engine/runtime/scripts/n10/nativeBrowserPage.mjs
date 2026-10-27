@@ -4,6 +4,7 @@ export function nativeBrowserHtml(token) {
 <script src="/socket.io/socket.io.js"></script><script type="module">
 import {startReceiverObservation,offerDigest} from '/collector.js';
 import {collectBrowserQuality} from '/quality.js';
+import {startControlContinuity} from '/continuity.js';
 import {bindWebRTCEngineErrors} from '/engine-errors.js';
 const socket=io({auth:{token:${JSON.stringify(token)}},transports:['websocket'],reconnection:false});
 const initial=new URLSearchParams(location.search).get('peer');
@@ -37,7 +38,10 @@ socket.on('webrtc-receiver-unbind',message=>{if(active&&message.peerId===active.
 socket.on('acceptance-observer-stop',()=>{if(active)active.stop();});
 socket.on('disconnect',()=>{if(active)active.stop();});
 window.snapshot=()=>({problem:window.problem,failures:window.failures,counts:window.counts,bindings:window.bindings,unbound:window.unbound,state:active?.pc.connectionState,timelines:window.timelines,timeline_basis:'page_performance_ms_no_native_alignment'});
-window.collectQuality=()=>collectBrowserQuality(active.pc,video);
+window.collectQuality=(duration=4000)=>collectBrowserQuality(active.pc,video,duration);
+let stopContinuity=null;
+window.startControlTrace=()=>{if(stopContinuity)throw Error('trace already started');stopContinuity=startControlContinuity(active.pc,video);};
+window.stopControlTrace=()=>{if(!stopContinuity)throw Error('trace not started');return stopContinuity();};
 window.stopObservations=()=>{if(active)active.stop();return video.getVideoPlaybackQuality().totalVideoFrames;};
 window.videoFrames=()=>video.getVideoPlaybackQuality().totalVideoFrames;
 window.cleanup=()=>{stop();socket.disconnect();};

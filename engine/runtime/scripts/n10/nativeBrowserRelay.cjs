@@ -11,7 +11,7 @@ const { createLobbyManager } = require("../../dist/src/signaling/lobby/lobby.js"
 const { registerSignalingRelayHandlers, createSignalingPeerRegistry } = require("../../dist/src/signaling/signalingRelay.js");
 const { registerEngineErrorHandlers } = require("../../dist/src/signaling/engineErrorHandlers.js");
 const { joinSession } = require("../../dist/src/signaling/sessionRooms.js");
-const files = new Map(["index.html", "collector.js", "engine-errors.js", "quality.js"].map((name) => ["/" + name, fs.readFileSync("/acceptance/" + name)]));
+const files = new Map(["index.html", "collector.js", "engine-errors.js", "quality.js", "continuity.js"].map((name) => ["/" + name, fs.readFileSync("/acceptance/" + name)]));
 const server = http.createServer((req, res) => {
   const pathname = new URL(req.url, "http://localhost").pathname;
   const name = pathname === "/" ? "/index.html" : pathname;

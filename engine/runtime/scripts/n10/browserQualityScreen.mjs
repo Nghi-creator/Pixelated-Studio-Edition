@@ -1,6 +1,6 @@
 /** Serialized into the disposable page; identical measurement overhead in on/off cases. */
 export async function collectBrowserQuality(pc, video, durationMs = 4000) {
-  if (durationMs !== 4000 || pc.connectionState !== "connected" || !video.requestVideoFrameCallback) throw new Error("quality screen unavailable");
+  if (![2000, 4000].includes(durationMs) || pc.connectionState !== "connected" || !video.requestVideoFrameCallback) throw new Error("quality screen unavailable");
   const start = performance.now();
   const frames = [], stats = [], visuals = [];
   let frameId, busy = false, failure = null, closed = false, identity = null;

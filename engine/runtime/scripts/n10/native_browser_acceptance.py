@@ -14,6 +14,8 @@ from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
 
+ACCEPTANCE_PROFILE = {"id": "balanced", "fps": 30, "bitrateKbps": 1500}
+
 RUNTIME = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RUNTIME))
 
@@ -22,12 +24,13 @@ def main():
     if sys.argv[1:] != ["--isolated-browser-acceptance"] or os.environ.get("N10_BROWSER_ACCEPTANCE") != "1":
         raise ValueError("explicit disposable acceptance opt-in required")
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on"):
+    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance"):
         raise ValueError("closed acceptance mode required")
+    control_mode = mode == "engineering-disturbance"
     moving_mode = mode in ("observer-moving-off", "observer-moving-on")
     observer_off = mode in ("observer-off", "observer-moving-off")
     diagnostic_mode = mode == "observer-static-diagnostic"
-    screen_mode = mode in ("observer-off", "observer-on") or diagnostic_mode or moving_mode
+    screen_mode = mode in ("observer-off", "observer-on") or diagnostic_mode or moving_mode or control_mode
     import gi
     import socketio
     from observer_native_screen import NativeScreen
@@ -73,7 +76,7 @@ def main():
             "PULSE_SERVER": "127.0.0.1", "XDG_RUNTIME_DIR": directory,
             "XDG_CONFIG_HOME": directory + "/config", "PIXELATED_DEDICATED_PEER_WORKERS": "1",
             "PIXELATED_RECEIVER_OBSERVATIONS": "0" if observer_off else "1", "PIXELATED_MAX_STREAM_PEERS": "3",
-            "PIXELATED_SESSION_ID": "native_acceptance", "PIXELATED_STREAM_PROFILE": '{"id":"balanced","fps":30,"bitrate_kbps":1500}',
+            "PIXELATED_SESSION_ID": "native_acceptance", "PIXELATED_STREAM_PROFILE": json.dumps(ACCEPTANCE_PROFILE),
             "PIXELATED_CAMERA_PEER_STATE_PATH": directory + "/peers.json",
             "PIXELATED_CAMERA_TELEMETRY_STATE_PATH": directory + "/telemetry.json",
         }))
@@ -111,7 +114,7 @@ def main():
             return original_connect(instance, *args, **kwargs)
 
         ledger = cleanup.enter_context(tempfile.TemporaryDirectory())
-        policy = Policy(24, 60, 2 * 10**9, 3, 12 * 10**9, 10**9, 20, 100000000)
+        policy = Policy(24, 60, (5 if control_mode else 2) * 10**9, 3, 12 * 10**9, 10**9, 20, 100000000)
 
         def step():
             try:
@@ -126,9 +129,20 @@ def main():
                     if not observer_off:
                         state["local"] = cleanup.enter_context(LocalProbeOwner(service, ledger, policy, enabled=True))
                         state["capability"] = state["local"].claim()
-                    state["phase"] = "observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission")
-                    emit("camera_ready", mode=mode, source=service.source)
+                    state["phase"] = "control-screen" if control_mode else ("observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission"))
+                    emit("camera_ready", mode=mode, source=service.source, profile=service.profile)
                 local, capability = state.get("local"), state.get("capability")
+                if state["phase"] == "control-screen":
+                    if "control_screen" not in state:
+                        from control_disturbance import ControlDisturbance
+                        state["control_screen"] = ControlDisturbance(service, scene, bridge, local, capability, emit)
+                    if not state["control_screen"].tick():
+                        return True
+                    state["slots"] = list(service.active.values())
+                    state["phase"] = "disconnected"
+                    state["disconnect_thread"] = threading.Thread(target=captured["client"].disconnect, daemon=True)
+                    state["disconnect_thread"].start()
+                    return True
                 if state["phase"] == "observer-diagnostic":
                     if "diagnostic" not in state:
                         from observer_static_diagnostic import ObserverStaticDiagnostic

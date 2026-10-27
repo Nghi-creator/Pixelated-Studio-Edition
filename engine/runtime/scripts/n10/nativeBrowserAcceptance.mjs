@@ -18,11 +18,12 @@ const runtime = fileURLToPath(new URL("../../", import.meta.url));
 
 export async function runNativeBrowserAcceptance(image, mode = "production-admission") {
   if (!/^sha256:[a-f0-9]{64}$/.test(image || "")) throw new Error("explicit cached image digest required");
-  if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on"].includes(mode)) throw new Error("invalid acceptance mode");
+  if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance"].includes(mode)) throw new Error("invalid acceptance mode");
+  const controlMode = mode === "engineering-disturbance";
   const movingMode = ["observer-moving-off", "observer-moving-on"].includes(mode);
   const observerOff = ["observer-off", "observer-moving-off"].includes(mode);
   const diagnosticMode = mode === "observer-static-diagnostic";
-  const screenMode = mode.startsWith("observer-");
+  const screenMode = mode.startsWith("observer-") || controlMode;
   const docker = process.platform === "darwin" ? "/Applications/Docker.app/Contents/Resources/bin/docker" : "docker";
   const name = `n10-browser-native-${process.pid}-${Date.now()}`;
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "n10-browser-native-"));
@@ -64,10 +65,11 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       }).outputText);
     }
     await fs.copyFile(new URL("./browserQualityScreen.mjs", import.meta.url), path.join(directory, "quality.js"));
+    await fs.copyFile(new URL("./controlContinuity.mjs", import.meta.url), path.join(directory, "continuity.js"));
     // Readable by the image's unprivileged UID on native Linux bind mounts too.
     // These assets contain only this disposable test's ephemeral pairing token.
     await fs.chmod(directory, 0o755);
-    for (const asset of ["index.html", "collector.js", "engine-errors.js", "quality.js"]) await fs.chmod(path.join(directory, asset), 0o644);
+    for (const asset of ["index.html", "collector.js", "engine-errors.js", "quality.js", "continuity.js"]) await fs.chmod(path.join(directory, asset), 0o644);
     const args = ["run", "--rm", "--init", "--name", name, "--pull", "never", "--read-only", "--cap-drop", "ALL",
       "--security-opt", "no-new-privileges", "--cpus", "2", "--memory", "768m", "--pids-limit", "256",
       "--network", "bridge", "--publish", "127.0.0.1::8080", "--tmpfs", "/tmp:rw,nosuid,nodev,noexec,size=96m",
@@ -130,12 +132,12 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       await fs.rename(marker, path.join(directory, "presented.json"));
     }
     let quality = null, browserResources = null;
-    const diagnosticWindows = [];
-    async function measurePages() {
+    const diagnosticWindows = [], controlWindows = [];
+    async function measurePages(durationMs = 4000) {
       const session = await browser.newBrowserCDPSession();
       try {
         const before = processCpuSample((await session.send("SystemInfo.getProcessInfo")).processInfo, Number(process.hrtime.bigint()));
-        quality = await Promise.all([first, second].map((page) => page.evaluate(() => globalThis.collectQuality())));
+        quality = await Promise.all([first, second].map((page) => page.evaluate((duration) => globalThis.collectQuality(duration), durationMs)));
         const after = processCpuSample((await session.send("SystemInfo.getProcessInfo")).processInfo, Number(process.hrtime.bigint()));
         browserResources = { basis: "host_hrtime_browser_owned_process_cpu_separate_clock", before, after };
         return { quality, browser_resources: browserResources };
@@ -149,6 +151,13 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
           if (screenMode && !measured && events.some((event) => event.kind === "screen_started")) {
             measured = true;
             await measurePages();
+          }
+          if (controlMode) {
+            const pending = events.filter((event) => event.kind === "control_window_started")[controlWindows.length];
+            if (pending) {
+              if (controlWindows.length === 0) await Promise.all(pages.map((page) => page.evaluate(() => globalThis.startControlTrace())));
+              controlWindows.push({ phase: pending.phase, ...await measurePages(2000) });
+            }
           }
           if (diagnosticMode) {
             const pending = events.filter((event) => event.kind === "diagnostic_started")[diagnosticWindows.length];
@@ -167,6 +176,8 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("outer acceptance deadline")), 36000); }),
     ]);
     if (!observerOff) await Promise.all([first, second].map((page) => page.waitForFunction(() => globalThis.unbound >= 1, undefined, { timeout: 2000 })));
+    const continuity = controlMode ? await Promise.all(pages.map((page) => page.evaluate(() => globalThis.stopControlTrace()))) : null;
+    if (controlMode) assert.deepEqual(controlWindows.map((window) => window.phase), ["baseline", "during", "restored"]);
     const snapshots = await Promise.all([first, second].map((page) => page.evaluate(() => globalThis.snapshot())));
     assert.deepEqual(pageErrors, []);
     assert.equal(snapshots[0].problem, null);
@@ -196,6 +207,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     const exitCode = await exited;
     assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
     return { status: "passed", mode, live_authority: false, context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
+      ...(controlMode ? {role: "integrated_synthetic_control_disturbance_not_qualification", method: "n10-integrated-control-disturbance-v1", control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound })) };
