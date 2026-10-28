@@ -38,7 +38,10 @@ settling stage and remain stable for 500 ms before measurement. Early completion
 inside that window fails. Restoration must complete through the controller's
 independent port proof, with a clean journal, one retained action and seven
 seconds of reserved budget (five seconds plus the existing grace reservation).
-Another fixed 500 ms settling interval precedes restored measurement.
+After that result, both peers must supply newer native snapshot sequences and
+show 30 FPS within one second. Cached pre-restoration samples do not start the
+settling interval. Another fixed 500 ms of stable 30 FPS then precedes restored
+measurement; target loss during that interval remains a failure.
 
 The offline screen requires the same worker generations/offers through all phases,
 unchanged balanced-profile bitrate/CPU/quantizer settings, advancing native source

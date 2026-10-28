@@ -7,6 +7,7 @@ import uuid
 from dataclasses import asdict
 
 from control_disturbance import GameControlDisturbance
+from failure_lifetime import observe
 from live_probe_control.contained_capture import (
     SOCKET,
     GameCaptureContext,
@@ -79,6 +80,8 @@ class GameFailureAcceptance(GameControlDisturbance):
         self.source_restored = False
         self.sibling_before = self.game_before = self.sibling_identity = None
         self.duration = 2 * 10**9
+        self.issuer_epoch, self.admission_outcomes = 1, {}
+        self.old_process = self.old_process_hash = None
 
     def journal(self):
         with CadenceJournal(self.local.directory) as store:
@@ -101,16 +104,17 @@ class GameFailureAcceptance(GameControlDisturbance):
 
     def begin_restart(self, slots, now):
         self.journal()
-        for call in (lambda: self.local.recheck(self.capability, self.draft),
-                     lambda: self.local.inspect(self.old_receiver)):
+        for name, call in (("retired_draft", lambda: self.local.recheck(self.capability, self.draft)),
+                           ("retired_receiver", lambda: self.local.inspect(self.old_receiver))):
             try:
                 call()
             except ValueError:
-                pass
+                self.admission_outcomes[name] = "rejected"
             else:
                 raise ValueError("retired draft/receiver survived replacement")
         if slots["replacement"].token == self.old.token:
             raise ValueError("replacement reused old worker identity")
+        observe(self, "replacement_ready", slots)
         prior_owner, prior_capability = self.local, self.capability
         prior_owner.close()
         for peer in slots:
@@ -118,6 +122,7 @@ class GameFailureAcceptance(GameControlDisturbance):
         self.restart_owner = LocalProbeOwner(self.service, prior_owner.directory, prior_owner.policy, enabled=True)
         self.local = self.restart_owner.__enter__()
         self.capability = self.local.claim()
+        self.issuer_epoch += 1
         self.prior_capability = prior_capability
         self.scopes = {}
         for peer in slots:
@@ -158,6 +163,9 @@ class GameFailureAcceptance(GameControlDisturbance):
                 raise ValueError("fault missed the active target")
             snapshot = self.old.owner.last_snapshot
             if snapshot and snapshot["configured_fps"] == snapshot["negotiated_fps"] == 24:
+                self.old_process = self.old.owner.child
+                observed = observe(self, "active_target", {"first": self.old, "second": self.slots()["second"]})
+                self.old_process_hash = observed["peers"]["first"]["process"]["identity_hash"]
                 self.faulted_at = now
                 if self.case == "cancel":
                     self.local.cancel(self.capability, self.operation)
@@ -214,6 +222,7 @@ class GameFailureAcceptance(GameControlDisturbance):
             except ValueError as exc:
                 if "capability" not in str(exc):
                     raise
+                self.admission_outcomes["old_issuer"] = "rejected_capability"
             else:
                 raise ValueError("restarted owner accepted old capability")
             try:
@@ -221,17 +230,20 @@ class GameFailureAcceptance(GameControlDisturbance):
             except ValueError as exc:
                 if self.case == "cancel" or "dirty owner/session ledger" not in str(exc):
                     raise
+                self.admission_outcomes["new_request"] = "rejected_dirty_ledger"
             else:
                 if self.case != "cancel":
                     raise ValueError("restart bypassed dirty ledger")
                 if draft.dispatch_available or draft.budget_reserved or draft.live_authority:
                     raise ValueError("read-only restart draft granted authority")
+                self.admission_outcomes["new_request"] = "read_only_draft"
             if self.scene.resources()["cpu_ticks"] <= self.game_before or self.scene.game.poll() is not None or self.scene.display.poll() is not None:
                 raise ValueError("fault did not preserve owned game/display")
             if self.identity({"second": slots["second"]})["second"] != self.sibling_identity or slots["second"].owner.last_snapshot["encoded_buffers"] <= self.sibling_before:
                 raise ValueError("fault stopped sibling source")
             if GameCaptureContext.from_scene(self.scene) != self.service.control.capture:
                 raise ValueError("fault did not restore exact capture scope")
+            observe(self, "issuer_restarted", slots)
             self.emit("game_failure_verified", method=METHOD, case=self.case, old_exit=self.old.owner.exit_code,
                       old_reaped=True, stale_handles_rejected=True, owner_restarted=True, old_owner_rejected=True,
                       dirty_blocked=self.case != "cancel", clean_draft_allowed=self.case == "cancel",

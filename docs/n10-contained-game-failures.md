@@ -69,3 +69,29 @@ still assessed after an unavailable row. `failure_screen=met` means only this
 contained failure-handling screen; qualification remains unavailable, perceptual
 quality unevaluated and live authority false. A no-result case is reported as
 `unavailable_no_result`, never converted into a successful or verified result.
+
+The contained driver also emits `failure_lifetime` observations, method
+`n10-contained-game-lifetime-observations-v1`, at the observed active target,
+replacement readiness and the end of the logical issuer restart. Each retains
+camera-relative monotonic read brackets, hashed camera/game/display/peer process
+lifetimes, peer generation/token/offer hashes, original child-native stamps and
+camera receipt/sequence values. Child clocks retain separate origins. Only live
+Popen/pidfd handles from this fixture are sampled; no remote PID/path selects a
+process. PID, boot and start-time preimages, SDP, tokens and capability objects
+are not exported. The exact retained old child return code is recorded after
+the supervisor releases its reaped handle.
+
+Journal observations validate the existing private format/hash and directory
+binding and read the complete atomically published file without taking the
+writer's lease. They cannot write. The exported projection hashes private boot
+and process identities and retains exact cooldown values as decimal text.
+`projection_hash` binds the exported fields; `private_content_hash` references
+the validated private content rather than exposing its preimage. The final two
+snapshots must retain the same journal, reservation and dirty/clean state through
+issuer restart. Typed admission outcomes retain the actual driver check results.
+
+Core's `latency-fingerprint reconstruct-integrated-game-record RECORD --lifetimes`
+compares these supplied observations separately from the original temporal and
+declaration screen. Older reports without them remain unavailable for lifetime
+comparison. Consistent observations do not authenticate execution, verify live
+authorization, qualify a relief family or turn process death into restoration.

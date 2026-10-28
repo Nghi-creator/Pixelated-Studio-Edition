@@ -230,7 +230,8 @@ class CameraNativeTests(unittest.TestCase):
             before = second.frames()
             camera["on_peer_disconnect"]({"peerId": "first"})
             harness.pending.pop(0)()
-            until(lambda: old_slot.done.is_set(), seconds=3)
+            # Cleanup can finish before the sibling's next frame callback.
+            until(lambda: old_slot.done.is_set() and second.frames() > before, seconds=3)
             self.assertGreater(second.frames(), before)
             with self.assertRaisesRegex(ValueError, "stale"):
                 local.recheck(capability, draft)

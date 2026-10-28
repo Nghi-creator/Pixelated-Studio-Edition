@@ -135,6 +135,13 @@ class ControlDisturbance:
                     raise ValueError("control ledger/budget mismatch")
                 self.emit("control_result", method=self.method, result=asdict(result), ledger_state=journal["state"],
                           actions=journal["actions"], reserved_ns=journal["reserved_ns"])
+                self.restoration_sequences = {peer: slot.owner.last_observation[2] for peer, slot in slots.items()}
+                self.stage, self.stage_start = "await-restored", now
+        elif self.stage == "await-restored":
+            if now - self.stage_start > 1000000000:
+                raise ValueError("fresh restored target unavailable within observation bound")
+            if self.target_ready(slots, 30) and all(slot.owner.last_observation[2] > self.restoration_sequences[peer]
+                                                   for peer, slot in slots.items()):
                 self.stage, self.stage_start = "settle-restored", now
         elif self.stage == "settle-restored":
             if not self.target_ready(slots, 30):
