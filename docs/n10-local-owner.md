@@ -125,3 +125,11 @@ for native prerequisites and isolation bounds.
 [Scoped browser receiver observations](n10-browser-observations.md) describes
 the default-off authenticated relay/collector and local owner attachment. It
 keeps browser data declared and does not enable production probe dispatch.
+
+The read-only inspection also exposes `continuity_ready`. This retains native
+connection, counter-progress and browser-freshness checks while a completed
+operation's two-snapshot cache transitions back to baseline cadence. It does not
+authorize preparation or dispatch. Admission still requires both retained native
+samples to match the baseline once no operation is active. A restored acquisition
+window requires that strict admission readiness as well as verified restoration
+and fresh stable cadence snapshots.

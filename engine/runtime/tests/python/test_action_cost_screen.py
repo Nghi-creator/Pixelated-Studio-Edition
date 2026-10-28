@@ -338,3 +338,52 @@ class ActionCostScreenTests(unittest.TestCase):
                 else:
                     run["viewers"][0]["bindings"] = 1.0
                 self.assertEqual(summarize(run)["control_screen"], "unavailable")
+
+
+def acquisition_v2(condition="unchanged"):
+    from live_probe_control.action_cost_protocol import METHOD_V2, SCHEDULE_V2
+
+    run = acquisition(condition)
+    run["method"] = METHOD_V2
+    run["mode"] += "-v2"
+    for event in run["events"]:
+        if "method" in event:
+            event["method"] = METHOD_V2
+        if event["kind"] == "camera_ready":
+            event["mode"] = run["mode"]
+        if event["kind"] == "action_cost_schedule":
+            event["schedule"] = SCHEDULE_V2.copy()
+            for edge in event["edges"]:
+                if edge["label"].startswith("during_"):
+                    for key in (
+                        "at_ns",
+                        "script_age_ns",
+                        "game_age_ns",
+                        "planned_script_age_ns",
+                    ):
+                        edge[key] += 1000000000
+                    edge["script_actions"] = edge["script_age_ns"] // 400000000 + 1
+        if event["kind"] == "control_native" and event["phase"] == "during":
+            for sample in event["samples"]:
+                sample["read_start_ns"] += 1000000000
+                sample["read_end_ns"] += 1000000000
+                point = sample["game_phase"]
+                point["game_age_ns"] += 1000000000
+                point["script_age_ns"] += 1000000000
+                point["script_actions"] = point["script_age_ns"] // 400000000 + 1
+    for viewer in (0, 1):
+        run["control_windows"][1]["quality"][viewer]["frames"] = [
+            {**f, "at_ms": f["at_ms"] - 5000}
+            for f in run["continuity"][viewer]["frames"]
+            if 5000 <= f["at_ms"] <= 7000
+        ]
+    return run
+
+
+class ActionCostV2ScreenTests(unittest.TestCase):
+    def test_v2_is_separate_fixed_eight_second_window_and_rejects_relabelled_v1(self):
+        for condition in ("unchanged", "action"):
+            run = acquisition_v2(condition)
+            self.assertEqual(summarize(run)["control_screen"], "met", summarize(run))
+            run["mode"] = run["mode"].removesuffix("-v2")
+            self.assertEqual(summarize(run)["control_screen"], "unavailable")

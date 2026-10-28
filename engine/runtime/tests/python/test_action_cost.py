@@ -212,3 +212,46 @@ class ActionCostDriverTests(unittest.TestCase):
                 None,
                 condition="unchanged",
             )
+
+    def test_v2_handles_slow_snapshot_with_fixed_eight_second_window(self):
+        from live_probe_control.action_cost_protocol import METHOD_V2, SCHEDULE_V2
+
+        self.driver.method, self.driver.schedule = METHOD_V2, SCHEDULE_V2
+        self.target_at = 6800000000
+        self.finish("action")
+        self.assertEqual(
+            [
+                e["script_age_ns"]
+                for e in self.driver.edges
+                if e["label"].endswith("_start")
+            ],
+            [3000000000, 8000000000, 14000000000],
+        )
+        self.assertEqual(self.events[-1]["reserved_ns"], 7000000000)
+
+    def test_v2_cannot_wait_past_eight_seconds_for_target_stability(self):
+        from live_probe_control.action_cost_protocol import METHOD_V2, SCHEDULE_V2
+
+        self.driver.method, self.driver.schedule = METHOD_V2, SCHEDULE_V2
+        self.driver.condition = "action"
+        self.target_at = 7800000000
+        with self.assertRaisesRegex(ValueError, "not stable"):
+            for age in range(3000000000, 8050000000, 50000000):
+                self.tick(age)
+
+    def test_verified_restore_mixed_native_cache_uses_continuity_until_fresh_admission(
+        self,
+    ):
+        self.driver.ready.side_effect = lambda slots, continuity=False: (
+            continuity or not 11200000000 <= self.age < 11800000000
+        )
+        self.finish("action")
+        self.assertTrue(self.driver.result_seen)
+        self.assertEqual(self.events[-1]["journal_state"], "clean")
+
+    def test_restored_window_still_requires_strict_admission_readiness(self):
+        self.driver.ready.side_effect = lambda slots, continuity=False: (
+            continuity or self.age < 14000000000
+        )
+        with self.assertRaisesRegex(ValueError, "restoration not stable"):
+            self.finish("action")

@@ -449,6 +449,31 @@ class LocalOwnerTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 ReceiverSample(**(args | fields))
 
+    def test_continuity_during_restore_does_not_grant_fresh_admission(self):
+        self.ready()
+        binding = self.scope.bindings[self.receiver]
+        done = threading.Event()
+        binding.operation = SimpleNamespace(
+            request=SimpleNamespace(target_fps=24),
+            done=done,
+            publish=lambda *args: None,
+        )
+        self.observe(2, 30, configured_fps=24, negotiated_fps=24)
+        done.set()
+        self.observe(3, 40)
+        self.assertIsNone(binding.operation)
+        state = self.scope.inspect(self.receiver)
+        self.assertTrue(state["continuity_ready"])
+        self.assertEqual(state["status"], "insufficient_or_stale")
+        with self.assertRaisesRegex(ValueError, "preconditions"):
+            self.draft()
+        self.observe(4, 50)
+        self.assertEqual(
+            self.scope.inspect(self.receiver)["status"], "ready_for_dry_run"
+        )
+        self.now += 800000000
+        self.assertFalse(self.scope.inspect(self.receiver)["continuity_ready"])
+
 
 if __name__ == "__main__":
     unittest.main()

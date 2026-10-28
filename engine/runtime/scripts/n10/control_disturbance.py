@@ -48,14 +48,16 @@ class ControlDisturbance:
         return {peer: digest({"token": slot.token, "offer": slot.sdp, "generation": asdict(slot.owner.generation)})
                 for peer, slot in slots.items()}
 
-    def ready(self, slots):
+    def ready(self, slots, *, continuity=False):
         for peer, slot in slots.items():
             record = self.bridge.records.get(peer)
             if record is None or not record.receiver_socket_id:
                 return False
             if peer not in self.scopes:
                 self.scopes[peer] = self.bridge.attach(self.local, self.capability, peer, slot.token)
-        return all(self.local.inspect(scope)["status"] == "ready_for_dry_run" for scope in (self.scopes[peer] for peer in slots))
+        observations = [self.local.inspect(self.scopes[peer]) for peer in slots]
+        return all(value["continuity_ready"] if continuity else value["status"] == "ready_for_dry_run"
+                   for value in observations)
 
     def begin(self, slots):
         identity = self.identity(slots)

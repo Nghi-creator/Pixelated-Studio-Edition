@@ -186,7 +186,7 @@ class Binding:
             self.invalid = True
             raise ValueError("invalid bound declared receiver observation") from None
 
-    def ready(self, now):
+    def continuity_ready(self, now):
         if self.invalid or len(self.native) < 2 or len(self.browser) < 2:
             return False
         first, stamp = self.native[0]
@@ -202,13 +202,6 @@ class Binding:
                 or body["connection_state"] != "connected"
                 or body["ice_connection_state"] not in ("connected", "completed")
                 or any(body[k] is None for k in (*SETTINGS, *COUNTERS))
-                or (
-                    self.operation is None
-                    and (
-                        body["configured_fps"] != self.expected[0]
-                        or body["negotiated_fps"] != self.expected[1]
-                    )
-                )
             ):
                 return False
         if any(last[k] <= first[k] for k in ("capture_buffers", "encoded_buffers")):
@@ -224,6 +217,16 @@ class Binding:
             and all(
                 value is not None and 0 <= now - value <= BROWSER_FRESH_NS
                 for value in self.progress.values()
+            )
+        )
+
+    def ready(self, now):
+        return self.continuity_ready(now) and (
+            self.operation is not None
+            or all(
+                body["configured_fps"] == self.expected[0]
+                and body["negotiated_fps"] == self.expected[1]
+                for body, _ in self.native
             )
         )
 
@@ -412,6 +415,7 @@ class LocalProbeOwner:
             "status": "ready_for_dry_run"
             if binding.ready(now)
             else "insufficient_or_stale",
+            "continuity_ready": binding.continuity_ready(now),
             "browser_basis": "declared_counters_not_authenticated_playback",
             "native_basis": "bound_connection_and_source_progress",
             "dispatch_available": False,

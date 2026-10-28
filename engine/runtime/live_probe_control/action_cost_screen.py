@@ -11,7 +11,14 @@ from .observer_screen import (
 from .probe_transport import hash_value, request_value
 from .observer_moving_screen import script_phase
 
-from .action_cost_protocol import METHOD, SCHEDULE, PHASES, UNMEASURED_COST_SCOPES
+from .action_cost_protocol import (
+    METHOD,
+    METHOD_V2,
+    SCHEDULE as SCHEDULE,
+    PHASES,
+    UNMEASURED_COST_SCOPES,
+    versioned_protocol,
+)
 
 
 def one(events, kind):
@@ -29,16 +36,14 @@ def integer(value):
 
 
 def protocol(run):
+    version = "v2" if run["method"] == METHOD_V2 else "v1"
+    method, schedule, modes = versioned_protocol(version)
     condition = run["condition"]
-    if condition not in ("unchanged", "action") or run[
-        "mode"
-    ] != "engineering-game-" + (
-        "unchanged-cost" if condition == "unchanged" else "action-cost"
-    ):
+    if condition not in ("unchanged", "action") or modes.get(run["mode"]) != condition:
         raise ValueError("closed condition/mode required")
     if (
         run["status"] != "passed"
-        or run["method"] != METHOD
+        or run["method"] != method
         or run["role"] != "contained_game_action_cost_not_qualification"
         or run["live_authority"] is not False
     ):
@@ -58,7 +63,7 @@ def protocol(run):
     ):
         raise ValueError("owned game/cleanup observations required")
     if (
-        bound["method"] != METHOD
+        bound["method"] != method
         or bound["scope"] != "owned_x99_game_display"
         or bound["live_authority"] is not False
     ):
@@ -68,12 +73,12 @@ def protocol(run):
     boundary = one(events, "action_cost_boundary")
     if (
         any(
-            e["method"] != METHOD
+            e["method"] != method
             or e["condition"] != condition
             or e["live_authority"] is not False
             for e in (summary, boundary)
         )
-        or summary["schedule"] != SCHEDULE
+        or summary["schedule"] != schedule
         or any(type(v) is not int for v in summary["schedule"].values())
         or summary["source_content_matched"] is not False
     ):
@@ -107,7 +112,7 @@ def protocol(run):
         if result["result"]["live_authority"] is not False:
             raise ValueError("controller result cannot grant authority")
         if (
-            result["method"] != METHOD
+            result["method"] != method
             or result["live_authority"] is not False
             or result["result"]
             != dict(
@@ -140,7 +145,7 @@ def protocol(run):
         raise ValueError("complete fixed edges required")
     for e in edges:
         name = e["label"].split("_")[0]
-        expected = SCHEDULE[name] + (2500000000 if e["label"].endswith("_end") else 0)
+        expected = schedule[name] + (2500000000 if e["label"].endswith("_end") else 0)
         tolerance = 500000000 if e["label"].endswith("_end") else 150000000
         if (
             integer(e["planned_script_age_ns"]) != expected
@@ -178,11 +183,11 @@ def protocol(run):
         ("moving_eligible", eligible[0]),
         ("moving_window", eligible[1]),
     ):
-        if one(events, kind) != {"kind": kind, "method": METHOD, **phase}:
+        if one(events, kind) != {"kind": kind, "method": method, **phase}:
             raise ValueError("eligibility events disagree")
     target = one(events, "action_cost_target_observed")
     if (
-        target["method"] != METHOD
+        target["method"] != method
         or target["condition"] != condition
         or target["live_authority"] is not False
         or integer(target["target_fps"]) != (24 if condition == "action" else 30)
@@ -206,7 +211,7 @@ def protocol(run):
     else:
         restored = one(events, "action_cost_restore_observed")
         if (
-            restored["method"] != METHOD
+            restored["method"] != method
             or restored["live_authority"] is not False
             or not edges[2]["at_ns"] + 5000000000
             <= integer(outcome[0]["at_ns"])
@@ -286,7 +291,7 @@ def protocol(run):
 
 def summarize(run):
     result = {
-        "method": METHOD,
+        "method": METHOD_V2 if run.get("method") == METHOD_V2 else METHOD,
         "control_screen": "unavailable",
         "live_authority": False,
         "qualification": "unavailable_action_cost_acquisition_only",
@@ -318,7 +323,7 @@ def summarize(run):
         rows, previous, all_samples = [], -1, []
         for phase, window, report in zip(PHASES, windows, native, strict=True):
             if (
-                report["method"] != METHOD
+                report["method"] != run["method"]
                 or report["worker_identities"] != identities
                 or len(window["quality"]) != 2
             ):

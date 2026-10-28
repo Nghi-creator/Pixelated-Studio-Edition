@@ -23,7 +23,10 @@ const runtime = fileURLToPath(new URL("../../", import.meta.url));
 export async function runNativeBrowserAcceptance(image, mode = "production-admission") {
   if (!/^sha256:[a-f0-9]{64}$/.test(image || "")) throw new Error("explicit cached image digest required");
   const gameFailure = gameFailures.get(mode);
-  const costCondition = mode === "engineering-game-unchanged-cost" ? "unchanged" : mode === "engineering-game-action-cost" ? "action" : null;
+  const costVersion = mode.endsWith("-v2") ? "v2" : "v1";
+  const costMode = costVersion === "v2" ? mode.slice(0, -3) : mode;
+  const costMethod = `n10-contained-game-action-cost-acquisition-${costVersion}`;
+  const costCondition = costMode === "engineering-game-unchanged-cost" ? "unchanged" : costMode === "engineering-game-action-cost" ? "action" : null;
   if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"].includes(mode) && !gameFailure && !costCondition) throw new Error("invalid acceptance mode");
   const gameControl = mode === "engineering-game-disturbance";
   const controlMode = ["engineering-disturbance", "engineering-game-disturbance"].includes(mode) || Boolean(costCondition);
@@ -135,7 +138,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
         return globalThis.snapshot().state === "connected" && item?.first_presented?.presented > 0;
       }, undefined, { timeout: 8000 })));
       const marker = path.join(directory, "presented.pending");
-      await fs.writeFile(marker, JSON.stringify({ method: costCondition ? "n10-contained-game-action-cost-acquisition-v1" : "n10-observer-moving-acquisition-v2", peers: ["first", "second"] }), { flag: "wx", mode: 0o644 });
+      await fs.writeFile(marker, JSON.stringify({ method: costCondition ? costMethod : "n10-observer-moving-acquisition-v2", peers: ["first", "second"] }), { flag: "wx", mode: 0o644 });
       await fs.chmod(marker, 0o644);
       await fs.rename(marker, path.join(directory, "presented.json"));
     }
@@ -231,7 +234,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
     return { status: "passed", mode, live_authority: false, context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
       ...(gameFailure ? {role: "contained_game_failure_not_qualification", method: "n10-contained-game-failure-v1", case: gameFailure, sibling_quality: siblingQuality} : {}),
-      ...(controlMode ? {role: costCondition ? "contained_game_action_cost_not_qualification" : gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: costCondition ? "n10-contained-game-action-cost-acquisition-v1" : gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", ...(costCondition ? {condition: costCondition} : {}), control_windows: controlWindows, continuity} : {}),
+      ...(controlMode ? {role: costCondition ? "contained_game_action_cost_not_qualification" : gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: costCondition ? costMethod : gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", ...(costCondition ? {condition: costCondition} : {}), control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound, bindings: snapshot.bindings.length })) };

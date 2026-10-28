@@ -15,6 +15,7 @@ from live_probe_control.action_cost_protocol import (
     SCHEDULE,
     LATE_NS,
     UNMEASURED_COST_SCOPES,
+    versioned_protocol,
 )
 
 
@@ -24,13 +25,27 @@ class ActionCostGate(MovingObserverGate):
 
 class GameActionCost(GameControlDisturbance):
     method = METHOD
+    schedule = SCHEDULE
 
-    def __init__(self, service, scene, bridge, local, capability, emit, *, condition):
+    def __init__(
+        self,
+        service,
+        scene,
+        bridge,
+        local,
+        capability,
+        emit,
+        *,
+        condition,
+        version="v1",
+    ):
         if condition not in ("unchanged", "action"):
             raise ValueError("closed action-cost condition required")
+        self.method, self.schedule, _ = versioned_protocol(version)
         super().__init__(service, scene, bridge, local, capability, emit)
         self.condition = condition
         self.gate = ActionCostGate(scene, emit)
+        self.gate.method = self.method
         self.gate.origin = self.origin
         self.edges, self.completed_phases = [], []
         self.boundary = self.target_since = self.restored_since = None
@@ -54,7 +69,7 @@ class GameActionCost(GameControlDisturbance):
         )
 
     def begin_window(self, phase, age):
-        if not 0 <= age - SCHEDULE[phase] <= LATE_NS:
+        if not 0 <= age - self.schedule[phase] <= LATE_NS:
             raise ValueError("action-cost fixed window missed")
         self.phase = phase
         self.sampler = NativeScreen(
@@ -64,18 +79,18 @@ class GameActionCost(GameControlDisturbance):
             control_phase=phase,
             during_fps=24 if self.condition == "action" else 30,
         )
-        self.edge(phase + "_start", SCHEDULE[phase])
-        self.emit("control_window_started", phase=phase, method=METHOD)
+        self.edge(phase + "_start", self.schedule[phase])
+        self.emit("control_window_started", phase=phase, method=self.method)
 
     def apply_boundary(self, slots, now, age):
-        if not 0 <= age - SCHEDULE["boundary"] <= LATE_NS:
+        if not 0 <= age - self.schedule["boundary"] <= LATE_NS:
             raise ValueError("action-cost fixed boundary missed")
         self.no_journal()
         self.boundary = now
         self.boundary_sequences = {
             peer: slot.owner.last_observation[2] for peer, slot in slots.items()
         }
-        self.edge("boundary", SCHEDULE["boundary"])
+        self.edge("boundary", self.schedule["boundary"])
         request = None
         if self.condition == "action":
             draft = self.local.prepare(
@@ -91,7 +106,7 @@ class GameActionCost(GameControlDisturbance):
             request = asdict(draft.request)
         self.emit(
             "action_cost_boundary",
-            method=METHOD,
+            method=self.method,
             condition=self.condition,
             request=request,
             native_sequences=self.boundary_sequences,
@@ -118,7 +133,7 @@ class GameActionCost(GameControlDisturbance):
         journal = self.completed_journal()
         self.emit(
             "action_cost_result",
-            method=METHOD,
+            method=self.method,
             result=asdict(result),
             ledger_state=journal["state"],
             actions=journal["actions"],
@@ -165,7 +180,9 @@ class GameActionCost(GameControlDisturbance):
         self.last_age = age
         if self.stage == "done":
             raise ValueError("action-cost acquisition already complete")
-        if not self.ready(slots):
+        if self.boundary is not None:
+            self.observe_result(slots)
+        if not self.ready(slots, continuity=self.result_seen):
             raise ValueError("action-cost receiver readiness lost")
         self.no_journal(required=self.condition == "unchanged" or self.boundary is None)
         if self.condition == "unchanged" or self.boundary is None:
@@ -173,7 +190,7 @@ class GameActionCost(GameControlDisturbance):
                 raise ValueError("unchanged/baseline readiness lost")
         if self.sampler is None and not self.completed_phases:
             self.begin_window("baseline", age)
-        if self.boundary is None and age >= SCHEDULE["boundary"]:
+        if self.boundary is None and age >= self.schedule["boundary"]:
             if self.completed_phases != ["baseline"]:
                 raise ValueError("baseline crossed fixed action boundary")
             self.apply_boundary(slots, now, age)
@@ -193,7 +210,7 @@ class GameActionCost(GameControlDisturbance):
                             self.target_since = time.monotonic_ns()
                             self.emit(
                                 "action_cost_target_observed",
-                                method=METHOD,
+                                method=self.method,
                                 condition=self.condition,
                                 at_ns=self.target_since - self.origin,
                                 **self.scene.phase(),
@@ -213,7 +230,7 @@ class GameActionCost(GameControlDisturbance):
                         self.restored_since = time.monotonic_ns()
                         self.emit(
                             "action_cost_restore_observed",
-                            method=METHOD,
+                            method=self.method,
                             at_ns=self.restored_since - self.origin,
                             **self.scene.phase(),
                             native_sequences={
@@ -227,7 +244,7 @@ class GameActionCost(GameControlDisturbance):
         if (
             self.sampler is None
             and self.completed_phases == ["baseline"]
-            and age >= SCHEDULE["during"]
+            and age >= self.schedule["during"]
         ):
             if self.target_since is None or now - self.target_since < 500000000:
                 raise ValueError("target was not stable before fixed during window")
@@ -235,10 +252,11 @@ class GameActionCost(GameControlDisturbance):
         if (
             self.sampler is None
             and self.completed_phases == ["baseline", "during"]
-            and age >= SCHEDULE["restored"]
+            and age >= self.schedule["restored"]
         ):
             if self.condition == "action" and (
                 not self.result_seen
+                or not self.ready(slots)
                 or self.restored_since is None
                 or now - self.restored_since < 500000000
             ):
@@ -254,12 +272,12 @@ class GameActionCost(GameControlDisturbance):
             if self.sampler.sample():
                 self.emit(
                     "control_native",
-                    method=METHOD,
+                    method=self.method,
                     phase=self.phase,
                     worker_identities=self.identities,
                     **self.sampler.report(),
                 )
-                self.edge(self.phase + "_end", SCHEDULE[self.phase] + 2500000000)
+                self.edge(self.phase + "_end", self.schedule[self.phase] + 2500000000)
                 self.completed_phases.append(self.phase)
                 self.sampler = None
                 if self.phase == "restored":
@@ -269,9 +287,9 @@ class GameActionCost(GameControlDisturbance):
                         self.completed_journal()
                     self.emit(
                         "action_cost_schedule",
-                        method=METHOD,
+                        method=self.method,
                         condition=self.condition,
-                        schedule=SCHEDULE,
+                        schedule=self.schedule,
                         edges=self.edges,
                         eligibility=self.gate.phases,
                         journal_state="absent"

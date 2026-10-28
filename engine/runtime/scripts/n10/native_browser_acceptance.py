@@ -24,7 +24,8 @@ def main():
     if sys.argv[1:] != ["--isolated-browser-acceptance"] or os.environ.get("N10_BROWSER_ACCEPTANCE") != "1":
         raise ValueError("explicit disposable acceptance opt-in required")
     from game_failure_acceptance import MODES as GAME_FAILURE_MODES
-    from live_probe_control.action_cost_protocol import MODES as ACTION_COST_MODES
+    from live_probe_control.action_cost_protocol import MODES, MODES_V2
+    ACTION_COST_MODES = {**MODES, **MODES_V2}
 
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
     if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", *GAME_FAILURE_MODES, *ACTION_COST_MODES):
@@ -161,7 +162,8 @@ def main():
                         if cost_mode:
                             from action_cost import GameActionCost
                             state["control_screen"] = GameActionCost(service, scene, bridge, local, capability, emit,
-                                                                      condition=ACTION_COST_MODES[mode])
+                                                                      condition=ACTION_COST_MODES[mode],
+                                                                      version="v2" if mode in MODES_V2 else "v1")
                         else:
                             screen_class = GameControlDisturbance if game_control else ControlDisturbance
                             state["control_screen"] = screen_class(service, scene, bridge, local, capability, emit)
