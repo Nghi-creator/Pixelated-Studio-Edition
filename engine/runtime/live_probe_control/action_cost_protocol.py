@@ -25,4 +25,14 @@ def versioned_protocol(version):
         return METHOD, SCHEDULE, MODES
     if version == "v2":
         return METHOD_V2, SCHEDULE_V2, MODES_V2
+    if version == "v3":
+        return METHOD_V3, SCHEDULE_V2, MODES_V3
     raise ValueError("closed action-cost protocol version required")
+
+
+METHOD_V3 = "n10-contained-game-action-cost-acquisition-v3"
+MODES_V3 = {
+    "engineering-game-unchanged-span": "unchanged",
+    "engineering-game-action-span": "action",
+    "engineering-game-action-span-failure": "action",
+}

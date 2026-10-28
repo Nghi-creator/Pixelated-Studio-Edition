@@ -24,8 +24,8 @@ def main():
     if sys.argv[1:] != ["--isolated-browser-acceptance"] or os.environ.get("N10_BROWSER_ACCEPTANCE") != "1":
         raise ValueError("explicit disposable acceptance opt-in required")
     from game_failure_acceptance import MODES as GAME_FAILURE_MODES
-    from live_probe_control.action_cost_protocol import MODES, MODES_V2
-    ACTION_COST_MODES = {**MODES, **MODES_V2}
+    from live_probe_control.action_cost_protocol import MODES, MODES_V2, MODES_V3
+    ACTION_COST_MODES = {**MODES, **MODES_V2, **MODES_V3}
 
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
     if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", *GAME_FAILURE_MODES, *ACTION_COST_MODES):
@@ -161,7 +161,13 @@ def main():
                         )
                         if cost_mode:
                             from action_cost import GameActionCost
-                            state["control_screen"] = GameActionCost(service, scene, bridge, local, capability, emit,
+                            if mode in MODES_V3:
+                                from action_span import GameActionSpan
+                                state["control_screen"] = GameActionSpan(service, scene, bridge, local, capability, emit,
+                                    condition=ACTION_COST_MODES[mode], pulse=pulse,
+                                    inject_failure=mode == "engineering-game-action-span-failure")
+                            else:
+                                state["control_screen"] = GameActionCost(service, scene, bridge, local, capability, emit,
                                                                       condition=ACTION_COST_MODES[mode],
                                                                       version="v2" if mode in MODES_V2 else "v1")
                         else:

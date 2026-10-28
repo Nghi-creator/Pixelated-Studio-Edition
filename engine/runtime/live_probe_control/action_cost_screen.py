@@ -14,6 +14,7 @@ from .observer_moving_screen import script_phase
 from .action_cost_protocol import (
     METHOD,
     METHOD_V2,
+    METHOD_V3,
     SCHEDULE as SCHEDULE,
     PHASES,
     UNMEASURED_COST_SCOPES,
@@ -36,7 +37,11 @@ def integer(value):
 
 
 def protocol(run):
-    version = "v2" if run["method"] == METHOD_V2 else "v1"
+    version = (
+        "v3"
+        if run["method"] == METHOD_V3
+        else ("v2" if run["method"] == METHOD_V2 else "v1")
+    )
     method, schedule, modes = versioned_protocol(version)
     condition = run["condition"]
     if condition not in ("unchanged", "action") or modes.get(run["mode"]) != condition:
@@ -291,7 +296,9 @@ def protocol(run):
 
 def summarize(run):
     result = {
-        "method": METHOD_V2 if run.get("method") == METHOD_V2 else METHOD,
+        "method": run.get("method")
+        if run.get("method") in (METHOD_V2, METHOD_V3)
+        else METHOD,
         "control_screen": "unavailable",
         "live_authority": False,
         "qualification": "unavailable_action_cost_acquisition_only",

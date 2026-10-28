@@ -138,3 +138,8 @@ continuity while the two-snapshot admission cache returns to baseline. A mixed
 old-target/new-baseline cache cannot authorize another action. Strict admission
 readiness is required again before the fixed restored window; stale browser or
 native observations, lost progress and changed worker identities still fail.
+
+The separate [full-span cost acquisition](n10-full-span-cost.md) adds checkpointed
+native costs through the gaps between phase windows, owned Pulse costs and an
+independent browser CPU span. It retains explicit partial outcomes on failed
+attempts and separate exclusions; older measured-phase records are not promoted.

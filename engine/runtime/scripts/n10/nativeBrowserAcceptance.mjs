@@ -10,6 +10,7 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { processCpuSample } from "./gameBrowserTrial.mjs";
+import { BrowserCostSpan } from "./browserCostSpan.mjs";
 import { nativeBrowserHtml } from "./nativeBrowserPage.mjs";
 
 const require = createRequire(import.meta.url);
@@ -23,10 +24,11 @@ const runtime = fileURLToPath(new URL("../../", import.meta.url));
 export async function runNativeBrowserAcceptance(image, mode = "production-admission") {
   if (!/^sha256:[a-f0-9]{64}$/.test(image || "")) throw new Error("explicit cached image digest required");
   const gameFailure = gameFailures.get(mode);
-  const costVersion = mode.endsWith("-v2") ? "v2" : "v1";
+  const spanCondition = new Map([["engineering-game-unchanged-span", "unchanged"], ["engineering-game-action-span", "action"], ["engineering-game-action-span-failure", "action"]]).get(mode);
+  const costVersion = spanCondition ? "v3" : (mode.endsWith("-v2") ? "v2" : "v1");
   const costMode = costVersion === "v2" ? mode.slice(0, -3) : mode;
   const costMethod = `n10-contained-game-action-cost-acquisition-${costVersion}`;
-  const costCondition = costMode === "engineering-game-unchanged-cost" ? "unchanged" : costMode === "engineering-game-action-cost" ? "action" : null;
+  const costCondition = spanCondition || (costMode === "engineering-game-unchanged-cost" ? "unchanged" : costMode === "engineering-game-action-cost" ? "action" : null);
   if (!["production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"].includes(mode) && !gameFailure && !costCondition) throw new Error("invalid acceptance mode");
   const gameControl = mode === "engineering-game-disturbance";
   const controlMode = ["engineering-disturbance", "engineering-game-disturbance"].includes(mode) || Boolean(costCondition);
@@ -38,7 +40,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const name = `n10-browser-native-${process.pid}-${Date.now()}`;
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "n10-browser-native-"));
   const token = randomBytes(32).toString("hex");
-  let browser, child, timer, processFailure, softwareHash;
+  let browser, child, timer, processFailure, softwareHash, costSpan, costSpanResult;
   let siblingQuality = null, siblingTask = null, siblingError = null;
   const pages = [];
   const events = []; let logTail = "";
@@ -166,7 +168,10 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
           if (controlMode) {
             const pending = events.filter((event) => event.kind === "control_window_started")[controlWindows.length];
             if (pending) {
-              if (controlWindows.length === 0) await Promise.all(pages.map((page) => page.evaluate(() => globalThis.startControlTrace())));
+              if (controlWindows.length === 0) {
+                if (spanCondition) { costSpan = new BrowserCostSpan(browser); await costSpan.start(); }
+                await Promise.all(pages.map((page) => page.evaluate(() => globalThis.startControlTrace())));
+              }
               controlWindows.push({ phase: pending.phase, ...await measurePages(2000) });
             }
           }
@@ -189,6 +194,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       })(),
       new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("outer acceptance deadline")), 36000); }),
     ]);
+    if (costSpan) costSpanResult = await costSpan.finish("completed");
     if (siblingTask) await siblingTask;
     if (siblingError) throw siblingError;
     if (gameFailure) assert.ok(siblingQuality, "fault sibling quality measured");
@@ -232,16 +238,17 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if (processFailure) throw processFailure;
     const exitCode = await exited;
     assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
-    return { status: "passed", mode, live_authority: false, context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
+    return { status: "passed", mode, live_authority: false, ...(spanCondition ? { browser_cost_span: costSpanResult } : {}), context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
       ...(gameFailure ? {role: "contained_game_failure_not_qualification", method: "n10-contained-game-failure-v1", case: gameFailure, sibling_quality: siblingQuality} : {}),
       ...(controlMode ? {role: costCondition ? "contained_game_action_cost_not_qualification" : gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: costCondition ? costMethod : gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", ...(costCondition ? {condition: costCondition} : {}), control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound, bindings: snapshot.bindings.length })) };
   } catch (error) {
+    if (costSpan) costSpanResult = await costSpan.finish("failed_prefix");
     const diagnostics = await Promise.allSettled(pages.map((page) => page.evaluate(() => globalThis.snapshot?.())));
     const failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logTail}`, { cause: error });
-    failure.acquisition = { status: "failed", mode, live_authority: false, events, diagnostics, ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
+    failure.acquisition = { status: "failed", mode, live_authority: false, events, diagnostics, ...(spanCondition ? { browser_cost_span: costSpanResult || null, browser: browser?.version() || null } : {}), ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
       context: { image, software_hash: softwareHash || null, host_platform: process.platform, host_arch: process.arch } };
     throw failure;
   } finally {
