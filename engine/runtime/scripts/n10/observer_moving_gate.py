@@ -10,6 +10,8 @@ METHOD = "n10-observer-moving-acquisition-v2"
 
 
 class MovingObserverGate:
+    method = METHOD
+
     def __init__(self, scene, emit, *, marker=Path("/acceptance/presented.json")):
         self.scene, self.emit, self.marker = scene, emit, marker
         self.origin = time.monotonic_ns()
@@ -40,18 +42,18 @@ class MovingObserverGate:
             if len(body) > 4096:
                 raise ValueError("moving presentation marker size")
             value = json.loads(body, object_pairs_hook=strict_object)
-            if value != {"method": METHOD, "peers": ["first", "second"]}:
+            if value != {"method": self.method, "peers": ["first", "second"]}:
                 raise ValueError("moving presentation marker mismatch")
             self.scene.arm_script()
             self.warmup = now
-            self.emit("moving_eligible", method=METHOD, **self.phase("eligible"))
+            self.emit("moving_eligible", method=self.method, **self.phase("eligible"))
             return False
         if not native_ready:
             raise ValueError("moving readiness lost during fixed warmup")
         if now - self.warmup < 3 * 10**9:
             return False
         self.window_started = True
-        self.emit("moving_window", method=METHOD, **self.phase("window_start"))
+        self.emit("moving_window", method=self.method, **self.phase("window_start"))
         return True
 
     def report(self):
@@ -59,6 +61,6 @@ class MovingObserverGate:
             raise ValueError("moving window not started")
         if self.result is None:
             self.phase("window_end")
-            self.result = {"method": METHOD, "basis": "camera_host_monotonic_no_browser_alignment",
+            self.result = {"method": self.method, "basis": "camera_host_monotonic_no_browser_alignment",
                            "source_content_matched": False, "phases": list(self.phases)}
         return self.result

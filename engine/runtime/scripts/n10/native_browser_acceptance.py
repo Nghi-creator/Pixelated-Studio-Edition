@@ -24,13 +24,15 @@ def main():
     if sys.argv[1:] != ["--isolated-browser-acceptance"] or os.environ.get("N10_BROWSER_ACCEPTANCE") != "1":
         raise ValueError("explicit disposable acceptance opt-in required")
     from game_failure_acceptance import MODES as GAME_FAILURE_MODES
+    from live_probe_control.action_cost_protocol import MODES as ACTION_COST_MODES
 
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", *GAME_FAILURE_MODES):
+    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", *GAME_FAILURE_MODES, *ACTION_COST_MODES):
         raise ValueError("closed acceptance mode required")
     game_failure = mode in GAME_FAILURE_MODES
-    game_control = mode == "engineering-game-disturbance" or game_failure
-    control_mode = mode in ("engineering-disturbance", "engineering-game-disturbance")
+    cost_mode = mode in ACTION_COST_MODES
+    game_control = mode == "engineering-game-disturbance" or game_failure or cost_mode
+    control_mode = mode in ("engineering-disturbance", "engineering-game-disturbance") or cost_mode
     moving_mode = mode in ("observer-moving-off", "observer-moving-on")
     observer_off = mode in ("observer-off", "observer-moving-off")
     diagnostic_mode = mode == "observer-static-diagnostic"
@@ -57,7 +59,7 @@ def main():
         print("N10_ACCEPTANCE " + json.dumps({"kind": kind, **values}), flush=True)
 
     with ExitStack() as cleanup:
-        scene = GameScene(defer_script=moving_mode)
+        scene = GameScene(defer_script=moving_mode or cost_mode)
         def close_scene():
             emit("host_shutdown", stage="scene_close_start")
             if not scene.close():
@@ -156,8 +158,13 @@ def main():
                             ControlDisturbance,
                             GameControlDisturbance,
                         )
-                        screen_class = GameControlDisturbance if game_control else ControlDisturbance
-                        state["control_screen"] = screen_class(service, scene, bridge, local, capability, emit)
+                        if cost_mode:
+                            from action_cost import GameActionCost
+                            state["control_screen"] = GameActionCost(service, scene, bridge, local, capability, emit,
+                                                                      condition=ACTION_COST_MODES[mode])
+                        else:
+                            screen_class = GameControlDisturbance if game_control else ControlDisturbance
+                            state["control_screen"] = screen_class(service, scene, bridge, local, capability, emit)
                     if not state["control_screen"].tick():
                         return True
                     state["slots"] = list(service.active.values())
