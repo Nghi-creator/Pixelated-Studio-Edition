@@ -40,7 +40,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const name = `n10-browser-native-${process.pid}-${Date.now()}`;
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "n10-browser-native-"));
   const token = randomBytes(32).toString("hex");
-  let browser, child, timer, processFailure, softwareHash, costSpan, costSpanResult;
+  let browser, child, timer, processFailure, softwareHash, costSpan, costSpanResult, reading;
   let siblingQuality = null, siblingTask = null, siblingError = null;
   const pages = [];
   const events = []; let logTail = "";
@@ -104,7 +104,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     });
     child.stderr.on("data", append);
     child.stdout.on("data", (data) => { stdoutBytes += data.length; append(data); if (stdoutBytes > 1024 * 1024) child.kill(); });
-    const reading = (async () => {
+    reading = (async () => {
       for await (const line of readline.createInterface({ input: child.stdout })) {
         if (line.length > 65536) throw new Error("acceptance output line budget");
         if (line.startsWith("N10_ACCEPTANCE ")) events.push(JSON.parse(line.slice(15)));
@@ -245,6 +245,12 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound, bindings: snapshot.bindings.length })) };
   } catch (error) {
+    if (spanCondition && child) {
+      // Retain the native cleanup-tail checkpoint before removing the owned container.
+      let cleanupTimer;
+      try { await Promise.race([reading, new Promise((resolve) => { cleanupTimer = setTimeout(resolve, 4000); })]); }
+      finally { clearTimeout(cleanupTimer); }
+    }
     if (costSpan) costSpanResult = await costSpan.finish("failed_prefix");
     const diagnostics = await Promise.allSettled(pages.map((page) => page.evaluate(() => globalThis.snapshot?.())));
     const failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logTail}`, { cause: error });

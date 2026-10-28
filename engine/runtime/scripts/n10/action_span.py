@@ -97,12 +97,14 @@ class NativeCostSpan:
 
 
 class GameActionSpan(GameActionCost):
-    def __init__(self, *args, pulse, inject_failure=False, **kwargs):
+    def __init__(self, *args, pulse, container_cost, inject_failure=False, **kwargs):
         super().__init__(*args, version="v3", **kwargs)
         self.pulse, self.inject_failure, self.span = pulse, inject_failure, None
+        self.container_cost = container_cost
 
     def begin_window(self, phase, age):
         if phase == "baseline":
+            self.container_cost.start_action()
             self.span = NativeCostSpan(
                 self.service, self.scene, self.pulse, self.emit, self.origin
             )
@@ -120,8 +122,10 @@ class GameActionSpan(GameActionCost):
                     raise ValueError("predeclared cost-span failure at script9.5s")
                 if done:
                     self.span.finish("completed")
+                    self.container_cost.finish_action("completed")
             return done
         except Exception:
             if self.span:
                 self.span.finish("failed_prefix")
+                self.container_cost.finish_action("failed_prefix")
             raise

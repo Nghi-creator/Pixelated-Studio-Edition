@@ -6,6 +6,7 @@ from .observer_moving_screen import script_phase
 from .observer_screen import acquisition_context, cohort_main, number
 
 METHOD = "n10-contained-game-action-cost-comparison-v1"
+METHOD_V3 = "n10-contained-game-action-cost-comparison-v3"
 METHOD_V2 = "n10-contained-game-action-cost-comparison-v2"
 ORDER = tuple(
     "engineering-game-" + condition + "-cost"
@@ -17,6 +18,10 @@ ORDER = tuple(
         "unchanged",
         "action",
     )
+)
+ORDER_V3 = tuple(
+    "engineering-game-" + ("unchanged" if "unchanged" in mode else "action") + "-span"
+    for mode in ORDER
 )
 ORDER_V2 = tuple(mode + "-v2" for mode in ORDER)
 PAIRS = (
@@ -114,9 +119,13 @@ def comparable(a, b):
 
 
 def assess(runs, *, version="v1"):
-    if version not in ("v1", "v2"):
+    if version not in ("v1", "v2", "v3"):
         raise ValueError("closed action-cost comparison version required")
-    method, order = (METHOD, ORDER) if version == "v1" else (METHOD_V2, ORDER_V2)
+    method, order = {
+        "v1": (METHOD, ORDER),
+        "v2": (METHOD_V2, ORDER_V2),
+        "v3": (METHOD_V3, ORDER_V3),
+    }[version]
     result = {
         "method": method,
         "comparison_screen": "unavailable",

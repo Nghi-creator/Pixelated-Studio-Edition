@@ -60,11 +60,19 @@ def main():
         print("N10_ACCEPTANCE " + json.dumps({"kind": kind, **values}), flush=True)
 
     with ExitStack() as cleanup:
+        def finish_container_cost():
+            if state.get("container_cost"):
+                service = captured.get("workers")
+                state["container_cost"].finish(scene_closed=state.get("scene_closed", False),
+                    pulse_reaped=pulse.poll() is not None, workers_closed=bool(service and service.closed),
+                    active_peers=len(service.active) if service else -1)
+        cleanup.callback(finish_container_cost)
         scene = GameScene(defer_script=moving_mode or cost_mode)
         def close_scene():
             emit("host_shutdown", stage="scene_close_start")
             if not scene.close():
                 raise ValueError("owned game/display cleanup unconfirmed")
+            state["scene_closed"] = True
             emit("host_shutdown", stage="scene_closed")
         cleanup.callback(close_scene)
         original_popen = subprocess.Popen
@@ -138,6 +146,9 @@ def main():
                         state["local"] = cleanup.enter_context(LocalProbeOwner(service, ledger, policy, enabled=True))
                         state["capability"] = state["local"].claim()
                     state["phase"] = "game-failure" if game_failure else ("control-screen" if control_mode else ("observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission")))
+                    if mode in MODES_V3:
+                        from container_cost import ContainerCost
+                        state["container_cost"] = ContainerCost(emit)
                     emit("camera_ready", mode=mode, source=service.source, profile=service.profile)
                 local, capability = state.get("local"), state.get("capability")
                 if state["phase"] == "game-failure":
@@ -164,7 +175,7 @@ def main():
                             if mode in MODES_V3:
                                 from action_span import GameActionSpan
                                 state["control_screen"] = GameActionSpan(service, scene, bridge, local, capability, emit,
-                                    condition=ACTION_COST_MODES[mode], pulse=pulse,
+                                    condition=ACTION_COST_MODES[mode], pulse=pulse, container_cost=state["container_cost"],
                                     inject_failure=mode == "engineering-game-action-span-failure")
                             else:
                                 state["control_screen"] = GameActionCost(service, scene, bridge, local, capability, emit,

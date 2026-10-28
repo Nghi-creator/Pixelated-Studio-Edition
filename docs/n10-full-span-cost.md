@@ -63,3 +63,52 @@ causal benefit, qualify perceptual/audio/desktop behavior or grant live authorit
 A full-span matched cohort, required fault/cleanup costs and reviewed limits are
 separate requirements before qualification. Every result here retains
 `live_authority=false`.
+
+## Matched full-span comparison and cleanup CPU boundary
+
+Acquire six fresh sessions with a new absolute output path:
+
+```sh
+node engine/runtime/scripts/n10/actionCostCohort.mjs \
+  --image "$N10_NATIVE_IMAGE" --output "$N10_FULL_SPAN_COHORT" --protocol v3
+PYTHONPATH=engine/runtime python3 -m live_probe_control.full_span_cohort_v2 \
+  "$N10_FULL_SPAN_COHORT"
+```
+
+The fixed order is unchanged/action, action/unchanged, unchanged/action; pairs
+remain `(0,1)`, `(3,2)`, `(4,5)` with action-minus-unchanged deltas. Before collection,
+freeze exact context, all original rows, comparability and missingness. The screen
+retains the existing phase/context/independence rules and requires full-span
+native, browser and fixed action-container durations within150ms in each pair. It reports
+CPU-seconds, CPU percentage-point and sampled RSS-byte differences separately.
+No averaging, retries, outlier selection or cross-clock sum is performed. Missing
+or incomparable measurements leave the affected pair's deltas null.
+
+Span modes also checkpoint the disposable container's cumulative cgroup-v2 CPU
+at camera readiness and after its cleanup callbacks. This aggregate includes CPU
+already charged to exited/reaped container tasks, including ancillary children;
+it does not provide their individual breakdown. Counter lifetime replacement,
+resets, unavailable reads or uncertain scene/Pulse/worker cleanup leave the
+container CPU screen unavailable. The browser failure path waits up to four
+seconds for native terminal output before removing its owned container.
+
+This is a separate interval from the baseline-to-restored process span. It
+includes readiness/warmup after camera readiness and the cleanup callbacks, but
+excludes initial source startup and later relay/interpreter/container/browser exit.
+Container CPU overlaps the process CPU observations and must not be added to them.
+It supplies bounded cleanup-tail CPU for an intentional failed attempt when its
+terminal checkpoint and cleanup flags are present; it does not make the earlier
+failed native prefix complete or qualify source/receiver/watchdog fault cases.
+No per-process teardown RSS, browser RSS/GPU, causal benefit or reviewed cost
+limit is established by a met comparison.
+
+The fixed action-container interval has separate cgroup CPU checkpoints at the
+baseline and restored-span boundaries, within50ms of the corresponding native
+reads. `full_span_cohort_v2` uses method
+`n10-owned-game-full-span-comparison-v2` and compares that interval. Broader
+camera-ready-through-cleanup CPU remains a separate descriptive observation;
+its setup and cleanup durations are not fixed to script phase. It cannot replace
+the action interval or be presented as a matched cleanup effect. The older
+`full_span_cohort` method retains its stricter comparison of those broader
+intervals; old records and unavailable comparisons are preserved under that method.
+New comparisons reject records missing the fixed action checkpoints.
