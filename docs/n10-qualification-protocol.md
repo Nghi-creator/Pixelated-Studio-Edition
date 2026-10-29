@@ -1,6 +1,6 @@
 # Qualification protocol declarations
 
-`live_probe_control.qualification_protocol` checks an operator's proposed
+`live_probe_control.qualification_protocol_v2` checks an operator's proposed
 qualification protocol without running an acquisition, inspecting evidence,
 approving review claims or enabling a controller. It is separate from frozen
 core evidence roots, engineering controller configuration and producer activation.
@@ -11,15 +11,16 @@ Generate a new draft under ignored `local/` from the repository root:
 PYTHONPATH=engine/runtime python3 - <<'PY'
 import json
 from pathlib import Path
-from live_probe_control.qualification_protocol import draft
+from live_probe_control.qualification_protocol_v2 import draft
+Path('local').mkdir(exist_ok=True)
 with Path('local/n10-qualification-draft.json').open('x') as output:
     output.write(json.dumps(draft(), indent=2) + '\n')
 PY
-PYTHONPATH=engine/runtime python3 -m live_probe_control.qualification_protocol \
+PYTHONPATH=engine/runtime python3 -m live_probe_control.qualification_protocol_v2 \
   local/n10-qualification-draft.json
 ```
 
-The version is `n10-qualification-protocol-draft-v1`, role
+The version is `n10-qualification-protocol-draft-v2`, role
 `operator_planning_only`, with `live_authority=false`. Input is bounded to64KiB,
 closed fields and procedure versions, duplicate-safe JSON and finite typed values.
 The checker reads only the supplied protocol file; nested references are text
@@ -31,15 +32,17 @@ and are not opened or executed. Inspection does not modify the draft.
 | --- | --- |
 | Context | Exact image, final source hash and browser; the initial supported proposal is an owned Linux/aarch64 game capture with a Darwin/arm64 headless receiver, balanced1500kbps,640×480, VP8 CPU-used6/quantizer48. Other contexts require a separate protocol revision. |
 | Operation | Baseline/target cadence, duration and bounded controller policy. The fixed30→24 FPS/five-second proposal and its budgets come from engineering limits; generation does not qualify them. A different rate/duration requires separate procedure versions. The full reservation must fit the cumulative budget; the typed engineering envelope still applies. |
-| Cost limits | Explicit maximum, units, comparison, interval, rationale and review reference for each fixed metric slot. Action container/browser/worker CPU and worker sampled RSS use action-minus-unchanged pairs; fault totals use absolute CPU-seconds before dispatch through cleanup callbacks. Limits remain null until decided. |
+| Fault operation | Separate fixed 30→24 FPS/two-second request and four-second reservation, including its actual two-second maximum-duration policy. This declaration cannot be substituted with the five-second matched-action operation or changed by an integral-looking float or Boolean. |
+| Cost limits | Explicit maximum, units, comparison, interval, rationale and review reference for all 14 fixed metric slots. Six action CPU/RSS slots use action-minus-unchanged pairs; eight fault slots use absolute CPU-seconds. Seven fault intervals end at cleanup callbacks; whole-camera death ends after owned descendant cleanup. Limits remain null until decided. |
 | Quality | Procedures, criteria and review references for cadence, perceptual quality, audio and supported desktop workflows. A procedure must explicitly state any scope exclusion; headless video proxies do not establish desktop/audio acceptance. |
-| Additional faults | Decide whether whole-camera death and controller-thread-only failure are required or excluded. A required case needs a procedure; an exclusion needs rationale and review reference. Stopped-worker teardown does not establish either case. |
-| Unmeasured scopes | Decide whether initial source startup, later process/container/browser exit, individual ancillary breakdown and browser cleanup/RSS/GPU costs are accepted exclusions or must be measured. A measurement requirement needs its own procedure; acceptance needs a scoped rationale and review reference. |
+| Additional faults | Separate scope decisions for controller-thread exit, controller-thread blocking and whole-camera death. Each required case must name its exact versioned procedure; an exclusion needs rationale and review reference. One thread case cannot stand in for the other. |
+| Unmeasured scopes | Decide whether initial source startup, later process/container/browser exit, individual ancillary breakdown and browser cleanup/RSS/GPU costs are accepted exclusions or must be measured. Whole-camera death has an additional explicit later relay/monitor/interpreter/container/browser-exit declaration. A measurement requirement needs its own procedure; acceptance needs a scoped rationale and review reference. |
 | Review and acquisition | Protocol revision, review reference, independence rationale and fixed prospective retention rules. These are supplied declarations, not authenticated approvals. |
 
 The fixed procedure inventory covers read-only observer comparison, matched
 full-span action costs, actual cancellation/loss/reconnect costs, stopped-worker
-costs and Linux native guard regressions. Changing a procedure's meaning or version
+costs, both controller-thread cases, whole-camera death and Linux native guard
+regressions. Changing a procedure's meaning or version
 requires a new protocol revision rather than silently substituting another screen.
 Cost scopes overlap or use independent clocks; the protocol cannot authorize
 adding them into a synchronized system total.
@@ -76,10 +79,22 @@ checker's exit status cannot authorize mutation. The core
 [qualification requirements](../../latency_fingerprinting/docs/live_probes/N10_QUALIFICATION.md)
 state the broader evidence and producer boundary.
 
-The v1 draft's fixed procedure and cost slots cover the observer, matched action,
-four original fault cases and stopped worker. The separate controller-thread
-exit/block and whole-camera-death methods require explicit procedure and metric
-slots in a new protocol revision before their costs can be required for
-qualification. In particular, whole-camera descendant cleanup is a different
-interval from camera cleanup callbacks. Adding free-text fault references to a
-v1 draft does not add those metric slots or qualify the additional evidence.
+## Version compatibility and migration
+
+`live_probe_control.qualification_protocol` remains the v1 generator and checker.
+Its 11 cost slots, procedure inventory, combined controller-thread scope field,
+document hashes and interpretation are preserved. Each checker accepts only its
+own format; changing a method string cannot convert a protocol.
+
+For a new v2 draft, retain the original v1 file. Copy only unchanged context,
+matched-action operation, quality declarations, original cost rows and original
+exclusion rows after checking their applicability. The whole-camera scope row
+can retain its declaration, but a required procedure must match v2's exact method.
+Do not copy a combined thread-failure decision into both new thread scope rows.
+Leave new limits and scope declarations missing until independently decided.
+The new protocol revision needs its own review; a v1 review reference does not
+establish that v2's extra costs or exclusions were reviewed.
+
+Keep engineering acquisition records at their actual source versions. Preparing
+v2 or copying a historical context pin does not freeze a final qualifying source,
+approve old observations, or establish applicability to another source snapshot.

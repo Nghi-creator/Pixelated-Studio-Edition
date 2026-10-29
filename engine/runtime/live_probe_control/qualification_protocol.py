@@ -184,9 +184,24 @@ def text_or_missing(value, label, missing):
         raise ValueError(label + ": nonblank bounded text required")
 
 
-def inspect(value):
+def _fixed(value, expected, label):
+    if type(expected) is dict:
+        closed(value, expected, label)
+        for key, entry in expected.items():
+            _fixed(value[key], entry, label + "." + key)
+    elif type(value) is not type(expected) or value != expected:
+        raise ValueError("fixed declaration changed: " + label)
+
+
+def _inspect(value, template, *, fixed_sections=(), fault_procedures=None):
+    method = template["method"]
+    procedures = template["procedures"]
+    limit_specs = {
+        name: tuple(row[key] for key in ("metric", "unit", "comparison", "interval"))
+        for name, row in template["cost_limits"].items()
+    }
     result = dict(
-        method=METHOD,
+        method=method,
         protocol_state="invalid",
         qualification="unavailable_protocol_is_not_evidence",
         live_authority=False,
@@ -194,14 +209,23 @@ def inspect(value):
         activation="not_implemented_by_this_tool",
     )
     try:
-        template = draft()
         closed(value, template, "protocol")
         if (
-            value["method"] != METHOD
+            value["method"] != method
             or value["role"] != "operator_planning_only"
             or value["live_authority"] is not False
         ):
             raise ValueError("planning role and false authority required")
+        for section in fixed_sections:
+            _fixed(value[section], template[section], section)
+        if "fault_operation" in fixed_sections:
+            fault = value["fault_operation"]
+            Policy(**fault["policy"])
+            if (
+                fault["reserved_duration_ns"]
+                != fault["requested_duration_ns"] + GRACE_NS
+            ):
+                raise ValueError("fault reservation no longer matches controller grace")
         missing = []
         context = value["context"]
         closed(context, template["context"], "context")
@@ -256,13 +280,13 @@ def inspect(value):
             > baseline * policy["maximum_reduction_percent"]
         ):
             raise ValueError("operation exceeds proposed engineering envelope")
-        closed(value["procedures"], PROCEDURES, "procedures")
-        if value["procedures"] != PROCEDURES:
+        closed(value["procedures"], procedures, "procedures")
+        if value["procedures"] != procedures:
             raise ValueError(
                 "procedure versions changed; use a separate protocol revision"
             )
-        closed(value["cost_limits"], LIMIT_SPECS, "cost_limits")
-        for name, spec in LIMIT_SPECS.items():
+        closed(value["cost_limits"], limit_specs, "cost_limits")
+        for name, spec in limit_specs.items():
             row = value["cost_limits"][name]
             closed(row, template["cost_limits"][name], "cost_limits." + name)
             if (
@@ -283,9 +307,9 @@ def inspect(value):
             for key in ("rationale", "review_reference"):
                 text_or_missing(row[key], "cost_limits." + name + "." + key, missing)
         for section, names in (
-            ("quality", QUALITY),
-            ("fault_scope", FAULT_SCOPE),
-            ("exclusions", EXCLUSIONS),
+            ("quality", template["quality"]),
+            ("fault_scope", template["fault_scope"]),
+            ("exclusions", template["exclusions"]),
         ):
             closed(value[section], names, section)
             for name in names:
@@ -315,6 +339,14 @@ def inspect(value):
                             )
                     else:
                         text_or_missing(entry, label, missing)
+        for name, expected in (fault_procedures or {}).items():
+            row = value["fault_scope"][name]
+            if (
+                row["disposition"] == "required"
+                and row["procedure"] is not None
+                and row["procedure"] != expected
+            ):
+                raise ValueError("required fault procedure substitution: " + name)
         closed(value["protocol_review"], template["protocol_review"], "protocol_review")
         for key, entry in value["protocol_review"].items():
             text_or_missing(entry, "protocol_review." + key, missing)
@@ -338,16 +370,24 @@ def inspect(value):
             proposed_reservation_ns=duration + GRACE_NS,
             policy_facts="declarations_only_not_review_authentication",
         )
+        if "fault_operation" in fixed_sections:
+            result["proposed_fault_reservation_ns"] = value["fault_operation"][
+                "reserved_duration_ns"
+            ]
     except (ValueError, KeyError, TypeError, OverflowError) as error:
         result["reason"] = str(error)
     return result
+
+
+def inspect(value):
+    return _inspect(value, draft())
 
 
 def reject_constant(_value):
     raise ValueError("nonfinite JSON constant")
 
 
-def main():
+def _main(inspector):
     if len(sys.argv) != 2:
         return 2
     try:
@@ -360,7 +400,7 @@ def main():
             object_pairs_hook=strict_object,
             parse_constant=reject_constant,
         )
-        result = inspect(value)
+        result = inspector(value)
     except (OSError, ValueError, UnicodeError, TypeError, RecursionError) as error:
         result = dict(
             protocol_state="invalid",
@@ -370,6 +410,10 @@ def main():
         )
     print(json.dumps(result, indent=2, allow_nan=False))
     return 0 if result["protocol_state"] == "complete_declarations_unverified" else 1
+
+
+def main():
+    return _main(inspect)
 
 
 if __name__ == "__main__":
