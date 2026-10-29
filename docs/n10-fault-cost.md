@@ -145,3 +145,46 @@ three-second reservation. It opens no game, display, device or network receiver.
 It tests independent watchdog behavior when only the control thread fails; it
 does not supply owned-game/browser fault costs, whole-camera death evidence,
 restoration proof or acceptance of the qualification protocol's fault scope.
+
+## Owned-game controller-thread exit cost
+
+The separate mode `engineering-game-controller-thread-exit-cost` uses the owned
+Linux game, actual dedicated peer worker and authenticated headless receiver.
+Its fixture-only launcher wraps the worker's snapshot method; the normal worker
+entry point and production configuration have no fault hook. After the host
+observes the target cadence, it publishes a private marker bound to the exact
+request and generation. A healthy 24 FPS snapshot on the controller thread then
+raises `SystemExit`, terminating only that thread.
+
+The child main loop must subsequently observe the controller thread dead,
+unchanged 24 FPS caps and an advancing encoded-buffer counter. An atomically
+published local observation records this before the result event. The independent
+guards and supervisor remain enabled; their teardown can race, so the acquisition
+does not attribute which one killed the worker. No camera, game, display or
+sibling process is a signal target.
+
+```sh
+npm run smoke:n10-browser-native -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --mode engineering-game-controller-thread-exit-cost
+```
+
+For retained acquisition, call `acquireNativeCohort` with this one explicit mode
+and a fresh absolute output path, then inspect the original one-record array:
+
+```sh
+PYTHONPATH=engine/runtime python3 -m live_probe_control.thread_exit_cost_screen \
+  "$N10_THREAD_EXIT_COST"
+```
+
+The method is `n10-contained-controller-thread-exit-cost-v1`, role
+`contained_game_controller_thread_exit_cost_not_qualification`. The two-second
+request reserves four seconds. Missing controller results remain missing;
+the journal must retain `active` unresolved intent through worker replacement
+and issuer restart, and a new action must remain blocked. The same bounded
+container cost checkpoints and separate browser span apply. Supplied lifetime
+and journal consistency checks do not authenticate execution or approve costs.
+
+This case establishes a scoped thread-exit observation, not a blocked controller
+thread in this game/browser context, whole-camera death, perceptual/audio
+acceptance or qualification. Existing evidence roots keep their original case
+inventories; do not relabel this record into an earlier four-case cohort.

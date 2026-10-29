@@ -113,6 +113,7 @@ class StalledCostTests(unittest.TestCase):
     def test_unresolved_active_intent_and_missing_result_are_preserved(self):
         result = summarize(acquisition())
         self.assertEqual(result["cost_screen"], "met", result)
+        self.assertEqual(result["method"], METHOD)
         self.assertEqual(result["lifecycle"]["ledger_state"], "active")
         self.assertEqual(result["lifecycle"]["restoration"], "unavailable_no_result")
         self.assertEqual(result["cost_limits"], "not_evaluated")

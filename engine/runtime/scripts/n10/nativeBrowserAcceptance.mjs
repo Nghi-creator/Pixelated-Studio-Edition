@@ -23,6 +23,10 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const selectedFault = faultMode(mode);
   const faultCost = selectedFault?.cost || false;
   const gameFailure = selectedFault?.case;
+  const interruption = new Map([
+    ["worker-stall", {method: "n10-contained-stalled-worker-cost-v1", role: "contained_game_stalled_worker_cost_not_qualification"}],
+    ["controller-thread-exit", {method: "n10-contained-controller-thread-exit-cost-v1", role: "contained_game_controller_thread_exit_cost_not_qualification"}],
+  ]).get(gameFailure);
   const spanCondition = new Map([["engineering-game-unchanged-span", "unchanged"], ["engineering-game-action-span", "action"], ["engineering-game-action-span-failure", "action"]]).get(mode);
   const costVersion = spanCondition ? "v3" : (mode.endsWith("-v2") ? "v2" : "v1");
   const costMode = costVersion === "v2" ? mode.slice(0, -3) : mode;
@@ -140,7 +144,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       }, undefined, { timeout: 8000 })));
       const marker = path.join(directory, "presented.pending");
       if (faultCost) { costSpan = new BrowserCostSpan(browser); await costSpan.start(); }
-      await fs.writeFile(marker, JSON.stringify(faultCost ? { method: gameFailure === "worker-stall" ? "n10-contained-stalled-worker-cost-v1" : "n10-contained-game-fault-cost-v1", case: gameFailure, peers: ["first", "second"] } : { method: costCondition ? costMethod : "n10-observer-moving-acquisition-v2", peers: ["first", "second"] }), { flag: "wx", mode: 0o644 });
+      await fs.writeFile(marker, JSON.stringify(faultCost ? { method: interruption?.method || "n10-contained-game-fault-cost-v1", case: gameFailure, peers: ["first", "second"] } : { method: costCondition ? costMethod : "n10-observer-moving-acquisition-v2", peers: ["first", "second"] }), { flag: "wx", mode: 0o644 });
       await fs.chmod(marker, 0o644);
       await fs.rename(marker, path.join(directory, faultCost ? "fault-cost-ready.json" : "presented.json"));
     }
@@ -211,7 +215,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       if (observerOff) assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === 0 && Object.keys(snapshot.counts).length === 0 && snapshot.unbound === 0));
       else assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === (diagnosticMode ? 2 : 1) && snapshot.unbound === 1));
     } else if (gameFailure) {
-      const expectedFailures = ["source-loss", "receiver-loss", "worker-stall"].includes(gameFailure) ? 1 : 0;
+      const expectedFailures = ["source-loss", "receiver-loss", "worker-stall", "controller-thread-exit"].includes(gameFailure) ? 1 : 0;
       assert.equal(snapshots[0].failures.length, expectedFailures);
       if (expectedFailures) assert.equal(snapshots[0].failures[0].peerId, "first");
       assert.deepEqual(snapshots[1].failures, []);
@@ -239,7 +243,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     const exitCode = await exited;
     assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
     return { status: "passed", mode, live_authority: false, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult } : {}), context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
-      ...(gameFailure ? {role: gameFailure === "worker-stall" ? "contained_game_stalled_worker_cost_not_qualification" : faultCost ? "contained_game_fault_cost_not_qualification" : "contained_game_failure_not_qualification", method: gameFailure === "worker-stall" ? "n10-contained-stalled-worker-cost-v1" : faultCost ? "n10-contained-game-fault-cost-v1" : "n10-contained-game-failure-v1", case: gameFailure, sibling_quality: siblingQuality} : {}),
+      ...(gameFailure ? {role: interruption ? interruption.role : faultCost ? "contained_game_fault_cost_not_qualification" : "contained_game_failure_not_qualification", method: interruption ? interruption.method : faultCost ? "n10-contained-game-fault-cost-v1" : "n10-contained-game-failure-v1", case: gameFailure, sibling_quality: siblingQuality} : {}),
       ...(controlMode ? {role: costCondition ? "contained_game_action_cost_not_qualification" : gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: costCondition ? costMethod : gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", ...(costCondition ? {condition: costCondition} : {}), control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),

@@ -26,3 +26,9 @@ test("stopped-worker cost is explicit and never uses planned reconnect routing",
   assert.equal(faultMode("engineering-game-worker-stall"), null);
   assert.equal(shouldForwardReconnect("engineering-game-worker-stall-cost", { kind: "game_failure_reconnect" }), false);
 });
+
+test("controller thread exit cost is explicit and cannot request reconnect routing", () => {
+  assert.deepEqual(faultMode("engineering-game-controller-thread-exit-cost"), { base: "engineering-game-controller-thread-exit-cost", case: "controller-thread-exit", cost: true });
+  assert.equal(faultMode("engineering-game-controller-thread-exit"), null);
+  assert.equal(shouldForwardReconnect("engineering-game-controller-thread-exit-cost", { kind: "game_failure_reconnect" }), false);
+});

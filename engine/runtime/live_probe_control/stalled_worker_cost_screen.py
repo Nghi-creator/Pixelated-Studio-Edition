@@ -14,12 +14,12 @@ def require(value, message):
         raise ValueError(message)
 
 
-def lifecycle_summary(run):
+def _interrupted_lifecycle(run, *, method, mode, case):
     events = run["events"]
     ready, complete = one(events, "camera_ready"), one(events, "complete")
     require(
         ready["source"] == "isolated_game"
-        and ready["mode"] == MODE
+        and ready["mode"] == mode
         and complete["worker_cleanup"] is True
         and complete["game_alive"] is True,
         "owned source/cleanup missing",
@@ -27,7 +27,7 @@ def lifecycle_summary(run):
     capture = one(events, "control_capture_bound")
     hash_value(capture["binding_hash"])
     require(
-        capture["method"] == METHOD
+        capture["method"] == method
         and capture["scope"] == "owned_x99_game_display"
         and capture["live_authority"] is False,
         "capture mismatch",
@@ -43,7 +43,7 @@ def lifecycle_summary(run):
     ]
     require(
         all(
-            e["method"] == METHOD and e["case"] == "worker-stall"
+            e["method"] == method and e["case"] == case
             for e in (dispatched, fault, result, verified)
         ),
         "stalled worker event scope changed",
@@ -119,7 +119,7 @@ def lifecycle_summary(run):
     for i, row in enumerate(rows):
         require(
             row["method"] == "n10-contained-game-lifetime-observations-v1"
-            and row["case"] == "worker-stall"
+            and row["case"] == case
             and row["live_authority"] is False
             and row["capture_hash"] == capture["binding_hash"],
             "lifetime scope changed",
@@ -234,13 +234,17 @@ def lifecycle_summary(run):
         "browser failure/replacement mismatch",
     )
     return dict(
-        case="worker-stall",
+        case=case,
         sibling=browser_screen(run["sibling_quality"], measurement_ms=2000),
         restoration="unavailable_no_result",
         ledger_state="active",
         old_exit=-9,
         teardown_cause="not_attributed_between_independent_guards_and_supervisor",
     )
+
+
+def lifecycle_summary(run):
+    return _interrupted_lifecycle(run, method=METHOD, mode=MODE, case="worker-stall")
 
 
 def summarize(run):

@@ -9,15 +9,19 @@ ORDER = tuple("engineering-game-" + case + "-cost" for case in CASES)
 PHASES = ("before_dispatch", "fault_injected", "result_observed", "lifecycle_verified")
 
 
-def summarize(run, *, _stalled=False):
+def summarize(run, *, _stalled=False, _thread=False):
     method = "n10-contained-stalled-worker-cost-v1" if _stalled else METHOD
+    if _thread:
+        method = "n10-contained-controller-thread-exit-cost-v1"
     role = (
         "contained_game_stalled_worker_cost_not_qualification"
         if _stalled
         else "contained_game_fault_cost_not_qualification"
     )
+    if _thread:
+        role = "contained_game_controller_thread_exit_cost_not_qualification"
     result = dict(
-        method=METHOD,
+        method=method,
         cost_screen="unavailable",
         live_authority=False,
         cost_limits="not_evaluated",
@@ -41,12 +45,26 @@ def summarize(run, *, _stalled=False):
         acquisition_context(run)
         case = run["case"]
         if (
-            case not in (("worker-stall",) if _stalled else CASES)
+            case
+            not in (
+                ("controller-thread-exit",)
+                if _thread
+                else ("worker-stall",)
+                if _stalled
+                else CASES
+            )
             or run["mode"] != "engineering-game-" + case + "-cost"
         ):
             raise ValueError("closed fault-cost case required")
         # Reuse the existing lifecycle rules on a local view; do not relabel or mutate the record.
-        if _stalled:
+        if _thread:
+            from .thread_exit_cost_screen import lifecycle_summary
+
+            lifecycle = lifecycle_summary(run)
+            result["lifetime_comparison"] = (
+                "supplied_thread_exit_lifetime_consistency_only"
+            )
+        elif _stalled:
             from .stalled_worker_cost_screen import lifecycle_summary
 
             lifecycle = lifecycle_summary(run)
