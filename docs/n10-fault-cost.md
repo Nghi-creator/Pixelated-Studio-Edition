@@ -120,3 +120,28 @@ and later exit/GPU/RSS exclusions remain explicit.
 The [qualification protocol checker](n10-qualification-protocol.md) makes pending
 scope, limit, quality and exclusion decisions explicit. Filling its declarations
 never approves these engineering cost observations or enables dispatch.
+
+## Controller-thread regression
+
+The opt-in Linux regression `test_controller_thread_fault_native.py` exercises
+the real cadence controller and pidfd watchdog with a disposable synthetic
+GStreamer stream. After observing the actual 30→24 FPS caps change, it either
+terminates only the controller thread with `SystemExit` or blocks that thread.
+The main loop and native media threads continue running. The test requires
+continued 24 FPS negotiation and advancing buffer counts after the thread fault,
+followed by SIGKILL teardown of the dedicated worker at its watchdog deadline.
+Reopening the actual journal must retain unresolved intent and the full
+reservation, with new dispatch blocked until explicit teardown recovery.
+
+Run inside the Linux native test environment with GStreamer and pidfd support:
+
+```sh
+N10_NATIVE_PEER_TESTS=1 PYTHONPATH=engine/runtime python3 -m unittest discover \
+  -s engine/runtime/tests/python -p test_controller_thread_fault_native.py -v
+```
+
+This regression uses a 64×48 synthetic stream and a one-second request with a
+three-second reservation. It opens no game, display, device or network receiver.
+It tests independent watchdog behavior when only the control thread fails; it
+does not supply owned-game/browser fault costs, whole-camera death evidence,
+restoration proof or acceptance of the qualification protocol's fault scope.
