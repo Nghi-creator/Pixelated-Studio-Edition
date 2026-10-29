@@ -33,6 +33,33 @@ INTERRUPTIONS = {
 }
 
 
+def browser_cost(run):
+    browser = run["browser_cost_span"]
+    a, b = browser["before"], browser["after"]
+    if (
+        browser["method"] != "n10-browser-cost-span-v1"
+        or browser["basis"] != "host_hrtime_browser_owned_process_cpu_separate_clock"
+        or browser["outcome"] != "completed"
+        or browser["failure"] is not None
+    ):
+        raise ValueError("browser fault span incomplete")
+    if not a["inventory_hash"] or (a["inventory_hash"], a["process_count"]) != (
+        b["inventory_hash"],
+        b["process_count"],
+    ):
+        raise ValueError("browser process inventory changed")
+    wall = number(b["host_at_ns"]) - number(a["host_at_ns"])
+    if not 0 < wall <= 30000000000:
+        raise ValueError("browser fault span clock unavailable")
+    cpu = delta([a, b], "cpu_seconds", integral=False)
+    return dict(
+        browser_cpu_seconds=cpu,
+        browser_cpu_percent=cpu * 100000000000 / wall,
+        browser_duration_ns=wall,
+        clock_alignment="none_browser_and_native_separate",
+    )
+
+
 def summarize(run, *, _interruption=None):
     selected = (
         INTERRUPTIONS.get(_interruption) if isinstance(_interruption, str) else None
@@ -151,25 +178,7 @@ def summarize(run, *, _interruption=None):
                 **interval_cost(points[-1]["sample"], end["sample"]),
             )
         )
-        browser = run["browser_cost_span"]
-        a, b = browser["before"], browser["after"]
-        if (
-            browser["method"] != "n10-browser-cost-span-v1"
-            or browser["basis"]
-            != "host_hrtime_browser_owned_process_cpu_separate_clock"
-            or browser["outcome"] != "completed"
-            or browser["failure"] is not None
-        ):
-            raise ValueError("browser fault span incomplete")
-        if not a["inventory_hash"] or (a["inventory_hash"], a["process_count"]) != (
-            b["inventory_hash"],
-            b["process_count"],
-        ):
-            raise ValueError("browser process inventory changed")
-        wall = number(b["host_at_ns"]) - number(a["host_at_ns"])
-        if not 0 < wall <= 30000000000:
-            raise ValueError("browser fault span clock unavailable")
-        cpu = delta([a, b], "cpu_seconds", integral=False)
+        browser_measurement = browser_cost(run)
         result.update(
             cost_screen="met" if lifecycle["sibling"]["met"] else "not_met",
             case=case,
@@ -178,10 +187,7 @@ def summarize(run, *, _interruption=None):
             container_before_dispatch_through_cleanup=interval_cost(
                 points[0]["sample"], end["sample"]
             ),
-            browser_cpu_seconds=cpu,
-            browser_cpu_percent=cpu * 100000000000 / wall,
-            browser_duration_ns=wall,
-            clock_alignment="none_browser_and_native_separate",
+            **browser_measurement,
         )
     except (ValueError, KeyError, TypeError, IndexError, OverflowError) as exc:
         result["unavailable_reason"] = str(exc)

@@ -220,3 +220,53 @@ container CPU checkpoints and independent browser span keep the existing
 exclusions and false live authority. This is scoped blocked-thread evidence;
 whole-camera death, reviewed cost/quality limits and production activation remain
 separate requirements.
+
+## Whole-camera death cost
+
+`engineering-game-camera-death-cost` abruptly terminates the fixture's actual
+camera process during an observed 24 FPS action. The relay starts a separate
+local monitor. Before any signal, that monitor pins the relay's directly owned
+camera and its two media workers, game, display and Pulse processes by exact
+pidfd lifetimes, verifying their parentage and capture binding.
+
+The monitor sends SIGKILL only to the pinned camera. Both workers must exit
+without a direct signal from the monitor. The observation does not attribute
+their exits to a specific lease guard, watchdog or capture-health path. The
+game/display/Pulse processes must remain alive until the monitor's explicit
+fixture cleanup. Cleanup signals use their already-pinned lifetimes; completion
+requires those process lifetimes to disappear and no non-ancestor processes to
+remain in the private container cgroup.
+
+The relay must reap the actual camera with SIGKILL. The action's journal must
+retain the same unresolved active request, one action and four-second reservation
+through that run. A new controller must reject dispatch against this journal;
+no recovery or budget refund is performed. A missing controller result remains
+missing, and restoration remains `unavailable_camera_died`.
+
+```sh
+npm run smoke:n10-browser-native -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --mode engineering-game-camera-death-cost
+```
+
+Retain an original one-record array with `acquireNativeCohort` and inspect it with:
+
+```sh
+PYTHONPATH=engine/runtime python3 -m live_probe_control.camera_death_cost_screen \
+  "$N10_CAMERA_DEATH_COST"
+```
+
+The separate method is `n10-contained-camera-death-cost-v1`, role
+`contained_camera_death_cost_not_qualification`. Camera-side checkpoints cover
+before dispatch and fault readiness; external monitor checkpoints cover before
+the camera kill, worker exits and owned descendant cleanup. These use the same
+private cgroup CPU counters and Linux monotonic clock. The browser span retains
+its independent clock. Short-stage CPU percentages are descriptive measurements,
+not reviewed limits or synchronized system totals.
+
+This interval includes explicit owned game/display/Pulse teardown. It differs
+from earlier camera-through-cleanup-callback intervals. Initial source startup,
+later relay/monitor/interpreter/container/browser exit, individual ancillary
+costs and browser cleanup/RSS/GPU remain excluded. Browser cleanup is explicitly
+requested by the fixture after the monitor completes; the acquisition does not
+establish automatic desktop disconnect behavior or a full camera restart and
+reconnect. The earlier method inventories and evidence roots remain unchanged.

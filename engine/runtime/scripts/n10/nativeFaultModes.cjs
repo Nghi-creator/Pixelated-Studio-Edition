@@ -8,6 +8,7 @@ const cases = Object.freeze({
 const costModes = Object.freeze(Object.fromEntries(Object.keys(cases).map((base) => [base + "-cost", base])));
 function faultMode(mode) {
   if (typeof mode !== "string") return null;
+  if (mode === "engineering-game-camera-death-cost") return { base: mode, case: "camera-death", cost: true };
   if (mode === "engineering-game-controller-thread-block-cost") return { base: mode, case: "controller-thread-block", cost: true };
   if (mode === "engineering-game-controller-thread-exit-cost") return { base: mode, case: "controller-thread-exit", cost: true };
   if (mode === "engineering-game-worker-stall-cost") return { base: mode, case: "worker-stall", cost: true };

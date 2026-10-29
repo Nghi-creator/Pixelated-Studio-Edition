@@ -75,3 +75,11 @@ control guard. N9 proposals, old record hashes, a caller's filled JSON or this
 checker's exit status cannot authorize mutation. The core
 [qualification requirements](../../latency_fingerprinting/docs/live_probes/N10_QUALIFICATION.md)
 state the broader evidence and producer boundary.
+
+The v1 draft's fixed procedure and cost slots cover the observer, matched action,
+four original fault cases and stopped worker. The separate controller-thread
+exit/block and whole-camera-death methods require explicit procedure and metric
+slots in a new protocol revision before their costs can be required for
+qualification. In particular, whole-camera descendant cleanup is a different
+interval from camera cleanup callbacks. Adding free-text fault references to a
+v1 draft does not add those metric slots or qualify the additional evidence.

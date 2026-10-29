@@ -5,6 +5,7 @@ const readline = require("node:readline");
 const { spawn } = require("node:child_process");
 const { Server } = require("socket.io");
 const { shouldForwardReconnect } = require("./nativeFaultModes.cjs");
+const { cameraDeathMonitor } = require("./cameraDeathMonitor.cjs");
 const { ownRelayShutdown } = require("./nativeBrowserShutdown.cjs");
 const { createEngineTokenAuth } = require("../../dist/src/signaling/socketAuth.js");
 const { canClaimTrustedCamera } = require("../../dist/src/signaling/cameraAuthorization.js");
@@ -40,7 +41,11 @@ io.on("connection", (socket) => {
   registerEngineErrorHandlers(socket);
 });
 server.listen(8080, "0.0.0.0", () => {
-  const camera = spawn("python3", ["-u", "/opt/repo/engine/runtime/scripts/n10/native_browser_acceptance.py", "--isolated-browser-acceptance"], { stdio: ["ignore", "pipe", "inherit"] });
+  const wholeCamera = process.env.N10_BROWSER_ACCEPTANCE_MODE === "engineering-game-camera-death-cost";
+  const deathDirectory = wholeCamera ? fs.mkdtempSync("/tmp/n10-camera-death-") : null;
+  if (deathDirectory) fs.chmodSync(deathDirectory, 0o700);
+  const camera = spawn("python3", ["-u", "/opt/repo/engine/runtime/scripts/n10/native_browser_acceptance.py", "--isolated-browser-acceptance"], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, ...(wholeCamera ? {N10_CAMERA_DEATH_DIRECTORY: deathDirectory} : {}) } });
+  const death = wholeCamera ? cameraDeathMonitor(camera, deathDirectory, {spawn, forward: (line) => process.stdout.write(line + "\n")}) : null;
   const diagnosticTimer = setTimeout(() => {
     process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "relay_shutdown_diagnostic",
       camera_exit: camera.exitCode, camera_signal: camera.signalCode,
@@ -57,6 +62,7 @@ server.listen(8080, "0.0.0.0", () => {
       try {
         const event = JSON.parse(line.slice(15));
         if (process.env.N10_BROWSER_ACCEPTANCE_MODE === "observer-static-diagnostic" && event.kind === "diagnostic_observer_stop") io.to("session:native_acceptance").emit("acceptance-observer-stop");
+        if (wholeCamera && event.kind === "camera_death_armed") death.start();
         if (shouldForwardReconnect(process.env.N10_BROWSER_ACCEPTANCE_MODE, event)) io.to("session:native_acceptance").emit("acceptance-peer-reconnect");
       } catch { camera.kill(); }
     }
@@ -64,11 +70,13 @@ server.listen(8080, "0.0.0.0", () => {
   camera.on("exit", (code, signal) => {
     process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "camera_process_exit", code, signal }) + "\n");
     process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "relay_shutdown", stage: "close_start" }) + "\n");
-    closeRelay().then(() => {
+    (wholeCamera ? death.finish(code, signal) : Promise.resolve()).then(() => closeRelay()).then(() => {
       process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "relay_shutdown", stage: "closed" }) + "\n");
-      process.exitCode = code === 0 ? 0 : 1;
+      if (deathDirectory) fs.rmSync(deathDirectory, {recursive: true, force: true});
+      process.exitCode = wholeCamera || code === 0 ? 0 : 1;
     }).catch(() => {
-      process.stdout.write('N10_ACCEPTANCE {"kind":"failed","reason":"relay cleanup failed"}\n');
+      void closeRelay().catch(() => {});
+      process.stdout.write('N10_ACCEPTANCE {"kind":"failed","reason":"relay or camera-death monitor cleanup failed"}\n');
       process.exitCode = 1;
     });
   });

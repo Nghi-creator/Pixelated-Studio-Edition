@@ -23,8 +23,10 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const selectedFault = faultMode(mode);
   const faultCost = selectedFault?.cost || false;
   const gameFailure = selectedFault?.case;
+  const cameraDeath = gameFailure === "camera-death";
   const interruption = new Map([
     ["worker-stall", {method: "n10-contained-stalled-worker-cost-v1", role: "contained_game_stalled_worker_cost_not_qualification"}],
+    ["camera-death", {method: "n10-contained-camera-death-cost-v1", role: "contained_camera_death_cost_not_qualification"}],
     ["controller-thread-block", {method: "n10-contained-controller-thread-block-cost-v1", role: "contained_game_controller_thread_block_cost_not_qualification"}],
     ["controller-thread-exit", {method: "n10-contained-controller-thread-exit-cost-v1", role: "contained_game_controller_thread_exit_cost_not_qualification"}],
   ]).get(gameFailure);
@@ -184,7 +186,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
             const pending = events.filter((event) => event.kind === "diagnostic_started")[diagnosticWindows.length];
             if (pending) diagnosticWindows.push({ phase: pending.phase, ...await measurePages() });
           }
-          if (gameFailure && !siblingTask && events.some((event) => event.kind === "game_failure_fault")) {
+          if (gameFailure && !cameraDeath && !siblingTask && events.some((event) => event.kind === "game_failure_fault")) {
             siblingTask = second.evaluate(() => globalThis.collectQuality(2000)).then((value) => { siblingQuality = value; }).catch((error) => { siblingError = error; });
           }
           if (!stopped && events.some((event) => event.kind === "stop_first_observations")) {
@@ -202,8 +204,9 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if (costSpan) costSpanResult = await costSpan.finish("completed");
     if (siblingTask) await siblingTask;
     if (siblingError) throw siblingError;
-    if (gameFailure) assert.ok(siblingQuality, "fault sibling quality measured");
-    if (!observerOff) await Promise.all([first, second].map((page) => page.waitForFunction(() => globalThis.unbound >= 1, undefined, { timeout: 2000 })));
+    if (gameFailure && !cameraDeath) assert.ok(siblingQuality, "fault sibling quality measured");
+    if (cameraDeath) await Promise.all(pages.map((page) => page.evaluate(() => globalThis.cleanup())));
+    if (!observerOff && !cameraDeath) await Promise.all([first, second].map((page) => page.waitForFunction(() => globalThis.unbound >= 1, undefined, { timeout: 2000 })));
     const continuity = controlMode ? await Promise.all(pages.map((page) => page.evaluate(() => globalThis.stopControlTrace()))) : null;
     if (controlMode) assert.deepEqual(controlWindows.map((window) => window.phase), ["baseline", "during", "restored"]);
     const snapshots = await Promise.all([first, second].map((page) => page.evaluate(() => globalThis.snapshot())));
@@ -215,6 +218,8 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       assert.ok(snapshots.every((snapshot) => snapshot.failures.length === 0));
       if (observerOff) assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === 0 && Object.keys(snapshot.counts).length === 0 && snapshot.unbound === 0));
       else assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === (diagnosticMode ? 2 : 1) && snapshot.unbound === 1));
+    } else if (cameraDeath) {
+      assert.ok(snapshots.every((snapshot) => Object.values(snapshot.counts).some((item) => item.framesDecoded > 0)));
     } else if (gameFailure) {
       const expectedFailures = ["source-loss", "receiver-loss", "worker-stall", "controller-thread-exit", "controller-thread-block"].includes(gameFailure) ? 1 : 0;
       assert.equal(snapshots[0].failures.length, expectedFailures);

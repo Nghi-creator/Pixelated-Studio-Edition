@@ -38,3 +38,9 @@ test("blocked controller cost cannot use exit or planned reconnect routing", () 
   assert.equal(faultMode("engineering-game-controller-thread-block"), null);
   assert.equal(shouldForwardReconnect("engineering-game-controller-thread-block-cost", { kind: "game_failure_reconnect" }), false);
 });
+
+test("whole-camera death is explicit and has no reconnect injection", () => {
+  assert.deepEqual(faultMode("engineering-game-camera-death-cost"), { base: "engineering-game-camera-death-cost", case: "camera-death", cost: true });
+  assert.equal(faultMode("engineering-game-camera-death"), null);
+  assert.equal(shouldForwardReconnect("engineering-game-camera-death-cost", { kind: "game_failure_reconnect" }), false);
+});

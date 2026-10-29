@@ -162,12 +162,15 @@ def main():
                         from game_failure_acceptance import GameFailureAcceptance
                         if fault_cost:
                             from fault_cost import FaultCostAcceptance, StalledWorkerCost
-                            if mode in ("engineering-game-controller-thread-exit-cost", "engineering-game-controller-thread-block-cost"):
+                            if mode == "engineering-game-camera-death-cost":
+                                from camera_death import CameraDeathCost
+                                fault_class = CameraDeathCost
+                            elif mode in ("engineering-game-controller-thread-exit-cost", "engineering-game-controller-thread-block-cost"):
                                 from game_thread_fault import ControllerThreadExitCost, ControllerThreadBlockCost
                                 fault_class = ControllerThreadBlockCost if mode == "engineering-game-controller-thread-block-cost" else ControllerThreadExitCost
                             else:
                                 fault_class = StalledWorkerCost if mode == "engineering-game-worker-stall-cost" else FaultCostAcceptance
-                            state["game_failure"] = fault_class(service, scene, bridge, local, capability, emit, captured["client"], FAULT_COST_MODES[mode], container_cost=state["container_cost"])
+                            state["game_failure"] = fault_class(service, scene, bridge, local, capability, emit, captured["client"], FAULT_COST_MODES[mode], container_cost=state["container_cost"], **({"pulse": pulse} if mode == "engineering-game-camera-death-cost" else {}))
                         else:
                             state["game_failure"] = GameFailureAcceptance(service, scene, bridge, local, capability, emit, captured["client"], mode)
                         cleanup.callback(state["game_failure"].close)
