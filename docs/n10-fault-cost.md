@@ -116,3 +116,7 @@ exercise guard EOF, stalled heartbeat and watchdog behavior. This is a stopped
 media-worker case, not whole-camera death, controller-thread-only failure, full
 platform coverage or a qualified live family. The existing cost/quality limits
 and later exit/GPU/RSS exclusions remain explicit.
+
+The [qualification protocol checker](n10-qualification-protocol.md) makes pending
+scope, limit, quality and exclusion decisions explicit. Filling its declarations
+never approves these engineering cost observations or enables dispatch.
