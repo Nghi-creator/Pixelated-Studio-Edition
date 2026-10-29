@@ -112,3 +112,7 @@ the action interval or be presented as a matched cleanup effect. The older
 `full_span_cohort` method retains its stricter comparison of those broader
 intervals; old records and unavailable comparisons are preserved under that method.
 New comparisons reject records missing the fixed action checkpoints.
+
+The separate [actual fault-cost procedure](n10-fault-cost.md) records cancellation,
+receiver/source loss and reconnect recovery through bounded cleanup callbacks,
+while retaining their original lifecycle rules and uncertainty semantics.

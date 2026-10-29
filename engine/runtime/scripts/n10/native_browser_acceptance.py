@@ -24,13 +24,15 @@ def main():
     if sys.argv[1:] != ["--isolated-browser-acceptance"] or os.environ.get("N10_BROWSER_ACCEPTANCE") != "1":
         raise ValueError("explicit disposable acceptance opt-in required")
     from game_failure_acceptance import MODES as GAME_FAILURE_MODES
+    from fault_cost import COST_MODES as FAULT_COST_MODES
     from live_probe_control.action_cost_protocol import MODES, MODES_V2, MODES_V3
     ACTION_COST_MODES = {**MODES, **MODES_V2, **MODES_V3}
 
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", *GAME_FAILURE_MODES, *ACTION_COST_MODES):
+    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
         raise ValueError("closed acceptance mode required")
-    game_failure = mode in GAME_FAILURE_MODES
+    fault_cost = mode in FAULT_COST_MODES
+    game_failure = mode in GAME_FAILURE_MODES or fault_cost
     cost_mode = mode in ACTION_COST_MODES
     game_control = mode == "engineering-game-disturbance" or game_failure or cost_mode
     control_mode = mode in ("engineering-disturbance", "engineering-game-disturbance") or cost_mode
@@ -146,7 +148,7 @@ def main():
                         state["local"] = cleanup.enter_context(LocalProbeOwner(service, ledger, policy, enabled=True))
                         state["capability"] = state["local"].claim()
                     state["phase"] = "game-failure" if game_failure else ("control-screen" if control_mode else ("observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission")))
-                    if mode in MODES_V3:
+                    if mode in MODES_V3 or fault_cost:
                         from container_cost import ContainerCost
                         state["container_cost"] = ContainerCost(emit)
                     emit("camera_ready", mode=mode, source=service.source, profile=service.profile)
@@ -154,7 +156,11 @@ def main():
                 if state["phase"] == "game-failure":
                     if "game_failure" not in state:
                         from game_failure_acceptance import GameFailureAcceptance
-                        state["game_failure"] = GameFailureAcceptance(service, scene, bridge, local, capability, emit, captured["client"], mode)
+                        if fault_cost:
+                            from fault_cost import FaultCostAcceptance
+                            state["game_failure"] = FaultCostAcceptance(service, scene, bridge, local, capability, emit, captured["client"], FAULT_COST_MODES[mode], container_cost=state["container_cost"])
+                        else:
+                            state["game_failure"] = GameFailureAcceptance(service, scene, bridge, local, capability, emit, captured["client"], mode)
                         cleanup.callback(state["game_failure"].close)
                     if not state["game_failure"].tick():
                         return True

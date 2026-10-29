@@ -129,6 +129,9 @@ class GameFailureAcceptance(GameControlDisturbance):
             self.sio.emit("webrtc-receiver-bind", self.bridge.open(peer))
         self.stage, self.stage_start = "restarted-owner", now
 
+    def before_dispatch(self):
+        pass
+
     def tick(self):
         now = time.monotonic_ns()
         if self.swap is not None and not self.source_restored and now - self.faulted_at >= 500000000:
@@ -151,6 +154,7 @@ class GameFailureAcceptance(GameControlDisturbance):
                 self.sibling_before = slots["second"].owner.last_observation[0]["encoded_buffers"]
                 self.sibling_identity = self.identity({"second": slots["second"]})["second"]
                 self.game_before = self.scene.resources()["cpu_ticks"]
+                self.before_dispatch()
                 self.draft = self.local.prepare(self.capability, self.old_receiver, "game-failure-request", 24, self.duration)
                 self.operation = self.local.dispatch(self.capability, self.draft)
                 if self.local.dispatch(self.capability, self.draft) is not self.operation:

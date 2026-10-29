@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const readline = require("node:readline");
 const { spawn } = require("node:child_process");
 const { Server } = require("socket.io");
+const { shouldForwardReconnect } = require("./nativeFaultModes.cjs");
 const { ownRelayShutdown } = require("./nativeBrowserShutdown.cjs");
 const { createEngineTokenAuth } = require("../../dist/src/signaling/socketAuth.js");
 const { canClaimTrustedCamera } = require("../../dist/src/signaling/cameraAuthorization.js");
@@ -56,7 +57,7 @@ server.listen(8080, "0.0.0.0", () => {
       try {
         const event = JSON.parse(line.slice(15));
         if (process.env.N10_BROWSER_ACCEPTANCE_MODE === "observer-static-diagnostic" && event.kind === "diagnostic_observer_stop") io.to("session:native_acceptance").emit("acceptance-observer-stop");
-        if (["engineering-game-cancel", "engineering-game-reconnect"].includes(process.env.N10_BROWSER_ACCEPTANCE_MODE) && event.kind === "game_failure_reconnect") io.to("session:native_acceptance").emit("acceptance-peer-reconnect");
+        if (shouldForwardReconnect(process.env.N10_BROWSER_ACCEPTANCE_MODE, event)) io.to("session:native_acceptance").emit("acceptance-peer-reconnect");
       } catch { camera.kill(); }
     }
   });

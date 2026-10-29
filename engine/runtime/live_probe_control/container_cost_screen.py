@@ -70,34 +70,35 @@ def summarize(data, *, action=False):
             ):
                 raise ValueError("container action/native span edges disagree")
         left, right = a["sample"], b["sample"]
-        for sample in (left, right):
-            if (
-                not 0
-                <= number(sample["read_end_ns"]) - number(sample["read_start_ns"])
-                <= 50000000
-            ):
-                raise ValueError("container read bracket unavailable")
-        wall = right["read_start_ns"] - left["read_start_ns"]
-        if not 0 < wall <= 40000000000:
-            raise ValueError("container cost duration unavailable")
-        costs = {}
-        for key in ("usage_usec", "user_usec", "system_usec"):
-            if (
-                any(
-                    type(v[key]) is not int or number(v[key]) < 0 for v in (left, right)
-                )
-                or right[key] < left[key]
-            ):
-                raise ValueError("container CPU counter reset")
-            costs[key.removesuffix("_usec") + "_seconds"] = (
-                right[key] - left[key]
-            ) / 1000000
-        result.update(
-            screen="met",
-            duration_ns=wall,
-            cpu_percent=costs["usage_seconds"] * 100000000000 / wall,
-            **costs,
-        )
+        result.update(screen="met", **interval_cost(left, right))
     except (ValueError, KeyError, TypeError, IndexError, OverflowError) as exc:
         result["unavailable_reason"] = str(exc)
     return result
+
+
+def interval_cost(left, right):
+    for sample in (left, right):
+        if (
+            not 0
+            <= number(sample["read_end_ns"]) - number(sample["read_start_ns"])
+            <= 50000000
+        ):
+            raise ValueError("container read bracket unavailable")
+    wall = right["read_start_ns"] - left["read_start_ns"]
+    if not 0 < wall <= 40000000000:
+        raise ValueError("container cost duration unavailable")
+    costs = {}
+    for key in ("usage_usec", "user_usec", "system_usec"):
+        if (
+            any(type(v[key]) is not int or number(v[key]) < 0 for v in (left, right))
+            or right[key] < left[key]
+        ):
+            raise ValueError("container CPU counter reset")
+        costs[key.removesuffix("_usec") + "_seconds"] = (
+            right[key] - left[key]
+        ) / 1000000
+    return dict(
+        duration_ns=wall,
+        cpu_percent=costs["usage_seconds"] * 100000000000 / wall,
+        **costs,
+    )
