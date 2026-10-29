@@ -9,7 +9,13 @@ ORDER = tuple("engineering-game-" + case + "-cost" for case in CASES)
 PHASES = ("before_dispatch", "fault_injected", "result_observed", "lifecycle_verified")
 
 
-def summarize(run):
+def summarize(run, *, _stalled=False):
+    method = "n10-contained-stalled-worker-cost-v1" if _stalled else METHOD
+    role = (
+        "contained_game_stalled_worker_cost_not_qualification"
+        if _stalled
+        else "contained_game_fault_cost_not_qualification"
+    )
     result = dict(
         method=METHOD,
         cost_screen="unavailable",
@@ -27,24 +33,35 @@ def summarize(run):
     try:
         if (
             run["status"] != "passed"
-            or run["method"] != METHOD
-            or run["role"] != "contained_game_fault_cost_not_qualification"
+            or run["method"] != method
+            or run["role"] != role
             or run["live_authority"] is not False
         ):
             raise ValueError("complete fault-cost acquisition required")
         acquisition_context(run)
         case = run["case"]
-        if case not in CASES or run["mode"] != "engineering-game-" + case + "-cost":
+        if (
+            case not in (("worker-stall",) if _stalled else CASES)
+            or run["mode"] != "engineering-game-" + case + "-cost"
+        ):
             raise ValueError("closed fault-cost case required")
         # Reuse the existing lifecycle rules on a local view; do not relabel or mutate the record.
-        lifecycle = failure_summary(
-            {
-                **run,
-                "method": LIFECYCLE_METHOD,
-                "role": "contained_game_failure_not_qualification",
-            },
-            case,
-        )
+        if _stalled:
+            from .stalled_worker_cost_screen import lifecycle_summary
+
+            lifecycle = lifecycle_summary(run)
+            result["lifetime_comparison"] = (
+                "supplied_stalled_worker_lifetime_consistency_only"
+            )
+        else:
+            lifecycle = failure_summary(
+                {
+                    **run,
+                    "method": LIFECYCLE_METHOD,
+                    "role": "contained_game_failure_not_qualification",
+                },
+                case,
+            )
         events = run["events"]
         gate = one(events, "fault_cost_started")
         points = [e for e in events if e["kind"] == "fault_cost_checkpoint"]
@@ -58,7 +75,7 @@ def summarize(run):
         ):
             raise ValueError("ordered original cost checkpoints required")
         if any(
-            e["method"] != METHOD
+            e["method"] != method
             or e["case"] != case
             or e["live_authority"] is not False
             for e in [gate, *points]

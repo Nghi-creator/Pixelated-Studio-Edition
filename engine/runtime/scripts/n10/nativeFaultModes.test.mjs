@@ -20,3 +20,9 @@ test("unlisted modes and cost-like strings cannot open reconnect routing", () =>
     assert.equal(shouldForwardReconnect(mode, { kind: "game_failure_reconnect" }), false);
   }
 });
+
+test("stopped-worker cost is explicit and never uses planned reconnect routing", () => {
+  assert.deepEqual(faultMode("engineering-game-worker-stall-cost"), { base: "engineering-game-worker-stall-cost", case: "worker-stall", cost: true });
+  assert.equal(faultMode("engineering-game-worker-stall"), null);
+  assert.equal(shouldForwardReconnect("engineering-game-worker-stall-cost", { kind: "game_failure_reconnect" }), false);
+});

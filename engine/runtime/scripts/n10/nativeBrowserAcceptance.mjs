@@ -140,7 +140,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       }, undefined, { timeout: 8000 })));
       const marker = path.join(directory, "presented.pending");
       if (faultCost) { costSpan = new BrowserCostSpan(browser); await costSpan.start(); }
-      await fs.writeFile(marker, JSON.stringify(faultCost ? { method: "n10-contained-game-fault-cost-v1", case: gameFailure, peers: ["first", "second"] } : { method: costCondition ? costMethod : "n10-observer-moving-acquisition-v2", peers: ["first", "second"] }), { flag: "wx", mode: 0o644 });
+      await fs.writeFile(marker, JSON.stringify(faultCost ? { method: gameFailure === "worker-stall" ? "n10-contained-stalled-worker-cost-v1" : "n10-contained-game-fault-cost-v1", case: gameFailure, peers: ["first", "second"] } : { method: costCondition ? costMethod : "n10-observer-moving-acquisition-v2", peers: ["first", "second"] }), { flag: "wx", mode: 0o644 });
       await fs.chmod(marker, 0o644);
       await fs.rename(marker, path.join(directory, faultCost ? "fault-cost-ready.json" : "presented.json"));
     }
@@ -211,7 +211,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       if (observerOff) assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === 0 && Object.keys(snapshot.counts).length === 0 && snapshot.unbound === 0));
       else assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === (diagnosticMode ? 2 : 1) && snapshot.unbound === 1));
     } else if (gameFailure) {
-      const expectedFailures = ["source-loss", "receiver-loss"].includes(gameFailure) ? 1 : 0;
+      const expectedFailures = ["source-loss", "receiver-loss", "worker-stall"].includes(gameFailure) ? 1 : 0;
       assert.equal(snapshots[0].failures.length, expectedFailures);
       if (expectedFailures) assert.equal(snapshots[0].failures[0].peerId, "first");
       assert.deepEqual(snapshots[1].failures, []);
@@ -239,7 +239,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     const exitCode = await exited;
     assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
     return { status: "passed", mode, live_authority: false, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult } : {}), context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
-      ...(gameFailure ? {role: faultCost ? "contained_game_fault_cost_not_qualification" : "contained_game_failure_not_qualification", method: faultCost ? "n10-contained-game-fault-cost-v1" : "n10-contained-game-failure-v1", case: gameFailure, sibling_quality: siblingQuality} : {}),
+      ...(gameFailure ? {role: gameFailure === "worker-stall" ? "contained_game_stalled_worker_cost_not_qualification" : faultCost ? "contained_game_fault_cost_not_qualification" : "contained_game_failure_not_qualification", method: gameFailure === "worker-stall" ? "n10-contained-stalled-worker-cost-v1" : faultCost ? "n10-contained-game-fault-cost-v1" : "n10-contained-game-failure-v1", case: gameFailure, sibling_quality: siblingQuality} : {}),
       ...(controlMode ? {role: costCondition ? "contained_game_action_cost_not_qualification" : gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: costCondition ? costMethod : gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", ...(costCondition ? {condition: costCondition} : {}), control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),

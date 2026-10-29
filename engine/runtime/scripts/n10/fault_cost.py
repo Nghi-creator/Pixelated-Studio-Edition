@@ -3,16 +3,22 @@
 import json
 import os
 import stat
+import signal
 import time
 from pathlib import Path
 from game_failure_acceptance import GameFailureAcceptance, MODES
 from live_probe_control.browser_game_worker import strict_object
 
 METHOD = "n10-contained-game-fault-cost-v1"
+STALLED_METHOD = "n10-contained-stalled-worker-cost-v1"
 COST_MODES = {mode + "-cost": mode for mode in MODES}
+
+COST_MODES["engineering-game-worker-stall-cost"] = "engineering-game-reconnect"
 
 
 class FaultCostAcceptance(GameFailureAcceptance):
+    cost_method = METHOD
+
     def __init__(self, *args, container_cost, **kwargs):
         original_emit = args[5]
         self.cost, self.gated = container_cost, False
@@ -35,7 +41,7 @@ class FaultCostAcceptance(GameFailureAcceptance):
     def checkpoint(self, phase):
         self.cost_emit(
             "fault_cost_checkpoint",
-            method=METHOD,
+            method=self.cost_method,
             case=self.case,
             phase=phase,
             index=self.cost_index,
@@ -63,7 +69,7 @@ class FaultCostAcceptance(GameFailureAcceptance):
             if len(body) > 4096:
                 raise ValueError("fault cost marker bound")
             if json.loads(body, object_pairs_hook=strict_object) != {
-                "method": METHOD,
+                "method": self.cost_method,
                 "case": self.case,
                 "peers": ["first", "second"],
             }:
@@ -71,8 +77,30 @@ class FaultCostAcceptance(GameFailureAcceptance):
             self.gated = True
             self.cost_emit(
                 "fault_cost_started",
-                method=METHOD,
+                method=self.cost_method,
                 case=self.case,
                 live_authority=False,
             )
         return super().tick()
+
+
+class StalledWorkerCost(FaultCostAcceptance):
+    method = STALLED_METHOD
+    cost_method = STALLED_METHOD
+    unresolved_journal_state = "active"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.case = "worker-stall"
+
+    def inject_fault(self):
+        if (
+            self.old_process is not self.old.owner.child
+            or self.old_process.poll() is not None
+            or self.old.owner.pidfd is None
+        ):
+            raise ValueError("exact live dedicated worker required for stop")
+        signal.pidfd_send_signal(self.old.owner.pidfd, signal.SIGSTOP)
+
+    def result_extra(self):
+        return {"operation_status": self.operation.status}

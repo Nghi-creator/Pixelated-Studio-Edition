@@ -77,3 +77,42 @@ or action limits automatically. Define permitted visual/cadence loss, audio
 continuity and supported desktop workflows separately. Bind accepted evidence and
 limits to an explicit policy revision before supported producer activation.
 A missing decision or acceptance keeps qualification unavailable.
+
+## Stopped media worker
+
+A separate case stops only the exact dedicated media worker after its actual
+24 FPS target is observed. The camera, game/display and sibling are not stop
+or kill targets. It uses the existing pidfd-bound supervision, lease guard and
+controller watchdog paths without disabling them or extending their deadlines.
+
+```sh
+npm run smoke:n10-browser-native -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --mode engineering-game-worker-stall-cost
+```
+
+The four-case runner above retains its original order and does not include this
+case. For checkpointed acquisition, use `acquireNativeCohort` with this one explicit
+mode and a new absolute output file; inspect its one-record array with:
+
+```sh
+PYTHONPATH=engine/runtime python3 -m live_probe_control.stalled_worker_cost_screen \
+  "$N10_STALLED_WORKER_COST"
+```
+
+Its method is `n10-contained-stalled-worker-cost-v1` and role is
+`contained_game_stalled_worker_cost_not_qualification`. A stopped worker must
+produce no fabricated controller result: operation status is `worker_lost`, the
+old exact child exits via SIGKILL and is reaped, and its journal remains `active`
+with one full four-second reservation. This is unresolved durable intent, not a
+clean reservation or verified restoration. Replacement and issuer restart must
+preserve the journal and block a new action. The sibling, owned source and camera
+must retain their lifetimes and progress. Hashed lifetime/journal consistency is
+checked under this separate method; older four-case roots cannot accept it.
+
+The same container CPU checkpoints and independent browser CPU span apply.
+A met screen does not attribute the teardown to a particular watchdog, lease
+guard or supervisor: their protections can race. Native helper tests separately
+exercise guard EOF, stalled heartbeat and watchdog behavior. This is a stopped
+media-worker case, not whole-camera death, controller-thread-only failure, full
+platform coverage or a qualified live family. The existing cost/quality limits
+and later exit/GPU/RSS exclusions remain explicit.

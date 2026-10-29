@@ -157,8 +157,9 @@ def main():
                     if "game_failure" not in state:
                         from game_failure_acceptance import GameFailureAcceptance
                         if fault_cost:
-                            from fault_cost import FaultCostAcceptance
-                            state["game_failure"] = FaultCostAcceptance(service, scene, bridge, local, capability, emit, captured["client"], FAULT_COST_MODES[mode], container_cost=state["container_cost"])
+                            from fault_cost import FaultCostAcceptance, StalledWorkerCost
+                            fault_class = StalledWorkerCost if mode == "engineering-game-worker-stall-cost" else FaultCostAcceptance
+                            state["game_failure"] = fault_class(service, scene, bridge, local, capability, emit, captured["client"], FAULT_COST_MODES[mode], container_cost=state["container_cost"])
                         else:
                             state["game_failure"] = GameFailureAcceptance(service, scene, bridge, local, capability, emit, captured["client"], mode)
                         cleanup.callback(state["game_failure"].close)

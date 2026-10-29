@@ -68,6 +68,7 @@ class SourceSocketSwap:
 
 class GameFailureAcceptance(GameControlDisturbance):
     method = METHOD
+    unresolved_journal_state = "dirty"
 
     def __init__(self, service, scene, bridge, local, capability, emit, sio, mode):
         if mode not in MODES:
@@ -88,7 +89,7 @@ class GameFailureAcceptance(GameControlDisturbance):
             value = store.journal
         if value is None or value["actions"] != 1 or value["reserved_ns"] != self.duration + GRACE_NS:
             raise ValueError("failure case lost durable reservation")
-        expected = "clean" if self.case == "cancel" else "dirty"
+        expected = "clean" if self.case == "cancel" else self.unresolved_journal_state
         if value["state"] != expected:
             raise ValueError("failure case journal state mismatch")
         return value
@@ -97,10 +98,10 @@ class GameFailureAcceptance(GameControlDisturbance):
         if self.swap is not None and not self.source_restored:
             self.swap.close()
             self.source_restored = True
-            self.emit("game_failure_source_restored", method=METHOD, case=self.case)
+            self.emit("game_failure_source_restored", method=self.method, case=self.case)
 
     def reconnect(self):
-        self.emit("game_failure_reconnect", method=METHOD, case=self.case)
+        self.emit("game_failure_reconnect", method=self.method, case=self.case)
 
     def begin_restart(self, slots, now):
         self.journal()
@@ -128,6 +129,19 @@ class GameFailureAcceptance(GameControlDisturbance):
         for peer in slots:
             self.sio.emit("webrtc-receiver-bind", self.bridge.open(peer))
         self.stage, self.stage_start = "restarted-owner", now
+
+    def inject_fault(self):
+        if self.case == "cancel":
+            self.local.cancel(self.capability, self.operation)
+        elif self.case == "receiver-loss":
+            self.emit("stop_first_observations")
+        elif self.case == "source-loss":
+            self.swap = SourceSocketSwap(self.scene, self.service.control.capture)
+        else:
+            self.reconnect()
+
+    def result_extra(self):
+        return {}
 
     def before_dispatch(self):
         pass
@@ -160,7 +174,7 @@ class GameFailureAcceptance(GameControlDisturbance):
                 if self.local.dispatch(self.capability, self.draft) is not self.operation:
                     raise ValueError("failure retry issued another operation")
                 self.stage, self.stage_start = "active", now
-                self.emit("game_failure_dispatched", method=METHOD, case=self.case, request=asdict(self.draft.request), live_authority=False)
+                self.emit("game_failure_dispatched", method=self.method, case=self.case, request=asdict(self.draft.request), live_authority=False)
             return False
         if self.stage == "active":
             if now - self.stage_start > 2 * 10**9 or self.operation.done.is_set():
@@ -171,15 +185,8 @@ class GameFailureAcceptance(GameControlDisturbance):
                 observed = observe(self, "active_target", {"first": self.old, "second": self.slots()["second"]})
                 self.old_process_hash = observed["peers"]["first"]["process"]["identity_hash"]
                 self.faulted_at = now
-                if self.case == "cancel":
-                    self.local.cancel(self.capability, self.operation)
-                elif self.case == "receiver-loss":
-                    self.emit("stop_first_observations")
-                elif self.case == "source-loss":
-                    self.swap = SourceSocketSwap(self.scene, self.service.control.capture)
-                else:
-                    self.reconnect()
-                self.emit("game_failure_fault", method=METHOD, case=self.case, target_observed=True)
+                self.inject_fault()
+                self.emit("game_failure_fault", method=self.method, case=self.case, target_observed=True)
                 self.stage = "result"
             return False
         if self.stage == "result":
@@ -195,9 +202,9 @@ class GameFailureAcceptance(GameControlDisturbance):
             if self.case == "source-loss" and result is None:
                 raise ValueError("source loss lacked explicit uncertain restoration result")
             journal = self.journal()
-            self.emit("game_failure_result", method=METHOD, case=self.case,
+            self.emit("game_failure_result", method=self.method, case=self.case,
                       result=asdict(result) if result is not None else None, ledger_state=journal["state"],
-                      actions=journal["actions"], reserved_ns=journal["reserved_ns"])
+                      actions=journal["actions"], reserved_ns=journal["reserved_ns"], **self.result_extra())
             if self.case == "cancel":
                 self.reconnect()
             self.stage = "replacement"
@@ -248,7 +255,7 @@ class GameFailureAcceptance(GameControlDisturbance):
             if GameCaptureContext.from_scene(self.scene) != self.service.control.capture:
                 raise ValueError("fault did not restore exact capture scope")
             observe(self, "issuer_restarted", slots)
-            self.emit("game_failure_verified", method=METHOD, case=self.case, old_exit=self.old.owner.exit_code,
+            self.emit("game_failure_verified", method=self.method, case=self.case, old_exit=self.old.owner.exit_code,
                       old_reaped=True, stale_handles_rejected=True, owner_restarted=True, old_owner_rejected=True,
                       dirty_blocked=self.case != "cancel", clean_draft_allowed=self.case == "cancel",
                       source_restored=self.source_restored, game_progress=True, sibling_progress=True, sibling_identity_retained=True,
