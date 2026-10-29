@@ -15,6 +15,7 @@ COST_MODES = {mode + "-cost": mode for mode in MODES}
 
 COST_MODES["engineering-game-worker-stall-cost"] = "engineering-game-reconnect"
 COST_MODES["engineering-game-controller-thread-exit-cost"] = "engineering-game-reconnect"
+COST_MODES["engineering-game-controller-thread-block-cost"] = "engineering-game-reconnect"
 
 
 class FaultCostAcceptance(GameFailureAcceptance):

@@ -32,3 +32,9 @@ test("controller thread exit cost is explicit and cannot request reconnect routi
   assert.equal(faultMode("engineering-game-controller-thread-exit"), null);
   assert.equal(shouldForwardReconnect("engineering-game-controller-thread-exit-cost", { kind: "game_failure_reconnect" }), false);
 });
+
+test("blocked controller cost cannot use exit or planned reconnect routing", () => {
+  assert.deepEqual(faultMode("engineering-game-controller-thread-block-cost"), { base: "engineering-game-controller-thread-block-cost", case: "controller-thread-block", cost: true });
+  assert.equal(faultMode("engineering-game-controller-thread-block"), null);
+  assert.equal(shouldForwardReconnect("engineering-game-controller-thread-block-cost", { kind: "game_failure_reconnect" }), false);
+});

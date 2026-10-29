@@ -1,5 +1,7 @@
 """Actual fault lifecycle assertions and bounded container CPU; never qualified live limits."""
 
+from importlib import import_module
+
 from .game_failure_screen import failure_summary, one, METHOD as LIFECYCLE_METHOD, CASES
 from .observer_screen import acquisition_context, number, delta, cohort_main
 from .container_cost_screen import summarize as cleanup_screen, interval_cost
@@ -9,17 +11,37 @@ ORDER = tuple("engineering-game-" + case + "-cost" for case in CASES)
 PHASES = ("before_dispatch", "fault_injected", "result_observed", "lifecycle_verified")
 
 
-def summarize(run, *, _stalled=False, _thread=False):
-    method = "n10-contained-stalled-worker-cost-v1" if _stalled else METHOD
-    if _thread:
-        method = "n10-contained-controller-thread-exit-cost-v1"
-    role = (
-        "contained_game_stalled_worker_cost_not_qualification"
-        if _stalled
-        else "contained_game_fault_cost_not_qualification"
+INTERRUPTIONS = {
+    "worker-stall": (
+        "n10-contained-stalled-worker-cost-v1",
+        "contained_game_stalled_worker_cost_not_qualification",
+        "stalled_worker_cost_screen",
+        "supplied_stalled_worker_lifetime_consistency_only",
+    ),
+    "controller-thread-exit": (
+        "n10-contained-controller-thread-exit-cost-v1",
+        "contained_game_controller_thread_exit_cost_not_qualification",
+        "thread_exit_cost_screen",
+        "supplied_thread_exit_lifetime_consistency_only",
+    ),
+    "controller-thread-block": (
+        "n10-contained-controller-thread-block-cost-v1",
+        "contained_game_controller_thread_block_cost_not_qualification",
+        "thread_block_cost_screen",
+        "supplied_thread_block_lifetime_consistency_only",
+    ),
+}
+
+
+def summarize(run, *, _interruption=None):
+    selected = (
+        INTERRUPTIONS.get(_interruption) if isinstance(_interruption, str) else None
     )
-    if _thread:
-        role = "contained_game_controller_thread_exit_cost_not_qualification"
+    method, role = (
+        selected[:2]
+        if selected
+        else (METHOD, "contained_game_fault_cost_not_qualification")
+    )
     result = dict(
         method=method,
         cost_screen="unavailable",
@@ -35,6 +57,8 @@ def summarize(run, *, _stalled=False, _thread=False):
         ],
     )
     try:
+        if _interruption is not None and selected is None:
+            raise ValueError("closed interruption case required")
         if (
             run["status"] != "passed"
             or run["method"] != method
@@ -45,32 +69,16 @@ def summarize(run, *, _stalled=False, _thread=False):
         acquisition_context(run)
         case = run["case"]
         if (
-            case
-            not in (
-                ("controller-thread-exit",)
-                if _thread
-                else ("worker-stall",)
-                if _stalled
-                else CASES
-            )
+            case not in ((_interruption,) if selected else CASES)
             or run["mode"] != "engineering-game-" + case + "-cost"
         ):
             raise ValueError("closed fault-cost case required")
         # Reuse the existing lifecycle rules on a local view; do not relabel or mutate the record.
-        if _thread:
-            from .thread_exit_cost_screen import lifecycle_summary
-
-            lifecycle = lifecycle_summary(run)
-            result["lifetime_comparison"] = (
-                "supplied_thread_exit_lifetime_consistency_only"
+        if selected:
+            lifecycle = import_module("." + selected[2], __package__).lifecycle_summary(
+                run
             )
-        elif _stalled:
-            from .stalled_worker_cost_screen import lifecycle_summary
-
-            lifecycle = lifecycle_summary(run)
-            result["lifetime_comparison"] = (
-                "supplied_stalled_worker_lifetime_consistency_only"
-            )
+            result["lifetime_comparison"] = selected[3]
         else:
             lifecycle = failure_summary(
                 {

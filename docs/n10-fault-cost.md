@@ -188,3 +188,35 @@ This case establishes a scoped thread-exit observation, not a blocked controller
 thread in this game/browser context, whole-camera death, perceptual/audio
 acceptance or qualification. Existing evidence roots keep their original case
 inventories; do not relabel this record into an earlier four-case cohort.
+
+## Owned-game blocked-controller cost
+
+The separate mode `engineering-game-controller-thread-block-cost` parks only the
+controller thread in a ten-second event wait after a healthy target snapshot.
+That wait exceeds the unchanged four-second action reservation; it does not spin,
+disable a guard or alter a teardown deadline. The same private request/generation
+binding and fixture-only launcher apply.
+
+Before teardown, the child main loop must observe the controller thread still
+alive, at least 100 ms since fault injection, at least three additional encoded
+buffers, and both configured and negotiated cadence still at 24 FPS. A thread-exit
+observation cannot satisfy this case. The worker must subsequently be killed and
+reaped with no controller result, retaining unresolved intent and its full
+reservation through replacement and issuer restart. Sibling and owned source
+lifetime/progress checks remain required.
+
+Use the acquisition command above with
+`--mode engineering-game-controller-thread-block-cost`. Retain its original
+one-record array in a separate output and inspect it with:
+
+```sh
+PYTHONPATH=engine/runtime python3 -m live_probe_control.thread_block_cost_screen \
+  "$N10_THREAD_BLOCK_COST"
+```
+
+The method is `n10-contained-controller-thread-block-cost-v1`, role
+`contained_game_controller_thread_block_cost_not_qualification`. Its bounded
+container CPU checkpoints and independent browser span keep the existing
+exclusions and false live authority. This is scoped blocked-thread evidence;
+whole-camera death, reviewed cost/quality limits and production activation remain
+separate requirements.

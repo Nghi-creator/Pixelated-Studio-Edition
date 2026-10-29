@@ -25,6 +25,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const gameFailure = selectedFault?.case;
   const interruption = new Map([
     ["worker-stall", {method: "n10-contained-stalled-worker-cost-v1", role: "contained_game_stalled_worker_cost_not_qualification"}],
+    ["controller-thread-block", {method: "n10-contained-controller-thread-block-cost-v1", role: "contained_game_controller_thread_block_cost_not_qualification"}],
     ["controller-thread-exit", {method: "n10-contained-controller-thread-exit-cost-v1", role: "contained_game_controller_thread_exit_cost_not_qualification"}],
   ]).get(gameFailure);
   const spanCondition = new Map([["engineering-game-unchanged-span", "unchanged"], ["engineering-game-action-span", "action"], ["engineering-game-action-span-failure", "action"]]).get(mode);
@@ -215,7 +216,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       if (observerOff) assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === 0 && Object.keys(snapshot.counts).length === 0 && snapshot.unbound === 0));
       else assert.ok(snapshots.every((snapshot) => snapshot.bindings.length === (diagnosticMode ? 2 : 1) && snapshot.unbound === 1));
     } else if (gameFailure) {
-      const expectedFailures = ["source-loss", "receiver-loss", "worker-stall", "controller-thread-exit"].includes(gameFailure) ? 1 : 0;
+      const expectedFailures = ["source-loss", "receiver-loss", "worker-stall", "controller-thread-exit", "controller-thread-block"].includes(gameFailure) ? 1 : 0;
       assert.equal(snapshots[0].failures.length, expectedFailures);
       if (expectedFailures) assert.equal(snapshots[0].failures[0].peerId, "first");
       assert.deepEqual(snapshots[1].failures, []);

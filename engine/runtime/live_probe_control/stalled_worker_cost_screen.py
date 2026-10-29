@@ -250,7 +250,7 @@ def lifecycle_summary(run):
 def summarize(run):
     from .fault_cost_screen import summarize as cost_summary
 
-    return cost_summary(run, _stalled=True)
+    return cost_summary(run, _interruption="worker-stall")
 
 
 def assess(runs):

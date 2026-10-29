@@ -11,16 +11,18 @@ MODE = "engineering-game-controller-thread-exit-cost"
 CASE = "controller-thread-exit"
 
 
-def lifecycle_summary(run):
-    summary = _interrupted_lifecycle(run, method=METHOD, mode=MODE, case=CASE)
+def _thread_lifecycle(
+    run, *, method, mode, case, event, alive, minimum_ns=1, minimum_buffers=1
+):
+    summary = _interrupted_lifecycle(run, method=method, mode=mode, case=case)
     events = run["events"]
-    observation = one(events, "controller_thread_exit_observed")
+    observation = one(events, event)
     dispatched = one(events, "game_failure_dispatched")
     require(
-        observation["method"] == METHOD
+        observation["method"] == method
         and observation["request"] == dispatched["request"]
         and observation["live_authority"] is False
-        and observation["control_thread_alive"] is False
+        and observation["control_thread_alive"] is alive
         and type(observation["configured_fps"]) is int
         and type(observation["negotiated_fps"]) is int
         and observation["configured_fps"] == observation["negotiated_fps"] == 24,
@@ -29,19 +31,33 @@ def lifecycle_summary(run):
     for key in ("injected_at_ns", "observed_at_ns", "before_buffers", "after_buffers"):
         integer(observation[key], 1, 2**63 - 1)
     require(
-        observation["observed_at_ns"] > observation["injected_at_ns"]
-        and observation["after_buffers"] > observation["before_buffers"]
+        observation["observed_at_ns"] - observation["injected_at_ns"] >= minimum_ns
+        and observation["after_buffers"] - observation["before_buffers"]
+        >= minimum_buffers
         and events.index(one(events, "game_failure_fault"))
         < events.index(observation)
         < events.index(one(events, "game_failure_result")),
         "post-thread-exit media progress absent or misordered",
     )
-    summary["controller_thread"] = "exit_observed_media_progressed_without_result"
+    summary["controller_thread"] = (
+        "blocked" if alive else "exit"
+    ) + "_observed_media_progressed_without_result"
     return summary
 
 
+def lifecycle_summary(run):
+    return _thread_lifecycle(
+        run,
+        method=METHOD,
+        mode=MODE,
+        case=CASE,
+        event="controller_thread_exit_observed",
+        alive=False,
+    )
+
+
 def summarize(run):
-    return cost_summary(run, _thread=True)
+    return cost_summary(run, _interruption=CASE)
 
 
 def assess(runs):

@@ -132,9 +132,10 @@ def main():
             return original_connect(instance, *args, **kwargs)
 
         ledger = cleanup.enter_context(tempfile.TemporaryDirectory())
-        if mode == "engineering-game-controller-thread-exit-cost":
+        if mode in ("engineering-game-controller-thread-exit-cost", "engineering-game-controller-thread-block-cost"):
             from game_thread_fault import peer_subprocess_proxy
-            cleanup.enter_context(patch("live_probe_control.peer_supervisor.subprocess", peer_subprocess_proxy()))
+            kind = "block" if mode == "engineering-game-controller-thread-block-cost" else "exit"
+            cleanup.enter_context(patch("live_probe_control.peer_supervisor.subprocess", peer_subprocess_proxy(kind)))
         policy = Policy(24, 60, (5 if control_mode else 2) * 10**9, 3, 12 * 10**9, 10**9, 20, 100000000)
 
         def step():
@@ -161,9 +162,9 @@ def main():
                         from game_failure_acceptance import GameFailureAcceptance
                         if fault_cost:
                             from fault_cost import FaultCostAcceptance, StalledWorkerCost
-                            if mode == "engineering-game-controller-thread-exit-cost":
-                                from game_thread_fault import ControllerThreadExitCost
-                                fault_class = ControllerThreadExitCost
+                            if mode in ("engineering-game-controller-thread-exit-cost", "engineering-game-controller-thread-block-cost"):
+                                from game_thread_fault import ControllerThreadExitCost, ControllerThreadBlockCost
+                                fault_class = ControllerThreadBlockCost if mode == "engineering-game-controller-thread-block-cost" else ControllerThreadExitCost
                             else:
                                 fault_class = StalledWorkerCost if mode == "engineering-game-worker-stall-cost" else FaultCostAcceptance
                             state["game_failure"] = fault_class(service, scene, bridge, local, capability, emit, captured["client"], FAULT_COST_MODES[mode], container_cost=state["container_cost"])
