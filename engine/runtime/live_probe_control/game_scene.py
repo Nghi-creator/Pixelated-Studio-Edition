@@ -9,8 +9,31 @@ import time
 from .contracts import SECOND
 
 
+FIXTURE_SEED = 1
+FIXTURE_RANDOMNESS = f"""BEGIN {{
+    *CORE::GLOBAL::srand = sub {{ CORE::srand({FIXTURE_SEED}) }};
+    CORE::srand({FIXTURE_SEED});
+}}
+"""
+
+
+def game_command(*, fixed_seed=False):
+    if type(fixed_seed) is not bool:
+        raise ValueError("explicit fixture randomness choice required")
+    arguments = ["--fullscreen", "--solo", "--level", "1", "--no-sound", "--no-music", "--private"]
+    if not fixed_seed:
+        return ["/usr/games/frozen-bubble", *arguments]
+    # Frozen-Bubble explicitly reseeds from SDL ticks after loading a level.
+    # Install the fixture override before compiling that script, retaining its
+    # original arguments and one directly Popen-owned interpreter lifetime.
+    program = FIXTURE_RANDOMNESS + '\n$0 = "/usr/games/frozen-bubble"; my $loaded = do $0; die $@ if $@; die $! unless defined $loaded;'
+    return ["/usr/bin/perl", "-e", program, "--", *arguments]
+
+
 class GameScene:
-    def __init__(self, *, defer_script=False):
+    def __init__(self, *, defer_script=False, fixed_seed=False):
+        game_command(fixed_seed=fixed_seed)  # Validate before allocating processes.
+        self.fixed_seed = fixed_seed
         self.display = self.game = self.connection = None
         self.number = None
         self.started = None
@@ -60,16 +83,7 @@ class GameScene:
             os.environ, DISPLAY=f":{self.number}", SDL_AUDIODRIVER="dummy"
         )
         self.game = subprocess.Popen(
-            [
-                "/usr/games/frozen-bubble",
-                "--fullscreen",
-                "--solo",
-                "--level",
-                "1",
-                "--no-sound",
-                "--no-music",
-                "--private",
-            ],
+            game_command(fixed_seed=self.fixed_seed),
             env=environment,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,

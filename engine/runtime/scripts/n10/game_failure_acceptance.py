@@ -68,6 +68,7 @@ class SourceSocketSwap:
 
 class GameFailureAcceptance(GameControlDisturbance):
     method = METHOD
+    readiness_event = "game_failure_readiness_lost"
     unresolved_journal_state = "dirty"
 
     def __init__(self, service, scene, bridge, local, capability, emit, sio, mode):
@@ -162,6 +163,7 @@ class GameFailureAcceptance(GameControlDisturbance):
                 if self.ready(slots) and self.target_ready(slots, 30):
                     self.stage, self.stage_start = "warmup", now
             elif not self.ready(slots) or not self.target_ready(slots, 30):
+                self.readiness_lost(slots, now, "fixed_warmup")
                 raise ValueError("game failure fixed warmup readiness lost")
             elif now - self.stage_start >= 3 * 10**9:
                 self.old, self.old_receiver = slots["first"], self.scopes["first"]
@@ -178,6 +180,24 @@ class GameFailureAcceptance(GameControlDisturbance):
             return False
         if self.stage == "active":
             if now - self.stage_start > 2 * 10**9 or self.operation.done.is_set():
+                observation = self.old.owner.last_observation
+                lease = self.operation.lease()
+                stamp = time.monotonic_ns()
+                self.emit(
+                    "game_failure_operation_ended_before_fault", method=self.method, case=self.case,
+                    status=self.operation.status, rejection=self.operation.rejection,
+                    result=asdict(self.operation.result) if self.operation.result is not None else None,
+                    request_age_ns=stamp-self.stage_start,
+                    draft_remaining_ns=self.draft.expires_ns-stamp,
+                    receiver_lease_age_ns=stamp-lease["observed_ns"],
+                    receiver_lease_healthy=lease["healthy"],
+                    native_age_ns=None if observation is None else stamp-observation[1],
+                    native_caps={} if observation is None else {
+                        key: observation[0].get(key) for key in ("state", "connection_state", "ice_connection_state",
+                            "configured_fps", "negotiated_fps", "capture_buffers", "encoded_buffers",
+                            "queue_overruns_total", "pre_encoder_queue_level", "post_encoder_queue_level")},
+                    live_authority=False,
+                )
                 raise ValueError("fault missed the active target")
             snapshot = self.old.owner.last_snapshot
             if snapshot and snapshot["configured_fps"] == snapshot["negotiated_fps"] == 24:
@@ -224,6 +244,7 @@ class GameFailureAcceptance(GameControlDisturbance):
         if self.stage == "post-restart":
             slots = self.slots(("replacement", "second"))
             if slots is None or not self.ready(slots):
+                self.readiness_lost(slots, now, "post_restart")
                 raise ValueError("post-restart readiness lost")
             if now - self.stage_start < 2500000000:
                 return False

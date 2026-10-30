@@ -69,8 +69,14 @@ itself establish a causal observer-overhead estimate. Native CPU uses exact owne
 process tick deltas and Linux
 monotonic read brackets; RSS is the maximum sampled value, not an absolute peak.
 The relay is the camera host's direct parent, whose lifetime is pinned for the
-measurement. Browser CPU uses host-clock CDP process counters and requires an
-unchanged inventory within its own window. Browser and native CPU are reported
+measurement. Current native acceptance uses CDP only to enumerate the freshly
+owned browser's processes. CPU values come from read-only OS counters with
+explicit errors: Linux `/proc` ticks or Darwin `proc_pid_rusage` Mach ticks
+converted with the native timebase. Each sample retains hashed process lifetimes,
+individual counters and read durations; resets or changed inventories leave the
+measurement unavailable. Earlier CDP-counter receipts keep their original
+sampling context. The host sampler's own CPU is outside this browser-process
+measure. Browser and native CPU are reported
 separately. Game CPU must advance; Pulse/lease-guard overhead is outside the
 reported CPU scopes.
 

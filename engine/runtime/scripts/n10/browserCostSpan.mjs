@@ -1,5 +1,5 @@
 /** Two cumulative CPU observations of the owned browser; separate host clock. */
-import { processCpuSample } from "./gameBrowserTrial.mjs";
+import { sampleOwnedBrowserCpu } from "./nativeBrowserCpu.mjs";
 
 async function bounded(promise) {
   let timer;
@@ -8,9 +8,9 @@ async function bounded(promise) {
 }
 
 export class BrowserCostSpan {
-  constructor(browser) { this.browser = browser; this.result = null; }
+  constructor(browser, { sample = sampleOwnedBrowserCpu } = {}) { this.browser = browser; this.result = null; this.readSample = sample; }
   async sample() {
-    return processCpuSample((await bounded(this.session.send("SystemInfo.getProcessInfo"))).processInfo, Number(process.hrtime.bigint()));
+    return bounded(this.readSample(this.session));
   }
   async start() {
     this.session = await bounded(this.browser.newBrowserCDPSession());

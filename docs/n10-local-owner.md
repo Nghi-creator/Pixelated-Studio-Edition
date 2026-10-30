@@ -49,8 +49,8 @@ promise that execution budget will be available.
 When inspection is insufficient or stale, `readiness_diagnostics` explains the
 failed preconditions with bounded native/browser samples, receipt/progress ages
 and the unchanged freshness limits. These process-local diagnostics contain no
-owner tokens or filesystem paths and never grant admission. Fixture warmup
-failures retain the exact inspection responses; browser fixture snapshots also
+owner tokens or filesystem paths and never grant admission. Fixture readiness
+failures, including fault/restart checks, retain the exact inspection responses; browser fixture snapshots also
 retain a bounded list of collector stop reasons.
 
 ## Receiver and native evidence

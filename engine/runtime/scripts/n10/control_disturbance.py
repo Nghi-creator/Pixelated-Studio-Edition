@@ -17,6 +17,7 @@ DURATION_NS = 5000000000
 
 class ControlDisturbance:
     source = "isolated_synthetic"
+    readiness_event = "control_readiness_lost"
     method = METHOD
 
     def __init__(self, service, scene, bridge, local, capability, emit):
@@ -67,6 +68,22 @@ class ControlDisturbance:
         observations = self.last_readiness.values()
         return all(value["continuity_ready"] if continuity else value["status"] == "ready_for_dry_run"
                    for value in observations)
+
+    def readiness_lost(self, slots, now, stage):
+        keys = ("configured_fps", "negotiated_fps", "capture_buffers", "encoded_buffers")
+        self.emit(
+            self.readiness_event,
+            method=self.method,
+            stage=stage,
+            at_ns=now - self.origin,
+            slot_failure=self.last_slot_failure,
+            receivers=self.last_readiness if slots is not None else {},
+            native_caps={} if slots is None else {
+                peer: {key: slot.owner.last_observation[0].get(key) for key in keys}
+                for peer, slot in slots.items()
+            },
+            live_authority=False,
+        )
 
     def begin(self, slots):
         identity = self.identity(slots)

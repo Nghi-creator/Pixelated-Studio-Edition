@@ -6,10 +6,10 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts" / "n10"))
-from game_failure_acceptance import SourceSocketSwap
+from game_failure_acceptance import GameFailureAcceptance, SourceSocketSwap
 
 
 class SocketFaultTests(unittest.TestCase):
@@ -55,3 +55,46 @@ class SocketFaultTests(unittest.TestCase):
             SourceSocketSwap(object(), object())
         self.assertEqual(self.path.lstat().st_ino, self.capture.socket_inode)
         self.assertEqual(len(list(self.path.parent.iterdir())), 1)
+
+
+class RestartReadinessTests(unittest.TestCase):
+    def test_post_restart_failure_retains_cached_reason_before_abort(self):
+        driver = GameFailureAcceptance.__new__(GameFailureAcceptance)
+        driver.swap = None
+        driver.stage = "post-restart"
+        driver.origin = 0
+        driver.last_slot_failure = None
+        driver.last_readiness = {"second": {"readiness_diagnostics": {"reasons": ["native_source_progress_absent"]}}}
+        slots = {"second": SimpleNamespace(owner=SimpleNamespace(last_observation=({}, 0, 1)))}
+        driver.slots = Mock(return_value=slots)
+        driver.ready = Mock(return_value=False)
+        driver.emit = Mock()
+        with self.assertRaisesRegex(ValueError, "post-restart readiness lost"):
+            driver.tick()
+        driver.ready.assert_called_once()
+        self.assertEqual(driver.emit.call_args.args, ("game_failure_readiness_lost",))
+        self.assertEqual(driver.emit.call_args.kwargs["stage"], "post_restart")
+        self.assertEqual(driver.emit.call_args.kwargs["receivers"], driver.last_readiness)
+
+
+class EarlyOutcomeTests(unittest.TestCase):
+    def test_early_controller_outcome_is_retained_before_fault_abort(self):
+        from live_probe_control.contracts import Result
+        driver = GameFailureAcceptance.__new__(GameFailureAcceptance)
+        driver.swap = None
+        driver.stage, driver.stage_start = "active", 0
+        driver.case = "controller-thread-block"
+        driver.old = SimpleNamespace(owner=SimpleNamespace(last_observation=({}, 0, 1)))
+        driver.draft = SimpleNamespace(expires_ns=1)
+        driver.operation = SimpleNamespace(
+            done=SimpleNamespace(is_set=lambda: True), status="observed", rejection=None,
+            result=Result("request", "aborted", "verified_by_port", "apply_failed"),
+            lease=lambda: {"observed_ns": 0, "healthy": True})
+        driver.emit = Mock()
+        driver.inject_fault = Mock()
+        with self.assertRaisesRegex(ValueError, "fault missed"):
+            driver.tick()
+        driver.inject_fault.assert_not_called()
+        self.assertEqual(driver.emit.call_args.args, ("game_failure_operation_ended_before_fault",))
+        self.assertEqual(driver.emit.call_args.kwargs["result"]["reason"], "apply_failed")
+        self.assertFalse(driver.emit.call_args.kwargs["live_authority"])

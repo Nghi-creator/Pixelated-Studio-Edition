@@ -126,6 +126,17 @@ class DispatchTests(unittest.TestCase):
                 {"request_id": "request", "result": asdict(result), "rejection": None}
             )
 
+    def test_rejection_reason_is_retained_without_an_authority_or_result(self):
+        operation = self.operation()
+        with self.assertRaisesRegex(ValueError, "rejection"):
+            operation.finish({"request_id": "request", "result": None, "rejection": "unknown"})
+        self.assertFalse(operation.done.is_set())
+        operation.finish({"request_id": "request", "result": None, "rejection": "preconditions"})
+        self.assertEqual(operation.rejection, "preconditions")
+        self.assertEqual(operation.status, "rejected")
+        self.assertIsNone(operation.result)
+        self.assertTrue(operation.done.is_set())
+
     def test_scope_close_requests_cancellation(self):
         operation = self.operation()
         self.local.close()

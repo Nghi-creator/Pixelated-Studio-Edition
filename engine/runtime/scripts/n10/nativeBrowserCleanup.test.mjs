@@ -33,3 +33,9 @@ test("resource cleanup failure retains completed observations but cannot report 
   });
   assert.equal(acquisition.status, "passed");
 });
+
+test("actual failure survives later host shutdown events", async () => {
+  const { findAcceptanceFailure } = await import("./nativeBrowserCleanup.mjs");
+  const failure = { kind: "failed", reason: "readiness lost" };
+  assert.equal(findAcceptanceFailure([failure, { kind: "host_shutdown", stage: "socket_closed" }]), failure);
+});

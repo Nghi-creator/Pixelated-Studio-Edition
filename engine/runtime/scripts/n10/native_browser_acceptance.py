@@ -49,7 +49,7 @@ def main():
     from live_probe_control.camera_workers import CameraWorkers
     from live_probe_control.contracts import Policy
     from live_probe_control.controller import GRACE_NS
-    from live_probe_control.game_scene import GameScene
+    from live_probe_control.game_scene import FIXTURE_SEED, GameScene
     from live_probe_control.journal import CadenceJournal
     from live_probe_control.local_owner import LocalProbeOwner
     from live_probe_control.probe_transport import EngineeringControl
@@ -69,7 +69,7 @@ def main():
                     pulse_reaped=pulse.poll() is not None, workers_closed=bool(service and service.closed),
                     active_peers=len(service.active) if service else -1)
         cleanup.callback(finish_container_cost)
-        scene = GameScene(defer_script=moving_mode or cost_mode)
+        scene = GameScene(defer_script=moving_mode or cost_mode, fixed_seed=True)
         def close_scene():
             emit("host_shutdown", stage="scene_close_start")
             if not scene.close():
@@ -155,7 +155,8 @@ def main():
                     if mode in MODES_V3 or fault_cost:
                         from container_cost import ContainerCost
                         state["container_cost"] = ContainerCost(emit)
-                    emit("camera_ready", mode=mode, source=service.source, profile=service.profile)
+                    emit("camera_ready", mode=mode, source=service.source, profile=service.profile,
+                         fixture_randomness={"method": "fixed_perl_srand_v1", "seed": FIXTURE_SEED})
                 local, capability = state.get("local"), state.get("capability")
                 if state["phase"] == "game-failure":
                     if "game_failure" not in state:

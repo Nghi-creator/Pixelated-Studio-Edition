@@ -25,6 +25,7 @@ class ActionCostGate(MovingObserverGate):
 
 class GameActionCost(GameControlDisturbance):
     method = METHOD
+    readiness_event = "action_cost_readiness_lost"
     schedule = SCHEDULE
 
     def __init__(
@@ -159,22 +160,6 @@ class GameActionCost(GameControlDisturbance):
         ):
             raise ValueError("action-cost retained budget mismatch")
         return journal
-
-    def readiness_lost(self, slots, now, stage):
-        keys = ("configured_fps", "negotiated_fps", "capture_buffers", "encoded_buffers")
-        self.emit(
-            "action_cost_readiness_lost",
-            method=self.method,
-            stage=stage,
-            at_ns=now - self.origin,
-            slot_failure=self.last_slot_failure,
-            receivers=self.last_readiness if slots is not None else {},
-            native_caps={} if slots is None else {
-                peer: {key: slot.owner.last_observation[0].get(key) for key in keys}
-                for peer, slot in slots.items()
-            },
-            live_authority=False,
-        )
 
     def tick(self):
         now = time.monotonic_ns()

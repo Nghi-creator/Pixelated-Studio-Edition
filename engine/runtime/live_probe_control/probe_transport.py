@@ -12,6 +12,8 @@ from .contracts import Generation, Policy, Request, Result, digest, integer
 from .journal import CadenceJournal
 
 
+PROBE_REJECTIONS = ("disabled", "busy", "preconditions", "ledger_unavailable")
+
 def hash_value(value):
     if type(value) is not str or re.fullmatch(r"[a-f0-9]{64}", value) is None:
         raise ValueError("invalid probe binding hash")
@@ -143,6 +145,7 @@ class ProbeOperation:
         self.lock = threading.Lock()
         self.latest = None
         self.result = None
+        self.rejection = None
         self.status = "queued"
         self.publish(sample, True, observed_ns)
 
@@ -171,6 +174,10 @@ class ProbeOperation:
             result is not None and result.request_id != self.request.request_id
         ):
             raise ValueError("probe result identity mismatch")
+        rejection = body["rejection"]
+        if (result is None and rejection not in PROBE_REJECTIONS) or (result is not None and rejection is not None):
+            raise ValueError("invalid probe rejection/outcome")
+        self.rejection = rejection
         self.result = result
         self.status = "observed" if self.result is not None else "rejected"
         self.done.set()

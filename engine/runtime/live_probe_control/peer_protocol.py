@@ -7,6 +7,7 @@ from dataclasses import asdict
 from .contracts import Generation, Result, alias, digest, integer
 from .probe_transport import (
     EngineeringControl,
+    PROBE_REJECTIONS,
     hash_value,
     receiver_value,
     request_value,
@@ -206,12 +207,7 @@ def event_body(kind, body):
             value = Result(**body["result"])
             if value.request_id != body["request_id"] or body["rejection"] is not None:
                 raise ValueError("unbound probe result")
-        elif body["rejection"] not in (
-            "disabled",
-            "busy",
-            "preconditions",
-            "ledger_unavailable",
-        ):
+        elif body["rejection"] not in PROBE_REJECTIONS:
             raise ValueError("closed probe rejection required")
     elif kind == "error":
         closed(body, ("reason",))

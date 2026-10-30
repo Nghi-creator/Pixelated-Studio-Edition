@@ -13,7 +13,13 @@ from live_probe_control.game_scene import GameScene
 @unittest.skipUnless(sys.platform == "linux" and os.environ.get("N10_NATIVE_PEER_TESTS") == "1", "opt-in Linux capture pins")
 class NativeCaptureTests(unittest.TestCase):
     def test_exact_owned_scene_loss_invalidates_pins_but_does_not_kill_its_display(self):
-        scene = GameScene()
+        self.check_scene_loss(False)
+
+    def test_fixed_seed_scene_retains_exact_owned_lifetimes_and_source_loss_detection(self):
+        self.check_scene_loss(True)
+
+    def check_scene_loss(self, fixed_seed):
+        scene = GameScene(fixed_seed=fixed_seed)
         original = subprocess.Popen
 
         def private_display(argv, *args, **kwargs):

@@ -40,6 +40,11 @@ zero-filled. Missing checkpoints, counter resets, coverage gaps and a changed
 browser process inventory leave the cost screen unavailable. Hashes and named
 owned scopes do not by themselves authenticate execution.
 
+Current native acquisition uses the [OS browser CPU sampler](n10-browser-native-acceptance.md#browser-cpu-sampling),
+retaining per-process lifetimes and counters rather than trusting a summed CDP
+CPU value. Its host-clock span and original CPU limits remain separate from
+native and container measurements; older receipts are not reinterpreted.
+
 ## Failure prefixes and excluded work
 
 `engineering-game-action-span-failure` deliberately raises a fixture error at

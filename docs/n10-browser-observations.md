@@ -82,6 +82,15 @@ measurement of visual quality, or a qualified relief capability. Background or
 unsupported browsers may provide no usable observations; native health checks
 and local-owner readiness must remain conservative in those contexts.
 
+## Offer and local ICE ordering
+
+The app and contained receiver share a bounded local ICE queue. Candidates that
+arrive while the local offer is being prepared are published only after that
+offer, in order. A retired connection cannot publish a stale offer or drain its
+queued candidates. The queue permits at most128 candidates for one offer scope;
+overflow closes that scope. Incoming candidate binding and receiver admission
+remain separate checks.
+
 ## Camera and local owner binding
 
 `BrowserReceiverBridge` checks the acknowledged socket ID, nonce, exact offer and

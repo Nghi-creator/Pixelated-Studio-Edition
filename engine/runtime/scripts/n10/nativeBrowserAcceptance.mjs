@@ -9,10 +9,10 @@ import readline from "node:readline";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-import { processCpuSample } from "./gameBrowserTrial.mjs";
+import { sampleOwnedBrowserCpu } from "./nativeBrowserCpu.mjs";
 import { BrowserCostSpan } from "./browserCostSpan.mjs";
 import { nativeBrowserHtml } from "./nativeBrowserPage.mjs";
-import { requireAcceptanceCleanup } from "./nativeBrowserCleanup.mjs";
+import { findAcceptanceFailure, requireAcceptanceCleanup } from "./nativeBrowserCleanup.mjs";
 
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
@@ -73,12 +73,12 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     for (const relative of (await fs.readdir(path.join(runtime, "dist/src"), { recursive: true })).filter((name) => name.endsWith(".js")).sort()) {
       hash.update(JSON.stringify(["dist/src/" + relative, createHash("sha256").update(await fs.readFile(path.join(runtime, "dist/src", relative))).digest("hex")]));
     }
-    for (const relative of ["telemetry/receiverObservation.ts", "transport/webrtcEngineErrors.ts"]) {
+    for (const relative of ["telemetry/receiverObservation.ts", "transport/webrtcEngineErrors.ts", "transport/localIceQueue.ts"]) {
       hash.update(await fs.readFile(new URL(`../../../../apps/web/src/lib/webrtc/${relative}`, import.meta.url)));
     }
     softwareHash = hash.digest("hex");
     await fs.writeFile(path.join(directory, "index.html"), nativeBrowserHtml(token));
-    for (const [name, relative] of [["collector.js", "telemetry/receiverObservation.ts"], ["engine-errors.js", "transport/webrtcEngineErrors.ts"]]) {
+    for (const [name, relative] of [["collector.js", "telemetry/receiverObservation.ts"], ["engine-errors.js", "transport/webrtcEngineErrors.ts"], ["local-ice.js", "transport/localIceQueue.ts"]]) {
       const source = await fs.readFile(new URL(`../../../../apps/web/src/lib/webrtc/${relative}`, import.meta.url), "utf8");
       await fs.writeFile(path.join(directory, name), ts.transpileModule(source, {
         compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
@@ -89,7 +89,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     // Readable by the image's unprivileged UID on native Linux bind mounts too.
     // These assets contain only this disposable test's ephemeral pairing token.
     await fs.chmod(directory, 0o755);
-    for (const asset of ["index.html", "collector.js", "engine-errors.js", "quality.js", "continuity.js"]) await fs.chmod(path.join(directory, asset), 0o644);
+    for (const asset of ["index.html", "collector.js", "engine-errors.js", "local-ice.js", "quality.js", "continuity.js"]) await fs.chmod(path.join(directory, asset), 0o644);
     const args = ["run", "--rm", "--init", "--name", name, "--pull", "never", "--read-only", "--cap-drop", "ALL",
       "--security-opt", "no-new-privileges", "--cpus", "2", "--memory", "768m", "--pids-limit", "256",
       "--network", "bridge", "--publish", "127.0.0.1::8080", "--tmpfs", "/tmp:rw,nosuid,nodev,noexec,size=96m",
@@ -121,7 +121,8 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       const end = Date.now() + seconds * 1000;
       while (Date.now() < end) {
         if (processFailure) throw processFailure;
-        if (events.some((event) => event.kind === "failed")) throw new Error(JSON.stringify(events.at(-1)));
+        const failed = findAcceptanceFailure(events);
+        if (failed) throw new Error(JSON.stringify(failed));
         if (await predicate()) return;
         if (child.exitCode !== null) throw new Error("acceptance container exited early");
         await new Promise((resolve) => setTimeout(resolve, 50));
@@ -157,9 +158,9 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     async function measurePages(durationMs = 4000) {
       const session = await browser.newBrowserCDPSession();
       try {
-        const before = processCpuSample((await session.send("SystemInfo.getProcessInfo")).processInfo, Number(process.hrtime.bigint()));
+        const before = await sampleOwnedBrowserCpu(session);
         quality = await Promise.all([first, second].map((page) => page.evaluate((duration) => globalThis.collectQuality(duration), durationMs)));
-        const after = processCpuSample((await session.send("SystemInfo.getProcessInfo")).processInfo, Number(process.hrtime.bigint()));
+        const after = await sampleOwnedBrowserCpu(session);
         browserResources = { basis: "host_hrtime_browser_owned_process_cpu_separate_clock", before, after };
         return { quality, browser_resources: browserResources };
       } finally { await session.detach(); }

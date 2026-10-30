@@ -46,6 +46,38 @@ Cleanup uncertainty fails the acquisition and stops subsequent cohort cases.
 The failed record retains both the original acquisition diagnostics and cleanup
 failure details, including observations collected before cleanup failed. Cleanup
 failure can never convert a completed measurement into a passed acquisition.
+The first actual failure event is retained as the reason even when later
+shutdown events have already arrived. Failure snapshots also expose bounded
+ICE/signaling states and local/remote candidate counts, without candidate IPs.
+
+## Browser CPU sampling
+
+CDP provides the inventory of processes belonging to the freshly launched
+browser. The native host reads their CPU counters through `/proc` on Linux or
+`proc_pid_rusage(RUSAGE_INFO_V0)` on Darwin. Darwin CPU ticks are converted using
+`mach_timebase_info`; they are not assumed to be nanoseconds. Explicit OS read
+failures are unavailable, distinct from a successfully observed zero counter.
+
+The snapshot retains the sampling method, hashed process lifetimes, per-process
+raw tick strings, conversion factors, cumulative seconds and read duration.
+Counter resets cannot hide inside a rising aggregate. Each span requires the
+same process inventory and timebase, and CPU remains separate from container
+and native-worker clocks. The host sampler is outside this browser-process CPU
+scope. Historical acquisitions retain their original CDP-counter context.
+
+## Fixture randomness
+
+The native acceptance host explicitly selects seed `1` before compiling the
+installed Frozen-Bubble Perl script and reapplies that same seed when the game
+reseeds at level startup. It retains the original game arguments, rendering,
+input schedule and directly owned game process. `camera_ready.fixture_randomness`
+records this choice. The generic `GameScene` default and historical unseeded
+receipts retain their original behavior and context.
+
+This controls one source of workload variation; it does not assert identical
+pixels or causal observer overhead. Source hashes distinguish the seeded
+fixture from earlier acquisitions. CPU, freshness and temporal acceptance limits
+are unchanged.
 
 ## Scenarios and assertions
 
