@@ -29,17 +29,23 @@ class ControlDisturbance:
         self.scopes, self.identities = {}, None
         self.operation = self.sampler = None
         self.dispatched_at = None
+        self.last_readiness = {}
+        self.last_slot_failure = None
 
     def slots(self, peers=("first", "second")):
+        self.last_slot_failure = None
         slots = {peer: self.service.active.get(peer) for peer in peers}
         now = time.monotonic_ns()
         for slot in slots.values():
             if slot is None or slot.owner is None or slot.stop.is_set() or slot.done.is_set() or slot.failure:
+                self.last_slot_failure = {"peer": next(p for p,s in slots.items() if s is slot), "reason": "slot_missing_stopped_or_failed"}
                 return None
             observation = slot.owner.last_observation
             if observation is None or not 0 <= now - observation[1] <= 1500000000:
+                self.last_slot_failure = {"reason": "native_observation_missing_or_stale", "age_ns": None if observation is None else now-observation[1]}
                 return None
             if observation[0]["connection_state"] != "connected":
+                self.last_slot_failure = {"reason": "native_connection_not_connected", "state": observation[0]["connection_state"]}
                 return None
         return slots
 
@@ -49,13 +55,16 @@ class ControlDisturbance:
                 for peer, slot in slots.items()}
 
     def ready(self, slots, *, continuity=False):
+        self.last_readiness = {}
         for peer, slot in slots.items():
             record = self.bridge.records.get(peer)
             if record is None or not record.receiver_socket_id:
+                self.last_readiness[peer] = {"status": "receiver_unbound"}
                 return False
             if peer not in self.scopes:
                 self.scopes[peer] = self.bridge.attach(self.local, self.capability, peer, slot.token)
-        observations = [self.local.inspect(self.scopes[peer]) for peer in slots]
+        self.last_readiness = {peer: self.local.inspect(self.scopes[peer]) for peer in slots}
+        observations = self.last_readiness.values()
         return all(value["continuity_ready"] if continuity else value["status"] == "ready_for_dry_run"
                    for value in observations)
 

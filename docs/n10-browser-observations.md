@@ -67,7 +67,11 @@ after an established stats epoch, reset counters/identity, failed state or inval
 time ends collection.
 
 The collector queries stats about every 200 ms with at most one query in flight.
-A query taking more than 500 ms cannot emit its result as fresh data. No report
+A query taking more than 500 ms ends collection. Equal stats timestamps are
+treated as cached results: they emit no heartbeat, consume no sequence number,
+and polling continues until new stats arrive. Repeated cached results cannot
+sustain host freshness; timestamp reversal, counter resets and identity changes
+still end collection. No report
 is sent before an actual presentation callback. Frozen counters can be reported
 but cannot sustain downstream progress readiness. Disposal, disconnect, unbind
 and replacement cancel timers/frame callbacks; late asynchronous hash/stats

@@ -164,7 +164,8 @@ eight-second deadline. Missing or malformed markers fail acquisition.
 
 The existing fixed input script stays idle until eligibility and at least three
 seconds of game loading. It then starts once, followed by a fixed three-second
-warmup. Readiness loss fails that warmup instead of extending it. Native sampling
+warmup measured from the actual script-arm timestamp; polling time before the
+arm does not count toward it. Readiness loss fails that warmup instead of extending it. Native sampling
 records game age, script age and action count in every sample and at eligibility
 and window edges. Browser startup markers retain their separate page clock.
 The normal four-second browser and at least 4.5-second native sampling windows,

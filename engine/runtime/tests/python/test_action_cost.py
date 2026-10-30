@@ -111,6 +111,43 @@ class ActionCostDriverTests(unittest.TestCase):
                 return
         self.fail("fixed schedule did not complete")
 
+    def test_fixed_warmup_failure_emits_exact_readiness_before_abort(self):
+        d = self.driver
+        d.stage = "eligibility"
+        d.gate = SimpleNamespace(
+            warmup=1,
+            tick=MagicMock(
+                side_effect=ValueError("moving readiness lost during fixed warmup")
+            ),
+        )
+        d.ready.return_value = False
+        d.last_slot_failure = None
+        d.last_readiness = {
+            "second": {
+                "status": "insufficient_or_stale",
+                "readiness_diagnostics": {
+                    "reasons": ["browser_frames_decoded_progress_stale"]
+                },
+            }
+        }
+        for slot in self.slots.values():
+            slot.owner.last_observation = (
+                {
+                    "configured_fps": 30,
+                    "negotiated_fps": 30,
+                    "capture_buffers": 40,
+                    "encoded_buffers": 40,
+                },
+                1,
+                1,
+            )
+        with self.assertRaisesRegex(ValueError, "readiness lost"):
+            d.tick()
+        self.assertEqual(self.events[0]["kind"], "action_cost_readiness_lost")
+        self.assertEqual(self.events[0]["receivers"], d.last_readiness)
+        self.assertFalse(self.events[0]["live_authority"])
+        d.local.dispatch.assert_not_called()
+
     def test_unchanged_never_prepares_dispatches_reserves_or_fabricates_result(self):
         self.driver.local.prepare.side_effect = AssertionError("unchanged prepare")
         self.driver.local.dispatch.side_effect = AssertionError("unchanged dispatch")

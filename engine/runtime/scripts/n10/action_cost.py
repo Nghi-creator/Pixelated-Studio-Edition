@@ -167,6 +167,12 @@ class GameActionCost(GameControlDisturbance):
             ready = (
                 slots is not None and self.ready(slots) and self.target_ready(slots, 30)
             )
+            if not ready and self.gate.warmup is not None:
+                self.emit("action_cost_readiness_lost", method=self.method, stage="fixed_warmup",
+                          at_ns=now-self.origin, slot_failure=self.last_slot_failure,
+                          receivers=self.last_readiness if slots is not None else {},
+                          native_caps={} if slots is None else {peer:{key:slot.owner.last_observation[0][key] for key in ("configured_fps","negotiated_fps","capture_buffers","encoded_buffers")} for peer,slot in slots.items()},
+                          live_authority=False)
             if not self.gate.tick(ready):
                 return False
             self.identities = self.identity(slots)

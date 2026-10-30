@@ -102,6 +102,42 @@ class LocalOwnerTests(unittest.TestCase):
         args.update(changes)
         return self.scope.prepare(self.owner, self.receiver, **args)
 
+    def test_readiness_failure_distinguishes_fresh_reports_from_stalled_decode(self):
+        self.ready()
+        for sequence in range(2, 6):
+            self.now += 250000000
+            self.slot.seen_ns = self.now
+            self.slot.owner.last_observation = (
+                native(sequence * 10 + 1, 20 + sequence * 10),
+                self.now,
+                sequence + 1,
+            )
+            self.scope.report(
+                self.receiver,
+                ReceiverSample(sequence, "browser", sequence * 250000000, 20, 20),
+            )
+        result = self.scope.inspect(self.receiver)
+        self.assertEqual(result["status"], "insufficient_or_stale")
+        details = result["readiness_diagnostics"]
+        self.assertIn("browser_frames_decoded_progress_stale", details["reasons"])
+        self.assertIn("browser_presented_frames_progress_stale", details["reasons"])
+        self.assertNotIn("browser_receipt_stale", details["reasons"])
+        self.assertNotIn("native_source_progress_absent", details["reasons"])
+        self.assertEqual(len(details["native"]), 2)
+        self.assertEqual(len(details["browser"]), 2)
+        self.assertFalse(result["dispatch_available"])
+        self.assertFalse(result["live_authority"])
+
+    def test_readiness_failure_reports_native_progress_without_mutating_admission(self):
+        self.ready()
+        self.observe(2, 20)
+        result = self.scope.inspect(self.receiver)
+        self.assertEqual(result["status"], "insufficient_or_stale")
+        self.assertIn(
+            "native_source_progress_absent", result["readiness_diagnostics"]["reasons"]
+        )
+        self.assertFalse(result["budget_reserved"])
+
     def test_disabled_scope_does_not_open_ledger(self):
         path = Path(self.temp.name) / "absent"
         with self.assertRaises(ValueError):

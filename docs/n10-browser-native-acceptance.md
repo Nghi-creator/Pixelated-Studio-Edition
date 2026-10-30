@@ -50,6 +50,12 @@ are forwarded through authenticated peer/offer/nonce bindings; camera receipts
 retain their original host timestamp before GLib queueing. Local admission needs
 fresh native source/connection progress and fresh browser progress.
 
+Startup timelines record the first observed connected state, either in the
+connection event or directly in the first-frame callback if the connection
+already reads connected there. A queued connection event cannot overwrite an
+earlier observation. Presentation alone never implies a connected state; the
+startup ordering and latency checks remain unchanged.
+
 - **Production admission:** actual x99 capture and Pulse monitor. The local owner
   prepares a dry-run request, rejects controller dispatch for the production
   source, and creates no action journal. Killing the exact first worker must

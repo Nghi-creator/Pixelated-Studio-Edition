@@ -45,7 +45,7 @@ class MovingObserverGate:
             if value != {"method": self.method, "peers": ["first", "second"]}:
                 raise ValueError("moving presentation marker mismatch")
             self.scene.arm_script()
-            self.warmup = now
+            self.warmup = self.scene.script_started
             self.emit("moving_eligible", method=self.method, **self.phase("eligible"))
             return False
         if not native_ready:

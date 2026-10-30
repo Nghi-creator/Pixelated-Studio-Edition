@@ -220,6 +220,93 @@ class Binding:
             )
         )
 
+    def readiness_diagnostics(self, now):
+        """Bounded failure explanation only; never used to grant admission."""
+        native = [
+            dict(
+                received_age_ns=now - stamp,
+                state=body["state"],
+                connection_state=body["connection_state"],
+                ice_connection_state=body["ice_connection_state"],
+                configured_fps=body["configured_fps"],
+                negotiated_fps=body["negotiated_fps"],
+                capture_buffers=body["capture_buffers"],
+                encoded_buffers=body["encoded_buffers"],
+            )
+            for body, stamp in self.native
+        ]
+        browser = [
+            dict(
+                received_age_ns=now - stamp,
+                sequence=sample.sequence,
+                elapsed_ns=sample.elapsed_ns,
+                frames_decoded=sample.frames_decoded,
+                presented_frames=sample.presented_frames,
+            )
+            for sample, stamp in list(self.browser)[-2:]
+        ]
+        reasons = []
+        if self.invalid:
+            reasons.append("binding_invalid")
+        if len(self.native) < 2:
+            reasons.append("native_history_insufficient")
+        else:
+            first, stamp = self.native[0]
+            last, received = self.native[-1]
+            if not 0 <= now - received <= NATIVE_FRESH_NS:
+                reasons.append("native_receipt_stale")
+            if received - stamp > NATIVE_FRESH_NS:
+                reasons.append("native_pair_gap")
+            if any(
+                body["state"] != "playing"
+                or body["connection_state"] != "connected"
+                or body["ice_connection_state"] not in ("connected", "completed")
+                or any(body[k] is None for k in (*SETTINGS, *COUNTERS))
+                for body in (first, last)
+            ):
+                reasons.append("native_health_or_fields_unavailable")
+            if any(
+                type(first[k]) is not int
+                or type(last[k]) is not int
+                or last[k] <= first[k]
+                for k in ("capture_buffers", "encoded_buffers")
+            ):
+                reasons.append("native_source_progress_absent")
+        if self.settings is None:
+            reasons.append("native_settings_unavailable")
+        if len(self.browser) < 2:
+            reasons.append("browser_history_insufficient")
+        else:
+            first, start = self.browser[0]
+            last, end = self.browser[-1]
+            if not 0 <= now - end <= BROWSER_FRESH_NS:
+                reasons.append("browser_receipt_stale")
+            if (
+                end - start < 200000000
+                or last.elapsed_ns - first.elapsed_ns < 200000000
+            ):
+                reasons.append("browser_history_span_insufficient")
+        for name, stamp in self.progress.items():
+            if stamp is None or not 0 <= now - stamp <= BROWSER_FRESH_NS:
+                reasons.append("browser_" + name + "_progress_stale")
+        if self.operation is None and any(
+            body["configured_fps"] != self.expected[0]
+            or body["negotiated_fps"] != self.expected[1]
+            for body, _ in self.native
+        ):
+            reasons.append("fresh_action_caps_not_restored")
+        return dict(
+            reasons=reasons,
+            native=native,
+            browser=browser,
+            progress_age_ns={
+                key: None if stamp is None else now - stamp
+                for key, stamp in self.progress.items()
+            },
+            native_fresh_ns=NATIVE_FRESH_NS,
+            browser_fresh_ns=BROWSER_FRESH_NS,
+        )
+
     def ready(self, now):
         return self.continuity_ready(now) and (
             self.operation is not None
@@ -411,7 +498,7 @@ class LocalProbeOwner:
         now = self._now()
         binding = self._binding(receiver, now)
         now = self._now()
-        return {
+        result = {
             "status": "ready_for_dry_run"
             if binding.ready(now)
             else "insufficient_or_stale",
@@ -422,6 +509,10 @@ class LocalProbeOwner:
             "budget_reserved": False,
             "live_authority": False,
         }
+
+        if result["status"] != "ready_for_dry_run":
+            result["readiness_diagnostics"] = binding.readiness_diagnostics(now)
+        return result
 
     def prepare(self, capability, receiver, request_id, target_fps, duration_ns):
         self._check(capability)

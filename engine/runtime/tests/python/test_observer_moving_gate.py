@@ -45,6 +45,22 @@ class MovingGateTests(unittest.TestCase):
         self.assertEqual(self.gate.report()["phases"][1]["script_age_ns"], 3000000000)
         self.assertFalse(self.gate.report()["source_content_matched"])
 
+    def test_warmup_starts_at_actual_script_arm_not_earlier_gate_tick(self):
+        self.presented()
+        original_arm = self.scene.arm_script
+
+        def delayed_arm():
+            self.now += 1000000
+            original_arm()
+
+        with patch.object(self.scene, "arm_script", side_effect=delayed_arm):
+            self.assertFalse(self.gate.tick(True))
+        self.now = 7000000000
+        self.assertFalse(self.gate.tick(True))  # Actual script age is only2.999s.
+        self.now += 1000000
+        self.assertTrue(self.gate.tick(True))
+        self.assertEqual(self.gate.report()["phases"][1]["script_age_ns"], 3000000000)
+
     def test_incomplete_window_cannot_emit_a_report(self):
         with self.assertRaisesRegex(ValueError, "not started"):
             self.gate.report()

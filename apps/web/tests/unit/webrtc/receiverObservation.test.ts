@@ -4,7 +4,7 @@ import { offerDigest, parseReceiverChallenge, startReceiverObservation, type Rec
 
 const challenge = { peerId: "peer", bindingId: "a".repeat(64), offerHash: "b".repeat(64) };
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
-function fixture(initialMissing = false) {
+function fixture(initialMissing = false, onStop?: (reason: string) => void) {
   let now = 0, id = 0, frames = 0, timestamp = 0;
   let current = true;
   let pending: (() => Promise<RTCStatsReport>) | null = null;
@@ -24,7 +24,7 @@ function fixture(initialMissing = false) {
   };
   const stop = startReceiverObservation({ pc: pc as unknown as RTCPeerConnection, challenge,
     getVideo: () => video as unknown as HTMLVideoElement, getStream: () => stream as unknown as MediaStream,
-    isCurrent: () => current, emit: (value) => samples.push(value), now: () => now, clockId: "clock",
+    isCurrent: () => current, onStop, emit: (value) => samples.push(value), now: () => now, clockId: "clock",
     schedule: (callback) => { timers.set(++id, callback); return id; }, cancel: (handle) => { timers.delete(handle); },
   });
   return { stop, pc, video, record, samples, timers, callbacks, report,
@@ -97,4 +97,53 @@ test("connected-before-first-inbound-stats waits for data without inventing zero
   assert.equal(value.samples[0]?.sequence, 0);
   assert.equal(value.samples[0]?.framesDecoded, 6);
   value.stop();
+});
+
+test("cached inbound stats are skipped without ending observation or refreshing progress", async () => {
+  const value = fixture(); await flush(); value.fire(10); await value.tick();
+  assert.equal(value.samples.length, 1);
+  const cached = new Map([["inbound", { ...value.record, timestamp: 2, framesDecoded: 12 }]]) as unknown as RTCStatsReport;
+  value.setPending(async () => cached);
+  value.fire(12); await value.tick();
+  assert.equal(value.samples.length, 1, "cached decoded data must not receive a fresh elapsed timestamp");
+  assert.equal(value.timers.size, 1, "a legal cached report must not permanently stop collection");
+  assert.equal(value.callbacks.size, 1);
+  value.setPending(null); value.fire(16); await value.tick();
+  assert.equal(value.samples.length, 2);
+  assert.equal(value.samples[1]?.sequence, 1, "skipped cache must not create a sequence gap");
+  assert.equal(value.samples[1]?.elapsedNs, 600000000);
+  assert.equal(value.samples[1]?.framesDecoded, 18);
+  value.stop();
+});
+
+test("repeated cached stats never manufacture a heartbeat or frame progress", async () => {
+  const value = fixture(); await flush(); value.fire(10); await value.tick();
+  const first = { ...value.samples[0]! };
+  const cached = new Map([["inbound", { ...value.record, timestamp: 2, framesDecoded: 12 }]]) as unknown as RTCStatsReport;
+  value.setPending(async () => cached);
+  for (let i = 0; i < 5; i++) await value.tick();
+  assert.deepEqual(value.samples, [first]);
+  assert.equal(value.timers.size, 1);
+  value.stop();
+});
+
+test("timestamp reversal, counter reset and changed identity remain fatal even around cached stats", async () => {
+  for (const change of [{ timestamp: 1 }, { framesDecoded: 11 }, { ssrc: 456 }]) {
+    const value = fixture(); await flush(); value.fire(10); await value.tick();
+    const invalid = new Map([["inbound", { ...value.record, timestamp: 2, framesDecoded: 12, ...change }]]) as unknown as RTCStatsReport;
+    value.setPending(async () => invalid); await value.tick();
+    assert.equal(value.samples.length, 1);
+    assert.equal(value.timers.size, 0);
+    assert.equal(value.callbacks.size, 0);
+  }
+});
+
+
+test("collector termination reports once and diagnostic failure cannot prevent cleanup", async () => {
+  const reasons: string[] = [];
+  const value = fixture(false, (reason) => { reasons.push(reason); throw Error("diagnostic consumer failed"); });
+  await flush(); value.pc.connectionState = "disconnected"; await value.tick();
+  assert.deepEqual(reasons, ["connection_unavailable"]);
+  assert.equal(value.callbacks.size, 0); assert.equal(value.timers.size, 0);
+  value.stop(); assert.deepEqual(reasons, ["connection_unavailable"]);
 });
