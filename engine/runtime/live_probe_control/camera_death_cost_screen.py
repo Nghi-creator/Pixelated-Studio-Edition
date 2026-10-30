@@ -80,21 +80,6 @@ def assess(runs):
         for event in (armed, pinned, verified, complete):
             require(event["live_authority"] is False, "false authority required")
         require(
-            [
-                events.index(e)
-                for e in (dispatch, fault, armed, pinned, verified, complete)
-            ]
-            == sorted(
-                events.index(e)
-                for e in (dispatch, fault, armed, pinned, verified, complete)
-            ),
-            "camera-death chronology mismatch",
-        )
-        require(
-            events.index(exited) > events.index(armed),
-            "camera exit observed before arming",
-        )
-        require(
             exited["code"] is None and exited["signal"] == "SIGKILL",
             "exact direct camera was not reaped after abrupt kill",
         )
@@ -197,6 +182,7 @@ def assess(runs):
             armed,
             pinned,
             external[0],
+            exited,
             external[1],
             external[2],
             verified,

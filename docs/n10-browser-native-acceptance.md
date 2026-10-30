@@ -42,6 +42,11 @@ workers, guards, signaling server, browser and temporary files are owned and
 cleaned up by the run. Blocked local ICE fails rather than substituting media or
 relaxing readiness thresholds.
 
+Cleanup uncertainty fails the acquisition and stops subsequent cohort cases.
+The failed record retains both the original acquisition diagnostics and cleanup
+failure details, including observations collected before cleanup failed. Cleanup
+failure can never convert a completed measurement into a passed acquisition.
+
 ## Scenarios and assertions
 
 All scenarios use two real browser receivers, the actual app observation

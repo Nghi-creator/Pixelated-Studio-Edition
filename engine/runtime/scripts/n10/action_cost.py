@@ -160,6 +160,22 @@ class GameActionCost(GameControlDisturbance):
             raise ValueError("action-cost retained budget mismatch")
         return journal
 
+    def readiness_lost(self, slots, now, stage):
+        keys = ("configured_fps", "negotiated_fps", "capture_buffers", "encoded_buffers")
+        self.emit(
+            "action_cost_readiness_lost",
+            method=self.method,
+            stage=stage,
+            at_ns=now - self.origin,
+            slot_failure=self.last_slot_failure,
+            receivers=self.last_readiness if slots is not None else {},
+            native_caps={} if slots is None else {
+                peer: {key: slot.owner.last_observation[0].get(key) for key in keys}
+                for peer, slot in slots.items()
+            },
+            live_authority=False,
+        )
+
     def tick(self):
         now = time.monotonic_ns()
         slots = self.slots()
@@ -168,11 +184,7 @@ class GameActionCost(GameControlDisturbance):
                 slots is not None and self.ready(slots) and self.target_ready(slots, 30)
             )
             if not ready and self.gate.warmup is not None:
-                self.emit("action_cost_readiness_lost", method=self.method, stage="fixed_warmup",
-                          at_ns=now-self.origin, slot_failure=self.last_slot_failure,
-                          receivers=self.last_readiness if slots is not None else {},
-                          native_caps={} if slots is None else {peer:{key:slot.owner.last_observation[0][key] for key in ("configured_fps","negotiated_fps","capture_buffers","encoded_buffers")} for peer,slot in slots.items()},
-                          live_authority=False)
+                self.readiness_lost(slots, now, "fixed_warmup")
             if not self.gate.tick(ready):
                 return False
             self.identities = self.identity(slots)
@@ -189,6 +201,7 @@ class GameActionCost(GameControlDisturbance):
         if self.boundary is not None:
             self.observe_result(slots)
         if not self.ready(slots, continuity=self.result_seen):
+            self.readiness_lost(slots, now, self.stage)
             raise ValueError("action-cost receiver readiness lost")
         self.no_journal(required=self.condition == "unchanged" or self.boundary is None)
         if self.condition == "unchanged" or self.boundary is None:

@@ -162,6 +162,16 @@ class CameraDeathCostTests(unittest.TestCase):
                 self.assertEqual(assess([run])["cost_screen"], "unavailable")
         self.assertEqual(assess([block_acquisition()])["cost_screen"], "unavailable")
 
+    def test_camera_exit_must_fall_between_kill_checkpoint_and_worker_exit(self):
+        for destination in ("camera_death_pinned", "complete"):
+            with self.subTest(destination=destination):
+                run = acquisition()
+                event = next(e for e in run["events"] if e["kind"] == "camera_process_exit")
+                run["events"].remove(event)
+                index = next(i for i, e in enumerate(run["events"]) if e["kind"] == destination)
+                run["events"].insert(index, event)
+                self.assertEqual(assess([run])["cost_screen"], "unavailable")
+
     def test_foreign_camera_marker_is_rejected_before_any_signal(self):
         with (
             tempfile.TemporaryDirectory() as directory,

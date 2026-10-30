@@ -12,6 +12,7 @@ import { chromium } from "playwright";
 import { processCpuSample } from "./gameBrowserTrial.mjs";
 import { BrowserCostSpan } from "./browserCostSpan.mjs";
 import { nativeBrowserHtml } from "./nativeBrowserPage.mjs";
+import { requireAcceptanceCleanup } from "./nativeBrowserCleanup.mjs";
 
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
@@ -46,7 +47,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const name = `n10-browser-native-${process.pid}-${Date.now()}`;
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "n10-browser-native-"));
   const token = randomBytes(32).toString("hex");
-  let browser, child, timer, processFailure, softwareHash, costSpan, costSpanResult, reading;
+  let browser, child, timer, processFailure, softwareHash, costSpan, costSpanResult, reading, failure, acquisition;
   let siblingQuality = null, siblingTask = null, siblingError = null;
   const pages = [];
   const events = []; let logTail = "";
@@ -248,12 +249,13 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if (processFailure) throw processFailure;
     const exitCode = await exited;
     assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
-    return { status: "passed", mode, live_authority: false, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult } : {}), context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
+    acquisition = { status: "passed", mode, live_authority: false, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult } : {}), context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
       ...(gameFailure ? {role: interruption ? interruption.role : faultCost ? "contained_game_fault_cost_not_qualification" : "contained_game_failure_not_qualification", method: interruption ? interruption.method : faultCost ? "n10-contained-game-fault-cost-v1" : "n10-contained-game-failure-v1", case: gameFailure, sibling_quality: siblingQuality} : {}),
       ...(controlMode ? {role: costCondition ? "contained_game_action_cost_not_qualification" : gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: costCondition ? costMethod : gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", ...(costCondition ? {condition: costCondition} : {}), control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound, bindings: snapshot.bindings.length })) };
+    return acquisition;
   } catch (error) {
     if ((spanCondition || faultCost) && child) {
       // Retain the native cleanup-tail checkpoint before removing the owned container.
@@ -263,8 +265,8 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     }
     if (costSpan) costSpanResult = await costSpan.finish("failed_prefix");
     const diagnostics = await Promise.allSettled(pages.map((page) => page.evaluate(() => globalThis.snapshot?.())));
-    const failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logTail}`, { cause: error });
-    failure.acquisition = { status: "failed", mode, live_authority: false, events, diagnostics, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult || null, browser: browser?.version() || null } : {}), ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
+    failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logTail}`, { cause: error });
+    acquisition = failure.acquisition = { status: "failed", mode, live_authority: false, events, diagnostics, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult || null, browser: browser?.version() || null } : {}), ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
       context: { image, software_hash: softwareHash || null, host_platform: process.platform, host_arch: process.arch } };
     throw failure;
   } finally {
@@ -274,8 +276,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     const released = await Promise.allSettled([
       browser?.close(), fs.rm(directory, { recursive: true, force: true }),
     ]);
-    assert.ok(released.every((item) => item.status === "fulfilled"), "acceptance browser/assets cleanup unconfirmed");
-    assert.ok(cleanup.status === 0 || /No such container/.test(cleanup.stderr || ""), "acceptance container cleanup unconfirmed");
+    requireAcceptanceCleanup(failure, acquisition, cleanup, released);
   }
 }
 

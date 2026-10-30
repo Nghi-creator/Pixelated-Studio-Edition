@@ -53,6 +53,13 @@ adds dedicated-worker ownership and watchdog handling; it has no normal camera
 or qualified receiver binding. The [contained game/browser experiment](docs/n10-game-browser-trial.md)
 adds a fixed real-game source, headless Chromium presentation and descriptive
 resource/temporal-quality observations without enabling gameplay control.
+The separate [contained control fixture](docs/n10-contained-game-control.md)
+permits explicit local cadence actions only for its owned source. Its
+[observer](docs/n10-observer-disturbance.md),
+[matched action](docs/n10-full-span-cost.md) and
+[fault-cost](docs/n10-fault-cost.md) procedures retain independent resource and
+continuity evidence. The [qualification protocol](docs/n10-qualification-protocol.md)
+checks declarations without enabling production control.
 
 ## Architecture
 

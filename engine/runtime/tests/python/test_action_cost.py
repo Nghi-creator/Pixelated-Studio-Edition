@@ -49,6 +49,7 @@ class ActionCostDriverTests(unittest.TestCase):
         d.restoration_sequences = None
         d.last_age = -1
         d.sampler = d.operation = None
+        d.last_slot_failure, d.last_readiness = None, {}
         d.service = SimpleNamespace(measurements=[])
         d.local = MagicMock()
         d.local.directory = self.directory.name
@@ -234,6 +235,22 @@ class ActionCostDriverTests(unittest.TestCase):
         self.driver.identity = lambda slots: {"first": "c" * 64, "second": "b" * 64}
         with self.assertRaisesRegex(ValueError, "eligibility lost"):
             self.tick(3000000000)
+
+    def test_scheduled_readiness_failure_keeps_exact_cached_reason_without_dispatch(self):
+        diagnostics = {"second": {"status": "insufficient_or_stale", "readiness_diagnostics": {
+            "reasons": ["native_source_progress_absent"]
+        }}}
+        self.driver.last_readiness = diagnostics
+        self.driver.ready.return_value = False
+        with self.assertRaisesRegex(ValueError, "receiver readiness lost"):
+            self.tick(3000000000)
+        self.driver.ready.assert_called_once()
+        self.driver.local.dispatch.assert_not_called()
+        event = self.events[-1]
+        self.assertEqual(event["kind"], "action_cost_readiness_lost")
+        self.assertEqual(event["stage"], "scheduled")
+        self.assertEqual(event["receivers"], diagnostics)
+        self.assertFalse(event["live_authority"])
 
     def test_condition_or_production_source_cannot_open_driver(self):
         for condition in ("invalid", None):
