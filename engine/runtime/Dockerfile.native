@@ -1,7 +1,7 @@
 ARG DEBIAN_IMAGE=debian:trixie-slim@sha256:d7e12182ce18b85b93007c1dedf31f2d29e01ccf3182cc4017c709b6259bc132
 ARG NATIVE_RUNTIME_ID=debian-native-v1
 ARG NATIVE_RUNTIME_LOCK_SHA256=unknown
-ARG NODE_IMAGE=node:24.18.1-bookworm-slim@sha256:235600a8101ab264e117b1768e925532262668dc9b581ef1dd7d96ced463b8e7
+ARG NODE_IMAGE=node:24.22.1-bookworm-slim@sha256:be8204d4bd327363357f532187b752ff62759c31bedf98e9e18fc08c9cbd605c
 
 FROM ${NODE_IMAGE} AS app-builder
 
@@ -76,6 +76,9 @@ COPY --from=app-builder /app/dist /app/dist
 COPY --from=app-builder /app/node_modules /app/node_modules
 COPY --from=python-builder /out /usr/local/lib/pixelated-python
 COPY scenario_harness /app/scenario_harness
+COPY private_journal.py /app/
+COPY live_probe_control /app/live_probe_control
+COPY live_probe_inventory.py live_probe_trial.py live_probe_cadence_trial.py /app/
 COPY camera.py camera_config.py camera_protocol.py camera_state.py camera_trace.py camera_trace_config.py camera_trace_hooks.py camera_trace_export.py camera_trace_control.py input_gamepad.py input_keyboard.py /app/
 COPY native-runtime.lock.json /app/native-runtime.lock.json
 

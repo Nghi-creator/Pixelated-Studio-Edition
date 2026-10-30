@@ -78,13 +78,15 @@ test("runtime images pin the Python camera WebRTC dependencies", () => {
   assert.match(dockerfile, /gir1\.2-gst-plugins-bad-1\.0/);
   assert.match(dockerfile, /gir1\.2-gst-plugins-base-1\.0/);
   assert.match(dockerfile, /debian:trixie-slim@sha256:[a-f0-9]{64}/);
-  assert.match(dockerfile, /node:24\.18\.1-bookworm-slim@sha256:[a-f0-9]{64}/);
   assert.match(dockerfile, /-r \/tmp\/python-requirements\.lock/);
   assert.match(libretroDockerfile, /ubuntu:22\.04@sha256:[a-f0-9]{64}/);
-  assert.match(
-    libretroDockerfile,
-    /node:24\.18\.1-bullseye-slim@sha256:[a-f0-9]{64}/,
-  );
+  const nodeVersion = fs.readFileSync(path.resolve(__dirname, "../../../../../.nvmrc"), "utf8").trim();
+  for (const source of [dockerfile, libretroDockerfile]) {
+    const image = source.match(/^ARG NODE_IMAGE=(.+)$/m)?.[1];
+    assert.ok(image);
+    assert.ok(image.startsWith(`node:${nodeVersion}-bookworm-slim@sha256:`));
+    assert.match(image, /@sha256:[a-f0-9]{64}$/);
+  }
   assert.match(libretroDockerfile, /-r \/tmp\/python-requirements\.lock/);
   for (const source of [dockerfile, libretroDockerfile]) {
     assert.match(source, /mkdir -p [^\n]*\/run\/pixelated/);

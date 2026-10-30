@@ -43,6 +43,23 @@ Optional [stage tracing](docs/n4-stage-trace-export.md) captures bounded host an
 browser timing. The [scenario harness](docs/n5-scenario-harness.md) provides
 predeclared experiments, [lifecycle control](docs/n5-lifecycle.md),
 [supported adapters](docs/n5-adapters.md) and [offline export](docs/n5-experiment-export.md).
+The opt-in [property inventory](docs/n10-capability-inventory.md) inspects installed
+GStreamer metadata before live-relief capability qualification. The explicit
+[isolated bitrate trial](docs/n10-bitrate-feasibility.md) tests a disposable
+synthetic encoder/decoder. The [capture-cadence experiment](docs/n10-cadence-feasibility.md)
+tests source framerate renegotiation in disposable synthetic/private-Xvfb pipelines;
+live relief remains unavailable. The [default-disabled lifecycle kernel](docs/n10-cadence-controller.md)
+adds dedicated-worker ownership and watchdog handling; it has no normal camera
+or qualified receiver binding. The [contained game/browser experiment](docs/n10-game-browser-trial.md)
+adds a fixed real-game source, headless Chromium presentation and descriptive
+resource/temporal-quality observations without enabling gameplay control.
+The separate [contained control fixture](docs/n10-contained-game-control.md)
+permits explicit local cadence actions only for its owned source. Its
+[observer](docs/n10-observer-disturbance.md),
+[matched action](docs/n10-full-span-cost.md) and
+[fault-cost](docs/n10-fault-cost.md) procedures retain independent resource and
+continuity evidence. The [qualification protocol](docs/n10-qualification-protocol.md)
+checks declarations without enabling production control.
 
 ## Architecture
 

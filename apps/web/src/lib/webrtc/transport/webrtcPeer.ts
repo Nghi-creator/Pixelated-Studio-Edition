@@ -1,4 +1,7 @@
 import type { Socket } from "socket.io-client";
+import { createLocalIceQueue } from "./localIceQueue.ts";
+
+const localIce = new WeakMap<RTCPeerConnection, ReturnType<typeof createLocalIceQueue>>();
 
 type PeerConnectionOptions = {
   iceServers?: RTCIceServer[];
@@ -26,14 +29,14 @@ export const createEnginePeerConnection = ({
     onTrack(event.track);
   };
 
-  peerConnection.onicecandidate = (event) => {
-    if (event.candidate) {
-      socket.emit("webrtc-ice-candidate", {
-        sessionId,
-        peerId,
-        candidate: event.candidate,
-      });
-    }
+  const queue = createLocalIceQueue({
+    isCurrent: () => peerConnection.signalingState !== "closed",
+    send: (candidate) => socket.emit("webrtc-ice-candidate", { sessionId, peerId, candidate }),
+    onOverflow: () => peerConnection.close(),
+  });
+  localIce.set(peerConnection, queue);
+  peerConnection.onicecandidate = ({ candidate }) => {
+    if (candidate) queue.add(candidate.toJSON());
   };
 
   return peerConnection;
@@ -44,6 +47,7 @@ export const createAndSendOffer = async (
   socket: Socket,
   sessionId: string,
   peerId: string,
+  onOffer?: (sdp: string) => void,
 ) => {
   if (peerConnection.signalingState !== "stable") {
     throw new Error(
@@ -59,14 +63,18 @@ export const createAndSendOffer = async (
     peerConnection.addTransceiver("audio", { direction: "recvonly" });
   }
 
+  const requireOpen = () => {
+    if (peerConnection.signalingState === "closed") throw new Error("WebRTC connection closed before offer publication.");
+  };
   const offer = await peerConnection.createOffer();
+  requireOpen();
   await peerConnection.setLocalDescription(offer);
-
-  socket.emit("webrtc-offer", {
-    sessionId,
-    peerId,
-    type: offer.type,
-    sdp: offer.sdp,
-  });
+  requireOpen();
+  onOffer?.(offer.sdp || "");
+  requireOpen();
+  const sendOffer = () => socket.emit("webrtc-offer", { sessionId, peerId, type: offer.type, sdp: offer.sdp });
+  const queue = localIce.get(peerConnection);
+  if (queue) queue.publish(sendOffer);
+  else sendOffer();
 };
 

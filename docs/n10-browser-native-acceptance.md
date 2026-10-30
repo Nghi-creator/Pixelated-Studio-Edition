@@ -1,0 +1,144 @@
+# Browser/native worker acceptance
+
+The opt-in acceptance runner connects real Chromium video playback to the
+production Socket.IO auth, lobby, signaling and error handlers, the actual
+`camera.py` Socket.IO callbacks/GLib loop, `BrowserReceiverBridge`, local-owner
+admission and dedicated Linux Gst worker processes. It owns a private display,
+fixed Frozen-Bubble game and Pulse null-sink monitor. It never attaches to a
+running desktop session or uses a saved pairing token.
+
+## Run
+
+Use a cached native Linux image containing Node, Socket.IO, Python/GI, Gst
+WebRTC/VP8/Opus, pidfds, Xvfb, Frozen-Bubble, XTest and PulseAudio. Set
+`N10_NATIVE_IMAGE` to its immutable `sha256:` image ID. The host needs Docker,
+the workspace development dependencies and the installed Playwright Chromium.
+The runner neither pulls/builds an image nor downloads a browser.
+
+From the repository root:
+
+```sh
+npm run build:engine
+npm run smoke:n10-browser-native -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE"
+```
+
+The default `all` mode runs three independent disposable sessions in sequence.
+For a single scenario append `--mode production-admission`,
+`--mode engineering-complete` or `--mode engineering-receiver-loss`.
+Any failed assertion, deadline, process exit or unconfirmed cleanup fails the
+command. Successful JSON output is an engineering test receipt, not a public
+probe evidence bundle or qualification result. Keep session receipts in ignored
+`local/` if retaining them.
+
+The server publishes one ephemeral **loopback-only** host port. A Docker bridge
+allows the real host-browser/container ICE exchange; there is no external
+STUN/TURN configuration. The browser aborts non-test-origin HTTP requests.
+Container source mounts are read-only and limited to required code/assets.
+Capabilities are dropped, privilege escalation is disabled, and each container
+has 2 CPUs, 768 MiB memory, 256 PIDs, temporary writable caches and a 42-second
+outer lifetime. The camera scenario has a fixed 26-second deadline. The game,
+workers, guards, signaling server, browser and temporary files are owned and
+cleaned up by the run. Blocked local ICE fails rather than substituting media or
+relaxing readiness thresholds.
+
+Cleanup uncertainty fails the acquisition and stops subsequent cohort cases.
+The failed record retains both the original acquisition diagnostics and cleanup
+failure details, including observations collected before cleanup failed. Cleanup
+failure can never convert a completed measurement into a passed acquisition.
+The first actual failure event is retained as the reason even when later
+shutdown events have already arrived. Failure snapshots also expose bounded
+ICE/signaling states and local/remote candidate counts, without candidate IPs.
+
+## Browser CPU sampling
+
+CDP provides the inventory of processes belonging to the freshly launched
+browser. The native host reads their CPU counters through `/proc` on Linux or
+`proc_pid_rusage(RUSAGE_INFO_V0)` on Darwin. Darwin CPU ticks are converted using
+`mach_timebase_info`; they are not assumed to be nanoseconds. Explicit OS read
+failures are unavailable, distinct from a successfully observed zero counter.
+
+The snapshot retains the sampling method, hashed process lifetimes, per-process
+raw tick strings, conversion factors, cumulative seconds and read duration.
+Counter resets cannot hide inside a rising aggregate. Each span requires the
+same process inventory and timebase, and CPU remains separate from container
+and native-worker clocks. The host sampler is outside this browser-process CPU
+scope. Historical acquisitions retain their original CDP-counter context.
+
+## Fixture randomness
+
+The native acceptance host explicitly selects seed `1` before compiling the
+installed Frozen-Bubble Perl script and reapplies that same seed when the game
+reseeds at level startup. It retains the original game arguments, rendering,
+input schedule and directly owned game process. `camera_ready.fixture_randomness`
+records this choice. The generic `GameScene` default and historical unseeded
+receipts retain their original behavior and context.
+
+This controls one source of workload variation; it does not assert identical
+pixels or causal observer overhead. Source hashes distinguish the seeded
+fixture from earlier acquisitions. CPU, freshness and temporal acceptance limits
+are unchanged.
+
+## Scenarios and assertions
+
+All scenarios use two real browser receivers, the actual app observation
+collector and browser fatal-error handler. Browser decode/presentation counters
+are forwarded through authenticated peer/offer/nonce bindings; camera receipts
+retain their original host timestamp before GLib queueing. Local admission needs
+fresh native source/connection progress and fresh browser progress.
+
+Startup timelines record the first observed connected state, either in the
+connection event or directly in the first-frame callback if the connection
+already reads connected there. A queued connection event cannot overwrite an
+earlier observation. Presentation alone never implies a connected state; the
+startup ordering and latency checks remain unchanged.
+
+- **Production admission:** actual x99 capture and Pulse monitor. The local owner
+  prepares a dry-run request, rejects controller dispatch for the production
+  source, and creates no action journal. Killing the exact first worker must
+  fail only its viewer. That viewer creates a new peer/worker/binding and passes
+  fresh admission; the retired receiver capability and request are rejected.
+  The sibling viewer, source counters and separately owned game keep progressing.
+- **Engineering completion:** only the contained test host explicitly selects
+  `isolated_synthetic` and opens an `EngineeringControl` for its private ledger.
+  The local API dispatches one 30-to-24 FPS action. A repeated dispatch returns
+  the same handle. Completion requires `verified_by_port` restoration and a clean
+  journal. A subsequent worker kill/replacement must retain the action count and
+  full duration-plus-restoration-grace reservation.
+- **Engineering receiver loss:** after native target cadence is observed, the
+  host stops the first browser's observation collector. Actual video must still
+  advance, distinguishing report loss from an already dead stream. The action
+  must abort with restoration `unknown`, retain dirty intent/full reservation and
+  tear down only its exact worker. A replacement may establish read-only
+  admission but cannot prepare another action through the dirty ledger. The
+  sibling and game continue progressing.
+
+Each session ends by disconnecting the actual camera signaling connection.
+Captured live workers must complete bounded graceful cleanup with exit code zero;
+the previously failed worker must also be reaped. Camera unbind notifications
+must stop both active browser collectors, and late callbacks cannot resume their
+report sequences.
+
+## Test boundary and remaining qualification
+
+`nativeBrowserRelay.cjs` is a disposable server assembled from production
+handlers, with a fixed test session and ephemeral pairing credential; it does
+not launch the desktop UI or full application server. The Python host executes
+actual `camera.py` and captures references to its constructed worker/bridge/client
+objects to call trusted local APIs and inject exact-lifetime failures. It does
+not replace network signaling, native pipelines, browser counters or readiness
+checks. Engineering configuration is injected only inside this explicit test
+host; no controller or failure-injection endpoint is exposed to a browser.
+
+The separate [observer disturbance screen](n10-observer-disturbance.md) compares
+read-only observer/admission cost and temporal playback with a fixed off/on cohort.
+It retains separate CPU scopes and does not qualify a control action.
+
+This verifies integrated admission, action lifecycle, failure isolation,
+replacement, durable blocking and teardown. Browser counters remain declared
+observations, and `live_authority` stays false. It does not establish perceptual
+quality, acceptable disturbance/resource overhead, supported-device coverage or
+live relief-family qualification. Full desktop gameplay/audio/UI acceptance and
+production-path qualification remain separate requirements. Production probe
+dispatch stays unavailable and N10 remains open until its qualification gates
+are satisfied.

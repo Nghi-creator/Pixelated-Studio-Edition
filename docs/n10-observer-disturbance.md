@@ -1,0 +1,258 @@
+# Read-only observer disturbance screen
+
+The optional browser observation relay and local-owner admission path have a
+separate, fixed engineering cost screen. It compares observer-off with observer-on
+using actual production x99/Pulse capture, a private scripted Frozen-Bubble level,
+two balanced 640×480/30 FPS VP8 peers at 1500 kbps, authenticated signaling and fresh Chromium.
+There is no cadence action, remote control command or live probe authority.
+
+## Acquisition
+
+Build the engine and set `N10_NATIVE_IMAGE` to the immutable ID of a compatible
+cached native image, as described in [browser/native acceptance](n10-browser-native-acceptance.md).
+Set `N10_COHORT_OUTPUT` to a new absolute path under ignored `local/`.
+
+```sh
+npm run build:engine
+npm run smoke:n10-observer-cost -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --output "$N10_COHORT_OUTPUT"
+PYTHONPATH=engine/runtime python3 -m live_probe_control.observer_screen \
+  "$N10_COHORT_OUTPUT"
+```
+
+The order is off/on, on/off, off/on: six independent sessions, with matched pairs
+(0,1), (3,2), (4,5), always comparing on minus off. Each session creates its own
+game, display, camera, workers, browser, ephemeral credential and private owner
+directory. Off uses the dedicated media backend without constructing the browser
+bridge or local owner; on enables both and requires fresh local admission before
+measurement. Both conditions run the same additional diagnostic samplers.
+
+After both native connections are established, warmup is fixed at three seconds.
+Browser measurement lasts four seconds; bracketed native resource sampling lasts
+at least 4.5 seconds. The windows use their own clocks and are not aligned or
+combined. The runner records the actual image, runtime/compiled relay/collector
+source hash, browser version and host platform/architecture. All six runs must
+have the same recorded context. Startup, reconnect and controller costs are
+outside this steady-state comparison.
+
+The existing contained-runtime resource, deadline, loopback networking and cleanup
+bounds apply. Output is created exclusively and checkpointed after every case.
+Failed cases remain in order and are not retried or replaced. Unknown cleanup
+stops acquisition. A nonzero acquisition exit means the cohort is incomplete or a
+case failed; an acquisition success still requires inspecting the offline screen.
+Do not run unrelated benchmarks or builds concurrently with acquisition.
+
+## Fixed engineering limits
+
+Each viewer must retain 640×480 video, a connected stream, 27–33 decoded and
+presented FPS, no new dropped frames or freezes, no presentation or media-time
+gap over 250 ms, and coverage of the measurement-window edges. Samples must show
+at least four coarse color bins and three distinct visual hashes. These are
+nonblank/temporal proxies; no reference-image fidelity or perceptual quality
+assessment is inferred from them.
+
+Each matched pair has these maximum observer-on increases:
+
+| Scope | CPU increase, percentage points of one core | Peak sampled RSS increase |
+| --- | ---: | ---: |
+| Python camera/owner process | 5 | 8 MiB |
+| Node relay process | 5 | 8 MiB |
+| Two owned media workers together | 10 | 16 MiB |
+| Owned browser process inventory | 10 | Not measured |
+
+These are predeclared engineering budgets, not fitted confidence intervals or
+universal safety limits. Every pair and every viewer must pass; averages cannot
+hide one failed case. Negative resource differences are retained as measurements,
+not proof of a benefit. Pairwise deltas also include remaining content/timing
+variation and measurement noise; a breach blocks this screen but does not by
+itself establish a causal observer-overhead estimate. Native CPU uses exact owned
+process tick deltas and Linux
+monotonic read brackets; RSS is the maximum sampled value, not an absolute peak.
+The relay is the camera host's direct parent, whose lifetime is pinned for the
+measurement. Current native acceptance uses CDP only to enumerate the freshly
+owned browser's processes. CPU values come from read-only OS counters with
+explicit errors: Linux `/proc` ticks or Darwin `proc_pid_rusage` Mach ticks
+converted with the native timebase. Each sample retains hashed process lifetimes,
+individual counters and read durations; resets or changed inventories leave the
+measurement unavailable. Earlier CDP-counter receipts keep their original
+sampling context. The host sampler's own CPU is outside this browser-process
+measure. Browser and native CPU are reported
+separately. Game CPU must advance; Pulse/lease-guard overhead is outside the
+reported CPU scopes.
+
+## Results and missingness
+
+The offline method is `n10-observer-disturbance-v1`. `observer_screen` is `met`,
+`not_met`, or `unavailable`. The offline command emits its assessment and exits
+nonzero unless this narrow screen is `met`; this is not a live-qualification exit
+status. Missing/nonfinite/reset counters, changed process
+inventory, stale native observations, unknown cleanup, clock/coverage gaps,
+incomplete order or a changed software/image/browser context cannot pass.
+Native source progress is independently required; a browser claim alone is
+insufficient. Real counters and samples are retained for inspection.
+
+`qualification` remains `unavailable_engineering_only`, `perceptual_quality`
+remains `not_evaluated`, and `live_authority` remains false even if this screen
+passes. Its scope is the read-only observer/admission path in this contained
+context. It does not qualify a relief family, controller disturbance, audio
+quality, a desktop build, other profiles/devices or held-out diagnostic evidence.
+Those require their own production-path qualification and acceptance.
+
+## Same-worker exploratory diagnostic
+
+A separate diagnostic can help distinguish changing source content from observer
+activity. It is deliberately excluded from the six-case screen above:
+
+```sh
+npm run smoke:n10-browser-native -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --mode observer-static-diagnostic
+```
+
+It waits for actual local-owner readiness on both receivers (at most eight
+seconds), then applies a fixed three-second warmup. It stops only its own game
+through an exact pidfd and holds that framebuffer while two existing workers keep
+streaming. Three native 4.5-second/browser four-second windows run in on/off/on
+order, with fixed settling periods of 500 ms, 500 ms and 1 s. Eligibility loss,
+late rebind readiness or the 30-second scenario deadline fails the diagnostic;
+there is no adaptive warmup or retry.
+
+The off interval stops the actual browser collectors through a message emitted
+only from the directly owned camera CLI host's stdout into the disposable relay.
+No network handler accepts a request to inject that message. The second on
+interval obtains new camera challenges and local receiver handles for the same
+workers. Each measured window requires unchanged worker/offer identities and
+private command counts, advancing source counters, and zero game CPU progress
+while stopped. Cleanup resumes the game using that same pidfd before normal
+owned-process teardown, including on failed acquisition.
+
+Receipts contain browser startup markers for offer/answer, connection, video track,
+first presentation and first report. Native markers record when the host detects
+connection, binding, reports and readiness, plus the game age/script position at
+freeze. These are two separate clock domains; do not subtract a browser timestamp
+from a camera timestamp or treat a polling detection time as an exact capture time.
+Structured failure receipts retain collected events and page diagnostics.
+
+Save the emitted JSON under ignored `local/`. Its descriptive summary is:
+
+```sh
+PYTHONPATH=engine/runtime python3 -m live_probe_control.observer_diagnostic \
+  "$N10_DIAGNOSTIC_OUTPUT"
+```
+
+This reports scope-specific resource contrasts and temporal/nonblank continuity,
+without requiring visual variation from a deliberately frozen scene. It does not
+apply or modify the original cohort's budgets. A static framebuffer, the same
+processes and one on/off/on sequence do not qualify moving-gameplay overhead or
+identify a general causal effect. Diagnostic state `observed` means the
+measurement was available; qualification and live authority remain unavailable.
+The ordinary screen rejects diagnostic cases and still requires game progress
+and visual variation. Never replace a failed cohort case with this diagnostic.
+
+## Presentation-gated moving-workload acquisition
+
+Two additional modes rehearse a separate acquisition protocol:
+
+```sh
+npm run smoke:n10-browser-native -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --mode observer-moving-off
+npm run smoke:n10-browser-native -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --mode observer-moving-on
+```
+
+The method is `n10-observer-moving-acquisition-v2`. Both viewers must first
+present a real video frame and remain connected. The owning host atomically
+publishes a closed presentation marker in its disposable assets directory, which
+the container mounts read-only. This is a local acquisition handshake; there is
+no signaling handler or media-control endpoint for it. Native eligibility also
+requires connected workers with fresh observations; on additionally requires
+both local-owner receiver scopes to be ready. Native eligibility has a fixed
+eight-second deadline. Missing or malformed markers fail acquisition.
+
+The existing fixed input script stays idle until eligibility and at least three
+seconds of game loading. It then starts once, followed by a fixed three-second
+warmup measured from the actual script-arm timestamp; polling time before the
+arm does not count toward it. Readiness loss fails that warmup instead of extending it. Native sampling
+records game age, script age and action count in every sample and at eligibility
+and window edges. Browser startup markers retain their separate page clock.
+The normal four-second browser and at least 4.5-second native sampling windows,
+resource limits, cleanup requirements and default-off production settings apply.
+
+These modes emit the role `moving_acquisition_not_qualification`. They
+are not accepted by the original six-case assessor. Matching script age does
+not prove identical game state, source pixels or host scheduling; the receipt
+explicitly records `source_content_matched: false`. A subsequent cost comparison
+must predeclare its own complete order, eligibility and phase-comparability
+rules before acquisition. Keep original failed cohorts and budgets intact;
+rehearsal success grants no observer-cost, control-action or perceptual/audio
+qualification and no live authority.
+
+## Separate moving-workload cost cohort
+
+Use a new exclusive output path and select the moving protocol explicitly:
+
+```sh
+npm run smoke:n10-observer-cost -w @pixelated/engine-runtime -- \
+  --image "$N10_NATIVE_IMAGE" --output "$N10_COHORT_OUTPUT" --protocol moving-v2
+PYTHONPATH=engine/runtime python3 -m live_probe_control.observer_moving_screen \
+  "$N10_COHORT_OUTPUT"
+```
+
+The offline method is `n10-observer-moving-disturbance-v2`. It uses the same six
+independent off/on, on/off, off/on sessions, matched pair indices, temporal/nonblank
+checks and resource budgets as v1. Its acquisition modes are the presentation-gated
+moving modes above. The default acquisition protocol remains `v1`. Neither
+assessor accepts the other protocol's cases; rehearsal cases with the earlier
+rehearsal-only role cannot substitute for this cohort.
+
+Each moving case additionally requires exactly one eligibility, window-start and
+window-end phase trace, agreeing with the acquisition events. Eligibility must
+occur within eight native seconds, after at least three seconds of game loading,
+with zero input actions and at most 50 ms of script age. Measurement must start
+at script age 3.00–3.15 s with eight actions and end at 7.50–8.15 s. Every native
+sample must retain advancing integral script ages, consistent game/script origins
+and the fixed 400 ms input schedule with at most 150 ms input lateness. Phase
+edges must cover the native samples within 50 ms, and relative phase/native clock
+increments must agree within 50 ms. Game/script clock origins and relative edge
+timing must agree within 1 ms. Both initial browser traces must show a first
+presentation within one second after connection in their own page clocks.
+
+For each off/on pair, the script ages **and game ages** at both window edges must
+differ by at most 150 ms. An unavailable or incomparable pair has null cost deltas
+and cannot pass; later pairs are still assessed. Every case, viewer and comparable
+pair must pass, without averages, retries or replacement. Acquisition failures
+remain in their original positions, and unknown cleanup stops acquisition.
+
+A met result is only this contained read-only observer/admission engineering cost
+screen. It does not establish identical source pixels or a causal observer effect,
+qualify an actual relief/control action, or evaluate perceptual/audio/desktop
+quality. Those claims remain unavailable, and live authority remains false.
+Preserve earlier cohorts and freeze any new protocol before collecting its results.
+
+
+The acquisition also requires the camera/container to exit successfully. A media
+`complete` event alone cannot establish process cleanup. Disposable CLI receipts
+include shutdown stages and the owned camera's exit code/signal. If a host stalls,
+a 35-second Python stack dump, armed through interpreter exit, precedes the fixed
+42-second container timeout. The relay also records pending resource types and
+its own close stages. Failure logs retain a bounded tail so late shutdown
+diagnostics are preserved.
+These diagnostics do not extend deadlines or turn a timeout into a valid case.
+Separate shutdown failure drills cannot replace missing cohort cases.
+
+
+After the owned camera exits, the disposable relay explicitly destroys all
+connections accepted by its HTTP server, including upgraded connections. A
+connection accepted during that close transition is destroyed too. This prevents
+relay exit from depending on a browser transport finishing its own close handshake.
+Shutdown still awaits Socket.IO/server closure and preserves nonzero camera exit
+status; it does not force a successful exit or weaken the media/worker checks.
+These ownership rules apply to this acceptance fixture, not the production server.
+The normal engine test command includes HTTP and upgraded-socket close regressions.
+
+
+The acceptance host serializes its camera profile using the public `bitrateKbps`
+wire key, then retains the parsed worker profile and per-sample encoder settings.
+Native sampling requires 1,500,000 bit/s, CPU setting 6 and quantizer limit 48,
+along with the expected cadence and dimensions. A configuration fallback or
+unrelated setting change fails acquisition. Historical receipts remain scoped to
+their own source/settings; do not infer this profile from a method name alone.

@@ -1,3 +1,5 @@
+import { bindWebRTCEngineErrors } from "./webrtcEngineErrors";
+import { offerDigest, parseReceiverChallenge, startReceiverObservation } from "../telemetry/receiverObservation";
 import { clearEngineToken } from "../../engine/engineAuth";
 import { loadEngineSessionContext } from "../engine/engineContext";
 import { attachEngineInput } from "../input/webrtcInput";
@@ -28,6 +30,37 @@ export function bindWebRTCSocketEvents({
   params: UseWebRTCSessionLifecycleParams;
   runtime: WebRTCSessionRuntime;
 }) {
+  const stopReceiver = () => {
+    runtime.receiverObservationGeneration = (runtime.receiverObservationGeneration || 0) + 1;
+    runtime.stopReceiverObservation?.();
+    runtime.stopReceiverObservation = undefined;
+    runtime.receiverBindingId = undefined;
+  };
+  runtime.socket.on("webrtc-receiver-bind", async (raw: unknown) => {
+    const challenge = parseReceiverChallenge(raw);
+    if (!challenge || challenge.peerId !== config.peerId || runtime.disposed || !runtime.pc || !runtime.offeredSdp ||
+        challenge.bindingId === runtime.receiverBindingId) return;
+    stopReceiver();
+    const generation = runtime.receiverObservationGeneration;
+    const pc = runtime.pc;
+    const sdp = runtime.offeredSdp;
+    try {
+      if (await offerDigest(sdp) !== challenge.offerHash || runtime.disposed || runtime.pc !== pc ||
+          runtime.receiverObservationGeneration !== generation || !runtime.socket.connected) return;
+      runtime.receiverBindingId = challenge.bindingId;
+      runtime.stopReceiverObservation = startReceiverObservation({ pc, challenge,
+        getVideo: () => params.options.videoElementRef?.current || null,
+        getStream: () => runtime.incomingStream,
+        isCurrent: () => !runtime.disposed && runtime.pc === pc && runtime.socket.connected && runtime.receiverObservationGeneration === generation,
+        emit: (sample) => runtime.socket.emit("webrtc-receiver-observation", sample),
+      });
+    } catch { if (runtime.receiverObservationGeneration === generation) stopReceiver(); }
+  });
+  runtime.socket.on("webrtc-receiver-unbind", (raw: { peerId?: unknown; bindingId?: unknown } | null) => {
+    if (raw?.peerId === config.peerId && raw.bindingId === runtime.receiverBindingId) stopReceiver();
+  });
+  runtime.socket.on("disconnect", stopReceiver);
+
   runtime.socket.on(
     "webrtc-answer",
     (answer: RTCSessionDescriptionInit & { peerId?: string }) => {
@@ -85,17 +118,12 @@ export function bindWebRTCSocketEvents({
     );
   });
 
-  runtime.socket.on("engine-error", (payload: { code?: string; message?: string }) => {
-    console.error("[WebRTC] Engine error:", payload?.message);
-    params.onResearchEvent?.("engine_error", {
-      code: payload?.code || null,
-      message: payload?.message || null,
-      source: "engine-error",
-    });
-    if (payload?.code === "engine_access_revoked") {
-      clearEngineToken("rejected");
-    }
-    failStream(payload?.message || "Engine error");
+  bindWebRTCEngineErrors({
+    socket: runtime.socket, peerId: config.peerId,
+    isDisposed: () => runtime.disposed,
+    failStream,
+    report: (details) => params.onResearchEvent?.("engine_error", details),
+    clearRejectedToken: () => clearEngineToken("rejected"),
   });
 
   runtime.socket.on("connect", () => {
@@ -168,6 +196,7 @@ export function bindWebRTCSocketEvents({
           runtime.socket,
           params.sessionId,
           config.peerId,
+          (sdp) => { runtime.offeredSdp = sdp; },
         );
         params.onResearchEvent?.("offer_sent", {
           peerId: config.peerId,

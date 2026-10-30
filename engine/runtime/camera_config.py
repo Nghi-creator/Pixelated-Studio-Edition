@@ -30,7 +30,7 @@ def iter_ice_urls(server):
     return []
 
 
-def configure_ice_servers(webrtc, raw_value):
+def configure_ice_servers(webrtc, raw_value, *, emit=print):
     for server in parse_ice_servers(raw_value):
         username = server.get("username") if isinstance(server, dict) else None
         credential = server.get("credential") if isinstance(server, dict) else None
@@ -38,7 +38,7 @@ def configure_ice_servers(webrtc, raw_value):
             parsed = urlparse(url)
             if parsed.scheme == "stun":
                 webrtc.set_property("stun-server", url)
-                print(f"[Python] Configured STUN server: {url}")
+                emit(f"[Python] Configured STUN server: {url}")
             elif parsed.scheme in ["turn", "turns"] and username and credential:
                 safe_username = quote(username, safe="")
                 safe_credential = quote(credential, safe="")
@@ -47,7 +47,7 @@ def configure_ice_servers(webrtc, raw_value):
                     (parsed.scheme, netloc, parsed.path, "", parsed.query, "")
                 )
                 webrtc.set_property("turn-server", turn_url)
-                print(
+                emit(
                     f"[Python] Configured TURN server: "
                     f"{parsed.scheme}://{parsed.netloc}"
                 )

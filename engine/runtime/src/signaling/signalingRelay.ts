@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { receiverChallenge, receiverObservation } from "./receiverObservations";
 import { isSocketPayload } from "./socketPayload";
 import type { Socket } from "socket.io";
 import {
@@ -46,7 +48,8 @@ export function createSignalingPeerRegistry(
 
   const peers = new Map<
     string,
-    { peerId: string; sessionId: string; socketId: string }
+    { peerId: string; sessionId: string; socketId: string; offerHash: string | null;
+      receiver?: { bindingId: string; cameraId: string; sequence: number; clockId: string | null; elapsedNs: number; decoded: number; presented: number; receivedAt: number } }
   >();
 
   const peerKey = (sessionId: string, peerId: string) =>
@@ -59,14 +62,21 @@ export function createSignalingPeerRegistry(
   }
 
   return {
-    acquire(sessionId: string, peerId: string, socketId: string) {
+    acquire(sessionId: string, peerId: string, socketId: string, offerHash?: string) {
       const key = peerKey(sessionId, peerId);
       const existing = peers.get(key);
-      if (existing) return existing.socketId === socketId;
+      if (existing) {
+        if (existing.socketId !== socketId) return false;
+        if (offerHash && offerHash !== existing.offerHash) {
+          existing.offerHash = offerHash;
+          existing.receiver = undefined;
+        }
+        return true;
+      }
 
       releaseSocket(socketId);
       if (peers.size >= maxActivePeers) return false;
-      peers.set(key, { peerId, sessionId, socketId });
+      peers.set(key, { peerId, sessionId, socketId, offerHash: offerHash || null });
       return true;
     },
     release(sessionId: string, peerId: string, socketId: string) {
@@ -75,6 +85,50 @@ export function createSignalingPeerRegistry(
     },
     owns(sessionId: string, peerId: string, socketId: string) {
       return peers.get(peerKey(sessionId, peerId))?.socketId === socketId;
+    },
+    bindReceiver(sessionId: string, peerId: string, bindingId: string, offerHash: string, cameraId: string) {
+      const peer = peers.get(peerKey(sessionId, peerId));
+      if (!peer || peer.offerHash !== offerHash || peer.socketId === cameraId) return null;
+      if (peer.receiver?.bindingId === bindingId) {
+        return peer.receiver.cameraId === cameraId ? peer.socketId : null;
+      }
+      peer.receiver = { bindingId, cameraId, sequence: -1, clockId: null, elapsedNs: -1, decoded: 0, presented: 0, receivedAt: -Infinity };
+      return peer.socketId;
+    },
+    observeReceiver(sessionId: string, socketId: string, sample: NonNullable<ReturnType<typeof receiverObservation>>, stamp: number) {
+      const peer = peers.get(peerKey(sessionId, sample.peerId));
+      const receiver = peer?.receiver;
+      if (!peer || peer.socketId !== socketId || !receiver || receiver.bindingId !== sample.bindingId) return null;
+      if (stamp < receiver.receivedAt || sample.sequence !== receiver.sequence + 1 ||
+          (receiver.clockId !== null && receiver.clockId !== sample.clockId) ||
+          sample.elapsedNs <= receiver.elapsedNs || sample.framesDecoded < receiver.decoded || sample.presentedFrames < receiver.presented) {
+        peer.receiver = undefined;
+        return null;
+      }
+      // Bound forwarding rate before advancing sequence, so floods cannot silently
+      // skip samples and resume a supposedly continuous observation stream.
+      if (stamp - receiver.receivedAt < 100) { peer.receiver = undefined; return null; }
+      receiver.sequence = sample.sequence;
+      receiver.clockId = sample.clockId;
+      receiver.elapsedNs = sample.elapsedNs;
+      receiver.decoded = sample.framesDecoded;
+      receiver.presented = sample.presentedFrames;
+      receiver.receivedAt = stamp;
+      return { cameraId: receiver.cameraId, offerHash: peer.offerHash! };
+    },
+    invalidateReceiver(sessionId: string, peerId: string, socketId: string) {
+      const peer = peers.get(peerKey(sessionId, peerId));
+      if (peer?.socketId === socketId) peer.receiver = undefined;
+    },
+    dropReceiverCamera(cameraId: string) {
+      const dropped: Array<{ socketId: string; peerId: string; bindingId: string }> = [];
+      for (const peer of peers.values()) {
+        if (peer.receiver?.cameraId === cameraId) {
+          dropped.push({ socketId: peer.socketId, peerId: peer.peerId, bindingId: peer.receiver.bindingId });
+          peer.receiver = undefined;
+        }
+      }
+      return dropped;
     },
     releaseSocket,
     size: () => peers.size,
@@ -96,7 +150,7 @@ function payloadMatchesActiveSession(socket: Socket, payload: SessionPayload) {
   );
 }
 
-function getPeerRoom(sessionId: string, peerId: string) {
+export function getPeerRoom(sessionId: string, peerId: string) {
   return `session:${sessionId}:peer:${peerId}`;
 }
 
@@ -239,7 +293,7 @@ export function registerSignalingRelayHandlers(
     ) {
       return;
     }
-    if (!peerRegistry.acquire(sessionId, peerId, socket.id)) {
+    if (!peerRegistry.acquire(sessionId, peerId, socket.id, createHash("sha256").update(offer.sdp as string).digest("hex"))) {
       forgetPeer(socket, peerId);
       socket.emit("engine-error", {
         code: "engine_stream_capacity_reached",
@@ -248,6 +302,44 @@ export function registerSignalingRelayHandlers(
       return;
     }
     relayToSession(socket, "webrtc-offer", stripSessionId(offer));
+  });
+
+  socket.on("webrtc-receiver-bind", (payload: unknown) => {
+    if (!consumeSignalingBudget() || socket.data.trustedCamera !== true) return;
+    const challenge = receiverChallenge(payload);
+    const sessionId = normalizeSessionId(socket.data.sessionId);
+    if (!challenge || !sessionId) return;
+    const receiverSocketId = peerRegistry.bindReceiver(sessionId, challenge.peerId, challenge.bindingId, challenge.offerHash, socket.id);
+    if (!receiverSocketId) return;
+    const receiverSocket = socket.nsp.sockets.get(receiverSocketId);
+    if (!receiverSocket || receiverSocket.data.trustedCamera === true ||
+        normalizeSessionId(receiverSocket.data.sessionId) !== sessionId || !canCreatePeer(receiverSocket, sessionId)) {
+      peerRegistry.invalidateReceiver(sessionId, challenge.peerId, receiverSocketId);
+      return;
+    }
+    socket.to(receiverSocketId).emit("webrtc-receiver-bind", challenge);
+    socket.emit("webrtc-receiver-bound", { ...challenge, receiverSocketId });
+  });
+
+  socket.on("webrtc-receiver-observation", (payload: unknown) => {
+    if (!consumeSignalingBudget() || socket.data.trustedCamera === true) return;
+    const sample = receiverObservation(payload);
+    const sessionId = normalizeSessionId(socket.data.sessionId);
+    if (!sample || !sessionId) return;
+    if (!canCreatePeer(socket, sessionId)) {
+      peerRegistry.invalidateReceiver(sessionId, sample.peerId, socket.id);
+      return;
+    }
+    const binding = peerRegistry.observeReceiver(sessionId, socket.id, sample, now());
+    if (!binding) return;
+    const cameraSocket = socket.nsp.sockets.get(binding.cameraId);
+    if (!cameraSocket || cameraSocket.data.trustedCamera !== true || normalizeSessionId(cameraSocket.data.sessionId) !== sessionId) {
+      peerRegistry.dropReceiverCamera(binding.cameraId);
+      return;
+    }
+    socket.to(binding.cameraId).emit("webrtc-receiver-observation", {
+      ...sample, offerHash: binding.offerHash, receiverSocketId: socket.id,
+    });
   });
 
   socket.on("webrtc-peer-disconnect", (payload: SessionPayload = {}) => {
@@ -303,6 +395,9 @@ export function registerSignalingRelayHandlers(
   );
 
   const releasePeers = () => {
+    for (const binding of peerRegistry.dropReceiverCamera(socket.id)) {
+      socket.to(binding.socketId).emit("webrtc-receiver-unbind", { peerId: binding.peerId, bindingId: binding.bindingId });
+    }
     const peerIds = Array.isArray(socket.data.webrtcPeerIds)
       ? socket.data.webrtcPeerIds
       : [];

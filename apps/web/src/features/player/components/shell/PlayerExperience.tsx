@@ -132,6 +132,7 @@ export function PlayerExperience({
     telemetry,
   } = useWebRTC(id || "", streamProfile, {
     displayName,
+    videoElementRef: videoRef,
     mode: playerMode,
     onResearchEvent: recordResearchEvent,
     requestedRole: playerMode === "host" ? "host" : invitedRole,

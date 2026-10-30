@@ -41,6 +41,10 @@ export type WebRTCSessionRuntime = {
   resolvedBootTarget: BootTarget | null;
   socket: EngineSocket;
   stopTelemetry: () => void;
+  offeredSdp?: string;
+  receiverBindingId?: string;
+  receiverObservationGeneration?: number;
+  stopReceiverObservation?: () => void;
 };
 
 export type FailStream = (message: string) => void;
