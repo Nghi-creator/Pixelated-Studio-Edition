@@ -29,8 +29,8 @@
     "typecheck:tooling": "tsc -p tsconfig.tooling.json"
   },
   "dependencies": {
-    "@fastify/cors": "^11.3.0",
-    "@supabase/supabase-js": "^2.110.8",
+    "@fastify/cors": "^11.3.1",
+    "@supabase/supabase-js": "^2.118.0",
     "dotenv": "^16.6.1",
     "fastify": "5.12.7",
     "zod": "^4.6.7"
