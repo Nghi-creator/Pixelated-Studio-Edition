@@ -16,20 +16,25 @@ concurrency:
 
 jobs:
   quality:
-    name: Node ${{ matrix.node }} / Linux regression suite
+    name: ${{ matrix.label }} / Linux regression suite
     runs-on: ubuntu-latest
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        node: ["24.22.1", 26]
+        include:
+          - label: Node 24
+            node-version-file: .nvmrc
+          - label: Node 26
+            node-version: 26
     steps:
       - name: Check out repository
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: ${{ matrix.node }}
+          node-version: ${{ matrix.node-version }}
+          node-version-file: ${{ matrix.node-version-file }}
           cache: npm
       - name: Set up producer Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
@@ -48,3 +53,17 @@ jobs:
           node scripts/lan/multiplayerSmoke.mjs --help
           node scripts/hosted/hostedPairingSmoke.mjs --contract-only
           npm --prefix services/api run capture:catalog-artwork -- --help
+
+  required-quality-compatibility:
+    # Preserve the existing branch-protection context. This is an aggregate
+    # gate, not a Node version selection; the production lane reads .nvmrc.
+    name: Node 24.18.0 / Linux regression suite
+    needs: quality
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require both regression lanes to succeed
+        env:
+          QUALITY_RESULT: ${{ needs.quality.result }}
+        run: test "$QUALITY_RESULT" = success

@@ -182,7 +182,7 @@ test("Dependabot groups, cooldown, and privileged workflow remain aligned", () =
 });
 
 test("automatic merging requires both current repository quality lanes", () => {
-  for (const name of ["Node 24.22.1 / Linux regression suite", "Node 26 / Linux regression suite"]) {
+  for (const name of ["Node 24 / Linux regression suite", "Node 26 / Linux regression suite", "Node 24.18.0 / Linux regression suite"]) {
     assert.ok(requiredChecks.includes(name));
     assert.throws(() => validateChecks(checks(requiredChecks).filter(check => check.name !== name), []));
     const runs = checks(requiredChecks);
