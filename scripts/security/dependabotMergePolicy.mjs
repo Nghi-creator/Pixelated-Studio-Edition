@@ -8,7 +8,7 @@ export const allowedTypes = new Set([
 export const directories = ["", "apps/web/", "apps/desktop/", "services/api/", "engine/runtime/"];
 export const requiredChecks = [
   "API contract", "Hosted web and smoke contract",
-  "Node 24.18.0 / Linux regression suite", "Node 26 / Linux regression suite",
+  "Node 24.22.1 / Linux regression suite", "Node 26 / Linux regression suite",
   ...[["root", "."], ["web", "apps/web"], ["desktop", "apps/desktop"],
     ["api", "services/api"], ["engine-runtime", "engine/runtime"]]
     .map(([label, dir]) => `npm audit production dependencies (${label}, ${dir})`),

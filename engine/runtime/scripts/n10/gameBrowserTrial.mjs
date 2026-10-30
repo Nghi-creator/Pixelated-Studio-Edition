@@ -155,7 +155,6 @@ export async function runTrial(options) {
     await Promise.race([read(), new Promise((_, reject) => {
       timer = setTimeout(() => reject(new Error("outer trial deadline")), 40000);
     })]);
-    phase = "completed";
   } catch { failure = phase + "_failed"; }
   finally {
     closing = true;

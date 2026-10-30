@@ -19,6 +19,7 @@ export async function collectBrowserQuality(pc, video, durationMs = 4000) {
     try {
       const readStart = now();
       const values = [...(await pc.getStats()).values()].filter((s) => s.type === "inbound-rtp" && s.kind === "video");
+      // A pending read can resume after the window's finally block closes it.
       if (closed) return;
       if (values.length !== 1 || now() - readStart > 500) throw new Error("missing/slow inbound stats");
       const s = values[0], key = JSON.stringify([s.id, s.ssrc, s.trackIdentifier]);
