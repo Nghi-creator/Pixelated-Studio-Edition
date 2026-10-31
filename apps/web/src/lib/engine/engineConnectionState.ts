@@ -44,9 +44,3 @@ export function setEngineConnectionStatus(status: EngineConnectionStatus) {
     window.dispatchEvent(new Event(ENGINE_CONNECTION_EVENT));
   }
 }
-
-export function isEngineOnline(
-  status: EngineConnectionStatus = engineConnectionStatus,
-) {
-  return status === "online";
-}

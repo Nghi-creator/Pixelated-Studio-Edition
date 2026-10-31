@@ -235,8 +235,11 @@ class CameraWorkers:
                                 now > operation.expires_ns
                                 or operation.cancelled.is_set()
                             ):
-                                operation.status = "rejected"
-                                operation.done.set()
+                                operation.finish({
+                                    "request_id": operation.request.request_id,
+                                    "result": None,
+                                    "rejection": "preconditions",
+                                })
                             else:
                                 receiver = operation.lease()
                                 owner.probe(dict(operation.body, receiver=receiver))

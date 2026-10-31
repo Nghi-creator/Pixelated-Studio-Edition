@@ -13,10 +13,6 @@ export function printCheck(status, label, detail = "") {
   console.log(`[${status}] ${label}${suffix}`);
 }
 
-export function getHealthUrl(engineUrl) {
-  return `${engineUrl}/health`;
-}
-
 export function isHttpsCompanion(engineUrl) {
   return new URL(engineUrl).protocol === "https:";
 }

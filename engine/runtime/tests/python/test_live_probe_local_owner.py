@@ -128,6 +128,18 @@ class LocalOwnerTests(unittest.TestCase):
         self.assertFalse(result["dispatch_available"])
         self.assertFalse(result["live_authority"])
 
+    def test_readiness_and_diagnostics_agree_at_receiver_freshness_boundary(self):
+        self.ready()
+        self.now += 750000000
+        result = self.scope.inspect(self.receiver)
+        self.assertEqual(result["status"], "ready_for_dry_run")
+        self.assertNotIn("readiness_diagnostics", result)
+        self.now += 1
+        result = self.scope.inspect(self.receiver)
+        self.assertEqual(result["status"], "insufficient_or_stale")
+        self.assertIn("browser_receipt_stale", result["readiness_diagnostics"]["reasons"])
+        self.assertFalse(result["dispatch_available"])
+
     def test_readiness_failure_reports_native_progress_without_mutating_admission(self):
         self.ready()
         self.observe(2, 20)

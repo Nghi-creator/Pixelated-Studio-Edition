@@ -80,9 +80,6 @@ export const getCompanionAccessToken = (token = getEngineToken()) =>
     ? token.slice(COMPANION_TOKEN_PREFIX.length)
     : "";
 
-export const isCompanionEngineToken = (token = getEngineToken()) =>
-  Boolean(getCompanionAccessToken(token));
-
 export const engineAuthHeaders = (): Record<string, string> => {
   const token = getEngineToken();
   if (!token) return {};

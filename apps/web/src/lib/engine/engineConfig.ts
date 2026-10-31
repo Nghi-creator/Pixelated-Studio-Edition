@@ -10,8 +10,6 @@ const viteEnv = import.meta.env || {};
 export const DEFAULT_ENGINE_URL =
   viteEnv.VITE_ENGINE_URL || "http://localhost:8080";
 
-export const ENGINE_URL = DEFAULT_ENGINE_URL;
-
 const ALLOWED_ENGINE_PORTS = new Set(["8080", "8090", "8091"]);
 
 function normalizeEngineUrl(url: string) {

@@ -9,11 +9,11 @@ import unittest
 from dataclasses import asdict
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 import test_live_probe_local_owner as fixtures
-from live_probe_control.camera_workers import CameraWorkers
+from live_probe_control.camera_workers import CameraWorkers, Slot
 from live_probe_control.contracts import Request, Result, Snapshot, digest
 from live_probe_control.journal import CadenceJournal
 from live_probe_control.peer_control import PeerControl, ReceiverLease, WorkerProbePort
@@ -136,6 +136,33 @@ class DispatchTests(unittest.TestCase):
         self.assertEqual(operation.status, "rejected")
         self.assertIsNone(operation.result)
         self.assertTrue(operation.done.is_set())
+
+    def queued_rejection(self, *, expired):
+        operation = self.operation()
+        operation.expires_ns = time.monotonic_ns() + (-1 if expired else 10**9)
+        if not expired:
+            operation.cancelled.set()
+        slot = Slot("peer", "offer", operation=operation, seen_ns=time.monotonic_ns())
+        owner = MagicMock()
+        owner.state = "playing"
+        owner.__enter__.return_value = owner
+        owner.close.return_value = True
+        owner.poll.side_effect = lambda: (slot.stop.set(), [])[1]
+        owner.shutdown.side_effect = lambda: setattr(owner, "state", "closed")
+        service = CameraWorkers(fixtures.PROFILE, "[]", 1, factory=lambda **_: owner)
+        service._run(slot)
+        self.assertEqual(operation.status, "rejected")
+        self.assertEqual(operation.rejection, "preconditions")
+        self.assertTrue(operation.done.is_set())
+        self.assertIsNone(operation.result)
+        owner.probe.assert_not_called()
+        self.assertTrue(slot.cleanup_ok)
+
+    def test_expired_queued_operation_retains_rejection_without_dispatch(self):
+        self.queued_rejection(expired=True)
+
+    def test_cancelled_queued_operation_retains_rejection_without_dispatch(self):
+        self.queued_rejection(expired=False)
 
     def test_scope_close_requests_cancellation(self):
         operation = self.operation()
