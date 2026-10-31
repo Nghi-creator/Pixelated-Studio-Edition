@@ -164,16 +164,6 @@ export function getCompanionInviteStatus(
   return now >= state.expiresAt ? "expired" : "active";
 }
 
-export function isValidCompanionAccessToken(token: string, now = Date.now()) {
-  const record = companionAccessTokens.get(token);
-  if (!record) return false;
-  if (record.expiresAt <= now) {
-    companionAccessTokens.delete(token);
-    return false;
-  }
-  return true;
-}
-
 export function getCompanionAccessTokenScope(token: string, now = Date.now()) {
   const record = companionAccessTokens.get(token);
   if (!record) return null;

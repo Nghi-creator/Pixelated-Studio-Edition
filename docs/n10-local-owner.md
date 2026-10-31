@@ -2,6 +2,10 @@
 
 `engine/runtime/live_probe_control/local_owner.py` binds local request drafts to
 one current dedicated camera worker and a scoped receiver observation stream.
+`local_binding.py` owns bounded observation histories, draft value types and the
+shared readiness checks used by admission and diagnostic explanations. The
+owner API retains capability identity, ledger binding and dispatch ownership;
+its existing public imports remain available.
 It is default-disabled and import-safe. Normal camera startup does not construct
 this API, and no Socket.IO, hosted, LAN, HTTP or file-watching command endpoint
 calls it. Admission contains no cadence setter; a separate explicit synthetic

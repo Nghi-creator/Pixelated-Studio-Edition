@@ -278,11 +278,3 @@ export function createStreamTelemetryGraphPngBytes(
 
   return dataUrl ? dataUrlToBytes(dataUrl) : null;
 }
-
-export function createStreamTelemetryGraphPngBlob(
-  samples: StreamTelemetryGraphSample[],
-  metadata: StreamTelemetryGraphArtifactOptions,
-) {
-  const bytes = createStreamTelemetryGraphPngBytes(samples, metadata);
-  return bytes ? new Blob([bytes], { type: "image/png" }) : null;
-}

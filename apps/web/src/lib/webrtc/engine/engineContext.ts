@@ -131,14 +131,6 @@ export async function loadEngineSessionContext(): Promise<{
   }
 }
 
-export async function loadEngineInputCapabilities(): Promise<EngineInputCapabilities> {
-  return (await loadEngineSessionContext()).inputCapabilities;
-}
-
-export async function loadEngineShareContext(): Promise<EngineShareContext> {
-  return (await loadEngineSessionContext()).shareContext;
-}
-
 export async function loadEngineRuntimeKind() {
   const response = await engineFetch(engineEndpoint("/health"));
   if (!response.ok) throw new Error("Engine health check failed.");

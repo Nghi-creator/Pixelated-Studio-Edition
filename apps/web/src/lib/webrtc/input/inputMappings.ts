@@ -137,7 +137,3 @@ export function formatKeyboardCode(code: string) {
   return labels[code] || code.replace(/^Key/, "").replace(/^Digit/, "");
 }
 
-export function clearCachedStreamKeyboardMappingForTests() {
-  cachedMapping = null;
-}
-
