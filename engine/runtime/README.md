@@ -28,10 +28,17 @@ src/signaling/            Socket.IO auth, relay, lobby, input, and start-game ha
 src/telemetry/            Health and resource snapshots
 tests/                    Unit coverage by runtime area
 camera.py                 GStreamer WebRTC sender
-camera_trace*.py           Opt-in bounded stage tracing and standalone export
+research/                 Opt-in tracing, scenarios, probes and qualification
+scripts/research/n10/     Contained research drivers and browser checks
 input_keyboard.py         Persistent X11/XTest keyboard injection bridge
 server.ts                 Runtime process entry point
 ```
+
+The [Python test inventory](tests/python/README.md) lists the runtime test groups
+and focused discovery commands.
+
+See the [research runtime layout](research/README.md) for opt-in collectors,
+experiments, lifecycle control and qualification modules.
 
 ## Local commands
 
@@ -140,7 +147,7 @@ PIXELATED_ENGINE_NATIVE_IMAGE=pixelated-engine-native:debian-native-v1-...
 
 ## Optional stage tracing
 
-[Host configuration and limitations](../../docs/n4-host-stage-tracing.md) and
-[standalone export/integration](../../docs/n4-stage-trace-export.md) document N4.
+[Host configuration and limitations](../../docs/research/n4/n4-host-stage-tracing.md) and
+[standalone export/integration](../../docs/research/n4/n4-stage-trace-export.md) document N4.
 Disabled mode installs no probes. Synthetic software integration passes; real
 Linux capture and paired CPU/FPS overhead acceptance remain pending.

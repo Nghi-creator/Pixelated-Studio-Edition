@@ -93,10 +93,11 @@ test("runtime images pin the Python camera WebRTC dependencies", () => {
     assert.match(source, /chown -R 10001:10001 [^\n]*\/run\/pixelated/);
     assert.match(source, /chmod 0700 \/run\/pixelated/);
   }
-  for (const helper of ["camera_config.py", "camera_protocol.py", "camera_state.py", "camera_trace.py", "camera_trace_config.py", "camera_trace_hooks.py", "camera_trace_export.py", "camera_trace_control.py"]) {
+  for (const helper of ["camera_config.py", "camera_protocol.py", "camera_state.py"]) {
     assert.match(dockerfile, new RegExp(`COPY [^\\n]*${helper}`));
     assert.match(libretroDockerfile, new RegExp(`COPY [^\\n]*${helper}`));
   }
+  for (const source of [dockerfile, libretroDockerfile]) assert.match(source, /COPY research \/app\/research/);
   assert.match(requirements, /^python-socketio==\d+\.\d+\.\d+$/m);
   for (const requirement of requirements
     .split("\n")
