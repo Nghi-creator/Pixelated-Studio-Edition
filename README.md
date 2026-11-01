@@ -39,26 +39,28 @@ The browser is the front door: users browse games, play through a protected anon
 | Research telemetry | The gameplay screen records stream/playback samples, exports research bundles, and sends authenticated metrics to the API. |
 | Admin tools | Admin routes cover submissions, catalog candidates, users, access logs, reports, and moderation workflows. |
 
-Optional [stage tracing](docs/n4-stage-trace-export.md) captures bounded host and
-browser timing. The [scenario harness](docs/n5-scenario-harness.md) provides
-predeclared experiments, [lifecycle control](docs/n5-lifecycle.md),
-[supported adapters](docs/n5-adapters.md) and [offline export](docs/n5-experiment-export.md).
-The opt-in [property inventory](docs/n10-capability-inventory.md) inspects installed
+[Research documentation](docs/research/README.md) is organized by implementation slice.
+
+Optional [stage tracing](docs/research/n4/n4-stage-trace-export.md) captures bounded host and
+browser timing. The [scenario harness](docs/research/n5/n5-scenario-harness.md) provides
+predeclared experiments, [lifecycle control](docs/research/n5/n5-lifecycle.md),
+[supported adapters](docs/research/n5/n5-adapters.md) and [offline export](docs/research/n5/n5-experiment-export.md).
+The opt-in [property inventory](docs/research/n10/n10-capability-inventory.md) inspects installed
 GStreamer metadata before live-relief capability qualification. The explicit
-[isolated bitrate trial](docs/n10-bitrate-feasibility.md) tests a disposable
-synthetic encoder/decoder. The [capture-cadence experiment](docs/n10-cadence-feasibility.md)
+[isolated bitrate trial](docs/research/n10/n10-bitrate-feasibility.md) tests a disposable
+synthetic encoder/decoder. The [capture-cadence experiment](docs/research/n10/n10-cadence-feasibility.md)
 tests source framerate renegotiation in disposable synthetic/private-Xvfb pipelines;
-live relief remains unavailable. The [default-disabled lifecycle kernel](docs/n10-cadence-controller.md)
+live relief remains unavailable. The [default-disabled lifecycle kernel](docs/research/n10/n10-cadence-controller.md)
 adds dedicated-worker ownership and watchdog handling; it has no normal camera
-or qualified receiver binding. The [contained game/browser experiment](docs/n10-game-browser-trial.md)
+or qualified receiver binding. The [contained game/browser experiment](docs/research/n10/n10-game-browser-trial.md)
 adds a fixed real-game source, headless Chromium presentation and descriptive
 resource/temporal-quality observations without enabling gameplay control.
-The separate [contained control fixture](docs/n10-contained-game-control.md)
+The separate [contained control fixture](docs/research/n10/n10-contained-game-control.md)
 permits explicit local cadence actions only for its owned source. Its
-[observer](docs/n10-observer-disturbance.md),
-[matched action](docs/n10-full-span-cost.md) and
-[fault-cost](docs/n10-fault-cost.md) procedures retain independent resource and
-continuity evidence. The [qualification protocol](docs/n10-qualification-protocol.md)
+[observer](docs/research/n10/n10-observer-disturbance.md),
+[matched action](docs/research/n10/n10-full-span-cost.md) and
+[fault-cost](docs/research/n10/n10-fault-cost.md) procedures retain independent resource and
+continuity evidence. The [qualification protocol](docs/research/n10/n10-qualification-protocol.md)
 checks declarations without enabling production control.
 
 ## Architecture
@@ -211,7 +213,7 @@ MIT - see [LICENSE](LICENSE).
 
 Built by [Nicholas Nguyen](https://www.linkedin.com/in/nicholas-nguyen-3bb17a335/).
 
-Use the [live test guide](docs/n5-live-test-procedure.md) for opt-in research
+Use the [live test guide](docs/research/n5/n5-live-test-procedure.md) for opt-in research
 campaigns and paired overhead measurements. Normal startup leaves these controls disabled.
 
 [Script boundaries and CI maintenance](docs/script-maintenance.md) describes utility ownership, bounds and the full repository regression gate.

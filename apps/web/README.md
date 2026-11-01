@@ -121,7 +121,7 @@ The connection may be a raw local engine token for localhost use or a `companion
 ## Optional stage tracing
 
 The defaults in `.env.example` leave N4 disabled.
-[Browser tracing](../../docs/n4-browser-stage-tracing.md) documents the approved
-presentation/callback evidence; [export/integration](../../docs/n4-stage-trace-export.md)
+[Browser tracing](../../docs/research/n4/n4-browser-stage-tracing.md) documents the approved
+presentation/callback evidence; [export/integration](../../docs/research/n4/n4-stage-trace-export.md)
 documents the finish/download flow and synthetic verification. Real callbacks,
 picker interaction and measured overhead remain pending.

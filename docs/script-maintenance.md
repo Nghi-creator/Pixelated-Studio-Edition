@@ -46,7 +46,7 @@ The legacy `Node 24.18.0 / Linux regression suite` context is an aggregate gate
 for existing branch protection, and succeeds only when both lanes succeed. Its
 name does not select an older runtime.
 
-See the [live test procedure](n5-live-test-procedure.md) for runtime integration checks.
+See the [live test procedure](research/n5/n5-live-test-procedure.md) for runtime integration checks.
 
 ## TLS and diagnostics
 

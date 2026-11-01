@@ -167,11 +167,8 @@ COPY --from=mgba-builder /out/mgba_libretro.so /cores/mgba_libretro.so
 COPY --from=bsnes-builder /out/bsnes_libretro.so /cores/bsnes_libretro.so
 COPY --from=picodrive-builder /out/picodrive_libretro.so /cores/picodrive_libretro.so
 COPY --from=python-builder /out /usr/local/lib/python3.10/dist-packages
-COPY scenario_harness /app/scenario_harness
-COPY private_journal.py /app/
-COPY live_probe_control /app/live_probe_control
-COPY live_probe_inventory.py live_probe_trial.py live_probe_cadence_trial.py /app/
-COPY camera.py camera_config.py camera_protocol.py camera_state.py camera_trace.py camera_trace_config.py camera_trace_hooks.py camera_trace_export.py camera_trace_control.py input_gamepad.py input_keyboard.py /app/
+COPY research /app/research
+COPY camera.py camera_config.py camera_protocol.py camera_state.py input_gamepad.py input_keyboard.py /app/
 
 RUN install -d -o 10001 -g 10001 -m 0700 /n5 /n5/control
 

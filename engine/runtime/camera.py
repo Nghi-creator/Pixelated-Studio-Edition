@@ -10,16 +10,16 @@ from camera_config import (
     parse_max_active_peers,
     parse_stream_profile,
 )
-from live_probe_control.camera_workers import CameraWorkers, workers_enabled
-from live_probe_control.receiver_bridge import BrowserReceiverBridge, observation_enabled, valid_bound, valid_report
+from research.live_probe_control.peers.camera_workers import CameraWorkers, workers_enabled
+from research.live_probe_control.peers.receiver_bridge import BrowserReceiverBridge, observation_enabled, valid_bound, valid_report
 
 from camera_protocol import normalize_ice_candidate, normalize_peer_id, validate_offer
 from camera_state import write_encoder_telemetry, write_peer_state
-from camera_trace import HostTraceRecording
-from camera_trace_export import export_camera_trace
-from camera_trace_config import parse_trace_config
-from camera_trace_hooks import install_host_trace, install_trace_shutdown
-from camera_trace_control import PeerRecordingControl
+from research.tracing.camera_trace import HostTraceRecording
+from research.tracing.camera_trace_export import export_camera_trace
+from research.tracing.camera_trace_config import parse_trace_config
+from research.tracing.camera_trace_hooks import install_host_trace, install_trace_shutdown
+from research.tracing.camera_trace_control import PeerRecordingControl
 
 gi.require_version("Gst", "1.0")
 gi.require_version("GstWebRTC", "1.0")
@@ -35,7 +35,7 @@ ICE_SERVERS = os.environ.get('PIXELATED_ICE_SERVERS', '[]')
 N5_CAMPAIGN_DIRECTORY = os.environ.get("PIXELATED_N5_CAMPAIGN_DIRECTORY")
 N5_WORKLOAD_DECLARATION = None
 if N5_CAMPAIGN_DIRECTORY:
-    from scenario_harness.camera_runtime import WorkloadDeclaration
+    from research.scenario_harness.camera_runtime import WorkloadDeclaration
     declared_seed = os.environ.get("PIXELATED_N5_WORKLOAD_SEED", "")
     if declared_seed.isascii() and declared_seed.isdecimal() and len(declared_seed) <= 10:
         N5_WORKLOAD_DECLARATION = WorkloadDeclaration(
@@ -483,7 +483,7 @@ if WORKERS is not None:
     GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, lambda: loop.quit())
 campaign_service = None
 if N5_CAMPAIGN_DIRECTORY:
-    from scenario_harness.campaign import CampaignService
+    from research.scenario_harness.campaign import CampaignService
     if STAGE_TRACE is None:
         raise ValueError("N5 campaign requires explicitly enabled tracing")
     campaign_service = CampaignService(sys.modules[__name__], N5_CAMPAIGN_DIRECTORY)

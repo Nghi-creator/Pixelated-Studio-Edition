@@ -7,7 +7,7 @@ import test from "node:test";
 test("N4 host collector and fake pad lifecycle regressions pass", () => {
   const result = spawnSync(
     "python3",
-    ["-m", "unittest", "discover", "-s", "tests/python", "-p", "test_camera_trace*.py", "-v"],
+    ["-m", "unittest", "discover", "-s", "tests/python/tracing", "-t", "tests/python", "-p", "test_camera_trace*.py", "-v"],
     { cwd: process.cwd(), encoding: "utf8", timeout: 30000 },
   );
   assert.equal(result.error, undefined, String(result.error));
