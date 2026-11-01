@@ -36,5 +36,6 @@ names, such as `from tracing.test_camera_trace import Clock`.
 Native media and pidfd integration tests require the disposable Linux runtime
 and `N10_NATIVE_PEER_TESTS=1`. They are not desktop acceptance tests. See the
 [peer-worker procedure](../../../../docs/research/n10/n10-peer-workers.md) for setup and
-containment. The engine's Node test wrappers also run the tracing, scenario and
-live-probe unit groups through unittest discovery.
+containment. The engine's Node test wrapper runs this entire discovery root during
+`npm test`, including qualification and capture regressions. Native opt-in tests remain
+skipped unless their environment flags and platform requirements are satisfied.

@@ -1,19 +1,7 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import test from "node:test";
-
-test("N4 host collector and fake pad lifecycle regressions pass", () => {
-  const result = spawnSync(
-    "python3",
-    ["-m", "unittest", "discover", "-s", "tests/python/tracing", "-t", "tests/python", "-p", "test_camera_trace*.py", "-v"],
-    { cwd: process.cwd(), encoding: "utf8", timeout: 30000 },
-  );
-  assert.equal(result.error, undefined, String(result.error));
-  assert.equal(result.status, 0, result.stdout + result.stderr);
-  assert.match(result.stderr, /Ran \d+ tests/);
-});
 
 test("camera installs optional hooks before playback and closes them before teardown", () => {
   const source = fs.readFileSync(path.resolve(process.cwd(), "camera.py"), "utf8");
