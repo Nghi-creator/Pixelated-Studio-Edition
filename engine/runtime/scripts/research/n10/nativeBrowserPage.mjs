@@ -1,3 +1,4 @@
+import { rawObservationPageScript } from "./rawObservationPage.mjs";
 /** Fresh owned receiver page; imports actual app observation and error handlers. */
 export function markFirstPresentation(scope, item, mark) {
   // A frame callback can observe connected state before its queued state event.
@@ -5,7 +6,7 @@ export function markFirstPresentation(scope, item, mark) {
   mark(scope, "first_presented", { presented: item.presentedFrames, pts_ms: item.mediaTime * 1000 });
 }
 
-export function nativeBrowserHtml(token) {
+export function nativeBrowserHtml(token, rawObservation = false) {
   return `<!doctype html><video id="video" autoplay muted playsinline></video>
 <script src="/socket.io/socket.io.js"></script><script type="module">
 import {startReceiverObservation,offerDigest} from '/collector.js';
@@ -55,5 +56,6 @@ window.stopControlTrace=()=>{if(!stopContinuity)throw Error('trace not started')
 window.stopObservations=()=>{if(active)active.stop();return video.getVideoPlaybackQuality().totalVideoFrames;};
 window.videoFrames=()=>video.getVideoPlaybackQuality().totalVideoFrames;
 window.cleanup=()=>{stop();socket.disconnect();};
+${rawObservation ? rawObservationPageScript().replace("RAW_TOKEN", JSON.stringify(token)) : ""}
 </script>`;
 }

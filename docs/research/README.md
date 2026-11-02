@@ -17,3 +17,6 @@ Runtime modules are indexed in the [research layout](../../engine/runtime/resear
 and tests in the [Python test inventory](../../engine/runtime/tests/python/README.md).
 Moving guides does not change their evidence limits, acceptance requirements or
 control defaults.
+
+The [N11 contained raw-observation collector](n11/n11-raw-observation.md) records
+read-only engineering samples through the existing camera/native fixture.

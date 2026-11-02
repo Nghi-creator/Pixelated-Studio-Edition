@@ -13,8 +13,10 @@ const { createLobbyManager } = require("../../../dist/src/signaling/lobby/lobby.
 const { registerSignalingRelayHandlers, createSignalingPeerRegistry } = require("../../../dist/src/signaling/signalingRelay.js");
 const { registerEngineErrorHandlers } = require("../../../dist/src/signaling/engineErrorHandlers.js");
 const { joinSession } = require("../../../dist/src/signaling/sessionRooms.js");
-const files = new Map(["index.html", "collector.js", "engine-errors.js", "local-ice.js", "quality.js", "continuity.js"].map((name) => ["/" + name, fs.readFileSync("/acceptance/" + name)]));
+const files = new Map(["index.html", "collector.js", "engine-errors.js", "local-ice.js", "quality.js", "continuity.js", ...(process.env.N10_BROWSER_ACCEPTANCE_MODE === "n11-raw-observation" ? ["raw-stats.js", "raw-stream.js", "raw-artifact.js"] : [])].map((name) => ["/" + name, fs.readFileSync("/acceptance/" + name)]));
+let rawTelemetry;
 const server = http.createServer((req, res) => {
+  if (rawTelemetry?.handle(req, res)) return;
   const pathname = new URL(req.url, "http://localhost").pathname;
   const name = pathname === "/" ? "/index.html" : pathname;
   const body = files.get(name);
@@ -45,6 +47,13 @@ server.listen(8080, "0.0.0.0", () => {
   const deathDirectory = wholeCamera ? fs.mkdtempSync("/tmp/n10-camera-death-") : null;
   if (deathDirectory) fs.chmodSync(deathDirectory, 0o700);
   const camera = spawn("python3", ["-u", "/opt/repo/engine/runtime/scripts/research/n10/native_browser_acceptance.py", "--isolated-browser-acceptance"], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, ...(wholeCamera ? {N10_CAMERA_DEATH_DIRECTORY: deathDirectory} : {}) } });
+  if (process.env.N10_BROWSER_ACCEPTANCE_MODE === "n11-raw-observation") {
+    const {createRawObservationTelemetry} = require("./rawObservationTelemetry.cjs");
+    const {createResearchTelemetrySnapshot} = require("../../../dist/src/telemetry/researchTelemetrySnapshot.js");
+    const {readLinuxProcessCounters} = require("../../../dist/src/telemetry/linuxProcessCounters.js");
+    rawTelemetry = createRawObservationTelemetry({token:process.env.PIXELATED_ENGINE_TOKEN,
+      camera, createSnapshot:createResearchTelemetrySnapshot, readCounters:readLinuxProcessCounters});
+  }
   const death = wholeCamera ? cameraDeathMonitor(camera, deathDirectory, {spawn, forward: (line) => process.stdout.write(line + "\n")}) : null;
   const diagnosticTimer = setTimeout(() => {
     process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "relay_shutdown_diagnostic",
@@ -55,6 +64,16 @@ server.listen(8080, "0.0.0.0", () => {
   const lines = readline.createInterface({ input: camera.stdout });
   lines.on("line", (line) => {
     if (line.length > 65536) { camera.kill(); return; }
+    if (rawTelemetry && line.startsWith("N10_ACCEPTANCE ")) {
+      try {
+        const event = JSON.parse(line.slice(15));
+        if (event.kind === "n11_raw_identity") {
+          rawTelemetry.initialize(event);
+          process.stdout.write('N10_ACCEPTANCE {"kind":"n11_raw_ready"}\n');
+          return;
+        }
+      } catch { rawTelemetry.stop(); camera.kill(); return; }
+    }
     process.stdout.write(line + "\n");
     // Only the directly owned CLI host can inject this diagnostic event.
     // There is deliberately no socket handler accepting an injection request.
@@ -68,6 +87,7 @@ server.listen(8080, "0.0.0.0", () => {
     }
   });
   camera.on("exit", (code, signal) => {
+    rawTelemetry?.stop();
     process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "camera_process_exit", code, signal }) + "\n");
     process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "relay_shutdown", stage: "close_start" }) + "\n");
     (wholeCamera ? death.finish(code, signal) : Promise.resolve()).then(() => closeRelay()).then(() => {

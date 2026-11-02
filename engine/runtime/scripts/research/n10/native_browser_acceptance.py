@@ -29,8 +29,9 @@ def main():
     ACTION_COST_MODES = {**MODES, **MODES_V2, **MODES_V3}
 
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
+    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
         raise ValueError("closed acceptance mode required")
+    raw_mode = mode == "n11-raw-observation"
     fault_cost = mode in FAULT_COST_MODES
     game_failure = mode in GAME_FAILURE_MODES or fault_cost
     cost_mode = mode in ACTION_COST_MODES
@@ -39,7 +40,7 @@ def main():
     moving_mode = mode in ("observer-moving-off", "observer-moving-on")
     observer_off = mode in ("observer-off", "observer-moving-off")
     diagnostic_mode = mode == "observer-static-diagnostic"
-    screen_mode = mode in ("observer-off", "observer-on") or diagnostic_mode or moving_mode or control_mode
+    screen_mode = raw_mode or mode in ("observer-off", "observer-on") or diagnostic_mode or moving_mode or control_mode
     import gi
     import socketio
     from observer_native_screen import NativeScreen
@@ -148,16 +149,47 @@ def main():
                 if service is None or (bridge is None and not observer_off):
                     return True
                 if state["phase"] == "startup":
-                    if not observer_off:
+                    if not observer_off and not raw_mode:
                         state["local"] = cleanup.enter_context(LocalProbeOwner(service, ledger, policy, enabled=True))
                         state["capability"] = state["local"].claim()
-                    state["phase"] = "game-failure" if game_failure else ("control-screen" if control_mode else ("observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission")))
+                    state["phase"] = "raw-warmup" if raw_mode else "game-failure" if game_failure else ("control-screen" if control_mode else ("observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission")))
                     if mode in MODES_V3 or fault_cost:
                         from container_cost import ContainerCost
                         state["container_cost"] = ContainerCost(emit)
                     emit("camera_ready", mode=mode, source=service.source, profile=service.profile,
                          fixture_randomness={"method": "fixed_perl_srand_v1", "seed": FIXTURE_SEED})
                 local, capability = state.get("local"), state.get("capability")
+                if state["phase"] == "raw-warmup":
+                    slot = service.active.get("first")
+                    if slot is None or slot.owner is None or not slot.owner.last_snapshot:
+                        return True
+                    body = slot.owner.last_snapshot
+                    if len(service.active) != 1 or body["connection_state"] != "connected" or not body["encoded_buffers"]:
+                        return True
+                    state["raw_token"] = slot.token
+                    state["raw_start"] = time.monotonic()
+                    state["phase"] = "raw-measuring"
+                    emit("n11_raw_identity", game_pid=scene.game.pid,
+                         telemetry_path=os.environ["PIXELATED_CAMERA_TELEMETRY_STATE_PATH"])
+                if state["phase"] == "raw-measuring":
+                    slot = service.active.get("first")
+                    if len(service.active) != 1 or slot is None or slot.token != state["raw_token"] or slot.failure or scene.game.poll() is not None:
+                        raise ValueError("raw observation source lifetime changed")
+                    if time.monotonic() - state["raw_start"] > 13:
+                        raise ValueError("raw observation deadline")
+                    marker = Path("/acceptance/n11-complete.json")
+                    if not marker.is_file():
+                        return True
+                    if marker.stat().st_size > 128 or marker.read_text() != '{"complete":true}':
+                        raise ValueError("invalid raw completion marker")
+                    if (Path(ledger) / "journal.json").exists():
+                        raise ValueError("raw observation created action journal")
+                    emit("n11_raw_complete", action_journal_created=False)
+                    state["slots"] = [slot]
+                    state["phase"] = "disconnected"
+                    state["disconnect_thread"] = threading.Thread(target=captured["client"].disconnect, daemon=True)
+                    state["disconnect_thread"].start()
+                    return True
                 if state["phase"] == "game-failure":
                     if "game_failure" not in state:
                         from game_failure_acceptance import GameFailureAcceptance
