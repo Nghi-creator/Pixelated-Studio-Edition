@@ -26,7 +26,7 @@ export async function sourceReceipt() {
   for (const [name,file] of files.sort(([a],[b])=>a.localeCompare(b))) receipt[name]=sha(await fs.readFile(file));
   return receipt;
 }
-async function freezeSourceFiles(directory, sources) {
+export async function freezeSourceFiles(directory, sources) {
   const web=path.resolve(runtime,'../../apps/web/src');
   for(const [name,expected] of Object.entries(sources)) {
     const source=name.startsWith('web/src/') ? path.join(web,name.slice(8)) : path.join(runtime,name);

@@ -21,8 +21,12 @@ const ts = require("typescript");
 const { faultMode } = require("./nativeFaultModes.cjs");
 const runtime = fileURLToPath(new URL("../../../", import.meta.url));
 
-export async function runNativeBrowserAcceptance(image, mode = "production-admission") {
+export async function runNativeBrowserAcceptance(image, mode = "production-admission", options = {}) {
   if (!/^sha256:[a-f0-9]{64}$/.test(image || "")) throw new Error("explicit cached image digest required");
+  const pairedMode=mode==='engineering-n11-paired-observation';
+  if(pairedMode&&!/^n11-raw-[a-z0-9-]{1,40}$/.test(options.comparisonCaseId||''))throw Error('explicit paired case required');
+  let pairedObservation=null;
+  const primedPhases=[];
   const rawMode = mode === "n11-raw-observation";
   let rawObservation = null;
   const selectedFault = faultMode(mode);
@@ -40,13 +44,13 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const costMode = costVersion === "v2" ? mode.slice(0, -3) : mode;
   const costMethod = `n10-contained-game-action-cost-acquisition-${costVersion}`;
   const costCondition = spanCondition || (costMode === "engineering-game-unchanged-cost" ? "unchanged" : costMode === "engineering-game-action-cost" ? "action" : null);
-  if (!["n11-raw-observation", "production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"].includes(mode) && !gameFailure && !costCondition) throw new Error("invalid acceptance mode");
+  if (!["engineering-n11-paired-observation", "n11-raw-observation", "production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"].includes(mode) && !gameFailure && !costCondition) throw new Error("invalid acceptance mode");
   const gameControl = mode === "engineering-game-disturbance";
   const controlMode = ["engineering-disturbance", "engineering-game-disturbance"].includes(mode) || Boolean(costCondition);
   const movingMode = ["observer-moving-off", "observer-moving-on"].includes(mode);
   const observerOff = ["observer-off", "observer-moving-off"].includes(mode);
   const diagnosticMode = mode === "observer-static-diagnostic";
-  const screenMode = rawMode || mode.startsWith("observer-") || controlMode;
+  const screenMode = pairedMode || rawMode || mode.startsWith("observer-") || controlMode;
   const docker = process.platform === "darwin" ? "/Applications/Docker.app/Contents/Resources/bin/docker" : "docker";
   const name = `n10-browser-native-${process.pid}-${Date.now()}`;
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), "n10-browser-native-"));
@@ -78,8 +82,8 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       hash.update(await fs.readFile(new URL(`../../../../../apps/web/src/lib/webrtc/${relative}`, import.meta.url)));
     }
     softwareHash = hash.digest("hex");
-    await fs.writeFile(path.join(directory, "index.html"), nativeBrowserHtml(token, rawMode));
-    if (rawMode) await stageRawObservationAssets(runtime, directory, ts);
+    await fs.writeFile(path.join(directory, "index.html"), nativeBrowserHtml(token, rawMode, pairedMode));
+    if (rawMode || pairedMode) await stageRawObservationAssets(runtime, directory, ts);
     for (const [name, relative] of [["collector.js", "telemetry/receiverObservation.ts"], ["engine-errors.js", "transport/webrtcEngineErrors.ts"], ["local-ice.js", "transport/localIceQueue.ts"]]) {
       const source = await fs.readFile(new URL(`../../../../../apps/web/src/lib/webrtc/${relative}`, import.meta.url), "utf8");
       await fs.writeFile(path.join(directory, name), ts.transpileModule(source, {
@@ -138,7 +142,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     browser = await chromium.launch({ headless: true, args: ["--disable-features=WebRtcHideLocalIpsWithMdns"] });
     const context = await browser.newContext();
     await context.route("**/*", (route) => new URL(route.request().url()).origin === url ? route.continue() : route.abort());
-    const first = await context.newPage(); const second = rawMode ? null : await context.newPage();
+    const first = await context.newPage(); const second = rawMode || pairedMode ? null : await context.newPage();
     pages.push(first, ...(second ? [second] : []));
     const pageErrors = [];
     for (const page of pages) page.on("pageerror", (error) => pageErrors.push(error.message));
@@ -172,12 +176,28 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
         let stopped = false;
         let measured = false;
         await deadline(async () => {
+          if(pairedMode){
+            const target=events.filter(e=>e.kind==='n11_pair_target')[primedPhases.length];
+            if(target){
+              await first.evaluate(args=>globalThis.primePairedPhase(args),{phase:target.phase,comparisonCaseId:options.comparisonCaseId});
+              primedPhases.push(target.phase);
+              await fs.writeFile(path.join(directory,'n11-prime-'+target.phase+'.json'),'{"complete":true}',{flag:'wx',mode:0o644});
+            }
+            const completed=pairedObservation?.phases?.length||0;
+            const phase=events.filter(e=>e.kind==='n11_pair_phase_started')[completed];
+            if(phase){
+              const raw=await first.evaluate(phase=>globalThis.collectPairedPhase(phase),phase.phase);
+              pairedObservation=await first.evaluate(()=>globalThis.pairedObservationPrefix);
+              if(raw.failure)throw Error('whole paired browser collection failed');
+              await fs.writeFile(path.join(directory,'n11-phase-'+phase.phase+'.json'),'{"complete":true}',{flag:'wx',mode:0o644});
+            }
+          }
           if (rawMode && !rawObservation && events.some(event => event.kind === "n11_raw_ready")) {
             await first.waitForFunction(() => globalThis.snapshot().state === "connected" && globalThis.videoFrames() > 0, undefined, {timeout:4000});
             rawObservation = await first.evaluate(() => globalThis.collectRawObservation());
             await fs.writeFile(path.join(directory,"n11-complete.json"), '{"complete":true}', {flag:"wx",mode:0o644});
           }
-          if (screenMode && !rawMode && !measured && events.some((event) => event.kind === "screen_started")) {
+          if (screenMode && !rawMode && !pairedMode && !measured && events.some((event) => event.kind === "screen_started")) {
             measured = true;
             await measurePages();
           }
@@ -221,7 +241,12 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     const snapshots = await Promise.all(pages.map((page) => page.evaluate(() => globalThis.snapshot())));
     assert.deepEqual(pageErrors, []);
     for (const snapshot of snapshots) assert.equal(snapshot.problem, null);
-    if (rawMode) {
+    if(pairedMode){
+      assert.deepEqual(pairedObservation?.phases.map(p=>p.phase),['degraded','relief','recovery']);
+      assert.ok(pairedObservation.phases.every(p=>p.browser_samples.length===4&&!p.failure));
+      assert.ok(events.some(e=>e.kind==='n11_pair_result'&&e.result.outcome==='completed'&&e.result.restoration==='verified_by_port'&&e.ledger_state==='clean'));
+      assert.ok(snapshots.every(s=>s.failures.length===0&&s.bindings.length===1&&s.unbound===1));
+    } else if (rawMode) {
       assert.ok(rawObservation && rawObservation.browser_samples.length === 8 && !rawObservation.failure);
       assert.ok(snapshots.every(snapshot => snapshot.failures.length === 0 && snapshot.bindings.length === 1 && snapshot.unbound === 1));
       assert.ok(events.some(event => event.kind === "n11_raw_complete" && event.action_journal_created === false));
@@ -260,7 +285,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if (processFailure) throw processFailure;
     const exitCode = await exited;
     assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
-    acquisition = { status: "passed", mode, live_authority: false, ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult } : {}), context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
+    acquisition = { status: "passed", mode, live_authority: false, ...(pairedMode?{method:"n11-contained-paired-observation-v1",role:"engineering_no_fault_no_label",paired_observation:pairedObservation}:{}), ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult } : {}), context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
       ...(gameFailure ? {role: interruption ? interruption.role : faultCost ? "contained_game_fault_cost_not_qualification" : "contained_game_failure_not_qualification", method: interruption ? interruption.method : faultCost ? "n10-contained-game-fault-cost-v1" : "n10-contained-game-failure-v1", case: gameFailure, sibling_quality: siblingQuality} : {}),
       ...(controlMode ? {role: costCondition ? "contained_game_action_cost_not_qualification" : gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: costCondition ? costMethod : gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", ...(costCondition ? {condition: costCondition} : {}), control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
@@ -268,10 +293,13 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound, bindings: snapshot.bindings.length })) };
     return acquisition;
   } catch (error) {
+    if(pairedMode&&pages[0]){
+      try{pairedObservation=await pages[0].evaluate(()=>globalThis.pairedObservationPrefix||null);}catch{/* Retain the last host checkpoint on browser loss. */}
+    }
     if (rawMode && !rawObservation && pages[0]) {
       try { rawObservation = await pages[0].evaluate(() => globalThis.rawObservationPrefix || null); } catch { /* Browser loss leaves the existing prefix unavailable. */ }
     }
-    if ((spanCondition || faultCost) && child) {
+    if ((spanCondition || faultCost || pairedMode) && child) {
       // Retain the native cleanup-tail checkpoint before removing the owned container.
       let cleanupTimer;
       try { await Promise.race([reading, new Promise((resolve) => { cleanupTimer = setTimeout(resolve, 4000); })]); }
@@ -280,7 +308,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if (costSpan) costSpanResult = await costSpan.finish("failed_prefix");
     const diagnostics = await Promise.allSettled(pages.map((page) => page.evaluate(() => globalThis.snapshot?.())));
     failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logTail}`, { cause: error });
-    acquisition = failure.acquisition = { status: "failed", mode, live_authority: false, ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), events, diagnostics, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult || null, browser: browser?.version() || null } : {}), ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
+    acquisition = failure.acquisition = { status: "failed", mode, live_authority: false, ...(pairedMode?{method:"n11-contained-paired-observation-v1",role:"engineering_no_fault_no_label",paired_observation:pairedObservation}:{}), ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), events, diagnostics, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult || null, browser: browser?.version() || null } : {}), ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
       context: { image, software_hash: softwareHash || null, host_platform: process.platform, host_arch: process.arch } };
     throw failure;
   } finally {

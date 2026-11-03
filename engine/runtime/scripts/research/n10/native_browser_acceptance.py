@@ -29,18 +29,19 @@ def main():
     ACTION_COST_MODES = {**MODES, **MODES_V2, **MODES_V3}
 
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
+    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", "engineering-n11-paired-observation", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
         raise ValueError("closed acceptance mode required")
+    paired_mode = mode == "engineering-n11-paired-observation"
     raw_mode = mode == "n11-raw-observation"
     fault_cost = mode in FAULT_COST_MODES
     game_failure = mode in GAME_FAILURE_MODES or fault_cost
     cost_mode = mode in ACTION_COST_MODES
-    game_control = mode == "engineering-game-disturbance" or game_failure or cost_mode
-    control_mode = mode in ("engineering-disturbance", "engineering-game-disturbance") or cost_mode
+    game_control = paired_mode or mode == "engineering-game-disturbance" or game_failure or cost_mode
+    control_mode = paired_mode or mode in ("engineering-disturbance", "engineering-game-disturbance") or cost_mode
     moving_mode = mode in ("observer-moving-off", "observer-moving-on")
     observer_off = mode in ("observer-off", "observer-moving-off")
     diagnostic_mode = mode == "observer-static-diagnostic"
-    screen_mode = raw_mode or mode in ("observer-off", "observer-on") or diagnostic_mode or moving_mode or control_mode
+    screen_mode = paired_mode or raw_mode or mode in ("observer-off", "observer-on") or diagnostic_mode or moving_mode or control_mode
     import gi
     import socketio
     from observer_native_screen import NativeScreen
@@ -152,13 +153,29 @@ def main():
                     if not observer_off and not raw_mode:
                         state["local"] = cleanup.enter_context(LocalProbeOwner(service, ledger, policy, enabled=True))
                         state["capability"] = state["local"].claim()
-                    state["phase"] = "raw-warmup" if raw_mode else "game-failure" if game_failure else ("control-screen" if control_mode else ("observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission")))
+                    state["phase"] = "paired" if paired_mode else "raw-warmup" if raw_mode else "game-failure" if game_failure else ("control-screen" if control_mode else ("observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission")))
                     if mode in MODES_V3 or fault_cost:
                         from container_cost import ContainerCost
                         state["container_cost"] = ContainerCost(emit)
                     emit("camera_ready", mode=mode, source=service.source, profile=service.profile,
                          fixture_randomness={"method": "fixed_perl_srand_v1", "seed": FIXTURE_SEED})
                 local, capability = state.get("local"), state.get("capability")
+                if state["phase"] == "paired":
+                    if "paired" not in state:
+                        slot = service.active.get("first")
+                        if slot is None or slot.owner is None or not slot.owner.last_observation:
+                            return True
+                        from paired_observation import PairedObservation
+                        state["paired"] = PairedObservation(service, scene, bridge, local, capability, emit)
+                        emit("n11_raw_identity", game_pid=scene.game.pid,
+                             telemetry_path=os.environ["PIXELATED_CAMERA_TELEMETRY_STATE_PATH"])
+                    if not state["paired"].tick():
+                        return True
+                    state["slots"] = list(service.active.values())
+                    state["phase"] = "disconnected"
+                    state["disconnect_thread"] = threading.Thread(target=captured["client"].disconnect, daemon=True)
+                    state["disconnect_thread"].start()
+                    return True
                 if state["phase"] == "raw-warmup":
                     slot = service.active.get("first")
                     if slot is None or slot.owner is None or not slot.owner.last_snapshot:
@@ -444,6 +461,12 @@ def main():
                 runpy.run_path(str(RUNTIME / "camera.py"), run_name="__main__")
                 emit("host_shutdown", stage="camera_loop_returned")
         finally:
+            if state.get("paired"):
+                try:
+                    state["paired"].checkpoint()
+                except Exception as exc:
+                    emit("n11_pair_journal", state="unavailable", reason=type(exc).__name__)
+                    state["failure"] = state["failure"] or "paired journal checkpoint unavailable"
             if state.get("disconnect_thread"):
                 state["disconnect_thread"].join(timeout=3)
                 if state["disconnect_thread"].is_alive():

@@ -160,7 +160,8 @@ this short acquisition format separate from the read-only baseline partition.
 Every phase declaration hashes its original acquisition JSON; no old real capture
 should be retrofitted. An exported recovery phase does not generate a controller
 result, verified restoration, fault/healthy label or accepted diagnostic group.
-There is no paired native execution command yet.
+The separately opt-in [paired native collector](n11-paired-observation.md) supplies
+engineering control integration; it does not inject or label a fault.
 
 Artificial fixtures and negative checks:
 
