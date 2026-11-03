@@ -1,6 +1,7 @@
 """Scope pins never grant production control or select a game as a kill target."""
 
 import sys
+import threading
 import unittest
 from dataclasses import asdict
 from types import SimpleNamespace
@@ -87,6 +88,67 @@ class CapturePinsTests(unittest.TestCase):
         self.socket.return_value = (2, 99)
         self.assertFalse(lease.healthy(force=True))
         lease.close()
+
+    def test_concurrent_health_reads_cannot_reverse_an_ordered_clock(self):
+        lease = self.pin()
+        older_entered, release, newer_entered = (threading.Event() for _ in range(3))
+        results = {}
+        def clock():
+            if threading.current_thread().name == "older":
+                older_entered.set()
+                if not release.wait(2):
+                    raise RuntimeError("test clock release missing")
+                return self.now + 100
+            newer_entered.set()
+            return self.now + 200
+        lease.clock = clock
+        older = threading.Thread(name="older", target=lambda: results.update(older=lease.healthy()))
+        newer = threading.Thread(name="newer", target=lambda: results.update(newer=lease.healthy()))
+        older.start()
+        try:
+            self.assertTrue(older_entered.wait(2))
+            newer.start()
+            self.assertFalse(newer_entered.wait(0.05))
+        finally:
+            release.set()
+            older.join(2)
+            if newer.ident is not None:
+                newer.join(2)
+        self.assertFalse(older.is_alive() or newer.is_alive())
+        self.assertEqual(results, {"older": True, "newer": True})
+        self.assertEqual(lease.last_seen, self.now + 200)
+        lease.close()
+
+    def test_close_waits_for_inflight_health_read_before_closing_descriptors(self):
+        lease = self.pin()
+        entered, release, closed = (threading.Event() for _ in range(3))
+        results = {}
+        def clock():
+            entered.set()
+            if not release.wait(2):
+                raise RuntimeError("test clock release missing")
+            return self.now + 100
+        lease.clock = clock
+        reader = threading.Thread(target=lambda: results.update(healthy=lease.healthy()))
+        def close():
+            lease.close()
+            closed.set()
+        closer = threading.Thread(target=close)
+        reader.start()
+        try:
+            self.assertTrue(entered.wait(2))
+            closer.start()
+            self.assertFalse(closed.wait(0.05))
+            self.closed.assert_not_called()
+        finally:
+            release.set()
+            reader.join(2)
+            if closer.ident is not None:
+                closer.join(2)
+        self.assertFalse(reader.is_alive() or closer.is_alive())
+        self.assertEqual(results, {"healthy": True})
+        self.assertFalse(lease.healthy())
+        self.assertEqual(len(self.closed.call_args_list), 3)
 
 
 class CaptureBoundaryTests(unittest.TestCase):

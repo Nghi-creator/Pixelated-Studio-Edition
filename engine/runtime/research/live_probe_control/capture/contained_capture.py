@@ -5,6 +5,7 @@ import select
 import stat
 import subprocess
 import sys
+import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -83,6 +84,7 @@ class PinnedGameCapture:
         if sys.platform != "linux" or not hasattr(os, "pidfd_open"):
             raise ValueError("capture lifetime pins require Linux pidfds")
         self.context, self.clock = context, clock
+        self.lock = threading.Lock()
         self.fds, self.valid, self.next_check = [], True, 0
         self.last_seen = None
         self.poller = select.poll()
@@ -105,30 +107,32 @@ class PinnedGameCapture:
             raise
 
     def healthy(self, *, force=False):
-        if not self.valid or not self.fds:
-            return False
-        if self.poller.poll(0):
-            self.valid = False
-            return False
-        now = self.clock()
-        if type(now) is not int or now < 0 or (self.last_seen is not None and now < self.last_seen):
-            self.valid = False
-            return False
-        self.last_seen = now
-        if force or now >= self.next_check:
-            # Four periodic filesystem checks/s; bootstrap and setters force a read.
-            self.next_check = now + 250000000
-            try:
-                self.valid = socket_identity() == (self.context.socket_device, self.context.socket_inode)
-            except (OSError, ValueError):
+        with self.lock:
+            if not self.valid or not self.fds:
+                return False
+            if self.poller.poll(0):
                 self.valid = False
-        return self.valid
+                return False
+            now = self.clock()
+            if type(now) is not int or now < 0 or (self.last_seen is not None and now < self.last_seen):
+                self.valid = False
+                return False
+            self.last_seen = now
+            if force or now >= self.next_check:
+                # Four periodic filesystem checks/s; bootstrap and setters force a read.
+                self.next_check = now + 250000000
+                try:
+                    self.valid = socket_identity() == (self.context.socket_device, self.context.socket_inode)
+                except (OSError, ValueError):
+                    self.valid = False
+            return self.valid
 
     def close(self):
-        self.valid = False
-        for fd in self.fds:
-            os.close(fd)
-        self.fds.clear()
+        with self.lock:
+            self.valid = False
+            for fd in self.fds:
+                os.close(fd)
+            self.fds.clear()
 
     def __enter__(self):
         return self

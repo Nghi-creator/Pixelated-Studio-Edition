@@ -45,6 +45,10 @@ pin and checks the socket before putting capture into READY. These descriptors
 observe liveness only. The watchdog still targets the exact dedicated media
 worker; it never signals the game, display or camera host.
 
+Concurrent health readers and teardown serialize on the same capture lease. Clock
+ordering, sticky invalidation and descriptor access are checked within that lock;
+a true reversed clock or lost source still invalidates the lease permanently.
+
 The control thread checks pidfd liveness with nonblocking polls and periodically
 checks socket identity at most four times per second, with additional fresh
 checks at bootstrap and setters. No per-frame Python/filesystem callback is
