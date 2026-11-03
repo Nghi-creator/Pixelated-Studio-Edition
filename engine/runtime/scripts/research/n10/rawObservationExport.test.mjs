@@ -54,3 +54,17 @@ test('missing engine source remains unavailable and failed capture is never expo
   acquisition.raw_observation.engine_snapshots=source().raw_observation.engine_snapshots.reverse();
   await assert.rejects(exportRawObservation(runtime,acquisition,plan),/sequence/);
 });
+
+test('source-local export is opt-in and binds the original phase/evidence bytes',async()=>{
+  const {createHash}=await import('node:crypto');
+  const acquisition=source();
+  const ordinary=await exportRawObservation(runtime,acquisition,plan);
+  assert.equal(JSON.parse(members(ordinary.archive)['bundle-manifest.json']).sourceLocalPhase,undefined);
+  assert.equal(ordinary.context.versions.pixelatedTemporalContract,undefined);
+  const result=await exportRawObservation(runtime,acquisition,{...plan,temporal_contract:'source_local_stable_phase_v1'});
+  const declaration=JSON.parse(members(result.archive)['bundle-manifest.json']).sourceLocalPhase;
+  assert.deepEqual(declaration,{schemaVersion:'source-local-stable-phase-v1',basis:'operator_declared_not_authenticated',
+    phase:'healthy',comparisonCaseId:plan.acquisition_id,elapsedStartMs:0,elapsedEndMs:7000,
+    evidenceSha256:'sha256:'+createHash('sha256').update(JSON.stringify(acquisition,null,2)+'\n').digest('hex')});
+  assert.equal(result.context.versions.pixelatedTemporalContract,'source_local_stable_phase_v1');
+});

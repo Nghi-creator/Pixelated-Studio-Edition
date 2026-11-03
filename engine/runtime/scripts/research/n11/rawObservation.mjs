@@ -46,14 +46,15 @@ function argumentsMap(args, allowed) {
   if(Object.keys(result).length!==allowed.length)throw Error('explicit raw arguments required');
   return result;
 }
-export async function prepareRawPlan(args) {
+export async function prepareRawPlan(args, {sourceLocal=false} = {}) {
   const opts=argumentsMap(args,['--image','--acquisition-id','--core-revision','--output']);
   if(!/^sha256:[a-f0-9]{64}$/.test(opts['--image'])||!/^n11-raw-[a-z0-9-]{1,40}$/.test(opts['--acquisition-id'])||!/^[a-f0-9]{40}$/.test(opts['--core-revision'])) throw Error('invalid raw plan');
   const sources=await sourceReceipt();
-  const plan={schema_version:'n11-contained-raw-plan-v1',acquisition_id:opts['--acquisition-id'],image:opts['--image'],
+  const plan={schema_version:sourceLocal?'n11-contained-source-local-plan-v1':'n11-contained-raw-plan-v1',acquisition_id:opts['--acquisition-id'],image:opts['--image'],
     core_revision:opts['--core-revision'],producer_revision:execFileSync('git',['rev-parse','HEAD'],{cwd:runtime,encoding:'utf8'}).trim(),
     source_sha256:sources,source_manifest_hash:'sha256:'+sha(json(sources)),mode:'n11-raw-observation',
     observations:1,browser_samples:8,interval_ms:1000,retry_allowed:false,labels:'unavailable',scope:'engineering_no_action_no_pair_no_empirical_acceptance'};
+  if(sourceLocal)plan.temporal_contract='source_local_stable_phase_v1';
   await fs.writeFile(opts['--output'],json(plan),{flag:'wx',mode:0o600});return plan;
 }
 export async function acquireRawPlan(args) {
@@ -61,9 +62,11 @@ export async function acquireRawPlan(args) {
   const bytes=await fs.readFile(opts['--plan']);if(bytes.length>1024*1024)throw Error('raw plan budget');
   const plan=JSON.parse(bytes);if(bytes.toString()!==json(plan))throw Error('canonical raw plan required');
   const sources=await sourceReceipt();
-  const expected={schema_version:'n11-contained-raw-plan-v1',acquisition_id:plan.acquisition_id,image:plan.image,
+  const sourceLocal=plan.schema_version==='n11-contained-source-local-plan-v1';
+  const expected={schema_version:sourceLocal?'n11-contained-source-local-plan-v1':'n11-contained-raw-plan-v1',acquisition_id:plan.acquisition_id,image:plan.image,
     core_revision:plan.core_revision,producer_revision:plan.producer_revision,source_sha256:sources,source_manifest_hash:'sha256:'+sha(json(sources)),
     mode:'n11-raw-observation',observations:1,browser_samples:8,interval_ms:1000,retry_allowed:false,labels:'unavailable',scope:'engineering_no_action_no_pair_no_empirical_acceptance'};
+  if(sourceLocal)expected.temporal_contract='source_local_stable_phase_v1';
   if(json(plan)!==json(expected)||!/^sha256:[a-f0-9]{64}$/.test(plan.image)||!/^n11-raw-[a-z0-9-]{1,40}$/.test(plan.acquisition_id)||!/^[a-f0-9]{40}$/.test(plan.producer_revision)||!/^[a-f0-9]{40}$/.test(plan.core_revision))throw Error('raw source/plan mismatch');
   const directory=path.resolve(opts['--output-directory']);
   await fs.mkdir(directory,{mode:0o700}); // Exclusive allocation; never delete a failed cohort.
@@ -88,8 +91,9 @@ export async function acquireRawPlan(args) {
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   try {
-    if(process.argv[2]==='prepare')await prepareRawPlan(process.argv.slice(3));
+    if(process.argv[2]==='prepare-source-local')await prepareRawPlan(process.argv.slice(3),{sourceLocal:true});
+    else if(process.argv[2]==='prepare')await prepareRawPlan(process.argv.slice(3));
     else if(process.argv[2]==='acquire')await acquireRawPlan(process.argv.slice(3));
-    else throw Error('use prepare or acquire');
+    else throw Error('use prepare, prepare-source-local or acquire');
   } catch {console.error('error: contained raw observation failed; retain any allocated evidence directory');process.exitCode=1;}
 }

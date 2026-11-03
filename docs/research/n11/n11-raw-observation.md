@@ -107,3 +107,28 @@ Relevant Linux native ownership/media tests and the existing two-viewer observer
 mode must also pass when modifying collection or cleanup. Keep native receipts
 private; they describe their exact source/image rather than granting production
 qualification.
+
+## Explicit source-local phase export
+
+To prepare the separately approved source-local temporal contract, substitute
+`prepare-source-local` for `prepare`. The arguments and one-shot execution procedure
+are the same. It emits `n11-contained-source-local-plan-v1` with
+`temporal_contract = source_local_stable_phase_v1`; normal `prepare` retains its
+common-window plan and outputs.
+
+The new export records an operator-declared `sourceLocalPhase` in the raw manifest,
+exact full-phase bounds and the SHA-256 of the retained original acquisition JSON.
+Its context declares `versions.pixelatedTemporalContract`. This binds the unchanged
+observations to phase evidence without authenticating cause truth. Sampling,
+process identities, original UTC timestamps and cleanup behavior remain unchanged.
+Retain the original acquisition bytes and all source/plan receipts.
+
+Use core `ingest-pixelated-source-local --bundle ... --context ... --phase baseline
+--comparison-case-id ... --output ...` to rebuild each source on its own actual
+recorded span under method 1.2.0. All metrics of one source share that span, including
+missing values. Missing/one-point sources stay missing. The root phase, declaration
+and each positive source span must satisfy the explicit bounds/duration contract.
+Source-local completeness describes a stable phase; it does not establish identical
+cross-channel intervals, source-clock synchronization or passive timing authority.
+Core's existing N9 path rejects this method. Paired intervention/labels and final
+study targets remain separate requirements.
