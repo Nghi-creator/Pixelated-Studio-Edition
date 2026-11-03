@@ -1,8 +1,8 @@
 /** Structural evidence checks only; no authentication, cause label or acceptance. */
-export function inspectPairedAcquisition(run){
+export function inspectPairedAcquisition(run,{method='n11-contained-paired-observation-v1',role='engineering_no_fault_no_label'}={}){
   const phases=['degraded','relief','recovery'],targets=[30,24,30],events=run?.events;
-  if(run?.status!=='passed'||run.method!=='n11-contained-paired-observation-v1'||run.live_authority!==false||
-    run.role!=='engineering_no_fault_no_label'||run.paired_observation?.failure!==null||!Array.isArray(events)||
+  if(run?.status!=='passed'||run.method!==method||run.live_authority!==false||
+    run.role!==role||run.paired_observation?.failure!==null||!Array.isArray(events)||
     JSON.stringify(run.paired_observation.phases?.map(p=>p.phase))!==JSON.stringify(phases))throw Error('incomplete paired acquisition');
   const only=kind=>{const found=events.filter(e=>e.kind===kind);if(found.length!==1)throw Error('unique '+kind+' required');return found[0];};
   const camera=only('camera_ready'),binding=only('control_capture_bound');

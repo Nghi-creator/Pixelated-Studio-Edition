@@ -47,6 +47,9 @@ class PairedObservation(GameControlDisturbance):
             operation_done=bool(self.operation and self.operation.done.is_set()),
             result=asdict(self.operation.result) if self.operation and self.operation.result else None)
 
+    def phase_boundary(self, kind, phase):
+        """Optional slow-path observer seam; default mode performs no extra work."""
+
     def tick(self):
         now = self.now()
         slots = self.slots(("first",))
@@ -90,6 +93,10 @@ class PairedObservation(GameControlDisturbance):
                 if self.marker("prime"):
                     self.stage = "settle"
             elif self.stage == "settle" and now-self.stage_start >= 500000000:
+                self.phase_boundary("before_start", self.phase)
+                now = self.now()
+                if self.phase == "relief" and now-self.dispatched_at > 1750000000:
+                    raise ValueError("paired relief start deadline after boundary observation")
                 self.stage, self.stage_start = "measure", now
                 self.native_sequence = None
                 self.emit("n11_pair_phase_started", phase=self.phase, at_ns=now-self.origin,
@@ -109,6 +116,7 @@ class PairedObservation(GameControlDisturbance):
                         raise ValueError("premature whole paired phase completion")
                     self.emit("n11_pair_phase_completed", phase=self.phase, at_ns=now-self.origin,
                               action_elapsed_ns=now-self.dispatched_at if self.phase == "relief" else None)
+                    self.phase_boundary("after_end", self.phase)
                     if self.phase == "degraded":
                         draft = self.local.prepare(self.capability, self.scopes["first"], "n11-paired-request", 24, DURATION_NS)
                         self.dispatched_at = self.now()

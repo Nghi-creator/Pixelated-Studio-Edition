@@ -105,3 +105,8 @@ Native ownership/media regressions and existing production-admission/two-viewer
 modes should be rechecked when changing the common acceptance harness. Preserve
 all source/image-bound receipts privately; this guide records reusable operation,
 not qualification of a particular run or source revision.
+
+A separate [persistent contention engineering screen](n11-contention-feasibility.md)
+adds explicitly planned owned CPU workers and native before/after references.
+Normal `prepare` keeps this guide's no-fault scope; only `prepare-contention`
+selects the new engineering contract. Neither path supplies an accepted label.

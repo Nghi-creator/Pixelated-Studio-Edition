@@ -13,7 +13,7 @@ const { createLobbyManager } = require("../../../dist/src/signaling/lobby/lobby.
 const { registerSignalingRelayHandlers, createSignalingPeerRegistry } = require("../../../dist/src/signaling/signalingRelay.js");
 const { registerEngineErrorHandlers } = require("../../../dist/src/signaling/engineErrorHandlers.js");
 const { joinSession } = require("../../../dist/src/signaling/sessionRooms.js");
-const files = new Map(["index.html", "collector.js", "engine-errors.js", "local-ice.js", "quality.js", "continuity.js", ...(["n11-raw-observation","engineering-n11-paired-observation"].includes(process.env.N10_BROWSER_ACCEPTANCE_MODE) ? ["raw-stats.js", "raw-stream.js", "raw-artifact.js"] : [])].map((name) => ["/" + name, fs.readFileSync("/acceptance/" + name)]));
+const files = new Map(["index.html", "collector.js", "engine-errors.js", "local-ice.js", "quality.js", "continuity.js", ...(["n11-raw-observation","engineering-n11-paired-observation","engineering-n11-contention-paired"].includes(process.env.N10_BROWSER_ACCEPTANCE_MODE) ? ["raw-stats.js", "raw-stream.js", "raw-artifact.js"] : [])].map((name) => ["/" + name, fs.readFileSync("/acceptance/" + name)]));
 let rawTelemetry;
 const server = http.createServer((req, res) => {
   if (rawTelemetry?.handle(req, res)) return;
@@ -47,7 +47,7 @@ server.listen(8080, "0.0.0.0", () => {
   const deathDirectory = wholeCamera ? fs.mkdtempSync("/tmp/n10-camera-death-") : null;
   if (deathDirectory) fs.chmodSync(deathDirectory, 0o700);
   const camera = spawn("python3", ["-u", "/opt/repo/engine/runtime/scripts/research/n10/native_browser_acceptance.py", "--isolated-browser-acceptance"], { stdio: ["ignore", "pipe", "inherit"], env: { ...process.env, ...(wholeCamera ? {N10_CAMERA_DEATH_DIRECTORY: deathDirectory} : {}) } });
-  if (["n11-raw-observation","engineering-n11-paired-observation"].includes(process.env.N10_BROWSER_ACCEPTANCE_MODE)) {
+  if (["n11-raw-observation","engineering-n11-paired-observation","engineering-n11-contention-paired"].includes(process.env.N10_BROWSER_ACCEPTANCE_MODE)) {
     const {createRawObservationTelemetry} = require("./rawObservationTelemetry.cjs");
     const {createResearchTelemetrySnapshot} = require("../../../dist/src/telemetry/researchTelemetrySnapshot.js");
     const {readLinuxProcessCounters} = require("../../../dist/src/telemetry/linuxProcessCounters.js");

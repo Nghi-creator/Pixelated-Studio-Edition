@@ -142,3 +142,14 @@ class PairedObservationTests(unittest.TestCase):
             self.marker(p, "phase"); p.tick()
             self.assertEqual(p.dispatched_at, 3100000000)
             self.assertEqual(self.time, 3300000000)
+
+    def test_slow_boundary_observer_cannot_extend_relief_start_deadline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            p = self.make(directory)
+            p.phase, p.stage, p.stage_start, p.dispatched_at = "relief", "settle", 1000000000, 0
+            self.body.update(configured_fps=24,negotiated_fps=24)
+            self.time = 1700000000
+            def observe(*_): self.time += 100000000
+            p.phase_boundary = observe
+            with self.assertRaisesRegex(ValueError, "after boundary"):
+                p.tick()
