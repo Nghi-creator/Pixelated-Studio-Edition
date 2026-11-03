@@ -29,10 +29,11 @@ def main():
     ACTION_COST_MODES = {**MODES, **MODES_V2, **MODES_V3}
 
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", "engineering-n11-paired-observation", "engineering-n11-contention-paired", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
+    if mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", "engineering-n11-paired-observation", "engineering-n11-contention-paired", "engineering-n11-pacing-paired", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
         raise ValueError("closed acceptance mode required")
+    pacing_mode = mode == "engineering-n11-pacing-paired"
     contention_mode = mode == "engineering-n11-contention-paired"
-    paired_mode = contention_mode or mode == "engineering-n11-paired-observation"
+    paired_mode = pacing_mode or contention_mode or mode == "engineering-n11-paired-observation"
     raw_mode = mode == "n11-raw-observation"
     fault_cost = mode in FAULT_COST_MODES
     game_failure = mode in GAME_FAILURE_MODES or fault_cost
@@ -139,6 +140,9 @@ def main():
             from game_thread_fault import peer_subprocess_proxy
             kind = "block" if mode == "engineering-game-controller-thread-block-cost" else "exit"
             cleanup.enter_context(patch("research.live_probe_control.peers.peer_supervisor.subprocess", peer_subprocess_proxy(kind)))
+        if pacing_mode:
+            from pacing_fixture import peer_subprocess_proxy
+            cleanup.enter_context(patch("research.live_probe_control.peers.peer_supervisor.subprocess",peer_subprocess_proxy()))
         policy = Policy(24, 60, (5 if control_mode else 2) * 10**9, 3, 12 * 10**9, 10**9, 20, 100000000)
 
         def step():
@@ -167,7 +171,11 @@ def main():
                         if slot is None or slot.owner is None or not slot.owner.last_observation:
                             return True
                         from paired_observation import PairedObservation
-                        if contention_mode:
+                        if pacing_mode:
+                            from pacing_observation import PacingObservation
+                            state["paired"] = PacingObservation(service, scene, bridge, local, capability, emit)
+                            cleanup.callback(state["paired"].stop_pacing)
+                        elif contention_mode:
                             from contention_observation import ContentionObservation
                             state["paired"] = ContentionObservation(service, scene, bridge, local, capability, emit)
                             cleanup.callback(state["paired"].stop_pressure)

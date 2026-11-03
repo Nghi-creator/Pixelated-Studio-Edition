@@ -23,8 +23,9 @@ const runtime = fileURLToPath(new URL("../../../", import.meta.url));
 
 export async function runNativeBrowserAcceptance(image, mode = "production-admission", options = {}) {
   if (!/^sha256:[a-f0-9]{64}$/.test(image || "")) throw new Error("explicit cached image digest required");
+  const pacingMode=mode==='engineering-n11-pacing-paired';
   const contentionMode=mode==='engineering-n11-contention-paired';
-  const pairedMode=contentionMode||mode==='engineering-n11-paired-observation';
+  const pairedMode=pacingMode||contentionMode||mode==='engineering-n11-paired-observation';
   if(pairedMode&&!/^n11-raw-[a-z0-9-]{1,40}$/.test(options.comparisonCaseId||''))throw Error('explicit paired case required');
   let pairedObservation=null;
   const primedPhases=[];
@@ -45,7 +46,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const costMode = costVersion === "v2" ? mode.slice(0, -3) : mode;
   const costMethod = `n10-contained-game-action-cost-acquisition-${costVersion}`;
   const costCondition = spanCondition || (costMode === "engineering-game-unchanged-cost" ? "unchanged" : costMode === "engineering-game-action-cost" ? "action" : null);
-  if (!["engineering-n11-contention-paired", "engineering-n11-paired-observation", "n11-raw-observation", "production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"].includes(mode) && !gameFailure && !costCondition) throw new Error("invalid acceptance mode");
+  if (!["engineering-n11-pacing-paired", "engineering-n11-contention-paired", "engineering-n11-paired-observation", "n11-raw-observation", "production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"].includes(mode) && !gameFailure && !costCondition) throw new Error("invalid acceptance mode");
   const gameControl = mode === "engineering-game-disturbance";
   const controlMode = ["engineering-disturbance", "engineering-game-disturbance"].includes(mode) || Boolean(costCondition);
   const movingMode = ["observer-moving-off", "observer-moving-on"].includes(mode);
@@ -286,7 +287,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if (processFailure) throw processFailure;
     const exitCode = await exited;
     assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
-    acquisition = { status: "passed", mode, live_authority: false, ...(pairedMode?{method:contentionMode?"n11-contained-contention-paired-v1":"n11-contained-paired-observation-v1",role:contentionMode?"engineering_contention_label_unavailable":"engineering_no_fault_no_label",paired_observation:pairedObservation}:{}), ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult } : {}), context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
+    acquisition = { status: "passed", mode, live_authority: false, ...(pairedMode?{method:pacingMode?"n11-contained-pacing-paired-v1":contentionMode?"n11-contained-contention-paired-v1":"n11-contained-paired-observation-v1",role:pacingMode?"engineering_pacing_label_unavailable":contentionMode?"engineering_contention_label_unavailable":"engineering_no_fault_no_label",paired_observation:pairedObservation}:{}), ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult } : {}), context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
       ...(gameFailure ? {role: interruption ? interruption.role : faultCost ? "contained_game_fault_cost_not_qualification" : "contained_game_failure_not_qualification", method: interruption ? interruption.method : faultCost ? "n10-contained-game-fault-cost-v1" : "n10-contained-game-failure-v1", case: gameFailure, sibling_quality: siblingQuality} : {}),
       ...(controlMode ? {role: costCondition ? "contained_game_action_cost_not_qualification" : gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: costCondition ? costMethod : gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", ...(costCondition ? {condition: costCondition} : {}), control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
@@ -309,7 +310,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if (costSpan) costSpanResult = await costSpan.finish("failed_prefix");
     const diagnostics = await Promise.allSettled(pages.map((page) => page.evaluate(() => globalThis.snapshot?.())));
     failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logTail}`, { cause: error });
-    acquisition = failure.acquisition = { status: "failed", mode, live_authority: false, ...(pairedMode?{method:contentionMode?"n11-contained-contention-paired-v1":"n11-contained-paired-observation-v1",role:contentionMode?"engineering_contention_label_unavailable":"engineering_no_fault_no_label",paired_observation:pairedObservation}:{}), ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), events, diagnostics, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult || null, browser: browser?.version() || null } : {}), ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
+    acquisition = failure.acquisition = { status: "failed", mode, live_authority: false, ...(pairedMode?{method:pacingMode?"n11-contained-pacing-paired-v1":contentionMode?"n11-contained-contention-paired-v1":"n11-contained-paired-observation-v1",role:pacingMode?"engineering_pacing_label_unavailable":contentionMode?"engineering_contention_label_unavailable":"engineering_no_fault_no_label",paired_observation:pairedObservation}:{}), ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), events, diagnostics, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult || null, browser: browser?.version() || null } : {}), ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
       context: { image, software_hash: softwareHash || null, host_platform: process.platform, host_arch: process.arch } };
     throw failure;
   } finally {

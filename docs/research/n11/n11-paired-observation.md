@@ -110,3 +110,7 @@ A separate [persistent contention engineering screen](n11-contention-feasibility
 adds explicitly planned owned CPU workers and native before/after references.
 Normal `prepare` keeps this guide's no-fault scope; only `prepare-contention`
 selects the new engineering contract. Neither path supplies an accepted label.
+
+The separate [owned pacing fixture](n11-pacing-feasibility.md) uses an existing
+identity delay independently of cadence caps, without extending production IPC.
+It records property/effect/cleanup evidence and leaves diagnostic labels unavailable.
