@@ -2,10 +2,30 @@
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
+import {observedPhaseOptions} from './observedPhase.mjs';
 
 export async function exportRawObservation(runtime, acquisition, plan) {
+  return exportObservation(runtime, acquisition, plan, {
+    phase:'healthy',runId:plan.acquisition_id,sampleCount:8,profile:{id:'balanced',fps:30,bitrateKbps:1500},
+  });
+}
+
+/** Preparation seam only: caller supplies a fresh, explicitly recorded phase.
+ * This exports observations, never a controller result, verified pair or label. */
+export async function exportObservedPhase(runtime, acquisition, plan) {
+  // Snapshot before the first await: later caller edits cannot invalidate the
+  // checked settings or change the bytes bound by the declaration.
+  const evidence=structuredClone(acquisition),frozenPlan=structuredClone(plan);
+  const options=observedPhaseOptions(evidence,frozenPlan);
+  const result=await exportObservation(runtime,evidence,frozenPlan,options);
+  result.context.versions.pixelatedAcquisitionProtocol='n11-contained-paired-phase-v1';
+  result.context.compatibilityGroup='contained-native-paired-source-local-v1';
+  return result;
+}
+
+async function exportObservation(runtime, acquisition, plan, {phase,runId,profile,sampleCount}) {
   const raw = acquisition.raw_observation;
-  if (acquisition.status !== 'passed' || raw?.browser_samples?.length !== 8 || raw.failure) throw Error('incomplete raw acquisition');
+  if (acquisition.status !== 'passed' || raw?.browser_samples?.length !== sampleCount || raw.failure) throw Error('incomplete raw acquisition');
   const web = path.resolve(runtime,'../../apps/web/src/features/player');
   const load = relative => import(pathToFileURL(path.join(web,relative)));
   const {createEngineResearchTelemetrySamples,parseEngineResearchTelemetryResponse} = await load('telemetry/engineResearchTelemetry.ts');
@@ -25,26 +45,26 @@ export async function exportRawObservation(runtime, acquisition, plan) {
       excluded.push({sample_sequence:sequence,reason:'outside_browser_wall_derived_window'});
       continue;
     }
-    engineSamples.push(...createEngineResearchTelemetrySamples({elapsedMs,gameId:'frozen-bubble-fixture',response,runId:plan.acquisition_id}));
+    engineSamples.push(...createEngineResearchTelemetrySamples({elapsedMs,gameId:'frozen-bubble-fixture',response,runId:runId}));
   }
   const first=samples[0], last=samples.at(-1), recordedAt=new Date(last.capturedAt);
   const events=[
-    {capturedAt:first.capturedAt,elapsedMs:first.elapsedMs,runId:plan.acquisition_id,sessionId:'native_acceptance',name:'research_recording_started',details:null},
-    {capturedAt:last.capturedAt,elapsedMs:last.elapsedMs,runId:plan.acquisition_id,sessionId:'native_acceptance',name:'research_recording_completed',details:null},
+    {capturedAt:first.capturedAt,elapsedMs:first.elapsedMs,runId:runId,sessionId:'native_acceptance',name:'research_recording_started',details:null},
+    {capturedAt:last.capturedAt,elapsedMs:last.elapsedMs,runId:runId,sessionId:'native_acceptance',name:'research_recording_completed',details:null},
   ];
   const metadata={schemaVersion:1,capturedAt:last.capturedAt,client:{userAgent:acquisition.browser},
     game:{id:'frozen-bubble-fixture',title:'Contained seeded Frozen-Bubble level 1'},networkType:'local-docker-bridge',playerMode:'host',
-    runId:plan.acquisition_id,scenario:'localhost',sessionId:'native_acceptance',status:'playing',
-    streamProfile:{id:'balanced',fps:30,bitrateKbps:1500},trial:{coldStart:false}};
-  const summary=createResearchRunSummary({events,generatedAt:recordedAt,engineSamples,requiresComputeTelemetry:true,runId:plan.acquisition_id,samples,sessionId:'native_acceptance'});
+    runId:runId,scenario:'localhost',sessionId:'native_acceptance',status:'playing',
+    streamProfile:profile,trial:{coldStart:false}};
+  const summary=createResearchRunSummary({events,generatedAt:recordedAt,engineSamples,requiresComputeTelemetry:true,runId:runId,samples,sessionId:'native_acceptance'});
   const files=createResearchRunExportArtifacts({comparisonCaseId:plan.acquisition_id,engineSamples,events,graphPng:null,
-    metadataJson:JSON.stringify(metadata,null,2)+'\n',phase:'healthy',recordedAt,runId:plan.acquisition_id,samples,summaryJson:JSON.stringify(summary,null,2)+'\n'});
+    metadataJson:JSON.stringify(metadata,null,2)+'\n',phase,recordedAt,runId:runId,samples,summaryJson:JSON.stringify(summary,null,2)+'\n'});
   // The exporter permits an optional declared producer version. Actual changed
   // source bytes are separately frozen by the plan, never inferred from Git.
   const manifest=JSON.parse(files[0].data);manifest.producerVersion=plan.producer_revision;
   if(plan.temporal_contract==='source_local_stable_phase_v1') {
     manifest.sourceLocalPhase={schemaVersion:'source-local-stable-phase-v1',basis:'operator_declared_not_authenticated',
-      phase:'healthy',comparisonCaseId:plan.acquisition_id,elapsedStartMs:first.elapsedMs,elapsedEndMs:last.elapsedMs,
+      phase,comparisonCaseId:plan.acquisition_id,elapsedStartMs:first.elapsedMs,elapsedEndMs:last.elapsedMs,
       evidenceSha256:'sha256:'+createHash('sha256').update(JSON.stringify(acquisition,null,2)+'\n').digest('hex')};
   }
   files[0].data=JSON.stringify(manifest,null,2)+'\n';

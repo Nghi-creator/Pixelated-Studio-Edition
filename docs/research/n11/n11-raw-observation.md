@@ -132,3 +132,45 @@ Source-local completeness describes a stable phase; it does not establish identi
 cross-channel intervals, source-clock synchronization or passive timing authority.
 Core's existing N9 path rejects this method. Paired intervention/labels and final
 study targets remain separate requirements.
+
+## Paired-phase export preparation API
+
+`exportObservedPhase(runtime, acquisition, plan)` in `rawObservationExport.mjs`
+is an additive offline seam for a future paired collector. It requires a fresh
+`n11-contained-paired-phase-v1` acquisition with role
+`engineering_pair_phase_no_label`, matching raw `phase` and `comparison_case_id`,
+the source-local plan marker, four browser rows and observed stable encoder
+settings. Its fixed phase meanings are degraded 30, relief 24 and recovery 30 FPS,
+with bitrate 1500 kbps, CPU-used 6 and max-quantizer 48 throughout. Missing or
+changing settings, invalid source ordering and known bad excluded prefixes fail.
+Requests and received frame rates cannot substitute for observed encoder targets.
+
+The whole retained browser phase is 1–4 seconds; measurable engine span must be
+at least one second. Four rows at one-second cadence produce about three seconds,
+which can fit the existing five-second controller action ceiling in principle.
+No controller limit was extended. A future runtime must independently establish
+fresh native target/readiness and complete sampling before the action ends; this
+API alone cannot prove that timing or negotiated cadence. Normal read-only
+baseline plans still use eight samples and their existing export bytes.
+
+Run IDs are phase-specific, while case/context/nominal profile remain shared.
+Metadata records observed phase FPS, preserving the distinct `fps` and `targetFps`
+N2 settings. `versions.pixelatedAcquisitionProtocol` and compatibility group keep
+this short acquisition format separate from the read-only baseline partition.
+Every phase declaration hashes its original acquisition JSON; no old real capture
+should be retrofitted. An exported recovery phase does not generate a controller
+result, verified restoration, fault/healthy label or accepted diagnostic group.
+There is no paired native execution command yet.
+
+Artificial fixtures and negative checks:
+
+```sh
+node --experimental-strip-types --test engine/runtime/scripts/research/n10/observedPhase.test.mjs
+node --experimental-strip-types engine/runtime/scripts/research/n10/pairedPhaseFixture.mjs /absolute/fresh-existing-directory
+```
+
+The generator refuses to overwrite. Its `passed` fields are invented test inputs,
+not evidence of a successful native run. Core's `fixtures/paired-phase-v1` and
+installed-wheel checks consume these exports with independently specified N1/N2/N3
+expectations. The intervention declaration in the core test is explicitly invented
+and remains separate from the exporter.
