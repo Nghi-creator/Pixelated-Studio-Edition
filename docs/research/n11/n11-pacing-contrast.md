@@ -59,3 +59,18 @@ independent cause/healthy truth, N6 group acceptance, diagnostic utility or fina
 study acceptance. A separately versioned median-response experiment is also an
 explicit engineering analysis; it cannot confer labels or override original N7.
 Do not tune delays, thresholds or repetitions until a desired result appears.
+
+Future contrast captures also retain the worker snapshot's own read-start/read-end
+brackets as `native-counter-read-brackets-v1`. These are auxiliary fields in each
+native counter event, bound to the controller generation's worker clock. They are
+not media capture timestamps or an alignment to parent/browser clocks. Current
+plans explicitly require this evidence; missing/partial/foreign/replayed reads
+fail the new plan's inspection. Earlier receipts remain legacy/unavailable for
+this additional analysis, preserving their original contrast outcome.
+
+Recording occurs in the existing parent observer loop, outside media callbacks;
+the worker, closed IPC, property delay, control action and primary N3 export clocks
+are unchanged. The default no-fault/50,000 us paths retain their original event
+fields. Recorder qualification checks complete same-clock evidence and actual
+cleanup; it can succeed while the separately reported contrast remains unmet.
+It never grants a diagnostic label, dose adjustment or additional acquisition.

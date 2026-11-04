@@ -76,3 +76,18 @@ class PacingTests(unittest.TestCase):
             proxy.Popen([sys.executable,'-u','-m','research.live_probe_control.peers.peer_worker','--dedicated-peer-worker'])
             self.assertIn("child_main'](contrast=True)",launch.call_args.args[0][3])
         with self.assertRaises(ValueError):peer_subprocess_proxy(contrast=1)
+
+    def test_native_read_evidence_is_contrast_only_and_preserves_worker_bounds(self):
+        from paired_observation import PairedObservation
+        from pacing_observation import PacingContrastObservation
+        from research.live_probe_control.control.contracts import Generation, digest
+        self.assertEqual(PairedObservation.__new__(PairedObservation).native_read_evidence(None,None),{})
+        generation=Generation('owner','pipeline','peer')
+        slot=SimpleNamespace(owner=SimpleNamespace(generation=generation))
+        observer=PacingContrastObservation.__new__(PacingContrastObservation)
+        body=dict(read_start_ns=100,read_end_ns=200)
+        result=observer.native_read_evidence(slot,body)['native_read']
+        self.assertEqual(result['read_start_ns'],100);self.assertEqual(result['read_end_ns'],200)
+        self.assertEqual(result['clock_id'],'worker-monotonic-'+digest(dict(owner='owner',pipeline='pipeline',peer='peer')))
+        for bad in (dict(read_start_ns=True,read_end_ns=200),dict(read_start_ns=201,read_end_ns=200)):
+            with self.assertRaises(ValueError):observer.native_read_evidence(slot,bad)

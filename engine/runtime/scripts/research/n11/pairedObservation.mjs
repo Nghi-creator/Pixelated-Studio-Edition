@@ -33,7 +33,7 @@ async function canonicalPlan(image,id,revision,contention=false,pacing=false,con
   if(contrast){
     if(contention||pacing)throw Error('one closed paired fixture required');
     plan.fault={method:'owned_identity_pacing_contrast_v1',delay_us:37500,maximum_active_ms:20000,native_reference_ms:2000,establishment_ms:1000};
-    plan.contrast={method:'serial_delay_envelope_v1',ceiling:{numerator:80,denominator:3},initial_native_above_target:true,relief_native_below_initial:true,independent_n3_check_required:true};
+    plan.contrast={method:'serial_delay_envelope_v1',ceiling:{numerator:80,denominator:3},initial_native_above_target:true,relief_native_below_initial:true,independent_n3_check_required:true,native_counter_read_method:'native-counter-read-brackets-v1'};
     plan.scope='engineering_pacing_contrast_no_accepted_label_no_empirical_acceptance';
   }
   return plan;
@@ -57,7 +57,7 @@ export async function acquirePairedPlan(args){
     await freezeSourceFiles(directory,plan.source_sha256);
     acquisition=await runNativeBrowserAcceptance(plan.image,plan.mode,{comparisonCaseId:plan.acquisition_id});
     await fs.writeFile(path.join(directory,'acquisition.json'),json(acquisition),{flag:'wx',mode:0o600});
-    const receipt=plan.schema_version==='n11-contained-pacing-contrast-plan-v1'?inspectPacingAcquisition(acquisition,{contrast:true}):plan.schema_version==='n11-contained-pacing-plan-v1'?inspectPacingAcquisition(acquisition):plan.schema_version==='n11-contained-contention-plan-v1'?inspectContentionAcquisition(acquisition):inspectPairedAcquisition(acquisition);
+    const receipt=plan.schema_version==='n11-contained-pacing-contrast-plan-v1'?inspectPacingAcquisition(acquisition,{contrast:true,requireNativeReads:true}):plan.schema_version==='n11-contained-pacing-plan-v1'?inspectPacingAcquisition(acquisition):plan.schema_version==='n11-contained-contention-plan-v1'?inspectContentionAcquisition(acquisition):inspectPairedAcquisition(acquisition);
     await fs.writeFile(path.join(directory,'control-receipt.json'),json(receipt),{flag:'wx',mode:0o600});
     for(const raw of acquisition.paired_observation.phases){
       const phase={status:'passed',method:'n11-contained-paired-phase-v1',role:'engineering_pair_phase_no_label',

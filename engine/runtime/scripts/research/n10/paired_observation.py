@@ -50,6 +50,10 @@ class PairedObservation(GameControlDisturbance):
     def phase_boundary(self, kind, phase):
         """Optional slow-path observer seam; default mode performs no extra work."""
 
+    def native_read_evidence(self, slot, observation):
+        """Optional engineering metadata; default modes preserve original events."""
+        return {}
+
     def tick(self):
         now = self.now()
         slots = self.slots(("first",))
@@ -108,7 +112,8 @@ class PairedObservation(GameControlDisturbance):
                     self.native_sequence = sequence
                     self.emit("n11_pair_native", phase=self.phase, at_ns=now-self.origin,
                               sequence=sequence, **{k: observation[k] for k in (
-                                  "configured_fps", "negotiated_fps", "capture_buffers", "encoded_buffers")})
+                                  "configured_fps", "negotiated_fps", "capture_buffers", "encoded_buffers")},
+                              **self.native_read_evidence(slots["first"], observation))
                 if now-self.stage_start > 4500000000:
                     raise ValueError("whole paired collection deadline")
                 if self.marker("phase"):

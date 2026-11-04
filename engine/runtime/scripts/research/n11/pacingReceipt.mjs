@@ -1,7 +1,8 @@
 /** Separate pacing evidence and descriptive effect; no scientific label acceptance. */
+import {createHash} from 'node:crypto';
 import {inspectPairedAcquisition} from './pairedObservationReceipt.mjs';
-export function inspectPacingAcquisition(run,{contrast=false}={}){
- if(typeof contrast!=='boolean')throw Error('typed pacing fixture required');
+export function inspectPacingAcquisition(run,{contrast=false,requireNativeReads=false}={}){
+ if(typeof contrast!=='boolean'||typeof requireNativeReads!=='boolean'||requireNativeReads&&!contrast)throw Error('typed pacing fixture required');
  const method=contrast?'n11-contained-pacing-contrast-v1':'n11-contained-pacing-paired-v1';
  const role=contrast?'engineering_pacing_contrast_label_unavailable':'engineering_pacing_label_unavailable';
  const ownedMethod=contrast?'n11-owned-pacing-contrast-v1':'n11-owned-pacing-v1';
@@ -49,6 +50,23 @@ export function inspectPacingAcquisition(run,{contrast=false}={}){
  const indicators={pacing_persistent_all_phases:true,healthy_reference_adequate:healthy.frames*1e9>=27*healthy.duration_ns,
   initial_media_degradation:frames*healthy.duration_ns*100<=95*healthy.frames*duration,
   post_fault_recovery:post.frames*healthy.duration_ns*100>=95*healthy.frames*post.duration_ns};
+ let nativeReadEvidence={};
+ if(contrast){
+  const rows=events.filter(e=>e.kind==='n11_pair_native');
+  if(requireNativeReads||rows.some(e=>Object.hasOwn(e,'native_read'))){
+   const ordered={owner:generation.owner,peer:generation.peer,pipeline:generation.pipeline};
+   const clock='worker-monotonic-'+createHash('sha256').update(JSON.stringify(ordered)).digest('hex');
+   let lastEnd=-1,lastSequence=-1,lastCounter=-1;
+   for(const row of rows){
+    const read=row.native_read;
+    if(!read||Object.keys(read).length!==5||read.method!=='native-counter-read-brackets-v1'||read.basis!=='worker_elapsed_monotonic_ns'||read.clock_id!==clock||
+       !safe(read.read_start_ns)||!safe(read.read_end_ns)||read.read_start_ns>read.read_end_ns||read.read_start_ns<=lastEnd||row.sequence<=lastSequence||row.encoded_buffers<lastCounter)
+      throw Error('native worker counter read evidence invalid');
+    lastEnd=read.read_end_ns;lastSequence=row.sequence;lastCounter=row.encoded_buffers;
+   }
+   nativeReadEvidence={native_counter_reads:{state:'complete',method:'native-counter-read-brackets-v1',clock_id:clock,read_count:rows.length,alignment:'worker_own_elapsed_clock_no_parent_subtraction'}};
+  }else nativeReadEvidence={native_counter_reads:{state:'unavailable_legacy'}};
+ }
  let contrastEvidence={};
  if(contrast){
   const relief=events.filter(e=>e.kind==='n11_pair_native'&&e.phase==='relief');
@@ -58,7 +76,7 @@ export function inspectPacingAcquisition(run,{contrast=false}={}){
   indicators.relief_native_below_initial=reliefFrames*duration<frames*reliefDuration;
   contrastEvidence={contrast:{delay_us:37500,modeled_ceiling:{numerator:80,denominator:3},relief_fps:reliefFrames*1e9/reliefDuration,independent_n3_check:'required_unavailable_in_producer'}};
  }
- return {...control,...contrastEvidence,scope:contrast?'engineering_pacing_contrast_label_unavailable':'engineering_pacing_feasibility_label_unavailable',native_references:{healthy,post},initial_fps:frames*1e9/duration,
+ return {...control,...contrastEvidence,...nativeReadEvidence,scope:contrast?'engineering_pacing_contrast_label_unavailable':'engineering_pacing_feasibility_label_unavailable',native_references:{healthy,post},initial_fps:frames*1e9/duration,
   indicators,engineering_screen:Object.values(indicators).every(Boolean)?'met':'unmet',diagnostic_label:null,accepted_diagnostic_groups:0,
   recovery_attribution:'post_fault_recovery_follows_independent_fault_removal_not_probe_utility'};
 }

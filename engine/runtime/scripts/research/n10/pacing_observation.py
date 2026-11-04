@@ -1,5 +1,7 @@
 """Whole paired phases under a separately owned pacing property, no accepted labels."""
+from dataclasses import asdict
 from pacing_fixture import PacingHandle, read_marker
+from research.live_probe_control.control.contracts import digest
 from paired_observation import PairedObservation
 
 
@@ -86,3 +88,12 @@ class PacingObservation(PairedObservation):
 class PacingContrastObservation(PacingObservation):
     method="n11-contained-pacing-contrast-v1"
     contrast=True
+
+
+    def native_read_evidence(self, slot, observation):
+        start,end=observation['read_start_ns'],observation['read_end_ns']
+        if type(start) is not int or type(end) is not int or not 0<=start<=end:
+            raise ValueError('native counter read brackets unavailable')
+        return dict(native_read=dict(method='native-counter-read-brackets-v1',
+                    clock_id='worker-monotonic-'+digest(asdict(slot.owner.generation)),
+                    basis='worker_elapsed_monotonic_ns',read_start_ns=start,read_end_ns=end))

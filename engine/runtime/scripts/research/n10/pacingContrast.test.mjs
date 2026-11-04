@@ -42,3 +42,22 @@ test('preparation freezes separate protocol and source; mixed variants and overw
   await assert.rejects(()=>preparePairedPlan(args,{contrast:'true'}));
  }finally{await fs.rm(dir,{recursive:true,force:true});}
 });
+
+test('native read brackets bind to generation and cannot be replaced with parent event time',async()=>{
+ const {createHash}=await import('node:crypto');
+ const run=fixture(),gen=run.events.find(e=>e.kind==='n11_pair_dispatched').request.generation;
+ const clock='worker-monotonic-'+createHash('sha256').update(JSON.stringify({owner:gen.owner,peer:gen.peer,pipeline:gen.pipeline})).digest('hex');
+ for(const row of run.events.filter(e=>e.kind==='n11_pair_native')){
+  row.native_read={method:'native-counter-read-brackets-v1',clock_id:clock,basis:'worker_elapsed_monotonic_ns',read_start_ns:row.at_ns-1e9,read_end_ns:row.at_ns-1e9+1e6};
+ }
+ const r=inspectPacingAcquisition(run,{contrast:true,requireNativeReads:true});
+ assert.equal(r.native_counter_reads.state,'complete');assert.equal(r.native_counter_reads.clock_id,clock);
+ assert.equal(r.native_counter_reads.read_count,9);
+ assert.throws(()=>inspectPacingAcquisition(fixture(),{contrast:true,requireNativeReads:true}));
+ assert.equal(inspectPacingAcquisition(fixture(),{contrast:true}).native_counter_reads.state,'unavailable_legacy');
+ const changed=structuredClone(run);changed.events.find(e=>e.kind==='n11_pair_native').native_read.clock_id='worker-monotonic-'+'f'.repeat(64);
+ assert.throws(()=>inspectPacingAcquisition(changed,{contrast:true}));
+ const partial=structuredClone(run);delete partial.events.find(e=>e.kind==='n11_pair_native').native_read;
+ assert.throws(()=>inspectPacingAcquisition(partial,{contrast:true}));
+ assert.throws(()=>inspectPacingAcquisition(run,{requireNativeReads:true}));
+});
