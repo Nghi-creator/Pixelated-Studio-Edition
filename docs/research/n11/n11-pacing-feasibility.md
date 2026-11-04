@@ -72,3 +72,7 @@ Full engine/Linux-native and existing production-admission/no-fault checks are
 required when changing the shared harness. The installed native image/browser and
 all source bytes must match the allocated plan. Final-study counts, held-out data,
 passive timing, production activation and Phase 2 acceptance are separate gates.
+
+The [fixed contrast fixture](n11-pacing-contrast.md) provides a separately identified
+37,500 us experiment and additional measured contrast checks. The original mode
+above retains its 50,000 us property and original engineering criteria.

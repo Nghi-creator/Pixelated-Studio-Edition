@@ -142,6 +142,10 @@ class DispatchNativeTests(unittest.TestCase):
                 s.failure,
                 getattr(s.owner, "reason", None),
                 getattr(s.owner, "exit_code", None),
+                getattr(s.owner, "state", None),
+                getattr(s.operation, "status", None),
+                getattr(s.operation, "rejection", None),
+                getattr(s.operation, "result", None),
             )
             for p, s in self.service.active.items()
         ]

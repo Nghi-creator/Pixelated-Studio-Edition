@@ -13,11 +13,15 @@ sys.path.insert(0,str(Path(__file__).resolve().parent))
 from game_thread_fault import read_marker, write_marker
 
 METHOD = "n11-owned-pacing-v1"
+CONTRAST_METHOD = "n11-owned-pacing-contrast-v1"
 START, STOP, STATE = "n11-pacing-start.json", "n11-pacing-stop.json", "n11-pacing-state.json"
 
 
 class ElementPacer:
-    def __init__(self, element, owns, timer=threading.Timer):
+    def __init__(self, element, owns, timer=threading.Timer, *, delay_us=50000):
+        if type(delay_us) is not int or delay_us not in (50000,37500):
+            raise ValueError("closed fixed pacing variant required")
+        self.delay_us=delay_us
         self.element, self.owns, self.timer_factory = element, owns, timer
         self.lock, self.timer = threading.RLock(), None
         self.started = self.expired = self.failed = False
@@ -28,8 +32,8 @@ class ElementPacer:
                 raise ValueError("fresh pacing preimage required")
             self.started = True
             try:
-                self.element.set_property("sleep-time", 50000)
-                if self.element.get_property("sleep-time") != 50000:
+                self.element.set_property("sleep-time", self.delay_us)
+                if self.element.get_property("sleep-time") != self.delay_us:
                     raise ValueError("pacing apply failed")
                 self.timer = self.timer_factory(20, self.expire)
                 self.timer.daemon = True
@@ -44,7 +48,7 @@ class ElementPacer:
             if not self.owns() or self.expired or self.failed:
                 raise ValueError("pacing ownership/watchdog lost")
             value = self.element.get_property("sleep-time")
-            if value != (50000 if self.started else 0):
+            if value != (self.delay_us if self.started else 0):
                 raise ValueError("foreign pacing setting")
             return value
 
@@ -55,10 +59,10 @@ class ElementPacer:
                 self.failed = True
                 return False
             value = self.element.get_property("sleep-time")
-            if value not in ((0, 50000) if self.started else (0,)):
+            if value not in ((0, self.delay_us) if self.started else (0,)):
                 self.failed = True
                 return False
-            if value == 50000: self.element.set_property("sleep-time", 0)
+            if value == self.delay_us: self.element.set_property("sleep-time", 0)
             ok = self.element.get_property("sleep-time") == 0
             self.failed = self.failed or not ok
             return ok
@@ -69,17 +73,23 @@ class ElementPacer:
             self.expired = True
 
 
-def peer_subprocess_proxy():
+def peer_subprocess_proxy(*, contrast=False):
+    if type(contrast) is not bool:raise ValueError("typed fixture variant required")
     original = subprocess.Popen
     helper = str(Path(__file__).resolve())
     def launch(argv, **kwargs):
         if argv != [sys.executable,"-u","-m","research.live_probe_control.peers.peer_worker","--dedicated-peer-worker"]:
             raise ValueError("exact fixture peer command required")
-        return original([sys.executable,"-u","-c","import runpy; runpy.run_path("+repr(helper)+",run_name='__main__')","--dedicated-peer-worker"],**kwargs)
+        code="import runpy; runpy.run_path("+repr(helper)+",run_name='__main__')"
+        if contrast:code="import runpy; ns=runpy.run_path("+repr(helper)+"); raise SystemExit(ns['child_main'](contrast=True))"
+        return original([sys.executable,"-u","-c",code,"--dedicated-peer-worker"],**kwargs)
     return SimpleNamespace(Popen=launch, PIPE=subprocess.PIPE, TimeoutExpired=subprocess.TimeoutExpired)
 
 
-def child_main():
+def child_main(*, contrast=False):
+    if type(contrast) is not bool:raise ValueError("typed fixture variant required")
+    method=CONTRAST_METHOD if contrast else METHOD
+    delay=37500 if contrast else 50000
     if sys.argv[1:] != ["--dedicated-peer-worker"]:
         raise ValueError("explicit disposable worker required")
     from research.live_probe_control.peers import peer_worker
@@ -98,12 +108,12 @@ def child_main():
         element = media.pipeline.get_by_name("captured")
         if element is None or element.get_factory().get_name()!="identity" or element.get_property("sync") or element.get_property("drop-probability")!=0:
             raise ValueError("idle exact identity required")
-        media._pacer = ElementPacer(element,lambda:not media.closed and media.pipeline.get_by_name("captured")==element and media.capture_lease.healthy(force=True))
+        media._pacer = ElementPacer(element,lambda:not media.closed and media.pipeline.get_by_name("captured")==element and media.capture_lease.healthy(force=True),delay_us=delay)
         media._pacing_dir, media._pacing_sequence, media._pacing_next, media._pacing_stopped = directory, 0, 0, False
 
     def publish(media):
         media._pacing_sequence += 1
-        value=dict(method=METHOD,generation=media.bootstrap["generation"],sequence=media._pacing_sequence,
+        value=dict(method=method,generation=media.bootstrap["generation"],sequence=media._pacing_sequence,
                    worker_elapsed_ns=time.monotonic_ns()-media.origin,sleep_time_us=media._pacer.element.get_property("sleep-time"),
                    stopped=media._pacing_stopped,expired=media._pacer.expired,failed=media._pacer.failed)
         pending=media._pacing_dir/(STATE+".pending")
@@ -114,7 +124,7 @@ def child_main():
 
     def poll_inner(media):
         original_poll(media)
-        expected=dict(method=METHOD,generation=media.bootstrap["generation"])
+        expected=dict(method=method,generation=media.bootstrap["generation"])
         if not media._pacer.started and (media._pacing_dir/START).exists():
             if read_marker(media._pacing_dir/START)!=expected: raise ValueError("foreign pacing request")
             media._pacer.start()
@@ -133,7 +143,7 @@ def child_main():
             # Fixture-only failure evidence; retain the ordinary worker failure path.
             try:
                 write_marker(media._pacing_dir/"n11-pacing-failure.json",
-                             dict(method=METHOD,stage="poll",error_type=type(error).__name__,detail=str(error)[:256]))
+                             dict(method=method,stage="poll",error_type=type(error).__name__,detail=str(error)[:256]))
             except Exception:
                 pass
             raise
@@ -164,7 +174,10 @@ def close_paced_media(media, original_close, publish):
 
 
 class PacingHandle:
-    def __init__(self, local, slot):
+    def __init__(self, local, slot, *, contrast=False):
+        if type(contrast) is not bool:raise ValueError("typed fixture variant required")
+        self.method=CONTRAST_METHOD if contrast else METHOD
+        self.delay_us=37500 if contrast else 50000
         self.directory, self.slot = Path(local.directory), slot
         self.generation, self.token = asdict(slot.owner.generation), slot.token
         self.sequence, self.started_at, self.stopped = 0, None, False
@@ -182,7 +195,7 @@ class PacingHandle:
             if value is not None and (not fresh or value["sequence"]>self.sequence): break
             if time.monotonic()>=end: raise ValueError("pacing observation deadline")
             time.sleep(0.005)
-        if value.get("method")!=METHOD or value.get("generation")!=self.generation or value.get("expired") or value.get("failed") or type(value.get("sequence")) is not int or value['sequence']<self.sequence:
+        if value.get("method")!=self.method or value.get("generation")!=self.generation or value.get("expired") or value.get("failed") or type(value.get("sequence")) is not int or value['sequence']<self.sequence:
             raise ValueError("invalid pacing observation")
         self.sequence=value["sequence"]
         self.history.append(dict(value))
@@ -193,8 +206,8 @@ class PacingHandle:
         before=self.sample(fresh=True)
         if before["sleep_time_us"]!=0 or before["stopped"]: raise ValueError("pacing preimage unavailable")
         self.started_at=time.monotonic_ns()
-        write_marker(self.directory/START,dict(method=METHOD,generation=self.generation))
-        return self.wait_for(50000,False)
+        write_marker(self.directory/START,dict(method=self.method,generation=self.generation))
+        return self.wait_for(self.delay_us,False)
 
     def wait_for(self, delay, stopped):
         end=time.monotonic()+0.6
@@ -212,7 +225,7 @@ class PacingHandle:
         if self.stopped:return dict(self.last_stopped)
         self.current()
         if self.started_at is None:return self.sample(fresh=True)
-        expected=dict(method=METHOD,generation=self.generation)
+        expected=dict(method=self.method,generation=self.generation)
         if (self.directory/STOP).exists():
             if read_marker(self.directory/STOP)!=expected:raise ValueError("foreign pacing cleanup intent")
         else:write_marker(self.directory/STOP,expected)

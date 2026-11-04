@@ -5,6 +5,7 @@ from paired_observation import PairedObservation
 
 class PacingObservation(PairedObservation):
     method="n11-contained-pacing-paired-v1"
+    contrast=False
 
     def __init__(self,*args):
         super().__init__(*args)
@@ -55,7 +56,7 @@ class PacingObservation(PairedObservation):
     def phase_boundary(self,kind,phase):
         start=self.now()-self.origin
         state=self.pacer.sample(fresh=True)
-        if state['sleep_time_us']!=50000 or state['stopped']:raise ValueError('pacing not persistent')
+        if state['sleep_time_us']!=self.pacer.delay_us or state['stopped']:raise ValueError('pacing not persistent')
         self.emit('n11_pacing_sample',phase=phase,boundary=kind,read_start_ns=start,read_end_ns=self.now()-self.origin,observation=state)
 
     def tick(self):
@@ -64,7 +65,7 @@ class PacingObservation(PairedObservation):
             if not self.reference(now):return False
             if self.pacing_stage=='post':self.pacing_stage='done';return True
             slot=self.service.active['first']
-            self.pacer=PacingHandle(self.local,slot)
+            self.pacer=PacingHandle(self.local,slot,contrast=self.contrast)
             state=self.pacer.start()
             self.emit('n11_pacing_started',at_ns=self.pacer.started_at-self.origin,maximum_active_ns=20000000000,observation=state)
             self.pacing_stage='establish'
@@ -80,3 +81,8 @@ class PacingObservation(PairedObservation):
             self.pacing_stage='post'
             self.reference_sequence=self.service.active['first'].owner.last_observation[2]
         return False
+
+
+class PacingContrastObservation(PacingObservation):
+    method="n11-contained-pacing-contrast-v1"
+    contrast=True

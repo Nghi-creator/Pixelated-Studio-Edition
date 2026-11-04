@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
-import {exportRawObservation} from '../n11/rawObservationExport.mjs';
+import {exportRawObservation,exportObservedPhase} from '../n11/rawObservationExport.mjs';
 
 const runtime=fileURLToPath(new URL('../../../',import.meta.url));
 function source(){
@@ -67,4 +67,18 @@ test('source-local export is opt-in and binds the original phase/evidence bytes'
     phase:'healthy',comparisonCaseId:plan.acquisition_id,elapsedStartMs:0,elapsedEndMs:7000,
     evidenceSha256:'sha256:'+createHash('sha256').update(JSON.stringify(acquisition,null,2)+'\n').digest('hex')});
   assert.equal(result.context.versions.pixelatedTemporalContract,'source_local_stable_phase_v1');
+});
+
+
+test('contrast phase exports carry an exact separate acquisition/context partition',async()=>{
+  const acquisition=source();acquisition.method='n11-contained-paired-phase-v1';acquisition.role='engineering_pair_phase_no_label';
+  Object.assign(acquisition.raw_observation,{version:'n11-contained-raw-samples-v1',phase:'degraded',comparison_case_id:plan.acquisition_id});
+  acquisition.raw_observation.browser_samples=acquisition.raw_observation.browser_samples.slice(0,4);
+  const contrastPlan={...plan,temporal_contract:'source_local_stable_phase_v1',schema_version:'n11-contained-pacing-contrast-plan-v1',
+    mode:'engineering-n11-pacing-contrast',fault:{method:'owned_identity_pacing_contrast_v1',delay_us:37500}};
+  const result=await exportObservedPhase(runtime,acquisition,contrastPlan);
+  assert.equal(result.context.compatibilityGroup,'contained-native-contrast-source-local-v1');
+  assert.equal(result.context.versions.pixelatedAcquisitionProtocol,'n11-contained-contrast-phase-v1');
+  assert.equal(result.context.versions.n11ContrastProtocol,'fixed-pacing-37500-cadence-30-24-v1');
+  await assert.rejects(()=>exportObservedPhase(runtime,acquisition,{...contrastPlan,fault:{...contrastPlan.fault,delay_us:50000}}));
 });

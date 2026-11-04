@@ -57,3 +57,22 @@ class PacingTests(unittest.TestCase):
         owner,element,_=self.make();self.value=50000
         self.assertFalse(owner.stop())
         element.set_property.assert_not_called()
+
+    def test_contrast_delay_is_fixed_and_foreign_default_delay_is_not_cleared(self):
+        element=Mock();value=[0]
+        element.get_property.side_effect=lambda _:value[0]
+        element.set_property.side_effect=lambda _,v:value.__setitem__(0,v)
+        pacer=ElementPacer(element,lambda:True,timer=lambda *a:Mock(),delay_us=37500)
+        pacer.start();self.assertEqual(pacer.observe(),37500)
+        value[0]=50000;element.set_property.reset_mock()
+        self.assertFalse(pacer.stop());element.set_property.assert_not_called()
+        for bad in (True,35000,0,50000.0):
+            with self.assertRaises(ValueError):ElementPacer(element,lambda:True,delay_us=bad)
+
+    def test_contrast_launcher_has_explicit_fixed_child_entrypoint(self):
+        import subprocess
+        with patch.object(subprocess,'Popen') as launch:
+            proxy=peer_subprocess_proxy(contrast=True)
+            proxy.Popen([sys.executable,'-u','-m','research.live_probe_control.peers.peer_worker','--dedicated-peer-worker'])
+            self.assertIn("child_main'](contrast=True)",launch.call_args.args[0][3])
+        with self.assertRaises(ValueError):peer_subprocess_proxy(contrast=1)

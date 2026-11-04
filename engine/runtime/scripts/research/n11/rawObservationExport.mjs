@@ -20,6 +20,13 @@ export async function exportObservedPhase(runtime, acquisition, plan) {
   const result=await exportObservation(runtime,evidence,frozenPlan,options);
   result.context.versions.pixelatedAcquisitionProtocol='n11-contained-paired-phase-v1';
   result.context.compatibilityGroup='contained-native-paired-source-local-v1';
+  if(frozenPlan.schema_version==='n11-contained-pacing-contrast-plan-v1'){
+    if(frozenPlan.mode!=='engineering-n11-pacing-contrast'||frozenPlan.fault?.method!=='owned_identity_pacing_contrast_v1'||frozenPlan.fault.delay_us!==37500)
+      throw Error('fixed contrast context required');
+    result.context.versions.pixelatedAcquisitionProtocol='n11-contained-contrast-phase-v1';
+    result.context.versions.n11ContrastProtocol='fixed-pacing-37500-cadence-30-24-v1';
+    result.context.compatibilityGroup='contained-native-contrast-source-local-v1';
+  }
   return result;
 }
 
