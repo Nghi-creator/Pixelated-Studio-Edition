@@ -16,10 +16,26 @@ METHOD = "n11-owned-pacing-v1"
 CONTRAST_METHOD = "n11-owned-pacing-contrast-v1"
 START, STOP, STATE = "n11-pacing-start.json", "n11-pacing-stop.json", "n11-pacing-state.json"
 
+CAPACITY_GRID=(0,30000,32000,34000,36000,37500,40000,50000)
+
+
+def pacing_variant(*,contrast=False,calibration_index=None,confirmation=False):
+    if type(contrast) is not bool or type(confirmation) is not bool or (calibration_index is None and confirmation):
+        raise ValueError('closed pacing variant required')
+    if calibration_index is not None:
+        if type(calibration_index) is not int or not 0<=calibration_index<len(CAPACITY_GRID) or contrast:
+            raise ValueError('closed capacity grid required')
+        kind='confirmation' if confirmation else 'calibration'
+        return 'n11-owned-pacing-capacity-'+kind+'-v1',CAPACITY_GRID[calibration_index]
+    return (CONTRAST_METHOD,37500) if contrast else (METHOD,50000)
+
 
 class ElementPacer:
-    def __init__(self, element, owns, timer=threading.Timer, *, delay_us=50000):
-        if type(delay_us) is not int or delay_us not in (50000,37500):
+    def __init__(self, element, owns, timer=threading.Timer, *, delay_us=50000, calibration_index=None):
+        if calibration_index is not None:
+            if type(delay_us) is not int or delay_us!=50000:raise ValueError('mixed pacing variants')
+            _,delay_us=pacing_variant(calibration_index=calibration_index)
+        elif type(delay_us) is not int or delay_us not in (50000,37500):
             raise ValueError("closed fixed pacing variant required")
         self.delay_us=delay_us
         self.element, self.owns, self.timer_factory = element, owns, timer
@@ -73,8 +89,8 @@ class ElementPacer:
             self.expired = True
 
 
-def peer_subprocess_proxy(*, contrast=False):
-    if type(contrast) is not bool:raise ValueError("typed fixture variant required")
+def peer_subprocess_proxy(*, contrast=False, calibration_index=None, confirmation=False):
+    pacing_variant(contrast=contrast,calibration_index=calibration_index,confirmation=confirmation)
     original = subprocess.Popen
     helper = str(Path(__file__).resolve())
     def launch(argv, **kwargs):
@@ -82,14 +98,13 @@ def peer_subprocess_proxy(*, contrast=False):
             raise ValueError("exact fixture peer command required")
         code="import runpy; runpy.run_path("+repr(helper)+",run_name='__main__')"
         if contrast:code="import runpy; ns=runpy.run_path("+repr(helper)+"); raise SystemExit(ns['child_main'](contrast=True))"
+        if calibration_index is not None:code="import runpy; ns=runpy.run_path("+repr(helper)+"); raise SystemExit(ns['child_main'](calibration_index="+str(calibration_index)+",confirmation="+repr(confirmation)+"))"
         return original([sys.executable,"-u","-c",code,"--dedicated-peer-worker"],**kwargs)
     return SimpleNamespace(Popen=launch, PIPE=subprocess.PIPE, TimeoutExpired=subprocess.TimeoutExpired)
 
 
-def child_main(*, contrast=False):
-    if type(contrast) is not bool:raise ValueError("typed fixture variant required")
-    method=CONTRAST_METHOD if contrast else METHOD
-    delay=37500 if contrast else 50000
+def child_main(*, contrast=False, calibration_index=None, confirmation=False):
+    method,delay=pacing_variant(contrast=contrast,calibration_index=calibration_index,confirmation=confirmation)
     if sys.argv[1:] != ["--dedicated-peer-worker"]:
         raise ValueError("explicit disposable worker required")
     from research.live_probe_control.peers import peer_worker
@@ -108,7 +123,7 @@ def child_main(*, contrast=False):
         element = media.pipeline.get_by_name("captured")
         if element is None or element.get_factory().get_name()!="identity" or element.get_property("sync") or element.get_property("drop-probability")!=0:
             raise ValueError("idle exact identity required")
-        media._pacer = ElementPacer(element,lambda:not media.closed and media.pipeline.get_by_name("captured")==element and media.capture_lease.healthy(force=True),delay_us=delay)
+        media._pacer = ElementPacer(element,lambda:not media.closed and media.pipeline.get_by_name("captured")==element and media.capture_lease.healthy(force=True),**(dict(calibration_index=calibration_index) if calibration_index is not None else dict(delay_us=delay)))
         media._pacing_dir, media._pacing_sequence, media._pacing_next, media._pacing_stopped = directory, 0, 0, False
 
     def publish(media):
@@ -116,6 +131,7 @@ def child_main(*, contrast=False):
         value=dict(method=method,generation=media.bootstrap["generation"],sequence=media._pacing_sequence,
                    worker_elapsed_ns=time.monotonic_ns()-media.origin,sleep_time_us=media._pacer.element.get_property("sleep-time"),
                    stopped=media._pacing_stopped,expired=media._pacer.expired,failed=media._pacer.failed)
+        if calibration_index is not None:value["started"]=media._pacer.started
         pending=media._pacing_dir/(STATE+".pending")
         with pending.open("x") as stream:
             import json
@@ -174,10 +190,9 @@ def close_paced_media(media, original_close, publish):
 
 
 class PacingHandle:
-    def __init__(self, local, slot, *, contrast=False):
-        if type(contrast) is not bool:raise ValueError("typed fixture variant required")
-        self.method=CONTRAST_METHOD if contrast else METHOD
-        self.delay_us=37500 if contrast else 50000
+    def __init__(self, local, slot, *, contrast=False, calibration_index=None, confirmation=False):
+        self.method,self.delay_us=pacing_variant(contrast=contrast,calibration_index=calibration_index,confirmation=confirmation)
+        self.capacity=calibration_index is not None
         self.directory, self.slot = Path(local.directory), slot
         self.generation, self.token = asdict(slot.owner.generation), slot.token
         self.sequence, self.started_at, self.stopped = 0, None, False
@@ -204,7 +219,7 @@ class PacingHandle:
     def start(self):
         if self.started_at is not None: raise ValueError("pacing single use")
         before=self.sample(fresh=True)
-        if before["sleep_time_us"]!=0 or before["stopped"]: raise ValueError("pacing preimage unavailable")
+        if before["sleep_time_us"]!=0 or before["stopped"] or (self.capacity and before.get("started") is not False): raise ValueError("pacing preimage unavailable")
         self.started_at=time.monotonic_ns()
         write_marker(self.directory/START,dict(method=self.method,generation=self.generation))
         return self.wait_for(self.delay_us,False)
@@ -213,7 +228,7 @@ class PacingHandle:
         end=time.monotonic()+0.6
         while True:
             value=self.sample(fresh=True)
-            if value["sleep_time_us"]==delay and value["stopped"] is stopped:return value
+            if value["sleep_time_us"]==delay and value["stopped"] is stopped and (not self.capacity or value.get("started") is True):return value
             if time.monotonic()>=end:raise ValueError("pacing transition unobserved")
 
     def alive(self):

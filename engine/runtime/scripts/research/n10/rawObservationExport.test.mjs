@@ -82,3 +82,21 @@ test('contrast phase exports carry an exact separate acquisition/context partiti
   assert.equal(result.context.versions.n11ContrastProtocol,'fixed-pacing-37500-cadence-30-24-v1');
   await assert.rejects(()=>exportObservedPhase(runtime,acquisition,{...contrastPlan,fault:{...contrastPlan.fault,delay_us:50000}}));
 });
+
+test('capacity grid and confirmation exports share protocol without dose context leakage',async()=>{
+ const {CAPACITY_GRID,pacingVariant}=await import('../n11/pacingVariants.mjs');
+ const contexts=[];
+ for(const confirmation of [false,true])for(const index of [0,3,7]){
+  const variant=pacingVariant({calibrationIndex:index,confirmation}),role=confirmation?'confirmation':'calibration';
+  const acquisition=source();acquisition.method='n11-contained-paired-phase-v1';acquisition.role='engineering_pair_phase_no_label';
+  Object.assign(acquisition.raw_observation,{version:'n11-contained-raw-samples-v1',phase:'degraded',comparison_case_id:plan.acquisition_id});
+  acquisition.raw_observation.browser_samples=acquisition.raw_observation.browser_samples.slice(0,4);
+  const capacityPlan={...plan,temporal_contract:'source_local_stable_phase_v1',schema_version:'n11-contained-pacing-capacity-'+role+'-plan-v1',
+   capacity:{method:'n11-capacity-calibration-v1',grid_index:index,role},fault:{method:variant.ownedMethod,delay_us:variant.delay}};
+  const result=await exportObservedPhase(runtime,acquisition,capacityPlan);contexts.push(result.context);
+  assert.equal(result.context.versions.n11CapacityProtocol,'fixed-grid-'+CAPACITY_GRID.join('-')+'-cadence-30-24-v1');
+  assert.equal(result.context.compatibilityGroup,'contained-capacity-source-local-v1');
+  await assert.rejects(()=>exportObservedPhase(runtime,acquisition,{...capacityPlan,capacity:{...capacityPlan.capacity,grid_index:null}}));
+ }
+ assert.ok(contexts.every(c=>JSON.stringify(c)===JSON.stringify(contexts[0])));
+});

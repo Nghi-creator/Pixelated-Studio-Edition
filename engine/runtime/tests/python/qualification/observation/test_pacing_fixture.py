@@ -91,3 +91,31 @@ class PacingTests(unittest.TestCase):
         self.assertEqual(result['clock_id'],'worker-monotonic-'+digest(dict(owner='owner',pipeline='pipeline',peer='peer')))
         for bad in (dict(read_start_ns=True,read_end_ns=200),dict(read_start_ns=201,read_end_ns=200)):
             with self.assertRaises(ValueError):observer.native_read_evidence(slot,bad)
+
+    def test_capacity_grid_is_closed_and_zero_requires_explicit_index(self):
+        from pacing_fixture import CAPACITY_GRID, pacing_variant
+        self.assertEqual(CAPACITY_GRID,(0,30000,32000,34000,36000,37500,40000,50000))
+        for index,delay in enumerate(CAPACITY_GRID):
+            method,actual=pacing_variant(calibration_index=index)
+            self.assertEqual(actual,delay);self.assertIn('capacity-calibration',method)
+            element=Mock();value=[0]
+            element.get_property.side_effect=lambda _:value[0]
+            element.set_property.side_effect=lambda _,v:value.__setitem__(0,v)
+            owner=ElementPacer(element,lambda:True,timer=lambda *a:Mock(),calibration_index=index)
+            owner.start();self.assertEqual(owner.observe(),delay);self.assertTrue(owner.started)
+            self.assertTrue(owner.stop());self.assertEqual(value[0],0)
+        for bad in (-1,8,True,1.5,'1'):
+            with self.assertRaises(ValueError):pacing_variant(calibration_index=bad)
+        for kwargs in (dict(confirmation=True),dict(contrast=True,calibration_index=0)):
+            with self.assertRaises(ValueError):peer_subprocess_proxy(**kwargs)
+        with self.assertRaises(ValueError):ElementPacer(Mock(),lambda:True,delay_us=0)
+
+    def test_capacity_child_entrypoint_is_closed_and_zero_start_is_acknowledged(self):
+        import subprocess
+        from pacing_fixture import PacingHandle
+        with patch.object(subprocess,'Popen') as launch:
+            peer_subprocess_proxy(calibration_index=0).Popen([sys.executable,'-u','-m','research.live_probe_control.peers.peer_worker','--dedicated-peer-worker'])
+            self.assertIn("child_main'](calibration_index=0,confirmation=False)",launch.call_args.args[0][3])
+        owner=PacingHandle.__new__(PacingHandle);owner.capacity=True
+        owner.sample=Mock(side_effect=[dict(sleep_time_us=0,stopped=False,started=False),dict(sleep_time_us=0,stopped=False,started=True)])
+        self.assertTrue(owner.wait_for(0,False)['started']);self.assertEqual(owner.sample.call_count,2)

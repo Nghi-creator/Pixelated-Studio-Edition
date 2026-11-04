@@ -1,5 +1,6 @@
 /** Existing v2 writers on actual contained observations; no label or pair bridge. */
 import path from 'node:path';
+import {pacingVariant,CAPACITY_GRID} from './pacingVariants.mjs';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {observedPhaseOptions} from './observedPhase.mjs';
@@ -26,6 +27,13 @@ export async function exportObservedPhase(runtime, acquisition, plan) {
     result.context.versions.pixelatedAcquisitionProtocol='n11-contained-contrast-phase-v1';
     result.context.versions.n11ContrastProtocol='fixed-pacing-37500-cadence-30-24-v1';
     result.context.compatibilityGroup='contained-native-contrast-source-local-v1';
+  }
+  if(/^n11-contained-pacing-capacity-(calibration|confirmation)-plan-v1$/.test(frozenPlan.schema_version||'')){
+    const capacity=frozenPlan.capacity,variant=pacingVariant({calibrationIndex:capacity?.grid_index,confirmation:capacity?.role==='confirmation'});
+    if(capacity?.grid_index===null||capacity?.grid_index===undefined||!['calibration','confirmation'].includes(capacity?.role)||frozenPlan.schema_version!=='n11-contained-pacing-capacity-'+capacity.role+'-plan-v1'||capacity?.method!=='n11-capacity-calibration-v1'||frozenPlan.fault?.delay_us!==variant.delay||frozenPlan.fault.method!==variant.ownedMethod)throw Error('fixed capacity context required');
+    result.context.versions.pixelatedAcquisitionProtocol='n11-contained-capacity-phase-v1';
+    result.context.versions.n11CapacityProtocol='fixed-grid-'+CAPACITY_GRID.join('-')+'-cadence-30-24-v1';
+    result.context.compatibilityGroup='contained-capacity-source-local-v1';
   }
   return result;
 }

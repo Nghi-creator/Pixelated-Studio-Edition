@@ -1,6 +1,6 @@
 """Whole paired phases under a separately owned pacing property, no accepted labels."""
 from dataclasses import asdict
-from pacing_fixture import PacingHandle, read_marker
+from pacing_fixture import PacingHandle, read_marker, pacing_variant
 from research.live_probe_control.control.contracts import digest
 from paired_observation import PairedObservation
 
@@ -8,6 +8,8 @@ from paired_observation import PairedObservation
 class PacingObservation(PairedObservation):
     method="n11-contained-pacing-paired-v1"
     contrast=False
+    calibration_index=None
+    confirmation=False
 
     def __init__(self,*args):
         super().__init__(*args)
@@ -27,7 +29,7 @@ class PacingObservation(PairedObservation):
         body,_,sequence=slots['first'].owner.last_observation
         if sequence==self.reference_sequence:return False
         self.reference_sequence=sequence
-        self.reference_rows.append(dict(at_ns=now-self.origin,sequence=sequence,**{k:body[k] for k in ('configured_fps','negotiated_fps','capture_buffers','encoded_buffers')}))
+        self.reference_rows.append(dict(at_ns=now-self.origin,sequence=sequence,**{k:body[k] for k in ('configured_fps','negotiated_fps','capture_buffers','encoded_buffers')},**self.native_read_evidence(slots['first'],body)))
         if self.reference_rows[-1]['at_ns']-self.reference_rows[0]['at_ns']<2000000000:return False
         self.emit('n11_pacing_reference',phase=self.pacing_stage,samples=self.reference_rows,worker_identities=self.identities)
         self.reference_rows=[]
@@ -67,7 +69,7 @@ class PacingObservation(PairedObservation):
             if not self.reference(now):return False
             if self.pacing_stage=='post':self.pacing_stage='done';return True
             slot=self.service.active['first']
-            self.pacer=PacingHandle(self.local,slot,contrast=self.contrast)
+            self.pacer=PacingHandle(self.local,slot,contrast=self.contrast,calibration_index=self.calibration_index,confirmation=self.confirmation)
             state=self.pacer.start()
             self.emit('n11_pacing_started',at_ns=self.pacer.started_at-self.origin,maximum_active_ns=20000000000,observation=state)
             self.pacing_stage='establish'
@@ -97,3 +99,14 @@ class PacingContrastObservation(PacingObservation):
         return dict(native_read=dict(method='native-counter-read-brackets-v1',
                     clock_id='worker-monotonic-'+digest(asdict(slot.owner.generation)),
                     basis='worker_elapsed_monotonic_ns',read_start_ns=start,read_end_ns=end))
+
+
+class PacingCapacityObservation(PacingContrastObservation):
+    contrast=False
+
+    def __init__(self,*args,calibration_index,confirmation=False):
+        pacing_variant(calibration_index=calibration_index,confirmation=confirmation)
+        self.calibration_index,self.confirmation=calibration_index,confirmation
+        kind='confirmation' if confirmation else 'calibration'
+        self.method='n11-contained-pacing-capacity-'+kind+'-v1'
+        super().__init__(*args)
