@@ -19,7 +19,13 @@ START, STOP, STATE = "n11-pacing-start.json", "n11-pacing-stop.json", "n11-pacin
 CAPACITY_GRID=(0,30000,32000,34000,36000,37500,40000,50000)
 
 
-def pacing_variant(*,contrast=False,calibration_index=None,confirmation=False):
+def pacing_variant(*,contrast=False,calibration_index=None,confirmation=False,condition=None):
+    if condition is not None:
+        from condition_protocol import condition_variant
+        if contrast is not False or confirmation is not False or calibration_index is not None:
+            raise ValueError('mixed condition variants')
+        variant=condition_variant(condition)
+        return variant['owned_method'],variant['delay_us']
     if type(contrast) is not bool or type(confirmation) is not bool or (calibration_index is None and confirmation):
         raise ValueError('closed pacing variant required')
     if calibration_index is not None:
@@ -31,8 +37,12 @@ def pacing_variant(*,contrast=False,calibration_index=None,confirmation=False):
 
 
 class ElementPacer:
-    def __init__(self, element, owns, timer=threading.Timer, *, delay_us=50000, calibration_index=None):
-        if calibration_index is not None:
+    def __init__(self, element, owns, timer=threading.Timer, *, delay_us=50000, calibration_index=None, condition=None):
+        if condition is not None:
+            if type(delay_us) is not int or delay_us!=50000 or calibration_index is not None:
+                raise ValueError('mixed condition delay')
+            _,delay_us=pacing_variant(condition=condition)
+        elif calibration_index is not None:
             if type(delay_us) is not int or delay_us!=50000:raise ValueError('mixed pacing variants')
             _,delay_us=pacing_variant(calibration_index=calibration_index)
         elif type(delay_us) is not int or delay_us not in (50000,37500):
@@ -89,8 +99,8 @@ class ElementPacer:
             self.expired = True
 
 
-def peer_subprocess_proxy(*, contrast=False, calibration_index=None, confirmation=False):
-    pacing_variant(contrast=contrast,calibration_index=calibration_index,confirmation=confirmation)
+def peer_subprocess_proxy(*, contrast=False, calibration_index=None, confirmation=False,condition=None):
+    pacing_variant(contrast=contrast,calibration_index=calibration_index,confirmation=confirmation,condition=condition)
     original = subprocess.Popen
     helper = str(Path(__file__).resolve())
     def launch(argv, **kwargs):
@@ -99,12 +109,13 @@ def peer_subprocess_proxy(*, contrast=False, calibration_index=None, confirmatio
         code="import runpy; runpy.run_path("+repr(helper)+",run_name='__main__')"
         if contrast:code="import runpy; ns=runpy.run_path("+repr(helper)+"); raise SystemExit(ns['child_main'](contrast=True))"
         if calibration_index is not None:code="import runpy; ns=runpy.run_path("+repr(helper)+"); raise SystemExit(ns['child_main'](calibration_index="+str(calibration_index)+",confirmation="+repr(confirmation)+"))"
+        if condition is not None:code="import runpy; ns=runpy.run_path("+repr(helper)+"); raise SystemExit(ns['child_main'](condition="+repr(condition)+"))"
         return original([sys.executable,"-u","-c",code,"--dedicated-peer-worker"],**kwargs)
     return SimpleNamespace(Popen=launch, PIPE=subprocess.PIPE, TimeoutExpired=subprocess.TimeoutExpired)
 
 
-def child_main(*, contrast=False, calibration_index=None, confirmation=False):
-    method,delay=pacing_variant(contrast=contrast,calibration_index=calibration_index,confirmation=confirmation)
+def child_main(*, contrast=False, calibration_index=None, confirmation=False,condition=None):
+    method,delay=pacing_variant(contrast=contrast,calibration_index=calibration_index,confirmation=confirmation,condition=condition)
     if sys.argv[1:] != ["--dedicated-peer-worker"]:
         raise ValueError("explicit disposable worker required")
     from research.live_probe_control.peers import peer_worker
@@ -123,7 +134,7 @@ def child_main(*, contrast=False, calibration_index=None, confirmation=False):
         element = media.pipeline.get_by_name("captured")
         if element is None or element.get_factory().get_name()!="identity" or element.get_property("sync") or element.get_property("drop-probability")!=0:
             raise ValueError("idle exact identity required")
-        media._pacer = ElementPacer(element,lambda:not media.closed and media.pipeline.get_by_name("captured")==element and media.capture_lease.healthy(force=True),**(dict(calibration_index=calibration_index) if calibration_index is not None else dict(delay_us=delay)))
+        media._pacer = ElementPacer(element,lambda:not media.closed and media.pipeline.get_by_name("captured")==element and media.capture_lease.healthy(force=True),**(dict(condition=condition) if condition is not None else dict(calibration_index=calibration_index) if calibration_index is not None else dict(delay_us=delay)))
         media._pacing_dir, media._pacing_sequence, media._pacing_next, media._pacing_stopped = directory, 0, 0, False
 
     def publish(media):
@@ -131,7 +142,7 @@ def child_main(*, contrast=False, calibration_index=None, confirmation=False):
         value=dict(method=method,generation=media.bootstrap["generation"],sequence=media._pacing_sequence,
                    worker_elapsed_ns=time.monotonic_ns()-media.origin,sleep_time_us=media._pacer.element.get_property("sleep-time"),
                    stopped=media._pacing_stopped,expired=media._pacer.expired,failed=media._pacer.failed)
-        if calibration_index is not None:value["started"]=media._pacer.started
+        if calibration_index is not None or condition is not None:value["started"]=media._pacer.started
         pending=media._pacing_dir/(STATE+".pending")
         with pending.open("x") as stream:
             import json
@@ -190,9 +201,9 @@ def close_paced_media(media, original_close, publish):
 
 
 class PacingHandle:
-    def __init__(self, local, slot, *, contrast=False, calibration_index=None, confirmation=False):
-        self.method,self.delay_us=pacing_variant(contrast=contrast,calibration_index=calibration_index,confirmation=confirmation)
-        self.capacity=calibration_index is not None
+    def __init__(self, local, slot, *, contrast=False, calibration_index=None, confirmation=False,condition=None):
+        self.method,self.delay_us=pacing_variant(contrast=contrast,calibration_index=calibration_index,confirmation=confirmation,condition=condition)
+        self.capacity=calibration_index is not None or condition is not None
         self.directory, self.slot = Path(local.directory), slot
         self.generation, self.token = asdict(slot.owner.generation), slot.token
         self.sequence, self.started_at, self.stopped = 0, None, False

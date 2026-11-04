@@ -100,3 +100,20 @@ test('capacity grid and confirmation exports share protocol without dose context
  }
  assert.ok(contexts.every(c=>JSON.stringify(c)===JSON.stringify(contexts[0])));
 });
+
+test('condition arms export one common context without active condition leakage',async()=>{
+ const {CONDITIONS,CONDITION_PROTOCOL,CONDITION_MARKER,conditionVariant}=await import('../n11/conditionProtocol.mjs');
+ const contexts=[];
+ for(const condition of CONDITIONS){
+  const v=conditionVariant(condition),acquisition=source();acquisition.method='n11-contained-paired-phase-v1';acquisition.role='engineering_pair_phase_no_label';
+  Object.assign(acquisition.raw_observation,{version:'n11-contained-raw-samples-v1',phase:'degraded',comparison_case_id:plan.acquisition_id});
+  acquisition.raw_observation.browser_samples=acquisition.raw_observation.browser_samples.slice(0,4);
+  const conditionPlan={...plan,temporal_contract:'source_local_stable_phase_v1',schema_version:'n11-contained-condition-plan-v1',mode:'engineering-n11-condition-'+condition,
+   condition:{method:CONDITION_PROTOCOL,name:condition,recipe:CONDITION_MARKER},fault:{method:'fixed_owned_condition_v1',delay_us:v.delay,workers:v.pressureWorkers}};
+  const result=await exportObservedPhase(runtime,acquisition,conditionPlan);contexts.push(result.context);
+  assert.equal(result.context.versions.n11ConditionProtocol,CONDITION_MARKER);assert.equal(result.context.compatibilityGroup,'contained-condition-witness-source-local-v1');
+  assert.ok(!JSON.stringify(result.context).includes(condition));
+  await assert.rejects(()=>exportObservedPhase(runtime,acquisition,{...conditionPlan,fault:{...conditionPlan.fault,workers:1}}));
+ }
+ assert.ok(contexts.every(c=>JSON.stringify(c)===JSON.stringify(contexts[0])));
+});

@@ -2,10 +2,10 @@
 import {createHash} from 'node:crypto';
 import {pacingVariant} from './pacingVariants.mjs';
 import {inspectPairedAcquisition} from './pairedObservationReceipt.mjs';
-export function inspectPacingAcquisition(run,{contrast=false,requireNativeReads=false,requireReferenceReads=false,calibrationIndex=null,confirmation=false}={}){
- const variant=pacingVariant({contrast,calibrationIndex,confirmation});
- const capacity=calibrationIndex!==null;
- if(typeof requireNativeReads!=='boolean'||typeof requireReferenceReads!=='boolean'||(requireNativeReads||requireReferenceReads)&&!contrast&&!capacity)throw Error('typed pacing evidence required');
+export function inspectPacingAcquisition(run,{contrast=false,requireNativeReads=false,requireReferenceReads=false,calibrationIndex=null,confirmation=false,condition=null}={}){
+ const variant=pacingVariant({contrast,calibrationIndex,confirmation,condition});
+ const capacity=calibrationIndex!==null,conditionMode=condition!==null;
+ if(typeof requireNativeReads!=='boolean'||typeof requireReferenceReads!=='boolean'||(requireNativeReads||requireReferenceReads)&&!contrast&&!capacity&&!conditionMode)throw Error('typed pacing evidence required');
  const {method,role,ownedMethod,delay}=variant;
  const control=inspectPairedAcquisition(run,{method,role});
  const events=run.events;
@@ -15,7 +15,7 @@ export function inspectPacingAcquisition(run,{contrast=false,requireNativeReads=
  const generation=start.observation?.generation;
  const sameGeneration=(a,b)=>a&&b&&Object.keys(a).length===3&&Object.keys(b).length===3&&['owner','pipeline','peer'].every(k=>typeof a[k]==='string'&&a[k]===b[k]);
  if(!sameGeneration(generation,control.controller_request.generation))throw Error('pacing generation does not match probe');
- const valid=o=>o?.method===ownedMethod&&sameGeneration(o.generation,generation)&&safe(o.sequence)&&safe(o.worker_elapsed_ns)&&o.expired===false&&o.failed===false&&(!capacity||o.started===true);
+ const valid=o=>o?.method===ownedMethod&&sameGeneration(o.generation,generation)&&safe(o.sequence)&&safe(o.worker_elapsed_ns)&&o.expired===false&&o.failed===false&&(!(capacity||conditionMode)||o.started===true);
  if(!start.observation?.generation||!safe(start.at_ns)||!safe(stop.at_ns)||start.maximum_active_ns!==20e9||
   stop.at_ns<=start.at_ns||stop.at_ns-start.at_ns>=20e9||!valid(start.observation)||start.observation.sleep_time_us!==delay||
   stop.state!=='restored'||!valid(stop.observation)||stop.observation.sleep_time_us!==0||stop.observation.stopped!==true)throw Error('pacing ownership/cleanup unavailable');
@@ -51,10 +51,10 @@ export function inspectPacingAcquisition(run,{contrast=false,requireNativeReads=
   initial_media_degradation:frames*healthy.duration_ns*100<=95*healthy.frames*duration,
   post_fault_recovery:post.frames*healthy.duration_ns*100>=95*healthy.frames*post.duration_ns};
  let nativeReadEvidence={};
- if(contrast||capacity){
+ if(contrast||capacity||conditionMode){
   let rows=events.filter(e=>e.kind==='n11_pair_native');
-  if(capacity||requireNativeReads||rows.some(e=>Object.hasOwn(e,'native_read'))){
-   if(capacity||requireReferenceReads){
+  if(conditionMode||capacity||requireNativeReads||rows.some(e=>Object.hasOwn(e,'native_read'))){
+   if(conditionMode||capacity||requireReferenceReads){
     const healthyRows=one('n11_pacing_reference','healthy').samples;
     const postRows=one('n11_pacing_reference','post').samples;
     if(!Array.isArray(healthyRows)||!Array.isArray(postRows))throw Error('native reference reads unavailable');
@@ -70,7 +70,7 @@ export function inspectPacingAcquisition(run,{contrast=false,requireNativeReads=
       throw Error('native worker counter read evidence invalid');
     lastEnd=read.read_end_ns;lastSequence=row.sequence;lastCounter=row.encoded_buffers;
    }
-   nativeReadEvidence={native_counter_reads:{state:'complete',method:'native-counter-read-brackets-v1',clock_id:clock,read_count:rows.length,reference_reads:capacity||requireReferenceReads,alignment:'worker_own_elapsed_clock_no_parent_subtraction'}};
+   nativeReadEvidence={native_counter_reads:{state:'complete',method:'native-counter-read-brackets-v1',clock_id:clock,read_count:rows.length,reference_reads:conditionMode||capacity||requireReferenceReads,alignment:'worker_own_elapsed_clock_no_parent_subtraction'}};
   }else nativeReadEvidence={native_counter_reads:{state:'unavailable_legacy'}};
  }
  let contrastEvidence={};
@@ -82,7 +82,7 @@ export function inspectPacingAcquisition(run,{contrast=false,requireNativeReads=
   indicators.relief_native_below_initial=reliefFrames*duration<frames*reliefDuration;
   contrastEvidence={contrast:{delay_us:delay,...(contrast?{modeled_ceiling:{numerator:80,denominator:3}}:{}),relief_fps:reliefFrames*1e9/reliefDuration,independent_n3_check:'required_unavailable_in_producer'}};
  }
- return {...control,...contrastEvidence,...nativeReadEvidence,...(capacity?{capacity:{grid_index:calibrationIndex,delay_us:delay,role:confirmation?'confirmation':'calibration'}}:{}),scope:capacity?'engineering_capacity_'+(confirmation?'confirmation':'calibration')+'_label_unavailable':contrast?'engineering_pacing_contrast_label_unavailable':'engineering_pacing_feasibility_label_unavailable',native_references:{healthy,post},initial_fps:frames*1e9/duration,
+ return {...control,...contrastEvidence,...nativeReadEvidence,...(capacity?{capacity:{grid_index:calibrationIndex,delay_us:delay,role:confirmation?'confirmation':'calibration'}}:{}),scope:conditionMode?'engineering_condition_witness_label_unavailable':capacity?'engineering_capacity_'+(confirmation?'confirmation':'calibration')+'_label_unavailable':contrast?'engineering_pacing_contrast_label_unavailable':'engineering_pacing_feasibility_label_unavailable',native_references:{healthy,post},initial_fps:frames*1e9/duration,
   indicators,engineering_screen:Object.values(indicators).every(Boolean)?'met':'unmet',diagnostic_label:null,accepted_diagnostic_groups:0,
   recovery_attribution:'post_fault_recovery_follows_independent_fault_removal_not_probe_utility'};
 }

@@ -10,6 +10,7 @@ class PacingObservation(PairedObservation):
     contrast=False
     calibration_index=None
     confirmation=False
+    condition=None
 
     def __init__(self,*args):
         super().__init__(*args)
@@ -17,6 +18,9 @@ class PacingObservation(PairedObservation):
         self.reference_sequence=self.pacing_sequence=None
         self.pacer=None
         self.cleanup_emitted=False
+
+    def reference_witness(self,slot):
+        return {}
 
     def reference(self,now):
         slots=self.slots(("first",))
@@ -29,7 +33,7 @@ class PacingObservation(PairedObservation):
         body,_,sequence=slots['first'].owner.last_observation
         if sequence==self.reference_sequence:return False
         self.reference_sequence=sequence
-        self.reference_rows.append(dict(at_ns=now-self.origin,sequence=sequence,**{k:body[k] for k in ('configured_fps','negotiated_fps','capture_buffers','encoded_buffers')},**self.native_read_evidence(slots['first'],body)))
+        self.reference_rows.append(dict(at_ns=now-self.origin,sequence=sequence,**{k:body[k] for k in ('configured_fps','negotiated_fps','capture_buffers','encoded_buffers')},**self.native_read_evidence(slots['first'],body),**self.reference_witness(slots['first'])))
         if self.reference_rows[-1]['at_ns']-self.reference_rows[0]['at_ns']<2000000000:return False
         self.emit('n11_pacing_reference',phase=self.pacing_stage,samples=self.reference_rows,worker_identities=self.identities)
         self.reference_rows=[]
@@ -69,7 +73,7 @@ class PacingObservation(PairedObservation):
             if not self.reference(now):return False
             if self.pacing_stage=='post':self.pacing_stage='done';return True
             slot=self.service.active['first']
-            self.pacer=PacingHandle(self.local,slot,contrast=self.contrast,calibration_index=self.calibration_index,confirmation=self.confirmation)
+            self.pacer=PacingHandle(self.local,slot,contrast=self.contrast,calibration_index=self.calibration_index,confirmation=self.confirmation,condition=self.condition)
             state=self.pacer.start()
             self.emit('n11_pacing_started',at_ns=self.pacer.started_at-self.origin,maximum_active_ns=20000000000,observation=state)
             self.pacing_stage='establish'

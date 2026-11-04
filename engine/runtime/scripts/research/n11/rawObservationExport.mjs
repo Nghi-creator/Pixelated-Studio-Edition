@@ -1,5 +1,6 @@
 /** Existing v2 writers on actual contained observations; no label or pair bridge. */
 import path from 'node:path';
+import {conditionVariant,CONDITION_MARKER,CONDITION_PROTOCOL} from './conditionProtocol.mjs';
 import {pacingVariant,CAPACITY_GRID} from './pacingVariants.mjs';
 import {createHash} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
@@ -34,6 +35,13 @@ export async function exportObservedPhase(runtime, acquisition, plan) {
     result.context.versions.pixelatedAcquisitionProtocol='n11-contained-capacity-phase-v1';
     result.context.versions.n11CapacityProtocol='fixed-grid-'+CAPACITY_GRID.join('-')+'-cadence-30-24-v1';
     result.context.compatibilityGroup='contained-capacity-source-local-v1';
+  }
+  if(frozenPlan.schema_version==='n11-contained-condition-plan-v1'){
+    const condition=frozenPlan.condition,variant=conditionVariant(condition?.name);
+    if(condition.method!==CONDITION_PROTOCOL||condition.recipe!==CONDITION_MARKER||frozenPlan.mode!=='engineering-n11-condition-'+condition.name||frozenPlan.fault?.method!=='fixed_owned_condition_v1'||frozenPlan.fault.delay_us!==variant.delay||frozenPlan.fault.workers!==variant.pressureWorkers)throw Error('fixed condition context required');
+    result.context.versions.pixelatedAcquisitionProtocol='n11-contained-condition-phase-v1';
+    result.context.versions.n11ConditionProtocol=CONDITION_MARKER;
+    result.context.compatibilityGroup='contained-condition-witness-source-local-v1';
   }
   return result;
 }

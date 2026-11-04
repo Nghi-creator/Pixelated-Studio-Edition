@@ -104,6 +104,15 @@ export async function acquirePairedPlan(args){
     await fs.writeFile(path.join(directory,'acquisition.json'),json(acquisition),{flag:'wx',mode:0o600});
     const receipt=plan.capacity?inspectPacingAcquisition(acquisition,{calibrationIndex:plan.capacity.grid_index,confirmation:plan.capacity.role==='confirmation',requireNativeReads:true,requireReferenceReads:true}):plan.schema_version==='n11-contained-pacing-contrast-plan-v1'?inspectPacingAcquisition(acquisition,{contrast:true,requireNativeReads:true,requireReferenceReads:true}):plan.schema_version==='n11-contained-pacing-plan-v1'?inspectPacingAcquisition(acquisition):plan.schema_version==='n11-contained-contention-plan-v1'?inspectContentionAcquisition(acquisition):inspectPairedAcquisition(acquisition);
     await fs.writeFile(path.join(directory,'control-receipt.json'),json(receipt),{flag:'wx',mode:0o600});
+    await exportAcquiredPairedPhases(directory,acquisition,plan);
+    if(json(await sourceReceipt())!==json(plan.source_sha256))throw Error('paired source changed during acquisition');
+    return directory;
+  }catch(error){
+    if(!acquisition)await fs.writeFile(path.join(directory,'acquisition.json'),json(error.acquisition||{status:'failed',failure:'setup_unavailable',live_authority:false}),{flag:'wx',mode:0o600});
+    await fs.writeFile(path.join(directory,'failure.json'),json({status:'failed',detail:String(error.message).split('\n')[0].slice(0,512),live_authority:false}),{flag:'wx',mode:0o600});throw error;
+  }
+}
+export async function exportAcquiredPairedPhases(directory,acquisition,plan){
     for(const raw of acquisition.paired_observation.phases){
       const phase={status:'passed',method:'n11-contained-paired-phase-v1',role:'engineering_pair_phase_no_label',
         browser:acquisition.browser,native_receipt_sha256:'sha256:'+sha(json(acquisition)),raw_observation:raw,
@@ -115,12 +124,6 @@ export async function acquirePairedPlan(args){
         ['export.json',json({excluded_engine_snapshots:exported.excluded_engine_snapshots,clocks:exported.clocks})]])
         await fs.writeFile(path.join(phaseDirectory,name),data,{flag:'wx',mode:0o600});
     }
-    if(json(await sourceReceipt())!==json(plan.source_sha256))throw Error('paired source changed during acquisition');
-    return directory;
-  }catch(error){
-    if(!acquisition)await fs.writeFile(path.join(directory,'acquisition.json'),json(error.acquisition||{status:'failed',failure:'setup_unavailable',live_authority:false}),{flag:'wx',mode:0o600});
-    await fs.writeFile(path.join(directory,'failure.json'),json({status:'failed',detail:String(error.message).split('\n')[0].slice(0,512),live_authority:false}),{flag:'wx',mode:0o600});throw error;
-  }
 }
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
   try{if(process.argv[2]==='prepare-capacity')await prepareCapacityPlan(process.argv.slice(3));

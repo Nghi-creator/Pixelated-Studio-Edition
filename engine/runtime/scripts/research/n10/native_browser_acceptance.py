@@ -30,13 +30,15 @@ def main():
 
     import re
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
+    condition_match=re.fullmatch(r"engineering-n11-condition-(no_injected_fault|owned_identity_delay|owned_cpu_pressure)",mode)
+    condition_name=condition_match.group(1) if condition_match else None
     capacity = re.fullmatch(r"engineering-n11-capacity-(calibration|confirmation)-([0-7])",mode)
-    if not capacity and mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", "engineering-n11-paired-observation", "engineering-n11-contention-paired", "engineering-n11-pacing-paired", "engineering-n11-pacing-contrast", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
+    if not capacity and not condition_match and mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", "engineering-n11-paired-observation", "engineering-n11-contention-paired", "engineering-n11-pacing-paired", "engineering-n11-pacing-contrast", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
         raise ValueError("closed acceptance mode required")
     capacity_index=int(capacity.group(2)) if capacity else None
     capacity_confirmation=bool(capacity and capacity.group(1)=="confirmation")
     contrast_mode = mode == "engineering-n11-pacing-contrast"
-    pacing_mode = bool(capacity) or contrast_mode or mode == "engineering-n11-pacing-paired"
+    pacing_mode = bool(condition_match) or bool(capacity) or contrast_mode or mode == "engineering-n11-pacing-paired"
     contention_mode = mode == "engineering-n11-contention-paired"
     paired_mode = pacing_mode or contention_mode or mode == "engineering-n11-paired-observation"
     raw_mode = mode == "n11-raw-observation"
@@ -147,7 +149,7 @@ def main():
             cleanup.enter_context(patch("research.live_probe_control.peers.peer_supervisor.subprocess", peer_subprocess_proxy(kind)))
         if pacing_mode:
             from pacing_fixture import peer_subprocess_proxy
-            cleanup.enter_context(patch("research.live_probe_control.peers.peer_supervisor.subprocess",peer_subprocess_proxy(contrast=contrast_mode,calibration_index=capacity_index,confirmation=capacity_confirmation)))
+            cleanup.enter_context(patch("research.live_probe_control.peers.peer_supervisor.subprocess",peer_subprocess_proxy(contrast=contrast_mode,calibration_index=capacity_index,confirmation=capacity_confirmation,condition=condition_name)))
         policy = Policy(24, 60, (5 if control_mode else 2) * 10**9, 3, 12 * 10**9, 10**9, 20, 100000000)
 
         def step():
@@ -178,7 +180,10 @@ def main():
                         from paired_observation import PairedObservation
                         if pacing_mode:
                             from pacing_observation import PacingObservation, PacingContrastObservation, PacingCapacityObservation
-                            if capacity:
+                            if condition_match:
+                                from condition_observation import ConditionObservation
+                                state['paired']=ConditionObservation(service,scene,bridge,local,capability,emit,condition=condition_name)
+                            elif capacity:
                                 state["paired"] = PacingCapacityObservation(service,scene,bridge,local,capability,emit,calibration_index=capacity_index,confirmation=capacity_confirmation)
                             else:
                                 state["paired"] = (PacingContrastObservation if contrast_mode else PacingObservation)(service, scene, bridge, local, capability, emit)
