@@ -173,8 +173,19 @@ class LocalProbeOwner:
             if binding is not None:
                 binding.invalid = True
             raise ValueError("stale or foreign receiver capability")
-        observation = binding.slot.owner.last_observation
-        if observation is not None:
+        owner = binding.slot.owner
+        journal = getattr(owner, "observations_after", None)
+        if callable(journal):
+            try:
+                observations = journal(binding.native_sequence)
+            except (ValueError, TypeError, AttributeError):
+                binding.invalid = True
+                binding.invalid_native_reason = "journal_unavailable"
+                raise ValueError("invalid bound native observation: journal_unavailable") from None
+        else:
+            observation = owner.last_observation
+            observations = () if observation is None else (observation,)
+        for observation in observations:
             body, received, sequence = observation
             # The worker can publish between the API-entry clock read and this
             # atomic tuple read. Fence it with a clock read AFTER capturing it.

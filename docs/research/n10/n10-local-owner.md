@@ -144,3 +144,17 @@ authorize preparation or dispatch. Admission still requires both retained native
 samples to match the baseline once no operation is active. A restored acquisition
 window requires that strict admission readiness as well as verified restoration
 and fresh stable cadence snapshots.
+
+Native admission consumes the peer supervisor's bounded journal of eight real
+snapshots. A delayed host read replays retained consecutive samples through the
+same validation rather than forwarding only the newest snapshot. Each decoded
+frame has its own actual host monotonic receipt stamp; no timestamps or missing
+samples are synthesized. Bootstrap uses only the latest snapshot until another
+real sample arrives. Journal overrun/missing sequences, interior counter resets,
+reversed clocks, unsupported settings and stale observations still invalidate
+admission. Freshness, action and browser-observation bounds are unchanged.
+
+Bound-native failures retain a closed diagnostic suffix such as `sequence_gap`,
+`counter_reset`, `clock_or_receipt_reversed`, `unsupported_settings` or
+`invalid_fields_or_receipt`. These identify validation failures without granting
+authority or substituting diagnostics for source evidence.

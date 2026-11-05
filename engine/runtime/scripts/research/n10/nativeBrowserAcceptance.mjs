@@ -15,6 +15,7 @@ import { sampleOwnedBrowserCpu } from "./nativeBrowserCpu.mjs";
 import { BrowserCostSpan } from "./browserCostSpan.mjs";
 import { nativeBrowserHtml } from "./nativeBrowserPage.mjs";
 import { findAcceptanceFailure, requireAcceptanceCleanup } from "./nativeBrowserCleanup.mjs";
+import { publishCompletionMarker } from "./publishCompletionMarker.mjs";
 
 const require = createRequire(import.meta.url);
 const ts = require("typescript");
@@ -187,7 +188,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
             if(target){
               await first.evaluate(args=>globalThis.primePairedPhase(args),{phase:target.phase,comparisonCaseId:options.comparisonCaseId});
               primedPhases.push(target.phase);
-              await fs.writeFile(path.join(directory,'n11-prime-'+target.phase+'.json'),'{"complete":true}',{flag:'wx',mode:0o644});
+              await publishCompletionMarker(directory,'n11-prime-'+target.phase+'.json');
             }
             const completed=pairedObservation?.phases?.length||0;
             const phase=events.filter(e=>e.kind==='n11_pair_phase_started')[completed];
@@ -195,13 +196,13 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
               const raw=await first.evaluate(phase=>globalThis.collectPairedPhase(phase),phase.phase);
               pairedObservation=await first.evaluate(()=>globalThis.pairedObservationPrefix);
               if(raw.failure)throw Error('whole paired browser collection failed');
-              await fs.writeFile(path.join(directory,'n11-phase-'+phase.phase+'.json'),'{"complete":true}',{flag:'wx',mode:0o644});
+              await publishCompletionMarker(directory,'n11-phase-'+phase.phase+'.json');
             }
           }
           if (rawMode && !rawObservation && events.some(event => event.kind === "n11_raw_ready")) {
             await first.waitForFunction(() => globalThis.snapshot().state === "connected" && globalThis.videoFrames() > 0, undefined, {timeout:4000});
             rawObservation = await first.evaluate(() => globalThis.collectRawObservation());
-            await fs.writeFile(path.join(directory,"n11-complete.json"), '{"complete":true}', {flag:"wx",mode:0o644});
+            await publishCompletionMarker(directory,"n11-complete.json");
           }
           if (screenMode && !rawMode && !pairedMode && !measured && events.some((event) => event.kind === "screen_started")) {
             measured = true;

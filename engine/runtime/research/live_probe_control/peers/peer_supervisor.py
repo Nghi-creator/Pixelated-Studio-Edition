@@ -1,13 +1,16 @@
 """Opt-in exact-process supervisor. Call from an owner control thread, never media callbacks."""
 
+import copy
 import os
 import signal
 import subprocess
 import sys
 import time
 import uuid
+from collections import deque
 from dataclasses import asdict
 from pathlib import Path
+from threading import Lock
 
 from research.live_probe_control.control.contracts import Generation
 from research.live_probe_control.peers.peer_lifetime import ParentLease
@@ -76,6 +79,8 @@ class PeerSupervisor:
         self.last_heartbeat = 0
         self.last_snapshot = None
         self.last_observation = None
+        self.observation_history = deque(maxlen=8)
+        self.observation_lock = Lock()
         self.observation_sequence = 0
         self.last_snapshot_received = None
         self.offer_hash = self.offer_sequence = None
@@ -107,6 +112,22 @@ class PeerSupervisor:
             raise ValueError("peer owner clock unavailable")
         self.last_clock = value
         return value
+
+    def observations_after(self, sequence):
+        """Detached bounded journal, including the last consumed entry for rewrite checks.
+
+        This preserves actual samples when a host reader is delayed. It never fills
+        sequence gaps or changes receipt clocks; an overrun still fails continuity.
+        """
+        with self.observation_lock:
+            history = tuple(self.observation_history)
+            if sequence is None:
+                return copy.deepcopy(history[-1:])
+            if type(sequence) is not int or sequence < 1:
+                raise ValueError("invalid native observation journal cursor")
+            if history and sequence > history[-1][2]:
+                raise ValueError("native observation journal regressed")
+            return copy.deepcopy(tuple(row for row in history if row[2] >= sequence))
 
     def _queue(self, kind, body, expected, timeout=5 * SECOND):
         if self.sequence >= MAX_COMMANDS or len(self.pending) >= 32:
@@ -298,8 +319,10 @@ class PeerSupervisor:
                 raise ValueError("peer snapshot clock regressed")
             self.last_snapshot = message["body"]
             self.last_snapshot_received = now
-            self.observation_sequence += 1
-            self.last_observation = (message["body"], now, self.observation_sequence)
+            with self.observation_lock:
+                self.observation_sequence += 1
+                self.last_observation = (message["body"], now, self.observation_sequence)
+                self.observation_history.append(copy.deepcopy(self.last_observation))
         elif kind == "ice":
             if seq != self.offer_sequence:
                 raise ValueError("peer ICE belongs to a stale negotiation")
@@ -331,9 +354,9 @@ class PeerSupervisor:
                 if not data:
                     eof = True
                     break
-                events.extend(self._event(m, now) for m in self.lines.feed(data))
+                events.extend(self._event(m, self._now()) for m in self.lines.feed(data))
             # Drain already buffered complete frames even without another read.
-            events.extend(self._event(m, now) for m in self.lines.feed(b""))
+            events.extend(self._event(m, self._now()) for m in self.lines.feed(b""))
             for _ in range(4):
                 try:
                     data = os.read(self.child.stderr.fileno(), 16384)
@@ -344,6 +367,7 @@ class PeerSupervisor:
                 self.stderr_bytes += len(data)
                 if self.stderr_bytes > 1048576:
                     raise ValueError("private peer stderr budget exceeded")
+            now = self._now()
             if any(now > value[2] for value in self.pending.values()):
                 raise ValueError("private peer reply deadline")
             if (

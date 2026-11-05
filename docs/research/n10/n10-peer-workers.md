@@ -181,6 +181,12 @@ private IPC v3 connection-state snapshots and atomic parent observation sequence
 Its drafts remain read-only; engineering dispatch is separately gated and does
 not grant live mutation authority.
 
+The supervisor retains at most eight detached native snapshots for admission
+consumers. Buffered frames receive separate actual decode-time host timestamps,
+and consumers replay their original consecutive sequence numbers. Returning the
+journal does not transfer owner capabilities; a reader that falls behind retained
+history still fails continuity rather than filling gaps.
+
 [Scoped browser receiver observations](n10-browser-observations.md) describes
 the default-off authenticated relay/collector and local owner attachment. It
 keeps browser data declared and does not enable production probe dispatch.

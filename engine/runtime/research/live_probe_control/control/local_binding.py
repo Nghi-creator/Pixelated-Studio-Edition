@@ -95,6 +95,7 @@ class Binding:
             quantizer,
         )
         self.invalid = False
+        self.invalid_native_reason = None
         self.progress = {"frames_decoded": None, "presented_frames": None}
 
     def observe_native(self, body, received, sequence, now):
@@ -140,9 +141,17 @@ class Binding:
                     self.operation = None
             self.native.append((copy.deepcopy(body), received))
             self.native_sequence = sequence
-        except (ValueError, TypeError, KeyError):
+        except (ValueError, TypeError, KeyError) as exc:
             self.invalid = True
-            raise ValueError("invalid bound native observation") from None
+            reasons = {
+                "changed native observation": "changed_observation",
+                "native observation skipped": "sequence_gap",
+                "native observation reversed": "clock_or_receipt_reversed",
+                "native counter reset": "counter_reset",
+                "unsupported native profile/caps": "unsupported_settings",
+            }
+            self.invalid_native_reason = reasons.get(str(exc), "invalid_fields_or_receipt")
+            raise ValueError("invalid bound native observation: " + self.invalid_native_reason) from None
 
     def observe_browser(self, sample, now):
         try:

@@ -10,6 +10,7 @@ import unittest
 from dataclasses import asdict, replace
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
 from research.live_probe_control.control.contracts import Generation, Policy, Request, Snapshot, digest
@@ -450,6 +451,55 @@ class LocalOwnerTests(unittest.TestCase):
         self.slot.owner.last_observation = (native(100, 30), self.now, 3)
         with self.assertRaises(ValueError):
             self.scope.inspect(self.receiver)
+
+    def journal_after_ready(self, *, middle=None, gap=False):
+        self.ready()
+        prior = copy.deepcopy(self.slot.owner.last_observation)
+        stamp = self.now
+        rows = [prior]
+        if not gap:
+            rows.append((native(21, 30, **(middle or {})), stamp + 250000000, 3))
+        rows.append((native(31, 40), stamp + 500000000, 4))
+        self.now += 500000000
+        self.slot.seen_ns = self.now
+        self.slot.owner.last_observation = rows[-1]
+        self.slot.owner.observations_after = lambda sequence: copy.deepcopy(
+            [row for row in rows if sequence is None or row[2] >= sequence]
+        )
+        return rows
+
+    def test_retained_contiguous_native_batch_is_consumed_without_inventing_samples(self):
+        rows = self.journal_after_ready()
+        result = self.scope.inspect(self.receiver)
+        self.assertEqual(result["status"], "ready_for_dry_run")
+        binding = self.scope.bindings[self.receiver]
+        self.assertEqual(binding.native_sequence, 4)
+        self.assertEqual(binding.native[-1], rows[-1][:2])
+        self.assertEqual(binding.native[0], rows[-2][:2])
+        self.assertEqual(self.scope.inspect(self.receiver)["status"], "ready_for_dry_run")
+
+    def test_retained_batch_still_rejects_interior_counter_reset(self):
+        self.journal_after_ready(middle=dict(capture_buffers=5))
+        with self.assertRaisesRegex(ValueError, "counter_reset"):
+            self.scope.inspect(self.receiver)
+        self.assertTrue(self.scope.bindings[self.receiver].invalid)
+
+    def test_retained_batch_still_rejects_interior_unsupported_settings(self):
+        self.journal_after_ready(middle=dict(width=320))
+        with self.assertRaisesRegex(ValueError, "unsupported_settings"):
+            self.scope.inspect(self.receiver)
+
+    def test_retained_batch_gap_still_invalidates_instead_of_filling_missing_sample(self):
+        self.journal_after_ready(gap=True)
+        with self.assertRaisesRegex(ValueError, "sequence_gap"):
+            self.scope.inspect(self.receiver)
+
+    def test_native_journal_read_failure_permanently_invalidates_binding(self):
+        self.ready()
+        self.slot.owner.observations_after = Mock(side_effect=ValueError("overrun"))
+        with self.assertRaisesRegex(ValueError, "journal_unavailable"):
+            self.scope.inspect(self.receiver)
+        self.assertTrue(self.scope.bindings[self.receiver].invalid)
 
     def test_same_native_stamp_cannot_be_rewritten(self):
         self.observe(0, 10)

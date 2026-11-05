@@ -261,6 +261,45 @@ class SupervisorTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             owner._event(reply, 101)
 
+    def test_native_journal_is_bounded_and_detaches_returned_and_incoming_bodies(self):
+        owner, request = self.ready()
+        for index in range(1, 13):
+            reply = event(request, "snapshot", snapshot(index))
+            owner._event(reply, 100 + index)
+        self.assertEqual(len(owner.observation_history), 8)
+        self.assertEqual([r[2] for r in owner.observations_after(4)], list(range(5, 13)))
+        self.assertEqual([r[2] for r in owner.observations_after(None)], [12])
+        latest = owner.observations_after(12)
+        before = latest[0][0]["capture_buffers"]
+        latest[0][0]["capture_buffers"] = 123456
+        reply["body"]["capture_buffers"] = 654321
+        self.assertEqual(owner.observations_after(12)[0][0]["capture_buffers"], before)
+        with self.assertRaisesRegex(ValueError, "regressed"):
+            owner.observations_after(13)
+        for cursor in (True, 0, -1, 1.5):
+            with self.assertRaises(ValueError):
+                owner.observations_after(cursor)
+
+    def test_buffered_native_frames_get_actual_per_frame_decode_receipts(self):
+        owner, request = self.ready()
+        owner.clock = iter((200, 201, 202, 203)).__next__
+        owner.tx = b""
+        owner.child = SimpleNamespace(
+            stdout=SimpleNamespace(fileno=lambda: 11),
+            stderr=SimpleNamespace(fileno=lambda: 12),
+            poll=lambda: None,
+        )
+        data = encode(event(request, "snapshot", snapshot(1))) + encode(
+            event(request, "snapshot", snapshot(2))
+        )
+        with patch("research.live_probe_control.peers.peer_supervisor.os.read",
+                   side_effect=(data, BlockingIOError(), BlockingIOError())):
+            owner.poll()
+        self.assertNotEqual(owner.state, "failed")
+        records = owner.observations_after(1)
+        self.assertEqual([row[1] for row in records], [201, 202])
+        self.assertEqual([row[2] for row in records], [1, 2])
+
     def test_request_and_ice_budgets(self):
         owner, _ = self.ready()
         owner.sequence = 256
