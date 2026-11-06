@@ -8,6 +8,7 @@ modules does not enable probes or change the current qualification scope.
 | --- | --- |
 | `tracing/` | Camera stage trace configuration, hooks, recording and export |
 | `trials/` | Explicit disposable capability, bitrate and cadence trials |
+| `resource_observation/` | Candidate independent private-cgroup CPU reads and opt-in condition observer seam |
 | `scenario_harness/` | Bounded N5 workloads, campaign lifecycle and evidence export |
 | `live_probe_control/control/` | Contracts, cadence controller, ownership/binding, transport, journal and watchdog |
 | `live_probe_control/peers/` | Camera workers, peer protocol/supervision/lifetime and receiver bridge |
@@ -39,3 +40,7 @@ game-browser v1 driver retains logical source identifiers and maps them to the
 current files in its isolated worker dependency closure. Those identifiers are
 wire bindings, not filesystem paths. Reorganizing files changes the source
 context and does not requalify historical evidence.
+
+The [resource observation contract](../../../docs/research/n11/resource-observation.md)
+describes its separate controller clock, bounded reads and pending launcher/
+inspection integration. It does not enable a fixture acquisition.
