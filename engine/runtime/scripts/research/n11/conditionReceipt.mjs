@@ -1,13 +1,15 @@
 /** Owned fixture evidence only; no broad cause label or reviewer authentication. */
 import {isDeepStrictEqual as same} from 'node:util';
+import {resourceMode} from './resourceProtocol.mjs';
 import {conditionVariant} from './conditionProtocol.mjs';
 import {inspectPacingAcquisition} from './pacingReceipt.mjs';
-export function inspectConditionAcquisition(run,{condition}={}){
- const variant=conditionVariant(condition),base=inspectPacingAcquisition(run,{condition,requireNativeReads:true,requireReferenceReads:true});
- if(run.mode!=='engineering-n11-condition-'+condition)throw Error('condition mode mismatch');
+export function inspectConditionAcquisition(run,{condition,resource=false}={}){
+ const variant=conditionVariant(condition),base=inspectPacingAcquisition(run,{condition,requireNativeReads:true,requireReferenceReads:true,resource});
+ if(run.mode!==(resource?resourceMode(condition):'engineering-n11-condition-'+condition))throw Error('condition mode mismatch');
  const events=run.events,safe=v=>Number.isSafeInteger(v)&&v>=0;
  const only=(kind,phase)=>{const rows=events.filter(e=>e.kind===kind&&(phase===undefined||e.phase===phase));if(rows.length!==1)throw Error('unique condition evidence required');return rows[0];};
  if(events.some(e=>e.kind?.startsWith('n11_pressure_')||e.kind==='n11_pacing_fixture_failure'||e.kind?.startsWith('n11_condition_')&&!['n11_condition_started','n11_condition_sample','n11_condition_cleanup'].includes(e.kind)))throw Error('foreign condition evidence');
+ if(!resource&&events.some(e=>e.kind?.startsWith('n11_resource_')||Object.hasOwn(e,'container_cpu_read')||e.samples?.some(r=>Object.hasOwn(r,'container_cpu_read'))))throw Error('resource data requires explicit resource inspector');
  const start=only('n11_condition_started'),cleanup=only('n11_condition_cleanup'),pacingStart=only('n11_pacing_started'),pacingStop=only('n11_pacing_cleanup');
  const generation=base.controller_request.generation;
  if(start.condition!==condition||cleanup.condition!==condition||start.live_authority!==false||cleanup.live_authority!==false||!same(start.generation,generation)||

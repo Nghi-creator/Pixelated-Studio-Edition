@@ -1,12 +1,14 @@
 /** Separate pacing evidence and descriptive effect; no scientific label acceptance. */
 import {createHash} from 'node:crypto';
+import {RESOURCE_METHOD,RESOURCE_ROLE} from './resourceProtocol.mjs';
 import {pacingVariant} from './pacingVariants.mjs';
 import {inspectPairedAcquisition} from './pairedObservationReceipt.mjs';
-export function inspectPacingAcquisition(run,{contrast=false,requireNativeReads=false,requireReferenceReads=false,calibrationIndex=null,confirmation=false,condition=null}={}){
+export function inspectPacingAcquisition(run,{contrast=false,requireNativeReads=false,requireReferenceReads=false,calibrationIndex=null,confirmation=false,condition=null,resource=false}={}){
  const variant=pacingVariant({contrast,calibrationIndex,confirmation,condition});
  const capacity=calibrationIndex!==null,conditionMode=condition!==null;
  if(typeof requireNativeReads!=='boolean'||typeof requireReferenceReads!=='boolean'||(requireNativeReads||requireReferenceReads)&&!contrast&&!capacity&&!conditionMode)throw Error('typed pacing evidence required');
- const {method,role,ownedMethod,delay}=variant;
+ if(typeof resource!=='boolean'||resource&&!conditionMode)throw Error('closed resource variant required');
+ const {ownedMethod,delay}=variant,method=resource?RESOURCE_METHOD:variant.method,role=resource?RESOURCE_ROLE:variant.role;
  const control=inspectPairedAcquisition(run,{method,role});
  const events=run.events;
  const one=(kind,phase)=>{const rows=events.filter(e=>e.kind===kind&&(phase===undefined||e.phase===phase));if(rows.length!==1)throw Error('unique pacing evidence required');return rows[0];};

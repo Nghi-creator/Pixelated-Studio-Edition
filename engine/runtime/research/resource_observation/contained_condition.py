@@ -75,7 +75,7 @@ class ResourceConditionObservation(ConditionObservation):
             context = dict(
                 method=METHOD,
                 generation=asdict(slot.owner.generation),
-                controller_origin_ns=self.origin,
+                controller_origin_ns=str(self.origin),
             )
             clock_id = (
                 "controller-monotonic-"
@@ -85,6 +85,13 @@ class ResourceConditionObservation(ConditionObservation):
             )
             if self._resource_sampler is None:
                 self._resource_context = context
+                self.emit(
+                    "n11_resource_context",
+                    method=METHOD,
+                    clock_id=clock_id,
+                    context=context,
+                    live_authority=False,
+                )
                 self._resource_sampler = self._resource_factory(
                     clock_id=clock_id,
                     expected_quota_us=200000,

@@ -1,5 +1,7 @@
 /** Existing v2 writers on actual contained observations; no label or pair bridge. */
 import path from 'node:path';
+import {isDeepStrictEqual as same} from 'node:util';
+import {RESOURCE_METHOD,resourceMode,resourceDeclaration} from './resourceProtocol.mjs';
 import {conditionVariant,CONDITION_MARKER,CONDITION_PROTOCOL} from './conditionProtocol.mjs';
 import {pacingVariant,CAPACITY_GRID} from './pacingVariants.mjs';
 import {createHash} from 'node:crypto';
@@ -36,12 +38,19 @@ export async function exportObservedPhase(runtime, acquisition, plan) {
     result.context.versions.n11CapacityProtocol='fixed-grid-'+CAPACITY_GRID.join('-')+'-cadence-30-24-v1';
     result.context.compatibilityGroup='contained-capacity-source-local-v1';
   }
-  if(frozenPlan.schema_version==='n11-contained-condition-plan-v1'){
+  if(['n11-contained-condition-plan-v1','n11-contained-resource-condition-plan-v1'].includes(frozenPlan.schema_version)){
+    const resource=frozenPlan.schema_version==='n11-contained-resource-condition-plan-v1';
     const condition=frozenPlan.condition,variant=conditionVariant(condition?.name);
-    if(condition.method!==CONDITION_PROTOCOL||condition.recipe!==CONDITION_MARKER||frozenPlan.mode!=='engineering-n11-condition-'+condition.name||frozenPlan.fault?.method!=='fixed_owned_condition_v1'||frozenPlan.fault.delay_us!==variant.delay||frozenPlan.fault.workers!==variant.pressureWorkers)throw Error('fixed condition context required');
+    if(condition.method!==CONDITION_PROTOCOL||condition.recipe!==CONDITION_MARKER||frozenPlan.mode!==(resource?resourceMode(condition.name):'engineering-n11-condition-'+condition.name)||frozenPlan.fault?.method!=='fixed_owned_condition_v1'||frozenPlan.fault.delay_us!==variant.delay||frozenPlan.fault.workers!==variant.pressureWorkers)throw Error('fixed condition context required');
     result.context.versions.pixelatedAcquisitionProtocol='n11-contained-condition-phase-v1';
     result.context.versions.n11ConditionProtocol=CONDITION_MARKER;
     result.context.compatibilityGroup='contained-condition-witness-source-local-v1';
+    if(resource){
+      if(!same(frozenPlan.resources,resourceDeclaration()))throw Error('fixed resource source context required');
+      result.context.versions.pixelatedAcquisitionProtocol='n11-contained-resource-condition-phase-v1';
+      result.context.versions.n11ResourceProtocol=RESOURCE_METHOD;
+      result.context.compatibilityGroup='contained-resource-condition-source-local-v1';
+    }
   }
   return result;
 }

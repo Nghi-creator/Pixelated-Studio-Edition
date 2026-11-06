@@ -71,6 +71,12 @@ class ResourceConditionTests(unittest.TestCase):
         self.assertEqual(result["native_read"]["read_start_ns"], 1)
         factory.assert_called_once()
         sampler.sample.assert_called_once()
+        self.assertEqual(
+            result["container_cpu_read"]["clock_id"],
+            "controller-monotonic-9812989e220f8e39099f072549bdaab02f4c9f5e90c310231ca315de7f3acde5",
+        )
+        self.assertEqual(emit.call_args.args[0], "n11_resource_context")
+        self.assertEqual(emit.call_args.kwargs["context"]["controller_origin_ns"], "1000")
 
     def test_all_conditions_get_identical_measured_fields_and_fixed_quota(self):
         rows = []
@@ -164,6 +170,7 @@ class ResourceConditionTests(unittest.TestCase):
                 observer.pacing_stage = "pair"
                 observer.phase = "relief"
                 self.sample(observer, slot)
+                emit.reset_mock()
                 observer.now.return_value = 5_000_001_000
                 observer.stage_start = 0 if kind == "phase" else 4_000_001_000
                 observer.dispatched_at = 1000
@@ -184,6 +191,7 @@ class ResourceConditionTests(unittest.TestCase):
                 observer.pacing_stage = "pair"
                 observer.phase = "degraded"
                 self.sample(observer, slot)
+                emit.reset_mock()
                 if kind == "clock":
                     observer.now.return_value = 1500
                 with self.assertRaises(ValueError):

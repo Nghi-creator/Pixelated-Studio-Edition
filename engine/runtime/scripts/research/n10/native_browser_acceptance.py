@@ -30,8 +30,11 @@ def main():
 
     import re
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
-    condition_match=re.fullmatch(r"engineering-n11-condition-(no_injected_fault|owned_identity_delay|owned_cpu_pressure)",mode)
-    condition_name=condition_match.group(1) if condition_match else None
+    from research.resource_observation.modes import condition_mode, condition_observer_class
+    selected_condition=condition_mode(mode)
+    condition_match=selected_condition is not None
+    condition_name=selected_condition["condition"] if condition_match else None
+    resource_condition=selected_condition["resource"] if condition_match else False
     capacity = re.fullmatch(r"engineering-n11-capacity-(calibration|confirmation)-([0-7])",mode)
     if not capacity and not condition_match and mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", "engineering-n11-paired-observation", "engineering-n11-contention-paired", "engineering-n11-pacing-paired", "engineering-n11-pacing-contrast", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
         raise ValueError("closed acceptance mode required")
@@ -181,8 +184,8 @@ def main():
                         if pacing_mode:
                             from pacing_observation import PacingObservation, PacingContrastObservation, PacingCapacityObservation
                             if condition_match:
-                                from condition_observation import ConditionObservation
-                                state['paired']=ConditionObservation(service,scene,bridge,local,capability,emit,condition=condition_name)
+                                Observer=condition_observer_class(resource_condition)
+                                state['paired']=Observer(service,scene,bridge,local,capability,emit,condition=condition_name)
                             elif capacity:
                                 state["paired"] = PacingCapacityObservation(service,scene,bridge,local,capability,emit,calibration_index=capacity_index,confirmation=capacity_confirmation)
                             else:

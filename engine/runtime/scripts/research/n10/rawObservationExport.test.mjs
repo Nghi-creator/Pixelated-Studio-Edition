@@ -117,3 +117,19 @@ test('condition arms export one common context without active condition leakage'
  }
  assert.ok(contexts.every(c=>JSON.stringify(c)===JSON.stringify(contexts[0])));
 });
+
+test('resource phase exports have their own common context and fixed source declaration',async()=>{
+ const {CONDITIONS,CONDITION_PROTOCOL,CONDITION_MARKER,conditionVariant}=await import('../n11/conditionProtocol.mjs');
+ const {resourceMode,resourceDeclaration,RESOURCE_METHOD}=await import('../n11/resourceProtocol.mjs');
+ const contexts=[];
+ for(const condition of CONDITIONS){
+  const v=conditionVariant(condition),acquisition=source();acquisition.method='n11-contained-paired-phase-v1';acquisition.role='engineering_pair_phase_no_label';
+  Object.assign(acquisition.raw_observation,{version:'n11-contained-raw-samples-v1',phase:'degraded',comparison_case_id:plan.acquisition_id});
+  acquisition.raw_observation.browser_samples=acquisition.raw_observation.browser_samples.slice(0,4);
+  const p={...plan,temporal_contract:'source_local_stable_phase_v1',schema_version:'n11-contained-resource-condition-plan-v1',mode:resourceMode(condition),resources:resourceDeclaration(),condition:{method:CONDITION_PROTOCOL,name:condition,recipe:CONDITION_MARKER},fault:{method:'fixed_owned_condition_v1',delay_us:v.delay,workers:v.pressureWorkers}};
+  const result=await exportObservedPhase(runtime,acquisition,p);contexts.push(result.context);
+  assert.equal(result.context.compatibilityGroup,'contained-resource-condition-source-local-v1');assert.equal(result.context.versions.n11ResourceProtocol,RESOURCE_METHOD);assert.ok(!JSON.stringify(result.context).includes(condition));
+  await assert.rejects(exportObservedPhase(runtime,acquisition,{...p,resources:{...p.resources,maximum_samples:129}}));
+ }
+ assert.ok(contexts.every(c=>JSON.stringify(c)===JSON.stringify(contexts[0])));
+});

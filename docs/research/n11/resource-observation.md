@@ -4,7 +4,8 @@
 measurement components. Generic cgroup counters are separate from condition
 ownership witnesses, configured fault doses and owned-worker identities. These
 components do not establish diagnostic labels, empirical acceptance or acquisition
-authority. They do not add a launcher mode or change ordinary peer schemas.
+authority. The resource source uses a separate explicit launcher mode; ordinary peer schemas
+remain unchanged.
 
 ## Sampler
 
@@ -88,12 +89,61 @@ The driver must still run its existing checkpoint/cleanup path in `finally`.
 The observer does not replace that cleanup responsibility or change the ordinary
 condition observer's timing/output.
 
-## Integration boundary
+## Explicit launcher and passive inspection
 
-Before fixture collection, add an explicit new launcher mode and a passive
-inspector for resource schema, source identity/quota consistency, controller
-clock and phase containment, sample completeness and cleanup. Source hashes,
-export/custody, availability rules and independent ownership witness checks must
-cover the new mode. Then qualify its overhead/failure behavior and prepare a
-reviewed bounded engineering recipe. The standalone sampler's Linux filesystem
-test is not validation of the complete observer or recognition of conditions.
+The only resource modes are
+`engineering-n11-resource-condition-no_injected_fault`,
+`engineering-n11-resource-condition-owned_identity_delay` and
+`engineering-n11-resource-condition-owned_cpu_pressure`. They select the new
+observer; ordinary condition modes select their original class. Relay assets,
+container entry point and acquisition method/role use that same closed routing.
+No arbitrary condition, worker command or resource parameter is accepted.
+
+The observer emits one `n11_resource_context` before resource samples. Its clock
+hash binds method, generation and controller origin. The origin is a decimal
+string so Python/JavaScript transport preserves nanosecond integer identity.
+It remains an internal declared clock, without N9 latency authority.
+
+`inspectResourceConditionAcquisition(run, {condition})` first verifies independent
+condition ownership, cadence restoration, native source continuity and cleanup.
+It then verifies the exact CPU schema, quota/file lifetime/clock, contiguous
+sequences, nondecreasing counters, sample budgets and controller-clock containment
+in all five windows. It rejects missing/foreign/late/resource-labelled fields,
+overlong reads, gaps and windows. Required windows have4–64 samples, at least2s
+inner duration, at most5s outer duration, at most1.5s adjacent outer gap and15s
+between-window gap; total samples are at most128. Read start must follow the
+associated observer timestamp within50ms. Ordinary inspection rejects resource
+metadata rather than interpreting it as ordinary condition evidence.
+
+Prepare a source-bound one-shot engineering plan with:
+
+```sh
+node engine/runtime/scripts/research/n11/resourceConditionObservation.mjs prepare \
+  --image sha256:IMAGE_DIGEST --acquisition-id n11-raw-resource-CASE \
+  --core-revision CORE_GIT_REVISION --condition no_injected_fault --output plan.json
+```
+
+The explicit acquisition command is:
+
+```sh
+node engine/runtime/scripts/research/n11/resourceConditionObservation.mjs acquire \
+  --plan plan.json --output-directory fresh-case-directory
+```
+
+Preparation creates no acquisition. Acquiring requires matching canonical plan,
+current revision and source hashes. It exclusively allocates the output and
+attempt marker, retains failures and never retries or overwrites a case. Successful
+inspection writes `control-receipt.json` and `resource-observation.json`; the latter
+binds the exact `acquisition.json` byte hash, context, identity, windows and samples.
+All three ordinary phase bundles are also exported under the distinct
+`contained-resource-condition-source-local-v1` compatibility group, common to the
+three conditions and containing no active condition name/dose.
+
+The core operator's `verify_native_exports.py` replays both the resource receipt
+and byte-bound auxiliary export before checking SDK/CLI phase windows and the
+N2/N3 response. Use `check_resource_inspector.py --producer ROOT` for a synthetic
+cross-repo replay/tamper check. Existing N3 features and recognition methods do
+not automatically consume CPU records. Linux sampler/seam checks do not replace
+a complete contained acquisition or prospective recognition study. Engineering
+cases remain outside study fitting/evaluation; software success grants no
+independent-session, diagnostic, probe-benefit or physical-latency acceptance.
