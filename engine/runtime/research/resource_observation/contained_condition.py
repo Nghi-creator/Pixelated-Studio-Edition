@@ -13,6 +13,10 @@ ERROR = "invalid_contained_resource_observation"
 PHASES = ("healthy", "degraded", "relief", "recovery", "post")
 
 
+class _ReferencePending(Exception):
+    """Internal control flow: retain collected reference rows until read spans suffice."""
+
+
 class ResourceConditionObservation(ConditionObservation):
     """Add independent CPU reads to the existing reference/native sample seam.
 
@@ -32,7 +36,43 @@ class ResourceConditionObservation(ConditionObservation):
         self._resource_upstream_emit = self.emit
         self.emit = self._resource_emit
 
+    def reference(self, now):
+        try:
+            return super().reference(now)
+        except _ReferencePending:
+            # The base emits before clearing its row buffer or advancing stage.
+            return False
+
+    def _reference_read_spans_ready(self, rows):
+        if not isinstance(rows, list) or len(rows) > 64:
+            raise ValueError(ERROR)
+        if len(rows) < 4:
+            return False
+        first, last = rows[0], rows[-1]
+        ready = True
+        for key in ("container_cpu_read", "native_read"):
+            left, right = first[key], last[key]
+            if left["clock_id"] != right["clock_id"]:
+                raise ValueError(ERROR)
+            inner = right["read_start_ns"] - left["read_end_ns"]
+            outer = right["read_end_ns"] - left["read_start_ns"]
+            if inner < 0 or outer > 5_000_000_000:
+                raise ValueError(ERROR)
+            ready = ready and inner >= 2_000_000_000
+        return ready
+
     def _resource_emit(self, kind, **fields):
+        if kind == "n11_pacing_reference":
+            try:
+                if self._resource_failed or fields.get("phase") not in ("healthy", "post"):
+                    raise ValueError(ERROR)
+                if not self._reference_read_spans_ready(fields.get("samples")):
+                    raise _ReferencePending()
+            except _ReferencePending:
+                raise
+            except Exception:
+                self._resource_failed = True
+                raise ValueError(ERROR) from None
         if kind == "n11_pair_phase_completed":
             try:
                 # Base tick captured `now` before the added CPU read. Publish the

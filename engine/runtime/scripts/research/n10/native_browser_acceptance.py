@@ -35,6 +35,10 @@ def main():
     condition_match=selected_condition is not None
     condition_name=selected_condition["condition"] if condition_match else None
     resource_condition=selected_condition["resource"] if condition_match else False
+    timing_flag=os.environ.get("N11_RESOURCE_TIMING_DIAGNOSTICS")
+    if timing_flag not in (None,"1") or timing_flag and not resource_condition:
+        raise ValueError("explicit resource timing diagnostic mode required")
+    resource_timing=timing_flag=="1"
     capacity = re.fullmatch(r"engineering-n11-capacity-(calibration|confirmation)-([0-7])",mode)
     if not capacity and not condition_match and mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", "engineering-n11-paired-observation", "engineering-n11-contention-paired", "engineering-n11-pacing-paired", "engineering-n11-pacing-contrast", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
         raise ValueError("closed acceptance mode required")
@@ -184,7 +188,7 @@ def main():
                         if pacing_mode:
                             from pacing_observation import PacingObservation, PacingContrastObservation, PacingCapacityObservation
                             if condition_match:
-                                Observer=condition_observer_class(resource_condition)
+                                Observer=condition_observer_class(resource_condition,timing=resource_timing)
                                 state['paired']=Observer(service,scene,bridge,local,capability,emit,condition=condition_name)
                             elif capacity:
                                 state["paired"] = PacingCapacityObservation(service,scene,bridge,local,capability,emit,calibration_index=capacity_index,confirmation=capacity_confirmation)

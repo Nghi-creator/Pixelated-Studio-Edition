@@ -71,6 +71,15 @@ origin. The supplied clock callback uses the controller's elapsed time, matching
 its phase markers. Changing generation/origin fails observation; it does not
 create a replacement sampler. Sampling outside those fixed seams is rejected.
 
+Healthy/post reference completion additionally requires at least two seconds
+between the first read's end and last read's start on **each** of the CPU and
+worker clocks independently. A pre-read observer timestamp spanning two seconds
+is insufficient. The new observer retains its existing reference rows and waits
+for a fresh sample when either actual read span is short; it does not emit a
+reference, clear rows, or advance the stage early. Overlong windows/changed clocks
+fail rather than extending limits. The two clocks are never subtracted from one
+another. Ordinary condition reference collection remains unchanged.
+
 The resource record has no condition name, dose or owned-worker fields. Standard
 ownership witnesses remain separate. Native encoded-buffer read brackets retain
 their worker clock; subtracting resource and worker timestamps is not allowed.
@@ -147,3 +156,33 @@ not automatically consume CPU records. Linux sampler/seam checks do not replace
 a complete contained acquisition or prospective recognition study. Engineering
 cases remain outside study fitting/evaluation; software success grants no
 independent-session, diagnostic, probe-benefit or physical-latency acceptance.
+
+
+## Engineering-only call-path timing diagnostics
+
+The ordinary resource observer remains the default. An explicit
+`resourceTimingDiagnostics: true` option to `runNativeBrowserAcceptance` is
+accepted only for a resource-condition mode. It sets the private container flag
+`N11_RESOURCE_TIMING_DIAGNOSTICS=1`, selecting `ResourceTimingObservation`.
+Non-resource modes and untyped flags are rejected before native work.
+The acquisition is marked `n11-resource-observer-timing-diagnostic-v1`.
+This is an engineering diagnostic path, not a prospective recognition mode.
+
+The observer records at most four traces: the first two measured references in
+healthy and post. Each has at most24nested component spans, including eligibility/
+readiness, identity, native/resource metadata, context emission, sampler
+construction/read and ownership witness. Trace output is deferred until after
+the reference call. No sample/observer timestamps are rewritten and no source
+lag/read/window/action/fault limits change. Eligibility polls without a
+measurement emit no trace. Failure propagates and cleanup remains available.
+
+`inspectResourceTimingDiagnostics` validates the exact diagnostic schema, bounds,
+sequence and clock, and binds complete traces to their original CPU samples.
+It reports observer-to-reference-entry, observer-to-read-start, read span and
+nested component elapsed durations. Overlapping nested spans must not be summed
+as independent CPU costs. Elapsed time includes descheduling and output/file
+waits; a long component span locates delay in a call path but does not prove its
+operating-system cause. Instrumentation itself has overhead and may perturb the
+run. Ordinary resource/ownership/source inspection remains required separately;
+a valid diagnostic trace does not make an invalid resource sample acceptable.
+Diagnostic acquisitions must stay excluded from study fitting/evaluation.

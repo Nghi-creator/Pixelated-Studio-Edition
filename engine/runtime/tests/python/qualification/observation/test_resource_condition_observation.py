@@ -202,6 +202,63 @@ class ResourceConditionTests(unittest.TestCase):
                     )
                 emit.assert_not_called()
 
+    def reference_rows(self, inner=2_000_000_000, worker_inner=None):
+        worker_inner = inner if worker_inner is None else worker_inner
+        rows = []
+        for i in range(5):
+            row = {}
+            for key, span, clock in (
+                ("container_cpu_read", inner, "controller"),
+                ("native_read", worker_inner, "worker"),
+            ):
+                start = (span + 1000) * i // 4
+                row[key] = dict(read_start_ns=start, read_end_ns=start + 1000, clock_id=clock)
+            rows.append(row)
+        return rows
+
+    def test_reference_requires_actual_cpu_and_worker_inner_duration(self):
+        observer, _, _, _, _ = self.observer()
+        self.assertFalse(observer._reference_read_spans_ready(self.reference_rows(1_999_415_376)))
+        self.assertFalse(
+            observer._reference_read_spans_ready(self.reference_rows(2_000_000_000, 1_999_999_999))
+        )
+        self.assertTrue(observer._reference_read_spans_ready(self.reference_rows(2_000_000_000)))
+        self.assertTrue(observer._reference_read_spans_ready(self.reference_rows(2_500_000_000)))
+        self.assertFalse(observer._reference_read_spans_ready(self.reference_rows()[:3]))
+
+    def test_reference_pending_retains_rows_and_does_not_emit_or_advance(self):
+        observer, _, _, _, emit = self.observer()
+        observer.reference_rows = self.reference_rows(1_999_415_376)
+
+        def base_reference(now):
+            observer.emit("n11_pacing_reference", phase="post", samples=observer.reference_rows)
+            observer.reference_rows = []
+            return True
+
+        with patch.object(ConditionObservation, "reference", side_effect=base_reference):
+            self.assertFalse(observer.reference(100))
+            self.assertEqual(len(observer.reference_rows), 5)
+            self.assertFalse(observer._resource_failed)
+            emit.assert_not_called()
+            observer.reference_rows = self.reference_rows(2_500_000_000)
+            self.assertTrue(observer.reference(200))
+            self.assertEqual(observer.reference_rows, [])
+            self.assertEqual(emit.call_count, 1)
+
+    def test_bad_reference_clock_and_overlong_window_fail_sticky(self):
+        for kind in ("clock", "long"):
+            observer, _, _, _, emit = self.observer()
+            rows = self.reference_rows(5_000_000_001 if kind == "long" else 2_000_000_000)
+            if kind == "clock":
+                rows[-1]["native_read"]["clock_id"] = "changed"
+            with self.assertRaises(ValueError):
+                observer.emit("n11_pacing_reference", phase="post", samples=rows)
+            self.assertTrue(observer._resource_failed)
+            emit.assert_not_called()
+
+    def test_reference_fix_does_not_change_normal_condition_reference_method(self):
+        self.assertIsNot(ResourceConditionObservation.reference, ConditionObservation.reference)
+
 
 if __name__ == "__main__":
     unittest.main()
