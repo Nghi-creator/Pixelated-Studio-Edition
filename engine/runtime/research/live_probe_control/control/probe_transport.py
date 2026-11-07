@@ -184,6 +184,21 @@ class ProbeOperation:
         with self.lock:
             return copy.deepcopy(self.latest)
 
+    def checkpoint(self):
+        """Passive terminal/pending state; no admission, retry or result authority."""
+        # finish()/lost() publish done only after their terminal fields. Do not
+        # expose partially published result fields while the operation is active.
+        done = self.done.is_set()
+        return dict(
+            method="n11-cadence-operation-checkpoint-v1",
+            request_id=self.request.request_id,
+            status=self.status if done else "pending",
+            done=done,
+            rejection=self.rejection if done else None,
+            result=asdict(self.result) if done and self.result is not None else None,
+            live_authority=False,
+        )
+
     def finish(self, body):
         if self.done.is_set():
             raise ValueError("duplicate probe outcome")

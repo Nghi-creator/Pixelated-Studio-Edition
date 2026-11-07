@@ -35,11 +35,21 @@ class ResourceConditionObservation(ConditionObservation):
         self._resource_sampler = self._resource_context = None
         self._resource_failed = False
         self._cadence_diagnostic_emitted = False
+        self._operation_checkpoint_emitted = False
         self._resource_last_end = self._resource_last_phase = None
         self._resource_upstream_emit = self.emit
         self.emit = self._resource_emit
 
     def checkpoint(self):
+        operation = getattr(self, "operation", None)
+        checkpoint = getattr(operation, "checkpoint", None)
+        if callable(checkpoint) and not getattr(self, "_operation_checkpoint_emitted", False):
+            self.emit(
+                "n11_cadence_operation_checkpoint", operation=checkpoint(),
+                scope="passive_operation_status_not_admission_or_restoration_proof",
+                live_authority=False,
+            )
+            self._operation_checkpoint_emitted = True
         diagnostic = getattr(getattr(self, "operation", None), "diagnostic", None)
         if diagnostic is not None and not getattr(self, "_cadence_diagnostic_emitted", False):
             self.emit(

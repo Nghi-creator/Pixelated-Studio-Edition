@@ -224,6 +224,84 @@ class FailureDiagnosticTests(unittest.TestCase):
         self.assertEqual(observer.emit.call_args.args[0], "n11_cadence_failure_diagnostic")
         self.assertFalse(observer.emit.call_args.kwargs["live_authority"])
 
+    def operation(self):
+        request = Request("diag", fixtures.GEN, 24, fixtures.SECOND)
+        draft = SimpleNamespace(
+            request=request,
+            token="token",  # noqa: S106 -- synthetic local handle
+            expires_ns=1,
+            offer_hash="a" * 64,
+            settings_hash="b" * 64,
+            policy_hash="c" * 64,
+        )
+        return ProbeOperation(
+            draft, SimpleNamespace(sequence=1, frames_decoded=1, presented_frames=1), 1
+        )
+
+    def test_pending_checkpoint_does_not_publish_partial_terminal_fields(self):
+        op = self.operation()
+        op.status = "rejected"
+        op.rejection = "preconditions"
+        report = op.checkpoint()
+        self.assertEqual(report["status"], "pending")
+        self.assertFalse(report["done"])
+        self.assertIsNone(report["rejection"])
+        self.assertIsNone(report["result"])
+
+    def test_rejection_checkpoint_is_distinct_from_controller_abort(self):
+        op = self.operation()
+        op.finish(dict(request_id="diag", result=None, rejection="preconditions"))
+        report = op.checkpoint()
+        self.assertTrue(report["done"])
+        self.assertEqual(report["status"], "rejected")
+        self.assertEqual(report["rejection"], "preconditions")
+        self.assertIsNone(report["result"])
+        self.assertFalse(report["live_authority"])
+
+    def test_worker_loss_checkpoint_does_not_invent_rejection_or_result(self):
+        op = self.operation()
+        op.lost()
+        report = op.checkpoint()
+        self.assertEqual(report["status"], "worker_lost")
+        self.assertTrue(report["done"])
+        self.assertIsNone(report["rejection"])
+        self.assertIsNone(report["result"])
+
+    def test_observed_result_checkpoint_is_copied_and_cannot_grant_authority(self):
+        op = self.operation()
+        op.finish(self.body())
+        report = op.checkpoint()
+        self.assertEqual(report["status"], "observed")
+        report["result"]["reason"] = "cancelled"
+        self.assertEqual(op.result.reason, "health_abort")
+        self.assertFalse(report["result"]["live_authority"])
+        with self.assertRaises(ValueError):
+            op.finish(self.body())
+
+    def test_operation_checkpoint_survives_missing_journal_and_cleanup_failure_once(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
+        from condition_observation import ConditionObservation
+
+        from research.resource_observation.contained_condition import ResourceConditionObservation
+
+        observer = object.__new__(ResourceConditionObservation)
+        observer.operation = self.operation()
+        observer.operation.finish(
+            dict(request_id="diag", result=None, rejection="ledger_unavailable")
+        )
+        observer.emit = Mock()
+        with patch.object(
+            ConditionObservation, "checkpoint", side_effect=ValueError("cleanup failed")
+        ), self.assertRaises(ValueError):
+            observer.checkpoint()
+        with patch.object(ConditionObservation, "checkpoint"):
+            observer.checkpoint()
+        observer.emit.assert_called_once()
+        self.assertEqual(observer.emit.call_args.args[0], "n11_cadence_operation_checkpoint")
+        self.assertEqual(
+            observer.emit.call_args.kwargs["operation"]["rejection"], "ledger_unavailable"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -241,3 +241,14 @@ The original combined v3 failure remains unchanged and has no such diagnostic.
 Its early health abort cannot be retrospectively attributed to receiver, native
 progress, capture identity or scheduling from the generic result alone. Any new
 source uses fresh pins and engineering qualification before a prospective study.
+
+Resource checkpoint also emits one `n11_cadence_operation_checkpoint` before
+cleanup, using the local operation handle's versioned
+`n11-cadence-operation-checkpoint-v1` summary. A terminal summary distinguishes
+`rejected` (with its existing rejection code), `worker_lost` (without an invented
+result), and `observed` (with the typed controller result). An unfinished operation
+is reported as `pending` without partially published terminal fields. This passive
+record is independent of journal creation and cannot admit, retry, cancel or
+restore an operation. Repeated checkpoint calls do not duplicate it. It covers the
+observability gap exposed by combined v4's failed owned-delay case, whose old raw
+record cannot retrospectively establish a rejection or worker-loss reason.
