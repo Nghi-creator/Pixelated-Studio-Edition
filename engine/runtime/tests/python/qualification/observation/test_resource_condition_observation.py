@@ -228,6 +228,7 @@ class ResourceConditionTests(unittest.TestCase):
 
     def test_reference_pending_retains_rows_and_does_not_emit_or_advance(self):
         observer, _, _, _, emit = self.observer()
+        observer._resource_sampler = Mock()  # This test starts after preparation.
         observer.reference_rows = self.reference_rows(1_999_415_376)
 
         def base_reference(now):

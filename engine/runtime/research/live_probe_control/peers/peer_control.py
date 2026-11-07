@@ -6,10 +6,20 @@ import threading
 import time
 from dataclasses import asdict
 
-from research.live_probe_control.control.contracts import Generation, Result, Snapshot, digest
+from research.live_probe_control.control.contracts import (
+    HEALTH_CHECKS,
+    Generation,
+    Result,
+    Snapshot,
+    digest,
+)
 from research.live_probe_control.control.controller import CadenceController
 from research.live_probe_control.control.journal import CadenceJournal
-from research.live_probe_control.control.probe_transport import EngineeringControl, receiver_value, request_value
+from research.live_probe_control.control.probe_transport import (
+    EngineeringControl,
+    receiver_value,
+    request_value,
+)
 
 SETTINGS = (
     "configured_fps",
@@ -29,9 +39,7 @@ class ReceiverLease:
         self.valid = True
         self.value = dict(receiver_value(value))
         self.received = self.clock()
-        self.progress = dict.fromkeys(
-            ("frames_decoded", "presented_frames"), self.received
-        )
+        self.progress = dict.fromkeys(("frames_decoded", "presented_frames"), self.received)
 
     def update(self, value):
         value = dict(receiver_value(value))
@@ -57,18 +65,17 @@ class ReceiverLease:
     def healthy(self):
         with self.lock:
             now = self.clock()
-            return (
-                self.valid
-                and self.value["healthy"]
-                and all(
-                    0 <= now - stamp <= LEASE_NS
-                    for stamp in (
-                        self.received,
-                        self.value["observed_ns"],
-                        *self.progress.values(),
-                    )
-                )
+            self.last_health_checks = dict(
+                receiver_valid=self.valid,
+                receiver_reported_healthy=self.value["healthy"],
+                receiver_receipt_fresh=0 <= now - self.received <= LEASE_NS,
+                receiver_observation_fresh=0 <= now - self.value["observed_ns"] <= LEASE_NS,
+                receiver_decode_fresh=0 <= now - self.progress["frames_decoded"] <= LEASE_NS,
+                receiver_presentation_fresh=0
+                <= now - self.progress["presented_frames"]
+                <= LEASE_NS,
             )
+            return all(self.last_health_checks.values())
 
     def counts(self):
         with self.lock:
@@ -90,6 +97,7 @@ class WorkerProbePort:
         self.progress_at = 0
         self.valid = True
         self.last_native = None
+        self.last_health_checks = None
 
     def snapshot(self):
         value = self.media.snapshot()
@@ -106,19 +114,33 @@ class WorkerProbePort:
         settings = {key: value[key] for key in SETTINGS[2:]}
         if any(v is None for v in settings.values()):
             self.valid = False
+        checks = dict(
+            native_valid=self.valid,
+            playing=value["state"] == "playing",
+            connected=value["connection_state"] == "connected",
+            ice_connected=value["ice_connection_state"] in ("connected", "completed"),
+            buffers_present=all(value[k] is not None and value[k] > 0 for k in keys),
+            native_progress_fresh=0 <= now - self.progress_at <= LEASE_NS,
+            **dict.fromkeys(HEALTH_CHECKS[6:]),
+        )
+        healthy = all(v for v in list(checks.values())[:6])
+        if healthy:
+            checks["receiver_healthy"] = self.lease.healthy()
+            healthy = checks["receiver_healthy"]
+            checks.update(getattr(self.lease, "last_health_checks", {}))
+        if healthy:
+            checks["capture_healthy"] = (
+                getattr(self.media, "capture_lease", None) is None
+                or self.media.capture_lease.healthy()
+            )
+            healthy = checks["capture_healthy"]
+        self.last_health_checks = checks
         return Snapshot(
             self.generation,
             value["configured_fps"],
             value["negotiated_fps"],
             digest(settings),
-            self.valid
-            and value["state"] == "playing"
-            and value["connection_state"] == "connected"
-            and value["ice_connection_state"] in ("connected", "completed")
-            and all(value[k] is not None and value[k] > 0 for k in keys)
-            and 0 <= now - self.progress_at <= LEASE_NS
-            and self.lease.healthy()
-            and (getattr(self.media, "capture_lease", None) is None or self.media.capture_lease.healthy()),
+            healthy,
         )
 
     def set_fps(self, fps):
@@ -126,7 +148,9 @@ class WorkerProbePort:
             raise ValueError("setter outside exact request/preimage")
         if fps != self.prior_fps and time.monotonic_ns() > self.deadline:
             raise ValueError("probe admission expired before setter")
-        if getattr(self.media, "capture_lease", None) is not None and not self.media.capture_lease.healthy(force=True):
+        if getattr(
+            self.media, "capture_lease", None
+        ) is not None and not self.media.capture_lease.healthy(force=True):
             raise ValueError("owned capture identity lost before setter")
         current = self.media.snapshot()["configured_fps"]
         if current not in (self.prior_fps, self.request.target_fps):
@@ -157,10 +181,7 @@ class WorkerProbePort:
             if (
                 time.monotonic_ns() - started >= 200000000
                 and receiver["sequence"] >= initial["sequence"] + 2
-                and all(
-                    receiver[k] > initial[k]
-                    for k in ("frames_decoded", "presented_frames")
-                )
+                and all(receiver[k] > initial[k] for k in ("frames_decoded", "presented_frames"))
                 and all(
                     self.last_native[k] >= native[k] + 2
                     for k in ("capture_buffers", "encoded_buffers")
@@ -200,11 +221,15 @@ class PeerControl:
         else:
             native = self.media.snapshot()
             if (
-                (self.config.capture is not None and (getattr(self.media, "capture_lease", None) is None
-                    or not self.media.capture_lease.healthy(force=True)))
+                (
+                    self.config.capture is not None
+                    and (
+                        getattr(self.media, "capture_lease", None) is None
+                        or not self.media.capture_lease.healthy(force=True)
+                    )
+                )
                 or request.generation != Generation(**envelope["generation"])
-                or request.generation
-                != Generation(**self.media.bootstrap["generation"])
+                or request.generation != Generation(**self.media.bootstrap["generation"])
                 or self.media.offer is None
                 or body["offer_hash"] != digest(self.media.offer["body"])
                 or body["settings_hash"] != digest(tuple(native[k] for k in SETTINGS))
@@ -287,19 +312,19 @@ class PeerControl:
                 or (control is not None and control.guard is not None)
                 or self._retained_intent(request, control)
             ):
-                result = Result(
-                    request.request_id, "unknown", "unknown", "journal_failed"
-                )
+                result = Result(request.request_id, "unknown", "unknown", "journal_failed")
                 self.blocked = True
             else:
                 rejection = "ledger_unavailable"
-        self.results.put_nowait(
-            {
-                "request_id": request.request_id,
-                "result": asdict(result) if result is not None else None,
-                "rejection": rejection,
-            }
-        )
+        body = {
+            "request_id": request.request_id,
+            "result": asdict(result) if result is not None else None,
+            "rejection": rejection,
+        }
+        diagnostic = getattr(control, "failure_diagnostic", None)
+        if result is not None and result.outcome == "aborted" and diagnostic is not None:
+            body["diagnostic"] = diagnostic
+        self.results.put_nowait(body)
 
     def heartbeat(self, body):
         if (
@@ -311,8 +336,7 @@ class PeerControl:
 
     def cancel(self, request_id=None):
         if request_id is not None and (
-            self.active is None
-            or request_id != self.active["body"]["request"]["request_id"]
+            self.active is None or request_id != self.active["body"]["request"]["request_id"]
         ):
             raise ValueError("stale probe cancellation")
         self.cancelled.set()

@@ -1,12 +1,12 @@
 /** Synthetic resource records only; never a native acquisition. */
 import {fixture as conditionFixture} from './conditionReceiptFixture.mjs';
-import {RESOURCE_METHOD,RESOURCE_ROLE,RESOURCE_READ_METHOD,resourceMode,resourceClockId} from '../n11/resourceProtocol.mjs';
+import {RESOURCE_METHOD,RESOURCE_ROLE,RESOURCE_READ_METHOD,RESOURCE_PREPARATION_METHOD,resourceMode,resourceClockId} from '../n11/resourceProtocol.mjs';
 export function fixture(condition='no_injected_fault'){
  const run=conditionFixture(condition);
  Object.assign(run,{method:RESOURCE_METHOD,role:RESOURCE_ROLE,mode:resourceMode(condition)});
  const generation=run.events.find(e=>e.kind==='n11_pair_dispatched').request.generation;
  const context={method:RESOURCE_METHOD,generation,controller_origin_ns:'1234567890123456789'},clock_id=resourceClockId(context);
- run.events.unshift({kind:'n11_resource_context',method:RESOURCE_METHOD,context,clock_id,live_authority:false});
+ run.events.unshift({kind:'n11_resource_context',method:RESOURCE_METHOD,context,clock_id,live_authority:false},{kind:'n11_observer_prepared',method:RESOURCE_PREPARATION_METHOD,read_start_ns:1,read_end_ns:1000000,clock_id,measurement_samples_taken:0,scope:'startup_eligibility_context_and_sampler_setup_before_reference_measurement',live_authority:false});
  // Extend only this invented fixture to four endpoint-spanning native samples.
  for(const phase of ['degraded','relief','recovery']){
   const rows=run.events.filter(e=>e.kind==='n11_pair_native'&&e.phase===phase),last=rows.at(-1),previous=rows.at(-2),extra=structuredClone(last);

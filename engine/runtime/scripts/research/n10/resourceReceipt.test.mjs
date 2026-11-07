@@ -47,3 +47,14 @@ test('clock origin is lossless decimal data and field order is deterministic',()
  assert.throws(()=>resourceClockId({...context,controller_origin_ns:1234}));
  assert.throws(()=>resourceClockId({...context,controller_origin_ns:'9223372036854775808'}));
 });
+
+for(const kind of ['missing','duplicate','overlap','sampled','budget','clock'])test('preparation rejects '+kind,()=>{
+ const run=fixture(),event=run.events.find(e=>e.kind==='n11_observer_prepared');
+ if(kind==='missing')run.events.splice(run.events.indexOf(event),1);
+ else if(kind==='duplicate')run.events.push(structuredClone(event));
+ else if(kind==='overlap')event.read_end_ns=run.events.find(e=>e.kind==='n11_pacing_reference'&&e.phase==='healthy').samples[0].at_ns;
+ else if(kind==='sampled')event.measurement_samples_taken=1;
+ else if(kind==='budget')event.read_end_ns=event.read_start_ns+1e9+1;
+ else event.clock_id='controller-monotonic-'+'f'.repeat(64);
+ assert.throws(()=>inspect(run,{condition:'no_injected_fault'}));
+});

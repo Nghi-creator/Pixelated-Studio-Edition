@@ -59,6 +59,8 @@ class TimingDiagnosticTests(unittest.TestCase):
             owner=SimpleNamespace(generation=Generation("owner", "pipe", "peer"))
         )
 
+        observer._prepare_reference = lambda: observer._ensure_resource_sampler(slot)
+
         def ready(*args, **kwargs):
             clock[0] += delay
             return True
@@ -68,6 +70,8 @@ class TimingDiagnosticTests(unittest.TestCase):
             observer.native_read_evidence(slot, dict(read_start_ns=10, read_end_ns=20))
             return False
 
+        observer.reference(clock[0])
+        events.clear()
         return observer, clock, events, ready, reference, slot
 
     def test_elapsed_ready_delay_is_visible_and_original_lag_is_not_hidden(self):
@@ -85,21 +89,19 @@ class TimingDiagnosticTests(unittest.TestCase):
         self.assertEqual(event["observer_tick_ns"], 1000)
         self.assertNotIn("condition", event)
 
-    def test_context_output_delay_is_attributed_to_its_nested_span(self):
-        observer, _, events, ready, reference, _ = self.observer(emit_delay=60_050_000)
+    def test_context_output_delay_is_outside_measurement_after_preparation(self):
+        observer, clock, events, ready, reference, _ = self.observer(emit_delay=60_050_000)
+        # The helper has prepared once, consuming the deliberately slow output.
+        tick = clock[0]
         with (
             patch.object(ConditionObservation, "reference", side_effect=reference),
             patch.object(ConditionObservation, "ready", side_effect=ready),
         ):
-            observer.reference(1000)
+            observer.reference(tick)
         trace = next(e for e in events if e["kind"] == "n11_observer_timing")
-        span = next(s for s in trace["spans"] if s["component"] == "context_emit")
-        self.assertEqual(span["end_ns"] - span["start_ns"], 60_050_000)
-        self.assertEqual(trace["resource_read_start_ns"] - trace["observer_tick_ns"], 60_050_000)
-        self.assertLess(
-            next(i for i, e in enumerate(events) if e["kind"] == "n11_resource_context"),
-            next(i for i, e in enumerate(events) if e["kind"] == "n11_observer_timing"),
-        )
+        self.assertEqual(trace["resource_read_start_ns"] - trace["observer_tick_ns"], 0)
+        self.assertNotIn("context_emit", [s["component"] for s in trace["spans"]])
+        self.assertEqual(trace["observer_tick_ns"], tick)
 
     def test_at_most_two_traces_in_each_reference_phase_and_no_phase_trace(self):
         observer, clock, events, ready, reference, slot = self.observer()

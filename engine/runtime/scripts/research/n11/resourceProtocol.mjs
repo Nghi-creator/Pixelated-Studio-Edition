@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {CONDITIONS} from './conditionProtocol.mjs';
 export const RESOURCE_METHOD='n11-contained-condition-resource-candidate-v1';
 export const RESOURCE_ROLE='engineering_resource_condition_witness_label_unavailable';
+export const RESOURCE_PREPARATION_METHOD='n11-resource-reference-preparation-candidate-v1';
 export const RESOURCE_READ_METHOD='n11-private-cgroup-cpu-read-candidate-v1';
 export function resourceMode(condition){
  if(!CONDITIONS.includes(condition))throw Error('closed resource condition required');
@@ -17,4 +18,4 @@ export function resourceClockId(context){
  return 'controller-monotonic-'+createHash('sha256').update(JSON.stringify({controller_origin_ns:context.controller_origin_ns,generation:{owner,peer,pipeline},method:RESOURCE_METHOD})).digest('hex');
 }
 
-export function resourceDeclaration(){return {method:RESOURCE_METHOD,read_method:RESOURCE_READ_METHOD,quota_usec:200000,period_usec:100000,maximum_samples:128,maximum_read_span_ns:50000000,clock:'controller_elapsed_monotonic_separate_from_worker'};}
+export function resourceDeclaration(){return {method:RESOURCE_METHOD,read_method:RESOURCE_READ_METHOD,quota_usec:200000,period_usec:100000,maximum_samples:128,maximum_read_span_ns:50000000,clock:'controller_elapsed_monotonic_separate_from_worker',reference_preparation:RESOURCE_PREPARATION_METHOD,maximum_preparation_ns:1000000000};}

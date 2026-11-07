@@ -61,7 +61,8 @@ condition observer under method `n11-contained-condition-resource-candidate-v1`.
 Like the other contained observers, importing it requires the runtime root and
 `engine/runtime/scripts/research/n10` on the Python import path. Its constructor
 accepts the original condition observer arguments and an injectable sampler
-factory for tests. Resource I/O is lazy, beginning at the first reference read.
+factory for tests. CPU counter I/O begins at the first measured reference read. A separate
+preparation pass constructs the sampler and establishes eligibility first.
 
 The new class adds `container_cpu_read` beside existing worker read metadata for
 healthy/post reference samples and measured degraded/relief/recovery samples.
@@ -186,3 +187,57 @@ operating-system cause. Instrumentation itself has overhead and may perturb the
 run. Ordinary resource/ownership/source inspection remains required separately;
 a valid diagnostic trace does not make an invalid resource sample acceptable.
 Diagnostic acquisitions must stay excluded from study fitting/evaluation.
+
+
+## Preparation before measured references
+
+The prepared source recipe adds
+`reference_preparation: n11-resource-reference-preparation-candidate-v1` and
+`maximum_preparation_ns: 1000000000` to its canonical plan declaration.
+Before the first healthy measurement, a dedicated reference pass checks the
+source/target/readiness/identity, publishes the controller clock context and
+constructs the sampler. It performs no CPU sample, takes no warm-up counter read,
+leaves the reference rows/sequence untouched and returns without collecting.
+The next normal tick rechecks readiness and uses that tick's original timestamp.
+Setup does not overwrite or backdate any recorded timestamp. A subsequent
+measurement stall still violates the existing50ms association requirement.
+
+A unique `n11_observer_prepared` record brackets the preparation on its declared
+controller clock and states `measurement_samples_taken: 0`. Successful setup and
+unsuccessful readiness attempts are each limited to one second of elapsed work;
+failures latch, with existing cleanup still available. Sampler source/quota and
+generation/origin stay pinned. The inspector requires exact preparation schema,
+clock/budget, zero measurements and completion strictly before the first healthy
+sample's observer timestamp. Missing, duplicate, overlapping, sampled, over-budget
+or wrong-clock preparation records are rejected.
+
+This isolates known one-time setup from measured reference collection. It does
+not prove that setup caused a historical stall or guarantee future scheduling
+latency. No observer lag/read/window minimum, missingness rule, action/fault
+lifetime, classifier coordinate, distance or acceptance criterion is relaxed.
+Historical sources and cohorts remain frozen under their original source pins;
+new prospective collection requires review of the changed source recipe.
+
+### Passive cadence failure diagnostics
+
+The contained resource observer can retain one `n11-cadence-failure-diagnostic-v1`
+record from an aborted private cadence operation. It freezes the first failed
+controller check and its already-read typed snapshot before restoration. When the
+worker port supplied health checks, the record distinguishes native validity,
+connection/progress, receiver freshness/progress and capture health. A null check
+means that short-circuit evaluation did not read that source. Exceptions carry a
+fixed `control_exception` code with no exception text or invented snapshot.
+
+The optional `probe_result.diagnostic` field is closed, versioned, bound to the
+same request/result envelope and allowed only for aborted results. Existing result
+shapes remain valid. The operation handle copies the record by value. Resource
+checkpoint emits it before pacing cleanup, so a cleanup error cannot hide the
+primary observation. No additional native/capture/receiver reads, setter calls,
+leases or action budget are granted by diagnostics. Missing or invalid diagnostic
+details never convert a failed operation to success. This identifies the observed
+failed guard; it does not authenticate an external cause or establish diagnosis.
+
+The original combined v3 failure remains unchanged and has no such diagnostic.
+Its early health abort cannot be retrospectively attributed to receiver, native
+progress, capture identity or scheduling from the generic result alone. Any new
+source uses fresh pins and engineering qualification before a prospective study.

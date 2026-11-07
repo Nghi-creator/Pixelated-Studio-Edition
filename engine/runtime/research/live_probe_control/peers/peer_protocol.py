@@ -4,8 +4,21 @@ import json
 import re
 from dataclasses import asdict
 
-from research.live_probe_control.control.contracts import Generation, Result, alias, digest, integer
-from research.live_probe_control.control.probe_transport import EngineeringControl, PROBE_REJECTIONS, hash_value, receiver_value, request_value
+from research.live_probe_control.control.contracts import (
+    Generation,
+    Result,
+    alias,
+    digest,
+    failure_diagnostic,
+    integer,
+)
+from research.live_probe_control.control.probe_transport import (
+    PROBE_REJECTIONS,
+    EngineeringControl,
+    hash_value,
+    receiver_value,
+    request_value,
+)
 
 VERSION = "n10-peer-ipc-v3"
 MAX_LINE = 262144
@@ -155,10 +168,7 @@ def command_body(kind, body):
 def event_body(kind, body):
     if kind == "ready":
         closed(body, ("live_authority", "mutation_available"))
-        if (
-            body["live_authority"] is not False
-            or body["mutation_available"] is not False
-        ):
+        if body["live_authority"] is not False or body["mutation_available"] is not False:
             raise ValueError("private transport cannot authorize mutation")
     elif kind == "answer":
         closed(body, ("sdp",))
@@ -195,7 +205,19 @@ def event_body(kind, body):
         if body["teardown"] not in ("null_observed", "unknown"):
             raise ValueError("invalid peer teardown")
     elif kind == "probe_result":
-        closed(body, ("request_id", "result", "rejection"))
+        closed(
+            body,
+            (
+                "request_id",
+                "result",
+                "rejection",
+                *(("diagnostic",) if "diagnostic" in body else ()),
+            ),
+        )
+        if "diagnostic" in body:
+            failure_diagnostic(body["diagnostic"])
+            if body["result"] is None or body["result"].get("outcome") != "aborted":
+                raise ValueError("diagnostic requires aborted result")
         alias(body["request_id"])
         if body["result"] is not None:
             value = Result(**body["result"])
@@ -290,10 +312,7 @@ def decode(line, *, incoming_command=False):
 
 def encode(value):
     data = (
-        json.dumps(
-            value, sort_keys=True, separators=(",", ":"), allow_nan=False
-        ).encode()
-        + b"\n"
+        json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False).encode() + b"\n"
     )
     if len(data) > MAX_LINE:
         raise ValueError("private peer frame limit")

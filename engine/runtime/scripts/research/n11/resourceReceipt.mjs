@@ -1,7 +1,7 @@
 /** Passive declared-source checks only; never a recognition/latency acceptance. */
 import {isDeepStrictEqual as same} from 'node:util';
 import {inspectConditionAcquisition} from './conditionReceipt.mjs';
-import {RESOURCE_METHOD,RESOURCE_READ_METHOD,resourceClockId} from './resourceProtocol.mjs';
+import {RESOURCE_METHOD,RESOURCE_READ_METHOD,RESOURCE_PREPARATION_METHOD,resourceClockId} from './resourceProtocol.mjs';
 const PHASES=['healthy','degraded','relief','recovery','post'];
 const COUNTERS=['usage_usec','user_usec','system_usec','nr_periods','nr_throttled','throttled_usec'];
 const safe=v=>Number.isSafeInteger(v)&&v>=0;
@@ -13,6 +13,10 @@ export function inspectResourceConditionAcquisition(run,{condition}={}){
  if(contexts.length!==1||events.some(e=>e.kind?.startsWith('n11_resource_')&&e.kind!=='n11_resource_context'))throw Error('unique resource context required');
  const record=contexts[0],context=record.context,clock=resourceClockId(context);
  if(!exact(record,['kind','method','clock_id','context','live_authority'])||record.method!==RESOURCE_METHOD||record.clock_id!==clock||record.live_authority!==false||!same(context.generation,base.controller_request.generation))throw Error('resource generation/context mismatch');
+ const prepared=events.filter(e=>e.kind==='n11_observer_prepared');
+ if(prepared.length!==1)throw Error('unique premeasurement preparation required');
+ const preparation=prepared[0];
+ if(!exact(preparation,['kind','method','read_start_ns','read_end_ns','clock_id','measurement_samples_taken','scope','live_authority'])||preparation.method!==RESOURCE_PREPARATION_METHOD||preparation.clock_id!==clock||preparation.live_authority!==false||preparation.measurement_samples_taken!==0||!safe(preparation.read_start_ns)||!safe(preparation.read_end_ns)||preparation.read_end_ns<preparation.read_start_ns||preparation.read_end_ns-preparation.read_start_ns>1e9||preparation.scope!=='startup_eligibility_context_and_sampler_setup_before_reference_measurement'||events.indexOf(record)>events.indexOf(preparation))throw Error('invalid source preparation');
  let prior=null,identity=null,count=0,maxSpan=0;const windows={},samples={};
  const pacingStart=events.find(e=>e.kind==='n11_pacing_started'),cleanup=events.find(e=>e.kind==='n11_condition_cleanup');
  for(const phase of PHASES){
@@ -22,6 +26,7 @@ export function inspectResourceConditionAcquisition(run,{condition}={}){
   samples[phase]=[];
   for(const row of rows){
    const r=row.container_cpu_read;
+   if(phase==='healthy'&&row===rows[0]&&(preparation.read_end_ns>=row.at_ns||events.indexOf(preparation)>events.indexOf(references[0])))throw Error('preparation overlaps first measurement');
    if(!exact(r,['method','scope','clock_id','sequence','read_start_ns','read_end_ns','source_identity','quota','counters','counter_units','underlying_counter_freshness','source_authenticity','live_authority','phase'])||r.method!==RESOURCE_READ_METHOD||r.scope!=='private_container_cpu_counters_not_ownership_or_diagnosis'||r.phase!==phase||r.clock_id!==clock||r.live_authority!==false||
     r.counter_units!=='microseconds_for_usec_fields_counts_for_nr_fields'||r.underlying_counter_freshness!=='not_authenticated_by_read_brackets'||r.source_authenticity!=='declared_namespace_quota_and_file_identity_only'||
     !safe(r.read_start_ns)||!safe(r.read_end_ns)||r.read_end_ns<r.read_start_ns||r.read_end_ns-r.read_start_ns>50e6||r.sequence!==count||!safe(row.at_ns)||r.read_start_ns<row.at_ns||r.read_start_ns-row.at_ns>50e6||

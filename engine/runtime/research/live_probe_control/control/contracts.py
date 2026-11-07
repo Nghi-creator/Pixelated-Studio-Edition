@@ -129,3 +129,64 @@ class Result:
             raise ValueError("teardown outcome mismatch")
         if type(self.live_authority) is not bool or self.live_authority is not False:
             raise ValueError("controller cannot grant live authority")
+
+
+FAILURE_DIAGNOSTIC_METHOD = "n11-cadence-failure-diagnostic-v1"
+HEALTH_CHECKS = (
+    "native_valid",
+    "playing",
+    "connected",
+    "ice_connected",
+    "buffers_present",
+    "native_progress_fresh",
+    "receiver_healthy",
+    "capture_healthy",
+    "receiver_valid",
+    "receiver_reported_healthy",
+    "receiver_receipt_fresh",
+    "receiver_observation_fresh",
+    "receiver_decode_fresh",
+    "receiver_presentation_fresh",
+)
+
+
+def failure_diagnostic(value):
+    """Bounded passive evidence, never a result or control-authority substitute."""
+    if type(value) is not dict or set(value) != {"method", "check", "snapshot", "health_checks"}:
+        raise ValueError("closed cadence diagnostic required")
+    if value["method"] != FAILURE_DIAGNOSTIC_METHOD or value["check"] not in (
+        "preimage_changed",
+        "cancelled",
+        "generation_changed",
+        "snapshot_unhealthy",
+        "settings_changed",
+        "configured_fps_changed",
+        "negotiated_fps_invalid",
+        "negotiation_deadline",
+        "apply_not_observed",
+        "control_exception",
+    ):
+        raise ValueError("invalid cadence diagnostic check")
+    snapshot = value["snapshot"]
+    if snapshot is not None:
+        if type(snapshot) is not dict or set(snapshot) != {
+            "healthy",
+            "configured_fps",
+            "negotiated_fps",
+            "generation_matches",
+            "settings_match",
+        }:
+            raise ValueError("invalid cadence diagnostic snapshot")
+        for key in ("healthy", "generation_matches", "settings_match"):
+            if type(snapshot[key]) is not bool:
+                raise ValueError("typed diagnostic flags required")
+        integer(snapshot["configured_fps"], 1, 240)
+        integer(snapshot["negotiated_fps"], 1, 240)
+    checks = value["health_checks"]
+    if checks is not None and (
+        type(checks) is not dict
+        or set(checks) != set(HEALTH_CHECKS)
+        or any(v is not None and type(v) is not bool for v in checks.values())
+    ):
+        raise ValueError("invalid cadence health checks")
+    return value

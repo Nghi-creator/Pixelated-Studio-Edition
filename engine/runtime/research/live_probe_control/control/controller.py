@@ -5,9 +5,23 @@ import threading
 import time
 from dataclasses import asdict
 
-from research.live_probe_control.control.contracts import Generation, Policy, Request, Result, Snapshot, digest, integer
+from research.live_probe_control.control.contracts import (
+    FAILURE_DIAGNOSTIC_METHOD,
+    Generation,
+    Policy,
+    Request,
+    Result,
+    Snapshot,
+    digest,
+    failure_diagnostic,
+    integer,
+)
 from research.live_probe_control.control.journal import CadenceJournal
-from research.live_probe_control.control.watchdog import PidfdWatchdog, process_gone, process_identity
+from research.live_probe_control.control.watchdog import (
+    PidfdWatchdog,
+    process_gone,
+    process_identity,
+)
 
 GRACE_NS = 2000000000
 
@@ -41,6 +55,7 @@ class CadenceController:
         self.watchdog_factory = watchdog_factory
         self.clock, self.sleep, self.identity, self.gone = clock, sleep, identity, gone
         self.guard = None
+        self.failure_diagnostic = None
         self.busy = False
         self.last_clock = None
         self.operation_lock = threading.Lock()
@@ -77,6 +92,32 @@ class CadenceController:
             raise ValueError("typed cadence snapshot required")
         return Snapshot(**asdict(value) | {"generation": Generation(**asdict(value.generation))})
 
+    def _record_failure(self, check, current, prior):
+        # Freeze the first failing observation before restoration changes the port.
+        # Diagnostic errors must never change action, cleanup or journal semantics.
+        if self.failure_diagnostic is not None:
+            return
+        try:
+            value = dict(
+                method=FAILURE_DIAGNOSTIC_METHOD,
+                check=check,
+                snapshot=None
+                if current is None
+                else dict(
+                    healthy=current.healthy,
+                    configured_fps=current.configured_fps,
+                    negotiated_fps=current.negotiated_fps,
+                    generation_matches=current.generation == prior.generation,
+                    settings_match=current.settings_hash == prior.settings_hash,
+                ),
+                health_checks=copy.deepcopy(getattr(self.port, "last_health_checks", None))
+                if current is not None
+                else None,
+            )
+            self.failure_diagnostic = copy.deepcopy(failure_diagnostic(value))
+        except Exception:  # noqa: BLE001 -- passive diagnostics cannot affect control
+            return
+
     def execute(self, request, *, cancelled=lambda: False):
         if not self.operation_lock.acquire(blocking=False):
             raise ValueError("cadence control already active")
@@ -87,6 +128,7 @@ class CadenceController:
             request = Request(
                 **asdict(request) | {"generation": Generation(**asdict(request.generation))}
             )
+            self.failure_diagnostic = None
             self.busy = True
             try:
                 return self._execute(request, cancelled)
@@ -182,20 +224,25 @@ class CadenceController:
             started = self._now()
             hard_deadline = started + reserve
             # Arm first, then recheck identities/health immediately before mutation.
-            if self._snapshot() != prior:
+            current = self._snapshot()
+            if current != prior:
+                self._record_failure("preimage_changed", current, prior)
                 raise ValueError("cadence preimage changed")
             if cancelled() is not False:
                 reason = "cancelled"
+                self._record_failure("cancelled", current, prior)
                 raise ValueError("cancelled before setter")
             self.port.set_fps(request.target_fps)
             reason = "duration_elapsed"
             while self._now() < started + request.duration_ns:
                 if cancelled() is not False:
                     reason = "cancelled"
+                    self._record_failure("cancelled", None, prior)
                     break
                 current = self._snapshot()
                 if current.generation != prior.generation:
                     reason = "generation_changed"
+                    self._record_failure("generation_changed", current, prior)
                     break
                 if (
                     not current.healthy
@@ -208,12 +255,26 @@ class CadenceController:
                     )
                 ):
                     reason = "health_abort"
+                    check = (
+                        "snapshot_unhealthy"
+                        if not current.healthy
+                        else "settings_changed"
+                        if current.settings_hash != prior.settings_hash
+                        else "configured_fps_changed"
+                        if current.configured_fps != request.target_fps
+                        else "negotiated_fps_invalid"
+                        if current.negotiated_fps not in (prior.configured_fps, request.target_fps)
+                        else "negotiation_deadline"
+                    )
+                    self._record_failure(check, current, prior)
                     break
                 applied_observed = applied_observed or current.negotiated_fps == request.target_fps
                 self.sleep(0.05)
             if reason == "duration_elapsed" and not applied_observed:
                 reason = "apply_failed"
+                self._record_failure("apply_not_observed", None, prior)
         except (Exception, KeyboardInterrupt):
+            self._record_failure("control_exception", None, prior)
             reason = reason if reason in ("apply_failed", "cancelled") else "health_abort"
         restored = False
         try:

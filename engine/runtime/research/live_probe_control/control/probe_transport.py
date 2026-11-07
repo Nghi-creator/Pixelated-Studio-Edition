@@ -7,12 +7,23 @@ import threading
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from research.live_probe_control.capture.contained_capture import GameCaptureContext, PinnedGameCapture
-from research.live_probe_control.control.contracts import Generation, Policy, Request, Result, digest, integer
+from research.live_probe_control.capture.contained_capture import (
+    GameCaptureContext,
+    PinnedGameCapture,
+)
+from research.live_probe_control.control.contracts import (
+    Generation,
+    Policy,
+    Request,
+    Result,
+    digest,
+    failure_diagnostic,
+    integer,
+)
 from research.live_probe_control.control.journal import CadenceJournal
 
-
 PROBE_REJECTIONS = ("disabled", "busy", "preconditions", "ledger_unavailable")
+
 
 def hash_value(value):
     if type(value) is not str or re.fullmatch(r"[a-f0-9]{64}", value) is None:
@@ -59,8 +70,13 @@ class EngineeringControl:
     def open(cls, directory, policy, *, scene=None):
         with CadenceJournal(directory) as store:
             info = os.fstat(store.directory_fd)
-            value = cls(str(directory), policy, info.st_dev, info.st_ino,
-                        GameCaptureContext.from_scene(scene) if scene is not None else None)
+            value = cls(
+                str(directory),
+                policy,
+                info.st_dev,
+                info.st_ino,
+                GameCaptureContext.from_scene(scene) if scene is not None else None,
+            )
             value.check(store)
             return value
 
@@ -93,7 +109,8 @@ class EngineeringControl:
 
     def matches_source(self, source):
         return (source == "isolated_synthetic" and self.capture is None) or (
-            source == "isolated_game" and type(self.capture) is GameCaptureContext)
+            source == "isolated_game" and type(self.capture) is GameCaptureContext
+        )
 
     def check_capture(self):
         if self.capture is not None:
@@ -146,6 +163,7 @@ class ProbeOperation:
         self.latest = None
         self.result = None
         self.rejection = None
+        self.diagnostic = None
         self.status = "queued"
         self.publish(sample, True, observed_ns)
 
@@ -175,8 +193,16 @@ class ProbeOperation:
         ):
             raise ValueError("probe result identity mismatch")
         rejection = body["rejection"]
-        if (result is None and rejection not in PROBE_REJECTIONS) or (result is not None and rejection is not None):
+        if (result is None and rejection not in PROBE_REJECTIONS) or (
+            result is not None and rejection is not None
+        ):
             raise ValueError("invalid probe rejection/outcome")
+        diagnostic = body.get("diagnostic")
+        if "diagnostic" in body:
+            failure_diagnostic(diagnostic)
+            if result is None or result.outcome != "aborted":
+                raise ValueError("diagnostic requires aborted result")
+        self.diagnostic = copy.deepcopy(diagnostic)
         self.rejection = rejection
         self.result = result
         self.status = "observed" if self.result is not None else "rejected"

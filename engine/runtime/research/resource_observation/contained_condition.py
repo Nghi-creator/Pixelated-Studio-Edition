@@ -10,6 +10,8 @@ from .cgroup_cpu import CgroupCpuSampler
 
 METHOD = "n11-contained-condition-resource-candidate-v1"
 ERROR = "invalid_contained_resource_observation"
+PREPARATION_METHOD = "n11-resource-reference-preparation-candidate-v1"
+MAX_PREPARATION_NS = 1_000_000_000
 PHASES = ("healthy", "degraded", "relief", "recovery", "post")
 
 
@@ -32,16 +34,100 @@ class ResourceConditionObservation(ConditionObservation):
         self._resource_factory = sampler_factory
         self._resource_sampler = self._resource_context = None
         self._resource_failed = False
+        self._cadence_diagnostic_emitted = False
         self._resource_last_end = self._resource_last_phase = None
         self._resource_upstream_emit = self.emit
         self.emit = self._resource_emit
 
+    def checkpoint(self):
+        diagnostic = getattr(getattr(self, "operation", None), "diagnostic", None)
+        if diagnostic is not None and not getattr(self, "_cadence_diagnostic_emitted", False):
+            self.emit(
+                "n11_cadence_failure_diagnostic", diagnostic=diagnostic,
+                scope="passive_first_failure_not_causal_proof_or_control_authority",
+                live_authority=False,
+            )
+            self._cadence_diagnostic_emitted = True
+        return super().checkpoint()
+
     def reference(self, now):
         try:
+            if self._resource_failed:
+                raise ValueError(ERROR)
+            if self.pacing_stage == "healthy" and self._resource_sampler is None:
+                self._prepare_reference()
+                # Preparation never contributes a measurement. The next normal
+                # tick supplies its own honest timestamp and rechecks readiness.
+                return False
             return super().reference(now)
         except _ReferencePending:
             # The base emits before clearing its row buffer or advancing stage.
             return False
+
+    def _ensure_resource_sampler(self, slot):
+        context = dict(
+            method=METHOD,
+            generation=asdict(slot.owner.generation),
+            controller_origin_ns=str(self.origin),
+        )
+        clock_id = (
+            "controller-monotonic-"
+            + hashlib.sha256(
+                json.dumps(context, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()
+        )
+        if self._resource_sampler is None:
+            self._resource_context = context
+            self._resource_clock_id = clock_id
+            self.emit(
+                "n11_resource_context",
+                method=METHOD,
+                clock_id=clock_id,
+                context=context,
+                live_authority=False,
+            )
+            self._resource_sampler = self._resource_factory(
+                clock_id=clock_id,
+                expected_quota_us=200000,
+                expected_period_us=100000,
+                clock=lambda: self.now() - self.origin,
+            )
+        if context != self._resource_context:
+            raise ValueError(ERROR)
+
+    def _prepare_reference(self):
+        try:
+            start = self.now()
+            slots = self.slots(("first",))
+            if self.scene.game.poll() is not None:
+                raise ValueError(ERROR)
+            if slots is None or not self.target_ready(slots, 30) or not self.ready(slots):
+                if not 0 <= self.now() - start <= MAX_PREPARATION_NS:
+                    raise ValueError(ERROR)
+                return
+            identity = self.identity(slots)
+            if self.identities is not None and identity != self.identities:
+                raise ValueError(ERROR)
+            self.identities = identity
+            self._ensure_resource_sampler(slots["first"])
+            end = self.now()
+            if not 0 <= end - start <= MAX_PREPARATION_NS:
+                raise ValueError(ERROR)
+            self.emit(
+                "n11_observer_prepared",
+                method=PREPARATION_METHOD,
+                read_start_ns=start - self.origin,
+                read_end_ns=end - self.origin,
+                clock_id=self._resource_clock_id,
+                measurement_samples_taken=0,
+                scope="startup_eligibility_context_and_sampler_setup_before_reference_measurement",
+                live_authority=False,
+            )
+            if not 0 <= self.now() - start <= MAX_PREPARATION_NS:
+                raise ValueError(ERROR)
+        except Exception:
+            self._resource_failed = True
+            raise ValueError(ERROR) from None
 
     def _reference_read_spans_ready(self, rows):
         if not isinstance(rows, list) or len(rows) > 64:
@@ -112,34 +198,8 @@ class ResourceConditionObservation(ConditionObservation):
                 raise ValueError(ERROR)
             if phase not in PHASES:
                 raise ValueError(ERROR)
-            context = dict(
-                method=METHOD,
-                generation=asdict(slot.owner.generation),
-                controller_origin_ns=str(self.origin),
-            )
-            clock_id = (
-                "controller-monotonic-"
-                + hashlib.sha256(
-                    json.dumps(context, sort_keys=True, separators=(",", ":")).encode()
-                ).hexdigest()
-            )
-            if self._resource_sampler is None:
-                self._resource_context = context
-                self.emit(
-                    "n11_resource_context",
-                    method=METHOD,
-                    clock_id=clock_id,
-                    context=context,
-                    live_authority=False,
-                )
-                self._resource_sampler = self._resource_factory(
-                    clock_id=clock_id,
-                    expected_quota_us=200000,
-                    expected_period_us=100000,
-                    clock=lambda: self.now() - self.origin,
-                )
-            if context != self._resource_context:
-                raise ValueError(ERROR)
+            self._ensure_resource_sampler(slot)
+            clock_id = self._resource_clock_id
             sample = self._resource_sampler.sample()
             if sample.get("clock_id") != clock_id or sample.get("quota") != dict(
                 quota_usec=200000, period_usec=100000
