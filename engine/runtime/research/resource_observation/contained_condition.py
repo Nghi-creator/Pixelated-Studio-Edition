@@ -6,6 +6,8 @@ from dataclasses import asdict
 
 from condition_observation import ConditionObservation
 
+from research.live_probe_control.peers.peer_protocol import encoded_read_value
+
 from .cgroup_cpu import CgroupCpuSampler
 
 METHOD = "n11-contained-condition-resource-candidate-v1"
@@ -200,6 +202,21 @@ class ResourceConditionObservation(ConditionObservation):
             raise ValueError(ERROR)
         try:
             native = super().native_read_evidence(slot, observation)
+            if "encoded_counter_read" in observation:
+                encoded = encoded_read_value(
+                    observation["encoded_counter_read"],
+                    outer_start=observation["read_start_ns"],
+                    outer_end=observation["read_end_ns"],
+                    counter=observation["encoded_buffers"],
+                )
+                if encoded is not None:
+                    native["encoded_counter_read"] = dict(
+                        **encoded, clock_id=native["native_read"]["clock_id"],
+                        basis="worker_elapsed_monotonic_ns",
+                        scope="reported_encoded_counter_only_not_other_snapshot_fields",
+                        underlying_counter_freshness="not_authenticated_by_read_brackets",
+                        live_authority=False,
+                    )
             if self.pacing_stage in ("healthy", "post"):
                 phase = self.pacing_stage
             elif self.pacing_stage == "pair" and self.stage == "measure":

@@ -20,7 +20,8 @@ from research.live_probe_control.control.probe_transport import (
     request_value,
 )
 
-VERSION = "n10-peer-ipc-v3"
+VERSION = "n10-peer-ipc-v4"
+ENCODED_READ_METHOD = "native-encoded-counter-read-brackets-v1"
 MAX_LINE = 262144
 MAX_BUFFER = 524288
 MAX_COMMANDS = 256
@@ -165,6 +166,23 @@ def command_body(kind, body):
     return body
 
 
+def encoded_read_value(value, *, outer_start, outer_end, counter):
+    """Bind optional counter-specific timing to the unchanged outer snapshot."""
+    if value is None:
+        if counter is not None:
+            raise ValueError("missing encoded read for available counter")
+        return None
+    closed(value, ("method", "read_start_ns", "read_end_ns", "value"))
+    if value["method"] != ENCODED_READ_METHOD:
+        raise ValueError("invalid encoded counter read method")
+    integer(value["read_start_ns"], outer_start, outer_end)
+    integer(value["read_end_ns"], value["read_start_ns"], outer_end)
+    integer(value["value"], 0, 2**53 - 1)
+    if type(counter) is not int or value["value"] != counter:
+        raise ValueError("encoded counter read value mismatch")
+    return value
+
+
 def event_body(kind, body):
     if kind == "ready":
         closed(body, ("live_authority", "mutation_available"))
@@ -188,6 +206,7 @@ def event_body(kind, body):
                 "state",
                 *SNAPSHOT_COUNTERS,
                 *SNAPSHOT_STATES,
+                *(("encoded_counter_read",) if "encoded_counter_read" in body else ()),
             ),
         )
         integer(body["read_start_ns"], 0, 2**53 - 1)
@@ -200,6 +219,11 @@ def event_body(kind, body):
         for key in SNAPSHOT_COUNTERS:
             if body[key] is not None:
                 integer(body[key], 0, 2**53 - 1)
+        if "encoded_counter_read" in body:
+            encoded_read_value(
+                body["encoded_counter_read"], outer_start=body["read_start_ns"],
+                outer_end=body["read_end_ns"], counter=body["encoded_buffers"],
+            )
     elif kind == "closed":
         closed(body, ("teardown",))
         if body["teardown"] not in ("null_observed", "unknown"):

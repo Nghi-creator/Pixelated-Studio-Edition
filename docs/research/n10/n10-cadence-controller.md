@@ -245,3 +245,12 @@ The [synthetic engineering dispatch path](n10-engineering-dispatch.md) runs this
 controller through a dedicated camera worker with local owner/receiver binding.
 It retains one owner/session ledger across replacements and remains unavailable
 for production capture and qualified live activation.
+
+Application settling is timed from immediately before the FPS setter attempt,
+after the final read-only preimage check. The numeric policy limit is unchanged.
+The action duration, watchdog deadline and reservation retain their original
+start; preparation does not restart or extend them. If the original action
+window has already elapsed, the controller refuses to call the setter. Earlier
+source counted preimage-check time against application settling; a controlled
+clock regression demonstrates an immediate false abort after a slow pre-check.
+Historical evidence retains those original source pins and outcomes.

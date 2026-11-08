@@ -252,3 +252,70 @@ record is independent of journal creation and cannot admit, retry, cancel or
 restore an operation. Repeated checkpoint calls do not duplicate it. It covers the
 observability gap exposed by combined v4's failed owned-delay case, whose old raw
 record cannot retrospectively establish a rejection or worker-loss reason.
+
+### Matching the study's host process lifetime
+
+`scripts/research/n11/conditionEngineering.mjs` is an acquisition-only engineering
+runner that retains one Node process across all cases and synchronous core
+verification, like `combinedResourceStudy.mjs`. A Python loop launching a fresh
+Node child per case does not exercise that process lifetime; successful results
+from that topology cannot establish that the long-lived study host is reliable.
+This execution difference is not itself evidence of a memory/GC or other cause.
+
+The CLI takes an absolute JSON configuration path and its exact `sha256:` byte
+hash. Configuration declares `scope: "engineering_only_no_study_admission"`,
+`retryAllowed: false`, a fixed `maximumAcquisitions` (1–36), absolute `directory`
+and `coreDirectory`, `sourceManifestHash`, pinned `dependencyFiles` including the
+runner, an absolute `verificationCommand`, and fixed `cases`. Each case has a
+fresh `n11-raw-eng-` ID, condition, absolute plan path/hash, and its exact numbered
+output path under `directory/cases/`. Prepare all canonical resource plans first;
+create the output parent and leave every case output/attempt absent. Supply the
+existing verifier with `--write-derived` and the fixed policy; no fit/score command
+is used by this runner.
+
+Source/dependency/plan checks precede every attempt. An exclusive run-start file
+prevents resume; any acquisition/verification failure closes the remaining suffix.
+Verification bytes are preserved, and PID/memory-after-case records describe the
+host process outside measurement windows. A durable supervisor supplies the
+aggregate deadline. Every allocated engineering ID remains excluded from studies,
+including unstarted cases. These runs neither authorize prospective study collection
+nor establish classifier/diagnostic acceptance.
+
+Combined v5's first-failure record identified `negotiation_deadline`: configured
+24 FPS, negotiated 30 FPS, with all recorded health/settings/generation checks
+passing. The controller restored successfully; the run remains failed. A controlled
+clock drill separately proved that final preimage-check time was being charged
+against application settling. The corrected source anchors that clock immediately
+before the setter attempt, preserving the 100 ms numeric policy and original
+action/watchdog/reservation deadlines. A setter is refused if preparation consumed
+the original action window. This is a clock-anchor correction, not an increase in
+the limit or retrospective acceptance of v5. The old record lacks timing brackets,
+so the drill does not prove how much pre-check delay that specific attempt had.
+
+### Counter-specific timing diagnostics (no analytical adoption)
+
+Private peer IPC v4 adds optional `encoded_counter_read` metadata with separately
+identified `native-encoded-counter-read-brackets-v1` semantics. The worker brackets
+the existing encoded-buffer property read exactly once and binds its returned value
+inside the unchanged whole-snapshot bounds. Resource evidence adds the same
+worker-generation clock, explicit reported-counter-only scope and unauthenticated
+underlying freshness. Missing/failed counter reads produce no invented timing.
+Parent validation rejects value mismatch, out-of-bounds/reversed times, malformed
+fields and mixed old transport versions; coherent frozen source bundles retain
+their own original transport implementation.
+
+The original `native_read` remains a whole-snapshot read. The current combined
+projection still uses it with the encoded 100 ms limit; CPU reads separately retain
+50 ms. The new diagnostic field is not an alternative accepted input or a fallback.
+V6 correctly remained unavailable for its 101.255250 ms composite read. Its earlier
+71.873001 ms composite read was below the actual encoded limit and did not reject
+that response. No old encoded read can be narrowed retrospectively: the new point
+brackets did not exist in old data.
+
+Any analytical adoption of the new timing needs a separately versioned source/
+projection contract and fresh prospective validation, preserving full metadata
+bounds, phase/clock/value identity, all samples, minimum duration, missingness and
+numeric eligibility gates. A preemption during the encoded getter must remain
+visible; no clipping, dropping an inconvenient sample or refreshing its timestamp.
+This records a read of a reported internal counter, not authenticated frame event
+time, physical capture latency or an N9 clock-authority upgrade.

@@ -176,3 +176,8 @@ Source loss invalidates the binding permanently. Loss during an action can leave
 restoration unknown and the journal dirty; the exact-worker watchdog remains the
 fallback. Game/display lifetime descriptors never become watchdog kill targets.
 There is still no network setter, production control flag or live qualification.
+
+The current private source bundle uses IPC v4, retaining the engineering dispatch
+commands/results and adding bounded optional counter-specific timing metadata.
+It does not grant new control authority or change admission, budgets or restoration.
+Old bundles/receipts keep their original version; mixed live endpoints fail closed.

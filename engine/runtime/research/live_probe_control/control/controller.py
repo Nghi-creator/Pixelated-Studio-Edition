@@ -232,6 +232,12 @@ class CadenceController:
                 reason = "cancelled"
                 self._record_failure("cancelled", current, prior)
                 raise ValueError("cancelled before setter")
+            # Application settling starts at the setter attempt, after the final
+            # read-only preimage check. The action/watchdog deadlines still use
+            # the original start; slow preparation cannot extend either budget.
+            settling_started = self._now()
+            if settling_started >= started + request.duration_ns:
+                raise ValueError("action deadline reached before setter")
             self.port.set_fps(request.target_fps)
             reason = "duration_elapsed"
             while self._now() < started + request.duration_ns:
@@ -250,7 +256,7 @@ class CadenceController:
                     or current.configured_fps != request.target_fps
                     or current.negotiated_fps not in (prior.configured_fps, request.target_fps)
                     or (
-                        self._now() >= started + self.policy.settling_ns
+                        self._now() >= settling_started + self.policy.settling_ns
                         and current.negotiated_fps != request.target_fps
                     )
                 ):

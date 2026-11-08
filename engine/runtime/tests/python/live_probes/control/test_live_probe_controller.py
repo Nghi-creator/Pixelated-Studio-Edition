@@ -358,12 +358,68 @@ class ControllerTests(unittest.TestCase):
             pass
 
 
+    def delayed_application(self, precheck_ns, caps_ns):
+        snapshot, setter = self.port.snapshot, self.port.set_fps
+        marks = {}
+        prechecked = False
+
+        def observed():
+            nonlocal prechecked
+            if self.guards and self.guards[-1].armed and not self.port.calls and not prechecked:
+                prechecked = True
+                self.clock.now += precheck_ns
+            if self.port.fps == 24 and "setter_ns" in marks:
+                self.port.negotiated = (
+                    24 if self.clock.now - marks["setter_ns"] >= caps_ns else 30
+                )
+            return snapshot()
+
+        def applied(fps):
+            setter(fps)
+            if fps == 24:
+                marks["setter_ns"] = self.clock.now
+                self.port.negotiated = 30 if caps_ns else 24
+            else:
+                marks["restore_ns"] = self.clock.now
+
+        self.port.snapshot, self.port.set_fps = observed, applied
+        start = self.clock.now
+        with self.control() as control:
+            result = control.execute(Request("settling-clock", GEN, 24, SECOND))
+            diagnostic = control.failure_diagnostic
+        return result, diagnostic, marks, start
+
+    def test_final_preimage_check_does_not_consume_application_settling(self):
+        result, diagnostic, marks, start = self.delayed_application(150000000, 50000000)
+        self.assertEqual(result.outcome, "completed")
+        self.assertIsNone(diagnostic)
+        self.assertEqual(marks["setter_ns"] - start, 150000000)
+        self.assertEqual(marks["restore_ns"] - start, SECOND)
+        self.assertEqual(self.guards[0].armed, SECOND + 2 * SECOND)
+        self.assertTrue(self.guards[0].cancelled)
+
+    def test_still_late_negotiation_aborts_at_unchanged_post_setter_limit(self):
+        result, diagnostic, marks, _ = self.delayed_application(150000000, 150000000)
+        self.assertEqual(result.outcome, "aborted")
+        self.assertEqual(diagnostic["check"], "negotiation_deadline")
+        self.assertEqual(marks["restore_ns"] - marks["setter_ns"], POLICY.settling_ns)
+        self.assertEqual(result.restoration, "verified_by_port")
+
+    def test_preimage_delay_cannot_start_setter_after_original_action_deadline(self):
+        result, _, marks, _ = self.delayed_application(SECOND + 100000000, 50000000)
+        self.assertEqual(result.outcome, "aborted")
+        self.assertEqual(result.reason, "apply_failed")
+        self.assertNotIn("setter_ns", marks)
+        self.assertEqual(self.port.calls, [])
+
+
 @unittest.skipUnless(sys.platform == "linux" and hasattr(os, "pidfd_open"), "Linux pidfd only")
 class NativeWatchdogTests(unittest.TestCase):
     def test_lost_control_pipe_triggers_exact_worker_teardown(self):
         root = Path(__file__).resolve().parents[4]
         code = (
-            "from research.live_probe_control.control.watchdog import PidfdWatchdog; import os,time; "
+            "from research.live_probe_control.control.watchdog import PidfdWatchdog; "
+            "import os,time; "
             "w=PidfdWatchdog(); w.arm(2000000000); os.close(w.write_fd); time.sleep(10)"
         )
         result = subprocess.run(  # noqa: S603 -- fixed owned child

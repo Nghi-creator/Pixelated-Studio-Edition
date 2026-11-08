@@ -1,5 +1,6 @@
 """Dedicated one-pipeline answerer. Explicit private CLI only; no camera import."""
 
+import contextlib
 import json
 import os
 import queue
@@ -8,7 +9,16 @@ import sys
 import time
 from contextlib import nullcontext
 
-from research.live_probe_control.peers.peer_protocol import MAX_BUFFER, PROFILE_ENCODERS, SNAPSHOT_COUNTERS, SNAPSHOT_STATES, Lines, encode, event
+from research.live_probe_control.peers.peer_protocol import (
+    ENCODED_READ_METHOD,
+    MAX_BUFFER,
+    PROFILE_ENCODERS,
+    SNAPSHOT_COUNTERS,
+    SNAPSHOT_STATES,
+    Lines,
+    encode,
+    event,
+)
 
 
 def counter(value):
@@ -46,8 +56,9 @@ class PeerMedia:
         gi.require_version("GstWebRTC", "1.0")
         gi.require_version("GstSdp", "1.0")
         gi.require_version("GstVideo", "1.0")
-        from camera_config import configure_ice_servers
         from gi.repository import Gst, GstSdp, GstVideo, GstWebRTC
+
+        from camera_config import configure_ice_servers
 
         self.gst, self.sdp, self.rtc, self.video = Gst, GstSdp, GstWebRTC, GstVideo
         Gst.init(None)
@@ -68,7 +79,8 @@ class PeerMedia:
         cpu, quantizer = PROFILE_ENCODERS[settings["id"]]
         isolated = bootstrap["body"]["source"] == "isolated_synthetic"
         source = (
-            "videotestsrc name=video_capture is-live=true pattern=ball ! video/x-raw,width=640,height=480"
+            "videotestsrc name=video_capture is-live=true pattern=ball ! "
+            "video/x-raw,width=640,height=480"
             if isolated
             else "ximagesrc name=video_capture display-name=:99 use-damage=false show-pointer=false"
         )
@@ -79,16 +91,20 @@ class PeerMedia:
         )
         text = (
             "webrtcbin name=sendrecv bundle-policy=max-bundle "
-            f'{source} ! capsfilter name=source_rate caps-change-mode=immediate caps="video/x-raw,framerate={settings["fps"]}/1" '
-            "! videoconvert ! video/x-raw,format=I420 ! identity name=captured signal-handoffs=false "
+            f'{source} ! capsfilter name=source_rate caps-change-mode=immediate '
+            f'caps="video/x-raw,framerate={settings["fps"]}/1" '
+            "! videoconvert ! video/x-raw,format=I420 ! identity name=captured "
+            "signal-handoffs=false "
             "! queue name=pre_encoder_queue max-size-buffers=1 leaky=downstream "
             f"! vp8enc name=video_encoder deadline=1 cpu-used={cpu} threads=4 end-usage=cbr "
-            f"target-bitrate={settings['bitrate_kbps'] * 1000} max-quantizer={quantizer} min-quantizer=4 "
+            f"target-bitrate={settings['bitrate_kbps'] * 1000} "
+            f"max-quantizer={quantizer} min-quantizer=4 "
             "keyframe-max-dist=120 error-resilient=1 ! identity name=encoded signal-handoffs=false "
             "! rtpvp8pay pt=96 ! queue name=post_encoder_queue max-size-buffers=1 leaky=downstream "
             "! application/x-rtp,media=video,encoding-name=VP8,payload=96 ! sendrecv. "
             f"{audio} ! audioconvert ! audioresample ! queue max-size-buffers=3 leaky=downstream "
-            "! opusenc ! rtpopuspay pt=111 ! queue ! application/x-rtp,media=audio,encoding-name=OPUS,payload=111 ! sendrecv."
+            "! opusenc ! rtpopuspay pt=111 ! queue ! "
+            "application/x-rtp,media=audio,encoding-name=OPUS,payload=111 ! sendrecv."
         )
         self.pipeline = Gst.parse_launch(text)
         self.webrtc = self.pipeline.get_by_name("sendrecv")
@@ -128,7 +144,10 @@ class PeerMedia:
             return
 
     def _request_startup_keyframe(self):
-        if self.closed or self.offer is None or not self.startup_keyframe_pending or self.startup_keyframe_attempted:
+        if (
+            self.closed or self.offer is None or not self.startup_keyframe_pending
+            or self.startup_keyframe_attempted
+        ):
             return
         try:
             connected = self.webrtc.get_property("connection-state").value_nick == "connected"
@@ -141,8 +160,12 @@ class PeerMedia:
         # a downstream implementation does not accept the request.
         self.startup_keyframe_attempted = True
         self.startup_keyframe_pending = False
-        event = self.video.video_event_new_upstream_force_key_unit(self.gst.CLOCK_TIME_NONE, True, 1)
-        self.startup_keyframe_accepted = self.pipeline.get_by_name("video_encoder").get_static_pad("src").send_event(event)
+        event = self.video.video_event_new_upstream_force_key_unit(
+            self.gst.CLOCK_TIME_NONE, True, 1
+        )
+        self.startup_keyframe_accepted = (
+            self.pipeline.get_by_name("video_encoder").get_static_pad("src").send_event(event)
+        )
 
     def _overrun(self, _):
         if not self.closed:
@@ -233,31 +256,34 @@ class PeerMedia:
                 values[key] = native if native in allowed else "unknown"
             except (ValueError, TypeError, AttributeError, RuntimeError):
                 values[key] = "unknown"
+        encoded_read = None
         for name, key in (
             ("captured", "capture_buffers"),
             ("encoded", "encoded_buffers"),
         ):
-            try:
+            with contextlib.suppress(ValueError, TypeError, AttributeError):
+                read_start = time.monotonic_ns() - self.origin if key == "encoded_buffers" else None
                 values[key] = counter(
                     self.pipeline.get_by_name(name)
                     .get_property("stats")
                     .get_value("num-buffers")
                 )
-            except (ValueError, TypeError, AttributeError):
-                pass
+                if key == "encoded_buffers" and values[key] is not None:
+                    encoded_read = dict(
+                        method=ENCODED_READ_METHOD, read_start_ns=read_start,
+                        read_end_ns=time.monotonic_ns() - self.origin, value=values[key],
+                    )
         values["queue_overruns_total"] = counter(self.overruns)
         for name, key in (
             ("pre_encoder_queue", "pre_encoder_queue_level"),
             ("post_encoder_queue", "post_encoder_queue_level"),
         ):
-            try:
+            with contextlib.suppress(ValueError, TypeError, AttributeError):
                 values[key] = counter(
                     self.pipeline.get_by_name(name).get_property(
                         "current-level-buffers"
                     )
                 )
-            except (ValueError, TypeError, AttributeError):
-                pass
         try:
             values["configured_fps"] = caps_values(
                 self.pipeline.get_by_name("source_rate").get_property("caps")
@@ -280,6 +306,7 @@ class PeerMedia:
             read_start_ns=start,
             read_end_ns=time.monotonic_ns() - self.origin,
             state=state,
+            encoded_counter_read=encoded_read,
             **values,
         )
         self.latest_snapshot = (snapshot, time.monotonic_ns())

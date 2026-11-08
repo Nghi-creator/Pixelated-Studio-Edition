@@ -158,3 +158,8 @@ Bound-native failures retain a closed diagnostic suffix such as `sequence_gap`,
 `counter_reset`, `clock_or_receipt_reversed`, `unsupported_settings` or
 `invalid_fields_or_receipt`. These identify validation failures without granting
 authority or substituting diagnostics for source evidence.
+
+Current bundled private peers use IPC v4 for separately identified optional
+encoded-counter read timing. Existing outer snapshot bounds, settings and health
+checks remain. Both endpoints must use the same frozen source bundle; v3 messages
+are rejected by v4 rather than silently mixed. Historical bundles retain v3 code.
