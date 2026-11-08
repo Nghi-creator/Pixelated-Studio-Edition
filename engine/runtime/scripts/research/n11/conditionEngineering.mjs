@@ -55,6 +55,7 @@ export async function runConditionEngineering(config, dependencies = {}) {
     await assert.rejects(fs.lstat(slot.output), {code:'ENOENT'});
     await assert.rejects(fs.lstat(path.join(path.dirname(slot.plan), slot.id + '.attempt.json')), {code:'ENOENT'});
   }
+  await fs.mkdir(path.join(directory, 'cases'), {recursive:true, mode:0o700});
   await write(path.join(directory, 'run-start.json'), {
     method:'n11-single-node-condition-engineering-v1', node_process_id:process.pid,
     started_at_utc:new Date().toISOString(), maximum_acquisitions:config.maximumAcquisitions,
@@ -68,6 +69,9 @@ export async function runConditionEngineering(config, dependencies = {}) {
       active = slot; attempted = false; stage = 'preflight';
       await preflight();
       assert.equal(await hash(slot.plan), slot.planSha256);
+      stage = 'before_acquire';
+      if (dependencies.beforeAcquire) await dependencies.beforeAcquire(slot);
+      await preflight();
       stage = 'acquire'; attempted = true;
       await acquire(['--plan', slot.plan, '--output-directory', slot.output]);
       await preflight(); stage = 'verify';
@@ -76,6 +80,8 @@ export async function runConditionEngineering(config, dependencies = {}) {
       assert.equal(receipt.acquisition_id, slot.id);
       assert.equal(receipt.source_manifest, config.sourceManifestHash);
       assert.equal(receipt.sdk_cli_equal_phases, 3);
+      stage = 'post_verify_preflight';
+      await preflight();
       await fs.writeFile(path.join(slot.output, 'engineering-verification.stdout'), bytes, {flag:'wx', mode:0o600});
       rows.push({acquisition_id:slot.id, condition:slot.condition, state:'source_engineering_verified',
         sdk_cli_equal_phases:3, node_process_id:process.pid, node_memory_after_case:process.memoryUsage()});

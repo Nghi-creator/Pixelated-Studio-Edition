@@ -13,7 +13,6 @@ const runner = fileURLToPath(new URL('../n11/conditionEngineering.mjs', import.m
 async function fixture(t, count = 3) {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'n11-single-node-test-'));
   t.after(() => fs.rm(directory, {recursive:true, force:true}));
-  await fs.mkdir(path.join(directory, 'cases'));
   let sources = {fixture:'a'.repeat(64)};
   const sourceManifestHash = sha(json(sources));
   const config = {directory, coreDirectory:directory, scope:'engineering_only_no_study_admission', retryAllowed:false,
@@ -73,16 +72,27 @@ test('verification failure preserves attempted case and stops suffix', async t =
   assert.equal(f.calls.length, 1);
 });
 
-test('changed source between cases stops before next attempt', async t => {
+test('source change during verification rejects that case and stops the suffix', async t => {
   const f = await fixture(t); const verify = f.dependencies.verify;
   f.dependencies.verify = slot => { f.changeSource(); return verify(slot); };
   await assert.rejects(runConditionEngineering(f.config, f.dependencies));
   const result = await f.result();
-  assert.equal(result.rows.length, 1);
-  assert.equal(result.failed_acquisition_id, null);
-  assert.equal(result.failed_stage, 'preflight');
+  assert.equal(result.rows.length, 0);
+  assert.equal(result.failed_acquisition_id, f.config.cases[0].id);
+  assert.equal(result.failed_stage, 'post_verify_preflight');
   assert.deepEqual(result.unstarted_acquisition_ids, f.config.cases.slice(1).map(s => s.id));
   assert.equal(f.calls.length, 1);
+});
+
+test('a failed fitting boundary happens before any next native attempt', async t => {
+  const f = await fixture(t);
+  f.dependencies.beforeAcquire = () => { throw Error('fit unavailable to execute'); };
+  await assert.rejects(runConditionEngineering(f.config, f.dependencies), /fit unavailable/);
+  const result = await f.result();
+  assert.equal(result.failed_acquisition_id, null);
+  assert.equal(result.failed_stage, 'before_acquire');
+  assert.equal(f.calls.length, 0);
+  assert.equal(result.unstarted_acquisition_ids.length, 3);
 });
 
 test('changed plans or unpinned runner cannot acquire', async t => {
