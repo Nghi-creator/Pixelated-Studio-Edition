@@ -9,6 +9,7 @@ from condition_observation import ConditionObservation
 from research.live_probe_control.peers.peer_protocol import encoded_read_value
 
 from .cgroup_cpu import CgroupCpuSampler
+from .encoded_phase_trace import REFERENCE_SPAN_NS
 
 METHOD = "n11-contained-condition-resource-candidate-v1"
 ERROR = "invalid_contained_resource_observation"
@@ -31,9 +32,12 @@ class ResourceConditionObservation(ConditionObservation):
 
     method = METHOD
 
-    def __init__(self, *args, sampler_factory=CgroupCpuSampler, **kwargs):
+    def __init__(self, *args, sampler_factory=CgroupCpuSampler, encoded_event_trace=False, **kwargs):
         super().__init__(*args, **kwargs)
         self._resource_factory = sampler_factory
+        self._encoded_event_trace = encoded_event_trace
+        if encoded_event_trace:
+            self.minimum_phase_ns = REFERENCE_SPAN_NS
         self._resource_sampler = self._resource_context = None
         self._resource_failed = False
         self._cadence_diagnostic_emitted = False
@@ -147,6 +151,9 @@ class ResourceConditionObservation(ConditionObservation):
         if len(rows) < 4:
             return False
         first, last = rows[0], rows[-1]
+        minimum_span = 2_000_000_000
+        if self._encoded_event_trace:
+            minimum_span = REFERENCE_SPAN_NS
         ready = True
         for key in ("container_cpu_read", "native_read"):
             left, right = first[key], last[key]
@@ -156,7 +163,7 @@ class ResourceConditionObservation(ConditionObservation):
             outer = right["read_end_ns"] - left["read_start_ns"]
             if inner < 0 or outer > 5_000_000_000:
                 raise ValueError(ERROR)
-            ready = ready and inner >= 2_000_000_000
+            ready = ready and inner >= minimum_span
         return ready
 
     def _resource_emit(self, kind, **fields):

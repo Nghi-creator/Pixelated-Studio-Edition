@@ -42,6 +42,7 @@ class Slot:
     reported: bool = False
     cleanup_ok: bool = False
     operation: object = None
+    encoded_trace_requested: bool = False
 
 
 class CameraWorkers:
@@ -210,6 +211,7 @@ class CameraWorkers:
                 last_receiver_sequence = None
                 last_receiver_sent_ns = 0
                 cancel_sent = False
+                trace_sent = False
                 while True:
                     now = time.monotonic_ns()
                     if now < slot.seen_ns or now - slot.seen_ns > 3 * SECOND:
@@ -260,6 +262,9 @@ class CameraWorkers:
                                 )
                                 last_receiver_sequence = receiver["sequence"]
                                 last_receiver_sent_ns = now
+                        if slot.encoded_trace_requested and not trace_sent:
+                            owner.request_encoded_trace()
+                            trace_sent = True
                         # Limit outstanding requests and return to supervisor polling.
                         for _ in range(8):
                             if len(owner.pending) >= 24:

@@ -39,6 +39,10 @@ def main():
     if timing_flag not in (None,"1") or timing_flag and not resource_condition:
         raise ValueError("explicit resource timing diagnostic mode required")
     resource_timing=timing_flag=="1"
+    trace_flag = os.environ.get("N11_ENCODED_EVENT_DIAGNOSTICS")
+    if trace_flag not in (None, "1") or trace_flag and not resource_condition:
+        raise ValueError("explicit resource encoded event diagnostic mode required")
+    encoded_trace = trace_flag == "1"
     capacity = re.fullmatch(r"engineering-n11-capacity-(calibration|confirmation)-([0-7])",mode)
     if not capacity and not condition_match and mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", "engineering-n11-paired-observation", "engineering-n11-contention-paired", "engineering-n11-pacing-paired", "engineering-n11-pacing-contrast", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
         raise ValueError("closed acceptance mode required")
@@ -189,7 +193,12 @@ def main():
                             from pacing_observation import PacingObservation, PacingContrastObservation, PacingCapacityObservation
                             if condition_match:
                                 Observer=condition_observer_class(resource_condition,timing=resource_timing)
-                                state['paired']=Observer(service,scene,bridge,local,capability,emit,condition=condition_name)
+                                observer_emit = emit
+                                if encoded_trace:
+                                    from research.resource_observation.encoded_phase_trace import EncodedPhaseTrace
+                                    state["encoded_phase_trace"] = EncodedPhaseTrace(emit)
+                                    observer_emit = state["encoded_phase_trace"].observe
+                                state['paired']=Observer(service,scene,bridge,local,capability,observer_emit,condition=condition_name, **({'encoded_event_trace': True} if encoded_trace else {}))
                             elif capacity:
                                 state["paired"] = PacingCapacityObservation(service,scene,bridge,local,capability,emit,calibration_index=capacity_index,confirmation=capacity_confirmation)
                             else:
@@ -203,8 +212,29 @@ def main():
                             state["paired"] = PairedObservation(service, scene, bridge, local, capability, emit)
                         emit("n11_raw_identity", game_pid=scene.game.pid,
                              telemetry_path=os.environ["PIXELATED_CAMERA_TELEMETRY_STATE_PATH"])
-                    if not state["paired"].tick():
+                    if not state.get("encoded_trace_pending") and not state["paired"].tick():
                         return True
+                    if encoded_trace:
+                        slot = service.active["first"]
+                        if not state.get("encoded_trace_pending"):
+                            from research.resource_observation.encoded_phase_trace import SUFFIX_WAIT_NS
+
+                            state["encoded_trace_pending"] = time.monotonic_ns() + SUFFIX_WAIT_NS
+                            return True
+                        if time.monotonic_ns() < state["encoded_trace_pending"]:
+                            return True
+                        slot.encoded_trace_requested = True
+                        if slot.owner.encoded_trace_reply is None:
+                            if slot.owner.state != "playing":
+                                raise ValueError("encoded trace worker unavailable")
+                            return True
+                        report = state["encoded_phase_trace"].report(
+                            slot.owner.encoded_trace_reply,
+                            generation=slot.owner.generation,
+                            controller_origin_ns=state["paired"].origin,
+                            controller_namespace=os.readlink("/proc/self/ns/time"),
+                        )
+                        emit("n11_encoded_event_trace", **report)
                     state["slots"] = list(service.active.values())
                     state["phase"] = "disconnected"
                     state["disconnect_thread"] = threading.Thread(target=captured["client"].disconnect, daemon=True)

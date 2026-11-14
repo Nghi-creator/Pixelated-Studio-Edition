@@ -14,7 +14,7 @@ from threading import Lock
 
 from research.live_probe_control.control.contracts import Generation
 from research.live_probe_control.peers.peer_lifetime import ParentLease
-from research.live_probe_control.peers.peer_protocol import MAX_BUFFER, MAX_COMMANDS, Lines, command, decode, encode
+from research.live_probe_control.peers.peer_protocol import EVENT_TRACE_ENV, MAX_BUFFER, MAX_COMMANDS, Lines, command, decode, encode
 from research.live_probe_control.control.probe_transport import EngineeringControl
 
 SECOND = 1000000000
@@ -91,6 +91,8 @@ class PeerSupervisor:
         self.control = None
         self.probe_sequence = self.probe_id = None
         self.probe_unresolved = False
+        self.encoded_trace_enabled = False
+        self.encoded_trace_reply = None
 
     def __enter__(self):
         if self.entered or self.state != "new":
@@ -170,6 +172,9 @@ class PeerSupervisor:
         command(self.generation, 0, "bootstrap", body)
         self.control = control
         environment = child_environment(os.environ)
+        self.encoded_trace_enabled = source == "isolated_game" and os.environ.get(EVENT_TRACE_ENV) == "1"
+        if self.encoded_trace_enabled:
+            environment[EVENT_TRACE_ENV] = "1"
         try:
             self.child = subprocess.Popen(
                 [
@@ -267,6 +272,15 @@ class PeerSupervisor:
             raise ValueError("stale engineering cancellation")
         self._queue("probe_cancel", {"request_id": request_id}, "ack")
 
+    def request_encoded_trace(self):
+        if not self.encoded_trace_enabled or self.state != "playing":
+            raise ValueError("encoded trace diagnostic unavailable")
+        if self.encoded_trace_reply is not None or any(
+            pending[1] == "encoded_trace" for pending in self.pending.values()
+        ):
+            raise ValueError("encoded trace already requested")
+        self._queue("encoded_trace", {}, "encoded_trace", SECOND)
+
     def shutdown(self):
         if self.state not in ("starting", "ready", "answering", "playing"):
             raise ValueError("peer shutdown unavailable")
@@ -281,7 +295,7 @@ class PeerSupervisor:
         seq, kind = message["sequence"], message["kind"]
         if self.anchors.get(seq) != message["request_hash"]:
             raise ValueError("unbound private peer reply")
-        if kind in ("ready", "answer", "ack", "closed", "probe_result"):
+        if kind in ("ready", "answer", "ack", "closed", "probe_result", "encoded_trace"):
             pending = self.pending.get(seq)
             if pending is None or pending[1] != kind:
                 raise ValueError("duplicate or unexpected peer reply")
@@ -304,6 +318,8 @@ class PeerSupervisor:
                 if self.state == "answering":
                     self.state = "playing"
                 self.last_snapshot_received = now
+            elif kind == "encoded_trace":
+                self.encoded_trace_reply = message["body"]
             elif kind == "closed":
                 self.closed_reply = message["body"]["teardown"]
             if kind not in ("ready", "answer"):

@@ -11,6 +11,7 @@ from contextlib import nullcontext
 
 from research.live_probe_control.peers.peer_protocol import (
     ENCODED_READ_METHOD,
+    EVENT_TRACE_ENV,
     MAX_BUFFER,
     PROFILE_ENCODERS,
     SNAPSHOT_COUNTERS,
@@ -108,6 +109,7 @@ class PeerMedia:
         )
         self.pipeline = Gst.parse_launch(text)
         self.webrtc = self.pipeline.get_by_name("sendrecv")
+        self.event_observer = None
         try:
             if bootstrap["body"]["source"] == "isolated_game":
                 from research.live_probe_control.capture.contained_capture import PinnedGameCapture
@@ -115,6 +117,13 @@ class PeerMedia:
 
                 config = EngineeringControl.from_wire(bootstrap["body"]["control"])
                 self.capture_lease = PinnedGameCapture(config.capture, expected_owner=os.getppid())
+            if os.environ.get(EVENT_TRACE_ENV) == "1" and bootstrap["body"]["source"] == "isolated_game":
+                from research.live_probe_control.peers.encoded_event_observer import EncodedEventObserver
+
+                self.event_observer = EncodedEventObserver(origin_ns=self.origin, clock_id=None)
+                pad = self.pipeline.get_by_name("encoded").get_static_pad("src")
+                if not self.event_observer.attach(pad, Gst):
+                    raise ValueError("encoded event observer installation failed")
             configure_ice_servers(
                 self.webrtc,
                 json.dumps(bootstrap["body"]["ice_servers"]),
@@ -236,6 +245,15 @@ class PeerMedia:
             self.webrtc.emit("add-ice-candidate", index, candidate)
             status = "forwarded"
         self.emit(request, "ack", {"state": status})
+
+    def encoded_trace(self):
+        if self.event_observer is None:
+            raise ValueError("encoded trace unavailable")
+        encoded = self.pipeline.get_by_name("encoded")
+        return self.event_observer.snapshot(
+            lambda: counter(encoded.get_property("stats").get_value("num-buffers")),
+            time_namespace=os.readlink("/proc/self/ns/time"),
+        )
 
     def snapshot(self):
         start = time.monotonic_ns() - self.origin
@@ -428,6 +446,8 @@ def main():
                     elif kind == "probe_cancel":
                         control.cancel(request["body"]["request_id"])
                         emit(request, "ack", {"state": "forwarded"})
+                    elif kind == "encoded_trace":
+                        emit(request, "encoded_trace", media.encoded_trace())
                     elif kind == "shutdown":
                         if control.running():
                             control.cancel()

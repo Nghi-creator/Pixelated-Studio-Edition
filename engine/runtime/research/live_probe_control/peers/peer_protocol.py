@@ -4,6 +4,8 @@ import json
 import re
 from dataclasses import asdict
 
+from research.live_probe_control.peers.encoded_event_observer import MAX_EVENTS
+
 from research.live_probe_control.control.contracts import (
     Generation,
     Result,
@@ -21,6 +23,7 @@ from research.live_probe_control.control.probe_transport import (
 )
 
 VERSION = "n10-peer-ipc-v4"
+EVENT_TRACE_ENV = "N11_ENCODED_EVENT_DIAGNOSTICS"
 ENCODED_READ_METHOD = "native-encoded-counter-read-brackets-v1"
 MAX_LINE = 262144
 MAX_BUFFER = 524288
@@ -159,7 +162,7 @@ def command_body(kind, body):
     elif kind == "probe_cancel":
         closed(body, ("request_id",))
         alias(body["request_id"])
-    elif kind == "shutdown":
+    elif kind in ("shutdown", "encoded_trace"):
         closed(body, ())
     else:
         raise ValueError("unsupported private peer command")
@@ -181,6 +184,34 @@ def encoded_read_value(value, *, outer_start, outer_end, counter):
     if type(counter) is not int or value["value"] != counter:
         raise ValueError("encoded counter read value mismatch")
     return value
+
+
+def encoded_trace_value(body):
+    """Validate compact diagnostic rows before expanding them outside the worker."""
+    closed(body, ("origin_ns", "time_namespace", "identity_read", "observed", "buffer_list", "rows"))
+    integer(body["origin_ns"], 0, 2**63 - 1)
+    if type(body["time_namespace"]) is not str or re.fullmatch(r"time:\[[0-9]{1,20}\]", body["time_namespace"]) is None:
+        raise ValueError("invalid worker time namespace")
+    integer(body["observed"], 0, 2**53 - 1)
+    if type(body["buffer_list"]) is not bool:
+        raise ValueError("invalid event list status")
+    read = closed(body["identity_read"], ("start_ns", "end_ns", "count", "observed_before", "observed_after"))
+    integer(read["start_ns"], 0, 2**53 - 1)
+    integer(read["end_ns"], read["start_ns"], 2**53 - 1)
+    if read["count"] is not None:
+        integer(read["count"], 0, 2**53 - 1)
+    integer(read["observed_before"], 0, body["observed"])
+    integer(read["observed_after"], read["observed_before"], body["observed"])
+    rows = body["rows"]
+    if type(rows) is not list or len(rows) != min(MAX_EVENTS, body["observed"]):
+        raise ValueError("invalid encoded trace row count")
+    previous = -1
+    for ordinal, row in enumerate(rows, 1):
+        if type(row) is not list or len(row) != 3 or type(row[0]) is not int or row[0] != ordinal:
+            raise ValueError("invalid encoded trace ordinal")
+        integer(row[1], previous + 1, 2**53 - 1)
+        previous = integer(row[2], row[1], 2**53 - 1)
+    return body
 
 
 def event_body(kind, body):
@@ -224,6 +255,8 @@ def event_body(kind, body):
                 body["encoded_counter_read"], outer_start=body["read_start_ns"],
                 outer_end=body["read_end_ns"], counter=body["encoded_buffers"],
             )
+    elif kind == "encoded_trace":
+        encoded_trace_value(body)
     elif kind == "closed":
         closed(body, ("teardown",))
         if body["teardown"] not in ("null_observed", "unknown"):

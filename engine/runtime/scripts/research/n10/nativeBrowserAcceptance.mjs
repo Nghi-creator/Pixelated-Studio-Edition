@@ -31,6 +31,8 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const conditionRole=resourceCondition?RESOURCE_ROLE:'engineering_condition_witness_label_unavailable';
   const resourceTimingDiagnostics=options.resourceTimingDiagnostics??false;
   if(typeof resourceTimingDiagnostics!=='boolean'||resourceTimingDiagnostics&&!resourceCondition)throw Error('explicit resource timing diagnostic mode required');
+  const encodedEventDiagnostics=options.encodedEventDiagnostics??false;
+  if(typeof encodedEventDiagnostics!=='boolean'||encodedEventDiagnostics&&!resourceCondition)throw Error('explicit resource encoded event diagnostic mode required');
   const capacity=/^engineering-n11-capacity-(calibration|confirmation)-([0-7])$/.exec(mode);
   const capacityKind=capacity?.[1]||null;
   const contrastMode=mode==='engineering-n11-pacing-contrast';
@@ -117,6 +119,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       "--env", "N10_BROWSER_ACCEPTANCE=1", "--env", `N10_BROWSER_ACCEPTANCE_MODE=${mode}`, "--env", `PIXELATED_ENGINE_TOKEN=${token}`, "--workdir", "/app",
       "--mount", `type=bind,src=${directory},dst=/acceptance,readonly`,
     ];
+    if(encodedEventDiagnostics)args.push('--env','N11_ENCODED_EVENT_DIAGNOSTICS=1');
     if(resourceTimingDiagnostics)args.push('--env','N11_RESOURCE_TIMING_DIAGNOSTICS=1');
     for (const [source, target] of [
       ["dist", "/app/engine/runtime/dist"], ["scripts/research/n10", "/app/engine/runtime/scripts/research/n10"],

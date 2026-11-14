@@ -13,6 +13,7 @@ TARGETS = dict(zip(PHASES, (30, 24, 30)))
 
 class PairedObservation(GameControlDisturbance):
     method = "n11-contained-paired-observation-v1"
+    minimum_phase_ns = 3_000_000_000
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -119,6 +120,8 @@ class PairedObservation(GameControlDisturbance):
                 if self.marker("phase"):
                     if now-self.stage_start < 3000000000:
                         raise ValueError("premature whole paired phase completion")
+                    if now-self.stage_start < self.minimum_phase_ns:
+                        return False
                     self.emit("n11_pair_phase_completed", phase=self.phase, at_ns=now-self.origin,
                               action_elapsed_ns=now-self.dispatched_at if self.phase == "relief" else None)
                     self.phase_boundary("after_end", self.phase)
