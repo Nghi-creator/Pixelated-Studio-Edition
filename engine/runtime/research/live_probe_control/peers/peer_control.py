@@ -1,9 +1,11 @@
 """Child-only engineering controller runner; main IPC loop remains responsive."""
 
+import os
 import queue
 import sys
 import threading
 import time
+from collections import deque
 from dataclasses import asdict
 
 from research.live_probe_control.control.contracts import (
@@ -21,6 +23,8 @@ from research.live_probe_control.control.probe_transport import (
     request_value,
 )
 
+from research.live_probe_control.peers.peer_protocol import RECEIVER_TRACE_ENV, RECEIVER_TRACE_LIMIT
+
 SETTINGS = (
     "configured_fps",
     "negotiated_fps",
@@ -34,12 +38,22 @@ LEASE_NS = 750000000
 
 
 class ReceiverLease:
-    def __init__(self, value, *, clock=time.monotonic_ns):
+    def __init__(self, value, *, clock=time.monotonic_ns, delivery_trace=False):
         self.clock, self.lock = clock, threading.Lock()
         self.valid = True
         self.value = dict(receiver_value(value))
         self.received = self.clock()
+        self.delivery = deque(maxlen=RECEIVER_TRACE_LIMIT) if delivery_trace else None
+        self._record_delivery()
         self.progress = dict.fromkeys(("frames_decoded", "presented_frames"), self.received)
+
+    def _record_delivery(self):
+        if self.delivery is not None:
+            self.delivery.append({
+                "sequence": self.value["sequence"],
+                "observed_ns": self.value["observed_ns"],
+                "received_ns": self.received,
+            })
 
     def update(self, value):
         value = dict(receiver_value(value))
@@ -61,6 +75,7 @@ class ReceiverLease:
                     self.progress[key] = value["observed_ns"]
             self.valid = self.valid and value["healthy"]
             self.value, self.received = value, now
+            self._record_delivery()
 
     def healthy(self):
         with self.lock:
@@ -251,7 +266,13 @@ class PeerControl:
             return
         self.active = envelope
         self.cancelled.clear()
-        self.lease = ReceiverLease(body["receiver"])
+        self.lease = ReceiverLease(
+            body["receiver"],
+            delivery_trace=(
+                self.media.bootstrap["body"]["source"] == "isolated_game"
+                and os.environ.get(RECEIVER_TRACE_ENV) == "1"
+            ),
+        )
 
         class DedicatedPort(WorkerProbePort):
             dedicated_process = True
@@ -324,6 +345,9 @@ class PeerControl:
         diagnostic = getattr(control, "failure_diagnostic", None)
         if result is not None and result.outcome == "aborted" and diagnostic is not None:
             body["diagnostic"] = diagnostic
+        if self.lease is not None and self.lease.delivery is not None:
+            with self.lease.lock:
+                body["receiver_delivery"] = list(self.lease.delivery)
         self.results.put_nowait(body)
 
     def heartbeat(self, body):

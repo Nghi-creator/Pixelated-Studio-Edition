@@ -43,6 +43,14 @@ def main():
     if trace_flag not in (None, "1") or trace_flag and not resource_condition:
         raise ValueError("explicit resource encoded event diagnostic mode required")
     encoded_trace = trace_flag == "1"
+    control_flag = os.environ.get("N11_ENCODED_EVENT_CONTROL")
+    if control_flag not in (None, "1") or control_flag and (not resource_condition or encoded_trace):
+        raise ValueError("exclusive resource encoded event control required")
+    delivery_flag = os.environ.get("N11_RECEIVER_DELIVERY_DIAGNOSTICS")
+    if delivery_flag not in (None, "1") or delivery_flag and not resource_condition:
+        raise ValueError("explicit resource receiver delivery diagnostic required")
+    delivery_trace = delivery_flag == "1"
+    event_timing = encoded_trace or control_flag == "1"
     capacity = re.fullmatch(r"engineering-n11-capacity-(calibration|confirmation)-([0-7])",mode)
     if not capacity and not condition_match and mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", "engineering-n11-paired-observation", "engineering-n11-contention-paired", "engineering-n11-pacing-paired", "engineering-n11-pacing-contrast", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
         raise ValueError("closed acceptance mode required")
@@ -146,6 +154,8 @@ def main():
             captured["workers"] = instance
 
         def bridge_init(instance, *args, **kwargs):
+            if delivery_trace:
+                kwargs["delivery_trace"] = True
             original_bridge(instance, *args, **kwargs)
             captured["bridge"] = instance
 
@@ -177,7 +187,7 @@ def main():
                         state["local"] = cleanup.enter_context(LocalProbeOwner(service, ledger, policy, enabled=True))
                         state["capability"] = state["local"].claim()
                     state["phase"] = "paired" if paired_mode else "raw-warmup" if raw_mode else "game-failure" if game_failure else ("control-screen" if control_mode else ("observer-diagnostic" if diagnostic_mode else ("observer-warmup" if screen_mode else "admission")))
-                    if mode in MODES_V3 or fault_cost:
+                    if mode in MODES_V3 or fault_cost or event_timing:
                         from container_cost import ContainerCost
                         state["container_cost"] = ContainerCost(emit)
                     emit("camera_ready", mode=mode, source=service.source, profile=service.profile,
@@ -198,7 +208,7 @@ def main():
                                     from research.resource_observation.encoded_phase_trace import EncodedPhaseTrace
                                     state["encoded_phase_trace"] = EncodedPhaseTrace(emit)
                                     observer_emit = state["encoded_phase_trace"].observe
-                                state['paired']=Observer(service,scene,bridge,local,capability,observer_emit,condition=condition_name, **({'encoded_event_trace': True} if encoded_trace else {}))
+                                state['paired']=Observer(service,scene,bridge,local,capability,observer_emit,condition=condition_name, **({'encoded_event_trace': True} if event_timing else {}))
                             elif capacity:
                                 state["paired"] = PacingCapacityObservation(service,scene,bridge,local,capability,emit,calibration_index=capacity_index,confirmation=capacity_confirmation)
                             else:
@@ -212,10 +222,16 @@ def main():
                             state["paired"] = PairedObservation(service, scene, bridge, local, capability, emit)
                         emit("n11_raw_identity", game_pid=scene.game.pid,
                              telemetry_path=os.environ["PIXELATED_CAMERA_TELEMETRY_STATE_PATH"])
+                    if delivery_trace:
+                        state["delivery_slot"] = service.active.get("first")
                     if not state.get("encoded_trace_pending") and not state["paired"].tick():
                         return True
-                    if encoded_trace:
-                        slot = service.active["first"]
+                    if event_timing and "encoded_observation_cost_end" not in state:
+                        sample = state["container_cost"].sample()
+                        state["encoded_observation_cost_end"] = sample
+                        emit("n11_encoded_observation_cost_end", sample=sample,
+                             observer_enabled=encoded_trace, live_authority=False)
+                    if event_timing:
                         if not state.get("encoded_trace_pending"):
                             from research.resource_observation.encoded_phase_trace import SUFFIX_WAIT_NS
 
@@ -223,6 +239,8 @@ def main():
                             return True
                         if time.monotonic_ns() < state["encoded_trace_pending"]:
                             return True
+                    if encoded_trace:
+                        slot = service.active["first"]
                         slot.encoded_trace_requested = True
                         if slot.owner.encoded_trace_reply is None:
                             if slot.owner.state != "playing":
@@ -531,6 +549,18 @@ def main():
                 except Exception as exc:
                     emit("n11_pair_journal", state="unavailable", reason=type(exc).__name__)
                     state["failure"] = state["failure"] or "paired journal checkpoint unavailable"
+            if delivery_trace:
+                slot = state.get("delivery_slot")
+                bridge = captured.get("bridge")
+                operation = getattr(state.get("paired"), "operation", None)
+                emit(
+                    "n11_receiver_delivery",
+                    bridge=list(bridge.delivery) if bridge is not None else [],
+                    owner=list(slot.receiver_delivery_sent or ()) if slot is not None else [],
+                    worker=getattr(operation, "receiver_delivery", None),
+                    basis="browser_elapsed_separate_from_linux_monotonic",
+                    live_authority=False,
+                )
             if state.get("disconnect_thread"):
                 state["disconnect_thread"].join(timeout=3)
                 if state["disconnect_thread"].is_alive():

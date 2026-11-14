@@ -4,9 +4,11 @@ import hashlib
 import re
 import secrets
 import time
+from collections import deque
 from dataclasses import dataclass
 
 from research.live_probe_control.control.local_owner import BROWSER_FRESH_NS, ReceiverSample
+from research.live_probe_control.peers.peer_protocol import RECEIVER_TRACE_LIMIT
 
 
 def observation_enabled(environment, workers):
@@ -82,9 +84,10 @@ class ReceiverRecord:
 
 
 class BrowserReceiverBridge:
-    def __init__(self, workers, *, clock=time.monotonic_ns):
+    def __init__(self, workers, *, clock=time.monotonic_ns, delivery_trace=False):
         self.workers, self.clock = workers, clock
         self.records = {}
+        self.delivery = deque(maxlen=RECEIVER_TRACE_LIMIT) if delivery_trace else None
 
     def _current(self, peer_id, record):
         slot = self.workers.active.get(peer_id)
@@ -161,6 +164,24 @@ class BrowserReceiverBridge:
         return True
 
     def accept(self, value, received_ns):
+        result = self._accept(value, received_ns)
+        if self.delivery is not None and valid_report(value):
+            record = self.records.get(value["peerId"])
+            self.delivery.append({
+                "sequence": value["sequence"],
+                "browser_elapsed_ns": value["elapsedNs"],
+                "received_ns": received_ns,
+                "checked_ns": self.clock(),
+                "local_sequence": (
+                    value["sequence"] - record.offset
+                    if result and record is not None and record.offset is not None
+                    else None
+                ),
+                "accepted": result,
+            })
+        return result
+
+    def _accept(self, value, received_ns):
         if not valid_report(value):
             return False
         record = self.records.get(value["peerId"])

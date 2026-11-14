@@ -164,6 +164,7 @@ class ProbeOperation:
         self.result = None
         self.rejection = None
         self.diagnostic = None
+        self.receiver_delivery = None
         self.status = "queued"
         self.publish(sample, True, observed_ns)
 
@@ -218,6 +219,7 @@ class ProbeOperation:
             if result is None or result.outcome != "aborted":
                 raise ValueError("diagnostic requires aborted result")
         self.diagnostic = copy.deepcopy(diagnostic)
+        self.receiver_delivery = copy.deepcopy(body.get("receiver_delivery"))
         self.rejection = rejection
         self.result = result
         self.status = "observed" if self.result is not None else "rejected"

@@ -7,7 +7,7 @@ export function markFirstPresentation(scope, item, mark) {
   mark(scope, "first_presented", { presented: item.presentedFrames, pts_ms: item.mediaTime * 1000 });
 }
 
-export function nativeBrowserHtml(token, rawObservation = false, pairedObservation = false) {
+export function nativeBrowserHtml(token, rawObservation = false, pairedObservation = false, receiverDelivery = false) {
   return `<!doctype html><video id="video" autoplay muted playsinline></video>
 <script src="/socket.io/socket.io.js"></script><script type="module">
 import {startReceiverObservation,offerDigest} from '/collector.js';
@@ -21,6 +21,7 @@ let active=null;const video=document.getElementById('video');
 window.timelines={};
 ${markFirstPresentation.toString()}
 function mark(scope,name,values={}){if(!(name in scope.timeline))scope.timeline[name]={at_ms:performance.now(),...values};}
+const delivery = ${receiverDelivery ? '[]' : 'null'};
 window.observationStops=[];window.failures=[];window.counts={};window.bindings=[];window.unbound=0;window.problem=null;
 function stop(){if(!active)return;active.live=false;active.stop();if(active.firstFrameId!==undefined)video.cancelVideoFrameCallback(active.firstFrameId);active.pc.close();active=null;video.srcObject=null;}
 async function start(peerId){
@@ -44,12 +45,14 @@ socket.on('webrtc-receiver-bind',async challenge=>{try{const scope=active;if(!sc
  scope.stop();window.bindings.push(challenge.bindingId);scope.bindingId=challenge.bindingId;
  scope.stop=startReceiverObservation({pc:scope.pc,challenge,getVideo:()=>video,getStream:()=>scope.stream,isCurrent:()=>active===scope&&scope.live&&socket.connected,
  onStop:reason=>{if(reason!=='disposed'&&window.observationStops.length<16)window.observationStops.push({peerId:scope.peerId,reason,at_ms:performance.now()});},
- emit:sample=>{mark(scope,'first_report',{decoded:sample.framesDecoded,presented:sample.presentedFrames});window.counts[scope.peerId]=sample;socket.emit('webrtc-receiver-observation',sample);}});}catch(e){window.problem=String(e);}});
+ emit:sample=>{mark(scope,'first_report',{decoded:sample.framesDecoded,presented:sample.presentedFrames});window.counts[scope.peerId]=sample;
+ if(delivery){if(delivery.length===128)delivery.shift();delivery.push({sequence:sample.sequence,elapsed_ns:sample.elapsedNs,emitted_ms:performance.now(),frames_decoded:sample.framesDecoded,presented_frames:sample.presentedFrames});}
+ socket.emit('webrtc-receiver-observation',sample);}});}catch(e){window.problem=String(e);}});
 socket.on('webrtc-receiver-unbind',message=>{if(active&&message.peerId===active.peerId&&message.bindingId===active.bindingId){active.stop();window.unbound++;}});
 socket.on('acceptance-peer-reconnect',()=>{if(active?.peerId!=='first')return;socket.emit('webrtc-peer-disconnect',{peerId:'first',sessionId:'native_acceptance'});start('replacement').catch(e=>window.problem=String(e));});
 socket.on('acceptance-observer-stop',()=>{if(active)active.stop();});
 socket.on('disconnect',()=>{if(active)active.stop();});
-window.snapshot=()=>({observationStops:window.observationStops,problem:window.problem,failures:window.failures,counts:window.counts,bindings:window.bindings,unbound:window.unbound,state:active?.pc.connectionState,ice_state:active?.pc.iceConnectionState,signaling_state:active?.pc.signalingState,local_candidates:active?.localIce.snapshot(),remote_candidates:active?.remoteCandidates,timelines:window.timelines,timeline_basis:'page_performance_ms_no_native_alignment'});
+window.snapshot=()=>({...(delivery?{receiver_delivery:delivery}:{}),observationStops:window.observationStops,problem:window.problem,failures:window.failures,counts:window.counts,bindings:window.bindings,unbound:window.unbound,state:active?.pc.connectionState,ice_state:active?.pc.iceConnectionState,signaling_state:active?.pc.signalingState,local_candidates:active?.localIce.snapshot(),remote_candidates:active?.remoteCandidates,timelines:window.timelines,timeline_basis:'page_performance_ms_no_native_alignment'});
 window.collectQuality=(duration=4000)=>collectBrowserQuality(active.pc,video,duration);
 let stopContinuity=null;
 window.startControlTrace=()=>{if(stopContinuity)throw Error('trace already started');stopContinuity=startControlContinuity(active.pc,video);};

@@ -23,6 +23,8 @@ from research.live_probe_control.control.probe_transport import (
 )
 
 VERSION = "n10-peer-ipc-v4"
+RECEIVER_TRACE_ENV = "N11_RECEIVER_DELIVERY_DIAGNOSTICS"
+RECEIVER_TRACE_LIMIT = 128
 EVENT_TRACE_ENV = "N11_ENCODED_EVENT_DIAGNOSTICS"
 ENCODED_READ_METHOD = "native-encoded-counter-read-brackets-v1"
 MAX_LINE = 262144
@@ -269,12 +271,22 @@ def event_body(kind, body):
                 "result",
                 "rejection",
                 *(("diagnostic",) if "diagnostic" in body else ()),
+                *(("receiver_delivery",) if "receiver_delivery" in body else ()),
             ),
         )
         if "diagnostic" in body:
             failure_diagnostic(body["diagnostic"])
             if body["result"] is None or body["result"].get("outcome") != "aborted":
                 raise ValueError("diagnostic requires aborted result")
+        if "receiver_delivery" in body:
+            rows = body["receiver_delivery"]
+            if type(rows) is not list or not 1 <= len(rows) <= RECEIVER_TRACE_LIMIT:
+                raise ValueError("invalid receiver delivery history")
+            for row in rows:
+                closed(row, ("sequence", "observed_ns", "received_ns"))
+                integer(row["sequence"], 0, 2**53 - 1)
+                integer(row["observed_ns"], 0, 2**63 - 1)
+                integer(row["received_ns"], row["observed_ns"], 2**63 - 1)
         alias(body["request_id"])
         if body["result"] is not None:
             value = Result(**body["result"])

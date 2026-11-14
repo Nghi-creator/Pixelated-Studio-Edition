@@ -425,6 +425,18 @@ class ReceiverLeaseTests(unittest.TestCase):
         self.now += 750000001
         self.assertFalse(self.lease.healthy())
 
+    def test_delivery_trace_records_only_valid_updates_and_keeps_original_receipt(self):
+        self.lease = ReceiverLease(self.value, clock=lambda: self.now, delivery_trace=True)
+        self.update(observed_ns=self.now + 150000000)
+        self.assertEqual(list(self.lease.delivery), [
+            {"sequence": 1, "observed_ns": 1000000000, "received_ns": 1000000000},
+            {"sequence": 2, "observed_ns": 1150000000, "received_ns": 1200000000},
+        ])
+        with self.assertRaises(ValueError):
+            self.update(sequence=2)
+        self.assertEqual(len(self.lease.delivery), 2)
+        self.assertFalse(self.lease.healthy())
+
     def test_repeated_counts_cannot_renew_progress_indefinitely(self):
         for _ in range(4):
             self.update(frames_decoded=10, presented_frames=10)

@@ -1,6 +1,8 @@
 """Bounded camera adapter. Main-loop methods never wait for native child work."""
 
 import json
+import os
+from collections import deque
 import queue
 import threading
 import time
@@ -8,7 +10,7 @@ import uuid
 from dataclasses import dataclass, field
 
 from research.live_probe_control.control.contracts import SECOND, Generation
-from research.live_probe_control.peers.peer_protocol import command
+from research.live_probe_control.peers.peer_protocol import RECEIVER_TRACE_ENV, RECEIVER_TRACE_LIMIT, command
 from research.live_probe_control.peers.peer_supervisor import PeerSupervisor
 from research.live_probe_control.control.probe_transport import EngineeringControl, ProbeOperation
 
@@ -42,6 +44,7 @@ class Slot:
     reported: bool = False
     cleanup_ok: bool = False
     operation: object = None
+    receiver_delivery_sent: object = None
     encoded_trace_requested: bool = False
 
 
@@ -112,6 +115,8 @@ class CameraWorkers:
         if len(self.active) + len(self.retired) >= self.maximum:
             raise ValueError("dedicated peer capacity includes retiring workers")
         slot = Slot(peer_id, sdp, seen_ns=time.monotonic_ns())
+        if self.source == "isolated_game" and os.environ.get(RECEIVER_TRACE_ENV) == "1":
+            slot.receiver_delivery_sent = deque(maxlen=RECEIVER_TRACE_LIMIT)
         self.active[peer_id] = slot
         slot.thread = threading.Thread(
             target=self._run,
@@ -244,6 +249,12 @@ class CameraWorkers:
                                 })
                             else:
                                 receiver = operation.lease()
+                                if slot.receiver_delivery_sent is not None:
+                                    slot.receiver_delivery_sent.append({
+                                        "sequence": receiver["sequence"],
+                                        "observed_ns": receiver["observed_ns"],
+                                        "queued_ns": time.monotonic_ns(),
+                                    })
                                 owner.probe(dict(operation.body, receiver=receiver))
                                 last_receiver_sequence = receiver["sequence"]
                                 last_receiver_sent_ns = now
@@ -257,6 +268,12 @@ class CameraWorkers:
                                 receiver["sequence"] != last_receiver_sequence
                                 and now - last_receiver_sent_ns >= 150000000
                             ):
+                                if slot.receiver_delivery_sent is not None:
+                                    slot.receiver_delivery_sent.append({
+                                        "sequence": receiver["sequence"],
+                                        "observed_ns": receiver["observed_ns"],
+                                        "queued_ns": time.monotonic_ns(),
+                                    })
                                 owner.probe_heartbeat(
                                     operation.request.request_id, receiver
                                 )

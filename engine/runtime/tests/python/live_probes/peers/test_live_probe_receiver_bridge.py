@@ -59,6 +59,19 @@ class ReceiverBridgeTests(unittest.TestCase):
             observation_enabled({"PIXELATED_RECEIVER_OBSERVATIONS": "1"}, self.service)
         )
 
+    def test_delivery_trace_preserves_rejection_and_local_sequence(self):
+        from collections import deque
+
+        self.bridge.delivery = deque(maxlen=128)
+        self.bridge.attach(self.local, self.owner, "peer", "token")
+        self.assertTrue(self.bridge.accept(self.report(), self.fixture.now))
+        self.assertFalse(self.bridge.accept(self.report(), self.fixture.now))
+        ok, rejected = self.bridge.delivery
+        self.assertEqual(ok["local_sequence"], 0)
+        self.assertEqual(ok["received_ns"], self.fixture.now)
+        self.assertFalse(rejected["accepted"])
+        self.assertIsNone(rejected["local_sequence"])
+
     def test_closed_payload_never_accepts_target_or_host_receipt(self):
         sample = self.report()
         self.assertTrue(valid_report(sample))

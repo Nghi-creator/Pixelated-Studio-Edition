@@ -33,6 +33,16 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   if(typeof resourceTimingDiagnostics!=='boolean'||resourceTimingDiagnostics&&!resourceCondition)throw Error('explicit resource timing diagnostic mode required');
   const encodedEventDiagnostics=options.encodedEventDiagnostics??false;
   if(typeof encodedEventDiagnostics!=='boolean'||encodedEventDiagnostics&&!resourceCondition)throw Error('explicit resource encoded event diagnostic mode required');
+  const encodedEventControl = options.encodedEventControl ?? false;
+  if (typeof encodedEventControl !== "boolean" ||
+      (encodedEventControl && (!resourceCondition || encodedEventDiagnostics))) {
+    throw Error("exclusive resource encoded event control required");
+  }
+  const receiverDeliveryDiagnostics = options.receiverDeliveryDiagnostics ?? false;
+  if (typeof receiverDeliveryDiagnostics !== "boolean" ||
+      (receiverDeliveryDiagnostics && !resourceCondition)) {
+    throw Error("explicit resource receiver delivery diagnostic required");
+  }
   const capacity=/^engineering-n11-capacity-(calibration|confirmation)-([0-7])$/.exec(mode);
   const capacityKind=capacity?.[1]||null;
   const contrastMode=mode==='engineering-n11-pacing-contrast';
@@ -97,7 +107,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       hash.update(await fs.readFile(new URL(`../../../../../apps/web/src/lib/webrtc/${relative}`, import.meta.url)));
     }
     softwareHash = hash.digest("hex");
-    await fs.writeFile(path.join(directory, "index.html"), nativeBrowserHtml(token, rawMode, pairedMode));
+    await fs.writeFile(path.join(directory, "index.html"), nativeBrowserHtml(token, rawMode, pairedMode, receiverDeliveryDiagnostics));
     if (rawMode || pairedMode) await stageRawObservationAssets(runtime, directory, ts);
     for (const [name, relative] of [["collector.js", "telemetry/receiverObservation.ts"], ["engine-errors.js", "transport/webrtcEngineErrors.ts"], ["local-ice.js", "transport/localIceQueue.ts"]]) {
       const source = await fs.readFile(new URL(`../../../../../apps/web/src/lib/webrtc/${relative}`, import.meta.url), "utf8");
@@ -119,6 +129,8 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       "--env", "N10_BROWSER_ACCEPTANCE=1", "--env", `N10_BROWSER_ACCEPTANCE_MODE=${mode}`, "--env", `PIXELATED_ENGINE_TOKEN=${token}`, "--workdir", "/app",
       "--mount", `type=bind,src=${directory},dst=/acceptance,readonly`,
     ];
+    if(receiverDeliveryDiagnostics)args.push('--env','N11_RECEIVER_DELIVERY_DIAGNOSTICS=1');
+    if(encodedEventControl)args.push('--env','N11_ENCODED_EVENT_CONTROL=1');
     if(encodedEventDiagnostics)args.push('--env','N11_ENCODED_EVENT_DIAGNOSTICS=1');
     if(resourceTimingDiagnostics)args.push('--env','N11_RESOURCE_TIMING_DIAGNOSTICS=1');
     for (const [source, target] of [
@@ -307,6 +319,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       ...(controlMode ? {role: costCondition ? "contained_game_action_cost_not_qualification" : gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: costCondition ? costMethod : gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", ...(costCondition ? {condition: costCondition} : {}), control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
       ...(diagnosticMode ? {role: "exploratory_static_scene_not_qualification", diagnostic_windows: diagnosticWindows} : {}), startup: snapshots.map((snapshot) => ({ basis: snapshot.timeline_basis, timelines: snapshot.timelines })), browser: browser.version(),
+      ...(receiverDeliveryDiagnostics ? {receiver_delivery_browser: snapshots[0].receiver_delivery} : {}),
       viewers: snapshots.map((snapshot) => ({ failures: snapshot.failures.length, epochs: Object.keys(snapshot.counts), unbound: snapshot.unbound, bindings: snapshot.bindings.length })) };
     return acquisition;
   } catch (error) {

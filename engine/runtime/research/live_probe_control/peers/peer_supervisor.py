@@ -14,7 +14,7 @@ from threading import Lock
 
 from research.live_probe_control.control.contracts import Generation
 from research.live_probe_control.peers.peer_lifetime import ParentLease
-from research.live_probe_control.peers.peer_protocol import EVENT_TRACE_ENV, MAX_BUFFER, MAX_COMMANDS, Lines, command, decode, encode
+from research.live_probe_control.peers.peer_protocol import EVENT_TRACE_ENV, RECEIVER_TRACE_ENV, MAX_BUFFER, MAX_COMMANDS, Lines, command, decode, encode
 from research.live_probe_control.control.probe_transport import EngineeringControl
 
 SECOND = 1000000000
@@ -175,6 +175,8 @@ class PeerSupervisor:
         self.encoded_trace_enabled = source == "isolated_game" and os.environ.get(EVENT_TRACE_ENV) == "1"
         if self.encoded_trace_enabled:
             environment[EVENT_TRACE_ENV] = "1"
+        if source == "isolated_game" and os.environ.get(RECEIVER_TRACE_ENV) == "1":
+            environment[RECEIVER_TRACE_ENV] = "1"
         try:
             self.child = subprocess.Popen(
                 [
