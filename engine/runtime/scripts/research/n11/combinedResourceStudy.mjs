@@ -7,6 +7,7 @@ import {execFileSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {allocateStudy} from './studySession.mjs';
 import {prepareResourceConditionPlan,acquireResourceConditionPlan} from './resourceConditionObservation.mjs';
+import {EVENT_SPAN_RECIPE} from './conditionObservation.mjs';
 import {sourceReceipt} from './rawObservation.mjs';
 
 const json = v => JSON.stringify(v, null, 2) + '\n';
@@ -15,6 +16,18 @@ const read = async file => JSON.parse(await fs.readFile(file, 'utf8'));
 const write = (file, value) => fs.writeFile(file, json(value), {flag:'wx',mode:0o600});
 const hash = async file => sha(await fs.readFile(file));
 const tool = fileURLToPath(import.meta.url);
+const LEGACY_PROTOCOL='n11-combined-resource-study-protocol-v1';
+const EVENT_SPAN_PROTOCOL='n11-condition-specific-event-span-study-protocol-v1';
+
+function method(protocol) {
+  const release=protocol.schema_version;
+  assert.ok(release===LEGACY_PROTOCOL||release===EVENT_SPAN_PROTOCOL,'unsupported study protocol');
+  return release;
+}
+
+function checkRecipe(plan,eventSpan) {
+  assert.equal(plan.observation_recipe,eventSpan?EVENT_SPAN_RECIPE:undefined);
+}
 function command(args, cwd) {
   return execFileSync(args[0], args.slice(1), {cwd,encoding:'utf8',timeout:120000,maxBuffer:64*1024*1024});
 }
@@ -22,21 +35,29 @@ function command(args, cwd) {
 export async function allocateCombinedStudy(config,dependencies={}) {
   assert.ok(path.isAbsolute(config.processor));
   assert.equal(config.dependencyFiles[config.processor], await hash(config.processor));
+  const reviewed=await read(config.protocolFile);
+  const release=method(reviewed);
+  const eventSpan=release===EVENT_SPAN_PROTOCOL;
   const inspect = async file => {
     const result=JSON.parse((dependencies.command||command)([config.python,config.processor,'inspect',file],config.coreDirectory));
     assert.equal(result.state,'reviewed_combined_study_declarations_complete');
+    assert.equal(result.method_release,release);
     // Reuse allocation mechanics, never the separate-session validator or its authority.
     return {state:'reviewed_protocol_declarations_complete'};
   };
-  const reviewed=await read(config.protocolFile);
   for(const [role,file]of Object.entries({processor:config.processor,verifier:config.verifier,runner:tool,supervisor:config.supervisor})){
     assert.ok(path.isAbsolute(file));
     assert.equal(config.dependencyFiles[file],await hash(file));
     assert.equal(reviewed.tool_hashes[role],await hash(file));
   }
-  const allocation=await allocateStudy(config,{...dependencies,inspect,prepare:dependencies.prepare||prepareResourceConditionPlan});
+  const prepare=async args=>{
+    const plan=await (dependencies.prepare||prepareResourceConditionPlan)(args,{eventSpan});
+    checkRecipe(plan,eventSpan);
+    return plan;
+  };
+  const allocation=await allocateStudy(config,{...dependencies,inspect,prepare});
   await write(path.join(config.directory,'combined-study-runner.json'),{
-    method_release:'n11-combined-resource-study-protocol-v1',
+    method_release:release,
     allocation_sha256:await hash(path.join(config.directory,'allocation.json')),
     tool_sha256:await hash(tool),processor:config.processor,python:config.python,
     session_components:1,independent_support_groups:0,
@@ -51,13 +72,16 @@ export async function runCombinedStudy({directory,contextFile}, dependencies={})
   const invoke=dependencies.command || command;
   const allocation=await read(path.join(directory,'allocation.json'));
   const runner=await read(path.join(directory,'combined-study-runner.json'));
-  assert.equal(runner.method_release,'n11-combined-resource-study-protocol-v1');
   assert.equal(await hash(tool),runner.tool_sha256);
   assert.equal(await hash(path.join(directory,'allocation.json')),runner.allocation_sha256);
   assert.equal(await hash(path.join(directory,'protocol.json')),allocation.protocol_file_sha256);
   const protocol=await read(path.join(directory,'protocol.json'));
+  const release=method(protocol);
+  const eventSpan=release===EVENT_SPAN_PROTOCOL;
+  assert.equal(runner.method_release,release);
   const inspection=JSON.parse(invoke([runner.python,runner.processor,'inspect',path.join(directory,'protocol.json')],allocation.core_directory));
   assert.equal(inspection.state,'reviewed_combined_study_declarations_complete');
+  assert.equal(inspection.method_release,release);
   const contextBytes=await fs.readFile(contextFile),context=JSON.parse(contextBytes);
   assert.equal(context.session_id,protocol.blocks[0].session_id);
   assert.equal(context.host_id,protocol.blocks[0].host_id);
@@ -83,6 +107,7 @@ export async function runCombinedStudy({directory,contextFile}, dependencies={})
       assert.equal(slot.ordinal,ordinal);
       assert.equal(slot.output,path.join(directory,'sessions',block.block_id,'condition-'+ordinal));
       assert.equal(await hash(slot.plan),slot.plan_sha256);
+      checkRecipe(await read(slot.plan),eventSpan);
       await assert.rejects(fs.lstat(slot.output),{code:'ENOENT'});
       await assert.rejects(fs.lstat(path.join(path.dirname(slot.plan),slot.acquisition_id+'.attempt.json')),{code:'ENOENT'});
     }
@@ -113,7 +138,7 @@ export async function runCombinedStudy({directory,contextFile}, dependencies={})
       assert.equal(await hash(slot.plan),slot.plan_sha256);
       await fs.mkdir(path.dirname(slot.output),{recursive:true,mode:0o700});
       attempted=true;stage='acquire';
-      await acquire(['--plan',slot.plan,'--output-directory',slot.output]);
+      await acquire(['--plan',slot.plan,'--output-directory',slot.output],{eventSpan});
       stage='verify';
       const verification=invoke([...allocation.verification_command,slot.output],allocation.core_directory);
       await fs.writeFile(path.join(slot.output,'verification-command.stdout'),verification,{flag:'wx',mode:0o600});

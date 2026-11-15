@@ -2,7 +2,7 @@
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {prepareConditionPlan,acquireConditionPlan} from './conditionObservation.mjs';
-export const prepareResourceConditionPlan=args=>prepareConditionPlan(args,{resource:true});
+export const prepareResourceConditionPlan=(args,options={})=>prepareConditionPlan(args,{...options,resource:true});
 export const acquireResourceConditionPlan=(args,dependencies={})=>acquireConditionPlan(args,{...dependencies,resource:true});
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)){
  try{

@@ -3,9 +3,13 @@ import test from 'node:test';import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
 import {createHash} from 'node:crypto';import {fileURLToPath} from 'node:url';
 import {runCombinedStudy,allocateCombinedStudy} from '../n11/combinedResourceStudy.mjs';
+const LEGACY_PROTOCOL='n11-combined-resource-study-protocol-v1';
+const EVENT_SPAN_PROTOCOL='n11-condition-specific-event-span-study-protocol-v1';
+const EVENT_RECIPE='n11-contained-encoded-event-trace-v1';
 const json=v=>JSON.stringify(v,null,2)+'\n',sha=b=>'sha256:'+createHash('sha256').update(b).digest('hex');
 
-async function fixture(t,{available=false,failAt=null,fitText=null,scoreText=null,failFit=false,failScore=false}={}) {
+async function fixture(t,{available=false,failAt=null,fitText=null,scoreText=null,failFit=false,failScore=false,eventSpan=false,wrongRecipe=false}={}) {
+ const release=eventSpan?EVENT_SPAN_PROTOCOL:LEGACY_PROTOCOL;
  const directory=await fs.mkdtemp(path.join(os.tmpdir(),'combined-study-test-'));
  t.after(()=>fs.rm(directory,{recursive:true,force:true}));
  const sources=async()=>({fake:'a'.repeat(64)}),sourceHash=sha(json(await sources()));
@@ -15,24 +19,24 @@ async function fixture(t,{available=false,failAt=null,fitText=null,scoreText=nul
   const plans=path.join(directory,'plans',block_id);await fs.mkdir(plans,{recursive:true});
   for(const [ordinal,condition]of conditions.entries()) {
    const acquisition_id=`n11-raw-cs-${b}-${ordinal}`,plan=path.join(plans,acquisition_id+'.json');
-   await fs.writeFile(plan,json({acquisition_id,condition:{name:condition}}));acquisition_ids[condition]=acquisition_id;
+   await fs.writeFile(plan,json({acquisition_id,condition:{name:condition},...(eventSpan&&!wrongRecipe?{observation_recipe:EVENT_RECIPE}:{})}));acquisition_ids[condition]=acquisition_id;
    slots.push({ordinal,condition,acquisition_id,plan,plan_sha256:sha(await fs.readFile(plan)),output:path.join(directory,'sessions',block_id,'condition-'+ordinal)});
   }
   const block={block_id,role,host_id:'host',session_id:'one-session',condition_order:conditions,acquisition_ids};
   blocks.push(block);sessions.push({...block,slots});
  }
  const runnerTool=fileURLToPath(new URL('../n11/combinedResourceStudy.mjs',import.meta.url));
- const protocol={protocol_id:'synthetic',blocks,tool_hashes:{runner:sha(await fs.readFile(runnerTool)),processor:sha('synthetic processor')}};const protocolFile=path.join(directory,'protocol.json');await fs.writeFile(protocolFile,json(protocol));
+ const protocol={schema_version:release,protocol_id:'synthetic',blocks,tool_hashes:{runner:sha(await fs.readFile(runnerTool)),processor:sha('synthetic processor')}};const protocolFile=path.join(directory,'protocol.json');await fs.writeFile(protocolFile,json(protocol));
  const dep=path.join(directory,'processor.py');await fs.writeFile(dep,'synthetic processor');
  const allocation={source_manifest_hash:sourceHash,core_directory:directory,protocol_file_sha256:sha(await fs.readFile(protocolFile)),dependency_files:{[dep]:sha(await fs.readFile(dep))},verification_command:['verify'],sessions};
  const allocationFile=path.join(directory,'allocation.json');await fs.writeFile(allocationFile,json(allocation));
  const tool=fileURLToPath(new URL('../n11/combinedResourceStudy.mjs',import.meta.url));
- await fs.writeFile(path.join(directory,'combined-study-runner.json'),json({method_release:'n11-combined-resource-study-protocol-v1',allocation_sha256:sha(await fs.readFile(allocationFile)),tool_sha256:sha(await fs.readFile(tool)),processor:dep,python:'python'}));
+ await fs.writeFile(path.join(directory,'combined-study-runner.json'),json({method_release:release,allocation_sha256:sha(await fs.readFile(allocationFile)),tool_sha256:sha(await fs.readFile(tool)),processor:dep,python:'python'}));
  const contextFile=path.join(directory,'context.json');await fs.writeFile(contextFile,json({session_id:'one-session',host_id:'host',session_components:1,independent_support_groups:0,documented_by:'synthetic-test',observed_context:{synthetic:true}}));
  const calls=[];let fitCalled=false,scoreCount=0;
- const acquire=async args=>{calls.push(args[3]);if(calls.length===failAt)throw Error('synthetic acquisition failure');await fs.mkdir(args[3]);};
+ const acquire=async (args,options)=>{assert.equal(options.eventSpan,eventSpan);calls.push(args[3]);if(calls.length===failAt)throw Error('synthetic acquisition failure');await fs.mkdir(args[3]);};
  const command=args=>{
-  if(args[2]==='inspect')return json({state:'reviewed_combined_study_declarations_complete'});
+  if(args[2]==='inspect')return json({state:'reviewed_combined_study_declarations_complete',method_release:release});
   if(args[2]==='fit'){if(failFit)throw Error('synthetic fit failure');assert.equal(calls.length,18);fitCalled=true;return fitText || json({calibration:{state:available?'candidate_calibration_available':'unavailable',reason_codes:available?[]:['calibration_folds_not_all_uniquely_correct']}});}
   if(args[2]==='score'){if(failScore)throw Error('synthetic score failure');assert.ok(fitCalled);assert.ok(!args.includes('--truth'));assert.ok(args.includes('--case'));assert.ok(!args.includes('--response'));scoreCount++;return scoreText || json({predicted_condition:'no_injected_fault'});}
   return json({verified:true});
@@ -89,7 +93,7 @@ test('pending protocol cannot allocate a directory or call plan preparation',asy
  for(const file of [processor,verifier,supervisor])await fs.writeFile(file,'synthetic tool');
  const tool=fileURLToPath(new URL('../n11/combinedResourceStudy.mjs',import.meta.url));
  const tool_hashes={processor:sha(await fs.readFile(processor)),verifier:sha(await fs.readFile(verifier)),runner:sha(await fs.readFile(tool)),supervisor:sha(await fs.readFile(supervisor))};
- const protocolFile=path.join(directory,'protocol.json');await fs.writeFile(protocolFile,json({review:{state:'pending'},tool_hashes}));
+ const protocolFile=path.join(directory,'protocol.json');await fs.writeFile(protocolFile,json({schema_version:LEGACY_PROTOCOL,review:{state:'pending'},tool_hashes}));
  const target=path.join(directory,'allocation');let prepared=0;
  await assert.rejects(allocateCombinedStudy({processor,verifier,supervisor,protocolFile,directory:target,python:'python',coreDirectory:directory,dependencyFiles:{[processor]:tool_hashes.processor,[verifier]:tool_hashes.verifier,[tool]:tool_hashes.runner,[supervisor]:tool_hashes.supervisor}},
   {command:()=>json({state:'unavailable',reason_codes:['protocol_review_pending']}),prepare:async()=>{prepared++;}}));
@@ -106,14 +110,28 @@ test('reviewed synthetic allocation freezes exactly36 resource plans and runner 
  const sourceFiles={fake:'a'.repeat(64)},source_manifest_hash=sha(json(sourceFiles));
  const conditions=['no_injected_fault','owned_identity_delay','owned_cpu_pressure'];
  const blocks=Array.from({length:12},(_,i)=>({block_id:'block-'+i,role:i<6?'training':'evaluation',host_id:'host',session_id:'session',condition_order:conditions,acquisition_ids:Object.fromEntries(conditions.map((c,j)=>[c,`n11-raw-cs-${i}-${j}`]))}));
- const protocolFile=path.join(directory,'protocol.json');await fs.writeFile(protocolFile,json({protocol_id:'synthetic',tool_hashes,source_manifest_hash,image_sha256:'sha256:'+'b'.repeat(64),blocks}));
+ const protocolFile=path.join(directory,'protocol.json');await fs.writeFile(protocolFile,json({schema_version:EVENT_SPAN_PROTOCOL,protocol_id:'synthetic',tool_hashes,source_manifest_hash,image_sha256:'sha256:'+'b'.repeat(64),blocks}));
  const target=path.join(directory,'allocation');let prepared=0;
  const result=await allocateCombinedStudy({processor,verifier,supervisor,protocolFile,directory:target,python:process.execPath,coreRevision:'a'.repeat(40),coreDirectory:directory,verificationCommand:[process.execPath,verifier],dependencyFiles},
- {sources:async()=>sourceFiles,command:()=>json({state:'reviewed_combined_study_declarations_complete'}),prepare:async args=>{
-  prepared++;const condition=args[7],plan={schema_version:'n11-contained-resource-condition-plan-v1',source_manifest_hash,condition:{name:condition}};await fs.writeFile(args[9],json(plan));return plan;
+ {sources:async()=>sourceFiles,command:()=>json({state:'reviewed_combined_study_declarations_complete',method_release:EVENT_SPAN_PROTOCOL}),prepare:async (args,options)=>{
+  assert.equal(options.eventSpan,true);
+  prepared++;const condition=args[7],plan={schema_version:'n11-contained-resource-condition-plan-v1',observation_recipe:EVENT_RECIPE,source_manifest_hash,condition:{name:condition}};await fs.writeFile(args[9],json(plan));return plan;
  }});
  assert.equal(prepared,36);assert.equal(result.sessions.length,12);assert.equal(result.acquisition_authority,false);
  const runner=JSON.parse(await fs.readFile(path.join(target,'combined-study-runner.json')));
- assert.equal(runner.method_release,'n11-combined-resource-study-protocol-v1');assert.equal(runner.tool_sha256,tool_hashes.runner);
+ assert.equal(runner.method_release,EVENT_SPAN_PROTOCOL);assert.equal(runner.tool_sha256,tool_hashes.runner);
  await assert.rejects(allocateCombinedStudy({processor,dependencyFiles}));assert.equal(prepared,36);
+});
+
+test('event-span calibration unavailable stops after 18 observer acquisitions',async t=>{
+ const f=await fixture(t,{eventSpan:true});const result=await runCombinedStudy(f,f.dependencies);
+ assert.equal(result.state,'calibration_unavailable_evaluation_unstarted');
+ assert.equal(f.calls.length,18);assert.equal(f.scores(),0);
+ assert.equal(result.unstarted_acquisition_ids.length,18);
+});
+test('event-span protocol refuses a polling plan before any attempt',async t=>{
+ const f=await fixture(t,{eventSpan:true,wrongRecipe:true});
+ await assert.rejects(runCombinedStudy(f,f.dependencies));
+ assert.equal(f.calls.length,0);
+ await assert.rejects(fs.stat(path.join(f.directory,'session-start.json')),{code:'ENOENT'});
 });

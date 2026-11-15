@@ -5,10 +5,10 @@ import {prepareResourceConditionPlan,acquireResourceConditionPlan} from '../n11/
 import {prepareConditionPlan,acquireConditionPlan} from '../n11/conditionObservation.mjs';
 import {fixture} from './resourceReceiptFixture.mjs';
 const sha=b=>'sha256:'+createHash('sha256').update(b).digest('hex');
-async function setup(t,id='n11-raw-resource-unit-001'){
+async function setup(t,id='n11-raw-resource-unit-001',options){
  const directory=await fs.mkdtemp(path.join(os.tmpdir(),'resource-route-'));t.after(()=>fs.rm(directory,{recursive:true,force:true}));
  const plan=path.join(directory,'plan.json'),output=path.join(directory,'case');
- await prepareResourceConditionPlan(['--image','sha256:'+'a'.repeat(64),'--acquisition-id',id,'--core-revision','b'.repeat(40),'--condition','no_injected_fault','--output',plan]);
+ await prepareResourceConditionPlan(['--image','sha256:'+'a'.repeat(64),'--acquisition-id',id,'--core-revision','b'.repeat(40),'--condition','no_injected_fault','--output',plan],options);
  return {directory,plan,output,args:['--plan',plan,'--output-directory',output]};
 }
 test('resource plan has explicit method/mode while ordinary defaults stay original',async t=>{
@@ -38,4 +38,22 @@ test('ordinary acquire and changed pinned plan reject before fake launch',async 
  await assert.rejects(acquireConditionPlan(f.args,dependencies));assert.equal(calls,0);
  const plan=JSON.parse(await fs.readFile(f.plan));plan.resources.maximum_samples=129;await fs.writeFile(f.plan,JSON.stringify(plan,null,2)+'\n');
  await assert.rejects(acquireResourceConditionPlan(f.args,dependencies));assert.equal(calls,0);
+});
+test('event-span plan binds diagnostics and refuses the ordinary acquisition route',async t=>{
+ const eventSpan=true;
+ const f=await setup(t,'n11-raw-es-v1-unit',{eventSpan});
+ const plan=JSON.parse(await fs.readFile(f.plan));
+ assert.equal(plan.observation_recipe,'n11-contained-encoded-event-trace-v1');
+ assert.equal(plan.fault.native_reference_ms,3200);
+ let calls=0;
+ const acquire=async(_image,_mode,options)=>{
+  calls++;
+  assert.equal(options.encodedEventDiagnostics,true);
+  assert.equal(options.receiverDeliveryDiagnostics,true);
+  return fixture();
+ };
+ await assert.rejects(acquireResourceConditionPlan(f.args,{acquire}));
+ assert.equal(calls,0);
+ await acquireResourceConditionPlan(f.args,{eventSpan,acquire,exportPhases:async()=>{}});
+ assert.equal(calls,1);
 });
