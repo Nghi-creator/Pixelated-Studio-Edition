@@ -150,6 +150,16 @@ HEALTH_CHECKS = (
 )
 
 
+def health_checks_value(checks):
+    if (
+        type(checks) is not dict
+        or set(checks) != set(HEALTH_CHECKS)
+        or any(v is not None and type(v) is not bool for v in checks.values())
+    ):
+        raise ValueError("invalid cadence health checks")
+    return checks
+
+
 def failure_diagnostic(value):
     """Bounded passive evidence, never a result or control-authority substitute."""
     if type(value) is not dict or set(value) != {"method", "check", "snapshot", "health_checks"}:
@@ -183,10 +193,6 @@ def failure_diagnostic(value):
         integer(snapshot["configured_fps"], 1, 240)
         integer(snapshot["negotiated_fps"], 1, 240)
     checks = value["health_checks"]
-    if checks is not None and (
-        type(checks) is not dict
-        or set(checks) != set(HEALTH_CHECKS)
-        or any(v is not None and type(v) is not bool for v in checks.values())
-    ):
-        raise ValueError("invalid cadence health checks")
+    if checks is not None:
+        health_checks_value(checks)
     return value

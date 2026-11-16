@@ -18,11 +18,35 @@ from research.live_probe_control.control.contracts import (
     Result,
     digest,
     failure_diagnostic,
+    health_checks_value,
     integer,
 )
 from research.live_probe_control.control.journal import CadenceJournal
 
 PROBE_REJECTIONS = ("disabled", "busy", "preconditions", "ledger_unavailable")
+REJECTION_STAGES = (
+    "fresh_source",
+    "journal_open",
+    "journal_identity",
+    "controller_execute",
+    "journal_close",
+)
+
+
+def rejection_details(body):
+    details = {}
+    if "rejection_health_checks" in body:
+        if body.get("rejection_stage") != "fresh_source":
+            raise ValueError("health checks require fresh-source stage")
+        details["rejection_health_checks"] = health_checks_value(body["rejection_health_checks"])
+    if "rejection_stage" not in body:
+        return details
+    stage = body["rejection_stage"]
+    if body["rejection"] != "ledger_unavailable" or body["result"] is not None or (
+        type(stage) is not str or stage not in REJECTION_STAGES
+    ):
+        raise ValueError("unbound probe rejection stage")
+    return {**details, "rejection_stage": stage}
 
 
 def hash_value(value):
@@ -163,6 +187,7 @@ class ProbeOperation:
         self.latest = None
         self.result = None
         self.rejection = None
+        self.rejection_details = {}
         self.diagnostic = None
         self.receiver_delivery = None
         self.status = "queued"
@@ -197,6 +222,7 @@ class ProbeOperation:
             done=done,
             rejection=self.rejection if done else None,
             result=asdict(self.result) if done and self.result is not None else None,
+            **(copy.deepcopy(self.rejection_details) if done else {}),
             live_authority=False,
         )
 
@@ -218,6 +244,7 @@ class ProbeOperation:
             failure_diagnostic(diagnostic)
             if result is None or result.outcome != "aborted":
                 raise ValueError("diagnostic requires aborted result")
+        self.rejection_details = copy.deepcopy(rejection_details(body))
         self.diagnostic = copy.deepcopy(diagnostic)
         self.receiver_delivery = copy.deepcopy(body.get("receiver_delivery"))
         self.rejection = rejection

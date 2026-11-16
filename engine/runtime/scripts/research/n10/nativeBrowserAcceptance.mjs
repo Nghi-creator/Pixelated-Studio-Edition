@@ -336,7 +336,20 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       finally { clearTimeout(cleanupTimer); }
     }
     if (costSpan) costSpanResult = await costSpan.finish("failed_prefix");
-    const diagnostics = await Promise.allSettled(pages.map((page) => page.evaluate(() => globalThis.snapshot?.())));
+    const diagnostics = await Promise.allSettled(pages.map((page) => page.evaluate(async () => {
+      const snapshot = globalThis.snapshot?.();
+      if (snapshot && globalThis.iceStartup) {
+        try {
+          snapshot.ice_startup = await Promise.race([
+            globalThis.iceStartup(),
+            new Promise((resolve) => setTimeout(() => resolve({ state: "timeout" }), 1000)),
+          ]);
+        } catch {
+          snapshot.ice_startup = { state: "unavailable" };
+        }
+      }
+      return snapshot;
+    })));
     failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logTail}`, { cause: error });
     acquisition = failure.acquisition = { status: "failed", mode, live_authority: false, ...(resourceTimingDiagnostics?{resource_timing_diagnostics:'n11-resource-observer-timing-diagnostic-v1'}:{}), ...(pairedMode?{method:conditionMatch?conditionMethod:capacity?"n11-contained-pacing-capacity-"+capacityKind+"-v1":contrastMode?"n11-contained-pacing-contrast-v1":pacingMode?"n11-contained-pacing-paired-v1":contentionMode?"n11-contained-contention-paired-v1":"n11-contained-paired-observation-v1",role:conditionMatch?conditionRole:capacity?"engineering_capacity_"+capacityKind+"_label_unavailable":contrastMode?"engineering_pacing_contrast_label_unavailable":pacingMode?"engineering_pacing_label_unavailable":contentionMode?"engineering_contention_label_unavailable":"engineering_no_fault_no_label",paired_observation:pairedObservation}:{}), ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), events, diagnostics, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult || null, browser: browser?.version() || null } : {}), ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
       context: { image, software_hash: softwareHash || null, host_platform: process.platform, host_arch: process.arch } };

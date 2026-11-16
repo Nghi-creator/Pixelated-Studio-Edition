@@ -28,6 +28,11 @@ io.use(createEngineTokenAuth(process.env.PIXELATED_ENGINE_TOKEN).useSocketEngine
 const closeRelay = ownRelayShutdown(server, io);
 const peers = createSignalingPeerRegistry(3);
 const lobby = createLobbyManager();
+const receiverTrace = process.env.N11_RECEIVER_DELIVERY_DIAGNOSTICS === "1" ? [] : null;
+const traceReceiver = receiverTrace ? (sample) => {
+  if (receiverTrace.length === 160) receiverTrace.shift();
+  receiverTrace.push(sample);
+} : undefined;
 io.on("connection", (socket) => {
   socket.on("join-session", (payload) => {
     if (!payload || payload.sessionId !== "native_acceptance") return;
@@ -39,7 +44,7 @@ io.on("connection", (socket) => {
     socket.emit("acceptance-joined");
   });
   lobby.registerLobbyHandlers(socket);
-  registerSignalingRelayHandlers(socket, { peerRegistry: peers, canCreatePeer: lobby.canReceiveStream });
+  registerSignalingRelayHandlers(socket, { peerRegistry: peers, canCreatePeer: lobby.canReceiveStream, traceReceiver });
   registerEngineErrorHandlers(socket);
 });
 server.listen(8080, "0.0.0.0", () => {
@@ -88,6 +93,13 @@ server.listen(8080, "0.0.0.0", () => {
   });
   camera.on("exit", (code, signal) => {
     rawTelemetry?.stop();
+    if (receiverTrace) {
+      process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({
+        kind: "n11_relay_receiver_delivery",
+        basis: "relay_wall_clock_ms_separate_from_browser_and_camera_clocks",
+        rows: receiverTrace,
+      }) + "\n");
+    }
     process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "camera_process_exit", code, signal }) + "\n");
     process.stdout.write("N10_ACCEPTANCE " + JSON.stringify({ kind: "relay_shutdown", stage: "close_start" }) + "\n");
     (wholeCamera ? death.finish(code, signal) : Promise.resolve()).then(() => closeRelay()).then(() => {

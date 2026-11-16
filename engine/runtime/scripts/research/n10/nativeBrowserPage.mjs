@@ -7,6 +7,45 @@ export function markFirstPresentation(scope, item, mark) {
   mark(scope, "first_presented", { presented: item.presentedFrames, pts_ms: item.mediaTime * 1000 });
 }
 
+export async function collectIceStartup(pc) {
+  const stats = await pc.getStats();
+  const candidates = new Map();
+  let selectedPair;
+  for (const row of stats.values()) {
+    if (row.type === "transport" && row.selectedCandidatePairId) {
+      selectedPair = row.selectedCandidatePairId;
+    }
+    if (row.type === "local-candidate" || row.type === "remote-candidate") {
+      candidates.set(row.id, {
+        side: row.type === "local-candidate" ? "local" : "remote",
+        type: row.candidateType,
+        protocol: row.protocol,
+        address: row.address,
+        port: row.port,
+      });
+    }
+  }
+  const pairs = [];
+  for (const row of stats.values()) {
+    if (row.type !== "candidate-pair" || pairs.length >= 24) continue;
+    pairs.push({
+      local: candidates.get(row.localCandidateId),
+      remote: candidates.get(row.remoteCandidateId),
+      selected: row.id === selectedPair,
+      state: row.state,
+      nominated: row.nominated,
+      requests_sent: row.requestsSent,
+      requests_received: row.requestsReceived,
+      responses_received: row.responsesReceived,
+    });
+  }
+  return {
+    gathering_state: pc.iceGatheringState,
+    candidates: [...candidates.values()].slice(0, 24),
+    candidate_pairs: pairs,
+  };
+}
+
 export function nativeBrowserHtml(token, rawObservation = false, pairedObservation = false, receiverDelivery = false) {
   return `<!doctype html><video id="video" autoplay muted playsinline></video>
 <script src="/socket.io/socket.io.js"></script><script type="module">
@@ -23,6 +62,18 @@ ${markFirstPresentation.toString()}
 function mark(scope,name,values={}){if(!(name in scope.timeline))scope.timeline[name]={at_ms:performance.now(),...values};}
 const delivery = ${receiverDelivery ? '[]' : 'null'};
 window.observationStops=[];window.failures=[];window.counts={};window.bindings=[];window.unbound=0;window.problem=null;
+function recordInboundStats(sequence, stats) {
+  const row = delivery?.at(-1);
+  if (!row || row.sequence !== sequence) return;
+  const fields = [
+    'packetsReceived', 'packetsLost', 'bytesReceived', 'framesReceived',
+    'framesDropped', 'keyFramesDecoded', 'jitterBufferEmittedCount',
+    'nackCount', 'pliCount', 'firCount',
+  ];
+  row.inbound_rtp = Object.fromEntries(fields.map((key) => [
+    key, Number.isFinite(stats[key]) ? stats[key] : null,
+  ]));
+}
 function stop(){if(!active)return;active.live=false;active.stop();if(active.firstFrameId!==undefined)video.cancelVideoFrameCallback(active.firstFrameId);active.pc.close();active=null;video.srcObject=null;}
 async function start(peerId){
  stop();const scope={peerId,pc:new RTCPeerConnection({iceServers:[]}),stream:new MediaStream(),live:true,stop:()=>{},pending:[],sdp:null,timeline:{},remoteCandidates:0};active=scope;window.timelines[peerId]=scope.timeline;mark(scope,'created');
@@ -44,6 +95,7 @@ socket.on('webrtc-ice-candidate-backend',async candidate=>{try{const scope=activ
 socket.on('webrtc-receiver-bind',async challenge=>{try{const scope=active;if(!scope||challenge.peerId!==scope.peerId||await offerDigest(scope.sdp)!==challenge.offerHash||active!==scope)return;
  scope.stop();window.bindings.push(challenge.bindingId);scope.bindingId=challenge.bindingId;
  scope.stop=startReceiverObservation({pc:scope.pc,challenge,getVideo:()=>video,getStream:()=>scope.stream,isCurrent:()=>active===scope&&scope.live&&socket.connected,
+ onSampleStats:delivery?recordInboundStats:undefined,
  onStop:reason=>{if(reason!=='disposed'&&window.observationStops.length<16)window.observationStops.push({peerId:scope.peerId,reason,at_ms:performance.now()});},
  emit:sample=>{mark(scope,'first_report',{decoded:sample.framesDecoded,presented:sample.presentedFrames});window.counts[scope.peerId]=sample;
  if(delivery){if(delivery.length===128)delivery.shift();delivery.push({sequence:sample.sequence,elapsed_ns:sample.elapsedNs,emitted_ms:performance.now(),frames_decoded:sample.framesDecoded,presented_frames:sample.presentedFrames});}
@@ -53,6 +105,7 @@ socket.on('acceptance-peer-reconnect',()=>{if(active?.peerId!=='first')return;so
 socket.on('acceptance-observer-stop',()=>{if(active)active.stop();});
 socket.on('disconnect',()=>{if(active)active.stop();});
 window.snapshot=()=>({...(delivery?{receiver_delivery:delivery}:{}),observationStops:window.observationStops,problem:window.problem,failures:window.failures,counts:window.counts,bindings:window.bindings,unbound:window.unbound,state:active?.pc.connectionState,ice_state:active?.pc.iceConnectionState,signaling_state:active?.pc.signalingState,local_candidates:active?.localIce.snapshot(),remote_candidates:active?.remoteCandidates,timelines:window.timelines,timeline_basis:'page_performance_ms_no_native_alignment'});
+${receiverDelivery ? collectIceStartup.toString() + '\nwindow.iceStartup = () => active ? collectIceStartup(active.pc) : null;' : ''}
 window.collectQuality=(duration=4000)=>collectBrowserQuality(active.pc,video,duration);
 let stopContinuity=null;
 window.startControlTrace=()=>{if(stopContinuity)throw Error('trace already started');stopContinuity=startControlContinuity(active.pc,video);};

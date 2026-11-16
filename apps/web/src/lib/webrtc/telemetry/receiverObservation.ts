@@ -21,7 +21,7 @@ export async function offerDigest(sdp: string) {
 
 const integer = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 
-export function startReceiverObservation({ pc, challenge, getVideo, getStream, isCurrent, emit, onStop,
+export function startReceiverObservation({ pc, challenge, getVideo, getStream, isCurrent, emit, onStop, onSampleStats,
   now = () => performance.now(), schedule = (callback, delay) => window.setTimeout(callback, delay),
   cancel = (handle) => window.clearTimeout(handle), clockId = `rx_${crypto.randomUUID().replaceAll("-", "")}`,
 }: {
@@ -29,6 +29,7 @@ export function startReceiverObservation({ pc, challenge, getVideo, getStream, i
   getVideo: () => HTMLVideoElement | null; getStream: () => MediaStream | null;
   isCurrent: () => boolean; emit: (sample: ReceiverObservation) => void;
   onStop?: (reason: string) => void;
+  onSampleStats?: (sequence: number, stats: Readonly<Record<string, unknown>>) => void;
   now?: () => number; schedule?: (callback: () => void, delay: number) => number;
   cancel?: (handle: number) => void; clockId?: string;
 }) {
@@ -119,6 +120,7 @@ export function startReceiverObservation({ pc, challenge, getVideo, getStream, i
       if (presented !== null) {
         emit({ peerId: challenge.peerId, bindingId: challenge.bindingId, clockId, sequence,
           elapsedNs, framesDecoded: value.framesDecoded, presentedFrames: presented });
+        try { onSampleStats?.(sequence, value); } catch { /* Diagnostics cannot stop observations. */ }
         sequence += 1;
       }
       if (current()) timer = schedule(() => { void sample(); }, 200);

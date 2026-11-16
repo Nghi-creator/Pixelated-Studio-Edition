@@ -19,6 +19,7 @@ from research.live_probe_control.control.probe_transport import (
     EngineeringControl,
     hash_value,
     receiver_value,
+    rejection_details,
     request_value,
 )
 
@@ -272,12 +273,15 @@ def event_body(kind, body):
                 "rejection",
                 *(("diagnostic",) if "diagnostic" in body else ()),
                 *(("receiver_delivery",) if "receiver_delivery" in body else ()),
+                *(("rejection_stage",) if "rejection_stage" in body else ()),
+                *(("rejection_health_checks",) if "rejection_health_checks" in body else ()),
             ),
         )
         if "diagnostic" in body:
             failure_diagnostic(body["diagnostic"])
             if body["result"] is None or body["result"].get("outcome") != "aborted":
                 raise ValueError("diagnostic requires aborted result")
+        rejection_details(body)
         if "receiver_delivery" in body:
             rows = body["receiver_delivery"]
             if type(rows) is not list or not 1 <= len(rows) <= RECEIVER_TRACE_LIMIT:

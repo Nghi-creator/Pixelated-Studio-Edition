@@ -21,7 +21,9 @@ const offerHash = createHash("sha256").update("offer").digest("hex");
 const challenge = { peerId: "peer", bindingId, offerHash };
 const observation = { peerId: "peer", bindingId, clockId: "clock", sequence: 0, elapsedNs: 1, framesDecoded: 5, presentedFrames: 4 };
 
-function fixture() {
+type RelayTrace = NonNullable<NonNullable<Parameters<typeof registerSignalingRelayHandlers>[1]>["traceReceiver"]>;
+
+function fixture(traceReceiver?: RelayTrace) {
   const registry = createSignalingPeerRegistry(2);
   let now = 1000;
   let allowed = true;
@@ -30,11 +32,11 @@ function fixture() {
   const camera = new Fake("camera"); camera.data.trustedCamera = true;
   const sockets = new Map([browser, foreign, camera].map((socket) => [socket.id, socket]));
   for (const socket of sockets.values()) socket.nsp.sockets = sockets;
-  for (const socket of [browser, foreign, camera]) registerSignalingRelayHandlers(socket as never, { peerRegistry: registry, now: () => now, canCreatePeer: () => allowed });
+  for (const socket of [browser, foreign, camera]) registerSignalingRelayHandlers(socket as never, { peerRegistry: registry, now: () => now, canCreatePeer: () => allowed, traceReceiver });
   browser.emit("webrtc-offer", { peerId: "peer", type: "offer", sdp: "offer" });
   camera.emit("webrtc-receiver-bind", challenge);
   browser.relays = []; camera.relays = [];
-  return { registry, browser, foreign, camera, revoke: () => { allowed = false; }, tick: () => { now += 200; } };
+  return { registry, browser, foreign, camera, revoke: () => { allowed = false; }, tick: (ms = 200) => { now += ms; } };
 }
 
 test("receiver messages are closed, bounded data with no mutation or receipt fields", () => {
@@ -120,4 +122,24 @@ test("live lobby permission and camera role are rechecked before forwarding", ()
   changed.camera.data.trustedCamera = true; changed.tick();
   changed.browser.emit("webrtc-receiver-observation", { ...observation, sequence: 1, elapsedNs: 200000001 });
   assert.equal(changed.browser.relays.length, 0);
+});
+
+
+test("relay diagnostics identify a compacted arrival and the resulting lost binding", () => {
+  const trace: Array<Parameters<RelayTrace>[0]> = [];
+  const { browser, tick } = fixture((row) => trace.push(row));
+  browser.emit("webrtc-receiver-observation", observation);
+  tick(376);
+  browser.emit("webrtc-receiver-observation", { ...observation, sequence: 1, elapsedNs: 203400001 });
+  tick(28);
+  browser.emit("webrtc-receiver-observation", { ...observation, sequence: 2, elapsedNs: 406800001 });
+  tick();
+  browser.emit("webrtc-receiver-observation", { ...observation, sequence: 3, elapsedNs: 610200001 });
+  assert.equal(browser.relays.length, 2);
+  assert.deepEqual(trace, [
+    { sequence: 0, received_ms: 1000, decision: "forwarded" },
+    { sequence: 1, received_ms: 1376, decision: "forwarded" },
+    { sequence: 2, received_ms: 1404, decision: "minimum_arrival_interval" },
+    { sequence: 3, received_ms: 1604, decision: "unbound_receiver" },
+  ]);
 });

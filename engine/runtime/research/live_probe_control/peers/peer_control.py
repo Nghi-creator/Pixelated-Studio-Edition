@@ -311,6 +311,7 @@ class PeerControl:
     def _execute(self, request):
         result, rejection = None, None
         control = None
+        stage = "fresh_source"
         try:
             # Establish actual fresh source progress before reserving any action.
             until = min(self.port.deadline, time.monotonic_ns() + 150000000)
@@ -320,13 +321,17 @@ class PeerControl:
                 time.sleep(0.01)
             else:
                 raise ValueError("fresh source/receiver preimage unavailable")
+            stage = "journal_open"
             with CadenceController(
                 self.config.directory, self.config.policy, self.port, enabled=True
             ) as control:
                 self.controller = control
+                stage = "journal_identity"
                 self.config.check(control.store)
+                stage = "controller_execute"
                 result = control.execute(request, cancelled=self.cancelled.is_set)
                 self.blocked = result.restoration == "unknown"
+                stage = "journal_close"
         except Exception:  # noqa: BLE001 -- unknown after intent is never a no-effect rejection
             if (
                 self.port.touched
@@ -346,6 +351,11 @@ class PeerControl:
         if result is not None and result.outcome == "aborted" and diagnostic is not None:
             body["diagnostic"] = diagnostic
         if self.lease is not None and self.lease.delivery is not None:
+            if rejection == "ledger_unavailable":
+                body["rejection_stage"] = stage
+                checks = getattr(self.port, "last_health_checks", None)
+                if stage == "fresh_source" and checks is not None:
+                    body["rejection_health_checks"] = dict(checks)
             with self.lease.lock:
                 body["receiver_delivery"] = list(self.lease.delivery)
         self.results.put_nowait(body)

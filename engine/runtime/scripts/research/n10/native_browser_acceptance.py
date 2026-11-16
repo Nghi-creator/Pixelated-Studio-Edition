@@ -10,6 +10,7 @@ import sys
 import tempfile
 import threading
 import time
+from collections import deque
 from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
@@ -86,6 +87,8 @@ def main():
     from research.live_probe_control.peers.receiver_bridge import BrowserReceiverBridge
 
     captured, state = {}, {"phase": "startup", "scopes": {}, "failure": None}
+    worker_media = deque(maxlen=128)
+    worker_observation = None
     origin = time.monotonic()
 
     def emit(kind, **values):
@@ -174,6 +177,7 @@ def main():
         policy = Policy(24, 60, (5 if control_mode else 2) * 10**9, 3, 12 * 10**9, 10**9, 20, 100000000)
 
         def step():
+            nonlocal worker_observation
             try:
                 if not (state.get("diagnostic") and state["diagnostic"].frozen):
                     scene.tick()
@@ -223,7 +227,22 @@ def main():
                         emit("n11_raw_identity", game_pid=scene.game.pid,
                              telemetry_path=os.environ["PIXELATED_CAMERA_TELEMETRY_STATE_PATH"])
                     if delivery_trace:
-                        state["delivery_slot"] = service.active.get("first")
+                        slot = state["delivery_slot"] = service.active.get("first")
+                        owner = slot.owner if slot is not None else None
+                        latest = owner.last_observation if owner is not None else None
+                        if latest is not None and latest is not worker_observation:
+                            snapshot, received_ns, sequence = latest
+                            worker_observation = latest
+                            worker_media.append(dict(
+                                sequence=sequence,
+                                controller_received_ns=received_ns,
+                                **{key: snapshot.get(key) for key in (
+                                    "read_start_ns", "read_end_ns", "configured_fps",
+                                    "negotiated_fps", "capture_buffers", "encoded_buffers",
+                                    "queue_overruns_total", "pre_encoder_queue_level",
+                                    "post_encoder_queue_level",
+                                )},
+                            ))
                     if not state.get("encoded_trace_pending") and not state["paired"].tick():
                         return True
                     if event_timing and "encoded_observation_cost_end" not in state:
@@ -532,6 +551,26 @@ def main():
                 state["failure"] = type(exc).__name__ + ": " + str(exc)
                 if state.get("diagnostic"):
                     emit("diagnostic_trace", **state["diagnostic"].trace())
+                if delivery_trace and state["phase"] == "paired":
+                    workers = captured.get("workers")
+                    slot = workers.active.get("first") if workers is not None else None
+                    owner = slot.owner if slot is not None else None
+                    snapshot = (owner.last_snapshot or {}) if owner is not None else {}
+                    paired = state.get("paired")
+                    emit(
+                        "n11_worker_observation_checkpoint",
+                        owner_state=owner.state if owner is not None else None,
+                        reference_stage=getattr(paired, "pacing_stage", None),
+                        phase=getattr(paired, "phase", None),
+                        phase_stage=getattr(paired, "stage", None),
+                        reference_sample_count=len(getattr(paired, "reference_rows", ())),
+                        slot_failure=getattr(paired, "last_slot_failure", None),
+                        snapshot={key: snapshot.get(key) for key in (
+                            "state", "connection_state", "ice_connection_state",
+                            "capture_buffers", "encoded_buffers",
+                        )},
+                        live_authority=False,
+                    )
                 emit("failed", reason=state["failure"])
                 state["timer_finished"] = True
                 os.kill(os.getpid(), signal.SIGTERM)
@@ -553,6 +592,12 @@ def main():
                 slot = state.get("delivery_slot")
                 bridge = captured.get("bridge")
                 operation = getattr(state.get("paired"), "operation", None)
+                emit(
+                    "n11_worker_media_progress",
+                    basis="worker_read_brackets_and_controller_receipt_separate_from_browser_clock",
+                    rows=list(worker_media),
+                    live_authority=False,
+                )
                 emit(
                     "n11_receiver_delivery",
                     bridge=list(bridge.delivery) if bridge is not None else [],

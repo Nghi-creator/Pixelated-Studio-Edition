@@ -32,11 +32,29 @@ export type SignalingPeerRegistry = ReturnType<
   typeof createSignalingPeerRegistry
 >;
 
+type ReceiverRelayDecision =
+  | "signaling_budget"
+  | "trusted_camera"
+  | "invalid_observation_or_session"
+  | "ineligible_receiver"
+  | "unbound_receiver"
+  | "discontinuous_observation"
+  | "minimum_arrival_interval"
+  | "camera_unavailable"
+  | "forwarded";
+
+type ReceiverRelayTrace = (sample: {
+  sequence: number | null;
+  received_ms: number;
+  decision: ReceiverRelayDecision;
+}) => void;
+
 type SignalingRelayOptions = {
   canCreatePeer?: (socket: Socket, sessionId: string) => boolean;
   eventLimitPerSecond?: number;
   now?: () => number;
   peerRegistry?: SignalingPeerRegistry;
+  traceReceiver?: ReceiverRelayTrace;
 };
 
 export function createSignalingPeerRegistry(
@@ -95,19 +113,31 @@ export function createSignalingPeerRegistry(
       peer.receiver = { bindingId, cameraId, sequence: -1, clockId: null, elapsedNs: -1, decoded: 0, presented: 0, receivedAt: -Infinity };
       return peer.socketId;
     },
-    observeReceiver(sessionId: string, socketId: string, sample: NonNullable<ReturnType<typeof receiverObservation>>, stamp: number) {
+    observeReceiver(
+      sessionId: string, socketId: string,
+      sample: NonNullable<ReturnType<typeof receiverObservation>>, stamp: number,
+      rejected?: (decision: ReceiverRelayDecision) => void,
+    ) {
       const peer = peers.get(peerKey(sessionId, sample.peerId));
       const receiver = peer?.receiver;
-      if (!peer || peer.socketId !== socketId || !receiver || receiver.bindingId !== sample.bindingId) return null;
+      if (!peer || peer.socketId !== socketId || !receiver || receiver.bindingId !== sample.bindingId) {
+        rejected?.("unbound_receiver");
+        return null;
+      }
       if (stamp < receiver.receivedAt || sample.sequence !== receiver.sequence + 1 ||
           (receiver.clockId !== null && receiver.clockId !== sample.clockId) ||
           sample.elapsedNs <= receiver.elapsedNs || sample.framesDecoded < receiver.decoded || sample.presentedFrames < receiver.presented) {
         peer.receiver = undefined;
+        rejected?.("discontinuous_observation");
         return null;
       }
       // Bound forwarding rate before advancing sequence, so floods cannot silently
       // skip samples and resume a supposedly continuous observation stream.
-      if (stamp - receiver.receivedAt < 100) { peer.receiver = undefined; return null; }
+      if (stamp - receiver.receivedAt < 100) {
+        peer.receiver = undefined;
+        rejected?.("minimum_arrival_interval");
+        return null;
+      }
       receiver.sequence = sample.sequence;
       receiver.clockId = sample.clockId;
       receiver.elapsedNs = sample.elapsedNs;
@@ -322,24 +352,39 @@ export function registerSignalingRelayHandlers(
   });
 
   socket.on("webrtc-receiver-observation", (payload: unknown) => {
-    if (!consumeSignalingBudget() || socket.data.trustedCamera === true) return;
+    const withinBudget = consumeSignalingBudget();
+    const trustedCamera = socket.data.trustedCamera === true;
+    if ((trustedCamera || !withinBudget) && !options.traceReceiver) return;
     const sample = receiverObservation(payload);
-    const sessionId = normalizeSessionId(socket.data.sessionId);
-    if (!sample || !sessionId) return;
-    if (!canCreatePeer(socket, sessionId)) {
-      peerRegistry.invalidateReceiver(sessionId, sample.peerId, socket.id);
+    const stamp = options.traceReceiver ? now() : undefined;
+    const trace = stamp === undefined ? undefined : (decision: ReceiverRelayDecision) =>
+      options.traceReceiver?.({ sequence: sample?.sequence ?? null, received_ms: stamp, decision });
+    if (!withinBudget || trustedCamera) {
+      trace?.(withinBudget ? "trusted_camera" : "signaling_budget");
       return;
     }
-    const binding = peerRegistry.observeReceiver(sessionId, socket.id, sample, now());
+    const sessionId = normalizeSessionId(socket.data.sessionId);
+    if (!sample || !sessionId) {
+      trace?.("invalid_observation_or_session");
+      return;
+    }
+    if (!canCreatePeer(socket, sessionId)) {
+      peerRegistry.invalidateReceiver(sessionId, sample.peerId, socket.id);
+      trace?.("ineligible_receiver");
+      return;
+    }
+    const binding = peerRegistry.observeReceiver(sessionId, socket.id, sample, stamp ?? now(), trace);
     if (!binding) return;
     const cameraSocket = socket.nsp.sockets.get(binding.cameraId);
     if (!cameraSocket || cameraSocket.data.trustedCamera !== true || normalizeSessionId(cameraSocket.data.sessionId) !== sessionId) {
       peerRegistry.dropReceiverCamera(binding.cameraId);
+      trace?.("camera_unavailable");
       return;
     }
     socket.to(binding.cameraId).emit("webrtc-receiver-observation", {
       ...sample, offerHash: binding.offerHash, receiverSocketId: socket.id,
     });
+    trace?.("forwarded");
   });
 
   socket.on("webrtc-peer-disconnect", (payload: SessionPayload = {}) => {

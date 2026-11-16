@@ -278,6 +278,20 @@ class FailureDiagnosticTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             op.finish(self.body())
 
+    def test_rejected_admission_keeps_a_passive_copy_of_freshness_checks(self):
+        from research.live_probe_control.control.contracts import HEALTH_CHECKS
+
+        checks = dict.fromkeys(HEALTH_CHECKS)
+        checks["native_progress_fresh"] = False
+        body = dict(request_id="diag", result=None, rejection="ledger_unavailable",
+                    rejection_stage="fresh_source", rejection_health_checks=checks)
+        op = self.operation()
+        op.finish(body)
+        checks["native_progress_fresh"] = True
+        self.assertFalse(op.checkpoint()["rejection_health_checks"]["native_progress_fresh"])
+        with self.assertRaises(ValueError):
+            self.operation().finish({**body, "rejection_stage": "journal_open"})
+
     def test_operation_checkpoint_survives_missing_journal_and_cleanup_failure_once(self):
         sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
         from condition_observation import ConditionObservation
@@ -287,7 +301,8 @@ class FailureDiagnosticTests(unittest.TestCase):
         observer = object.__new__(ResourceConditionObservation)
         observer.operation = self.operation()
         observer.operation.finish(
-            dict(request_id="diag", result=None, rejection="ledger_unavailable")
+            dict(request_id="diag", result=None, rejection="ledger_unavailable",
+                 rejection_stage="fresh_source")
         )
         observer.emit = Mock()
         with patch.object(
@@ -301,6 +316,12 @@ class FailureDiagnosticTests(unittest.TestCase):
         self.assertEqual(
             observer.emit.call_args.kwargs["operation"]["rejection"], "ledger_unavailable"
         )
+        self.assertEqual(
+            observer.emit.call_args.kwargs["operation"]["rejection_stage"], "fresh_source"
+        )
+        with self.assertRaises(ValueError):
+            self.operation().finish(dict(request_id="diag", result=None,
+                                         rejection="preconditions", rejection_stage="fresh_source"))
 
 
 if __name__ == "__main__":

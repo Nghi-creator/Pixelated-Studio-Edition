@@ -4,6 +4,7 @@ import copy
 import signal
 import sys
 import tempfile
+import threading
 import time
 import unittest
 from dataclasses import asdict
@@ -290,6 +291,10 @@ class DispatchTests(unittest.TestCase):
                 child = PeerControl(
                     SimpleNamespace(bootstrap={"body": {}}), lambda *_: None
                 )
+                child.lease = SimpleNamespace(
+                    delivery=[dict(sequence=1, observed_ns=1, received_ns=2)],
+                    lock=threading.Lock(),
+                )
                 child.config = SimpleNamespace(
                     directory=self.fixture.temp.name,
                     policy=fixtures.POLICY,
@@ -316,8 +321,13 @@ class DispatchTests(unittest.TestCase):
                     self.assertEqual(body["result"]["outcome"], "unknown")
                     self.assertEqual(body["result"]["restoration"], "unknown")
                     self.assertTrue(child.blocked)
+                    self.assertNotIn("rejection_stage", body)
                 else:
                     self.assertIsNone(body["result"])
+                    self.assertEqual(body["rejection_stage"], "controller_execute")
+                    envelope = command(fixtures.GEN, 1, "probe", self.body())
+                    reply = event(envelope, "probe_result", body)
+                    self.assertEqual(reply["body"]["rejection_stage"], "controller_execute")
 
     def test_intent_persisted_before_memory_update_is_unknown_not_rejected(self):
         self.fixture.ledger(active=True)
