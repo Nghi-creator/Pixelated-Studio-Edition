@@ -44,3 +44,27 @@ context and does not requalify historical evidence.
 The [resource observation contract](../../../docs/research/n11/resource-observation.md)
 describes its separate controller clock, bounded reads and pending launcher/
 inspection integration. It does not enable a fixture acquisition.
+
+For an isolated-game worker with `N11_RECEIVER_DELIVERY_DIAGNOSTICS=1`, the
+cadence operation checkpoint also retains `admission_progress` using
+`n11-native-admission-progress-trace-v2` (the reader also accepts archived v1).
+It brackets the existing native reads
+during fresh-source admission and records previous/current capture and encoder
+counts, each counter's last observed advance, their oldest timestamp, and health decisions. Its timestamps
+are worker-local monotonic values; do not subtract controller or browser times.
+The last 32 completed reads are retained with a total and explicit truncation
+flag. A getter that throws does not produce a completed-read row.
+
+This opt-in trace adds no native reads, retries, admission time or control
+authority. It stops before journal/controller execution; ordinary workers do
+not collect it. The 150 ms admission budget and 750 ms health lease remain in
+force. Trace collection adds clock reads and serialization overhead, so its
+source version must be qualified separately from earlier frozen evidence.
+
+Native health requires capture and encoded counts each to have advanced within
+the unchanged 750 ms lease. They may advance on different reads; advancing only
+one counter never establishes health. Any counter regression remains invalid for
+the port's lifetime. Admission rechecks its original deadline after each native
+read, so a slow healthy getter cannot authorize journal/controller execution
+after the 150 ms budget or request expiry. An in-flight getter is not preempted;
+this check prevents late admission rather than bounding getter execution time.

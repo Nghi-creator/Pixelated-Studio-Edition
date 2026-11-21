@@ -16,6 +16,7 @@ from research.live_probe_control.control.contracts import (
     digest,
 )
 from research.live_probe_control.control.controller import CadenceController
+from research.live_probe_control.control.admission_trace import AdmissionTrace
 from research.live_probe_control.control.journal import CadenceJournal
 from research.live_probe_control.control.probe_transport import (
     EngineeringControl,
@@ -110,11 +111,16 @@ class WorkerProbePort:
         cached = media.latest_snapshot
         self.last = cached[0] if cached is not None else None
         self.progress_at = 0
+        self.counter_progress_at = dict.fromkeys(("capture_buffers", "encoded_buffers"))
         self.valid = True
         self.last_native = None
         self.last_health_checks = None
+        self.admission_trace = None
 
     def snapshot(self):
+        trace = self.admission_trace
+        read_start = time.monotonic_ns() if trace is not None else None
+        previous = self.last
         value = self.media.snapshot()
         now = time.monotonic_ns()
         keys = ("capture_buffers", "encoded_buffers")
@@ -123,8 +129,11 @@ class WorkerProbePort:
         ):
             if any(value[k] < self.last[k] for k in keys):
                 self.valid = False
-            if all(value[k] > self.last[k] for k in keys):
-                self.progress_at = now
+            for key in keys:
+                if value[key] > self.last[key]:
+                    self.counter_progress_at[key] = now
+        progress = tuple(self.counter_progress_at.values())
+        self.progress_at = min(progress) if all(t is not None for t in progress) else 0
         self.last = self.last_native = value
         settings = {key: value[key] for key in SETTINGS[2:]}
         if any(v is None for v in settings.values()):
@@ -135,7 +144,7 @@ class WorkerProbePort:
             connected=value["connection_state"] == "connected",
             ice_connected=value["ice_connection_state"] in ("connected", "completed"),
             buffers_present=all(value[k] is not None and value[k] > 0 for k in keys),
-            native_progress_fresh=0 <= now - self.progress_at <= LEASE_NS,
+            native_progress_fresh=all(t is not None and 0 <= now - t <= LEASE_NS for t in progress),
             **dict.fromkeys(HEALTH_CHECKS[6:]),
         )
         healthy = all(v for v in list(checks.values())[:6])
@@ -150,6 +159,9 @@ class WorkerProbePort:
             )
             healthy = checks["capture_healthy"]
         self.last_health_checks = checks
+        if trace is not None:
+            trace.record(read_start, now, previous, value, self.progress_at, healthy, checks,
+                         self.counter_progress_at)
         return Snapshot(
             self.generation,
             value["configured_fps"],
@@ -312,15 +324,23 @@ class PeerControl:
         result, rejection = None, None
         control = None
         stage = "fresh_source"
+        trace = AdmissionTrace() if self.lease is not None and self.lease.delivery is not None else None
+        self.port.admission_trace = trace
         try:
             # Establish actual fresh source progress before reserving any action.
             until = min(self.port.deadline, time.monotonic_ns() + 150000000)
-            while time.monotonic_ns() < until:
-                if self.port.snapshot().healthy:
-                    break
-                time.sleep(0.01)
-            else:
-                raise ValueError("fresh source/receiver preimage unavailable")
+            try:
+                while time.monotonic_ns() < until:
+                    snapshot = self.port.snapshot()
+                    if time.monotonic_ns() >= until:
+                        raise ValueError("fresh source read exceeded admission deadline")
+                    if snapshot.healthy:
+                        break
+                    time.sleep(0.01)
+                else:
+                    raise ValueError("fresh source/receiver preimage unavailable")
+            finally:
+                self.port.admission_trace = None
             stage = "journal_open"
             with CadenceController(
                 self.config.directory, self.config.policy, self.port, enabled=True
@@ -351,6 +371,7 @@ class PeerControl:
         if result is not None and result.outcome == "aborted" and diagnostic is not None:
             body["diagnostic"] = diagnostic
         if self.lease is not None and self.lease.delivery is not None:
+            body["admission_progress"] = trace.value()
             if rejection == "ledger_unavailable":
                 body["rejection_stage"] = stage
                 checks = getattr(self.port, "last_health_checks", None)

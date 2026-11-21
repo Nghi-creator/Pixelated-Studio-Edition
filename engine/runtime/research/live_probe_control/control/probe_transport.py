@@ -22,6 +22,7 @@ from research.live_probe_control.control.contracts import (
     integer,
 )
 from research.live_probe_control.control.journal import CadenceJournal
+from research.live_probe_control.control.admission_trace import admission_trace_value
 
 PROBE_REJECTIONS = ("disabled", "busy", "preconditions", "ledger_unavailable")
 REJECTION_STAGES = (
@@ -35,6 +36,10 @@ REJECTION_STAGES = (
 
 def rejection_details(body):
     details = {}
+    if "admission_progress" in body:
+        if body["result"] is None and body["rejection"] != "ledger_unavailable":
+            raise ValueError("admission trace requires an attempted admission")
+        details["admission_progress"] = admission_trace_value(body["admission_progress"])
     if "rejection_health_checks" in body:
         if body.get("rejection_stage") != "fresh_source":
             raise ValueError("health checks require fresh-source stage")

@@ -275,6 +275,7 @@ def event_body(kind, body):
                 *(("receiver_delivery",) if "receiver_delivery" in body else ()),
                 *(("rejection_stage",) if "rejection_stage" in body else ()),
                 *(("rejection_health_checks",) if "rejection_health_checks" in body else ()),
+                *(("admission_progress",) if "admission_progress" in body else ()),
             ),
         )
         if "diagnostic" in body:
