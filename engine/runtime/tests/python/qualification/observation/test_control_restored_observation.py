@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts" / "research" / "n10"))
-from control_disturbance import ControlDisturbance
+from scripts.research.n10.observers.control_disturbance import ControlDisturbance
 
 
 class RestoredObservationTests(unittest.TestCase):
@@ -37,7 +37,7 @@ class RestoredObservationTests(unittest.TestCase):
 
     def test_cached_target_is_not_a_failed_restoration_and_needs_fresh_both_peers(self):
         driver, slots = self.driver()
-        with patch("control_disturbance.time.monotonic_ns", return_value=100000000):
+        with patch("scripts.research.n10.observers.control_disturbance.time.monotonic_ns", return_value=100000000):
             self.assertFalse(driver.tick())
         self.assertEqual(driver.stage, "await-restored")
         slots["first"].owner.last_observation = (
@@ -45,7 +45,7 @@ class RestoredObservationTests(unittest.TestCase):
             0,
             11,
         )
-        with patch("control_disturbance.time.monotonic_ns", return_value=200000000):
+        with patch("scripts.research.n10.observers.control_disturbance.time.monotonic_ns", return_value=200000000):
             driver.tick()
         self.assertEqual(driver.stage, "await-restored")
         slots["second"].owner.last_observation = (
@@ -53,26 +53,26 @@ class RestoredObservationTests(unittest.TestCase):
             0,
             11,
         )
-        with patch("control_disturbance.time.monotonic_ns", return_value=300000000):
+        with patch("scripts.research.n10.observers.control_disturbance.time.monotonic_ns", return_value=300000000):
             driver.tick()
         self.assertEqual(driver.stage, "settle-restored")
-        with patch("control_disturbance.time.monotonic_ns", return_value=799999999):
+        with patch("scripts.research.n10.observers.control_disturbance.time.monotonic_ns", return_value=799999999):
             driver.tick()
         driver.begin.assert_not_called()
-        with patch("control_disturbance.time.monotonic_ns", return_value=800000000):
+        with patch("scripts.research.n10.observers.control_disturbance.time.monotonic_ns", return_value=800000000):
             driver.tick()
         self.assertEqual(driver.phase, "restored")
         driver.begin.assert_called_once_with(slots)
 
     def test_fresh_observation_deadline_is_bounded(self):
         driver, _ = self.driver()
-        with patch("control_disturbance.time.monotonic_ns", return_value=1000000001):
+        with patch("scripts.research.n10.observers.control_disturbance.time.monotonic_ns", return_value=1000000001):
             with self.assertRaisesRegex(ValueError, "observation bound"):
                 driver.tick()
 
     def test_target_loss_after_settling_begins_remains_failure(self):
         driver, _ = self.driver()
         driver.stage = "settle-restored"
-        with patch("control_disturbance.time.monotonic_ns", return_value=100000000):
+        with patch("scripts.research.n10.observers.control_disturbance.time.monotonic_ns", return_value=100000000):
             with self.assertRaisesRegex(ValueError, "lost during fixed settling"):
                 driver.tick()

@@ -1,13 +1,10 @@
 """Invented counters exercise units, missingness and retained prefixes only."""
 
-import sys
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
-from action_span import NativeCostSpan
+from scripts.research.n10.cost.action_span import NativeCostSpan
 from research.live_probe_control.qualification.action_span_screen import ACTORS, EXCLUDED, METHOD, summarize
 from research.live_probe_control.qualification.action_cost_protocol import METHOD_V3
 from qualification.costs.test_action_cost_screen import acquisition_v2
@@ -126,9 +123,9 @@ class SpanTests(unittest.TestCase):
             phase=lambda: dict(script_age_ns=now[0]),
         )
         with (
-            patch("action_span.time.monotonic_ns", side_effect=lambda: now[0]),
+            patch("scripts.research.n10.cost.action_span.time.monotonic_ns", side_effect=lambda: now[0]),
             patch(
-                "action_span.NativeScreen.process",
+                "scripts.research.n10.cost.action_span.NativeScreen.process",
                 return_value=dict(cpu_ticks=1, rss_bytes=2),
             ),
         ):

@@ -1,5 +1,4 @@
 """Native paired state machine: whole phases cannot overrun or invent restoration."""
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -7,8 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 from threading import Event
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
-from paired_observation import PairedObservation
+from scripts.research.n11.native.paired_observation import PairedObservation
 from research.live_probe_control.control.contracts import Result, Request, Generation
 
 
@@ -92,7 +90,7 @@ class PairedObservationTests(unittest.TestCase):
                 p.operation.result = Result("n11-paired-request", "completed" if restoration == "verified_by_port" else "aborted", restoration, "duration_elapsed" if restoration == "verified_by_port" else "restore_failed")
                 journal = Mock(); journal.__enter__ = Mock(return_value=SimpleNamespace(journal=dict(state=state, actions=1, reserved_ns=reservation)))
                 journal.__exit__ = Mock(return_value=False)
-                with patch("paired_observation.CadenceJournal", return_value=journal):
+                with patch("scripts.research.n11.native.paired_observation.CadenceJournal", return_value=journal):
                     if state == "clean" and reservation == 7000000000:
                         p.tick(); self.assertEqual((p.phase, p.stage), ("recovery", "target"))
                     else:

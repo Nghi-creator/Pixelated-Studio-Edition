@@ -4,10 +4,8 @@ import os
 import sys
 import time
 import unittest
-from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
-from native_browser_cpu import reader, sample
+from scripts.research.n10.cost.native_browser_cpu import reader, sample
 
 
 class NativeBrowserCpuTests(unittest.TestCase):

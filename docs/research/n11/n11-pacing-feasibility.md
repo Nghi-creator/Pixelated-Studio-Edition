@@ -8,12 +8,12 @@ fixture's exact worker launcher installs the local pacing helper.
 
 ```sh
 npm run build:engine
-node --experimental-strip-types engine/runtime/scripts/research/n11/pairedObservation.mjs prepare-pacing \
+node --experimental-strip-types engine/runtime/scripts/research/n11/acquisition/pairedObservation.mjs prepare-pacing \
   --image sha256:<cached-native-image-id> \
   --acquisition-id n11-raw-pacing-example \
   --core-revision <full-current-core-revision> \
   --output /absolute/private/pacing-plan.json
-node --experimental-strip-types engine/runtime/scripts/research/n11/pairedObservation.mjs acquire \
+node --experimental-strip-types engine/runtime/scripts/research/n11/acquisition/pairedObservation.mjs acquire \
   --plan /absolute/private/pacing-plan.json \
   --output-directory /absolute/private/pacing-example
 ```
@@ -63,7 +63,7 @@ one connected source group. Independent labels/group review and real N7 support/
 positive dispersion remain required; do not manufacture variation or relax gates.
 
 ```sh
-node --experimental-strip-types --test engine/runtime/scripts/research/n10/pacingReceipt.test.mjs
+node --experimental-strip-types --test engine/runtime/scripts/research/n11/receipts/pacingReceipt.test.mjs
 cd engine/runtime
 python3 -m unittest discover -s tests/python/qualification/observation -t tests/python -p test_pacing_fixture.py -v
 ```

@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 
 SCRIPTS = Path(__file__).resolve().parents[4] / "scripts" / "research" / "n10"
 sys.path.insert(0, str(SCRIPTS))
-from observer_static_diagnostic import ObserverStaticDiagnostic
+from scripts.research.n10.observers.observer_static_diagnostic import ObserverStaticDiagnostic
 
 
 class DiagnosticTests(unittest.TestCase):
@@ -23,10 +23,10 @@ class DiagnosticTests(unittest.TestCase):
         with (
             patch.object(diagnostic, "workers", return_value={"first": object(), "second": object()}),
             patch.object(diagnostic, "ready", return_value=True),
-            patch("observer_static_diagnostic.time.monotonic_ns", return_value=3000000001),
-            patch("observer_static_diagnostic.os.pidfd_open", return_value=99, create=True) as opened,
-            patch("observer_static_diagnostic.signal.pidfd_send_signal", create=True) as sent,
-            patch("observer_static_diagnostic.os.close") as closed,
+            patch("scripts.research.n10.observers.observer_static_diagnostic.time.monotonic_ns", return_value=3000000001),
+            patch("scripts.research.n10.observers.observer_static_diagnostic.os.pidfd_open", return_value=99, create=True) as opened,
+            patch("scripts.research.n10.observers.observer_static_diagnostic.signal.pidfd_send_signal", create=True) as sent,
+            patch("scripts.research.n10.observers.observer_static_diagnostic.os.close") as closed,
         ):
             self.assertFalse(diagnostic.tick())
             self.assertTrue(diagnostic.frozen)
@@ -41,8 +41,8 @@ class DiagnosticTests(unittest.TestCase):
     def test_eligibility_deadline_does_not_start_or_freeze_unready_game(self):
         diagnostic = self.make()
         with (
-            patch("observer_static_diagnostic.time.monotonic_ns", return_value=diagnostic.origin + 8000000001),
-            patch("observer_static_diagnostic.os.pidfd_open", create=True) as opened,
+            patch("scripts.research.n10.observers.observer_static_diagnostic.time.monotonic_ns", return_value=diagnostic.origin + 8000000001),
+            patch("scripts.research.n10.observers.observer_static_diagnostic.os.pidfd_open", create=True) as opened,
         ):
             with self.assertRaisesRegex(ValueError, "eligibility deadline"):
                 diagnostic.tick()

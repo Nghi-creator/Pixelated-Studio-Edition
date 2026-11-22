@@ -16,10 +16,10 @@ From the producer root, prepare a fresh private plan and output location:
 npm run build:engine
 mkdir -p -m 700 local/phase_2/n11-raw
 CORE_REVISION="$(git -C ../latency_fingerprinting rev-parse HEAD)"
-node --experimental-strip-types engine/runtime/scripts/research/n11/rawObservation.mjs prepare \
+node --experimental-strip-types engine/runtime/scripts/research/n11/acquisition/rawObservation.mjs prepare \
   --image "$N11_IMAGE_SHA" --acquisition-id n11-raw-engineering-001 \
   --core-revision "$CORE_REVISION" --output local/phase_2/n11-raw/plan-001.json
-node --experimental-strip-types engine/runtime/scripts/research/n11/rawObservation.mjs acquire \
+node --experimental-strip-types engine/runtime/scripts/research/n11/acquisition/rawObservation.mjs acquire \
   --plan local/phase_2/n11-raw/plan-001.json \
   --output-directory local/phase_2/n11-raw/observation-001
 ```
@@ -100,7 +100,7 @@ authority are unavailable.
 ```sh
 npm test -w @pixelated/engine-runtime
 npm run lint:engine
-node --test engine/runtime/scripts/research/n10/rawObservation*.test.mjs
+node --test 'engine/runtime/scripts/research/n11/{acquisition,browser,export}/*.test.mjs'
 ```
 
 Relevant Linux native ownership/media tests and the existing two-viewer observer
@@ -166,8 +166,8 @@ engineering control integration; it does not inject or label a fault.
 Artificial fixtures and negative checks:
 
 ```sh
-node --experimental-strip-types --test engine/runtime/scripts/research/n10/observedPhase.test.mjs
-node --experimental-strip-types engine/runtime/scripts/research/n10/pairedPhaseFixture.mjs /absolute/fresh-existing-directory
+node --experimental-strip-types --test engine/runtime/scripts/research/n11/receipts/observedPhase.test.mjs
+node --experimental-strip-types engine/runtime/scripts/research/n11/receipts/pairedPhaseFixture.mjs /absolute/fresh-existing-directory
 ```
 
 The generator refuses to overwrite. Its `passed` fields are invented test inputs,

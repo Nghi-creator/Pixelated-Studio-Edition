@@ -9,7 +9,7 @@ sources continue to reject engineering control configuration and dispatch.
 
 ```sh
 npm run build:engine
-node engine/runtime/scripts/research/n10/faultCostCohort.mjs \
+node engine/runtime/scripts/research/n10/cost/faultCostCohort.mjs \
   --image "$N10_NATIVE_IMAGE" --output "$N10_FAULT_COST_COHORT"
 PYTHONPATH=engine/runtime python3 -m research.live_probe_control.qualification.fault_cost_screen \
   "$N10_FAULT_COST_COHORT"

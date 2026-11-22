@@ -1,13 +1,11 @@
 """Disposable cgroup file doubles validate pinning and cumulative end counters."""
 
-import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
-from container_cost import ContainerCost
+from scripts.research.n10.cost.container_cost import ContainerCost
 
 
 class ContainerCostTests(unittest.TestCase):
@@ -18,7 +16,7 @@ class ContainerCostTests(unittest.TestCase):
             ns.write_text("0::/\n")
             events = []
             with patch(
-                "container_cost.Path",
+                "scripts.research.n10.cost.container_cost.Path",
                 side_effect=lambda p: stats if p.endswith("cpu.stat") else ns,
             ):
                 c = ContainerCost(
@@ -47,7 +45,7 @@ class ContainerCostTests(unittest.TestCase):
             ns.write_text("0::/foreign\n")
             events = []
             with patch(
-                "container_cost.Path",
+                "scripts.research.n10.cost.container_cost.Path",
                 side_effect=lambda p: stats if p.endswith("cpu.stat") else ns,
             ):
                 with self.assertRaisesRegex(ValueError, "private cgroup"):

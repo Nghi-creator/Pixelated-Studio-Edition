@@ -1,6 +1,6 @@
 # Contained game and browser cadence experiment
 
-`engine/runtime/scripts/research/n10/gameBrowserTrial.mjs` runs a fixed, disposable Linux
+`engine/runtime/scripts/research/n10/capture/gameBrowserTrial.mjs` runs a fixed, disposable Linux
 Frozen-Bubble level through an owned Gst WebRTC sender and a separate headless
 Chromium video receiver. It exercises the [cadence controller](n10-cadence-controller.md)
 without attaching to `camera.py`, an existing game session, a user's browser
@@ -21,7 +21,7 @@ create a new private state directory for this independent experiment:
 
 ```sh
 mkdir -m 700 local/phase_2/game-browser-state
-node engine/runtime/scripts/research/n10/gameBrowserTrial.mjs \
+node engine/runtime/scripts/research/n10/capture/gameBrowserTrial.mjs \
   --mode changed --image "$N10_IMAGE_SHA" \
   --state-directory local/phase_2/game-browser-state \
   --output local/phase_2/game-browser-acquisition.json
@@ -146,7 +146,7 @@ separate acceptance requirements. The acquisition and summary always state
 ```sh
 cd engine/runtime
 python3 -m unittest discover -s tests/python -p 'test_live_probe_*.py' -v
-node --test scripts/research/n10/gameBrowserTrial.test.mjs
+node --test scripts/research/n10/capture/gameBrowserTrial.test.mjs
 ```
 
 The runtime Node suite also invokes these boundary checks. Real game/browser

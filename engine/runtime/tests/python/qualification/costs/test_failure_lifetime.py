@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts" / "research" / "n10"))
-from failure_lifetime import journal_read, process_hash, process_read
+from scripts.research.n10.cost.failure_lifetime import journal_read, process_hash, process_read
 from research.live_probe_control.control.contracts import Policy, digest
 from research.live_probe_control.control.journal import CadenceJournal
 from research.live_probe_control.control.probe_transport import EngineeringControl
@@ -35,11 +35,11 @@ class LifetimeReadTests(unittest.TestCase):
         fields = ["0"] * 22
         fields[11], fields[12], fields[19] = "2", "3", "123"
         with (
-            patch("failure_lifetime.subprocess.Popen", Process),
-            patch("failure_lifetime.os.getpid", return_value=7),
-            patch("failure_lifetime.process_identity", return_value=(7, 123)),
+            patch("scripts.research.n10.cost.failure_lifetime.subprocess.Popen", Process),
+            patch("scripts.research.n10.cost.failure_lifetime.os.getpid", return_value=7),
+            patch("scripts.research.n10.cost.failure_lifetime.process_identity", return_value=(7, 123)),
             patch(
-                "failure_lifetime.Path.read_text",
+                "scripts.research.n10.cost.failure_lifetime.Path.read_text",
                 return_value="42 (name) " + " ".join(fields),
             ),
         ):
@@ -50,13 +50,13 @@ class LifetimeReadTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 process_read("boot", SimpleNamespace(pid=42, poll=lambda: None))
         with (
-            patch("failure_lifetime.subprocess.Popen", Process),
-            patch("failure_lifetime.os.getpid", return_value=7),
+            patch("scripts.research.n10.cost.failure_lifetime.subprocess.Popen", Process),
+            patch("scripts.research.n10.cost.failure_lifetime.os.getpid", return_value=7),
             patch(
-                "failure_lifetime.process_identity", side_effect=[(7, 123), (7, 124)]
+                "scripts.research.n10.cost.failure_lifetime.process_identity", side_effect=[(7, 123), (7, 124)]
             ),
             patch(
-                "failure_lifetime.Path.read_text",
+                "scripts.research.n10.cost.failure_lifetime.Path.read_text",
                 return_value="42 (name) " + " ".join(fields),
             ),
         ):
@@ -67,11 +67,11 @@ class LifetimeReadTests(unittest.TestCase):
         fields = ["0"] * 22
         fields[19] = "123"
         with (
-            patch("failure_lifetime.subprocess.Popen", Process),
-            patch("failure_lifetime.os.getpid", return_value=7),
-            patch("failure_lifetime.process_identity", return_value=(8, 123)),
+            patch("scripts.research.n10.cost.failure_lifetime.subprocess.Popen", Process),
+            patch("scripts.research.n10.cost.failure_lifetime.os.getpid", return_value=7),
+            patch("scripts.research.n10.cost.failure_lifetime.process_identity", return_value=(8, 123)),
             patch(
-                "failure_lifetime.Path.read_text",
+                "scripts.research.n10.cost.failure_lifetime.Path.read_text",
                 return_value="42 (name) " + " ".join(fields),
             ),
         ):

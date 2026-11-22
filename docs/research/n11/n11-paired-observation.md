@@ -17,12 +17,12 @@ No image/browser download or image rebuild is performed by this command.
 
 ```sh
 npm run build:engine
-node --experimental-strip-types engine/runtime/scripts/research/n11/pairedObservation.mjs prepare \
+node --experimental-strip-types engine/runtime/scripts/research/n11/acquisition/pairedObservation.mjs prepare \
   --image sha256:<cached-native-image-id> \
   --acquisition-id n11-raw-paired-example \
   --core-revision <full-current-core-revision> \
   --output /absolute/private/paired-plan.json
-node --experimental-strip-types engine/runtime/scripts/research/n11/pairedObservation.mjs acquire \
+node --experimental-strip-types engine/runtime/scripts/research/n11/acquisition/pairedObservation.mjs acquire \
   --plan /absolute/private/paired-plan.json \
   --output-directory /absolute/private/paired-example
 ```
@@ -98,7 +98,7 @@ an engineering control integration.
 ```sh
 npm test -w @pixelated/engine-runtime
 npm run lint:engine
-node --experimental-strip-types --test engine/runtime/scripts/research/n10/pairedObservation*.test.mjs
+node --experimental-strip-types --test 'engine/runtime/scripts/research/n11/{browser,receipts}/*Observation*.test.mjs'
 ```
 
 Native ownership/media regressions and existing production-admission/two-viewer

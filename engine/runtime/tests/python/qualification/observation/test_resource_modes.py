@@ -6,8 +6,7 @@ from pathlib import Path
 
 RUNTIME = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(RUNTIME))
-sys.path.insert(0, str(RUNTIME / "scripts/research/n10"))
-from condition_observation import ConditionObservation
+from scripts.research.n11.native.condition_observation import ConditionObservation
 from research.resource_observation.contained_condition import ResourceConditionObservation
 from research.resource_observation.modes import condition_mode, condition_observer_class
 

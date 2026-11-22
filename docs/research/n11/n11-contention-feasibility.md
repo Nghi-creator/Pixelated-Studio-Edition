@@ -17,12 +17,12 @@ custody protections are the same as the no-fault collector.
 
 ```sh
 npm run build:engine
-node --experimental-strip-types engine/runtime/scripts/research/n11/pairedObservation.mjs prepare-contention \
+node --experimental-strip-types engine/runtime/scripts/research/n11/acquisition/pairedObservation.mjs prepare-contention \
   --image sha256:<cached-native-image-id> \
   --acquisition-id n11-raw-contention-example \
   --core-revision <full-current-core-revision> \
   --output /absolute/private/contention-plan.json
-node --experimental-strip-types engine/runtime/scripts/research/n11/pairedObservation.mjs acquire \
+node --experimental-strip-types engine/runtime/scripts/research/n11/acquisition/pairedObservation.mjs acquire \
   --plan /absolute/private/contention-plan.json \
   --output-directory /absolute/private/contention-example
 ```
@@ -88,7 +88,7 @@ acquisition group. Existing N5 policies, durations and fixed settings are unchan
 ## Verification
 
 ```sh
-node --experimental-strip-types --test engine/runtime/scripts/research/n10/contentionReceipt.test.mjs
+node --experimental-strip-types --test engine/runtime/scripts/research/n11/receipts/contentionReceipt.test.mjs
 cd engine/runtime
 python3 -m unittest discover -s tests/python/qualification/observation -t tests/python -v
 ```

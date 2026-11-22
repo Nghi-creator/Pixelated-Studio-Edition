@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts" / "research" / "n10"))
-from action_cost import GameActionCost
+from scripts.research.n10.cost.action_cost import GameActionCost
 from research.live_probe_control.control.contracts import Generation, Request, Result
 
 
@@ -39,7 +39,7 @@ class ActionCostDriverTests(unittest.TestCase):
         self.enterContext(
             patch("time.monotonic_ns", side_effect=lambda: 100000000000 + self.age)
         )
-        self.enterContext(patch("action_cost.NativeScreen", Sampler))
+        self.enterContext(patch("scripts.research.n10.cost.action_cost.NativeScreen", Sampler))
         self.driver = GameActionCost.__new__(GameActionCost)
         d = self.driver
         d.condition, d.stage, d.origin = "unchanged", "scheduled", 100000000000

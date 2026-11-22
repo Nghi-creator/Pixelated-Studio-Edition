@@ -203,8 +203,7 @@ class FailureDiagnosticTests(unittest.TestCase):
         self.assertTrue(child.blocked)
 
     def test_resource_checkpoint_emits_before_cleanup_can_fail(self):
-        sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
-        from condition_observation import ConditionObservation
+        from scripts.research.n11.native.condition_observation import ConditionObservation
 
         from research.resource_observation.contained_condition import ResourceConditionObservation
 
@@ -293,8 +292,7 @@ class FailureDiagnosticTests(unittest.TestCase):
             self.operation().finish({**body, "rejection_stage": "journal_open"})
 
     def test_operation_checkpoint_survives_missing_journal_and_cleanup_failure_once(self):
-        sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
-        from condition_observation import ConditionObservation
+        from scripts.research.n11.native.condition_observation import ConditionObservation
 
         from research.resource_observation.contained_condition import ResourceConditionObservation
 

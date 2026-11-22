@@ -11,7 +11,7 @@ from unittest.mock import Mock, patch
 from research.live_probe_control.capture.game_scene import GameScene
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts" / "research" / "n10"))
-from observer_moving_gate import METHOD, MovingObserverGate
+from scripts.research.n10.observers.observer_moving_gate import METHOD, MovingObserverGate
 
 
 class MovingGateTests(unittest.TestCase):

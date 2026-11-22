@@ -29,7 +29,7 @@ python3 -m research.trials.live_probe_cadence_trial --isolated-cadence-trial
 The second command is an explicit disposable media experiment and requires the
 native Linux/GStreamer dependencies. See the
 [cadence procedure](../../../docs/research/n10/n10-cadence-feasibility.md) for its full setup.
-Research drivers live in [`scripts/research/n10/`](../scripts/research/n10/).
+Research drivers are grouped in [`scripts/research/`](../scripts/research/README.md).
 Root-level [`scripts/research/n4/`](../../../scripts/research/n4/) and
 [`scripts/research/n5/`](../../../scripts/research/n5/) supply synthetic fixture
 exporters for the Python core.

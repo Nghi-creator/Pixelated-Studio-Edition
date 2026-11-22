@@ -74,7 +74,7 @@ separate requirements before qualification. Every result here retains
 Acquire six fresh sessions with a new absolute output path:
 
 ```sh
-node engine/runtime/scripts/research/n10/actionCostCohort.mjs \
+node engine/runtime/scripts/research/n10/cost/actionCostCohort.mjs \
   --image "$N10_NATIVE_IMAGE" --output "$N10_FULL_SPAN_COHORT" --protocol v3
 PYTHONPATH=engine/runtime python3 -m research.live_probe_control.qualification.full_span_cohort_v2 \
   "$N10_FULL_SPAN_COHORT"

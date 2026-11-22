@@ -96,7 +96,7 @@ is unconfirmed. Run it only after freezing the exact source and context and the
 comparison rules in an ignored local plan:
 
 ```sh
-node engine/runtime/scripts/research/n10/actionCostCohort.mjs \
+node engine/runtime/scripts/research/n10/cost/actionCostCohort.mjs \
   --image "$N10_NATIVE_IMAGE" --output "$N10_ACTION_COST_COHORT" --protocol v2
 PYTHONPATH=engine/runtime python3 -m research.live_probe_control.qualification.action_cost_cohort_v2 \
   "$N10_ACTION_COST_COHORT"

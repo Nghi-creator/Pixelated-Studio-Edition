@@ -33,6 +33,6 @@ def condition_observer_class(resource, *, timing=False):
         from .contained_condition import ResourceConditionObservation
 
         return ResourceConditionObservation
-    from condition_observation import ConditionObservation
+    from scripts.research.n11.native.condition_observation import ConditionObservation
 
     return ConditionObservation

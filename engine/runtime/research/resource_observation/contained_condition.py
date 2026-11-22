@@ -4,7 +4,7 @@ import hashlib
 import json
 from dataclasses import asdict
 
-from condition_observation import ConditionObservation
+from scripts.research.n11.native.condition_observation import ConditionObservation
 
 from research.live_probe_control.peers.peer_protocol import encoded_read_value
 

@@ -129,7 +129,7 @@ is available after building the engine:
 
 ```sh
 npm run build:engine
-node engine/runtime/scripts/research/n10/browserReceiverSmoke.mjs
+node engine/runtime/scripts/research/n10/browser/browserReceiverSmoke.mjs
 ```
 
 It uses the installed Playwright Chromium, disposable pairing credentials, an

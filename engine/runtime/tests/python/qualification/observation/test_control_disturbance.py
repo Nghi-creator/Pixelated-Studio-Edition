@@ -8,11 +8,11 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts" / "research" / "n10"))
 from camera_config import parse_stream_profile
-from control_disturbance import ControlDisturbance
+from scripts.research.n10.observers.control_disturbance import ControlDisturbance
 from research.live_probe_control.control.contracts import Generation, Policy
 from research.live_probe_control.control.probe_transport import EngineeringControl
-from native_browser_acceptance import ACCEPTANCE_PROFILE
-from observer_native_screen import NativeScreen
+from scripts.research.n10.browser.native_browser_acceptance import ACCEPTANCE_PROFILE
+from scripts.research.n10.observers.observer_native_screen import NativeScreen
 
 
 class ControlAcquisitionTests(unittest.TestCase):
@@ -35,7 +35,7 @@ class ControlAcquisitionTests(unittest.TestCase):
         slot = SimpleNamespace(owner=SimpleNamespace(last_observation=(body, 1000000000), child=None),
                                failure=None, stop=SimpleNamespace(is_set=lambda: False), done=SimpleNamespace(is_set=lambda: False))
         sampler = NativeScreen(SimpleNamespace(active={"first": slot, "second": slot}), Mock())
-        with patch("observer_native_screen.time.monotonic_ns", return_value=1000000000), self.assertRaisesRegex(ValueError, "profile/caps changed"):
+        with patch("scripts.research.n10.observers.observer_native_screen.time.monotonic_ns", return_value=1000000000), self.assertRaisesRegex(ValueError, "profile/caps changed"):
             sampler.sample()
         self.assertEqual(sampler.samples, [])
 
@@ -47,7 +47,7 @@ class ControlAcquisitionTests(unittest.TestCase):
     def test_missing_native_eligibility_has_a_fixed_deadline(self):
         screen = self.make()
         with (patch.object(screen, "slots", return_value=None),
-              patch("control_disturbance.time.monotonic_ns", return_value=screen.origin + 8000000001),
+              patch("scripts.research.n10.observers.control_disturbance.time.monotonic_ns", return_value=screen.origin + 8000000001),
               self.assertRaisesRegex(ValueError, "deadline")):
             screen.tick()
         screen.local.dispatch.assert_not_called()

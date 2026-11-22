@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts" / "research" / "n10"))
-from game_failure_acceptance import GameFailureAcceptance, SourceSocketSwap
+from scripts.research.n10.cost.game_failure_acceptance import GameFailureAcceptance, SourceSocketSwap
 
 
 class SocketFaultTests(unittest.TestCase):
@@ -22,9 +22,9 @@ class SocketFaultTests(unittest.TestCase):
         self.original.bind(str(self.path))
         info = self.path.lstat()
         self.capture = SimpleNamespace(socket_device=info.st_dev, socket_inode=info.st_ino)
-        self.enterContext(patch("game_failure_acceptance.SOCKET", self.path))
-        self.enterContext(patch("game_failure_acceptance.socket_identity", side_effect=lambda: (self.path.lstat().st_dev, self.path.lstat().st_ino)))
-        self.enterContext(patch("game_failure_acceptance.GameCaptureContext.from_scene", return_value=self.capture))
+        self.enterContext(patch("scripts.research.n10.cost.game_failure_acceptance.SOCKET", self.path))
+        self.enterContext(patch("scripts.research.n10.cost.game_failure_acceptance.socket_identity", side_effect=lambda: (self.path.lstat().st_dev, self.path.lstat().st_ino)))
+        self.enterContext(patch("scripts.research.n10.cost.game_failure_acceptance.GameCaptureContext.from_scene", return_value=self.capture))
 
     def test_owned_identity_is_changed_then_exact_original_restored_once(self):
         swap = SourceSocketSwap(object(), self.capture)

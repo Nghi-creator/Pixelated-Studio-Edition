@@ -17,13 +17,13 @@ no arbitrary delay, worker count, remote setter or automatic diagnostic dispatch
 Build the engine, then prepare one source-bound plan explicitly:
 
 ```sh
-node engine/runtime/scripts/research/n11/conditionObservation.mjs prepare \
+node engine/runtime/scripts/research/n11/acquisition/conditionObservation.mjs prepare \
   --image sha256:<cached-image-id> \
   --acquisition-id n11-raw-condition-example \
   --core-revision <full-core-revision> \
   --condition no_injected_fault \
   --output /absolute/private/condition-plan.json
-node engine/runtime/scripts/research/n11/conditionObservation.mjs acquire \
+node engine/runtime/scripts/research/n11/acquisition/conditionObservation.mjs acquire \
   --plan /absolute/private/condition-plan.json \
   --output-directory /absolute/private/condition-example
 ```

@@ -2,15 +2,13 @@
 import subprocess
 import sys
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-sys.path.insert(0,str(Path(__file__).resolve().parents[4]/'scripts/research/n10'))
-from condition_protocol import CONDITIONS, condition_variant
-from condition_observation import ConditionObservation
-from pacing_fixture import ElementPacer, peer_subprocess_proxy
-from pacing_observation import PacingContrastObservation
+from scripts.research.n11.native.condition_protocol import CONDITIONS, condition_variant
+from scripts.research.n11.native.condition_observation import ConditionObservation
+from scripts.research.n11.native.pacing_fixture import ElementPacer, peer_subprocess_proxy
+from scripts.research.n11.native.pacing_observation import PacingContrastObservation
 
 
 class ConditionTests(unittest.TestCase):
@@ -46,7 +44,7 @@ class ConditionTests(unittest.TestCase):
 
     def test_unused_registry_cannot_hide_a_child_or_return_false_cpu_measurements(self):
         o=self.observer()
-        with patch('condition_observation.cgroup_counters',return_value=dict(nr_periods=1,nr_throttled=0,throttled_usec=0)):
+        with patch('scripts.research.n11.native.condition_observation.cgroup_counters',return_value=dict(nr_periods=1,nr_throttled=0,throttled_usec=0)):
             value=o.registry();self.assertEqual(value['state'],'unused');self.assertEqual(value['cpu_ns'],[])
             o.pressure.records=[dict(pid=1)]
             with self.assertRaises(ValueError):o.registry()
@@ -55,7 +53,7 @@ class ConditionTests(unittest.TestCase):
         o=self.observer('owned_cpu_pressure')
         o.pressure=SimpleNamespace(used=True,closed=True,children=[Mock(),Mock()],handles=[None,None],records=[{},{}],identities=lambda:['a','b'])
         for child in o.pressure.children:child.poll.return_value=0
-        with patch('condition_observation.cgroup_counters',return_value=dict(nr_periods=1,nr_throttled=0,throttled_usec=0)):
+        with patch('scripts.research.n11.native.condition_observation.cgroup_counters',return_value=dict(nr_periods=1,nr_throttled=0,throttled_usec=0)):
             result=o.registry();self.assertEqual(result['state'],'reaped');self.assertIsNone(result['cpu_ns'])
             o.pressure.children[0].poll.return_value=None
             with self.assertRaises(ValueError):o.registry()

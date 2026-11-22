@@ -6,9 +6,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
-from contained_pressure import ContainedPressure
-from contention_observation import ContentionObservation
+from scripts.research.n11.native.contained_pressure import ContainedPressure
+from scripts.research.n11.native.contention_observation import ContentionObservation
 
 
 class Processes:
@@ -51,13 +50,13 @@ class Processes:
 class PressureTests(unittest.TestCase):
     def make(self):
         processes = Processes()
-        with patch("contained_pressure.LinuxProcesses", return_value=processes):
+        with patch("scripts.research.n11.native.contained_pressure.LinuxProcesses", return_value=processes):
             owner = ContainedPressure()
         processes.owner = owner
         self.addCleanup(owner.close)
         return owner, processes
 
-    @patch("contained_pressure.cgroup_counters", return_value=dict(nr_periods=1,nr_throttled=1,throttled_usec=10))
+    @patch("scripts.research.n11.native.contained_pressure.cgroup_counters", return_value=dict(nr_periods=1,nr_throttled=1,throttled_usec=10))
     def test_durable_two_child_ownership_precedes_go_and_same_children_are_reaped(self, _):
         owner, processes = self.make()
         started = owner.start()
@@ -68,14 +67,14 @@ class PressureTests(unittest.TestCase):
         self.assertTrue(owner.close()); self.assertTrue(owner.close())
         self.assertEqual(processes.stopped, {100, 101})
 
-    @patch("contained_pressure.cgroup_counters", return_value={})
+    @patch("scripts.research.n11.native.contained_pressure.cgroup_counters", return_value={})
     def test_pre_activation_pin_failure_reaps_exact_owned_children_without_go(self, _):
         owner, processes = self.make(); processes.fail_pin = True
         with self.assertRaises(OSError): owner.start()
         self.assertEqual(processes.activations, [])
         self.assertTrue(owner.close()); self.assertEqual(processes.stopped, {100, 101})
 
-    @patch("contained_pressure.cgroup_counters", return_value={})
+    @patch("scripts.research.n11.native.contained_pressure.cgroup_counters", return_value={})
     def test_generation_change_early_exit_counter_reset_and_deadline_are_rejected(self, _):
         for failure in ("identity", "exit", "reset", "deadline"):
             owner, processes = self.make(); owner.start(); owner.sample()
@@ -87,7 +86,7 @@ class PressureTests(unittest.TestCase):
             self.assertTrue(owner.close())
 
 
-    @patch("contained_pressure.cgroup_counters", return_value={})
+    @patch("scripts.research.n11.native.contained_pressure.cgroup_counters", return_value={})
     def test_failed_stop_persistence_remains_unconfirmed_and_can_finish_owned_cleanup(self, _):
         owner, processes = self.make(); owner.start()
         with patch.object(owner, "persist", side_effect=OSError("write failed")):
@@ -124,7 +123,7 @@ class LifecycleTests(unittest.TestCase):
         p.pressure.sample.return_value = dict(cpu_ns=[1,1])
         return p
 
-    @patch("contention_observation.cgroup_counters", return_value={})
+    @patch("scripts.research.n11.native.contention_observation.cgroup_counters", return_value={})
     def test_reference_then_same_pressure_survives_pair_until_recovery(self, _):
         p = self.make()
         for i in range(5):
@@ -135,17 +134,17 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(p.pressure_stage, "establish")
         p.pressure.start.assert_called_once()
         self.clock += 1000000000
-        with patch("contention_observation.PairedObservation.tick", return_value=False):
+        with patch("scripts.research.n11.native.contention_observation.PairedObservation.tick", return_value=False):
             self.assertFalse(p.tick())
         p.pressure.close.assert_not_called()
-        with patch("contention_observation.PairedObservation.tick", return_value=True):
+        with patch("scripts.research.n11.native.contention_observation.PairedObservation.tick", return_value=True):
             self.assertFalse(p.tick())
         p.pressure.close.assert_called_once()
         self.assertEqual(p.pressure_stage, "post")
 
     def test_cleanup_failure_still_checkpoints_controller_without_claiming_reaped(self):
         p = self.make(); p.pressure.close.return_value = False
-        with patch("contention_observation.PairedObservation.checkpoint") as controller:
+        with patch("scripts.research.n11.native.contention_observation.PairedObservation.checkpoint") as controller:
             with self.assertRaisesRegex(ValueError, "cleanup"): p.checkpoint()
         controller.assert_called_once()
         self.assertEqual(p.emit.call_args.kwargs["state"], "unknown")

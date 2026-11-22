@@ -8,8 +8,7 @@ from unittest.mock import Mock, patch
 
 RUNTIME = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(RUNTIME))
-sys.path.insert(0, str(RUNTIME / "scripts/research/n10"))
-from condition_observation import ConditionObservation
+from scripts.research.n11.native.condition_observation import ConditionObservation
 from research.live_probe_control.control.contracts import Generation
 from research.resource_observation.contained_condition import (
     MAX_PREPARATION_NS,

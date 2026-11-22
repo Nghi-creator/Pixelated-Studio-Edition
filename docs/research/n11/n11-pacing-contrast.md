@@ -13,12 +13,12 @@ proof of measured contrast, diagnosis or useful corrective action.
 
 ```sh
 npm run build:engine
-node --experimental-strip-types engine/runtime/scripts/research/n11/pairedObservation.mjs prepare-pacing-contrast \
+node --experimental-strip-types engine/runtime/scripts/research/n11/acquisition/pairedObservation.mjs prepare-pacing-contrast \
   --image sha256:<cached-native-image-id> \
   --acquisition-id n11-raw-contrast-example \
   --core-revision <full-current-core-revision> \
   --output /absolute/private/contrast-plan.json
-node --experimental-strip-types engine/runtime/scripts/research/n11/pairedObservation.mjs acquire \
+node --experimental-strip-types engine/runtime/scripts/research/n11/acquisition/pairedObservation.mjs acquire \
   --plan /absolute/private/contrast-plan.json \
   --output-directory /absolute/private/contrast-example
 ```

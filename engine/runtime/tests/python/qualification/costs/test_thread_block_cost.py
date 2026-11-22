@@ -13,8 +13,7 @@ from research.live_probe_control.qualification.fault_cost_screen import summariz
 from research.live_probe_control.qualification.thread_block_cost_screen import METHOD, MODE, summarize
 from qualification.costs.test_thread_exit_cost import acquisition as exited_acquisition
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
-import game_thread_fault as fixture
+import scripts.research.n10.cost.game_thread_fault as fixture
 
 
 def acquisition():

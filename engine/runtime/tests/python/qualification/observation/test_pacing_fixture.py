@@ -1,12 +1,10 @@
 """Fixture-only pacing: independent property, watchdog and exact cleanup."""
 import sys
 import unittest
-from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
-sys.path.insert(0,str(Path(__file__).resolve().parents[4]/'scripts/research/n10'))
-from pacing_fixture import ElementPacer, peer_subprocess_proxy, close_paced_media
+from scripts.research.n11.native.pacing_fixture import ElementPacer, peer_subprocess_proxy, close_paced_media
 
 
 class PacingTests(unittest.TestCase):
@@ -78,8 +76,8 @@ class PacingTests(unittest.TestCase):
         with self.assertRaises(ValueError):peer_subprocess_proxy(contrast=1)
 
     def test_native_read_evidence_is_contrast_only_and_preserves_worker_bounds(self):
-        from paired_observation import PairedObservation
-        from pacing_observation import PacingContrastObservation
+        from scripts.research.n11.native.paired_observation import PairedObservation
+        from scripts.research.n11.native.pacing_observation import PacingContrastObservation
         from research.live_probe_control.control.contracts import Generation, digest
         self.assertEqual(PairedObservation.__new__(PairedObservation).native_read_evidence(None,None),{})
         generation=Generation('owner','pipeline','peer')
@@ -93,7 +91,7 @@ class PacingTests(unittest.TestCase):
             with self.assertRaises(ValueError):observer.native_read_evidence(slot,bad)
 
     def test_capacity_grid_is_closed_and_zero_requires_explicit_index(self):
-        from pacing_fixture import CAPACITY_GRID, pacing_variant
+        from scripts.research.n11.native.pacing_fixture import CAPACITY_GRID, pacing_variant
         self.assertEqual(CAPACITY_GRID,(0,30000,32000,34000,36000,37500,40000,50000))
         for index,delay in enumerate(CAPACITY_GRID):
             method,actual=pacing_variant(calibration_index=index)
@@ -112,7 +110,7 @@ class PacingTests(unittest.TestCase):
 
     def test_capacity_child_entrypoint_is_closed_and_zero_start_is_acknowledged(self):
         import subprocess
-        from pacing_fixture import PacingHandle
+        from scripts.research.n11.native.pacing_fixture import PacingHandle
         with patch.object(subprocess,'Popen') as launch:
             peer_subprocess_proxy(calibration_index=0).Popen([sys.executable,'-u','-m','research.live_probe_control.peers.peer_worker','--dedicated-peer-worker'])
             self.assertIn("child_main'](calibration_index=0,confirmation=False)",launch.call_args.args[0][3])

@@ -138,18 +138,15 @@ class StalledCostTests(unittest.TestCase):
             self.assertEqual(summarize(run)["cost_screen"], "unavailable", mutation)
 
     def test_stop_targets_only_the_current_pinned_worker(self):
-        import sys
-        from pathlib import Path
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
-        from fault_cost import StalledWorkerCost
+        from scripts.research.n10.cost.fault_cost import StalledWorkerCost
 
         d = StalledWorkerCost.__new__(StalledWorkerCost)
         d.old_process = SimpleNamespace(poll=lambda: None)
         d.old = SimpleNamespace(owner=SimpleNamespace(child=d.old_process, pidfd=17))
-        with patch("fault_cost.signal.pidfd_send_signal", create=True) as send:
+        with patch("scripts.research.n10.cost.fault_cost.signal.pidfd_send_signal", create=True) as send:
             d.inject_fault()
             send.assert_called_once()
             self.assertEqual(send.call_args.args[0], 17)

@@ -1,7 +1,6 @@
 """Invented whole-camera observations and monitor ownership rejection tests."""
 
 import copy
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -11,8 +10,7 @@ from research.live_probe_control.qualification.camera_death_cost_screen import M
 from research.live_probe_control.control.contracts import digest
 from qualification.costs.test_thread_block_cost import acquisition as block_acquisition
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[4] / "scripts/research/n10"))
-import camera_death as fixture
+import scripts.research.n10.cost.camera_death as fixture
 
 
 def acquisition():

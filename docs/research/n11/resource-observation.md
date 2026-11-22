@@ -128,7 +128,7 @@ metadata rather than interpreting it as ordinary condition evidence.
 Prepare a source-bound one-shot engineering plan with:
 
 ```sh
-node engine/runtime/scripts/research/n11/resourceConditionObservation.mjs prepare \
+node engine/runtime/scripts/research/n11/acquisition/resourceConditionObservation.mjs prepare \
   --image sha256:IMAGE_DIGEST --acquisition-id n11-raw-resource-CASE \
   --core-revision CORE_GIT_REVISION --condition no_injected_fault --output plan.json
 ```
@@ -136,7 +136,7 @@ node engine/runtime/scripts/research/n11/resourceConditionObservation.mjs prepar
 The explicit acquisition command is:
 
 ```sh
-node engine/runtime/scripts/research/n11/resourceConditionObservation.mjs acquire \
+node engine/runtime/scripts/research/n11/acquisition/resourceConditionObservation.mjs acquire \
   --plan plan.json --output-directory fresh-case-directory
 ```
 
@@ -255,7 +255,7 @@ record cannot retrospectively establish a rejection or worker-loss reason.
 
 ### Matching the study's host process lifetime
 
-`scripts/research/n11/conditionEngineering.mjs` is an acquisition-only engineering
+`scripts/research/n11/acquisition/conditionEngineering.mjs` is an acquisition-only engineering
 runner that retains one Node process across all cases and synchronous core
 verification, like `combinedResourceStudy.mjs`. A Python loop launching a fresh
 Node child per case does not exercise that process lifetime; successful results

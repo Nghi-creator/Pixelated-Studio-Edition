@@ -10,7 +10,7 @@ absolute output path in ignored `local/`:
 
 ```sh
 npm run build:engine
-node engine/runtime/scripts/research/n10/gameFailureCohort.mjs \
+node engine/runtime/scripts/research/n10/cost/gameFailureCohort.mjs \
   --image "$N10_NATIVE_IMAGE" --output "$N10_GAME_FAILURE_OUTPUT"
 PYTHONPATH=engine/runtime python3 -m research.live_probe_control.qualification.game_failure_screen \
   "$N10_GAME_FAILURE_OUTPUT"
