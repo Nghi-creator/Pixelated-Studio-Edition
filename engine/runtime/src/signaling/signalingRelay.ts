@@ -49,6 +49,8 @@ type ReceiverRelayTrace = (sample: {
   decision: ReceiverRelayDecision;
 }) => void;
 
+type ReceiverBindingOwner = { socketId: string; peerId: string; bindingId: string };
+
 type SignalingRelayOptions = {
   canCreatePeer?: (socket: Socket, sessionId: string) => boolean;
   eventLimitPerSecond?: number;
@@ -117,6 +119,7 @@ export function createSignalingPeerRegistry(
       sessionId: string, socketId: string,
       sample: NonNullable<ReturnType<typeof receiverObservation>>, stamp: number,
       rejected?: (decision: ReceiverRelayDecision) => void,
+      revoked?: (binding: ReceiverBindingOwner) => void,
     ) {
       const peer = peers.get(peerKey(sessionId, sample.peerId));
       const receiver = peer?.receiver;
@@ -128,6 +131,7 @@ export function createSignalingPeerRegistry(
           (receiver.clockId !== null && receiver.clockId !== sample.clockId) ||
           sample.elapsedNs <= receiver.elapsedNs || sample.framesDecoded < receiver.decoded || sample.presentedFrames < receiver.presented) {
         peer.receiver = undefined;
+        revoked?.({ socketId: peer.socketId, peerId: peer.peerId, bindingId: receiver.bindingId });
         rejected?.("discontinuous_observation");
         return null;
       }
@@ -135,6 +139,7 @@ export function createSignalingPeerRegistry(
       // skip samples and resume a supposedly continuous observation stream.
       if (stamp - receiver.receivedAt < 100) {
         peer.receiver = undefined;
+        revoked?.({ socketId: peer.socketId, peerId: peer.peerId, bindingId: receiver.bindingId });
         rejected?.("minimum_arrival_interval");
         return null;
       }
@@ -148,7 +153,10 @@ export function createSignalingPeerRegistry(
     },
     invalidateReceiver(sessionId: string, peerId: string, socketId: string) {
       const peer = peers.get(peerKey(sessionId, peerId));
-      if (peer?.socketId === socketId) peer.receiver = undefined;
+      if (peer?.socketId !== socketId || !peer.receiver) return null;
+      const binding = { socketId, peerId, bindingId: peer.receiver.bindingId };
+      peer.receiver = undefined;
+      return binding;
     },
     dropReceiverCamera(cameraId: string) {
       const dropped: Array<{ socketId: string; peerId: string; bindingId: string }> = [];
@@ -351,40 +359,59 @@ export function registerSignalingRelayHandlers(
     socket.emit("webrtc-receiver-bound", { ...challenge, receiverSocketId });
   });
 
-  socket.on("webrtc-receiver-observation", (payload: unknown) => {
+  const notifyReceiverRevocation = (binding: ReceiverBindingOwner) => {
+    const receiver = socket.nsp.sockets.get(binding.socketId);
+    if (receiver && normalizeSessionId(receiver.data.sessionId) === normalizeSessionId(socket.data.sessionId)) {
+      receiver.emit("webrtc-receiver-unbind", {
+        peerId: binding.peerId, bindingId: binding.bindingId, reason: "observation_invalidated",
+      });
+    }
+  };
+
+  socket.on("webrtc-receiver-observation", (payload: unknown, acknowledge?: unknown) => {
     const withinBudget = consumeSignalingBudget();
     const trustedCamera = socket.data.trustedCamera === true;
-    if ((trustedCamera || !withinBudget) && !options.traceReceiver) return;
     const sample = receiverObservation(payload);
+    const reply = (accepted: boolean) => {
+      if (typeof acknowledge === "function") {
+        acknowledge({ bindingId: sample?.bindingId ?? null, sequence: sample?.sequence ?? null, accepted });
+      }
+    };
     const stamp = options.traceReceiver ? now() : undefined;
     const trace = stamp === undefined ? undefined : (decision: ReceiverRelayDecision) =>
       options.traceReceiver?.({ sequence: sample?.sequence ?? null, received_ms: stamp, decision });
     if (!withinBudget || trustedCamera) {
       trace?.(withinBudget ? "trusted_camera" : "signaling_budget");
+      reply(false);
       return;
     }
     const sessionId = normalizeSessionId(socket.data.sessionId);
     if (!sample || !sessionId) {
       trace?.("invalid_observation_or_session");
+      reply(false);
       return;
     }
     if (!canCreatePeer(socket, sessionId)) {
-      peerRegistry.invalidateReceiver(sessionId, sample.peerId, socket.id);
+      const revoked = peerRegistry.invalidateReceiver(sessionId, sample.peerId, socket.id);
+      if (revoked) notifyReceiverRevocation(revoked);
       trace?.("ineligible_receiver");
+      reply(false);
       return;
     }
-    const binding = peerRegistry.observeReceiver(sessionId, socket.id, sample, stamp ?? now(), trace);
-    if (!binding) return;
+    const binding = peerRegistry.observeReceiver(sessionId, socket.id, sample, stamp ?? now(), trace, notifyReceiverRevocation);
+    if (!binding) { reply(false); return; }
     const cameraSocket = socket.nsp.sockets.get(binding.cameraId);
     if (!cameraSocket || cameraSocket.data.trustedCamera !== true || normalizeSessionId(cameraSocket.data.sessionId) !== sessionId) {
-      peerRegistry.dropReceiverCamera(binding.cameraId);
+      for (const revoked of peerRegistry.dropReceiverCamera(binding.cameraId)) notifyReceiverRevocation(revoked);
       trace?.("camera_unavailable");
+      reply(false);
       return;
     }
     socket.to(binding.cameraId).emit("webrtc-receiver-observation", {
       ...sample, offerHash: binding.offerHash, receiverSocketId: socket.id,
     });
     trace?.("forwarded");
+    reply(true);
   });
 
   socket.on("webrtc-peer-disconnect", (payload: SessionPayload = {}) => {

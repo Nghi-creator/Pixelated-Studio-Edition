@@ -9,11 +9,14 @@ export async function publishCompletionMarker(directory, name, {io=fs}={}) {
   }
   const temporary=path.join(directory,'.n11-marker-'+randomUUID()+'.tmp');
   const target=path.join(directory,name);
+  const removeTemporary = async () => {
+    try {await io.unlink(temporary);} catch(error) {if(error.code!=='ENOENT')throw error;}
+  };
   try {
     await io.writeFile(temporary,'{"complete":true}',{flag:'wx',mode:0o644});
     // link is atomic and exclusive; rename would silently overwrite an existing target.
     await io.link(temporary,target);
   } finally {
-    try {await io.unlink(temporary);} catch(error) {if(error.code!=='ENOENT')throw error;}
+    await removeTemporary();
   }
 }

@@ -86,6 +86,23 @@ permitted; a foreign configured cadence is never overwritten during cleanup.
 
 A child receiver lease requires advancing observation sequence/counters and
 fresh host receipt stamps. It expires after 750 ms of missing report/progress.
+
+The browser observation sender allows one report in flight. The relay acknowledges
+the exact binding ID and sequence only after forwarding to the issuing camera;
+this receipt is not camera health or control authority. A 250 ms receipt timeout,
+rejection or mismatched receipt stops reporting without retry. The next 200 ms
+poll starts after acknowledgment, so delayed delivery cannot bunch two reports
+inside the relay's unchanged 100 ms arrival gate. Camera delivery and the existing
+750 ms health checks remain independently required. New senders require a relay
+that supports these receipts; legacy fire-and-forget senders remain accepted.
+
+An invalidated observation binding sends one matching
+`webrtc-receiver-unbind` with `reason: "observation_invalidated"` to its browser.
+The binding remains revoked and later reports cannot resume it. Normal camera
+cleanup retains its unbind without a reason. The research browser records
+revocation as a failure, so it cannot satisfy successful cleanup by silently
+treating a rejected receiver as healthy.
+
 Caller-reported browser elapsed time is not used as host freshness. These control
 stamps use the shared Linux kernel monotonic clock of the parent and its direct
 child; they are separate from child-relative trace timestamps and receiver clocks.

@@ -49,7 +49,7 @@ export async function collectIceStartup(pc) {
 export function nativeBrowserHtml(token, rawObservation = false, pairedObservation = false, receiverDelivery = false) {
   return `<!doctype html><video id="video" autoplay muted playsinline></video>
 <script src="/socket.io/socket.io.js"></script><script type="module">
-import {startReceiverObservation,offerDigest} from '/collector.js';
+import {emitReceiverObservation,startReceiverObservation,offerDigest} from '/collector.js';
 import {createLocalIceQueue} from '/local-ice.js';
 import {collectBrowserQuality} from '/quality.js';
 import {startControlContinuity} from '/continuity.js';
@@ -99,8 +99,8 @@ socket.on('webrtc-receiver-bind',async challenge=>{try{const scope=active;if(!sc
  onStop:reason=>{if(reason!=='disposed'&&window.observationStops.length<16)window.observationStops.push({peerId:scope.peerId,reason,at_ms:performance.now()});},
  emit:sample=>{mark(scope,'first_report',{decoded:sample.framesDecoded,presented:sample.presentedFrames});window.counts[scope.peerId]=sample;
  if(delivery){if(delivery.length===128)delivery.shift();delivery.push({sequence:sample.sequence,elapsed_ns:sample.elapsedNs,emitted_ms:performance.now(),frames_decoded:sample.framesDecoded,presented_frames:sample.presentedFrames});}
- socket.emit('webrtc-receiver-observation',sample);}});}catch(e){window.problem=String(e);}});
-socket.on('webrtc-receiver-unbind',message=>{if(active&&message.peerId===active.peerId&&message.bindingId===active.bindingId){active.stop();window.unbound++;}});
+ return emitReceiverObservation(socket,sample);}});}catch(e){window.problem=String(e);}});
+socket.on('webrtc-receiver-unbind',message=>{if(active&&message.peerId===active.peerId&&message.bindingId===active.bindingId){active.stop();window.unbound++;if(message.reason)window.problem='receiver observation revoked: '+message.reason;}});
 socket.on('acceptance-peer-reconnect',()=>{if(active?.peerId!=='first')return;socket.emit('webrtc-peer-disconnect',{peerId:'first',sessionId:'native_acceptance'});start('replacement').catch(e=>window.problem=String(e));});
 socket.on('acceptance-observer-stop',()=>{if(active)active.stop();});
 socket.on('disconnect',()=>{if(active)active.stop();});

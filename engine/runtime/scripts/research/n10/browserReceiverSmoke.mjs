@@ -28,7 +28,7 @@ test("real Chromium observations follow authenticated peer/camera binding and st
   const token = randomBytes(24).toString("hex");
   const html = `<!doctype html><video id="video" autoplay muted playsinline></video><canvas id="canvas" width="320" height="240"></canvas>
 <script src="/socket.io/socket.io.js"></script><script type="module">
-import {startReceiverObservation, offerDigest} from '/collector.js';
+import {emitReceiverObservation, startReceiverObservation, offerDigest} from '/collector.js';
 import {bindWebRTCEngineErrors} from '/engine-errors.js';
 const socket = io({auth:{token:${JSON.stringify(token)},role:'browser'},transports:['websocket']});
 window.sent = 0; window.stopped = false; window.error = null; window.starts = 0;
@@ -49,7 +49,7 @@ socket.on('webrtc-receiver-bind',async challenge=>{
  if(challenge.peerId!=='browser_peer'||await offerDigest(originalOffer)!==challenge.offerHash)return;
  window.starts++; stop(); nonce=challenge.bindingId; window.stopped=false;
  stop=startReceiverObservation({pc:rx,challenge,getVideo:()=>video,getStream:()=>incoming,isCurrent:()=>active&&socket.connected,
- emit:sample=>{window.sent++;socket.emit('webrtc-receiver-observation',sample);}});
+ emit:sample=>{window.sent++;return emitReceiverObservation(socket,sample);}});
 });
 socket.on('webrtc-receiver-unbind', value=>{if(value.bindingId===nonce){stop();window.stopped=true;}});
 window.diagnostics=async()=>({state:rx.connectionState,ready:video.readyState,starts:window.starts,
@@ -72,10 +72,18 @@ socket.on('connect',async()=>{try{
   const server = new Server(http, { maxHttpBufferSize: 128 * 1024 });
   server.use(createEngineTokenAuth(token).useSocketEngineToken);
   const peers = createSignalingPeerRegistry(2);
+  let delayedReport = false;
+  const receiverTrace = [];
   server.on("connection", (socket) => {
     socket.data.trustedCamera = canClaimTrustedCamera("raw", String(socket.handshake.auth.role));
     joinSession(socket, "smoke");
-    registerSignalingRelayHandlers(socket, { peerRegistry: peers });
+    socket.use(([event], next) => {
+      if (event === "webrtc-receiver-observation" && !delayedReport) {
+        delayedReport = true;
+        setTimeout(next, 120); // Controlled transport delay; production guards stay active.
+      } else next();
+    });
+    registerSignalingRelayHandlers(socket, { peerRegistry: peers, traceReceiver: row => receiverTrace.push(row) });
     registerEngineErrorHandlers(socket);
   });
   t.after(async () => { await new Promise((resolve) => server.close(resolve)); });
@@ -139,6 +147,8 @@ socket.on('connect',async()=>{try{
   const nextId = randomBytes(32).toString("hex");
   camera.emit("webrtc-receiver-bind", { peerId: "browser_peer", bindingId: nextId, offerHash });
   await until(() => samples.filter((s) => s.bindingId === nextId).length >= 3);
+  assert.ok(delayedReport);
+  assert.equal(receiverTrace.some(row => row.decision === "minimum_arrival_interval"), false);
   await page.evaluate((sample) => window.sendOld(sample), { peerId: old.peerId, bindingId, clockId: old.clockId, sequence: 0, elapsedNs: 1, framesDecoded: 999, presentedFrames: 999 });
   const fresh = samples.filter((sample) => sample.bindingId === nextId);
   assert.equal(fresh[0].sequence, 0);

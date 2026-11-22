@@ -21,13 +21,28 @@ export async function offerDigest(sdp: string) {
 
 const integer = (value: unknown): value is number => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
 
+type ReceiverReceiptSocket = {
+  timeout(milliseconds: number): {
+    emitWithAck(event: "webrtc-receiver-observation", sample: ReceiverObservation): Promise<unknown>;
+  };
+};
+
+/** Relay receipt only: never a claim of camera health or probe authority. */
+export async function emitReceiverObservation(socket: ReceiverReceiptSocket, sample: ReceiverObservation): Promise<void> {
+  const response = await socket.timeout(250).emitWithAck("webrtc-receiver-observation", sample);
+  if (!response || typeof response !== "object" || Array.isArray(response)) throw Error("receiver receipt unavailable");
+  const receipt = response as Record<string, unknown>;
+  if (Object.keys(receipt).length !== 3 || !["bindingId", "sequence", "accepted"].every(key => Object.hasOwn(receipt, key)) || receipt.bindingId !== sample.bindingId ||
+      receipt.sequence !== sample.sequence || receipt.accepted !== true) throw Error("receiver receipt rejected");
+}
+
 export function startReceiverObservation({ pc, challenge, getVideo, getStream, isCurrent, emit, onStop, onSampleStats,
   now = () => performance.now(), schedule = (callback, delay) => window.setTimeout(callback, delay),
   cancel = (handle) => window.clearTimeout(handle), clockId = `rx_${crypto.randomUUID().replaceAll("-", "")}`,
 }: {
   pc: RTCPeerConnection; challenge: ReceiverChallenge;
   getVideo: () => HTMLVideoElement | null; getStream: () => MediaStream | null;
-  isCurrent: () => boolean; emit: (sample: ReceiverObservation) => void;
+  isCurrent: () => boolean; emit: (sample: ReceiverObservation) => void | Promise<void>;
   onStop?: (reason: string) => void;
   onSampleStats?: (sequence: number, stats: Readonly<Record<string, unknown>>) => void;
   now?: () => number; schedule?: (callback: () => void, delay: number) => number;
@@ -118,10 +133,14 @@ export function startReceiverObservation({ pc, challenge, getVideo, getStream, i
       previousTimestamp = value.timestamp;
       previousDecoded = value.framesDecoded;
       if (presented !== null) {
-        emit({ peerId: challenge.peerId, bindingId: challenge.bindingId, clockId, sequence,
-          elapsedNs, framesDecoded: value.framesDecoded, presentedFrames: presented });
+        let delivery: void | Promise<void>;
+        try {
+          delivery = emit({ peerId: challenge.peerId, bindingId: challenge.bindingId, clockId, sequence,
+            elapsedNs, framesDecoded: value.framesDecoded, presentedFrames: presented });
+        } catch { stop("delivery_error"); return; }
         try { onSampleStats?.(sequence, value); } catch { /* Diagnostics cannot stop observations. */ }
         sequence += 1;
+        try { await delivery; } catch { stop("delivery_error"); return; }
       }
       if (current()) timer = schedule(() => { void sample(); }, 200);
     } catch { stop("stats_error"); }

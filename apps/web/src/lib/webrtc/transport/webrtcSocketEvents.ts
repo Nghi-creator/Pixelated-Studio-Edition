@@ -1,5 +1,5 @@
 import { bindWebRTCEngineErrors } from "./webrtcEngineErrors";
-import { offerDigest, parseReceiverChallenge, startReceiverObservation } from "../telemetry/receiverObservation";
+import { emitReceiverObservation, offerDigest, parseReceiverChallenge, startReceiverObservation } from "../telemetry/receiverObservation";
 import { clearEngineToken } from "../../engine/engineAuth";
 import { loadEngineSessionContext } from "../engine/engineContext";
 import { attachEngineInput } from "../input/webrtcInput";
@@ -52,7 +52,7 @@ export function bindWebRTCSocketEvents({
         getVideo: () => params.options.videoElementRef?.current || null,
         getStream: () => runtime.incomingStream,
         isCurrent: () => !runtime.disposed && runtime.pc === pc && runtime.socket.connected && runtime.receiverObservationGeneration === generation,
-        emit: (sample) => runtime.socket.emit("webrtc-receiver-observation", sample),
+        emit: (sample) => emitReceiverObservation(runtime.socket, sample),
       });
     } catch { if (runtime.receiverObservationGeneration === generation) stopReceiver(); }
   });

@@ -143,3 +143,33 @@ test("relay diagnostics identify a compacted arrival and the resulting lost bind
     { sequence: 3, received_ms: 1604, decision: "unbound_receiver" },
   ]);
 });
+
+test("forwarding receipts are bound to the sample and rejected arrivals revoke exactly once", () => {
+  const { browser, camera, tick } = fixture();
+  const receipts: unknown[] = [], unbound: unknown[] = [];
+  browser.on("webrtc-receiver-unbind", (value) => unbound.push(value));
+  browser.emit("webrtc-receiver-observation", observation, (value: unknown) => receipts.push(value));
+  tick(91);
+  browser.emit("webrtc-receiver-observation", { ...observation, sequence: 1, elapsedNs: 201900001 }, (value: unknown) => receipts.push(value));
+  assert.deepEqual(receipts, [
+    { bindingId, sequence: 0, accepted: true },
+    { bindingId, sequence: 1, accepted: false },
+  ]);
+  assert.deepEqual(unbound, [{ peerId: "peer", bindingId, reason: "observation_invalidated" }]);
+  tick();
+  browser.emit("webrtc-receiver-observation", { ...observation, sequence: 2, elapsedNs: 403800001 });
+  camera.emit("disconnect");
+  assert.equal(unbound.length, 1);
+  assert.equal(browser.relays.length, 1, "rejected samples still cannot reach the camera");
+});
+
+test("a foreign socket cannot revoke or acknowledge another browser's binding", () => {
+  const { browser, foreign } = fixture();
+  const unbound: unknown[] = [], receipts: unknown[] = [];
+  browser.on("webrtc-receiver-unbind", value => unbound.push(value));
+  foreign.emit("webrtc-receiver-observation", observation, (value: unknown) => receipts.push(value));
+  assert.deepEqual(receipts, [{ bindingId, sequence: 0, accepted: false }]);
+  assert.deepEqual(unbound, []);
+  browser.emit("webrtc-receiver-observation", observation);
+  assert.equal(browser.relays.length, 1);
+});

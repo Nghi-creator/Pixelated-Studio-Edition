@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { offerDigest, parseReceiverChallenge, startReceiverObservation, type ReceiverObservation } from "../../../src/lib/webrtc/telemetry/receiverObservation.ts";
+import { emitReceiverObservation, offerDigest, parseReceiverChallenge, startReceiverObservation, type ReceiverObservation } from "../../../src/lib/webrtc/telemetry/receiverObservation.ts";
 
 const challenge = { peerId: "peer", bindingId: "a".repeat(64), offerHash: "b".repeat(64) };
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
-function fixture(initialMissing = false, onStop?: (reason: string) => void) {
+function fixture(initialMissing = false, onStop?: (reason: string) => void, deliver?: (sample: ReceiverObservation) => Promise<void>) {
   let now = 0, id = 0, frames = 0, timestamp = 0;
   let current = true;
   let pending: (() => Promise<RTCStatsReport>) | null = null;
@@ -24,7 +24,7 @@ function fixture(initialMissing = false, onStop?: (reason: string) => void) {
   };
   const stop = startReceiverObservation({ pc: pc as unknown as RTCPeerConnection, challenge,
     getVideo: () => video as unknown as HTMLVideoElement, getStream: () => stream as unknown as MediaStream,
-    isCurrent: () => current, onStop, emit: (value) => samples.push(value), now: () => now, clockId: "clock",
+    isCurrent: () => current, onStop, emit: (value) => { samples.push(value); return deliver?.(value); }, now: () => now, clockId: "clock",
     schedule: (callback) => { timers.set(++id, callback); return id; }, cancel: (handle) => { timers.delete(handle); },
   });
   return { stop, pc, video, record, samples, timers, callbacks, report,
@@ -41,6 +41,46 @@ test("challenge parsing is closed and offer hashing preserves exact SDP bytes", 
   assert.equal(parseReceiverChallenge({ ...challenge, bindingId: "x" }), null);
   assert.equal(parseReceiverChallenge(Object.assign(Object.create(challenge), { a: 1, b: 2, c: 3 })), null);
   assert.notEqual(await offerDigest("offer\r\n"), await offerDigest("offer\n"));
+});
+
+test("the next sample waits for relay acknowledgment and late completion cannot restart disposal", async () => {
+  let resolve!: () => void;
+  const value = fixture(false, undefined, () => new Promise<void>(done => { resolve = done; }));
+  await flush(); value.fire(10); await value.tick();
+  assert.equal(value.samples.length, 1);
+  assert.equal(value.timers.size, 0, "no second sample can overtake an unacknowledged report");
+  resolve(); await flush();
+  assert.equal(value.timers.size, 1);
+  value.fire(16); await value.tick();
+  assert.equal(value.samples.length, 2);
+  value.stop(); resolve(); await flush();
+  assert.equal(value.timers.size, 0);
+  assert.equal(value.callbacks.size, 0);
+});
+
+test("delivery rejection stops observations instead of retrying or sending a sequence gap", async () => {
+  const reasons: string[] = [];
+  const value = fixture(false, reason => reasons.push(reason), async () => { throw Error("relay rejected"); });
+  await flush(); value.fire(10); await value.tick();
+  assert.deepEqual(reasons, ["delivery_error"]);
+  assert.equal(value.samples.length, 1);
+  assert.equal(value.timers.size, 0);
+  assert.equal(value.callbacks.size, 0);
+});
+
+test("relay acknowledgment is bounded and cannot accept a foreign or malformed receipt", async () => {
+  const sample = { peerId: "peer", bindingId: challenge.bindingId, clockId: "clock", sequence: 4, elapsedNs: 1, framesDecoded: 5, presentedFrames: 4 };
+  const received = { bindingId: challenge.bindingId, sequence: 4, accepted: true };
+  const limits: number[] = [];
+  for (const response of [received, { ...received, bindingId: "c".repeat(64) },
+    { ...received, sequence: 3 }, { ...received, accepted: false }, { ...received, extra: true },
+    Object.assign(Object.create(received), { a: 1, b: 2, c: 3 }), null]) {
+    const socket = { timeout: (ms: number) => { limits.push(ms); return { emitWithAck: async () => response }; } };
+    if (response === received) await emitReceiverObservation(socket, sample);
+    else await assert.rejects(emitReceiverObservation(socket, sample));
+  }
+  assert.ok(limits.every(ms => ms === 250));
+  await assert.rejects(emitReceiverObservation({ timeout: () => ({ emitWithAck: async () => { throw Error("timeout"); } }) }, sample));
 });
 
 test("reported progress requires actual frame callbacks and matching decoded track", async () => {
