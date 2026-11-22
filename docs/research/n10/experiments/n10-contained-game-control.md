@@ -65,11 +65,11 @@ diagnostic value. Those require separate predeclared acceptance. Live authority
 remains false, and no browser/network message grants controller permission.
 
 
-The separate [contained failure cohort](n10-contained-game-failures.md) covers
+The separate [contained failure cohort](../cost/n10-contained-game-failures.md) covers
 cancellation, observation/source loss, active reconnect, replacement and local
 owner restart against the same budget ledger. Its expected dirty/unknown outcomes
 are distinct from this completed-action temporal screen.
 
-The separate [fixed-schedule unchanged/action acquisition](n10-action-cost.md)
+The separate [fixed-schedule unchanged/action acquisition](../cost/n10-action-cost.md)
 provides common phase timing and an unchanged condition for developing a matched
 cost comparison. It retains a distinct method and operator-only evidence role.

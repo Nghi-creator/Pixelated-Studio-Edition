@@ -17,7 +17,7 @@ npm run smoke:n10-browser-native -w @pixelated/engine-runtime -- \
 ```
 
 Use the immutable cached image and ownership requirements from the
-[native acceptance procedure](n10-browser-native-acceptance.md). Freeze exact
+[native acceptance procedure](../experiments/n10-browser-native-acceptance.md). Freeze exact
 source, image, browser, order, timing, missingness and expected outcomes before
 collection. Retain each original attempt in a new ignored `local/` file. The
 acquisition method is `n10-contained-game-action-cost-acquisition-v3`; the cadence
@@ -40,7 +40,7 @@ zero-filled. Missing checkpoints, counter resets, coverage gaps and a changed
 browser process inventory leave the cost screen unavailable. Hashes and named
 owned scopes do not by themselves authenticate execution.
 
-Current native acquisition uses the [OS browser CPU sampler](n10-browser-native-acceptance.md#browser-cpu-sampling),
+Current native acquisition uses the [OS browser CPU sampler](../experiments/n10-browser-native-acceptance.md#browser-cpu-sampling),
 retaining per-process lifetimes and counters rather than trusting a summed CDP
 CPU value. Its host-clock span and original CPU limits remain separate from
 native and container measurements; older receipts are not reinterpreted.

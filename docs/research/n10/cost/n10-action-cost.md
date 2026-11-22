@@ -6,7 +6,7 @@ use the same presentation-gated game script and fixed measurement schedule.
 Normal production sources reject engineering control configuration and dispatch.
 
 Build the engine, then use an immutable cached native image from the
-[browser/native acceptance procedure](n10-browser-native-acceptance.md):
+[browser/native acceptance procedure](../experiments/n10-browser-native-acceptance.md):
 
 ```sh
 npm run build:engine
@@ -82,7 +82,7 @@ attempt and failure, use exclusive outputs and stop if cleanup is unconfirmed.
 Matching script age does not establish identical pixels. Do not derive live limits
 from development pilot results or treat a later pass as replacing an earlier row.
 
-The [contained lifecycle procedure](n10-contained-game-control.md) and
+The [contained lifecycle procedure](../experiments/n10-contained-game-control.md) and
 [failure cohort](n10-contained-game-failures.md) remain separate. Qualification
 and producer activation require their own evidence and explicit policy; every
 record here retains `live_authority=false`.

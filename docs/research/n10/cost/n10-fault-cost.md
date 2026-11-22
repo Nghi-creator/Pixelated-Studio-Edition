@@ -15,7 +15,7 @@ PYTHONPATH=engine/runtime python3 -m research.live_probe_control.qualification.f
   "$N10_FAULT_COST_COHORT"
 ```
 
-Use the immutable cached image from the [native acceptance procedure](n10-browser-native-acceptance.md).
+Use the immutable cached image from the [native acceptance procedure](../experiments/n10-browser-native-acceptance.md).
 The output must be a new absolute file in ignored `local/`. Freeze exact source,
 image, browser, the four-case order, timing, scope and missingness before collection.
 The runner opens outputs exclusively, checkpoints every attempt, makes no retries

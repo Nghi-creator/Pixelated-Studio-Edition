@@ -133,7 +133,7 @@ that disconnect invalidates the old draft and reconnect uses a new receiver
 handle with the same ledger directory. See the [peer-worker procedure](n10-peer-workers.md)
 for native prerequisites and isolation bounds.
 
-[Scoped browser receiver observations](n10-browser-observations.md) describes
+[Scoped browser receiver observations](../measurement/n10-browser-observations.md) describes
 the default-off authenticated relay/collector and local owner attachment. It
 keeps browser data declared and does not enable production probe dispatch.
 

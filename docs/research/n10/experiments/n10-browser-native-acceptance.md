@@ -130,7 +130,7 @@ not replace network signaling, native pipelines, browser counters or readiness
 checks. Engineering configuration is injected only inside this explicit test
 host; no controller or failure-injection endpoint is exposed to a browser.
 
-The separate [observer disturbance screen](n10-observer-disturbance.md) compares
+The separate [observer disturbance screen](../measurement/n10-observer-disturbance.md) compares
 read-only observer/admission cost and temporal playback with a fixed off/on cohort.
 It retains separate CPU scopes and does not qualify a control action.
 

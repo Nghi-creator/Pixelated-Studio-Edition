@@ -119,7 +119,7 @@ attached receiver capability and request cancellation of any issued engineering
 operation. Re-arming requires a fresh challenge/binding and fresh proof; it does
 not reset the owner/session journal. The bridge does not construct an owner,
 select a policy/directory, prepare a draft or dispatch an action. See
-[local admission](n10-local-owner.md) and [engineering dispatch](n10-engineering-dispatch.md).
+[local admission](../runtime/n10-local-owner.md) and [engineering dispatch](../runtime/n10-engineering-dispatch.md).
 
 ## Verification and limits
 
@@ -143,7 +143,7 @@ owned resources. No hosted service, engine game, real pairing token or probe
 mutation is used. It requires the workspace's development dependencies and
 Playwright browser cache; it does not download a browser.
 
-The [browser/native acceptance runner](n10-browser-native-acceptance.md) joins
+The [browser/native acceptance runner](../experiments/n10-browser-native-acceptance.md) joins
 the actual camera, relay, browser collector and local owner in one contained
 session, including synthetic action completion and receiver-loss teardown.
 The [read-only observer disturbance screen](n10-observer-disturbance.md) provides

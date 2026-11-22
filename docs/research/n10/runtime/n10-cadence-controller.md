@@ -5,7 +5,7 @@ capture-cadence candidate. It is disabled by default and has no camera, server,
 LAN, guest or automatic telemetry binding. Importing it creates no process or
 pipeline. This is not a qualified live capability.
 
-The earlier [isolated experiment](n10-cadence-feasibility.md) establishes a limited
+The earlier [isolated experiment](../experiments/n10-cadence-feasibility.md) establishes a limited
 source-control feasibility surface. The lifecycle kernel adds ownership, durable
 intent, conservative budgets, cancellation, independent process teardown and
 recovery. The explicit isolated worker below binds a disposable Gst WebRTC
@@ -194,7 +194,7 @@ the receiver pipeline clock and are not aligned to source/browser time. Window
 screens use exact integer arithmetic and ±10% rate tolerance. `status=observed`
 means the trial returned evidence; inspect `assessment` separately. This is a
 producer operator report. Core can import it into the separate
-[cadence evidence format](../../../../latency_fingerprinting/docs/live_probes/N10_CADENCE_EVIDENCE.md);
+[cadence evidence format](../../../../../latency_fingerprinting/docs/live_probes/N10_CADENCE_EVIDENCE.md);
 it is never relabeled as the frozen bitrate-only `live-probe-evidence-v1` root. Quality is explicitly `not_evaluated`
 and live authority remains false.
 
@@ -228,7 +228,7 @@ production activation and representative evidence remain open. Offline cadence
 export/inspection does not qualify these capabilities.
 
 
-The separate [contained game/browser experiment](n10-game-browser-trial.md) uses
+The separate [contained game/browser experiment](../experiments/n10-game-browser-trial.md) uses
 an actual fixed Frozen-Bubble level and headless Chromium to measure presentation
 and resource observations. Its operator report has a distinct scope/version;
 it does not widen the synthetic Gst cadence evidence root or qualify activation.

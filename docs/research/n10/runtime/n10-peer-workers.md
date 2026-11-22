@@ -80,7 +80,7 @@ its own startup lifetime and one-shot request.
 source and silent audio. The peer-isolation test uses synthetic media; the
 camera adapter test uses private x99 capture and a PulseAudio null-sink monitor.
 Scoped browser observations and local engineering dispatch are documented
-separately. The [browser/native acceptance runner](n10-browser-native-acceptance.md)
+separately. The [browser/native acceptance runner](../experiments/n10-browser-native-acceptance.md)
 checks the integrated lifecycle. Desktop acceptance, child trace exports and
 production qualification remain open.
 
@@ -187,6 +187,6 @@ and consumers replay their original consecutive sequence numbers. Returning the
 journal does not transfer owner capabilities; a reader that falls behind retained
 history still fails continuity rather than filling gaps.
 
-[Scoped browser receiver observations](n10-browser-observations.md) describes
+[Scoped browser receiver observations](../measurement/n10-browser-observations.md) describes
 the default-off authenticated relay/collector and local owner attachment. It
 keeps browser data declared and does not enable production probe dispatch.

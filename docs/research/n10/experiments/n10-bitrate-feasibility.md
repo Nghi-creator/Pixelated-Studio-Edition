@@ -114,7 +114,7 @@ return/getter value need not imply an output-rate effect. Compare all observed
 windows without treating a configured bitrate ratio as the measured response.
 `live_authority=false`, no selected family and `unavailable_unverified` are retained
 regardless of results. Full acceptance still requires the core's
-[live-evidence contract](../../../../latency_fingerprinting/docs/live_probes/N10_LIVE_EVIDENCE_CONTRACT.md),
+[live-evidence contract](../../../../../latency_fingerprinting/docs/live_probes/N10_LIVE_EVIDENCE_CONTRACT.md),
 an owned producer adapter and real receiver/watchdog/restoration/restart trials.
 
 Run fake failure-boundary tests with:

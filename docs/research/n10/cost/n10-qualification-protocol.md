@@ -76,7 +76,7 @@ The current checker performs none of steps2–4's review, acquisition, evidence
 acceptance or activation. Normal production sources retain their engineering
 control guard. N9 proposals, old record hashes, a caller's filled JSON or this
 checker's exit status cannot authorize mutation. The core
-[qualification requirements](../../../../latency_fingerprinting/docs/live_probes/N10_QUALIFICATION.md)
+[qualification requirements](../../../../../latency_fingerprinting/docs/live_probes/N10_QUALIFICATION.md)
 state the broader evidence and producer boundary.
 
 ## Version compatibility and migration

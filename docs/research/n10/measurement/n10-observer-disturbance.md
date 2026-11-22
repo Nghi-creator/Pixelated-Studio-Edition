@@ -9,7 +9,7 @@ There is no cadence action, remote control command or live probe authority.
 ## Acquisition
 
 Build the engine and set `N10_NATIVE_IMAGE` to the immutable ID of a compatible
-cached native image, as described in [browser/native acceptance](n10-browser-native-acceptance.md).
+cached native image, as described in [browser/native acceptance](../experiments/n10-browser-native-acceptance.md).
 Set `N10_COHORT_OUTPUT` to a new absolute path under ignored `local/`.
 
 ```sh

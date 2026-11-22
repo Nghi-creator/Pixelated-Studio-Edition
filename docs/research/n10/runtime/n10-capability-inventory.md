@@ -11,7 +11,7 @@ python3 -m unittest discover -s tests/python -p 'test_live_probe_*.py' -v
 Both runtime Dockerfiles ship `/app/research/trials/live_probe_inventory.py`. Existing images need
 a rebuild or an explicit read-only bind mount of that file; the camera and server
 do not import it or automatically run it. The core's
-[capability boundary](../../../../latency_fingerprinting/docs/live_probes/N10_CAPABILITY_INVENTORY.md)
+[capability boundary](../../../../../latency_fingerprinting/docs/live_probes/N10_CAPABILITY_INVENTORY.md)
 defines how these observations relate to later live relief proof.
 
 The command accepts no arguments and writes bounded, closed-inventory JSON to
@@ -69,10 +69,10 @@ The fake-boundary tests prove read-only behavior and retained failure semantics.
 They do not establish physical timing, actual live Gst mutability or safe playback.
 
 For explicit synthetic setter/output investigation, use the separately contained
-[isolated bitrate trial](n10-bitrate-feasibility.md). It changes only a disposable
+[isolated bitrate trial](../experiments/n10-bitrate-feasibility.md). It changes only a disposable
 encoder and does not qualify a running camera or WebRTC receiver.
 
-The conditional [capture-cadence experiment](n10-cadence-feasibility.md) tests
+The conditional [capture-cadence experiment](../experiments/n10-cadence-feasibility.md) tests
 actual source framerate renegotiation through a named caps filter, including
 private-Xvfb capture. It does not add that control to the camera or change
 production capability availability.

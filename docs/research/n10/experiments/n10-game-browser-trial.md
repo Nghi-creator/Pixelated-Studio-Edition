@@ -2,7 +2,7 @@
 
 `engine/runtime/scripts/research/n10/capture/gameBrowserTrial.mjs` runs a fixed, disposable Linux
 Frozen-Bubble level through an owned Gst WebRTC sender and a separate headless
-Chromium video receiver. It exercises the [cadence controller](n10-cadence-controller.md)
+Chromium video receiver. It exercises the [cadence controller](../runtime/n10-cadence-controller.md)
 without attaching to `camera.py`, an existing game session, a user's browser
 profile or any hosted service. Importing the Python/JavaScript helpers starts no
 browser, game, pipeline or control action. Live authority remains unavailable.
@@ -112,7 +112,7 @@ are limited to 250 ms and presentation/worker receipt gaps to 500 ms. Browser
 explicit instrumentation. The game-to-browser path is distinct from the earlier
 synthetic Gst-to-Gst experiment. It must not be imported or relabeled as that
 frozen `cadence-probe-evidence-v1` report scope or the bitrate-only evidence root.
-Core provides a separate [game/browser engineering evidence contract](../../../../latency_fingerprinting/docs/live_probes/N10_GAME_BROWSER_EVIDENCE.md)
+Core provides a separate [game/browser engineering evidence contract](../../../../../latency_fingerprinting/docs/live_probes/N10_GAME_BROWSER_EVIDENCE.md)
 with protected import and independent inspection for these acquisitions.
 
 For offline descriptive summaries:

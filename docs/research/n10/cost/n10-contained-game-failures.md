@@ -1,7 +1,7 @@
 # Contained game failure cohort
 
 This fixed engineering cohort exercises the
-[owned game-capture boundary](n10-contained-game-control.md) through actual
+[owned game-capture boundary](../experiments/n10-contained-game-control.md) through actual
 camera/worker/local-owner/browser paths. It does not qualify production dispatch,
 perceptual/audio quality, desktop playability or diagnostic value.
 

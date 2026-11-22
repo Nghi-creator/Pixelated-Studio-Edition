@@ -158,9 +158,9 @@ Software fault tests also cover partial native setter changes, foreign cadence,
 unknown results after watchdog disarm, and intent persisted before its in-memory
 copy updates.
 
-The [scoped browser observation relay](n10-browser-observations.md) now supplies
+The [scoped browser observation relay](../measurement/n10-browser-observations.md) now supplies
 authenticated connection identity while retaining declared-counter semantics.
-The [browser/native acceptance runner](n10-browser-native-acceptance.md) verifies
+The [browser/native acceptance runner](../experiments/n10-browser-native-acceptance.md) verifies
 integrated completion/restoration and real browser observation loss, including
 replacement budget retention and dirty-intent blocking. Production activation
 still requires desktop acceptance, supported quality/disturbance bounds and
@@ -168,7 +168,7 @@ qualification through the actual production path. This engineering option does
 not satisfy those conditions or close N10.
 
 
-The [integrated synthetic disturbance screen](n10-control-disturbance.md) adds
+The [integrated synthetic disturbance screen](../experiments/n10-control-disturbance.md) adds
 baseline/active/restored measurements for both the controlled peer and its
 unchanged sibling, plus continuous presentation traces across the setters. It
 uses the same synthetic-only local dispatch boundary and does not enable real
@@ -177,7 +177,7 @@ game capture control or establish perceptual/audio/desktop qualification.
 
 ## Explicitly owned game capture
 
-The [contained game disturbance procedure](n10-contained-game-control.md) uses
+The [contained game disturbance procedure](../experiments/n10-contained-game-control.md) uses
 `EngineeringControl.open(private_directory, policy, scene=owned_scene)` only for
 an actual live `GameScene` with its private X99 display. That creates a closed
 capture descriptor for the owner, game, display and X11 socket. The matching
