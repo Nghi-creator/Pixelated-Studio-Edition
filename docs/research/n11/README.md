@@ -14,6 +14,7 @@ The completed fixture evaluation is not broad N11 diagnosis acceptance.
 | [Contained paired observation collector](n11-paired-observation.md) | Producer contract and opt-in operator procedure |
 | [Contained raw-observation collector](n11-raw-observation.md) | Producer contract and opt-in operator procedure |
 | [Candidate independent container CPU observation](resource-observation.md) | Producer contract and opt-in operator procedure |
+| [Physical challenge source requirements](physical-challenges.md) | Mixed/changing recipe feasibility and required native implementation; no launcher enabled |
 
 Runtime scripts are grouped in [the research tool layout](../../../engine/runtime/scripts/research/README.md).
 Private acquisition receipts and personal plans stay in ignored `local/`.

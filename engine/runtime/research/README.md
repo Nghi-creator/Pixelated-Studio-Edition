@@ -9,6 +9,7 @@ modules does not enable probes or change the current qualification scope.
 | `tracing/` | Camera stage trace configuration, hooks, recording and export |
 | `trials/` | Explicit disposable capability, bitrate and cadence trials |
 | `resource_observation/` | Candidate independent private-cgroup CPU reads and opt-in condition observer seam |
+| `physical_challenges/` | Separate joint-condition lifecycle primitives and synthetic checks; peer/collector integration pending |
 | `scenario_harness/` | Bounded N5 workloads, campaign lifecycle and evidence export |
 | `live_probe_control/control/` | Contracts, cadence controller, ownership/binding, transport, journal and watchdog |
 | `live_probe_control/peers/` | Camera workers, peer protocol/supervision/lifetime and receiver bridge |
