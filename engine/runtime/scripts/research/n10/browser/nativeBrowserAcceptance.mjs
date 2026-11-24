@@ -1,10 +1,11 @@
+import {physicalChallengeSelection, PHYSICAL_METHOD, PHYSICAL_ROLE} from "../../n11/protocols/physicalChallengeProtocol.mjs";
 import {RESOURCE_METHOD,RESOURCE_ROLE} from '../../n11/protocols/resourceProtocol.mjs';
 import { stageRawObservationAssets } from "../../n11/browser/rawObservationAssets.mjs";
-import { researchSourceFiles, nativeResearchMounts } from "../shared/researchSources.mjs";
+import { nativeSoftwareIdentity, nativeResearchMounts } from "../shared/researchSources.mjs";
 /** Opt-in real browser -> authenticated relay -> actual Python camera/native owner acceptance. */
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
-import { createHash, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -25,6 +26,7 @@ const runtime = fileURLToPath(new URL("../../../../", import.meta.url));
 
 export async function runNativeBrowserAcceptance(image, mode = "production-admission", options = {}) {
   if (!/^sha256:[a-f0-9]{64}$/.test(image || "")) throw new Error("explicit cached image digest required");
+  const physicalRecipe=physicalChallengeSelection(mode);
   const conditionMatch=/^engineering-n11-(?:resource-)?condition-(no_injected_fault|owned_identity_delay|owned_cpu_pressure)$/.exec(mode);
   const resourceCondition=Boolean(conditionMatch)&&mode.startsWith('engineering-n11-resource-condition-');
   const conditionMethod=resourceCondition?RESOURCE_METHOD:'n11-contained-condition-witness-v1';
@@ -32,7 +34,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const resourceTimingDiagnostics=options.resourceTimingDiagnostics??false;
   if(typeof resourceTimingDiagnostics!=='boolean'||resourceTimingDiagnostics&&!resourceCondition)throw Error('explicit resource timing diagnostic mode required');
   const encodedEventDiagnostics=options.encodedEventDiagnostics??false;
-  if(typeof encodedEventDiagnostics!=='boolean'||encodedEventDiagnostics&&!resourceCondition)throw Error('explicit resource encoded event diagnostic mode required');
+  if(typeof encodedEventDiagnostics!=='boolean'||encodedEventDiagnostics&&!(resourceCondition||physicalRecipe))throw Error('explicit resource encoded event diagnostic mode required');
   const encodedEventControl = options.encodedEventControl ?? false;
   if (typeof encodedEventControl !== "boolean" ||
       (encodedEventControl && (!resourceCondition || encodedEventDiagnostics))) {
@@ -40,7 +42,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   }
   const receiverDeliveryDiagnostics = options.receiverDeliveryDiagnostics ?? false;
   if (typeof receiverDeliveryDiagnostics !== "boolean" ||
-      (receiverDeliveryDiagnostics && !resourceCondition)) {
+      (receiverDeliveryDiagnostics && !(resourceCondition || physicalRecipe))) {
     throw Error("explicit resource receiver delivery diagnostic required");
   }
   const capacity=/^engineering-n11-capacity-(calibration|confirmation)-([0-7])$/.exec(mode);
@@ -48,8 +50,9 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const contrastMode=mode==='engineering-n11-pacing-contrast';
   const pacingMode=Boolean(conditionMatch)||Boolean(capacity)||contrastMode||mode==='engineering-n11-pacing-paired';
   const contentionMode=mode==='engineering-n11-contention-paired';
-  const pairedMode=pacingMode||contentionMode||mode==='engineering-n11-paired-observation';
+  const pairedMode=Boolean(physicalRecipe)||pacingMode||contentionMode||mode==='engineering-n11-paired-observation';
   if(pairedMode&&!/^n11-raw-[a-z0-9-]{1,40}$/.test(options.comparisonCaseId||''))throw Error('explicit paired case required');
+  if(physicalRecipe&&(!receiverDeliveryDiagnostics||!encodedEventDiagnostics))throw Error("physical challenge requires receiver delivery and encoded event diagnostics");
   let pairedObservation=null;
   const primedPhases=[];
   const rawMode = mode === "n11-raw-observation";
@@ -69,7 +72,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
   const costMode = costVersion === "v2" ? mode.slice(0, -3) : mode;
   const costMethod = `n10-contained-game-action-cost-acquisition-${costVersion}`;
   const costCondition = spanCondition || (costMode === "engineering-game-unchanged-cost" ? "unchanged" : costMode === "engineering-game-action-cost" ? "action" : null);
-  if (!["engineering-n11-pacing-contrast", "engineering-n11-pacing-paired", "engineering-n11-contention-paired", "engineering-n11-paired-observation", "n11-raw-observation", "production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"].includes(mode) && !capacity && !conditionMatch && !gameFailure && !costCondition) throw new Error("invalid acceptance mode");
+  if (!["engineering-n11-pacing-contrast", "engineering-n11-pacing-paired", "engineering-n11-contention-paired", "engineering-n11-paired-observation", "n11-raw-observation", "production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance"].includes(mode) && !capacity && !conditionMatch && !physicalRecipe && !gameFailure && !costCondition) throw new Error("invalid acceptance mode");
   const gameControl = mode === "engineering-game-disturbance";
   const controlMode = ["engineering-disturbance", "engineering-game-disturbance"].includes(mode) || Boolean(costCondition);
   const movingMode = ["observer-moving-off", "observer-moving-on"].includes(mode);
@@ -96,17 +99,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     return result.stdout.trim();
   };
   try {
-    const hash = createHash("sha256");
-    for (const relative of await researchSourceFiles(runtime)) {
-      hash.update(JSON.stringify([relative, createHash("sha256").update(await fs.readFile(path.join(runtime, relative))).digest("hex")]));
-    }
-    for (const relative of (await fs.readdir(path.join(runtime, "dist/src"), { recursive: true })).filter((name) => name.endsWith(".js")).sort()) {
-      hash.update(JSON.stringify(["dist/src/" + relative, createHash("sha256").update(await fs.readFile(path.join(runtime, "dist/src", relative))).digest("hex")]));
-    }
-    for (const relative of ["telemetry/receiverObservation.ts", "transport/webrtcEngineErrors.ts", "transport/localIceQueue.ts"]) {
-      hash.update(await fs.readFile(new URL(`../../../../../../apps/web/src/lib/webrtc/${relative}`, import.meta.url)));
-    }
-    softwareHash = hash.digest("hex");
+    softwareHash = await nativeSoftwareIdentity(runtime);
     await fs.writeFile(path.join(directory, "index.html"), nativeBrowserHtml(token, rawMode, pairedMode, receiverDeliveryDiagnostics));
     if (rawMode || pairedMode) await stageRawObservationAssets(runtime, directory, ts);
     for (const [name, relative] of [["collector.js", "telemetry/receiverObservation.ts"], ["engine-errors.js", "transport/webrtcEngineErrors.ts"], ["local-ice.js", "transport/localIceQueue.ts"]]) {
@@ -313,7 +306,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if (processFailure) throw processFailure;
     const exitCode = await exited;
     assert.equal(exitCode, 0, `acceptance container exited with code ${exitCode} after media completion; process cleanup is required`);
-    acquisition = { status: "passed", mode, live_authority: false, ...(resourceTimingDiagnostics?{resource_timing_diagnostics:'n11-resource-observer-timing-diagnostic-v1'}:{}), ...(pairedMode?{method:conditionMatch?conditionMethod:capacity?"n11-contained-pacing-capacity-"+capacityKind+"-v1":contrastMode?"n11-contained-pacing-contrast-v1":pacingMode?"n11-contained-pacing-paired-v1":contentionMode?"n11-contained-contention-paired-v1":"n11-contained-paired-observation-v1",role:conditionMatch?conditionRole:capacity?"engineering_capacity_"+capacityKind+"_label_unavailable":contrastMode?"engineering_pacing_contrast_label_unavailable":pacingMode?"engineering_pacing_label_unavailable":contentionMode?"engineering_contention_label_unavailable":"engineering_no_fault_no_label",paired_observation:pairedObservation}:{}), ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult } : {}), context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
+    acquisition = { status: "passed", mode, live_authority: false, ...(physicalRecipe?{challenge_recipe:physicalRecipe}:{}), ...(resourceTimingDiagnostics?{resource_timing_diagnostics:'n11-resource-observer-timing-diagnostic-v1'}:{}), ...(pairedMode?{method:physicalRecipe?PHYSICAL_METHOD:conditionMatch?conditionMethod:capacity?"n11-contained-pacing-capacity-"+capacityKind+"-v1":contrastMode?"n11-contained-pacing-contrast-v1":pacingMode?"n11-contained-pacing-paired-v1":contentionMode?"n11-contained-contention-paired-v1":"n11-contained-paired-observation-v1",role:physicalRecipe?PHYSICAL_ROLE:conditionMatch?conditionRole:capacity?"engineering_capacity_"+capacityKind+"_label_unavailable":contrastMode?"engineering_pacing_contrast_label_unavailable":pacingMode?"engineering_pacing_label_unavailable":contentionMode?"engineering_contention_label_unavailable":"engineering_no_fault_no_label",paired_observation:pairedObservation}:{}), ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult } : {}), context: {image, software_hash: softwareHash, host_platform: process.platform, host_arch: process.arch}, events, ...(screenMode ? { quality, browser_resources: browserResources } : {}),
       ...(gameFailure ? {role: interruption ? interruption.role : faultCost ? "contained_game_fault_cost_not_qualification" : "contained_game_failure_not_qualification", method: interruption ? interruption.method : faultCost ? "n10-contained-game-fault-cost-v1" : "n10-contained-game-failure-v1", case: gameFailure, sibling_quality: siblingQuality} : {}),
       ...(controlMode ? {role: costCondition ? "contained_game_action_cost_not_qualification" : gameControl ? "contained_game_control_disturbance_not_qualification" : "integrated_synthetic_control_disturbance_not_qualification", method: costCondition ? costMethod : gameControl ? "n10-contained-game-control-disturbance-v1" : "n10-integrated-control-disturbance-v1", ...(costCondition ? {condition: costCondition} : {}), control_windows: controlWindows, continuity} : {}),
       ...(movingMode ? {role: "moving_acquisition_not_qualification", method: "n10-observer-moving-acquisition-v2"} : {}),
@@ -350,7 +343,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
       return snapshot;
     })));
     failure = new Error(`${error.message}\n${JSON.stringify(diagnostics)}\n${logTail}`, { cause: error });
-    acquisition = failure.acquisition = { status: "failed", mode, live_authority: false, ...(resourceTimingDiagnostics?{resource_timing_diagnostics:'n11-resource-observer-timing-diagnostic-v1'}:{}), ...(pairedMode?{method:conditionMatch?conditionMethod:capacity?"n11-contained-pacing-capacity-"+capacityKind+"-v1":contrastMode?"n11-contained-pacing-contrast-v1":pacingMode?"n11-contained-pacing-paired-v1":contentionMode?"n11-contained-contention-paired-v1":"n11-contained-paired-observation-v1",role:conditionMatch?conditionRole:capacity?"engineering_capacity_"+capacityKind+"_label_unavailable":contrastMode?"engineering_pacing_contrast_label_unavailable":pacingMode?"engineering_pacing_label_unavailable":contentionMode?"engineering_contention_label_unavailable":"engineering_no_fault_no_label",paired_observation:pairedObservation}:{}), ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), events, diagnostics, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult || null, browser: browser?.version() || null } : {}), ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
+    acquisition = failure.acquisition = { status: "failed", mode, live_authority: false, ...(physicalRecipe?{challenge_recipe:physicalRecipe}:{}), ...(resourceTimingDiagnostics?{resource_timing_diagnostics:'n11-resource-observer-timing-diagnostic-v1'}:{}), ...(pairedMode?{method:physicalRecipe?PHYSICAL_METHOD:conditionMatch?conditionMethod:capacity?"n11-contained-pacing-capacity-"+capacityKind+"-v1":contrastMode?"n11-contained-pacing-contrast-v1":pacingMode?"n11-contained-pacing-paired-v1":contentionMode?"n11-contained-contention-paired-v1":"n11-contained-paired-observation-v1",role:physicalRecipe?PHYSICAL_ROLE:conditionMatch?conditionRole:capacity?"engineering_capacity_"+capacityKind+"_label_unavailable":contrastMode?"engineering_pacing_contrast_label_unavailable":pacingMode?"engineering_pacing_label_unavailable":contentionMode?"engineering_contention_label_unavailable":"engineering_no_fault_no_label",paired_observation:pairedObservation}:{}), ...(rawMode ? {method:"n11-contained-raw-observation-v1",role:"engineering_raw_observation_no_pair_or_label",raw_observation:rawObservation} : {}), events, diagnostics, ...(spanCondition || faultCost ? { browser_cost_span: costSpanResult || null, browser: browser?.version() || null } : {}), ...(siblingQuality ? {sibling_quality: siblingQuality} : {}),
       context: { image, software_hash: softwareHash || null, host_platform: process.platform, host_arch: process.arch } };
     throw failure;
   } finally {

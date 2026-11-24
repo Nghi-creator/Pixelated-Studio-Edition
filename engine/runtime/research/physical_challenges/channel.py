@@ -4,6 +4,7 @@ import os
 import re
 import stat
 import time
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import suppress
 
 from .peer import MAX_ACK_BYTES, MAX_COMMAND_BYTES, encode
@@ -34,6 +35,8 @@ class OwnedDirectory:
             raise
 
     def check(self):
+        if self.fd is None:
+            raise ValueError(ERROR)
         info = os.stat(self.path, follow_symlinks=False)
         if (
             not stat.S_ISDIR(info.st_mode)
@@ -123,8 +126,16 @@ class OwnedDirectory:
 
 
 class ChallengeFileService:
-    def __init__(self, endpoint, directory, *, clock=time.monotonic_ns):
+    def __init__(self, endpoint, directory, *, clock=time.monotonic_ns, asynchronous=False):
         self.endpoint, self.directory, self.clock = endpoint, directory, clock
+        if type(asynchronous) is not bool:
+            raise ValueError(ERROR)
+        self.executor = (
+            ThreadPoolExecutor(max_workers=1, thread_name_prefix="physical-challenge")
+            if asynchronous
+            else None
+        )
+        self.pending = None
         self.report_sequence, self.next_report = 0, 0
         self.publish()
 
@@ -138,6 +149,12 @@ class ChallengeFileService:
         self.next_report = self.clock() + 100_000_000
 
     def poll(self):
+        if self.pending is not None:
+            if not self.pending.done():
+                return  # Native PeerMedia.poll still runs; do not wait on lifecycle's lock.
+            future, self.pending = self.pending, None
+            self.acknowledge(future.result())
+            return
         e = self.endpoint
         name = f"n11-challenge-command-{e.sequence + 1:02d}.json"
         raw = None
@@ -145,10 +162,19 @@ class ChallengeFileService:
             with suppress(FileNotFoundError):
                 raw = self.directory.read(name, MAX_COMMAND_BYTES)
         if raw is not None:
-            ack = e.execute(raw)
-            self.directory.write(f"n11-challenge-ack-{e.sequence:02d}.json", encode(ack))
-            self.publish()
-            if ack["status"] != "completed":
-                raise ValueError(ERROR)
+            if self.executor is not None:
+                self.pending = self.executor.submit(e.execute, raw)
+            else:
+                self.acknowledge(e.execute(raw))
         elif self.clock() >= self.next_report:
             self.publish()
+
+    def acknowledge(self, ack):
+        self.directory.write(f"n11-challenge-ack-{ack['command_sequence']:02d}.json", encode(ack))
+        self.publish()
+        if ack["status"] != "completed":
+            raise ValueError(ERROR)
+
+    def close(self):
+        if self.executor is not None:
+            self.executor.shutdown(wait=False, cancel_futures=True)

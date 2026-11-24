@@ -7,6 +7,7 @@ from scripts.research.n11.native.pacing_observation import PacingContrastObserva
 from scripts.research.n11.native.paired_observation import PairedObservation
 
 from research.resource_observation.cgroup_cpu import CgroupCpuSampler
+from research.resource_observation.contained_condition import ResourceConditionObservation
 
 from .handle import ChallengeHandle
 from .lifecycle import RECIPES
@@ -47,6 +48,8 @@ class ChallengeObservation(PairedObservation):
         self.reference_rows, self.reference_sequence = [], None
         self.resource_sampler, self.resource_context = None, None
         self.cleanup_emitted = False
+        self.handle_released = False
+        self._encoded_event_trace = True  # All challenge launch modes require event tracing.
 
     def _send(self, operation):
         start = self.now() - self.origin
@@ -135,6 +138,8 @@ class ChallengeObservation(PairedObservation):
         )
         if self.reference_rows[-1]["at_ns"] - self.reference_rows[0]["at_ns"] < 3_200_000_000:
             return False
+        if not ResourceConditionObservation._reference_read_spans_ready(self, self.reference_rows):
+            return False
         self.emit(
             "n11_challenge_reference",
             phase=self.challenge_stage,
@@ -154,6 +159,8 @@ class ChallengeObservation(PairedObservation):
             self.pacer.wait_established()  # Complete before the real cadence action exists.
 
     def stop_challenge(self):
+        if self.handle_released:
+            return  # Worker/media teardown retains the independent safety cleanup.
         if self.pacer is not None and not self.cleanup_emitted:
             self._send("close")
             self.cleanup_emitted = True
@@ -172,6 +179,7 @@ class ChallengeObservation(PairedObservation):
                 super().checkpoint()
             finally:
                 if self.pacer is not None:
+                    self.handle_released = True
                     self.pacer.release()
 
     def tick(self):

@@ -23,7 +23,8 @@ owned allocation and terminal reaping. Their primitives are useful building
 blocks, but do not already verify simultaneous pressure plus delay, changing
 injection state, transition establishment or new-source compatibility.
 
-No new challenge launcher or acquisition command is enabled by this document.
+The separate opt-in acquisition path below is now implemented. Its software
+checks do not constitute native qualification or a collection decision.
 
 ## Implemented lifecycle primitive
 
@@ -63,7 +64,9 @@ actual resource dose, native deadline success or scientific labels.
 `research.physical_challenges.worker.peer_subprocess_proxy(recipe)` selects an
 explicit fixture-only peer wrapper. It accepts only the exact dedicated worker
 command and the six closed recipe/control names. Ordinary peer wire schemas and
-all old fixed-condition selectors remain unchanged. The wrapper pins the private
+all old fixed-condition selectors remain unchanged. Long start/transition work runs on a single command executor while ordinary
+media polling continues. It does not publish an early command acknowledgment or
+restart any deadline. The wrapper pins the private
 engineering directory, isolated-game capture and actual identity element, and
 always attempts condition and media teardown after failure.
 
@@ -93,36 +96,60 @@ including phase timing and cleanup. It always leaves raw-media/dose verification
 and N2 admission false. Synthetic private-file round trips and tamper checks are
 software evidence only.
 
-## Remaining acquisition integration
+## One-shot acquisition and raw custody
 
-The main native/browser acceptance driver does not yet select a challenge mode.
-Add its explicit selector/source declaration and source-bound raw export without
-relabeling a challenge as a fixed condition or stable pair. Complete source
-inspection must link the raw media, command transcript, CPU/encoded reads,
-receiver delivery and cleanup before any physical source can be qualified.
-Persist old/new state brackets and fresh readback; establish each new
-condition for one second before its measurement. Pressure stop must prove reaping;
-delay stop must prove the zero postimage. Retain healthy and post references,
-media/receiver delivery checks, CPU and encoded read brackets, and complete
-restoration even after partial transition failure. Never reset a real condition
-lifetime or watchdog by replacing a state object.
+From `engine/runtime`, the separate collector is
+`scripts/research/n11/acquisition/physicalChallengeObservation.mjs`:
 
-Condition switching and establishment must finish before cadence dispatch. The
-current relief-start gate allows 1.75 seconds after dispatch; adding a one-second
-condition establishment inside an already started action can break that bound.
-Keep the 100 ms cadence-settling clock anchored at the actual setter attempt.
+```sh
+node scripts/research/n11/acquisition/physicalChallengeObservation.mjs prepare \
+  --image "$IMAGE_DIGEST" --acquisition-id "$CASE_ID" \
+  --core-revision "$CORE_REVISION" --recipe delay_to_pressure \
+  --exclusions /explicit/exclusions.json --output /explicit/plan.json
+node scripts/research/n11/acquisition/physicalChallengeObservation.mjs acquire \
+  --plan /explicit/plan.json --output-directory /explicit/new-case
+```
 
-Keep the existing 20-second active-condition limit, 40-second child failsafe,
-5-second cadence action, 4.5-second phase bound and existing setter/read budgets.
-Transition work must fit within them. Qualify timing and concurrent resource
-indicators on the real fixture before proposing a challenge cohort.
+`prepare` performs no acquisition. It snapshots the canonical no-retry exclusion
+receipt and binds source files, producer/core revisions, cached image and native
+software identity. `acquire` requires the unchanged canonical plan, allocates one
+new directory and one exclusive attempt marker, freezes the source files and
+executes exactly one contained capture. It checks the source again afterward.
+Previously excluded IDs are rejected. Failed or partial native captures stay on
+disk with a failure receipt; an attempt marker is never replaced to retry a case.
+A prepared plan is not study approval; use an exact reviewed collection scope.
 
-Changing recipes must not claim stable paired observations. Exports/receipts need
-to retain the change and allow the consumer to distinguish a failed source,
-unsupported projection and computed abstention. A stable mixed recipe must not
-be relabeled as either single owned condition. No challenge labels may leak into
-numerical scoring inputs. The new source needs matched controls and calibration;
-the old rx1 fit cannot silently accept its new source/runtime identity.
+The native/browser selector now accepts only the six closed
+`engineering-n11-physical-challenge-<recipe>` modes. This path requires both
+acknowledged receiver delivery and encoded-event diagnostics. It retains the
+original encoded-trace reconstruction and unavailable reasons, adapting only the
+new healthy/post reference event names. References require actual CPU and native
+read spans, using the existing 3.2-second readiness rule, rather than controller
+elapsed time alone. All original action, observer, read and watchdog limits stay.
+
+The broader `source_manifest_hash` and the driver's `native_software_hash` use
+different inventories. Both are recorded; the latter is computed by the same
+function during preparation and native capture and must match the actual result.
+Current N11 helper sources are in both custody hashes and native source mounts.
+This identifies recorded bytes, not independently authenticated execution.
+
+A case retains `plan.json`, `exclusions.json`, `sources/`, `acquisition.json`,
+`command-transcript.json`, `degraded.raw.json`, `relief.raw.json`,
+`recovery.raw.json` and `raw-export.json`. Captures are reserialized from the
+original acquisition and have separate byte hashes. No `observation.json`,
+stable-phase declaration or N2 bundle is emitted. Changing conditions are not
+relabeled as stable paired evidence. A late source change can leave an internally
+consistent raw export while `failure.json` still makes the overall case failed.
+
+The core's `inspect_challenge_raw_export` accepts the original acquisition, plan,
+raw export and exclusion bytes. It verifies these bindings and replays the full
+lifecycle transcript. It leaves media, resource-dose, N2 and empirical acceptance
+false. Whole-source/media/projection checks and native qualification remain
+separate work. Detailed pressure allocation/intent evidence and actual native
+media/read semantics must be sufficient for that inspection before a pilot.
+
+The draft engineering pilot and later study remain separate reviewed scopes.
+No physical data was collected by the software tests or the raw-custody examples.
 
 See [resource observation](resource-observation.md),
 [paired observations](n11-paired-observation.md) and [the N11 index](README.md).

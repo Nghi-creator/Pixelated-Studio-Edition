@@ -6,6 +6,7 @@ from unittest.mock import Mock, patch
 
 from research.live_probe_control.control.contracts import Generation
 from research.physical_challenges.observer import ChallengeObservation, _DispatchBoundary
+from research.resource_observation.contained_condition import ResourceConditionObservation
 from scripts.research.n11.native.paired_observation import PairedObservation
 
 
@@ -75,6 +76,26 @@ class ObserverTests(unittest.TestCase):
         self.assertIn(
             "n11_challenge_command_transcript", [c.args[0] for c in o.emit.call_args_list]
         )
+
+    def test_reference_requires_actual_cpu_and_native_read_spans(self):
+        o = self.make()
+
+        def row(at, start, end):
+            return {
+                "at_ns": at,
+                **{
+                    k: {"clock_id": k, "read_start_ns": start, "read_end_ns": end}
+                    for k in ("native_read", "container_cpu_read")
+                },
+            }
+
+        rows = [
+            row(i * 1_100_000_000, i * 1_100_000_000, i * 1_100_000_000 + 100_000_000)
+            for i in range(4)
+        ]
+        self.assertTrue(ResourceConditionObservation._reference_read_spans_ready(o, rows))
+        rows[-1]["native_read"]["read_start_ns"] -= 1
+        self.assertFalse(ResourceConditionObservation._reference_read_spans_ready(o, rows))
 
 
 if __name__ == "__main__":

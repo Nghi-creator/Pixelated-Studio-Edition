@@ -32,6 +32,8 @@ def main():
     import re
     mode = os.environ.get("N10_BROWSER_ACCEPTANCE_MODE", "production-admission")
     from research.resource_observation.modes import condition_mode, condition_observer_class
+    from research.physical_challenges.modes import physical_challenge_mode
+    physical_recipe = physical_challenge_mode(mode)
     selected_condition=condition_mode(mode)
     condition_match=selected_condition is not None
     condition_name=selected_condition["condition"] if condition_match else None
@@ -41,26 +43,28 @@ def main():
         raise ValueError("explicit resource timing diagnostic mode required")
     resource_timing=timing_flag=="1"
     trace_flag = os.environ.get("N11_ENCODED_EVENT_DIAGNOSTICS")
-    if trace_flag not in (None, "1") or trace_flag and not resource_condition:
+    if trace_flag not in (None, "1") or trace_flag and not (resource_condition or physical_recipe):
         raise ValueError("explicit resource encoded event diagnostic mode required")
     encoded_trace = trace_flag == "1"
     control_flag = os.environ.get("N11_ENCODED_EVENT_CONTROL")
     if control_flag not in (None, "1") or control_flag and (not resource_condition or encoded_trace):
         raise ValueError("exclusive resource encoded event control required")
     delivery_flag = os.environ.get("N11_RECEIVER_DELIVERY_DIAGNOSTICS")
-    if delivery_flag not in (None, "1") or delivery_flag and not resource_condition:
+    if delivery_flag not in (None, "1") or delivery_flag and not (resource_condition or physical_recipe):
         raise ValueError("explicit resource receiver delivery diagnostic required")
     delivery_trace = delivery_flag == "1"
+    if physical_recipe and not (encoded_trace and delivery_trace):
+        raise ValueError("physical challenge requires receiver delivery and encoded event diagnostics")
     event_timing = encoded_trace or control_flag == "1"
     capacity = re.fullmatch(r"engineering-n11-capacity-(calibration|confirmation)-([0-7])",mode)
-    if not capacity and not condition_match and mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", "engineering-n11-paired-observation", "engineering-n11-contention-paired", "engineering-n11-pacing-paired", "engineering-n11-pacing-contrast", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
+    if not capacity and not condition_match and not physical_recipe and mode not in ("production-admission", "engineering-complete", "engineering-receiver-loss", "observer-off", "observer-on", "observer-static-diagnostic", "observer-moving-off", "observer-moving-on", "engineering-disturbance", "engineering-game-disturbance", "n11-raw-observation", "engineering-n11-paired-observation", "engineering-n11-contention-paired", "engineering-n11-pacing-paired", "engineering-n11-pacing-contrast", *GAME_FAILURE_MODES, *FAULT_COST_MODES, *ACTION_COST_MODES):
         raise ValueError("closed acceptance mode required")
     capacity_index=int(capacity.group(2)) if capacity else None
     capacity_confirmation=bool(capacity and capacity.group(1)=="confirmation")
     contrast_mode = mode == "engineering-n11-pacing-contrast"
     pacing_mode = bool(condition_match) or bool(capacity) or contrast_mode or mode == "engineering-n11-pacing-paired"
     contention_mode = mode == "engineering-n11-contention-paired"
-    paired_mode = pacing_mode or contention_mode or mode == "engineering-n11-paired-observation"
+    paired_mode = bool(physical_recipe) or pacing_mode or contention_mode or mode == "engineering-n11-paired-observation"
     raw_mode = mode == "n11-raw-observation"
     fault_cost = mode in FAULT_COST_MODES
     game_failure = mode in GAME_FAILURE_MODES or fault_cost
@@ -171,7 +175,10 @@ def main():
             from scripts.research.n10.cost.game_thread_fault import peer_subprocess_proxy
             kind = "block" if mode == "engineering-game-controller-thread-block-cost" else "exit"
             cleanup.enter_context(patch("research.live_probe_control.peers.peer_supervisor.subprocess", peer_subprocess_proxy(kind)))
-        if pacing_mode:
+        if physical_recipe:
+            from research.physical_challenges.worker import peer_subprocess_proxy
+            cleanup.enter_context(patch("research.live_probe_control.peers.peer_supervisor.subprocess", peer_subprocess_proxy(physical_recipe)))
+        elif pacing_mode:
             from scripts.research.n11.native.pacing_fixture import peer_subprocess_proxy
             cleanup.enter_context(patch("research.live_probe_control.peers.peer_supervisor.subprocess",peer_subprocess_proxy(contrast=contrast_mode,calibration_index=capacity_index,confirmation=capacity_confirmation,condition=condition_name)))
         policy = Policy(24, 60, (5 if control_mode else 2) * 10**9, 3, 12 * 10**9, 10**9, 20, 100000000)
@@ -203,7 +210,15 @@ def main():
                         if slot is None or slot.owner is None or not slot.owner.last_observation:
                             return True
                         from scripts.research.n11.native.paired_observation import PairedObservation
-                        if pacing_mode:
+                        if physical_recipe:
+                            from research.physical_challenges.observer import ChallengeObservation
+                            from research.physical_challenges.trace import ChallengeEncodedPhaseTrace
+                            state["encoded_phase_trace"] = ChallengeEncodedPhaseTrace(emit)
+                            state["paired"] = ChallengeObservation(service, scene, bridge, local, capability,
+                                                                   state["encoded_phase_trace"].observe,
+                                                                   recipe=physical_recipe)
+                            cleanup.callback(state["paired"].stop_challenge)
+                        elif pacing_mode:
                             from scripts.research.n11.native.pacing_observation import PacingObservation, PacingContrastObservation, PacingCapacityObservation
                             if condition_match:
                                 Observer=condition_observer_class(resource_condition,timing=resource_timing)

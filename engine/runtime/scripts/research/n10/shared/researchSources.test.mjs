@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
-import { researchSourceFiles, nativeResearchMounts } from "./researchSources.mjs";
+import { researchSourceFiles, nativeResearchMounts, nativeSoftwareIdentity } from "./researchSources.mjs";
 
 test("custody inventory includes nested runtime and harness sources but excludes bytecode", async () => {
   const runtime = await fs.mkdtemp(path.join(os.tmpdir(), "research-sources-"));
@@ -46,4 +46,18 @@ test("every hashed Python source is covered by the current checkout mounts", asy
   }
   const driver = await fs.readFile(new URL("../browser/nativeBrowserAcceptance.mjs", import.meta.url), "utf8");
   assert.match(driver, /await nativeResearchMounts\(runtime\)/);
+});
+
+test("native software identity binds current helpers, compiled relay and raw browser modules", async () => {
+  const root=await fs.mkdtemp(path.join(os.tmpdir(),"native-identity-")),runtime=path.join(root,"engine/runtime");
+  try {
+    const inputs=["engine/runtime/research/unit.py","engine/runtime/scripts/research/n10/unit.mjs","engine/runtime/scripts/research/n11/unit.py","engine/runtime/dist/src/unit.js",...[
+      "telemetry/receiverObservation.ts","transport/webrtcEngineErrors.ts","transport/localIceQueue.ts"
+    ].map(name=>"apps/web/src/lib/webrtc/"+name)];
+    for(const name of inputs){await fs.mkdir(path.dirname(path.join(root,name)),{recursive:true});await fs.writeFile(path.join(root,name),"fixture");}
+    const original=await nativeSoftwareIdentity(runtime);assert.match(original,/^[a-f0-9]{64}$/);
+    await fs.writeFile(path.join(root,"README.md"),"unrelated");assert.equal(await nativeSoftwareIdentity(runtime),original);
+    await fs.writeFile(path.join(runtime,"scripts/research/n11/unit.py"),"changed");assert.notEqual(await nativeSoftwareIdentity(runtime),original);
+    const changed=await nativeSoftwareIdentity(runtime);await fs.writeFile(path.join(root,inputs.at(-1)),"browser changed");assert.notEqual(await nativeSoftwareIdentity(runtime),changed);
+  } finally {await fs.rm(root,{recursive:true,force:true});}
 });

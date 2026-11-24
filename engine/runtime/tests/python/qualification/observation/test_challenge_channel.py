@@ -5,7 +5,7 @@ import threading
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from research.live_probe_control.control.contracts import Generation
 from research.physical_challenges.channel import STATE, ChallengeFileService, OwnedDirectory
@@ -87,6 +87,16 @@ class ChannelTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             handle.send("start")
         self.assertFalse(list(Path(handle.directory.path).glob("*command*")))
+
+    def test_released_directory_cannot_fall_back_to_the_working_directory(self):
+        _, anchor = self.make()
+        anchor.close()
+        with patch(
+            "os.open", side_effect=AssertionError("closed directory attempted OS I/O")
+        ) as opened:
+            with self.assertRaises(ValueError):
+                anchor.write("n11-challenge-command-01.json", b"{}")
+            opened.assert_not_called()
 
     def test_ack_byte_hash_cannot_be_replaced_with_other_request(self):
         handle, anchor = self.make()

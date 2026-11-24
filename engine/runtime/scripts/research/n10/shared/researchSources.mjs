@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 const RESEARCH_DIRECTORIES = Object.freeze(["research", "scripts/research/n10", "scripts/research/n11"]);
 
@@ -10,6 +11,20 @@ export async function nativeResearchMounts(runtime) {
   }
   const names = [...RESEARCH_DIRECTORIES, ...(await fs.readdir(runtime)).filter(name => name.endsWith(".py"))];
   return names.map(name => [name, "/opt/repo/engine/runtime/" + name]);
+}
+
+export async function nativeSoftwareIdentity(runtime) {
+  const hash = createHash("sha256");
+  for (const relative of await researchSourceFiles(runtime)) {
+    hash.update(JSON.stringify([relative, createHash("sha256").update(await fs.readFile(path.join(runtime, relative))).digest("hex")]));
+  }
+  for (const relative of (await fs.readdir(path.join(runtime, "dist/src"), {recursive:true})).filter(name => name.endsWith(".js")).sort()) {
+    hash.update(JSON.stringify(["dist/src/" + relative, createHash("sha256").update(await fs.readFile(path.join(runtime, "dist/src", relative))).digest("hex")]));
+  }
+  for (const relative of ["telemetry/receiverObservation.ts", "transport/webrtcEngineErrors.ts", "transport/localIceQueue.ts"]) {
+    hash.update(await fs.readFile(path.resolve(runtime, "../../apps/web/src/lib/webrtc", relative)));
+  }
+  return hash.digest("hex");
 }
 
 // A layout change must not silently omit nested runtime sources from custody hashes.

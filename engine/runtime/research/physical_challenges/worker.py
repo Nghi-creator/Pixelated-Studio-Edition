@@ -32,6 +32,8 @@ def close_challenge_media(media, original_close):
             try:
                 closed = original_close(media)
             finally:
+                if hasattr(media, "_challenge_service"):
+                    media._challenge_service.close()
                 if hasattr(media, "_challenge_directory"):
                     media._challenge_directory.close()
     finally:
@@ -115,7 +117,9 @@ def child_main(recipe):
             owns=owns,
         )
         media._challenge_endpoint = ChallengeEndpoint(lifecycle, recipe, secrets.token_hex(32))
-        media._challenge_service = ChallengeFileService(media._challenge_endpoint, directory)
+        media._challenge_service = ChallengeFileService(
+            media._challenge_endpoint, directory, asynchronous=True
+        )
 
     def poll(media):
         original_poll(media)
