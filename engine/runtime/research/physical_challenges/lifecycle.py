@@ -225,6 +225,39 @@ class ChallengeLifecycle:
             except BaseException as error:
                 self._fail(error)
 
+    def reference_witness(self):
+        """Fresh owned absence before activation or after verified cleanup."""
+        with self.lock:
+            try:
+                start = self._now()
+                self._owner()
+                if self.state not in ("fresh", "closed") or self.failed or self.expired:
+                    raise ValueError(ERROR)
+                delay = self.element.get_property("sleep-time")
+                pressure = self._pressure_state()
+                post = self.element.get_property("sleep-time")
+                self._owner()
+                if (
+                    type(delay) is not int
+                    or type(post) is not int
+                    or delay != 0
+                    or post != 0
+                    or pressure["active_workers"]
+                ):
+                    raise ValueError(ERROR)
+                return dict(
+                    method=METHOD,
+                    generation=deepcopy(self.generation),
+                    read_start_ns=start,
+                    read_end_ns=self._now(),
+                    delay_us=0,
+                    pressure=pressure,
+                    clock="worker_monotonic_ns",
+                    live_authority=False,
+                )
+            except BaseException as error:
+                self._fail(error)
+
     def begin_phase(self, phase):
         with self.lock:
             try:
@@ -248,7 +281,9 @@ class ChallengeLifecycle:
                 if phase == "relief" and now - self._dispatch_at > 1_750_000_000:
                     raise ValueError(ERROR)
                 self._phase, self._phase_at = phase, now
-                self._events.append(dict(kind="phase_start", phase=phase, witness=witness))
+                self._events.append(
+                    dict(kind="phase_start", phase=phase, at_ns=now, witness=witness)
+                )
                 return deepcopy(witness)
             except BaseException as error:
                 self._fail(error)
@@ -260,7 +295,14 @@ class ChallengeLifecycle:
                 if self._phase is None or self._now() <= self._phase_at:
                     raise ValueError(ERROR)
                 witness = self._witness()
-                self._events.append(dict(kind="phase_end", phase=self._phase, witness=witness))
+                self._events.append(
+                    dict(
+                        kind="phase_end",
+                        phase=self._phase,
+                        at_ns=self._checkpoint(),
+                        witness=witness,
+                    )
+                )
                 self._phase = self._phase_at = None
                 self._next_phase += 1
                 return deepcopy(witness)
@@ -342,6 +384,8 @@ class ChallengeLifecycle:
                     interrupt = error
             try:
                 end = self._now()
+                if self.deadline_ns is not None and end >= self.deadline_ns:
+                    self.expired = self.failed = True
             except Exception:
                 self.failed = True
             ok = delay_ok and pressure_ok

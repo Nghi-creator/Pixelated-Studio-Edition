@@ -58,11 +58,49 @@ bounded peer transport and real native timing still require qualification.
 Synthetic regressions establish these software branches, not media continuity,
 actual resource dose, native deadline success or scientific labels.
 
-## Required implementation
+## Implemented peer path and phase observer
 
-Integrate these primitives into a separately named peer/native mode and source
-declaration, joint-condition observer and strict source receipts. Persist
-old/new state brackets and fresh readback; establish each new
+`research.physical_challenges.worker.peer_subprocess_proxy(recipe)` selects an
+explicit fixture-only peer wrapper. It accepts only the exact dedicated worker
+command and the six closed recipe/control names. Ordinary peer wire schemas and
+all old fixed-condition selectors remain unchanged. The wrapper pins the private
+engineering directory, isolated-game capture and actual identity element, and
+always attempts condition and media teardown after failure.
+
+`peer.ChallengeEndpoint` consumes sequential commands before executing them, so
+a failed command is never executed again. Requests are canonical JSON bounded to
+4 KiB; acknowledgments are bounded to 256 KiB and bind the exact request bytes.
+Generation, recipe, channel nonce and sequence must agree. There are at most 32
+commands; a completed normal sequence contains ten. No arbitrary property setter
+or pressure dose is exposed. `channel.OwnedDirectory` pins directory identity,
+ownership and private permissions; it uses descriptor-relative bounded reads,
+no-follow opens and atomic publication without replacing command/ack files.
+
+`handle.ChallengeHandle` pins the current slot/token and generation, retains raw
+request/ack strings and controller-side brackets, and never compares controller
+timestamps with worker timestamps. Fresh post-cleanup snapshots recheck owned
+absence; a stopped condition is not evidence that the media worker has stopped.
+
+`observer.ChallengeObservation` retains healthy/post references, phase witnesses
+and independent cgroup CPU reads. It delegates the original paired cadence/media
+checks. Condition transition and establishment finish before cadence readiness;
+the real cadence dispatch remains in the original local controller. Source
+cleanup and the complete command prefix are retained during checkpoint failures.
+It does not export a stable N2 pair for a changing condition.
+
+The core's `inspect_challenge_transcript` checks serialized lifecycle consistency,
+including phase timing and cleanup. It always leaves raw-media/dose verification
+and N2 admission false. Synthetic private-file round trips and tamper checks are
+software evidence only.
+
+## Remaining acquisition integration
+
+The main native/browser acceptance driver does not yet select a challenge mode.
+Add its explicit selector/source declaration and source-bound raw export without
+relabeling a challenge as a fixed condition or stable pair. Complete source
+inspection must link the raw media, command transcript, CPU/encoded reads,
+receiver delivery and cleanup before any physical source can be qualified.
+Persist old/new state brackets and fresh readback; establish each new
 condition for one second before its measurement. Pressure stop must prove reaping;
 delay stop must prove the zero postimage. Retain healthy and post references,
 media/receiver delivery checks, CPU and encoded read brackets, and complete

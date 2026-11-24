@@ -1,0 +1,81 @@
+"""Observer ordering/clock seams without native media, collection or label acceptance."""
+
+import unittest
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
+
+from research.live_probe_control.control.contracts import Generation
+from research.physical_challenges.observer import ChallengeObservation, _DispatchBoundary
+from scripts.research.n11.native.paired_observation import PairedObservation
+
+
+class ObserverTests(unittest.TestCase):
+    def make(self):
+        def base(o):
+            o.local = Mock()
+            o.origin = 1000
+            o.now = Mock(return_value=2000)
+            o.emit = Mock()
+
+        with patch.object(PairedObservation, "__init__", base):
+            o = ChallengeObservation(recipe="delay_to_pressure", sampler_factory=Mock())
+        o.pacer = Mock()
+        o.pacer.send.return_value = {"status": "completed"}
+        return o
+
+    def test_degraded_transition_and_establishment_precede_actual_cadence_dispatch(self):
+        o = self.make()
+        order = []
+        o.pacer.send.side_effect = lambda op: order.append(op) or {"status": "completed"}
+        o.pacer.wait_established.side_effect = lambda: order.append("established")
+        real = Mock()
+        real.dispatch.side_effect = lambda *a, **k: order.append("real_dispatch")
+        o.local = _DispatchBoundary(real, o)
+        o.phase_boundary("after_end", "degraded")
+        o.local.dispatch("capability", "draft")
+        self.assertEqual(
+            order,
+            ["end_degraded", "prepare_relief", "established", "dispatch_relief", "real_dispatch"],
+        )
+        real.dispatch.assert_called_once_with("capability", "draft")
+
+    def test_failed_establishment_never_dispatches_cadence(self):
+        o = self.make()
+        o.pacer.wait_established.side_effect = ValueError("not ready")
+        with self.assertRaises(ValueError):
+            o.phase_boundary("after_end", "degraded")
+        self.assertNotIn("dispatch_relief", [c.args[0] for c in o.pacer.send.call_args_list])
+
+    def test_independent_cpu_sampler_is_lazy_and_keeps_controller_clock(self):
+        o = self.make()
+        o.sampler_factory.assert_not_called()
+        sampler = Mock()
+        sampler.sample.return_value = {"cpu": "sample"}
+        o.sampler_factory.return_value = sampler
+        slot = SimpleNamespace(
+            owner=SimpleNamespace(generation=Generation("owner", "pipeline", "peer"))
+        )
+        result = o.native_read_evidence(slot, dict(read_start_ns=1, read_end_ns=2))
+        self.assertEqual(result["container_cpu_read"], {"cpu": "sample"})
+        self.assertEqual(o.sampler_factory.call_args.kwargs["clock"](), 1000)
+        self.assertNotEqual(
+            o.sampler_factory.call_args.kwargs["clock_id"], result["native_read"]["clock_id"]
+        )
+        slot.owner.generation = Generation("owner", "replacement", "peer")
+        with self.assertRaises(ValueError):
+            o.native_read_evidence(slot, dict(read_start_ns=3, read_end_ns=4))
+
+    def test_checkpoint_retains_failed_transcript_before_parent_checkpoint(self):
+        o = self.make()
+        o.pacer.send.side_effect = ValueError("cleanup unconfirmed")
+        with patch.object(PairedObservation, "checkpoint") as parent:
+            with self.assertRaises(ValueError):
+                o.checkpoint()
+            parent.assert_called_once()
+        self.assertIn(
+            "n11_challenge_command_transcript", [c.args[0] for c in o.emit.call_args_list]
+        )
+
+
+if __name__ == "__main__":
+    unittest.main()

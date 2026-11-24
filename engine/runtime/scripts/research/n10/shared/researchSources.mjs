@@ -1,10 +1,21 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
+const RESEARCH_DIRECTORIES = Object.freeze(["research", "scripts/research/n10", "scripts/research/n11"]);
+
+// Hash and mount the same checkout directories; never fall back to cached image helpers.
+export async function nativeResearchMounts(runtime) {
+  for (const directory of RESEARCH_DIRECTORIES) {
+    if (!(await fs.stat(path.join(runtime, directory))).isDirectory()) throw Error("current research source directory required");
+  }
+  const names = [...RESEARCH_DIRECTORIES, ...(await fs.readdir(runtime)).filter(name => name.endsWith(".py"))];
+  return names.map(name => [name, "/opt/repo/engine/runtime/" + name]);
+}
+
 // A layout change must not silently omit nested runtime sources from custody hashes.
 export async function researchSourceFiles(runtime) {
   const files = (await fs.readdir(runtime)).filter((name) => name.endsWith(".py"));
-  for (const directory of ["research", "scripts/research/n10", "scripts/research/n11"]) {
+  for (const directory of RESEARCH_DIRECTORIES) {
     for (const name of await fs.readdir(path.join(runtime, directory), { recursive: true }).catch(error => { if (error.code === "ENOENT" && directory === "scripts/research/n11") return []; throw error; })) {
       if (/\.(py|mjs|cjs)$/.test(name)) files.push(`${directory}/${name.split(path.sep).join("/")}`);
     }

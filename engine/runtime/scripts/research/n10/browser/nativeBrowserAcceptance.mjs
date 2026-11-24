@@ -1,6 +1,6 @@
 import {RESOURCE_METHOD,RESOURCE_ROLE} from '../../n11/protocols/resourceProtocol.mjs';
 import { stageRawObservationAssets } from "../../n11/browser/rawObservationAssets.mjs";
-import { researchSourceFiles } from "../shared/researchSources.mjs";
+import { researchSourceFiles, nativeResearchMounts } from "../shared/researchSources.mjs";
 /** Opt-in real browser -> authenticated relay -> actual Python camera/native owner acceptance. */
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
@@ -135,8 +135,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if(resourceTimingDiagnostics)args.push('--env','N11_RESOURCE_TIMING_DIAGNOSTICS=1');
     for (const [source, target] of [
       ["dist", "/app/engine/runtime/dist"], ["scripts/research/n10", "/app/engine/runtime/scripts/research/n10"],
-      ...["research", "scripts/research/n10", ...(await fs.readdir(runtime)).filter((name) => name.endsWith(".py"))]
-        .map((name) => [name, "/opt/repo/engine/runtime/" + name]),
+      ...await nativeResearchMounts(runtime),
     ]) args.push("--mount", `type=bind,src=${path.join(runtime, source)},dst=${target},readonly`);
     args.push("--entrypoint", "timeout", image, "42s", "node", "/app/engine/runtime/scripts/research/n10/browser/nativeBrowserRelay.cjs");
     child = spawn(docker, args, { stdio: ["ignore", "pipe", "pipe"] });

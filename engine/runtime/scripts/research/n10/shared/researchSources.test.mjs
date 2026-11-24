@@ -3,7 +3,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { researchSourceFiles } from "./researchSources.mjs";
+import { fileURLToPath } from "node:url";
+import { researchSourceFiles, nativeResearchMounts } from "./researchSources.mjs";
 
 test("custody inventory includes nested runtime and harness sources but excludes bytecode", async () => {
   const runtime = await fs.mkdtemp(path.join(os.tmpdir(), "research-sources-"));
@@ -32,4 +33,17 @@ test("frozen game-browser source bindings resolve to unique current files", asyn
     assert.match(name, /^(?:private_journal\.py|live_probe_control\/[a-z_]+\.py|scripts\/n10\/[A-Za-z]+\.mjs)$/);
     assert.ok((await fs.stat(new URL(relative, runtime))).isFile(), relative);
   }
+});
+
+test("every hashed Python source is covered by the current checkout mounts", async () => {
+  const runtime = fileURLToPath(new URL("../../../../", import.meta.url));
+  const mounts = await nativeResearchMounts(runtime);
+  assert.ok(mounts.some(([source, target]) => source === "scripts/research/n11" &&
+    target === "/opt/repo/engine/runtime/scripts/research/n11"));
+  assert.equal(new Set(mounts.map(([, target]) => target)).size, mounts.length);
+  for (const relative of (await researchSourceFiles(runtime)).filter(name => name.endsWith(".py"))) {
+    assert.ok(mounts.some(([source]) => relative === source || relative.startsWith(source + "/")), relative);
+  }
+  const driver = await fs.readFile(new URL("../browser/nativeBrowserAcceptance.mjs", import.meta.url), "utf8");
+  assert.match(driver, /await nativeResearchMounts\(runtime\)/);
 });

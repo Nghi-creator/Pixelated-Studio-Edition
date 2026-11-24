@@ -42,6 +42,11 @@ current files in its isolated worker dependency closure. Those identifiers are
 wire bindings, not filesystem paths. Reorganizing files changes the source
 context and does not requalify historical evidence.
 
+The native browser driver uses the same directory list for source hashing and
+checkout mounts: `research/`, `scripts/research/n10/` and `scripts/research/n11/`,
+plus root Python modules. Current N11 helpers are therefore included explicitly
+in its Python source mounts. This source change requires fresh qualification.
+
 The [resource observation contract](../../../docs/research/n11/resource-observation.md)
 describes its separate controller clock, bounded reads and pending launcher/
 inspection integration. It does not enable a fixture acquisition.

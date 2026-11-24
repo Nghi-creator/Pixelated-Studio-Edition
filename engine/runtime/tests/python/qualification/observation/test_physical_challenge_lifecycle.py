@@ -48,10 +48,15 @@ class Pressure:
     def sample(self):
         if self.lost or self.closed:
             raise ValueError("pressure lost")
-        return dict(identities=["a", "b"], active_workers=2, cpu_ns=[10, 20], cgroup={})
+        return dict(
+            identities=["a" * 64, "b" * 64],
+            active_workers=2,
+            cpu_ns=[10, 20],
+            cgroup=dict(nr_periods=10, nr_throttled=1, throttled_usec=100),
+        )
 
     def identities(self):
-        return ["a", "b"] if self.records else []
+        return ["a" * 64, "b" * 64] if self.records else []
 
     def close(self):
         self.close_calls += 1
@@ -367,6 +372,33 @@ class LifecycleTests(unittest.TestCase):
         self.assertFalse(c.close())
         self.assertTrue(self.pressure.closed)
         self.assertFalse(self.timers[0].cancelled)
+
+    def test_restored_resources_after_deadline_still_make_source_expired(self):
+        c = self.make()
+        c.start("mixed_delay_pressure")
+        self.clock.advance(19)
+        original = self.pressure.close
+
+        def slow_close():
+            self.clock.advance(2)
+            return original()
+
+        self.pressure.close = slow_close
+        self.assertTrue(c.close())
+        self.assertTrue(c.failed)
+        self.assertTrue(c.expired)
+        self.assertEqual(self.value, 0)
+
+    def test_fresh_post_reference_detects_new_foreign_setting_without_clearing_it(self):
+        c = self.make()
+        c.start("mixed_delay_pressure")
+        self.assertTrue(c.close())
+        self.assertEqual(c.reference_witness()["pressure"]["active_workers"], 0)
+        self.value = 25000
+        self.writes.clear()
+        with self.assertRaises(ValueError):
+            c.reference_witness()
+        self.assertEqual(self.writes, [])
 
 
 if __name__ == "__main__":
