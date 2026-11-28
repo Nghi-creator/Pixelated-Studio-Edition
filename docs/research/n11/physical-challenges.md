@@ -176,8 +176,14 @@ false. Other fixed-condition collection branches retain their existing behavior.
 
 The core separately checks command ACK/phase/reference links and receiver
 browser/relay/bridge/owner/worker links against the original acquisition bytes.
-Those component checks still require joint custody/measurement/projection
-orchestration before native qualification or any study admission.
+The core's `experiments.n11.physical_challenges.qualify` now orchestrates these
+checks with custody and measurement/projection inspection. It invokes the
+read-only `qualification/replayPhysicalChallenge.mjs` against the same original
+acquisition and plan bytes. That entrypoint replays media-v2 and recomputes the
+complete current source receipt and native software identity before and after.
+The core separately verifies the frozen source copies and original file bytes.
+No cached media report is treated as proof. These software checks still require
+bounded native qualification before any study admission; they collect no case.
 
 The core's `inspect_challenge_raw_export` accepts the original acquisition, plan,
 raw export and exclusion bytes. It verifies these bindings and replays the full
