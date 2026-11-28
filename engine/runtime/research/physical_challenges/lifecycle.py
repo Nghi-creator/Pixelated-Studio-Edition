@@ -12,6 +12,8 @@ from contextlib import suppress
 from copy import deepcopy
 from types import MappingProxyType
 
+from .pressure_receipt import capture_pressure_start
+
 METHOD = "n11-physical-condition-lifecycle-v1"
 ERROR = "invalid_physical_challenge_lifecycle"
 SECOND = 1_000_000_000
@@ -172,8 +174,18 @@ class ChallengeLifecycle:
             if self.element.get_property("sleep-time") != delay:
                 raise ValueError(ERROR)
             self._expected_delay = delay
+        pressure_start = None
         if workers and not self._pressure.used:
-            self._pressure.start()
+            start = self._checkpoint()
+            result = self._pressure.start()
+            pressure_start = dict(
+                method="n11-physical-pressure-start-v1",
+                read_start_ns=start,
+                **capture_pressure_start(self._pressure, result),
+                read_end_ns=self._checkpoint(),
+                clock="worker_monotonic_ns",
+                live_authority=False,
+            )
         after = self._witness()
         if after["pressure"]["active_workers"] != workers:
             raise ValueError(ERROR)
@@ -184,6 +196,7 @@ class ChallengeLifecycle:
                 before=before,
                 after=after,
                 established_not_before_ns=self._ready_at,
+                pressure_start=pressure_start,
             )
         )
 

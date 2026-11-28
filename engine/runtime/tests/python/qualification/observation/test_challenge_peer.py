@@ -13,6 +13,7 @@ class PeerTests(unittest.TestCase):
     def setUp(self):
         self.fixture = fixtures.LifecycleTests("test_closed_controller_cannot_be_restarted")
         self.controller = self.fixture.make()
+        self.addCleanup(self.fixture.doCleanups)
         self.peer = ChallengeEndpoint(self.controller, "mixed_delay_pressure", "a" * 64)
 
     def send(self, operation):

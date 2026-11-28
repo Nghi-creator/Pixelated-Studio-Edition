@@ -1,6 +1,10 @@
 """Synthetic worker-local lifecycle checks; no physical qualification or collection."""
 
+import hashlib
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 
 from research.physical_challenges.lifecycle import ChallengeLifecycle
@@ -33,36 +37,56 @@ class Pressure:
         self.used = self.closed = False
         self.children, self.handles, self.records = [], [], []
         self.started_at = None
+        self.directory = tempfile.TemporaryDirectory()
         self.close_calls = 0
         self.fail_start = self.fail_close = self.lost = False
 
     def start(self):
         self.used = True
         self.children = [SimpleNamespace(poll=lambda: 0 if self.closed else None) for _ in range(2)]
-        self.handles, self.records = [object(), object()], [{}, {}]
+        self.handles = [object(), object()]
+        self.records = [
+            dict(pid=i, boot="00000000-0000-0000-0000-000000000001", start=i + 10)
+            for i in (101, 102)
+        ]
         self.started_at = 0
         if self.fail_start:
             raise ValueError("partial pressure start")
-        return dict(workers=2)
+        raw = json.dumps(
+            dict(version="n11-private-pressure-v1", state="active", workers=self.records),
+            sort_keys=True,
+        ).encode()
+        Path(self.directory.name, "intent.json").write_bytes(raw)
+        return dict(
+            workers=2,
+            maximum_active_ns=20000000000,
+            child_failsafe_ns=40000000000,
+            identities=self.identities(),
+            intent_sha256=hashlib.sha256(raw).hexdigest(),
+            allocation_cores=2,
+        )
 
     def sample(self):
         if self.lost or self.closed:
             raise ValueError("pressure lost")
         return dict(
-            identities=["a" * 64, "b" * 64],
+            identities=self.identities(),
             active_workers=2,
             cpu_ns=[10, 20],
             cgroup=dict(nr_periods=10, nr_throttled=1, throttled_usec=100),
         )
 
     def identities(self):
-        return ["a" * 64, "b" * 64] if self.records else []
+        return [
+            hashlib.sha256(json.dumps(r, sort_keys=True).encode()).hexdigest() for r in self.records
+        ]
 
     def close(self):
         self.close_calls += 1
         if self.fail_close:
             return False
         self.closed = True
+        self.directory.cleanup()
         self.handles = [None for _ in self.handles]
         return True
 
@@ -70,6 +94,7 @@ class Pressure:
 class LifecycleTests(unittest.TestCase):
     def make(self):
         self.clock, self.pressure = Clock(), Pressure()
+        self.addCleanup(self.pressure.directory.cleanup)
         self.value, self.owned = 0, True
         self.generation = dict(owner="owner", pipeline="pipeline", peer="peer")
         self.timers, self.writes = [], []
@@ -128,6 +153,50 @@ class LifecycleTests(unittest.TestCase):
                 self.assertEqual(c.state, "closed")
                 self.assertFalse(c.failed)
                 self.assertTrue(c.events)
+
+    def test_pressure_start_retains_original_durable_intent_and_brackets(self):
+        c = self.make()
+        c.start("mixed_delay_pressure")
+        receipt = c.events[0]["pressure_start"]
+        self.assertEqual(receipt["method"], "n11-physical-pressure-start-v1")
+        self.assertEqual(receipt["read_start_ns"], 0)
+        self.assertEqual(receipt["read_end_ns"], 0)
+        self.assertEqual(receipt["start_result"]["identities"], self.pressure.identities())
+        self.assertEqual(
+            hashlib.sha256(receipt["intent_json"].encode()).hexdigest(),
+            receipt["start_result"]["intent_sha256"],
+        )
+        c.close()
+        self.assertEqual(
+            json.loads(c.events[0]["pressure_start"]["intent_json"])["state"], "active"
+        )
+
+    def test_missing_or_tampered_start_receipt_fails_closed(self):
+        for change in ("missing", "digest", "identity", "symlink"):
+            with self.subTest(change=change):
+                c = self.make()
+                original = self.pressure.start
+
+                def altered(original=original, change=change):
+                    result = original()
+                    path = Path(self.pressure.directory.name, "intent.json")
+                    if change == "missing":
+                        return None
+                    if change == "digest":
+                        result["intent_sha256"] = "0" * 64
+                    if change == "identity":
+                        result["identities"] = ["a" * 64, "b" * 64]
+                    if change == "symlink":
+                        path.rename(path.with_name("other.json"))
+                        path.symlink_to("other.json")
+                    return result
+
+                self.pressure.start = altered
+                with self.assertRaises(ValueError):
+                    c.start("mixed_delay_pressure")
+                self.assertTrue(c.failed)
+                self.assertTrue(self.pressure.closed)
+                self.assertEqual(self.value, 0)
 
     def test_transition_never_restarts_condition_watchdog(self):
         c = self.make()

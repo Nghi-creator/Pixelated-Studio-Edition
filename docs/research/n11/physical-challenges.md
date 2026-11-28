@@ -59,6 +59,17 @@ bounded peer transport and real native timing still require qualification.
 Synthetic regressions establish these software branches, not media continuity,
 actual resource dose, native deadline success or scientific labels.
 
+Each condition-application event now includes `pressure_start`. When starting
+pressure, `n11-physical-pressure-start-v1` retains the helper's original result
+and exact durable active-intent JSON between worker-clock brackets. The bounded,
+descriptor-relative no-follow read must match the helper's SHA-256 and current
+worker identities before any phase can start. Allocation and lifetime declarations
+remain two cores, 20 seconds and a 40-second child failsafe. A missing or altered
+receipt fails the lifecycle and attempts both cleanups. Other applications retain
+explicit `null`; transitions never restart pressure. The old fixed-condition
+helper and its exported contracts are unchanged. The consumer can require this
+evidence explicitly while continuing to replay old transcripts without it.
+
 ## Implemented peer path and phase observer
 
 `research.physical_challenges.worker.peer_subprocess_proxy(recipe)` selects an

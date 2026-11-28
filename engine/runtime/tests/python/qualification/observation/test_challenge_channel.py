@@ -19,6 +19,7 @@ class ChannelTests(unittest.TestCase):
     def make(self, recipe="mixed_delay_pressure"):
         self.fixture = fixtures.LifecycleTests("test_closed_controller_cannot_be_restarted")
         lifecycle = self.fixture.make()
+        self.addCleanup(self.fixture.doCleanups)
         directory = tempfile.TemporaryDirectory()
         self.addCleanup(directory.cleanup)
         anchor = OwnedDirectory(directory.name)
