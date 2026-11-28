@@ -1,4 +1,5 @@
 /** Raw phase and cadence consistency, separate from condition/source qualification. */
+import {inspectChallengePhaseCustody} from '../browser/challengePhaseCustody.mjs';
 import {createHash} from 'node:crypto';
 import {PHYSICAL_METHOD, PHYSICAL_ROLE, physicalChallengeSelection} from '../protocols/physicalChallengeProtocol.mjs';
 import {inspectPairedAcquisition} from './pairedObservationReceipt.mjs';
@@ -15,6 +16,8 @@ export function inspectPhysicalChallengeMedia(acquisitionBytes, acquisitionId) {
   const control=inspectPairedAcquisition(run,{method:PHYSICAL_METHOD,role:PHYSICAL_ROLE});
   const phases=run.paired_observation.phases.map(raw=>{
     const report=inspectRawPhaseMedia(raw,acquisitionId);
+    const start=run.events.find(e=>e.kind==='n11_pair_phase_started'&&e.phase===raw.phase);
+    const custody=inspectChallengePhaseCustody(run.events,start,raw,acquisitionId);
     const bounds=control.phase_native_bounds.find(row=>row.phase===raw.phase);
     if(bounds.end_ns-bounds.start_ns<3.2e9||bounds.end_ns-bounds.start_ns>4.5e9)
       throw Error('challenge whole-phase duration unavailable');
@@ -40,11 +43,11 @@ export function inspectPhysicalChallengeMedia(acquisitionBytes, acquisitionId) {
     }
     if(raw.engine_snapshots.at(-1).encoder.framesOutTotal<=raw.engine_snapshots[0].encoder.framesOutTotal)
       throw Error('encoder media did not advance');
-    return {...report,controller_bounds:bounds};
+    return {...report,controller_bounds:bounds,browser_custody:custody};
   });
-  return {method:'n11-physical-challenge-media-inspection-v1',
+  return {method:'n11-physical-challenge-media-inspection-v2',
     acquisition_sha256:sha(acquisitionBytes),recipe,acquisition_id:acquisitionId,
-    phase_media_consistent:true,cadence_restoration:control.restoration,phases,
+    phase_media_consistent:true,phase_causal_containment_verified:true,cadence_restoration:control.restoration,phases,
     scope:'declared_raw_media_and_cadence_consistency_requires_separate_source_links',
     phase_clock_alignment_verified:false,receiver_delivery_verified:false,
     source_media_verified:false,resource_dose_verified:false,n2_pair_admitted:false,

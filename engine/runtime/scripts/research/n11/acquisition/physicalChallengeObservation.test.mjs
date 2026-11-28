@@ -14,7 +14,7 @@ async function fixture(t){
  const planFile=path.join(dir,"plan.json");
  const args=["--image","sha256:"+"d".repeat(64),"--acquisition-id","n11-raw-unit-physical","--core-revision","e".repeat(40),"--recipe","delay_to_pressure","--exclusions",exclusions,"--output",planFile];
  const plan=await preparePhysicalChallengePlan(args,deps);
- const acquisition=mediaFixture(plan.recipe);
+ const acquisition=mediaFixture(plan.recipe,plan.acquisition_id);
  acquisition.context={image:plan.image,software_hash:plan.native_software_hash};
  for(const phase of acquisition.paired_observation.phases)phase.comparison_case_id=plan.acquisition_id;
  acquisition.events.push({kind:"n11_challenge_command_transcript",live_authority:false,transcript:{recipe:plan.recipe,records:Array.from({length:10},(_,sequence)=>({synthetic_sequence:sequence}))}});

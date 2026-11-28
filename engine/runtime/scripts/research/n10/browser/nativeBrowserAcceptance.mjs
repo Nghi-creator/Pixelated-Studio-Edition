@@ -1,3 +1,4 @@
+import {collectChallengePhase} from "../../n11/browser/challengePhaseCustody.mjs";
 import {physicalChallengeSelection, PHYSICAL_METHOD, PHYSICAL_ROLE} from "../../n11/protocols/physicalChallengeProtocol.mjs";
 import {RESOURCE_METHOD,RESOURCE_ROLE} from '../../n11/protocols/resourceProtocol.mjs';
 import { stageRawObservationAssets } from "../../n11/browser/rawObservationAssets.mjs";
@@ -207,10 +208,17 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
             const completed=pairedObservation?.phases?.length||0;
             const phase=events.filter(e=>e.kind==='n11_pair_phase_started')[completed];
             if(phase){
-              const raw=await first.evaluate(phase=>globalThis.collectPairedPhase(phase),phase.phase);
-              pairedObservation=await first.evaluate(()=>globalThis.pairedObservationPrefix);
-              if(raw.failure)throw Error('whole paired browser collection failed');
-              await publishCompletionMarker(directory,'n11-phase-'+phase.phase+'.json');
+              if(physicalRecipe){
+                pairedObservation=await collectChallengePhase(first,phase,{
+                  acquisitionId:options.comparisonCaseId,
+                  publish:marker=>publishCompletionMarker(directory,marker),record:event=>events.push(event),
+                });
+              }else{
+                const raw=await first.evaluate(phase=>globalThis.collectPairedPhase(phase),phase.phase);
+                pairedObservation=await first.evaluate(()=>globalThis.pairedObservationPrefix);
+                if(raw.failure)throw Error('whole paired browser collection failed');
+                await publishCompletionMarker(directory,'n11-phase-'+phase.phase+'.json');
+              }
             }
           }
           if (rawMode && !rawObservation && events.some(event => event.kind === "n11_raw_ready")) {

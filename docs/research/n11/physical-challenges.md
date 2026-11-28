@@ -165,6 +165,20 @@ the failure receipt. This report verifies declared component consistency only:
 browser/controller phase alignment, receiver-delivery linkage and whole condition
 ownership are separate gates; source/media, dose, N2 and empirical flags stay false.
 
+The native challenge branch now uses `browser/challengePhaseCustody.mjs` to retain
+collection causality: hash the observed native phase-start event, collect the
+raw browser phase, match the retained prefix and publish the owned completion
+marker, then record a hash-bound receipt. Failed collection/prefix/marker steps
+cannot emit a success receipt. Host hrtime brackets stay in their own domain.
+The v2 media inspector requires one matching receipt per phase and reports
+`phase_causal_containment_verified`; `phase_clock_alignment_verified` remains
+false. Other fixed-condition collection branches retain their existing behavior.
+
+The core separately checks command ACK/phase/reference links and receiver
+browser/relay/bridge/owner/worker links against the original acquisition bytes.
+Those component checks still require joint custody/measurement/projection
+orchestration before native qualification or any study admission.
+
 The core's `inspect_challenge_raw_export` accepts the original acquisition, plan,
 raw export and exclusion bytes. It verifies these bindings and replays the full
 lifecycle transcript. It leaves media, resource-dose, N2 and empirical acceptance
