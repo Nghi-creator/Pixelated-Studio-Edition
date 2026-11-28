@@ -128,7 +128,7 @@ export async function runNativeBrowserAcceptance(image, mode = "production-admis
     if(encodedEventDiagnostics)args.push('--env','N11_ENCODED_EVENT_DIAGNOSTICS=1');
     if(resourceTimingDiagnostics)args.push('--env','N11_RESOURCE_TIMING_DIAGNOSTICS=1');
     for (const [source, target] of [
-      ["dist", "/app/engine/runtime/dist"], ["scripts/research/n10", "/app/engine/runtime/scripts/research/n10"],
+      ["dist", "/app/engine/runtime/dist"],
       ...await nativeResearchMounts(runtime),
     ]) args.push("--mount", `type=bind,src=${path.join(runtime, source)},dst=${target},readonly`);
     args.push("--entrypoint", "timeout", image, "42s", "node", "/app/engine/runtime/scripts/research/n10/browser/nativeBrowserRelay.cjs");

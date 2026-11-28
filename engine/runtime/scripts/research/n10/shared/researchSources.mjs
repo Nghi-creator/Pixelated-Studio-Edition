@@ -10,7 +10,11 @@ export async function nativeResearchMounts(runtime) {
     if (!(await fs.stat(path.join(runtime, directory))).isDirectory()) throw Error("current research source directory required");
   }
   const names = [...RESEARCH_DIRECTORIES, ...(await fs.readdir(runtime)).filter(name => name.endsWith(".py"))];
-  return names.map(name => [name, "/opt/repo/engine/runtime/" + name]);
+  return [
+    ...names.map(name => [name, "/opt/repo/engine/runtime/" + name]),
+    ...RESEARCH_DIRECTORIES.filter(name => name.startsWith("scripts/")).map(name =>
+      [name, "/app/engine/runtime/" + name]),
+  ];
 }
 
 export async function nativeSoftwareIdentity(runtime) {

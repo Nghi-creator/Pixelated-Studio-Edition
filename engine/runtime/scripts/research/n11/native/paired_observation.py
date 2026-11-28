@@ -51,6 +51,26 @@ class PairedObservation(GameControlDisturbance):
     def phase_boundary(self, kind, phase):
         """Optional slow-path observer seam; default mode performs no extra work."""
 
+    def finish_phase_boundary(self, slots):
+        # Only an explicit False defers an opt-in boundary. Existing hooks return
+        # None and retain the same-tick transition and all original deadlines.
+        if self.phase_boundary("after_end", self.phase) is False:
+            return False
+        if self.phase == "degraded":
+            draft = self.local.prepare(self.capability, self.scopes["first"], "n11-paired-request", 24, DURATION_NS)
+            self.dispatched_at = self.now()
+            self.operation = self.local.dispatch(self.capability, draft)
+            self.target_sequence = slots["first"].owner.last_observation[2]
+            self.emit("n11_pair_dispatched", request=asdict(draft.request), at_ns=self.dispatched_at-self.origin,
+                      live_authority=False)
+            self.phase, self.stage, self.stage_start = "relief", "target", self.dispatched_at
+        elif self.phase == "relief":
+            self.stage = "result"
+        else:
+            self.stage = "done"
+            return True
+        return False
+
     def native_read_evidence(self, slot, observation):
         """Optional engineering metadata; default modes preserve original events."""
         return {}
@@ -89,6 +109,10 @@ class PairedObservation(GameControlDisturbance):
                 self.start_prime(now)
             elif now-self.stage_start > 1500000000:
                 raise ValueError("fresh paired target deadline")
+        elif self.stage == "boundary":
+            if not self.target_ready(slots, TARGETS[self.phase]):
+                raise ValueError("paired native target changed")
+            return self.finish_phase_boundary(slots)
         elif self.stage in ("prime", "settle", "measure"):
             if not self.target_ready(slots, TARGETS[self.phase]):
                 raise ValueError("paired native target changed")
@@ -98,7 +122,8 @@ class PairedObservation(GameControlDisturbance):
                 if self.marker("prime"):
                     self.stage = "settle"
             elif self.stage == "settle" and now-self.stage_start >= 500000000:
-                self.phase_boundary("before_start", self.phase)
+                if self.phase_boundary("before_start", self.phase) is False:
+                    return False
                 now = self.now()
                 if self.phase == "relief" and now-self.dispatched_at > 1750000000:
                     raise ValueError("paired relief start deadline after boundary observation")
@@ -124,20 +149,8 @@ class PairedObservation(GameControlDisturbance):
                         return False
                     self.emit("n11_pair_phase_completed", phase=self.phase, at_ns=now-self.origin,
                               action_elapsed_ns=now-self.dispatched_at if self.phase == "relief" else None)
-                    self.phase_boundary("after_end", self.phase)
-                    if self.phase == "degraded":
-                        draft = self.local.prepare(self.capability, self.scopes["first"], "n11-paired-request", 24, DURATION_NS)
-                        self.dispatched_at = self.now()
-                        self.operation = self.local.dispatch(self.capability, draft)
-                        self.target_sequence = slots["first"].owner.last_observation[2]
-                        self.emit("n11_pair_dispatched", request=asdict(draft.request), at_ns=self.dispatched_at-self.origin,
-                                  live_authority=False)
-                        self.phase, self.stage, self.stage_start = "relief", "target", self.dispatched_at
-                    elif self.phase == "relief":
-                        self.stage = "result"
-                    else:
-                        self.stage = "done"
-                        return True
+                    self.stage = "boundary"
+                    return self.finish_phase_boundary(slots)
         elif self.stage == "result":
             if now-self.dispatched_at > DURATION_NS+GRACE_NS+10**9:
                 raise ValueError("paired result deadline")

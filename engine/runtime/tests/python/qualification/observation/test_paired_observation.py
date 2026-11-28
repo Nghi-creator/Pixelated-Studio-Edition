@@ -49,6 +49,38 @@ class PairedObservationTests(unittest.TestCase):
             self.assertEqual((p.phase, p.stage), ("relief", "target"))
             self.assertEqual(p.local.dispatch.call_count, 1)
 
+    def test_deferred_end_boundary_preserves_one_phase_end_and_never_dispatches_early(self):
+        with tempfile.TemporaryDirectory() as directory:
+            p = self.make(directory)
+            p.stage, p.phase, p.stage_start = "measure", "degraded", 0
+            self.time = 3200000000
+            p.phase_boundary = Mock(return_value=False)
+            self.marker(p, "phase")
+            self.assertFalse(p.tick())
+            self.assertEqual(p.stage, "boundary")
+            self.assertFalse(p.tick())
+            self.assertEqual(sum(c.args[0] == "n11_pair_phase_completed" for c in p.emit.call_args_list), 1)
+            p.local.dispatch.assert_not_called()
+            p.phase_boundary.return_value = True
+            self.assertFalse(p.tick())
+            p.local.dispatch.assert_called_once()
+            self.assertEqual((p.phase, p.stage), ("relief", "target"))
+
+    def test_deferred_before_boundary_does_not_emit_a_started_phase(self):
+        with tempfile.TemporaryDirectory() as directory:
+            p = self.make(directory)
+            p.tick()
+            self.marker(p, "prime")
+            p.tick()
+            self.time += 500000000
+            p.phase_boundary = Mock(return_value=False)
+            self.assertFalse(p.tick())
+            self.assertEqual(p.stage, "settle")
+            self.assertFalse(any(c.args[0] == "n11_pair_phase_started" for c in p.emit.call_args_list))
+            p.phase_boundary.return_value = True
+            p.tick()
+            self.assertEqual(p.stage, "measure")
+
     def test_action_boundary_fails_even_before_controller_result_is_done(self):
         with tempfile.TemporaryDirectory() as directory:
             p = self.make(directory)

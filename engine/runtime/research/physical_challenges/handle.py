@@ -72,30 +72,42 @@ class ChallengeHandle:
             raise ValueError(ERROR)
         return value
 
+    def _available_snapshot(self, fresh):
+        self.current()
+        try:
+            frame = decode(self.directory.read(STATE, MAX_ACK_BYTES), MAX_ACK_BYTES)
+        except FileNotFoundError:
+            return None
+        if (
+            type(frame) is not dict
+            or set(frame) != {"report_sequence", "snapshot"}
+            or type(frame["report_sequence"]) is not int
+        ):
+            raise ValueError(ERROR)
+        sequence = frame["report_sequence"]
+        if sequence < self.report_sequence or sequence < 1:
+            raise ValueError(ERROR)
+        if fresh and sequence == self.report_sequence:
+            return None
+        return sequence, self._snapshot(frame["snapshot"])
+
+    def poll_snapshot(self, *, fresh=True):
+        """Read once without sleeping; None lets the controller service receiver callbacks."""
+        available = self._available_snapshot(fresh)
+        if available is None:
+            return None
+        self.report_sequence, snapshot = available
+        return deepcopy(snapshot)
+
     def sample(self, *, fresh=False, timeout_ns=600_000_000):
         start = self.clock()
         while self.clock() - start <= timeout_ns:
-            self.current()
-            try:
-                frame = decode(self.directory.read(STATE, MAX_ACK_BYTES), MAX_ACK_BYTES)
-            except FileNotFoundError:
-                frame = None
-            if frame is not None:
-                if (
-                    type(frame) is not dict
-                    or set(frame) != {"report_sequence", "snapshot"}
-                    or type(frame["report_sequence"]) is not int
-                ):
+            available = self._available_snapshot(fresh)
+            if available is not None:
+                if self.clock() - start > timeout_ns:
                     raise ValueError(ERROR)
-                sequence = frame["report_sequence"]
-                if sequence < self.report_sequence or sequence < 1:
-                    raise ValueError(ERROR)
-                if not fresh or sequence > self.report_sequence:
-                    snapshot = self._snapshot(frame["snapshot"])
-                    if self.clock() - start > timeout_ns:
-                        raise ValueError(ERROR)
-                    self.report_sequence = sequence
-                    return deepcopy(snapshot)
+                self.report_sequence, snapshot = available
+                return deepcopy(snapshot)
             self.sleep(0.005)
         raise ValueError(ERROR)
 

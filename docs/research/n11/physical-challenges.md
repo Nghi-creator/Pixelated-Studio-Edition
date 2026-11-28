@@ -102,6 +102,17 @@ the real cadence dispatch remains in the original local controller. Source
 cleanup and the complete command prefix are retained during checkpoint failures.
 It does not export a stable N2 pair for a changing condition.
 
+Establishment and fresh reference reads use `ChallengeHandle.poll_snapshot`: one
+bounded private-file read per observer tick, returning pending when no new worker
+report exists. They do not sleep waiting for the worker's next publication on the
+GLib thread. Transition establishment also yields between ticks after issuing its
+end/prepare commands once. The paired observer accepts an explicit `False` from a
+phase boundary to defer advancement; existing hooks returning `None` keep their
+same-tick behavior. Phase completion is emitted once, and cadence dispatch waits
+for establishment. The receiver's 750 ms freshness limit and all original
+condition, action, phase and watchdog budgets remain unchanged. Synthetic replay
+and host GLib scheduling checks do not establish native timing success.
+
 The core's `inspect_challenge_transcript` checks serialized lifecycle consistency,
 including phase timing and cleanup. It always leaves raw-media/dose verification
 and N2 admission false. Synthetic private-file round trips and tamper checks are
@@ -147,6 +158,19 @@ different inventories. Both are recorded; the latter is computed by the same
 function during preparation and native capture and must match the actual result.
 Current N11 helper sources are in both custody hashes and native source mounts.
 This identifies recorded bytes, not independently authenticated execution.
+
+The host and relay share the exact challenge grammar in
+`protocols/physicalChallengeModes.cjs`. The relay uses one raw-mode gate for both
+the staged browser modules and the token-protected telemetry route. Every
+challenge/control variant must enable both; ordinary/unknown modes do not gain
+the private route. Relay handler regressions exercise these HTTP responses with
+in-memory process/network ports.
+
+Research script mounts cover both import roots: Python's
+`/opt/repo/engine/runtime` and the Node relay's `/app/engine/runtime`. In particular,
+relative N11 imports from the relay must read current checkout helpers under the
+Node root, rather than cached image copies. The shared mount builder supplies
+unique targets for both script trees; the compiled `dist` mount stays explicit.
 
 A case retains `plan.json`, `exclusions.json`, `sources/`, `acquisition.json`,
 `command-transcript.json`, `degraded.raw.json`, `relief.raw.json`,

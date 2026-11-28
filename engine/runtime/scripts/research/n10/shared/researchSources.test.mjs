@@ -61,3 +61,12 @@ test("native software identity binds current helpers, compiled relay and raw bro
     const changed=await nativeSoftwareIdentity(runtime);await fs.writeFile(path.join(root,inputs.at(-1)),"browser changed");assert.notEqual(await nativeSoftwareIdentity(runtime),changed);
   } finally {await fs.rm(root,{recursive:true,force:true});}
 });
+
+test("every hashed Node helper is covered at the relay's /app import root",async()=>{
+  const runtime=fileURLToPath(new URL('../../../../',import.meta.url));
+  const mounts=await nativeResearchMounts(runtime);
+  for(const relative of (await researchSourceFiles(runtime)).filter(n=>n.startsWith('scripts/')&&/\.(mjs|cjs)$/.test(n))){
+    assert.ok(mounts.some(([source,target])=>relative.startsWith(source+'/')&&target==='/app/engine/runtime/'+source),relative);
+  }
+  assert.equal(new Set(mounts.map(([,target])=>target)).size,mounts.length);
+});

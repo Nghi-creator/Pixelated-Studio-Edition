@@ -28,7 +28,9 @@ class ObserverTests(unittest.TestCase):
         o = self.make()
         order = []
         o.pacer.send.side_effect = lambda op: order.append(op) or {"status": "completed"}
-        o.pacer.wait_established.side_effect = lambda: order.append("established")
+        o.pacer.poll_snapshot.side_effect = lambda **k: (
+            order.append("established") or {"observed_ns": 2, "ready_not_before_ns": 2}
+        )
         real = Mock()
         real.dispatch.side_effect = lambda *a, **k: order.append("real_dispatch")
         o.local = _DispatchBoundary(real, o)
@@ -42,10 +44,40 @@ class ObserverTests(unittest.TestCase):
 
     def test_failed_establishment_never_dispatches_cadence(self):
         o = self.make()
-        o.pacer.wait_established.side_effect = ValueError("not ready")
+        o.pacer.poll_snapshot.side_effect = ValueError("not ready")
         with self.assertRaises(ValueError):
             o.phase_boundary("after_end", "degraded")
         self.assertNotIn("dispatch_relief", [c.args[0] for c in o.pacer.send.call_args_list])
+
+    def test_establishment_yields_without_waiting_for_a_fresh_worker_report(self):
+        o = self.make()
+        o.challenge_stage = "establish"
+        o.pacer.sample.side_effect = AssertionError("blocking fresh sample must not run")
+        o.pacer.poll_snapshot.return_value = None
+        with patch.object(PairedObservation, "tick", return_value=False) as parent:
+            for _ in range(40):
+                self.assertFalse(o.tick())
+            parent.assert_not_called()
+            o.pacer.poll_snapshot.return_value = {"observed_ns": 2, "ready_not_before_ns": 2}
+            self.assertFalse(o.tick())
+            parent.assert_called_once()
+        o.pacer.sample.assert_not_called()
+
+    def test_transition_wait_yields_and_consumes_end_and_prepare_commands_once(self):
+        o = self.make()
+        o.pacer.wait_established.side_effect = AssertionError("no blocking establishment loop")
+        o.pacer.poll_snapshot.side_effect = [
+            None,
+            {"observed_ns": 1, "ready_not_before_ns": 2},
+            {"observed_ns": 2, "ready_not_before_ns": 2},
+        ]
+        self.assertFalse(o.phase_boundary("after_end", "degraded"))
+        self.assertFalse(o.phase_boundary("after_end", "degraded"))
+        self.assertTrue(o.phase_boundary("after_end", "degraded"))
+        self.assertEqual(
+            [c.args[0] for c in o.pacer.send.call_args_list], ["end_degraded", "prepare_relief"]
+        )
+        o.pacer.wait_established.assert_not_called()
 
     def test_independent_cpu_sampler_is_lazy_and_keeps_controller_clock(self):
         o = self.make()

@@ -50,6 +50,7 @@ class ChallengeObservation(PairedObservation):
         self.resource_sampler, self.resource_context = None, None
         self.cleanup_emitted = False
         self.handle_released = False
+        self._transition_waiting = False
         self._encoded_event_trace = True  # All challenge launch modes require event tracing.
 
     def _send(self, operation):
@@ -133,8 +134,10 @@ class ChallengeObservation(PairedObservation):
         body, _, sequence = slot.owner.last_observation
         if sequence == self.reference_sequence:
             return False
+        state = self.pacer.poll_snapshot(fresh=True)
+        if state is None:
+            return False
         self.reference_sequence = sequence
-        state = self.pacer.sample(fresh=True)
         if (
             state["witness"] is None
             or state["witness"]["delay_us"] != 0
@@ -175,10 +178,21 @@ class ChallengeObservation(PairedObservation):
     def phase_boundary(self, kind, phase):
         if kind not in ("before_start", "after_end"):
             raise ValueError("closed challenge boundary required")
-        self._send(("begin_" if kind == "before_start" else "end_") + phase)
-        if kind == "after_end" and phase == "degraded":
+        if kind == "before_start":
+            self._send("begin_" + phase)
+            return True
+        if phase != "degraded":
+            self._send("end_" + phase)
+            return True
+        if not self._transition_waiting:
+            self._send("end_degraded")
             self._send("prepare_relief")
-            self.pacer.wait_established()  # Complete before the real cadence action exists.
+            self._transition_waiting = True
+        state = self.pacer.poll_snapshot(fresh=True)
+        if state is None or state["observed_ns"] < state["ready_not_before_ns"]:
+            return False
+        self._transition_waiting = False
+        return True
 
     def stop_challenge(self):
         if self.handle_released:
@@ -221,8 +235,8 @@ class ChallengeObservation(PairedObservation):
             raise ValueError("challenge acquisition already complete")
         self.pacer.alive()
         if self.challenge_stage == "establish":
-            state = self.pacer.sample(fresh=True)
-            if state["observed_ns"] < state["ready_not_before_ns"]:
+            state = self.pacer.poll_snapshot(fresh=True)
+            if state is None or state["observed_ns"] < state["ready_not_before_ns"]:
                 return False
             self.challenge_stage = "pair"
         complete = super().tick()

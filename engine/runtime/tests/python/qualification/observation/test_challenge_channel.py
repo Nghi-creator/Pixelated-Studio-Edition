@@ -64,6 +64,16 @@ class ChannelTests(unittest.TestCase):
         transcript["records"].clear()
         self.assertEqual(len(handle.transcript["records"]), 10)
 
+    def test_poll_snapshot_never_sleeps_or_waits_for_the_next_report(self):
+        handle, _ = self.make()
+        handle.sleep = Mock(side_effect=AssertionError("main loop must not wait"))
+        before = self.fixture.clock.ns
+        self.assertIsNone(handle.poll_snapshot(fresh=True))
+        self.assertEqual(self.fixture.clock.ns, before)
+        self.service.publish()
+        self.assertIsNotNone(handle.poll_snapshot(fresh=True))
+        handle.sleep.assert_not_called()
+
     def test_closed_file_namespace_and_no_overwrite(self):
         _, anchor = self.make()
         with self.assertRaises(ValueError):
