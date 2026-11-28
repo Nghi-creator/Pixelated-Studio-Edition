@@ -6,6 +6,7 @@ from dataclasses import asdict
 from scripts.research.n11.native.pacing_observation import PacingContrastObservation
 from scripts.research.n11.native.paired_observation import PairedObservation
 
+from research.live_probe_control.peers.peer_protocol import encoded_read_value
 from research.resource_observation.cgroup_cpu import CgroupCpuSampler
 from research.resource_observation.contained_condition import ResourceConditionObservation
 
@@ -66,6 +67,27 @@ class ChallengeObservation(PairedObservation):
 
     def native_read_evidence(self, slot, observation):
         native = PacingContrastObservation.native_read_evidence(self, slot, observation)
+        phase = self.challenge_stage
+        if phase == "pair" and self.stage == "measure":
+            phase = self.phase
+        if phase not in ("healthy", "degraded", "relief", "recovery", "post"):
+            raise ValueError("challenge read outside measurement phase")
+        encoded = encoded_read_value(
+            observation.get("encoded_counter_read"),
+            outer_start=observation["read_start_ns"],
+            outer_end=observation["read_end_ns"],
+            counter=observation.get("encoded_buffers"),
+        )
+        if encoded is None:
+            raise ValueError("challenge encoded counter read unavailable")
+        native["encoded_counter_read"] = dict(
+            **encoded,
+            clock_id=native["native_read"]["clock_id"],
+            basis="worker_elapsed_monotonic_ns",
+            scope="reported_encoded_counter_only_not_other_snapshot_fields",
+            underlying_counter_freshness="not_authenticated_by_read_brackets",
+            live_authority=False,
+        )
         context = dict(
             method=METHOD,
             generation=asdict(slot.owner.generation),
@@ -88,7 +110,7 @@ class ChallengeObservation(PairedObservation):
             )
         if context != self.resource_context:
             raise ValueError("challenge resource generation changed")
-        return {**native, "container_cpu_read": self.resource_sampler.sample()}
+        return {**native, "container_cpu_read": {**self.resource_sampler.sample(), "phase": phase}}
 
     def reference(self, now):
         slots = self.slots(("first",))

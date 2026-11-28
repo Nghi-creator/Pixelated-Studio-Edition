@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 import {preparePhysicalChallengePlan,acquirePhysicalChallengePlan} from "./physicalChallengeObservation.mjs";
-import {PHYSICAL_METHOD,PHYSICAL_ROLE} from "../protocols/physicalChallengeProtocol.mjs";
+import {fixture as mediaFixture} from "../receipts/physicalChallengeMediaFixture.mjs";
 const json=v=>JSON.stringify(v,null,2)+"\n";
 async function fixture(t){
  const dir=await fs.mkdtemp(path.join(os.tmpdir(),"physical-raw-unit-"));t.after(()=>fs.rm(dir,{recursive:true,force:true}));
@@ -14,9 +14,10 @@ async function fixture(t){
  const planFile=path.join(dir,"plan.json");
  const args=["--image","sha256:"+"d".repeat(64),"--acquisition-id","n11-raw-unit-physical","--core-revision","e".repeat(40),"--recipe","delay_to_pressure","--exclusions",exclusions,"--output",planFile];
  const plan=await preparePhysicalChallengePlan(args,deps);
- const acquisition={status:"passed",mode:plan.mode,method:PHYSICAL_METHOD,role:PHYSICAL_ROLE,challenge_recipe:plan.recipe,live_authority:false,
-   context:{image:plan.image,software_hash:plan.native_software_hash},paired_observation:{phases:["degraded","relief","recovery"].map(phase=>({version:"n11-contained-raw-samples-v1",phase,comparison_case_id:plan.acquisition_id,failure:null,browser_samples:[{},{},{},{}],engine_snapshots:[]}))},
-   events:[{kind:"n11_challenge_command_transcript",live_authority:false,transcript:{recipe:plan.recipe,records:Array.from({length:10},(_,sequence)=>({synthetic_sequence:sequence}))}}]};
+ const acquisition=mediaFixture(plan.recipe);
+ acquisition.context={image:plan.image,software_hash:plan.native_software_hash};
+ for(const phase of acquisition.paired_observation.phases)phase.comparison_case_id=plan.acquisition_id;
+ acquisition.events.push({kind:"n11_challenge_command_transcript",live_authority:false,transcript:{recipe:plan.recipe,records:Array.from({length:10},(_,sequence)=>({synthetic_sequence:sequence}))}});
  return {dir,planFile,plan,deps,acquisition,args};
 }
 test("explicit plan keeps changing semantics, source identity and exclusions",async t=>{
@@ -52,4 +53,16 @@ test("a source change after acquisition leaves the capture retained with a failu
  const output=path.join(f.dir,"changed");await assert.rejects(acquirePhysicalChallengePlan(["--plan",f.planFile,"--output-directory",output],f.deps),/source changed during/);
  assert.equal(JSON.parse(await fs.readFile(path.join(output,"acquisition.json"))).status,"passed");
  assert.equal(JSON.parse(await fs.readFile(path.join(output,"failure.json"))).status,"failed");
+});
+
+test("failed media inspection retains original raw phases and closes the attempt",async t=>{
+ const f=await fixture(t);
+ f.acquisition.paired_observation.phases[0].browser_samples[0].connectionState="disconnected";
+ f.deps.acquire=async()=>f.acquisition;
+ const output=path.join(f.dir,"media-failed");
+ await assert.rejects(acquirePhysicalChallengePlan(["--plan",f.planFile,"--output-directory",output],f.deps),/browser evidence/);
+ assert.deepEqual(JSON.parse(await fs.readFile(path.join(output,"acquisition.json"))),f.acquisition);
+ assert.equal(JSON.parse(await fs.readFile(path.join(output,"failure.json"))).status,"failed");
+ assert.equal(JSON.parse(await fs.readFile(path.join(output,"degraded.raw.json"))).phase,"degraded");
+ await assert.rejects(fs.stat(path.join(output,"media-inspection.json")),{code:"ENOENT"});
 });

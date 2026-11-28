@@ -9,6 +9,7 @@ import {sourceReceipt,freezeSourceFiles} from "./rawObservation.mjs";
 import {nativeSoftwareIdentity} from "../../n10/shared/researchSources.mjs";
 import {runNativeBrowserAcceptance} from "../../n10/browser/nativeBrowserAcceptance.mjs";
 import {physicalChallengeMode} from "../protocols/physicalChallengeProtocol.mjs";
+import {inspectPhysicalChallengeMedia} from "../receipts/physicalChallengeMedia.mjs";
 import {createPhysicalChallengeRawExport} from "../export/physicalChallengeRawExport.mjs";
 const runtime=fileURLToPath(new URL("../../../../",import.meta.url));
 const json=value=>JSON.stringify(value,null,2)+"\n",sha=value=>"sha256:"+createHash("sha256").update(value).digest("hex");
@@ -62,6 +63,7 @@ export async function acquirePhysicalChallengePlan(args,dependencies={}){
    await write(path.join(directory,"raw-export.json"),exported);
    await fs.writeFile(path.join(directory,"command-transcript.json"),exported.transcript_json,{flag:"wx",mode:0o600});
    for(const phase of exported.phases)await fs.writeFile(path.join(directory,phase.phase+".raw.json"),phase.capture_json,{flag:"wx",mode:0o600});
+   await write(path.join(directory,"media-inspection.json"),inspectPhysicalChallengeMedia(acquisitionBytes,plan.acquisition_id));
    const after=await canonicalPlan(plan.image,plan.acquisition_id,plan.core_revision,plan.recipe,exclusions,dependencies);
    if(json(after)!==json(plan))throw Error("challenge source changed during acquisition");
    return directory;

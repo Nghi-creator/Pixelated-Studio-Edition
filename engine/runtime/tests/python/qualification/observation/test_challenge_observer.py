@@ -56,8 +56,21 @@ class ObserverTests(unittest.TestCase):
         slot = SimpleNamespace(
             owner=SimpleNamespace(generation=Generation("owner", "pipeline", "peer"))
         )
-        result = o.native_read_evidence(slot, dict(read_start_ns=1, read_end_ns=2))
-        self.assertEqual(result["container_cpu_read"], {"cpu": "sample"})
+        result = o.native_read_evidence(
+            slot,
+            dict(
+                read_start_ns=1,
+                read_end_ns=2,
+                encoded_buffers=10,
+                encoded_counter_read=dict(
+                    method="native-encoded-counter-read-brackets-v1",
+                    read_start_ns=1,
+                    read_end_ns=2,
+                    value=10,
+                ),
+            ),
+        )
+        self.assertEqual(result["container_cpu_read"], {"cpu": "sample", "phase": "healthy"})
         self.assertEqual(o.sampler_factory.call_args.kwargs["clock"](), 1000)
         self.assertNotEqual(
             o.sampler_factory.call_args.kwargs["clock_id"], result["native_read"]["clock_id"]
@@ -65,6 +78,42 @@ class ObserverTests(unittest.TestCase):
         slot.owner.generation = Generation("owner", "replacement", "peer")
         with self.assertRaises(ValueError):
             o.native_read_evidence(slot, dict(read_start_ns=3, read_end_ns=4))
+
+    def test_phase_tags_and_encoded_reads_are_preserved_or_rejected(self):
+        o = self.make()
+        o.sampler_factory.return_value.sample.return_value = {}
+        slot = SimpleNamespace(
+            owner=SimpleNamespace(generation=Generation("owner", "pipeline", "peer"))
+        )
+        body = dict(
+            read_start_ns=1,
+            read_end_ns=2,
+            encoded_buffers=10,
+            encoded_counter_read=dict(
+                method="native-encoded-counter-read-brackets-v1",
+                read_start_ns=1,
+                read_end_ns=2,
+                value=10,
+            ),
+        )
+        for phase in ("healthy", "degraded", "relief", "recovery", "post"):
+            o.challenge_stage = phase if phase in ("healthy", "post") else "pair"
+            o.stage, o.phase = "measure", phase
+            result = o.native_read_evidence(slot, body)
+            self.assertEqual(result["container_cpu_read"]["phase"], phase)
+            self.assertEqual(
+                result["encoded_counter_read"]["clock_id"], result["native_read"]["clock_id"]
+            )
+            self.assertEqual(result["encoded_counter_read"]["value"], 10)
+        for bad in (
+            {k: v for k, v in body.items() if k != "encoded_counter_read"},
+            {**body, "encoded_counter_read": {**body["encoded_counter_read"], "value": 11}},
+        ):
+            with self.assertRaises(ValueError):
+                o.native_read_evidence(slot, bad)
+        o.challenge_stage, o.stage = "pair", "prime"
+        with self.assertRaises(ValueError):
+            o.native_read_evidence(slot, body)
 
     def test_checkpoint_retains_failed_transcript_before_parent_checkpoint(self):
         o = self.make()

@@ -137,6 +137,10 @@ original encoded-trace reconstruction and unavailable reasons, adapting only the
 new healthy/post reference event names. References require actual CPU and native
 read spans, using the existing 3.2-second readiness rule, rather than controller
 elapsed time alone. All original action, observer, read and watchdog limits stay.
+Every CPU read retains its exact phase. Encoded-counter getter brackets are
+validated against the original outer read and counter value and forwarded with
+the generation-bound worker clock. Missing/inconsistent getter evidence fails
+before exporting a measurement sample; these fields are not inferred later.
 
 The broader `source_manifest_hash` and the driver's `native_software_hash` use
 different inventories. Both are recorded; the latter is computed by the same
@@ -151,6 +155,15 @@ original acquisition and have separate byte hashes. No `observation.json`,
 stable-phase declaration or N2 bundle is emitted. Changing conditions are not
 relabeled as stable paired evidence. A late source change can leave an internally
 consistent raw export while `failure.json` still makes the overall case failed.
+
+After saving the raw files, the collector invokes
+`receipts/physicalChallengeMedia.mjs` and writes `media-inspection.json` only when
+that check passes. This reuses paired cadence/restoration and raw phase setting
+checks, and checks browser connection/counter continuity, challenge phase timing,
+native allocation and encoder progression. Rejected media keeps the raw files and
+the failure receipt. This report verifies declared component consistency only:
+browser/controller phase alignment, receiver-delivery linkage and whole condition
+ownership are separate gates; source/media, dose, N2 and empirical flags stay false.
 
 The core's `inspect_challenge_raw_export` accepts the original acquisition, plan,
 raw export and exclusion bytes. It verifies these bindings and replays the full

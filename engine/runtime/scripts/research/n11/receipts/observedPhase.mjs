@@ -12,6 +12,19 @@ export function observedPhaseOptions(acquisition,plan) {
       raw.version!=='n11-contained-raw-samples-v1'||raw.failure!==null||
       raw.browser_samples?.length!==4||!Array.isArray(raw.engine_snapshots))
     throw Error('explicit fresh paired phase required');
+  inspectRawPhaseMedia(raw,plan.acquisition_id);
+  return {phase,sampleCount:4,runId:plan.acquisition_id+'-'+phase,
+    profile:{id:'balanced',fps:FPS[phase],bitrateKbps:1500}};
+}
+
+/** Raw within-phase media consistency only; no stable-pair or bundle declaration. */
+export function inspectRawPhaseMedia(raw, acquisitionId) {
+  const phase=raw?.phase;
+  if(typeof acquisitionId!=='string'||!/^n11-raw-[a-z0-9-]{1,40}$/.test(acquisitionId)||
+      !Object.hasOwn(FPS,phase)||raw.comparison_case_id!==acquisitionId||
+      raw.version!=='n11-contained-raw-samples-v1'||raw.failure!==null||
+      raw.browser_samples?.length!==4||!Array.isArray(raw.engine_snapshots))
+    throw Error('complete raw phase media required');
   const origin=Date.parse(raw.started_at),samples=raw.browser_samples;
   if(!Number.isFinite(origin))throw Error('invalid phase origin');
   let previous=-Infinity;
@@ -40,6 +53,5 @@ export function observedPhaseOptions(acquisition,plan) {
   }
   if(included.length<2||included.at(-1)-included[0]<1000)
     throw Error('insufficient native phase span');
-  return {phase,sampleCount:4,runId:plan.acquisition_id+'-'+phase,
-    profile:{id:'balanced',fps:FPS[phase],bitrateKbps:1500}};
+  return {phase,browser_samples:4,browser_duration_ms:last-first,native_samples_in_window:included.length};
 }
